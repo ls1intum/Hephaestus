@@ -81,12 +81,14 @@ class AchievementConcurrencyIntegrationTest extends BaseIntegrationTest {
         List<Throwable> escaped = runConcurrently(THREADS, i -> achievementService.checkAndUnlock(event));
 
         assertThat(escaped)
-            .as("the advisory lock must serialize same-user evaluation; nothing should escape")
-            .isEmpty();
+                .as("the advisory lock must serialize same-user evaluation; nothing should escape")
+                .isEmpty();
         assertThat(readProgress(user.getId(), LEGENDARY).current())
-            .as("all %d serialized increments must land (no lost updates)", THREADS)
-            .isEqualTo(THREADS);
-        assertThat(readUnlockedAt(user.getId(), LEGENDARY)).as("progress below target 50 stays locked").isNull();
+                .as("all %d serialized increments must land (no lost updates)", THREADS)
+                .isEqualTo(THREADS);
+        assertThat(readUnlockedAt(user.getId(), LEGENDARY))
+                .as("progress below target 50 stays locked")
+                .isNull();
     }
 
     @Test
@@ -98,11 +100,12 @@ class AchievementConcurrencyIntegrationTest extends BaseIntegrationTest {
             users.add(persistUser("parallel-user-" + i));
         }
 
-        List<Throwable> escaped = runConcurrently(userCount, i ->
-            achievementService.checkAndUnlock(mergedEvent(users.get(i), (long) i))
-        );
+        List<Throwable> escaped =
+                runConcurrently(userCount, i -> achievementService.checkAndUnlock(mergedEvent(users.get(i), (long) i)));
 
-        assertThat(escaped).as("per-user locks must not turn different users into failures").isEmpty();
+        assertThat(escaped)
+                .as("per-user locks must not turn different users into failures")
+                .isEmpty();
         for (User user : users) {
             assertThat(readProgress(user.getId(), LEGENDARY).current()).isEqualTo(1);
         }
@@ -112,13 +115,12 @@ class AchievementConcurrencyIntegrationTest extends BaseIntegrationTest {
 
     private ActivitySavedEvent mergedEvent(User user, Long targetId) {
         return new ActivitySavedEvent(
-            Optional.of(user),
-            ActivityEventType.PULL_REQUEST_MERGED,
-            Instant.parse("2024-08-15T10:00:00Z"),
-            1L,
-            ActivityTargetType.PULL_REQUEST,
-            targetId
-        );
+                Optional.of(user),
+                ActivityEventType.PULL_REQUEST_MERGED,
+                Instant.parse("2024-08-15T10:00:00Z"),
+                1L,
+                ActivityTargetType.PULL_REQUEST,
+                targetId);
     }
 
     /**
@@ -134,17 +136,15 @@ class AchievementConcurrencyIntegrationTest extends BaseIntegrationTest {
         try {
             for (int i = 0; i < parallelism; i++) {
                 int index = i;
-                futures.add(
-                    pool.submit(() -> {
-                        ready.countDown();
-                        try {
-                            start.await();
-                            task.accept(index);
-                        } catch (Throwable t) {
-                            escaped.add(t);
-                        }
-                    })
-                );
+                futures.add(pool.submit(() -> {
+                    ready.countDown();
+                    try {
+                        start.await();
+                        task.accept(index);
+                    } catch (Throwable t) {
+                        escaped.add(t);
+                    }
+                }));
             }
             ready.await(); // every worker parked on `start` → release together for maximum overlap
             start.countDown();
@@ -161,32 +161,26 @@ class AchievementConcurrencyIntegrationTest extends BaseIntegrationTest {
 
     /** Read progress in a fresh transaction (worker transactions have committed; avoid a stale context). */
     private LinearAchievementProgress readProgress(Long userId, String achievementId) {
-        return (LinearAchievementProgress) transactionTemplate.execute(status ->
-            userAchievementRepository
+        return (LinearAchievementProgress) transactionTemplate.execute(status -> userAchievementRepository
                 .findByUserIdAndAchievementId(userId, achievementId)
                 .orElseThrow()
-                .getProgressData()
-        );
+                .getProgressData());
     }
 
     private @Nullable Instant readUnlockedAt(Long userId, String achievementId) {
-        Optional<Instant> unlockedAt = transactionTemplate.execute(status ->
-            Optional.ofNullable(
-                userAchievementRepository
-                    .findByUserIdAndAchievementId(userId, achievementId)
-                    .orElseThrow()
-                    .getUnlockedAt()
-            )
-        );
+        Optional<Instant> unlockedAt =
+                transactionTemplate.execute(status -> Optional.ofNullable(userAchievementRepository
+                        .findByUserIdAndAchievementId(userId, achievementId)
+                        .orElseThrow()
+                        .getUnlockedAt()));
         return unlockedAt == null ? null : unlockedAt.orElse(null);
     }
 
     private User persistUser(String login) {
         IdentityProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
         User user = new User();
         user.setNativeId(nativeIdGenerator.incrementAndGet());
         user.setProvider(provider);

@@ -30,25 +30,25 @@ public class NecromancerEvaluator implements AchievementEvaluator {
         }
 
         return issueRepository
-            .findById(event.targetId())
-            .map(issue -> {
-                Instant createdAt = issue.getCreatedAt();
-                if (createdAt == null) {
+                .findById(event.targetId())
+                .map(issue -> {
+                    Instant createdAt = issue.getCreatedAt();
+                    if (createdAt == null) {
+                        return false;
+                    }
+
+                    // calculate duration between creation and the event's occurrence (closure)
+                    Instant closedAt = event.occurredAt();
+                    ZonedDateTime created = createdAt.atZone(ZoneOffset.UTC);
+                    ZonedDateTime closed = closedAt.atZone(ZoneOffset.UTC);
+
+                    long months = ChronoUnit.MONTHS.between(created, closed);
+                    if (months >= 6) {
+                        userAchievement.setProgressData(new BinaryAchievementProgress(true));
+                        return true;
+                    }
                     return false;
-                }
-
-                // calculate duration between creation and the event's occurrence (closure)
-                Instant closedAt = event.occurredAt();
-                ZonedDateTime created = createdAt.atZone(ZoneOffset.UTC);
-                ZonedDateTime closed = closedAt.atZone(ZoneOffset.UTC);
-
-                long months = ChronoUnit.MONTHS.between(created, closed);
-                if (months >= 6) {
-                    userAchievement.setProgressData(new BinaryAchievementProgress(true));
-                    return true;
-                }
-                return false;
-            })
-            .orElse(false);
+                })
+                .orElse(false);
     }
 }

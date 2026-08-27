@@ -43,20 +43,18 @@ public class GitLabProjectEventMessageHandler extends AbstractIntegrationMessage
     private final GitLabProperties gitLabProperties;
 
     GitLabProjectEventMessageHandler(
-        RepositoryRepository repositoryRepository,
-        OrganizationRepository organizationRepository,
-        IdentityProviderRepository gitProviderRepository,
-        GitLabProperties gitLabProperties,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            RepositoryRepository repositoryRepository,
+            OrganizationRepository organizationRepository,
+            IdentityProviderRepository gitProviderRepository,
+            GitLabProperties gitLabProperties,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITLAB,
-            GitLabEventType.PROJECT.getValue(),
-            GitLabProjectEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITLAB,
+                GitLabEventType.PROJECT.getValue(),
+                GitLabProjectEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.repositoryRepository = repositoryRepository;
         this.organizationRepository = organizationRepository;
         this.gitProviderRepository = gitProviderRepository;
@@ -67,15 +65,14 @@ public class GitLabProjectEventMessageHandler extends AbstractIntegrationMessage
     protected void handleEvent(GitLabProjectEventDTO event) {
         String safePath = sanitizeForLog(Objects.requireNonNull(event.pathWithNamespace()));
         log.debug(
-            "Received project event: eventName={}, path={}, projectId={}",
-            event.eventName(),
-            safePath,
-            event.projectId()
-        );
+                "Received project event: eventName={}, path={}, projectId={}",
+                event.eventName(),
+                safePath,
+                event.projectId());
 
         IdentityProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
-            .orElse(null);
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
+                .orElse(null);
 
         if (provider == null) {
             log.warn("IdentityProvider not found for GITLAB, skipping project event");
@@ -98,7 +95,9 @@ public class GitLabProjectEventMessageHandler extends AbstractIntegrationMessage
         long nativeId = event.projectId();
 
         // Check if already exists
-        if (repositoryRepository.findByNativeIdAndProviderId(nativeId, providerId).isPresent()) {
+        if (repositoryRepository
+                .findByNativeIdAndProviderId(nativeId, providerId)
+                .isPresent()) {
             log.debug("Repository already exists, skipping create: nativeId={}", nativeId);
             return;
         }
@@ -122,8 +121,8 @@ public class GitLabProjectEventMessageHandler extends AbstractIntegrationMessage
         String groupPath = extractGroupPath(Objects.requireNonNull(event.pathWithNamespace()));
         if (groupPath != null) {
             Organization org = organizationRepository
-                .findByLoginIgnoreCaseAndProviderId(groupPath, providerId)
-                .orElse(null);
+                    .findByLoginIgnoreCaseAndProviderId(groupPath, providerId)
+                    .orElse(null);
             if (org != null) {
                 repo.setOrganization(org);
             }
@@ -131,10 +130,9 @@ public class GitLabProjectEventMessageHandler extends AbstractIntegrationMessage
 
         repositoryRepository.save(repo);
         log.info(
-            "Created repository from project event: nativeId={}, path={}",
-            nativeId,
-            sanitizeForLog(Objects.requireNonNull(event.pathWithNamespace()))
-        );
+                "Created repository from project event: nativeId={}, path={}",
+                nativeId,
+                sanitizeForLog(Objects.requireNonNull(event.pathWithNamespace())));
     }
 
     private void handleProjectDestroy(GitLabProjectEventDTO event, IdentityProvider provider) {
@@ -142,23 +140,19 @@ public class GitLabProjectEventMessageHandler extends AbstractIntegrationMessage
         long nativeId = event.projectId();
 
         repositoryRepository
-            .findByNativeIdAndProviderId(nativeId, providerId)
-            .ifPresentOrElse(
-                repo -> {
-                    repositoryRepository.delete(repo);
-                    log.info(
-                        "Deleted repository from project event: nativeId={}, path={}",
-                        nativeId,
-                        sanitizeForLog(Objects.requireNonNull(event.pathWithNamespace()))
-                    );
-                },
-                () ->
-                    log.debug(
-                        "Repository not found for deletion: nativeId={}, path={}",
-                        nativeId,
-                        sanitizeForLog(Objects.requireNonNull(event.pathWithNamespace()))
-                    )
-            );
+                .findByNativeIdAndProviderId(nativeId, providerId)
+                .ifPresentOrElse(
+                        repo -> {
+                            repositoryRepository.delete(repo);
+                            log.info(
+                                    "Deleted repository from project event: nativeId={}, path={}",
+                                    nativeId,
+                                    sanitizeForLog(Objects.requireNonNull(event.pathWithNamespace())));
+                        },
+                        () -> log.debug(
+                                "Repository not found for deletion: nativeId={}, path={}",
+                                nativeId,
+                                sanitizeForLog(Objects.requireNonNull(event.pathWithNamespace()))));
     }
 
     private void handleProjectRenameOrTransfer(GitLabProjectEventDTO event, IdentityProvider provider) {
@@ -166,62 +160,58 @@ public class GitLabProjectEventMessageHandler extends AbstractIntegrationMessage
         long nativeId = event.projectId();
 
         repositoryRepository
-            .findByNativeIdAndProviderId(nativeId, providerId)
-            .ifPresentOrElse(
-                repo -> {
-                    String oldPath = repo.getNameWithOwner();
-                    String newPath = event.pathWithNamespace();
-                    String newName = event.name();
+                .findByNativeIdAndProviderId(nativeId, providerId)
+                .ifPresentOrElse(
+                        repo -> {
+                            String oldPath = repo.getNameWithOwner();
+                            String newPath = event.pathWithNamespace();
+                            String newName = event.name();
 
-                    if (newPath != null) {
-                        repo.setNameWithOwner(newPath);
-                    }
-                    if (newName != null) {
-                        repo.setName(newName);
-                    }
-
-                    // Update HTML URL
-                    String serverUrl = gitLabProperties.defaultServerUrl();
-                    if (serverUrl != null && newPath != null) {
-                        String baseUrl = serverUrl.endsWith("/") ? serverUrl : serverUrl + "/";
-                        repo.setHtmlUrl(baseUrl + newPath);
-                    }
-
-                    // Update visibility if provided
-                    if (event.projectVisibility() != null) {
-                        repo.setPrivate("private".equalsIgnoreCase(event.projectVisibility()));
-                    }
-
-                    // Re-link organization for transfers (new group may differ)
-                    if (event.isTransfer()) {
-                        String groupPath = extractGroupPath(newPath);
-                        if (groupPath != null) {
-                            Organization org = organizationRepository
-                                .findByLoginIgnoreCaseAndProviderId(groupPath, providerId)
-                                .orElse(null);
-                            if (org != null) {
-                                repo.setOrganization(org);
+                            if (newPath != null) {
+                                repo.setNameWithOwner(newPath);
                             }
-                        }
-                    }
+                            if (newName != null) {
+                                repo.setName(newName);
+                            }
 
-                    repositoryRepository.save(repo);
-                    log.info(
-                        "Updated repository from {} event: nativeId={}, oldPath={}, newPath={}",
-                        event.eventName(),
-                        nativeId,
-                        sanitizeForLog(oldPath),
-                        sanitizeForLog(newPath)
-                    );
-                },
-                () ->
-                    log.debug(
-                        "Repository not found for {}: nativeId={}, path={}",
-                        event.eventName(),
-                        nativeId,
-                        sanitizeForLog(Objects.requireNonNull(event.pathWithNamespace()))
-                    )
-            );
+                            // Update HTML URL
+                            String serverUrl = gitLabProperties.defaultServerUrl();
+                            if (serverUrl != null && newPath != null) {
+                                String baseUrl = serverUrl.endsWith("/") ? serverUrl : serverUrl + "/";
+                                repo.setHtmlUrl(baseUrl + newPath);
+                            }
+
+                            // Update visibility if provided
+                            if (event.projectVisibility() != null) {
+                                repo.setPrivate("private".equalsIgnoreCase(event.projectVisibility()));
+                            }
+
+                            // Re-link organization for transfers (new group may differ)
+                            if (event.isTransfer()) {
+                                String groupPath = extractGroupPath(newPath);
+                                if (groupPath != null) {
+                                    Organization org = organizationRepository
+                                            .findByLoginIgnoreCaseAndProviderId(groupPath, providerId)
+                                            .orElse(null);
+                                    if (org != null) {
+                                        repo.setOrganization(org);
+                                    }
+                                }
+                            }
+
+                            repositoryRepository.save(repo);
+                            log.info(
+                                    "Updated repository from {} event: nativeId={}, oldPath={}, newPath={}",
+                                    event.eventName(),
+                                    nativeId,
+                                    sanitizeForLog(oldPath),
+                                    sanitizeForLog(newPath));
+                        },
+                        () -> log.debug(
+                                "Repository not found for {}: nativeId={}, path={}",
+                                event.eventName(),
+                                nativeId,
+                                sanitizeForLog(Objects.requireNonNull(event.pathWithNamespace()))));
     }
 
     /**

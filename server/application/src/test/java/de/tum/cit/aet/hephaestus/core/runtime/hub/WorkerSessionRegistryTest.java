@@ -5,7 +5,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameCodec;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -50,10 +49,8 @@ class WorkerSessionRegistryTest extends BaseUnitTest {
     @Test
     void unregisterIsIdentityGated() {
         // Guards against a stale handler removing a fresh session installed by a reconnect.
-        WorkerSessionRegistry registry = new WorkerSessionRegistry(
-            mock(ApplicationEventPublisher.class),
-            new SimpleMeterRegistry()
-        );
+        WorkerSessionRegistry registry =
+                new WorkerSessionRegistry(mock(ApplicationEventPublisher.class), new SimpleMeterRegistry());
         WorkerSession first = newSession("worker-1", "session-1");
         registry.register(first);
         WorkerSession second = newSession("worker-1", "session-2");
@@ -64,13 +61,7 @@ class WorkerSessionRegistryTest extends BaseUnitTest {
 
     private WorkerSession sessionFor(String workerId, String sessionId, WebSocketSession transport) {
         return new WorkerSession(
-            workerId,
-            sessionId,
-            "jti-" + sessionId,
-            Instant.now().plusSeconds(3600),
-            transport,
-            codec
-        );
+                workerId, sessionId, "jti-" + sessionId, Instant.now().plusSeconds(3600), transport, codec);
     }
 
     private WebSocketSession newTransport() {

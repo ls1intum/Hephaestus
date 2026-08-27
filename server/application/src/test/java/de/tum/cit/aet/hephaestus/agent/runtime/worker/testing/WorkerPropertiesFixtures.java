@@ -11,21 +11,19 @@ public final class WorkerPropertiesFixtures {
     /** Minimal {@link WorkerProperties} for unit-test wiring with the given capacity. */
     public static WorkerProperties minimal(String reviewMax, String mentorMax) {
         return new WorkerProperties(
-            "test-worker",
-            new WorkerProperties.Capacity(reviewMax, mentorMax),
-            new WorkerProperties.Drain(Duration.ofMinutes(5)),
-            new WorkerProperties.Heartbeat(Duration.ofSeconds(20)),
-            new WorkerProperties.Control(URI.create("ws://example"), "tok", Duration.ofSeconds(10))
-        );
+                "test-worker",
+                new WorkerProperties.Capacity(reviewMax, mentorMax),
+                new WorkerProperties.Drain(Duration.ofMinutes(5)),
+                new WorkerProperties.Heartbeat(Duration.ofSeconds(20)),
+                new WorkerProperties.Control(URI.create("ws://example"), "tok", Duration.ofSeconds(10)));
     }
 
     public static WorkerProperties withDrain(Duration drainTimeout) {
         return new WorkerProperties(
-            "w",
-            new WorkerProperties.Capacity("2", "1"),
-            new WorkerProperties.Drain(drainTimeout),
-            new WorkerProperties.Heartbeat(Duration.ofSeconds(20)),
-            new WorkerProperties.Control(URI.create("ws://example"), "tok", Duration.ofSeconds(10))
-        );
+                "w",
+                new WorkerProperties.Capacity("2", "1"),
+                new WorkerProperties.Drain(drainTimeout),
+                new WorkerProperties.Heartbeat(Duration.ofSeconds(20)),
+                new WorkerProperties.Control(URI.create("ws://example"), "tok", Duration.ofSeconds(10)));
     }
 }

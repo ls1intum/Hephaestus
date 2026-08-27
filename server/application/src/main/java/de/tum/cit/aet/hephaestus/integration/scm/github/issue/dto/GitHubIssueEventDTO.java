@@ -14,15 +14,15 @@ import java.util.Map;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubIssueEventDTO(
-    @JsonProperty("action") String action,
-    @JsonProperty("issue") GitHubIssueDTO issue,
-    @JsonProperty("repository") GitHubRepositoryRefDTO repository,
-    @JsonProperty("organization") GitHubOrgRefDTO organization,
-    @JsonProperty("sender") GitHubUserDTO sender,
-    @JsonProperty("label") GitHubLabelDTO label,
-    @JsonProperty("type") GitHubIssueTypeDTO issueType,
-    @JsonProperty("changes") Map<String, Object> changes
-) implements GitHubWebhookEvent {
+        @JsonProperty("action") String action,
+        @JsonProperty("issue") GitHubIssueDTO issue,
+        @JsonProperty("repository") GitHubRepositoryRefDTO repository,
+        @JsonProperty("organization") GitHubOrgRefDTO organization,
+        @JsonProperty("sender") GitHubUserDTO sender,
+        @JsonProperty("label") GitHubLabelDTO label,
+        @JsonProperty("type") GitHubIssueTypeDTO issueType,
+        @JsonProperty("changes") Map<String, Object> changes)
+        implements GitHubWebhookEvent {
     @Override
     public GitHubEventAction.Issue actionType() {
         return GitHubEventAction.Issue.fromString(action);
@@ -32,5 +32,7 @@ public record GitHubIssueEventDTO(
      * DTO for organization reference in issue events.
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record GitHubOrgRefDTO(@JsonProperty("id") Long id, @JsonProperty("login") String login) {}
+    public record GitHubOrgRefDTO(
+            @JsonProperty("id") Long id,
+            @JsonProperty("login") String login) {}
 }

@@ -11,13 +11,10 @@ import io.swagger.v3.oas.annotations.media.Schema;
  * (e.g. {@link LinearAchievementProgress}) to be included by OpenAPIs type schema generation.
  *
  */
-
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type")
-@JsonSubTypes(
-    {
-        @JsonSubTypes.Type(value = LinearAchievementProgress.class, name = "LinearAchievementProgress"),
-        @JsonSubTypes.Type(value = BinaryAchievementProgress.class, name = "BinaryAchievementProgress"),
-    }
-)
+@JsonSubTypes({
+    @JsonSubTypes.Type(value = LinearAchievementProgress.class, name = "LinearAchievementProgress"),
+    @JsonSubTypes.Type(value = BinaryAchievementProgress.class, name = "BinaryAchievementProgress"),
+})
 @Schema(name = "AchievementProgress", description = "Polymorphic progress data")
 public interface AchievementProgress {}

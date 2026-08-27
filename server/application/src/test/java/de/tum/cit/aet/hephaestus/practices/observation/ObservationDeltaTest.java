@@ -34,63 +34,59 @@ class ObservationDeltaTest {
 
     @Test
     void aLocusMeasuredOnlyByTheNewestRunIsNew() {
-        ObservationDelta delta = ObservationDelta.classify(
-            List.of(locus("k1", SECOND_RUN, NEWER, Assessment.BAD, Severity.MAJOR))
-        );
+        ObservationDelta delta =
+                ObservationDelta.classify(List.of(locus("k1", SECOND_RUN, NEWER, Assessment.BAD, Severity.MAJOR)));
 
         assertThat(statusOf(delta, "k1")).contains(Status.NEW);
-        assertThat(changeOf(delta, "k1")).get().extracting(LocusChange::runsSeen).isEqualTo(1);
+        assertThat(changeOf(delta, "k1"))
+                .get()
+                .extracting(LocusChange::runsSeen)
+                .isEqualTo(1);
     }
 
     @Test
     void aProblemStillPresentButAtADifferentSeverityIsRecurring() {
-        ObservationDelta delta = ObservationDelta.classify(
-            List.of(
+        ObservationDelta delta = ObservationDelta.classify(List.of(
                 locus("k1", FIRST_RUN, OLDER, Assessment.BAD, Severity.MINOR),
-                locus("k1", SECOND_RUN, NEWER, Assessment.BAD, Severity.CRITICAL)
-            )
-        );
+                locus("k1", SECOND_RUN, NEWER, Assessment.BAD, Severity.CRITICAL)));
 
         assertThat(statusOf(delta, "k1")).contains(Status.RECURRING);
-        assertThat(changeOf(delta, "k1")).get().extracting(LocusChange::latestSeverity).isEqualTo(Severity.CRITICAL);
+        assertThat(changeOf(delta, "k1"))
+                .get()
+                .extracting(LocusChange::latestSeverity)
+                .isEqualTo(Severity.CRITICAL);
     }
 
     @Test
     void aProblemStillPresentAndUnmovedIsUnchanged() {
-        ObservationDelta delta = ObservationDelta.classify(
-            List.of(
+        ObservationDelta delta = ObservationDelta.classify(List.of(
                 locus("k1", FIRST_RUN, OLDER, Assessment.BAD, Severity.MAJOR),
-                locus("k1", SECOND_RUN, NEWER, Assessment.BAD, Severity.MAJOR)
-            )
-        );
+                locus("k1", SECOND_RUN, NEWER, Assessment.BAD, Severity.MAJOR)));
 
         assertThat(statusOf(delta, "k1")).contains(Status.UNCHANGED);
     }
 
     @Test
     void aProblemAbsentFromTheNewestRunOfItsArtifactIsResolved() {
-        ObservationDelta delta = ObservationDelta.classify(
-            List.of(
+        ObservationDelta delta = ObservationDelta.classify(List.of(
                 locus("gone", FIRST_RUN, OLDER, Assessment.BAD, Severity.MAJOR),
                 locus("still-here", FIRST_RUN, OLDER, Assessment.BAD, Severity.MINOR),
-                locus("still-here", SECOND_RUN, NEWER, Assessment.BAD, Severity.MINOR)
-            )
-        );
+                locus("still-here", SECOND_RUN, NEWER, Assessment.BAD, Severity.MINOR)));
 
         assertThat(statusOf(delta, "gone")).contains(Status.RESOLVED);
-        assertThat(changeOf(delta, "gone")).get().extracting(LocusChange::latestAssessment).isEqualTo(Assessment.BAD);
+        assertThat(changeOf(delta, "gone"))
+                .get()
+                .extracting(LocusChange::latestAssessment)
+                .isEqualTo(Assessment.BAD);
     }
 
     /** Crediting somebody with fixing what was already right is the one wrong answer this must not give. */
     @Test
     void aStrengthThatWasNotReObservedIsNotResolved() {
-        ObservationDelta delta = ObservationDelta.classify(
-            List.of(
+        ObservationDelta delta = ObservationDelta.classify(List.of(
                 locus("praise", FIRST_RUN, OLDER, Assessment.GOOD, null),
                 locus("problem", FIRST_RUN, OLDER, Assessment.BAD, Severity.MINOR),
-                locus("problem", SECOND_RUN, NEWER, Assessment.BAD, Severity.MINOR)
-            )
-        );
+                locus("problem", SECOND_RUN, NEWER, Assessment.BAD, Severity.MINOR)));
 
         assertThat(changeOf(delta, "praise")).isEmpty();
     }
@@ -101,30 +97,25 @@ class ObservationDeltaTest {
      */
     @Test
     void aNewerRunOnOneArtifactDoesNotResolveAnotherArtifactsLocus() {
-        ObservationDelta delta = ObservationDelta.classify(
-            List.of(
+        ObservationDelta delta = ObservationDelta.classify(List.of(
                 new Locus(
-                    "mr-18",
-                    "ships-tests",
-                    ArtifactKinds.PULL_REQUEST,
-                    18L,
-                    FIRST_RUN,
-                    OLDER,
-                    Assessment.BAD,
-                    Severity.MAJOR
-                ),
+                        "mr-18",
+                        "ships-tests",
+                        ArtifactKinds.PULL_REQUEST,
+                        18L,
+                        FIRST_RUN,
+                        OLDER,
+                        Assessment.BAD,
+                        Severity.MAJOR),
                 new Locus(
-                    "mr-22",
-                    "ships-tests",
-                    ArtifactKinds.PULL_REQUEST,
-                    22L,
-                    SECOND_RUN,
-                    NEWER,
-                    Assessment.BAD,
-                    Severity.MAJOR
-                )
-            )
-        );
+                        "mr-22",
+                        "ships-tests",
+                        ArtifactKinds.PULL_REQUEST,
+                        22L,
+                        SECOND_RUN,
+                        NEWER,
+                        Assessment.BAD,
+                        Severity.MAJOR)));
 
         assertThat(statusOf(delta, "mr-18")).contains(Status.NEW);
         assertThat(statusOf(delta, "mr-22")).contains(Status.NEW);
@@ -132,21 +123,17 @@ class ObservationDeltaTest {
 
     @Test
     void locusWithoutARecurrenceKeyIsSkippedRatherThanGroupedWithTheOthers() {
-        ObservationDelta delta = ObservationDelta.classify(
-            List.of(
+        ObservationDelta delta = ObservationDelta.classify(List.of(
                 new Locus(
-                    null,
-                    "ships-tests",
-                    ArtifactKinds.PULL_REQUEST,
-                    22L,
-                    SECOND_RUN,
-                    NEWER,
-                    Assessment.BAD,
-                    Severity.MAJOR
-                ),
-                locus("k1", SECOND_RUN, NEWER, Assessment.BAD, Severity.MAJOR)
-            )
-        );
+                        null,
+                        "ships-tests",
+                        ArtifactKinds.PULL_REQUEST,
+                        22L,
+                        SECOND_RUN,
+                        NEWER,
+                        Assessment.BAD,
+                        Severity.MAJOR),
+                locus("k1", SECOND_RUN, NEWER, Assessment.BAD, Severity.MAJOR)));
 
         assertThat(delta.loci()).extracting(LocusChange::recurrenceKey).containsExactly("k1");
     }
@@ -154,20 +141,17 @@ class ObservationDeltaTest {
     /** A truncating reader keeps what moved, so the order is part of the contract. */
     @Test
     void whatMovedIsOrderedAheadOfWhatDidNot() {
-        ObservationDelta delta = ObservationDelta.classify(
-            List.of(
+        ObservationDelta delta = ObservationDelta.classify(List.of(
                 locus("unmoved", FIRST_RUN, OLDER, Assessment.BAD, Severity.MAJOR),
                 locus("unmoved", SECOND_RUN, NEWER, Assessment.BAD, Severity.MAJOR),
                 locus("fresh", SECOND_RUN, NEWER, Assessment.BAD, Severity.MAJOR),
                 locus("worse", FIRST_RUN, OLDER, Assessment.BAD, Severity.MINOR),
                 locus("worse", SECOND_RUN, NEWER, Assessment.BAD, Severity.CRITICAL),
-                locus("fixed", FIRST_RUN, OLDER, Assessment.BAD, Severity.MAJOR)
-            )
-        );
+                locus("fixed", FIRST_RUN, OLDER, Assessment.BAD, Severity.MAJOR)));
 
         assertThat(delta.loci())
-            .extracting(LocusChange::recurrenceKey)
-            .containsExactly("fixed", "worse", "fresh", "unmoved");
+                .extracting(LocusChange::recurrenceKey)
+                .containsExactly("fixed", "worse", "fresh", "unmoved");
     }
 
     @Test
@@ -184,10 +168,8 @@ class ObservationDeltaTest {
     }
 
     private static Optional<LocusChange> changeOf(ObservationDelta delta, String key) {
-        return delta
-            .loci()
-            .stream()
-            .filter(change -> change.recurrenceKey().equals(key))
-            .findFirst();
+        return delta.loci().stream()
+                .filter(change -> change.recurrenceKey().equals(key))
+                .findFirst();
     }
 }

@@ -87,8 +87,7 @@ public class AuthEventLogger {
 
         public void record() {
             try {
-                writer.write(
-                    new AuthEventData(
+                writer.write(new AuthEventData(
                         type,
                         result,
                         accountId,
@@ -97,9 +96,7 @@ public class AuthEventLogger {
                         gitProviderId,
                         workspaceId,
                         identityLinkId,
-                        details
-                    )
-                );
+                        details));
             } catch (RuntimeException e) {
                 // An audit write must NEVER break the caller's business transaction. AuthEventWriter
                 // already swallows the insert failure, but its REQUIRES_NEW boundary can still surface an

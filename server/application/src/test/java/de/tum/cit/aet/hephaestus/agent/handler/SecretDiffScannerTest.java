@@ -40,9 +40,8 @@ class SecretDiffScannerTest extends BaseUnitTest {
         @Test
         @DisplayName("the live-grade regression: a hardcoded apiKey literal on a '+' line")
         void liveGradeOpenAiKey() {
-            List<SecretHit> hits = scanner.scan(
-                diff("FocusBoard/WeatherView.swift", "    let apiKey = \"" + OPENAI_KEY + "\"")
-            );
+            List<SecretHit> hits =
+                    scanner.scan(diff("FocusBoard/WeatherView.swift", "    let apiKey = \"" + OPENAI_KEY + "\""));
             assertThat(hits).isNotEmpty();
             SecretHit hit = hits.get(0);
             assertThat(hit.path()).isEqualTo("FocusBoard/WeatherView.swift");
@@ -85,10 +84,11 @@ class SecretDiffScannerTest extends BaseUnitTest {
         void hybridEnvFallbackWithRealLiteral() {
             // `process.env.KEY || "sk-…"` references an env var AND commits a real structural-prefix literal.
             // The line-wide env-reference veto must not suppress the committed secret on the fallback.
-            List<SecretHit> hits = scanner.scan(
-                diff("config.ts", "const key = process.env.OPENAI_KEY || \"" + OPENAI_KEY + "\";")
-            );
-            assertThat(hits).anyMatch(h -> h.ruleId().equals("openai-key") && h.addedLine().contains(OPENAI_KEY));
+            List<SecretHit> hits =
+                    scanner.scan(diff("config.ts", "const key = process.env.OPENAI_KEY || \"" + OPENAI_KEY + "\";"));
+            assertThat(hits)
+                    .anyMatch(h ->
+                            h.ruleId().equals("openai-key") && h.addedLine().contains(OPENAI_KEY));
         }
 
         @Test
@@ -106,8 +106,7 @@ class SecretDiffScannerTest extends BaseUnitTest {
         @DisplayName("env-var read is not a hardcode")
         void envReference() {
             List<SecretHit> hits = scanner.scan(
-                diff("WeatherView.swift", "let apiKey = ProcessInfo.processInfo.environment[\"API_KEY\"]")
-            );
+                    diff("WeatherView.swift", "let apiKey = ProcessInfo.processInfo.environment[\"API_KEY\"]"));
             assertThat(hits).isEmpty();
         }
 
@@ -138,11 +137,9 @@ class SecretDiffScannerTest extends BaseUnitTest {
 
         @Test
         void removedLinesIgnored() {
-            String d =
-                "diff --git a/app.py b/app.py\n--- a/app.py\n+++ b/app.py\n@@ -1,2 +1,1 @@\n" +
-                "-API_KEY = \"" +
-                OPENAI_KEY +
-                "\"\n const x = 1\n";
+            String d = "diff --git a/app.py b/app.py\n--- a/app.py\n+++ b/app.py\n@@ -1,2 +1,1 @@\n" + "-API_KEY = \""
+                    + OPENAI_KEY
+                    + "\"\n const x = 1\n";
             assertThat(scanner.scan(d)).isEmpty();
         }
 
@@ -159,13 +156,11 @@ class SecretDiffScannerTest extends BaseUnitTest {
         @Test
         @DisplayName("new-side line number tracks context + added lines from the hunk header")
         void tracksLineNumbers() {
-            String d =
-                "diff --git a/a.py b/a.py\n--- a/a.py\n+++ b/a.py\n@@ -10,2 +10,3 @@\n" +
-                " context_line\n" +
-                "+filler = 1\n" +
-                "+key = \"" +
-                OPENAI_KEY +
-                "\"\n";
+            String d = "diff --git a/a.py b/a.py\n--- a/a.py\n+++ b/a.py\n@@ -10,2 +10,3 @@\n" + " context_line\n"
+                    + "+filler = 1\n"
+                    + "+key = \""
+                    + OPENAI_KEY
+                    + "\"\n";
             List<SecretHit> hits = scanner.scan(d);
             assertThat(hits).isNotEmpty();
             // hunk starts at new line 10: context=10, filler=11, key=12
@@ -177,13 +172,11 @@ class SecretDiffScannerTest extends BaseUnitTest {
         void noNewlineMarkerDoesNotShiftLineNumber() {
             // The marker is diff metadata, not a source line; the secret on the line BEFORE it must keep its
             // true new-side number. Hunk starts at 5: context=5, EOF-appended secret=6, then the marker.
-            String d =
-                "diff --git a/.env b/.env\n--- a/.env\n+++ b/.env\n@@ -5,1 +5,2 @@\n" +
-                " EXISTING=1\n" +
-                "+API_KEY=\"" +
-                OPENAI_KEY +
-                "\"\n" +
-                "\\ No newline at end of file\n";
+            String d = "diff --git a/.env b/.env\n--- a/.env\n+++ b/.env\n@@ -5,1 +5,2 @@\n" + " EXISTING=1\n"
+                    + "+API_KEY=\""
+                    + OPENAI_KEY
+                    + "\"\n"
+                    + "\\ No newline at end of file\n";
             List<SecretHit> hits = scanner.scan(d);
             assertThat(hits).isNotEmpty();
             assertThat(hits.get(0).newLine()).isEqualTo(6);
@@ -199,7 +192,9 @@ class SecretDiffScannerTest extends BaseUnitTest {
             // Standard base64 uses '/' in its alphabet; a blanket '/'-ban would silently skip this real secret.
             String value = "aB3" + "xQ9/zR2tK7wL5pY8mN1";
             List<SecretHit> hits = scanner.scan(diff("server.js", "const secret = \"" + value + "\";"));
-            assertThat(hits).anyMatch(h -> h.ruleId().equals("generic-entropy") && h.matchedToken().equals(value));
+            assertThat(hits)
+                    .anyMatch(h -> h.ruleId().equals("generic-entropy")
+                            && h.matchedToken().equals(value));
         }
 
         @Test
@@ -220,9 +215,7 @@ class SecretDiffScannerTest extends BaseUnitTest {
             String pat1 = "glpat-" + "3hQ7kZ9mW2pX5tR8vL1q";
             String pat2 = "glpat-" + "9zX2mK7wL5pY8nR1tQ3v";
             List<SecretHit> hits = scanner.scan(diff("ci.env", "TOKENS=" + pat1 + "," + pat2));
-            assertThat(hits)
-                .filteredOn(h -> h.ruleId().equals("gitlab-pat"))
-                .hasSize(2);
+            assertThat(hits).filteredOn(h -> h.ruleId().equals("gitlab-pat")).hasSize(2);
             assertThat(hits).anyMatch(h -> h.matchedToken().equals(pat1));
             assertThat(hits).anyMatch(h -> h.matchedToken().equals(pat2));
         }

@@ -29,9 +29,9 @@ class ReviewBackfillSignalsTest extends BaseUnitTest {
         pr.setState(Issue.State.MERGED);
 
         assertThat(ReviewBackfillSignals.keyFor(WORKSPACE_ID, pr))
-            .get()
-            .extracting(SignalKey::signalName)
-            .isEqualTo(ScmSignals.PULL_REQUEST_MERGED);
+                .get()
+                .extracting(SignalKey::signalName)
+                .isEqualTo(ScmSignals.PULL_REQUEST_MERGED);
     }
 
     @Test
@@ -40,9 +40,9 @@ class ReviewBackfillSignalsTest extends BaseUnitTest {
         pr.setState(Issue.State.CLOSED);
 
         assertThat(ReviewBackfillSignals.keyFor(WORKSPACE_ID, pr))
-            .get()
-            .extracting(SignalKey::signalName)
-            .isEqualTo(ScmSignals.PULL_REQUEST_CLOSED);
+                .get()
+                .extracting(SignalKey::signalName)
+                .isEqualTo(ScmSignals.PULL_REQUEST_CLOSED);
     }
 
     /** A draft has not reached "ready"; claiming it had would measure it against the wrong occasion. */
@@ -52,17 +52,17 @@ class ReviewBackfillSignalsTest extends BaseUnitTest {
         pr.setDraft(true);
 
         assertThat(ReviewBackfillSignals.keyFor(WORKSPACE_ID, pr))
-            .get()
-            .extracting(SignalKey::signalName)
-            .isEqualTo(ScmSignals.PULL_REQUEST_OPENED);
+                .get()
+                .extracting(SignalKey::signalName)
+                .isEqualTo(ScmSignals.PULL_REQUEST_OPENED);
     }
 
     @Test
     void anOpenNonDraftPullRequestIsMeasuredAsReady() {
         assertThat(ReviewBackfillSignals.keyFor(WORKSPACE_ID, pullRequest()))
-            .get()
-            .extracting(SignalKey::signalName)
-            .isEqualTo(ScmSignals.PULL_REQUEST_READY);
+                .get()
+                .extracting(SignalKey::signalName)
+                .isEqualTo(ScmSignals.PULL_REQUEST_READY);
     }
 
     /**
@@ -72,15 +72,19 @@ class ReviewBackfillSignalsTest extends BaseUnitTest {
     @Test
     void theRevisionIsTheOneTheLivePathWouldHaveUsed() {
         PullRequest ready = pullRequest();
-        assertThat(ReviewBackfillSignals.keyFor(WORKSPACE_ID, ready).orElseThrow().revision().scheme()).contains(
-            RevisionScheme.HEAD_COMMIT
-        );
+        assertThat(ReviewBackfillSignals.keyFor(WORKSPACE_ID, ready)
+                        .orElseThrow()
+                        .revision()
+                        .scheme())
+                .contains(RevisionScheme.HEAD_COMMIT);
 
         PullRequest merged = pullRequest();
         merged.setMerged(true);
-        assertThat(ReviewBackfillSignals.keyFor(WORKSPACE_ID, merged).orElseThrow().revision().scheme()).contains(
-            RevisionScheme.TERMINAL_STATE
-        );
+        assertThat(ReviewBackfillSignals.keyFor(WORKSPACE_ID, merged)
+                        .orElseThrow()
+                        .revision()
+                        .scheme())
+                .contains(RevisionScheme.TERMINAL_STATE);
     }
 
     @Test
@@ -89,12 +93,10 @@ class ReviewBackfillSignalsTest extends BaseUnitTest {
         Issue closed = issue();
         closed.setState(Issue.State.CLOSED);
 
-        assertThat(ReviewBackfillSignals.keyFor(WORKSPACE_ID, open).map(SignalKey::signalName)).contains(
-            ScmSignals.ISSUE_OPENED
-        );
-        assertThat(ReviewBackfillSignals.keyFor(WORKSPACE_ID, closed).map(SignalKey::signalName)).contains(
-            ScmSignals.ISSUE_CLOSED
-        );
+        assertThat(ReviewBackfillSignals.keyFor(WORKSPACE_ID, open).map(SignalKey::signalName))
+                .contains(ScmSignals.ISSUE_OPENED);
+        assertThat(ReviewBackfillSignals.keyFor(WORKSPACE_ID, closed).map(SignalKey::signalName))
+                .contains(ScmSignals.ISSUE_CLOSED);
     }
 
     /** An issue has no commits, so its identity is what the author wrote — which a campaign can read. */

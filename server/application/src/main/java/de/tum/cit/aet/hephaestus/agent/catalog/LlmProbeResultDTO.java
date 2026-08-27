@@ -12,11 +12,17 @@ import org.jspecify.annotations.Nullable;
  */
 @Schema(description = "Result of testing an LLM connection's /models endpoint")
 public record LlmProbeResultDTO(
-    @NonNull @Schema(description = "Whether the provider answered with a successful models listing") Boolean reachable,
-    @NonNull @Schema(description = "Model ids returned by the provider (empty if unreachable)") List<String> models,
-    @Nullable @Schema(description = "HTTP status returned by the provider, if any") Integer statusCode,
-    @Nullable @Schema(description = "Human-readable diagnostic when not reachable") String message
-) {
+        @NonNull @Schema(description = "Whether the provider answered with a successful models listing")
+        Boolean reachable,
+
+        @NonNull @Schema(description = "Model ids returned by the provider (empty if unreachable)")
+        List<String> models,
+
+        @Nullable @Schema(description = "HTTP status returned by the provider, if any")
+        Integer statusCode,
+
+        @Nullable @Schema(description = "Human-readable diagnostic when not reachable")
+        String message) {
     public static LlmProbeResultDTO reachable(List<String> models, int statusCode) {
         return new LlmProbeResultDTO(true, models, statusCode, null);
     }

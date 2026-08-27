@@ -40,11 +40,10 @@ class ProxyStreamUsageTapTest extends BaseUnitTest {
             feed(tap, "data: {\"choices\":[{\"delta\":{\"content\":\"He\"}}],\"usage\":null}\n\n");
             feed(tap, "data: {\"choices\":[{\"delta\":{\"content\":\"llo\"}}],\"usage\":null}\n\n");
             feed(
-                tap,
-                "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":100,\"completion_tokens\":50," +
-                    "\"prompt_tokens_details\":{\"cached_tokens\":20}," +
-                    "\"completion_tokens_details\":{\"reasoning_tokens\":10}}}\n\n"
-            );
+                    tap,
+                    "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":100,\"completion_tokens\":50,"
+                            + "\"prompt_tokens_details\":{\"cached_tokens\":20},"
+                            + "\"completion_tokens_details\":{\"reasoning_tokens\":10}}}\n\n");
             feed(tap, "data: [DONE]\n\n");
 
             ProxyTokenUsage observed = tap.observed();
@@ -136,11 +135,10 @@ class ProxyStreamUsageTapTest extends BaseUnitTest {
 
             feed(tap, "data: {\"type\":\"response.output_text.delta\",\"delta\":\"hi\"}\n\n");
             feed(
-                tap,
-                "data: {\"type\":\"response.completed\",\"response\":{\"usage\":{\"input_tokens\":200," +
-                    "\"output_tokens\":70,\"input_tokens_details\":{\"cached_tokens\":50}," +
-                    "\"output_tokens_details\":{\"reasoning_tokens\":25}}}}\n\n"
-            );
+                    tap,
+                    "data: {\"type\":\"response.completed\",\"response\":{\"usage\":{\"input_tokens\":200,"
+                            + "\"output_tokens\":70,\"input_tokens_details\":{\"cached_tokens\":50},"
+                            + "\"output_tokens_details\":{\"reasoning_tokens\":25}}}}\n\n");
 
             ProxyTokenUsage observed = tap.observed();
             assertThat(observed).isNotNull();
@@ -156,10 +154,9 @@ class ProxyStreamUsageTapTest extends BaseUnitTest {
             ProxyStreamUsageTap tap = new ProxyStreamUsageTap(MAPPER, true);
 
             feed(
-                tap,
-                "data: {\"type\":\"response.incomplete\",\"response\":{\"usage\":{\"input_tokens\":11," +
-                    "\"output_tokens\":4}}}\n\n"
-            );
+                    tap,
+                    "data: {\"type\":\"response.incomplete\",\"response\":{\"usage\":{\"input_tokens\":11,"
+                            + "\"output_tokens\":4}}}\n\n");
 
             assertThat(tap.observed()).isNotNull();
             assertThat(tap.observed().billableInputTokens()).isEqualTo(11);

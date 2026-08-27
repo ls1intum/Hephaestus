@@ -33,19 +33,18 @@ import org.jspecify.annotations.Nullable;
  * @param backfillPercent           per-resource backfill percent, if applicable
  */
 public record SyncResourceState(
-    @NonNull Long id,
-    @NonNull String externalId,
-    @NonNull String name,
-    @NonNull Type type,
-    @NonNull String state,
-    @Nullable Instant lastSyncedAt,
-    @Nullable Long itemCount,
-    @NonNull List<SyncResourceCount> counts,
-    @Nullable Long upstreamCount,
-    @Nullable String lastError,
-    @Nullable Instant backfillCompletedThrough,
-    @Nullable Integer backfillPercent
-) {
+        @NonNull Long id,
+        @NonNull String externalId,
+        @NonNull String name,
+        @NonNull Type type,
+        @NonNull String state,
+        @Nullable Instant lastSyncedAt,
+        @Nullable Long itemCount,
+        @NonNull List<SyncResourceCount> counts,
+        @Nullable Long upstreamCount,
+        @Nullable String lastError,
+        @Nullable Instant backfillCompletedThrough,
+        @Nullable Integer backfillPercent) {
     public SyncResourceState {
         counts = counts == null ? List.of() : List.copyOf(counts);
     }

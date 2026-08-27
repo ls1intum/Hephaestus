@@ -83,14 +83,8 @@ class ArchitectureTest extends HephaestusArchitectureTest {
          */
         @Test
         void noCyclesBetweenModules() {
-            Set<String> dataPlatform = Set.of(
-                "integration",
-                "workspace",
-                "config",
-                "activity",
-                "leaderboard",
-                "profile"
-            );
+            Set<String> dataPlatform =
+                    Set.of("integration", "workspace", "config", "activity", "leaderboard", "profile");
             SliceAssignment boundedContexts = new SliceAssignment() {
                 @Override
                 public SliceIdentifier getIdentifierOf(JavaClass javaClass) {
@@ -113,8 +107,8 @@ class ArchitectureTest extends HephaestusArchitectureTest {
                         return SliceIdentifier.of("integration-outline");
                     }
                     return dataPlatform.contains(top)
-                        ? SliceIdentifier.of("scm-data-platform")
-                        : SliceIdentifier.of(top);
+                            ? SliceIdentifier.of("scm-data-platform")
+                            : SliceIdentifier.of(top);
                 }
 
                 @Override
@@ -122,11 +116,10 @@ class ArchitectureTest extends HephaestusArchitectureTest {
                     return "bounded contexts (SCM data platform folded; feature modules per top-level package)";
                 }
             };
-            ArchRule rule = slices()
-                .assignedFrom(boundedContexts)
-                .should()
-                .beFreeOfCycles()
-                .because("Cyclic dependencies between bounded contexts prevent independent evolution");
+            ArchRule rule = slices().assignedFrom(boundedContexts)
+                    .should()
+                    .beFreeOfCycles()
+                    .because("Cyclic dependencies between bounded contexts prevent independent evolution");
             rule.check(classes);
         }
 
@@ -139,12 +132,12 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         @Test
         void controllersDoNotAccessRepositories() {
             ArchRule rule = noClasses()
-                .that()
-                .areAnnotatedWith(RestController.class)
-                .should()
-                .dependOnClassesThat()
-                .areAnnotatedWith(Repository.class)
-                .because("Controllers should delegate to services, not access data layer directly");
+                    .that()
+                    .areAnnotatedWith(RestController.class)
+                    .should()
+                    .dependOnClassesThat()
+                    .areAnnotatedWith(Repository.class)
+                    .because("Controllers should delegate to services, not access data layer directly");
             rule.check(classes);
         }
     }
@@ -165,17 +158,17 @@ class ArchitectureTest extends HephaestusArchitectureTest {
             // Prevent Provider/Resolver/Listener SPI interfaces from creeping back
             // into integration.scm — they belong in integration.spi.
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..integration.scm.domain.common..")
-                .and()
-                .areInterfaces()
-                .should()
-                .haveSimpleNameEndingWith("Provider")
-                .orShould()
-                .haveSimpleNameEndingWith("Resolver")
-                .orShould()
-                .haveSimpleNameEndingWith("Listener")
-                .because("Cross-module SPIs (Provider/Resolver/Listener) belong in integration.spi");
+                    .that()
+                    .resideInAPackage("..integration.scm.domain.common..")
+                    .and()
+                    .areInterfaces()
+                    .should()
+                    .haveSimpleNameEndingWith("Provider")
+                    .orShould()
+                    .haveSimpleNameEndingWith("Resolver")
+                    .orShould()
+                    .haveSimpleNameEndingWith("Listener")
+                    .because("Cross-module SPIs (Provider/Resolver/Listener) belong in integration.spi");
             rule.check(classes);
         }
     }
@@ -194,11 +187,11 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         @Test
         void transactionalNotOnControllers() {
             ArchRule rule = noClasses()
-                .that()
-                .areAnnotatedWith(RestController.class)
-                .should()
-                .beAnnotatedWith(Transactional.class)
-                .because("Transaction boundaries should be defined in the service layer");
+                    .that()
+                    .areAnnotatedWith(RestController.class)
+                    .should()
+                    .beAnnotatedWith(Transactional.class)
+                    .because("Transaction boundaries should be defined in the service layer");
             rule.check(classes);
         }
 
@@ -211,13 +204,13 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         @Test
         void configurationClassesHaveConfigSuffix() {
             ArchRule rule = classes()
-                .that()
-                .areAnnotatedWith(Configuration.class)
-                .should()
-                .haveSimpleNameEndingWith("Config")
-                .orShould()
-                .haveSimpleNameEndingWith("Configuration")
-                .because("Configuration classes should be easily identifiable by naming");
+                    .that()
+                    .areAnnotatedWith(Configuration.class)
+                    .should()
+                    .haveSimpleNameEndingWith("Config")
+                    .orShould()
+                    .haveSimpleNameEndingWith("Configuration")
+                    .because("Configuration classes should be easily identifiable by naming");
             rule.check(classes);
         }
 
@@ -230,13 +223,13 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         @Test
         void repositoriesExtendSpringData() {
             ArchRule rule = classes()
-                .that()
-                .areAnnotatedWith(Repository.class)
-                .and()
-                .areInterfaces()
-                .should()
-                .beAssignableTo(org.springframework.data.repository.Repository.class)
-                .because("Repositories should use Spring Data abstractions");
+                    .that()
+                    .areAnnotatedWith(Repository.class)
+                    .and()
+                    .areInterfaces()
+                    .should()
+                    .beAssignableTo(org.springframework.data.repository.Repository.class)
+                    .because("Repositories should use Spring Data abstractions");
             rule.check(classes);
         }
     }
@@ -252,8 +245,7 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         @Test
         void noSystemOutOrErr() {
             ArchRule rule = NO_CLASSES_SHOULD_ACCESS_STANDARD_STREAMS.because(
-                "Use SLF4J (LoggerFactory.getLogger) instead of System.out/err"
-            );
+                    "Use SLF4J (LoggerFactory.getLogger) instead of System.out/err");
             rule.check(classes);
         }
 
@@ -263,8 +255,8 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         @Test
         void noGenericExceptions() {
             ArchRule rule = noClasses()
-                .should(THROW_GENERIC_EXCEPTIONS)
-                .because("Use specific exception types for better error handling");
+                    .should(THROW_GENERIC_EXCEPTIONS)
+                    .because("Use specific exception types for better error handling");
             rule.check(classes);
         }
 
@@ -274,8 +266,7 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         @Test
         void noFieldInjection() {
             ArchRule rule = NO_CLASSES_SHOULD_USE_FIELD_INJECTION.because(
-                "Constructor injection makes dependencies explicit and testable"
-            );
+                    "Constructor injection makes dependencies explicit and testable");
             rule.check(classes);
         }
     }
@@ -293,10 +284,10 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         @Test
         void noJodaTime() {
             ArchRule rule = noClasses()
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("org.joda.time..")
-                .because("Use java.time API instead of deprecated Joda Time");
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAPackage("org.joda.time..")
+                    .because("Use java.time API instead of deprecated Joda Time");
             rule.check(classes);
         }
 
@@ -308,10 +299,10 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         @Test
         void noJavaUtilLogging() {
             ArchRule rule = noClasses()
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("java.util.logging..")
-                .because("Use SLF4J for consistent logging across the application");
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAPackage("java.util.logging..")
+                    .because("Use SLF4J for consistent logging across the application");
             rule.check(classes);
         }
 
@@ -323,10 +314,10 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         @Test
         void noCommonsLogging() {
             ArchRule rule = noClasses()
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("org.apache.commons.logging..")
-                .because("Use SLF4J for consistent logging across the application");
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAPackage("org.apache.commons.logging..")
+                    .because("Use SLF4J for consistent logging across the application");
             rule.check(classes);
         }
     }
@@ -339,22 +330,22 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         @Test
         void controllerNaming() {
             ArchRule rule = classes()
-                .that()
-                .areAnnotatedWith(RestController.class)
-                .should()
-                .haveSimpleNameEndingWith("Controller")
-                .because("Consistent naming improves code discoverability");
+                    .that()
+                    .areAnnotatedWith(RestController.class)
+                    .should()
+                    .haveSimpleNameEndingWith("Controller")
+                    .because("Consistent naming improves code discoverability");
             rule.check(classes);
         }
 
         @Test
         void repositoryNaming() {
             ArchRule rule = classes()
-                .that()
-                .areAnnotatedWith(Repository.class)
-                .should()
-                .haveSimpleNameEndingWith("Repository")
-                .because("Consistent naming improves code discoverability");
+                    .that()
+                    .areAnnotatedWith(Repository.class)
+                    .should()
+                    .haveSimpleNameEndingWith("Repository")
+                    .because("Consistent naming improves code discoverability");
             rule.check(classes);
         }
 
@@ -375,11 +366,11 @@ class ArchitectureTest extends HephaestusArchitectureTest {
         @DisplayName("Adapter classes use @Component, not @Service")
         void adaptersAreNotServices() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..adapter..")
-                .should()
-                .beAnnotatedWith(Service.class)
-                .because("Adapters are infrastructure glue, not business services - use @Component");
+                    .that()
+                    .resideInAPackage("..adapter..")
+                    .should()
+                    .beAnnotatedWith(Service.class)
+                    .because("Adapters are infrastructure glue, not business services - use @Component");
             rule.check(classes);
         }
     }

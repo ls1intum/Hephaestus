@@ -19,7 +19,6 @@ import com.nimbusds.jose.PlainHeader;
 import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jose.jwk.Curve;
 import com.nimbusds.jose.jwk.ECKey;
-import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.JWKSelector;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.KeyUse;
@@ -81,9 +80,9 @@ class RevocationAwareJwtDecoderTest extends BaseUnitTest {
     @BeforeEach
     void setUp() throws Exception {
         signingKey = new ECKeyGenerator(Curve.P_256)
-            .keyID(UUID.randomUUID().toString())
-            .keyUse(KeyUse.SIGNATURE)
-            .generate();
+                .keyID(UUID.randomUUID().toString())
+                .keyUse(KeyUse.SIGNATURE)
+                .generate();
         JWKSet set = new JWKSet(List.of(signingKey));
         jwkSource = (JWKSelector selector, SecurityContext ctx) -> selector.select(set);
         encoder = new NimbusJwtEncoder(jwkSource);
@@ -100,9 +99,7 @@ class RevocationAwareJwtDecoderTest extends BaseUnitTest {
     /** A JwtSigningKeyService stub that exposes the test JWK source — the decoder's only key boundary. */
     private JwtSigningKeyService keyService(JWKSource<SecurityContext> source) {
         JwtSigningKeyService svc = mock(JwtSigningKeyService.class);
-        lenient()
-            .when(svc.get(any(JWKSelector.class), any()))
-            .thenAnswer(inv -> source.get(inv.getArgument(0), null));
+        lenient().when(svc.get(any(JWKSelector.class), any())).thenAnswer(inv -> source.get(inv.getArgument(0), null));
         return svc;
     }
 
@@ -116,14 +113,16 @@ class RevocationAwareJwtDecoderTest extends BaseUnitTest {
 
     private String mint(UUID jti, String iss, String aud, Instant exp) {
         JwtClaimsSet claims = JwtClaimsSet.builder()
-            .issuer(iss)
-            .subject("42")
-            .audience(List.of(aud))
-            .id(jti.toString())
-            .issuedAt(exp.minus(Duration.ofMinutes(30))) // iat strictly before exp in every case
-            .expiresAt(exp)
-            .build();
-        JwsHeader header = JwsHeader.with(SignatureAlgorithm.ES256).keyId(signingKey.getKeyID()).build();
+                .issuer(iss)
+                .subject("42")
+                .audience(List.of(aud))
+                .id(jti.toString())
+                .issuedAt(exp.minus(Duration.ofMinutes(30))) // iat strictly before exp in every case
+                .expiresAt(exp)
+                .build();
+        JwsHeader header = JwsHeader.with(SignatureAlgorithm.ES256)
+                .keyId(signingKey.getKeyID())
+                .build();
         return encoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
     }
 
@@ -134,15 +133,17 @@ class RevocationAwareJwtDecoderTest extends BaseUnitTest {
     /** A signature/issuer/audience-valid token whose jti claim is set verbatim (or omitted when null). */
     private String mintWithRawJti(@Nullable String rawJtiOrNull) {
         JwtClaimsSet.Builder claims = JwtClaimsSet.builder()
-            .issuer(ISSUER.toString())
-            .subject("42")
-            .audience(List.of(AUDIENCE))
-            .issuedAt(NOW.minus(Duration.ofMinutes(1)))
-            .expiresAt(NOW.plus(Duration.ofMinutes(15)));
+                .issuer(ISSUER.toString())
+                .subject("42")
+                .audience(List.of(AUDIENCE))
+                .issuedAt(NOW.minus(Duration.ofMinutes(1)))
+                .expiresAt(NOW.plus(Duration.ofMinutes(15)));
         if (rawJtiOrNull != null) {
             claims.id(rawJtiOrNull);
         }
-        JwsHeader header = JwsHeader.with(SignatureAlgorithm.ES256).keyId(signingKey.getKeyID()).build();
+        JwsHeader header = JwsHeader.with(SignatureAlgorithm.ES256)
+                .keyId(signingKey.getKeyID())
+                .build();
         return encoder.encode(JwtEncoderParameters.from(header, claims.build())).getTokenValue();
     }
 
@@ -151,16 +152,16 @@ class RevocationAwareJwtDecoderTest extends BaseUnitTest {
         // A signature-valid token with no jti is a client error → 401 (BadJwtException), not a 500.
         IssuedJwtRepository repo = mock(IssuedJwtRepository.class);
         assertThatThrownBy(() -> decoder(repo, cacheManager()).decode(mintWithRawJti(null)))
-            .isInstanceOf(BadJwtException.class)
-            .hasMessageContaining("missing jti");
+                .isInstanceOf(BadJwtException.class)
+                .hasMessageContaining("missing jti");
     }
 
     @Test
     void rejectsTokenWithMalformedJti() {
         IssuedJwtRepository repo = mock(IssuedJwtRepository.class);
         assertThatThrownBy(() -> decoder(repo, cacheManager()).decode(mintWithRawJti("not-a-uuid")))
-            .isInstanceOf(BadJwtException.class)
-            .hasMessageContaining("malformed jti");
+                .isInstanceOf(BadJwtException.class)
+                .hasMessageContaining("malformed jti");
     }
 
     @Test
@@ -188,8 +189,8 @@ class RevocationAwareJwtDecoderTest extends BaseUnitTest {
         // JwtAuthenticationProvider answer a revoked token with 401, not 500. Asserting the exact
         // type pins that production contract (covered end-to-end by CookieAuthenticationIntegrationTest).
         assertThatThrownBy(() -> decoder.decode(validToken(jti)))
-            .isInstanceOf(BadJwtException.class)
-            .hasMessageContaining("revoked");
+                .isInstanceOf(BadJwtException.class)
+                .hasMessageContaining("revoked");
     }
 
     @Test
@@ -197,8 +198,8 @@ class RevocationAwareJwtDecoderTest extends BaseUnitTest {
         UUID jti = UUID.randomUUID();
         IssuedJwtRepository repo = mock(IssuedJwtRepository.class);
         lenient()
-            .when(repo.findActive(eq(jti), any()))
-            .thenReturn(Optional.of(new IssuedJwt(jti, 42L, NOW.plus(Duration.ofMinutes(15)))));
+                .when(repo.findActive(eq(jti), any()))
+                .thenReturn(Optional.of(new IssuedJwt(jti, 42L, NOW.plus(Duration.ofMinutes(15)))));
 
         String token = validToken(jti);
         // Flip the FIRST character of the signature segment. (Flipping the LAST char is flaky: the
@@ -215,24 +216,28 @@ class RevocationAwareJwtDecoderTest extends BaseUnitTest {
     void rejectsTokenSignedByDifferentKey() throws Exception {
         // Sign with an attacker key; the decoder only trusts the real key source.
         ECKey attackerKey = new ECKeyGenerator(Curve.P_256)
-            .keyID(signingKey.getKeyID())
-            .keyUse(KeyUse.SIGNATURE)
-            .generate();
+                .keyID(signingKey.getKeyID())
+                .keyUse(KeyUse.SIGNATURE)
+                .generate();
         JWKSet attackerSet = new JWKSet(List.of(attackerKey));
         JWKSource<SecurityContext> attackerSource = (JWKSelector sel, SecurityContext ctx) -> sel.select(attackerSet);
         NimbusJwtEncoder attackerEncoder = new NimbusJwtEncoder(attackerSource);
 
         UUID jti = UUID.randomUUID();
         JwtClaimsSet claims = JwtClaimsSet.builder()
-            .issuer(ISSUER.toString())
-            .subject("42")
-            .audience(List.of(AUDIENCE))
-            .id(jti.toString())
-            .issuedAt(NOW.minus(Duration.ofMinutes(1)))
-            .expiresAt(NOW.plus(Duration.ofMinutes(15)))
-            .build();
-        JwsHeader header = JwsHeader.with(SignatureAlgorithm.ES256).keyId(signingKey.getKeyID()).build();
-        String forged = attackerEncoder.encode(JwtEncoderParameters.from(header, claims)).getTokenValue();
+                .issuer(ISSUER.toString())
+                .subject("42")
+                .audience(List.of(AUDIENCE))
+                .id(jti.toString())
+                .issuedAt(NOW.minus(Duration.ofMinutes(1)))
+                .expiresAt(NOW.plus(Duration.ofMinutes(15)))
+                .build();
+        JwsHeader header = JwsHeader.with(SignatureAlgorithm.ES256)
+                .keyId(signingKey.getKeyID())
+                .build();
+        String forged = attackerEncoder
+                .encode(JwtEncoderParameters.from(header, claims))
+                .getTokenValue();
 
         IssuedJwtRepository repo = mock(IssuedJwtRepository.class);
         assertThatThrownBy(() -> decoder(repo, cacheManager()).decode(forged)).isInstanceOf(JwtException.class);
@@ -275,11 +280,12 @@ class RevocationAwareJwtDecoderTest extends BaseUnitTest {
         // BadJwtException so the unverifiable token is answered 401 (fail-closed), not 500. A bare
         // JwtException here would turn every request during a DB blip into a 500 instead of a clean 401.
         assertThatThrownBy(() -> decoder(repo, cacheManager()).decode(validToken(jti)))
-            .isInstanceOf(BadJwtException.class)
-            .hasMessageContaining("revocation check failed");
+                .isInstanceOf(BadJwtException.class)
+                .hasMessageContaining("revocation check failed");
 
         // …and the fail-closed rejection is observable (a DB-outage mass-401 must not be silent).
-        assertThat(meterRegistry.counter("auth.revocation.check_failed").count()).isEqualTo(1.0);
+        assertThat(meterRegistry.counter("auth.revocation.check_failed").count())
+                .isEqualTo(1.0);
     }
 
     @Test
@@ -327,8 +333,8 @@ class RevocationAwareJwtDecoderTest extends BaseUnitTest {
         assertThat(decoder.decode(validToken(jti)).getId()).isEqualTo(jti.toString());
         // The revoke-between-requests verdict must also be a BadJwtException → 401 (see rejectsRevokedJti).
         assertThatThrownBy(() -> decoder.decode(validToken(jti)))
-            .isInstanceOf(BadJwtException.class)
-            .hasMessageContaining("revoked");
+                .isInstanceOf(BadJwtException.class)
+                .hasMessageContaining("revoked");
     }
 
     /**
@@ -362,7 +368,9 @@ class RevocationAwareJwtDecoderTest extends BaseUnitTest {
         UUID jti = UUID.randomUUID();
         // The public key bytes — exactly what a JWKS exposes — abused as the HMAC secret.
         byte[] publicKeyBytes = signingKey.toECPublicKey().getEncoded();
-        JWSHeader header = new JWSHeader.Builder(JWSAlgorithm.HS256).keyID(signingKey.getKeyID()).build();
+        JWSHeader header = new JWSHeader.Builder(JWSAlgorithm.HS256)
+                .keyID(signingKey.getKeyID())
+                .build();
         SignedJWT forged = new SignedJWT(header, confusionClaims(jti));
         forged.sign(new MACSigner(publicKeyBytes));
         String token = forged.serialize();
@@ -375,12 +383,12 @@ class RevocationAwareJwtDecoderTest extends BaseUnitTest {
     private JWTClaimsSet confusionClaims(UUID jti) {
         Instant exp = NOW.plus(Duration.ofMinutes(15));
         return new JWTClaimsSet.Builder()
-            .issuer(ISSUER.toString())
-            .subject("42")
-            .audience(AUDIENCE)
-            .jwtID(jti.toString())
-            .issueTime(Date.from(exp.minus(Duration.ofMinutes(30))))
-            .expirationTime(Date.from(exp))
-            .build();
+                .issuer(ISSUER.toString())
+                .subject("42")
+                .audience(AUDIENCE)
+                .jwtID(jti.toString())
+                .issueTime(Date.from(exp.minus(Duration.ofMinutes(30))))
+                .expirationTime(Date.from(exp))
+                .build();
     }
 }

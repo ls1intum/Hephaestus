@@ -17,13 +17,12 @@ import org.jspecify.annotations.Nullable;
  *                                (the publisher suppresses empty digests)
  */
 public record LeaderboardDigestReadyEvent(
-    long workspaceId,
-    String workspaceSlug,
-    String channelId,
-    @Nullable String teamLabel,
-    long currentDateEpochSeconds,
-    Instant after,
-    Instant before,
-    List<LeaderboardEntryDTO> topEntries,
-    String baseUrl
-) {}
+        long workspaceId,
+        String workspaceSlug,
+        String channelId,
+        @Nullable String teamLabel,
+        long currentDateEpochSeconds,
+        Instant after,
+        Instant before,
+        List<LeaderboardEntryDTO> topEntries,
+        String baseUrl) {}

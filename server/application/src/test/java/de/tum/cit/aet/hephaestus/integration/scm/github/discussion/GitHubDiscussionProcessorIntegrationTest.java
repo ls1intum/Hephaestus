@@ -104,10 +104,9 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
     private void setupTestData() {
         // Create GitHub provider
         githubProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
 
         // Create organization matching fixture data
         testOrganization = new Organization();
@@ -154,41 +153,40 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
 
     private GitHubUserDTO createAuthorDto() {
         return new GitHubUserDTO(
-            FIXTURE_AUTHOR_ID,
-            FIXTURE_AUTHOR_ID,
-            FIXTURE_AUTHOR_LOGIN,
-            "https://avatars.githubusercontent.com/u/" + FIXTURE_AUTHOR_ID,
-            "https://github.com/" + FIXTURE_AUTHOR_LOGIN,
-            null,
-            null
-        );
+                FIXTURE_AUTHOR_ID,
+                FIXTURE_AUTHOR_ID,
+                FIXTURE_AUTHOR_LOGIN,
+                "https://avatars.githubusercontent.com/u/" + FIXTURE_AUTHOR_ID,
+                "https://github.com/" + FIXTURE_AUTHOR_LOGIN,
+                null,
+                null);
     }
 
     private GitHubDiscussionDTO createBasicDiscussionDto(Long id, int number) {
         return new GitHubDiscussionDTO(
-            id, // id (webhook style - no databaseId)
-            null, // databaseId (null for webhook payloads)
-            "D_node_" + id,
-            number,
-            "Test Discussion #" + number,
-            "This is the body of test discussion #" + number,
-            "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/discussions/" + number,
-            "open",
-            null, // stateReason
-            false, // locked
-            null, // activeLockReason
-            0, // commentsCount
-            0, // upvoteCount
-            Instant.parse("2025-11-01T21:42:45Z"),
-            Instant.parse("2025-11-01T21:42:45Z"),
-            null, // closedAt
-            null, // answerChosenAt
-            createAuthorDto(),
-            null, // answerChosenBy
-            null, // category
-            null, // labels
-            null // answerComment
-        );
+                id, // id (webhook style - no databaseId)
+                null, // databaseId (null for webhook payloads)
+                "D_node_" + id,
+                number,
+                "Test Discussion #" + number,
+                "This is the body of test discussion #" + number,
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/discussions/" + number,
+                "open",
+                null, // stateReason
+                false, // locked
+                null, // activeLockReason
+                0, // commentsCount
+                0, // upvoteCount
+                Instant.parse("2025-11-01T21:42:45Z"),
+                Instant.parse("2025-11-01T21:42:45Z"),
+                null, // closedAt
+                null, // answerChosenAt
+                createAuthorDto(),
+                null, // answerChosenBy
+                null, // category
+                null, // labels
+                null // answerComment
+                );
     }
 
     // Critical: getDatabaseId() Fallback Tests
@@ -201,36 +199,36 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             // Given - GraphQL style DTO with databaseId
             Long databaseId = 123456789L;
             GitHubDiscussionDTO dto = new GitHubDiscussionDTO(
-                null, // id (null for GraphQL)
-                databaseId, // databaseId
-                "D_node_xyz",
-                27,
-                "GraphQL Discussion",
-                "Body",
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/discussions/27",
-                "open",
-                null,
-                false,
-                null,
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null,
-                null,
-                createAuthorDto(),
-                null,
-                null,
-                null,
-                null
-            );
+                    null, // id (null for GraphQL)
+                    databaseId, // databaseId
+                    "D_node_xyz",
+                    27,
+                    "GraphQL Discussion",
+                    "Body",
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/discussions/27",
+                    "open",
+                    null,
+                    false,
+                    null,
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null,
+                    null,
+                    createAuthorDto(),
+                    null,
+                    null,
+                    null,
+                    null);
 
             Discussion result = processor.process(dto, createContext());
 
             // Then - should use databaseId
             assertNotNull(result);
             assertThat(result.getNativeId()).isEqualTo(databaseId);
-            assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 27)).isPresent();
+            assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 27))
+                    .isPresent();
         }
 
         @Test
@@ -238,29 +236,28 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             // Given - Webhook style DTO with only id
             Long webhookId = FIXTURE_DISCUSSION_ID;
             GitHubDiscussionDTO dto = new GitHubDiscussionDTO(
-                webhookId, // id (this is the database ID in webhooks)
-                null, // databaseId is null in webhooks
-                "D_kwDOO4CKW84CxV91",
-                27,
-                "Webhook Discussion",
-                "Body",
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/discussions/27",
-                "open",
-                null,
-                false,
-                null,
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null,
-                null,
-                createAuthorDto(),
-                null,
-                null,
-                null,
-                null
-            );
+                    webhookId, // id (this is the database ID in webhooks)
+                    null, // databaseId is null in webhooks
+                    "D_kwDOO4CKW84CxV91",
+                    27,
+                    "Webhook Discussion",
+                    "Body",
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/discussions/27",
+                    "open",
+                    null,
+                    false,
+                    null,
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null,
+                    null,
+                    createAuthorDto(),
+                    null,
+                    null,
+                    null,
+                    null);
 
             // Verify the fallback works
             assertThat(dto.getDatabaseId()).isEqualTo(webhookId);
@@ -270,36 +267,36 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             // Then - should use id as fallback
             assertNotNull(result);
             assertThat(result.getNativeId()).isEqualTo(webhookId);
-            assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 27)).isPresent();
+            assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 27))
+                    .isPresent();
         }
 
         @Test
         void shouldReturnNullWhenBothIdsNull() {
             // Given - malformed DTO with no IDs
             GitHubDiscussionDTO dto = new GitHubDiscussionDTO(
-                null, // id
-                null, // databaseId
-                "D_node_xyz",
-                1,
-                "No ID Discussion",
-                "Body",
-                "https://example.com",
-                "open",
-                null,
-                false,
-                null,
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null,
-                null,
-                createAuthorDto(),
-                null,
-                null,
-                null,
-                null
-            );
+                    null, // id
+                    null, // databaseId
+                    "D_node_xyz",
+                    1,
+                    "No ID Discussion",
+                    "Body",
+                    "https://example.com",
+                    "open",
+                    null,
+                    false,
+                    null,
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null,
+                    null,
+                    createAuthorDto(),
+                    null,
+                    null,
+                    null,
+                    null);
 
             // Verify fallback returns null
             assertThat(dto.getDatabaseId()).isNull();
@@ -307,7 +304,8 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             Discussion result = processor.process(dto, createContext());
 
             assertThat(result).isNull();
-            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCreated.class)).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCreated.class))
+                    .isEmpty();
         }
     }
 
@@ -332,22 +330,24 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getRepository().getNativeId()).isEqualTo(FIXTURE_REPO_ID);
 
             // Verify persisted
-            assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 27)).isPresent();
+            assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 27))
+                    .isPresent();
 
             // Verify Created event published
             assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCreated.class))
-                .hasSize(1)
-                .first()
-                .satisfies(event -> {
-                    assertThat(event.discussion().id()).isEqualTo(result.getId());
-                    assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
-                });
+                    .hasSize(1)
+                    .first()
+                    .satisfies(event -> {
+                        assertThat(event.discussion().id()).isEqualTo(result.getId());
+                        assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
+                    });
         }
 
         @Test
         void shouldCreateAuthorIfNotExists() {
             // Given - no user exists
-            assertThat(userRepository.findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, providerId())).isEmpty();
+            assertThat(userRepository.findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, providerId()))
+                    .isEmpty();
 
             Long discussionId = 111222333L;
             GitHubDiscussionDTO dto = createBasicDiscussionDto(discussionId, 1);
@@ -358,7 +358,8 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getAuthor()).isNotNull();
             assertThat(result.getAuthor().getNativeId()).isEqualTo(FIXTURE_AUTHOR_ID);
             assertThat(result.getAuthor().getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
-            assertThat(userRepository.findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, providerId())).isPresent();
+            assertThat(userRepository.findByNativeIdAndProviderId(FIXTURE_AUTHOR_ID, providerId()))
+                    .isPresent();
         }
 
         @Test
@@ -389,29 +390,28 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldHandleNullBody() {
             Long discussionId = 333444555L;
             GitHubDiscussionDTO dto = new GitHubDiscussionDTO(
-                discussionId,
-                null,
-                "node",
-                3,
-                "Title",
-                null, // null body
-                "https://example.com",
-                "open",
-                null,
-                false,
-                null,
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null,
-                null,
-                createAuthorDto(),
-                null,
-                null,
-                null,
-                null
-            );
+                    discussionId,
+                    null,
+                    "node",
+                    3,
+                    "Title",
+                    null, // null body
+                    "https://example.com",
+                    "open",
+                    null,
+                    false,
+                    null,
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null,
+                    null,
+                    createAuthorDto(),
+                    null,
+                    null,
+                    null,
+                    null);
 
             Discussion result = processor.process(dto, createContext());
             assertNotNull(result);
@@ -423,29 +423,28 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldHandleNullAuthor() {
             Long discussionId = 444555666L;
             GitHubDiscussionDTO dto = new GitHubDiscussionDTO(
-                discussionId,
-                null,
-                "node",
-                4,
-                "Title",
-                "Body",
-                "https://example.com",
-                "open",
-                null,
-                false,
-                null,
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null,
-                null,
-                null, // null author
-                null,
-                null,
-                null,
-                null
-            );
+                    discussionId,
+                    null,
+                    "node",
+                    4,
+                    "Title",
+                    "Body",
+                    "https://example.com",
+                    "open",
+                    null,
+                    false,
+                    null,
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null,
+                    null,
+                    null, // null author
+                    null,
+                    null,
+                    null,
+                    null);
 
             Discussion result = processor.process(dto, createContext());
 
@@ -459,75 +458,73 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             Long labelId = 9567656085L;
             GitHubLabelDTO labelDto = new GitHubLabelDTO(labelId, "LA_node", "bug", "Bug label", "ff0000", null, null);
             GitHubDiscussionDTO dto = new GitHubDiscussionDTO(
-                discussionId,
-                null,
-                "node",
-                5,
-                "Title",
-                "Body",
-                "https://example.com",
-                "open",
-                null,
-                false,
-                null,
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null,
-                null,
-                createAuthorDto(),
-                null,
-                null,
-                List.of(labelDto),
-                null
-            );
+                    discussionId,
+                    null,
+                    "node",
+                    5,
+                    "Title",
+                    "Body",
+                    "https://example.com",
+                    "open",
+                    null,
+                    false,
+                    null,
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null,
+                    null,
+                    createAuthorDto(),
+                    null,
+                    null,
+                    List.of(labelDto),
+                    null);
 
             Discussion result = processor.process(dto, createContext());
             assertNotNull(result);
 
             assertThat(result.getLabels()).hasSize(1);
             assertThat(result.getLabels().iterator().next().getName()).isEqualTo("bug");
-            assertThat(labelRepository.findByNativeIdAndProviderId(labelId, providerId())).isPresent();
+            assertThat(labelRepository.findByNativeIdAndProviderId(labelId, providerId()))
+                    .isPresent();
         }
 
         @Test
         void shouldCreateCategoryWhenIncluded() {
             Long discussionId = 666777888L;
             GitHubDiscussionCategoryDTO categoryDto = new GitHubDiscussionCategoryDTO(
-                "DIC_kwDOO4CKW84CxV91",
-                "General",
-                "general",
-                "\uD83D\uDCAC", // 💬
-                "General discussions",
-                false,
-                Instant.now(),
-                Instant.now()
-            );
+                    "DIC_kwDOO4CKW84CxV91",
+                    "General",
+                    "general",
+                    "\uD83D\uDCAC", // 💬
+                    "General discussions",
+                    false,
+                    Instant.now(),
+                    Instant.now());
             GitHubDiscussionDTO dto = new GitHubDiscussionDTO(
-                discussionId,
-                null,
-                "node",
-                6,
-                "Title",
-                "Body",
-                "https://example.com",
-                "open",
-                null,
-                false,
-                null,
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null,
-                null,
-                createAuthorDto(),
-                null,
-                categoryDto,
-                null,
-                null
-            );
+                    discussionId,
+                    null,
+                    "node",
+                    6,
+                    "Title",
+                    "Body",
+                    "https://example.com",
+                    "open",
+                    null,
+                    false,
+                    null,
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null,
+                    null,
+                    createAuthorDto(),
+                    null,
+                    categoryDto,
+                    null,
+                    null);
 
             Discussion result = processor.process(dto, createContext());
             assertNotNull(result);
@@ -541,39 +538,37 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldHandleCategoryWithAnswerable() {
             Long discussionId = 777888999L;
             GitHubDiscussionCategoryDTO categoryDto = new GitHubDiscussionCategoryDTO(
-                "DIC_kwDOO4CKW84CxV92",
-                "Q&A",
-                "q-a",
-                "\u2753", // ❓
-                "Ask questions and get answers",
-                true, // answerable
-                Instant.now(),
-                Instant.now()
-            );
+                    "DIC_kwDOO4CKW84CxV92",
+                    "Q&A",
+                    "q-a",
+                    "\u2753", // ❓
+                    "Ask questions and get answers",
+                    true, // answerable
+                    Instant.now(),
+                    Instant.now());
             GitHubDiscussionDTO dto = new GitHubDiscussionDTO(
-                discussionId,
-                null,
-                "node",
-                7,
-                "Question Title",
-                "Question body",
-                "https://example.com",
-                "open",
-                null,
-                false,
-                null,
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null,
-                null,
-                createAuthorDto(),
-                null,
-                categoryDto,
-                null,
-                null
-            );
+                    discussionId,
+                    null,
+                    "node",
+                    7,
+                    "Question Title",
+                    "Question body",
+                    "https://example.com",
+                    "open",
+                    null,
+                    false,
+                    null,
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null,
+                    null,
+                    createAuthorDto(),
+                    null,
+                    categoryDto,
+                    null,
+                    null);
 
             Discussion result = processor.process(dto, createContext());
             assertNotNull(result);
@@ -594,58 +589,56 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             // Given - create existing discussion
             Long discussionId = FIXTURE_DISCUSSION_ID;
             GitHubDiscussionDTO initialDto = new GitHubDiscussionDTO(
-                discussionId,
-                null,
-                "node",
-                27,
-                "Old Title",
-                "Old body",
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/discussions/27",
-                "open",
-                null,
-                false,
-                null,
-                0,
-                0,
-                Instant.parse("2025-11-01T21:42:45Z"),
-                Instant.parse("2025-11-01T21:42:45Z"),
-                null,
-                null,
-                createAuthorDto(),
-                null,
-                null,
-                null,
-                null
-            );
+                    discussionId,
+                    null,
+                    "node",
+                    27,
+                    "Old Title",
+                    "Old body",
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/discussions/27",
+                    "open",
+                    null,
+                    false,
+                    null,
+                    0,
+                    0,
+                    Instant.parse("2025-11-01T21:42:45Z"),
+                    Instant.parse("2025-11-01T21:42:45Z"),
+                    null,
+                    null,
+                    createAuthorDto(),
+                    null,
+                    null,
+                    null,
+                    null);
             processor.process(initialDto, createContext());
 
             eventListener.clear();
 
             // Now update with new data
             GitHubDiscussionDTO updateDto = new GitHubDiscussionDTO(
-                discussionId,
-                null,
-                "node",
-                27,
-                "New Title",
-                "New body",
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/discussions/27",
-                "open",
-                null,
-                false,
-                null,
-                0,
-                0,
-                Instant.parse("2025-11-01T21:42:45Z"),
-                Instant.parse("2025-11-02T10:00:00Z"), // newer updatedAt
-                null,
-                null,
-                createAuthorDto(),
-                null,
-                null,
-                null,
-                null
-            );
+                    discussionId,
+                    null,
+                    "node",
+                    27,
+                    "New Title",
+                    "New body",
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/discussions/27",
+                    "open",
+                    null,
+                    false,
+                    null,
+                    0,
+                    0,
+                    Instant.parse("2025-11-01T21:42:45Z"),
+                    Instant.parse("2025-11-02T10:00:00Z"), // newer updatedAt
+                    null,
+                    null,
+                    createAuthorDto(),
+                    null,
+                    null,
+                    null,
+                    null);
 
             Discussion result = processor.process(updateDto, createContext());
             assertNotNull(result);
@@ -656,11 +649,11 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Verify Updated event with changedFields
             assertThat(eventListener.ofType(ScmDomainEvent.DiscussionUpdated.class))
-                .hasSize(1)
-                .first()
-                .satisfies(event -> {
-                    assertThat(event.changedFields()).contains("title", "body");
-                });
+                    .hasSize(1)
+                    .first()
+                    .satisfies(event -> {
+                        assertThat(event.changedFields()).contains("title", "body");
+                    });
         }
 
         @Test
@@ -668,63 +661,62 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             // Given - create existing discussion
             Long discussionId = FIXTURE_DISCUSSION_ID;
             GitHubDiscussionDTO dto = new GitHubDiscussionDTO(
-                discussionId,
-                null,
-                "node",
-                27,
-                "Same Title",
-                "Same body",
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/discussions/27",
-                "open",
-                null,
-                false,
-                null,
-                0,
-                0,
-                Instant.parse("2025-11-01T21:42:45Z"),
-                Instant.parse("2025-11-01T21:42:45Z"),
-                null,
-                null,
-                createAuthorDto(),
-                null,
-                null,
-                null,
-                null
-            );
+                    discussionId,
+                    null,
+                    "node",
+                    27,
+                    "Same Title",
+                    "Same body",
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/discussions/27",
+                    "open",
+                    null,
+                    false,
+                    null,
+                    0,
+                    0,
+                    Instant.parse("2025-11-01T21:42:45Z"),
+                    Instant.parse("2025-11-01T21:42:45Z"),
+                    null,
+                    null,
+                    createAuthorDto(),
+                    null,
+                    null,
+                    null,
+                    null);
             processor.process(dto, createContext());
 
             eventListener.clear();
 
             // Process same data again with a newer updatedAt so it doesn't get skipped as stale
             GitHubDiscussionDTO sameDto = new GitHubDiscussionDTO(
-                discussionId,
-                null,
-                "node",
-                27,
-                "Same Title",
-                "Same body",
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/discussions/27",
-                "open",
-                null,
-                false,
-                null,
-                0,
-                0,
-                Instant.parse("2025-11-01T21:42:45Z"),
-                Instant.parse("2025-11-02T10:00:00Z"), // newer so it passes stale check
-                null,
-                null,
-                createAuthorDto(),
-                null,
-                null,
-                null,
-                null
-            );
+                    discussionId,
+                    null,
+                    "node",
+                    27,
+                    "Same Title",
+                    "Same body",
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/discussions/27",
+                    "open",
+                    null,
+                    false,
+                    null,
+                    0,
+                    0,
+                    Instant.parse("2025-11-01T21:42:45Z"),
+                    Instant.parse("2025-11-02T10:00:00Z"), // newer so it passes stale check
+                    null,
+                    null,
+                    createAuthorDto(),
+                    null,
+                    null,
+                    null,
+                    null);
 
             processor.process(sameDto, createContext());
 
             // Then - no Updated event (empty changedFields means no event published)
-            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionUpdated.class)).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionUpdated.class))
+                    .isEmpty();
         }
 
         @Test
@@ -749,58 +741,56 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             // Given - create discussion with a future updatedAt
             Long discussionId = FIXTURE_DISCUSSION_ID;
             GitHubDiscussionDTO initialDto = new GitHubDiscussionDTO(
-                discussionId,
-                null,
-                "node",
-                27,
-                "Original Title",
-                "Original body",
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/discussions/27",
-                "open",
-                null,
-                false,
-                null,
-                0,
-                0,
-                Instant.parse("2025-11-01T21:42:45Z"),
-                Instant.parse("2030-01-01T00:00:00Z"), // far future updatedAt
-                null,
-                null,
-                createAuthorDto(),
-                null,
-                null,
-                null,
-                null
-            );
+                    discussionId,
+                    null,
+                    "node",
+                    27,
+                    "Original Title",
+                    "Original body",
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/discussions/27",
+                    "open",
+                    null,
+                    false,
+                    null,
+                    0,
+                    0,
+                    Instant.parse("2025-11-01T21:42:45Z"),
+                    Instant.parse("2030-01-01T00:00:00Z"), // far future updatedAt
+                    null,
+                    null,
+                    createAuthorDto(),
+                    null,
+                    null,
+                    null,
+                    null);
             processor.process(initialDto, createContext());
 
             eventListener.clear();
 
             // Now try to update with an older updatedAt
             GitHubDiscussionDTO staleDto = new GitHubDiscussionDTO(
-                discussionId,
-                null,
-                "node",
-                27,
-                "Stale Title",
-                "Stale body",
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/discussions/27",
-                "open",
-                null,
-                false,
-                null,
-                0,
-                0,
-                Instant.parse("2025-11-01T21:42:45Z"),
-                Instant.parse("2025-11-01T21:42:45Z"), // older than existing
-                null,
-                null,
-                createAuthorDto(),
-                null,
-                null,
-                null,
-                null
-            );
+                    discussionId,
+                    null,
+                    "node",
+                    27,
+                    "Stale Title",
+                    "Stale body",
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/discussions/27",
+                    "open",
+                    null,
+                    false,
+                    null,
+                    0,
+                    0,
+                    Instant.parse("2025-11-01T21:42:45Z"),
+                    Instant.parse("2025-11-01T21:42:45Z"), // older than existing
+                    null,
+                    null,
+                    createAuthorDto(),
+                    null,
+                    null,
+                    null,
+                    null);
 
             Discussion result = processor.process(staleDto, createContext());
 
@@ -809,9 +799,11 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getTitle()).isEqualTo("Original Title");
 
             // No Updated event published
-            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionUpdated.class)).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionUpdated.class))
+                    .isEmpty();
             // No Created event published either (it was already created)
-            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCreated.class)).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCreated.class))
+                    .isEmpty();
         }
 
         @Test
@@ -819,78 +811,69 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             // Given - create discussion without labels
             Long discussionId = FIXTURE_DISCUSSION_ID;
             GitHubDiscussionDTO initialDto = new GitHubDiscussionDTO(
-                discussionId,
-                null,
-                "node",
-                27,
-                "Title",
-                "Body",
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/discussions/27",
-                "open",
-                null,
-                false,
-                null,
-                0,
-                0,
-                Instant.parse("2025-11-01T21:42:45Z"),
-                Instant.parse("2025-11-01T21:42:45Z"),
-                null,
-                null,
-                createAuthorDto(),
-                null,
-                null,
-                null,
-                null
-            );
+                    discussionId,
+                    null,
+                    "node",
+                    27,
+                    "Title",
+                    "Body",
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/discussions/27",
+                    "open",
+                    null,
+                    false,
+                    null,
+                    0,
+                    0,
+                    Instant.parse("2025-11-01T21:42:45Z"),
+                    Instant.parse("2025-11-01T21:42:45Z"),
+                    null,
+                    null,
+                    createAuthorDto(),
+                    null,
+                    null,
+                    null,
+                    null);
             processor.process(initialDto, createContext());
 
             eventListener.clear();
 
             // Now update with a label
             Long labelId = 9567656085L;
-            GitHubLabelDTO labelDto = new GitHubLabelDTO(
-                labelId,
-                "LA_node",
-                "enhancement",
-                "Enhancement",
-                "84b6eb",
-                null,
-                null
-            );
+            GitHubLabelDTO labelDto =
+                    new GitHubLabelDTO(labelId, "LA_node", "enhancement", "Enhancement", "84b6eb", null, null);
             GitHubDiscussionDTO updateDto = new GitHubDiscussionDTO(
-                discussionId,
-                null,
-                "node",
-                27,
-                "Title",
-                "Body",
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/discussions/27",
-                "open",
-                null,
-                false,
-                null,
-                0,
-                0,
-                Instant.parse("2025-11-01T21:42:45Z"),
-                Instant.parse("2025-11-02T10:00:00Z"), // newer updatedAt
-                null,
-                null,
-                createAuthorDto(),
-                null,
-                null,
-                List.of(labelDto),
-                null
-            );
+                    discussionId,
+                    null,
+                    "node",
+                    27,
+                    "Title",
+                    "Body",
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/discussions/27",
+                    "open",
+                    null,
+                    false,
+                    null,
+                    0,
+                    0,
+                    Instant.parse("2025-11-01T21:42:45Z"),
+                    Instant.parse("2025-11-02T10:00:00Z"), // newer updatedAt
+                    null,
+                    null,
+                    createAuthorDto(),
+                    null,
+                    null,
+                    List.of(labelDto),
+                    null);
 
             processor.process(updateDto, createContext());
 
             // Then - Updated event should contain "labels" in changedFields
             assertThat(eventListener.ofType(ScmDomainEvent.DiscussionUpdated.class))
-                .hasSize(1)
-                .first()
-                .satisfies(event -> {
-                    assertThat(event.changedFields()).contains("labels");
-                });
+                    .hasSize(1)
+                    .first()
+                    .satisfies(event -> {
+                        assertThat(event.changedFields()).contains("labels");
+                    });
         }
 
         @Test
@@ -898,68 +881,65 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             // Given - create discussion without category
             Long discussionId = FIXTURE_DISCUSSION_ID;
             GitHubDiscussionDTO initialDto = new GitHubDiscussionDTO(
-                discussionId,
-                null,
-                "node",
-                27,
-                "Title",
-                "Body",
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/discussions/27",
-                "open",
-                null,
-                false,
-                null,
-                0,
-                0,
-                Instant.parse("2025-11-01T21:42:45Z"),
-                Instant.parse("2025-11-01T21:42:45Z"),
-                null,
-                null,
-                createAuthorDto(),
-                null,
-                null, // no category
-                null,
-                null
-            );
+                    discussionId,
+                    null,
+                    "node",
+                    27,
+                    "Title",
+                    "Body",
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/discussions/27",
+                    "open",
+                    null,
+                    false,
+                    null,
+                    0,
+                    0,
+                    Instant.parse("2025-11-01T21:42:45Z"),
+                    Instant.parse("2025-11-01T21:42:45Z"),
+                    null,
+                    null,
+                    createAuthorDto(),
+                    null,
+                    null, // no category
+                    null,
+                    null);
             processor.process(initialDto, createContext());
 
             eventListener.clear();
 
             // Now update with a category
             GitHubDiscussionCategoryDTO categoryDto = new GitHubDiscussionCategoryDTO(
-                "DIC_kwDOO4CKW84CxV91",
-                "General",
-                "general",
-                "\uD83D\uDCAC",
-                "General discussions",
-                false,
-                Instant.now(),
-                Instant.now()
-            );
+                    "DIC_kwDOO4CKW84CxV91",
+                    "General",
+                    "general",
+                    "\uD83D\uDCAC",
+                    "General discussions",
+                    false,
+                    Instant.now(),
+                    Instant.now());
             GitHubDiscussionDTO updateDto = new GitHubDiscussionDTO(
-                discussionId,
-                null,
-                "node",
-                27,
-                "Title",
-                "Body",
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/discussions/27",
-                "open",
-                null,
-                false,
-                null,
-                0,
-                0,
-                Instant.parse("2025-11-01T21:42:45Z"),
-                Instant.parse("2025-11-02T10:00:00Z"), // newer updatedAt
-                null,
-                null,
-                createAuthorDto(),
-                null,
-                categoryDto,
-                null,
-                null
-            );
+                    discussionId,
+                    null,
+                    "node",
+                    27,
+                    "Title",
+                    "Body",
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/discussions/27",
+                    "open",
+                    null,
+                    false,
+                    null,
+                    0,
+                    0,
+                    Instant.parse("2025-11-01T21:42:45Z"),
+                    Instant.parse("2025-11-02T10:00:00Z"), // newer updatedAt
+                    null,
+                    null,
+                    createAuthorDto(),
+                    null,
+                    categoryDto,
+                    null,
+                    null);
 
             Discussion result = processor.process(updateDto, createContext());
             assertNotNull(result);
@@ -969,11 +949,11 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Updated event should contain "category" in changedFields
             assertThat(eventListener.ofType(ScmDomainEvent.DiscussionUpdated.class))
-                .hasSize(1)
-                .first()
-                .satisfies(event -> {
-                    assertThat(event.changedFields()).contains("category");
-                });
+                    .hasSize(1)
+                    .first()
+                    .satisfies(event -> {
+                        assertThat(event.changedFields()).contains("category");
+                    });
         }
     }
 
@@ -986,29 +966,28 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
         void processClosedShouldPublishClosedEvent() {
             Long discussionId = FIXTURE_DISCUSSION_ID;
             GitHubDiscussionDTO dto = new GitHubDiscussionDTO(
-                discussionId,
-                null,
-                "node",
-                27,
-                "Title",
-                "Body",
-                "https://example.com",
-                "closed",
-                "resolved", // closed with reason
-                false,
-                null,
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                Instant.now(), // closedAt
-                null,
-                createAuthorDto(),
-                null,
-                null,
-                null,
-                null
-            );
+                    discussionId,
+                    null,
+                    "node",
+                    27,
+                    "Title",
+                    "Body",
+                    "https://example.com",
+                    "closed",
+                    "resolved", // closed with reason
+                    false,
+                    null,
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    Instant.now(), // closedAt
+                    null,
+                    createAuthorDto(),
+                    null,
+                    null,
+                    null,
+                    null);
 
             Discussion result = processor.processClosed(dto, createContext());
             assertNotNull(result);
@@ -1018,11 +997,11 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Verify Closed event
             assertThat(eventListener.ofType(ScmDomainEvent.DiscussionClosed.class))
-                .hasSize(1)
-                .first()
-                .satisfies(event -> {
-                    assertThat(event.stateReason()).isEqualTo("resolved");
-                });
+                    .hasSize(1)
+                    .first()
+                    .satisfies(event -> {
+                        assertThat(event.stateReason()).isEqualTo("resolved");
+                    });
         }
 
         @Test
@@ -1030,58 +1009,56 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             // Given - create closed discussion first
             Long discussionId = FIXTURE_DISCUSSION_ID;
             GitHubDiscussionDTO closedDto = new GitHubDiscussionDTO(
-                discussionId,
-                null,
-                "node",
-                27,
-                "Closed Discussion",
-                "Body",
-                "https://example.com",
-                "closed",
-                "resolved",
-                false,
-                null,
-                0,
-                0,
-                Instant.parse("2025-11-01T21:42:45Z"),
-                Instant.parse("2025-11-01T21:42:45Z"),
-                Instant.parse("2025-11-01T22:00:00Z"),
-                null,
-                createAuthorDto(),
-                null,
-                null,
-                null,
-                null
-            );
+                    discussionId,
+                    null,
+                    "node",
+                    27,
+                    "Closed Discussion",
+                    "Body",
+                    "https://example.com",
+                    "closed",
+                    "resolved",
+                    false,
+                    null,
+                    0,
+                    0,
+                    Instant.parse("2025-11-01T21:42:45Z"),
+                    Instant.parse("2025-11-01T21:42:45Z"),
+                    Instant.parse("2025-11-01T22:00:00Z"),
+                    null,
+                    createAuthorDto(),
+                    null,
+                    null,
+                    null,
+                    null);
             processor.process(closedDto, createContext());
 
             eventListener.clear();
 
             // Now reopen
             GitHubDiscussionDTO reopenedDto = new GitHubDiscussionDTO(
-                discussionId,
-                null,
-                "node",
-                27,
-                "Closed Discussion",
-                "Body",
-                "https://example.com",
-                "open",
-                "reopened",
-                false,
-                null,
-                0,
-                0,
-                Instant.parse("2025-11-01T21:42:45Z"),
-                Instant.parse("2025-11-02T10:00:00Z"), // newer updatedAt
-                null, // closedAt cleared
-                null,
-                createAuthorDto(),
-                null,
-                null,
-                null,
-                null
-            );
+                    discussionId,
+                    null,
+                    "node",
+                    27,
+                    "Closed Discussion",
+                    "Body",
+                    "https://example.com",
+                    "open",
+                    "reopened",
+                    false,
+                    null,
+                    0,
+                    0,
+                    Instant.parse("2025-11-01T21:42:45Z"),
+                    Instant.parse("2025-11-02T10:00:00Z"), // newer updatedAt
+                    null, // closedAt cleared
+                    null,
+                    createAuthorDto(),
+                    null,
+                    null,
+                    null,
+                    null);
 
             Discussion result = processor.processReopened(reopenedDto, createContext());
             assertNotNull(result);
@@ -1090,11 +1067,11 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Verify Reopened event
             assertThat(eventListener.ofType(ScmDomainEvent.DiscussionReopened.class))
-                .hasSize(1)
-                .first()
-                .satisfies(event -> {
-                    assertThat(event.discussion().id()).isEqualTo(result.getId());
-                });
+                    .hasSize(1)
+                    .first()
+                    .satisfies(event -> {
+                        assertThat(event.discussion().id()).isEqualTo(result.getId());
+                    });
         }
 
         @Test
@@ -1102,44 +1079,42 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             Long discussionId = FIXTURE_DISCUSSION_ID;
             Instant now = Instant.now();
             GitHubDiscussionCommentDTO answerComment = new GitHubDiscussionCommentDTO(
-                14848457L,
-                null,
-                "DC_node",
-                "Answer body",
-                "https://example.com",
-                true,
-                false,
-                null,
-                "MEMBER",
-                now,
-                now,
-                createAuthorDto(),
-                null
-            );
+                    14848457L,
+                    null,
+                    "DC_node",
+                    "Answer body",
+                    "https://example.com",
+                    true,
+                    false,
+                    null,
+                    "MEMBER",
+                    now,
+                    now,
+                    createAuthorDto(),
+                    null);
             GitHubDiscussionDTO dto = new GitHubDiscussionDTO(
-                discussionId,
-                null,
-                "node",
-                27,
-                "Question Title",
-                "Question body",
-                "https://example.com",
-                "open",
-                null,
-                false,
-                null,
-                1,
-                0,
-                now,
-                now,
-                null,
-                now, // answerChosenAt
-                createAuthorDto(),
-                createAuthorDto(), // answerChosenBy
-                null,
-                null,
-                answerComment
-            );
+                    discussionId,
+                    null,
+                    "node",
+                    27,
+                    "Question Title",
+                    "Question body",
+                    "https://example.com",
+                    "open",
+                    null,
+                    false,
+                    null,
+                    1,
+                    0,
+                    now,
+                    now,
+                    null,
+                    now, // answerChosenAt
+                    createAuthorDto(),
+                    createAuthorDto(), // answerChosenBy
+                    null,
+                    null,
+                    answerComment);
 
             Discussion result = processor.processAnswered(dto, createContext());
 
@@ -1147,12 +1122,12 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Verify Answered event
             assertThat(eventListener.ofType(ScmDomainEvent.DiscussionAnswered.class))
-                .hasSize(1)
-                .first()
-                .satisfies(event -> {
-                    assertThat(event.discussion().id()).isEqualTo(result.getId());
-                    assertThat(event.answerCommentId()).isEqualTo(14848457L);
-                });
+                    .hasSize(1)
+                    .first()
+                    .satisfies(event -> {
+                        assertThat(event.discussion().id()).isEqualTo(result.getId());
+                        assertThat(event.answerCommentId()).isEqualTo(14848457L);
+                    });
         }
     }
 
@@ -1170,7 +1145,8 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             assertNotNull(created);
             Long syntheticId = created.getId();
 
-            assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 27)).isPresent();
+            assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 27))
+                    .isPresent();
 
             eventListener.clear();
 
@@ -1178,14 +1154,16 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             // which silently fails with synthetic PKs. Use direct delete with synthetic PK instead.
             discussionRepository.deleteById(syntheticId);
 
-            assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 27)).isEmpty();
+            assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 27))
+                    .isEmpty();
         }
 
         @Test
         void processDeletedShouldHandleNonExistentGracefully() {
             // Given - discussion doesn't exist
             Long nonExistentId = 999999999L;
-            assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 99)).isEmpty();
+            assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 99))
+                    .isEmpty();
 
             GitHubDiscussionDTO dto = createBasicDiscussionDto(nonExistentId, 99);
 
@@ -1196,29 +1174,28 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
         @Test
         void processDeletedShouldHandleNullIdGracefully() {
             GitHubDiscussionDTO dto = new GitHubDiscussionDTO(
-                null, // id
-                null, // databaseId
-                "node",
-                1,
-                "Title",
-                null,
-                "https://example.com",
-                "open",
-                null,
-                false,
-                null,
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
+                    null, // id
+                    null, // databaseId
+                    "node",
+                    1,
+                    "Title",
+                    null,
+                    "https://example.com",
+                    "open",
+                    null,
+                    false,
+                    null,
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
 
             // When/Then - should not throw (falls through to findByRepositoryIdAndNumber)
             assertThatCode(() -> processor.processDeleted(dto, createContext())).doesNotThrowAnyException();
@@ -1233,48 +1210,49 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
             assertNotNull(created);
             Long syntheticId = created.getId();
 
-            assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 27)).isPresent();
+            assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 27))
+                    .isPresent();
 
             eventListener.clear();
 
             // Delete DTO has null IDs - should find by repo+number
             GitHubDiscussionDTO deleteDto = new GitHubDiscussionDTO(
-                null, // id is null
-                null, // databaseId is null
-                "node",
-                27, // same number
-                "Title",
-                null,
-                "https://example.com",
-                "open",
-                null,
-                false,
-                null,
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
+                    null, // id is null
+                    null, // databaseId is null
+                    "node",
+                    27, // same number
+                    "Title",
+                    null,
+                    "https://example.com",
+                    "open",
+                    null,
+                    false,
+                    null,
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
 
             processor.processDeleted(deleteDto, createContext());
 
             // Then - discussion should be deleted via the fallback path
-            assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 27)).isEmpty();
+            assertThat(discussionRepository.findByRepositoryIdAndNumber(testRepository.getId(), 27))
+                    .isEmpty();
 
             // Verify Deleted event - the fallback path uses discussion.getId() (synthetic PK)
             assertThat(eventListener.ofType(ScmDomainEvent.DiscussionDeleted.class))
-                .hasSize(1)
-                .first()
-                .satisfies(event -> {
-                    assertThat(event.discussionId()).isEqualTo(syntheticId);
-                });
+                    .hasSize(1)
+                    .first()
+                    .satisfies(event -> {
+                        assertThat(event.discussionId()).isEqualTo(syntheticId);
+                    });
         }
     }
 
@@ -1287,29 +1265,8 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldHandleNullDtoIds() {
             // When - DTO with null IDs (getDatabaseId() will return null)
             GitHubDiscussionDTO nullIdDto = new GitHubDiscussionDTO(
-                null,
-                null,
-                null,
-                0,
-                null,
-                null,
-                null,
-                null,
-                null,
-                false,
-                null,
-                0,
-                0,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
+                    null, null, null, 0, null, null, null, null, null, false, null, 0, 0, null, null, null, null, null,
+                    null, null, null, null);
 
             Discussion result = processor.process(nullIdDto, createContext());
 
@@ -1320,29 +1277,28 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldDefaultToOpenStateForNonClosedState() {
             Long discussionId = 111222333L;
             GitHubDiscussionDTO dto = new GitHubDiscussionDTO(
-                discussionId,
-                null,
-                "node",
-                1,
-                "Title",
-                null,
-                "https://example.com",
-                "UNKNOWN_STATE", // not "closed"
-                null,
-                false,
-                null,
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
+                    discussionId,
+                    null,
+                    "node",
+                    1,
+                    "Title",
+                    null,
+                    "https://example.com",
+                    "UNKNOWN_STATE", // not "closed"
+                    null,
+                    false,
+                    null,
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
 
             Discussion result = processor.process(dto, createContext());
             assertNotNull(result);
@@ -1355,29 +1311,28 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldHandleUnknownStateReasonAsUnknown() {
             Long discussionId = 222333444L;
             GitHubDiscussionDTO dto = new GitHubDiscussionDTO(
-                discussionId,
-                null,
-                "node",
-                2,
-                "Title",
-                null,
-                "https://example.com",
-                "closed",
-                "some_weird_reason",
-                false,
-                null,
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                Instant.now(),
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
+                    discussionId,
+                    null,
+                    "node",
+                    2,
+                    "Title",
+                    null,
+                    "https://example.com",
+                    "closed",
+                    "some_weird_reason",
+                    false,
+                    null,
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    Instant.now(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
 
             Discussion result = processor.process(dto, createContext());
             assertNotNull(result);
@@ -1389,29 +1344,28 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldHandleUnknownLockReason() {
             Long discussionId = 333444555L;
             GitHubDiscussionDTO dto = new GitHubDiscussionDTO(
-                discussionId,
-                null,
-                "node",
-                3,
-                "Title",
-                null,
-                "https://example.com",
-                "open",
-                null,
-                true, // locked
-                "some_unknown_reason", // unknown lock reason
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
+                    discussionId,
+                    null,
+                    "node",
+                    3,
+                    "Title",
+                    null,
+                    "https://example.com",
+                    "open",
+                    null,
+                    true, // locked
+                    "some_unknown_reason", // unknown lock reason
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
 
             Discussion result = processor.process(dto, createContext());
             assertNotNull(result);
@@ -1425,29 +1379,28 @@ class GitHubDiscussionProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldHandleEmptyLabelsList() {
             Long discussionId = 444555666L;
             GitHubDiscussionDTO dto = new GitHubDiscussionDTO(
-                discussionId,
-                null,
-                "node",
-                4,
-                "Title",
-                null,
-                "https://example.com",
-                "open",
-                null,
-                false,
-                null,
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null,
-                null,
-                createAuthorDto(),
-                null,
-                null,
-                List.of(), // empty labels
-                null
-            );
+                    discussionId,
+                    null,
+                    "node",
+                    4,
+                    "Title",
+                    null,
+                    "https://example.com",
+                    "open",
+                    null,
+                    false,
+                    null,
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null,
+                    null,
+                    createAuthorDto(),
+                    null,
+                    null,
+                    List.of(), // empty labels
+                    null);
 
             Discussion result = processor.process(dto, createContext());
             assertNotNull(result);

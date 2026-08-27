@@ -14,23 +14,20 @@ import org.springframework.test.context.TestPropertySource;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 @AutoConfigureWebTestClient
-@Import(
-    {
-        TestSecurityConfig.class,
-        TestAsyncConfiguration.class,
-        RecordingScmEventListener.class,
-        StubInstallationRepositoryEnumerator.class,
-        StubMentorChatStarter.class,
-        SharedTestDoubles.class,
-        AgentHandlerTestDoubles.class,
-        WorkspaceEchoControllers.ScopedEchoController.class,
-        WorkspaceEchoControllers.WorkspaceContextEchoController.class,
-    }
-)
+@Import({
+    TestSecurityConfig.class,
+    TestAsyncConfiguration.class,
+    RecordingScmEventListener.class,
+    StubInstallationRepositoryEnumerator.class,
+    StubMentorChatStarter.class,
+    SharedTestDoubles.class,
+    AgentHandlerTestDoubles.class,
+    WorkspaceEchoControllers.ScopedEchoController.class,
+    WorkspaceEchoControllers.WorkspaceContextEchoController.class,
+})
 @Tag("integration")
 @TestPropertySource(
-    properties = { "hephaestus.features.flags.gitlab-workspace-creation=true", "hephaestus.llm.display-currency=" }
-)
+        properties = {"hephaestus.features.flags.gitlab-workspace-creation=true", "hephaestus.llm.display-currency="})
 public abstract class BaseIntegrationTest {
 
     @Autowired

@@ -48,32 +48,30 @@ class ReviewSweepScheduleServiceTest extends BaseUnitTest {
     }
 
     @ParameterizedTest
-    @CsvSource({ "DAILY, 3", "DAILY, 7", "WEEKLY, 8", "WEEKLY, 30" })
+    @CsvSource({"DAILY, 3", "DAILY, 7", "WEEKLY, 8", "WEEKLY, 30"})
     void aWindowLongerThanTheCadenceAllowsIsRefusedBeforeAnythingIsWritten(String cadence, int lookbackDays) {
-        assertThatThrownBy(() ->
-            service().create(
-                context(),
-                request(ArtifactKinds.PULL_REQUEST, ReviewSweepCadence.valueOf(cadence), lookbackDays)
-            )
-        )
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("backfill campaign");
+        assertThatThrownBy(() -> service()
+                        .create(
+                                context(),
+                                request(ArtifactKinds.PULL_REQUEST, ReviewSweepCadence.valueOf(cadence), lookbackDays)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("backfill campaign");
 
         verify(scheduleRepository, never()).save(any());
     }
 
     @ParameterizedTest
-    @CsvSource({ "DAILY, 1", "DAILY, 2", "WEEKLY, 1", "WEEKLY, 7" })
+    @CsvSource({"DAILY, 1", "DAILY, 2", "WEEKLY, 1", "WEEKLY, 7"})
     void aWindowWithinTheCeilingGetsPastValidation(String cadence, int lookbackDays) {
-        when(scheduleRepository.existsByWorkspaceIdAndArtifactKind(anyLong(), anyString())).thenReturn(true);
+        when(scheduleRepository.existsByWorkspaceIdAndArtifactKind(anyLong(), anyString()))
+                .thenReturn(true);
 
         // A conflict exception, raised strictly after the window check, is what proves the window passed.
-        assertThatThrownBy(() ->
-            service().create(
-                context(),
-                request(ArtifactKinds.PULL_REQUEST, ReviewSweepCadence.valueOf(cadence), lookbackDays)
-            )
-        ).isInstanceOf(ReviewSweepScheduleConflictException.class);
+        assertThatThrownBy(() -> service()
+                        .create(
+                                context(),
+                                request(ArtifactKinds.PULL_REQUEST, ReviewSweepCadence.valueOf(cadence), lookbackDays)))
+                .isInstanceOf(ReviewSweepScheduleConflictException.class);
     }
 
     /**
@@ -82,9 +80,9 @@ class ReviewSweepScheduleServiceTest extends BaseUnitTest {
      */
     @Test
     void aKindNoCampaignCanEnumerateIsRefusedByName() {
-        assertThatThrownBy(() ->
-            service().create(context(), request(ArtifactKinds.CONVERSATION_THREAD, ReviewSweepCadence.DAILY, 1))
-        ).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service()
+                        .create(context(), request(ArtifactKinds.CONVERSATION_THREAD, ReviewSweepCadence.DAILY, 1)))
+                .isInstanceOf(IllegalArgumentException.class);
 
         verify(scheduleRepository, never()).save(any());
     }
@@ -95,20 +93,18 @@ class ReviewSweepScheduleServiceTest extends BaseUnitTest {
      */
     @Test
     void aSecondScheduleForTheSameKindOfWorkIsRefused() {
-        when(scheduleRepository.existsByWorkspaceIdAndArtifactKind(anyLong(), anyString())).thenReturn(true);
+        when(scheduleRepository.existsByWorkspaceIdAndArtifactKind(anyLong(), anyString()))
+                .thenReturn(true);
 
         assertThatThrownBy(() ->
-            service().create(context(), request(ArtifactKinds.PULL_REQUEST, ReviewSweepCadence.DAILY, 2))
-        ).isInstanceOf(ReviewSweepScheduleConflictException.class);
+                        service().create(context(), request(ArtifactKinds.PULL_REQUEST, ReviewSweepCadence.DAILY, 2)))
+                .isInstanceOf(ReviewSweepScheduleConflictException.class);
 
         verify(scheduleRepository, never()).save(any());
     }
 
     private static CreateReviewSweepScheduleRequestDTO request(
-        ArtifactKind kind,
-        ReviewSweepCadence cadence,
-        int lookbackDays
-    ) {
+            ArtifactKind kind, ReviewSweepCadence cadence, int lookbackDays) {
         return new CreateReviewSweepScheduleRequestDTO(kind, cadence, lookbackDays);
     }
 

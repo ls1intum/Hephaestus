@@ -102,12 +102,11 @@ public class ConversationThreadContentSource implements EvidenceSource, ReviewCo
             throw new JobPreparationException("Failed to serialize conversation_thread.json: " + e.getMessage(), e);
         }
         log.info(
-            "Conversation context built: channel={}, threadTs={}, turns={}, jobId={}",
-            channelId,
-            threadTs,
-            payload.path("messageCount").asInt(),
-            job.getId()
-        );
+                "Conversation context built: channel={}, threadTs={}, turns={}, jobId={}",
+                channelId,
+                threadTs,
+                payload.path("messageCount").asInt(),
+                job.getId());
     }
 
     @Override
@@ -128,39 +127,32 @@ public class ConversationThreadContentSource implements EvidenceSource, ReviewCo
         Map<SourceKind, Instant> effectiveAt = effectiveTime == null ? Map.of() : Map.of(KIND, effectiveTime);
         // An empty payload isn't necessarily a thread with no messages — a paused/withdrawn consent or a
         // deleted thread must not be misreported as a conversation the developer did not have.
-        Map<SourceKind, SourceCaptureState> stateOverrides =
-            messageCount == 0
-                ? absenceOf(
-                      projection.threadReadability(
-                          job.getWorkspace().getId(),
-                          metadata.path("slack_channel_id").asText(),
-                          metadata.path("slack_thread_ts").asText()
-                      )
-                  )
+        Map<SourceKind, SourceCaptureState> stateOverrides = messageCount == 0
+                ? absenceOf(projection.threadReadability(
+                        job.getWorkspace().getId(),
+                        metadata.path("slack_channel_id").asText(),
+                        metadata.path("slack_thread_ts").asText()))
                 : Map.of();
         return new EvidenceContribution(
-            captured.files(),
-            Map.of(
-                KIND,
-                payload.path("truncated").asBoolean() ? SourceCompleteness.PARTIAL : SourceCompleteness.COMPLETE
-            ),
-            Map.of(),
-            Map.of(),
-            effectiveAt,
-            Map.of(KIND, messageCount == 0 ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY),
-            stateOverrides
-        );
+                captured.files(),
+                Map.of(
+                        KIND,
+                        payload.path("truncated").asBoolean()
+                                ? SourceCompleteness.PARTIAL
+                                : SourceCompleteness.COMPLETE),
+                Map.of(),
+                Map.of(),
+                effectiveAt,
+                Map.of(KIND, messageCount == 0 ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY),
+                stateOverrides);
     }
 
     private static Map<SourceKind, SourceCaptureState> absenceOf(
-        ConversationThreadProjection.ThreadReadability readability
-    ) {
+            ConversationThreadProjection.ThreadReadability readability) {
         return switch (readability) {
             case READABLE -> Map.of();
-            case CONSENT_NOT_ACTIVE -> Map.of(
-                KIND,
-                new SourceCaptureState.Redacted(SourceAbsenceReason.CONSENT_NOT_ACTIVE)
-            );
+            case CONSENT_NOT_ACTIVE ->
+                Map.of(KIND, new SourceCaptureState.Redacted(SourceAbsenceReason.CONSENT_NOT_ACTIVE));
             case NOT_FOUND -> Map.of(KIND, new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND));
         };
     }

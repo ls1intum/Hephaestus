@@ -16,15 +16,14 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
 
     /** Imported by {@link #SCRIPT} with a relative specifier, so each must be staged beside it. */
     private static final List<String> SIDECARS = List.of(
-        "pi-error-text.ts",
-        "pi-observation-normalize.ts",
-        "pi-runner-usage.ts",
-        "pi-runner-timings.ts",
-        "pi-runner-composition.ts",
-        "pi-review-tree.ts",
-        "pi-session-tree.ts",
-        SandboxLayout.PROVIDER_HELPER_FILENAME
-    );
+            "pi-error-text.ts",
+            "pi-observation-normalize.ts",
+            "pi-runner-usage.ts",
+            "pi-runner-timings.ts",
+            "pi-runner-composition.ts",
+            "pi-review-tree.ts",
+            "pi-session-tree.ts",
+            SandboxLayout.PROVIDER_HELPER_FILENAME);
 
     private static final List<String> PROMPTS = List.of(SandboxLayout.FEEDBACK_COMPOSER_PROMPT_FILENAME);
 

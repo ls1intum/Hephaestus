@@ -19,4 +19,5 @@ import org.jspecify.annotations.Nullable;
  * @param roles     app roles ({@code "app_admin"} when app-admin, plus enabled feature-flag
  *                  keys) → {@code roles}
  */
-public record JwtPrincipal(Long accountId, String login, @Nullable String givenName, Set<String> roles) {}
+public record JwtPrincipal(
+        Long accountId, String login, @Nullable String givenName, Set<String> roles) {}

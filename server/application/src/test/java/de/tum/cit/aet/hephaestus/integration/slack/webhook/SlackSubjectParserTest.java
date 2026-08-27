@@ -38,20 +38,19 @@ class SlackSubjectParserTest extends BaseUnitTest {
 
     private static Stream<Arguments> invalidSubjects() {
         return Stream.of(
-            Arguments.of("null subject", null, "blank"),
-            Arguments.of("blank subject", "   ", "blank"),
-            Arguments.of("wrong prefix", "github.a.b.c", "slack."),
-            Arguments.of("too few components", "slack.T1.C1", ">= 4"),
-            Arguments.of("blank event segment", "slack.T1.C1.", "event segment must not be blank")
-        );
+                Arguments.of("null subject", null, "blank"),
+                Arguments.of("blank subject", "   ", "blank"),
+                Arguments.of("wrong prefix", "github.a.b.c", "slack."),
+                Arguments.of("too few components", "slack.T1.C1", ">= 4"),
+                Arguments.of("blank event segment", "slack.T1.C1.", "event segment must not be blank"));
     }
 
     @ParameterizedTest(name = "{0} throws")
     @MethodSource("invalidSubjects")
     void invalidSubjectThrows(String description, String subject, String expectedMessageFragment) {
         assertThatThrownBy(() -> parser.parse(subject))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining(expectedMessageFragment);
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(expectedMessageFragment);
     }
 
     @Test

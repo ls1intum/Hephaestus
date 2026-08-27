@@ -43,38 +43,32 @@ class OutlineApiClientPagingTest extends BaseUnitTest {
     /** A full page of {@code PAGE_LIMIT} minimal documents — enough to keep the pager asking for the next one. */
     private static String fullPage(int page) {
         String rows = IntStream.range(0, PAGE_LIMIT)
-            .mapToObj(i -> "{\"id\":\"doc-" + page + "-" + i + "\",\"updatedAt\":\"2026-01-01T00:00:00.000Z\"}")
-            .collect(Collectors.joining(","));
+                .mapToObj(i -> "{\"id\":\"doc-" + page + "-" + i + "\",\"updatedAt\":\"2026-01-01T00:00:00.000Z\"}")
+                .collect(Collectors.joining(","));
         return "{\"data\":[" + rows + "]}";
     }
 
     /** A client whose every call answers with {@code bodyForCall.apply(callIndex)}. */
     private static OutlineApiClient clientAnswering(IntFunction<String> bodyForCall, AtomicInteger calls) {
-        ExchangeFunction exchange = request ->
-            Mono.just(
-                ClientResponse.create(HttpStatus.OK)
-                    .header("Content-Type", "application/json")
-                    .body(bodyForCall.apply(calls.getAndIncrement()))
-                    .build()
-            );
+        ExchangeFunction exchange = request -> Mono.just(ClientResponse.create(HttpStatus.OK)
+                .header("Content-Type", "application/json")
+                .body(bodyForCall.apply(calls.getAndIncrement()))
+                .build());
         return new OutlineApiClient(
-            CircuitBreaker.ofDefaults("outlineRestApi"),
-            Retry.ofDefaults("outlineRestApi"),
-            WebClient.builder().exchangeFunction(exchange).build(),
-            new OutlineOriginPolicy(java.util.Set.of("https://wiki.example.com"))
-        );
+                CircuitBreaker.ofDefaults("outlineRestApi"),
+                Retry.ofDefaults("outlineRestApi"),
+                WebClient.builder().exchangeFunction(exchange).build(),
+                new OutlineOriginPolicy(java.util.Set.of("https://wiki.example.com")));
     }
 
     @Test
     void listDocuments_pagesUntilAShortPage_andReturnsEverything() {
         AtomicInteger calls = new AtomicInteger();
         OutlineApiClient client = clientAnswering(
-            call ->
-                call == 0
-                    ? fullPage(0)
-                    : "{\"data\":[{\"id\":\"doc-tail\",\"updatedAt\":\"2026-01-01T00:00:00.000Z\"}]}",
-            calls
-        );
+                call -> call == 0
+                        ? fullPage(0)
+                        : "{\"data\":[{\"id\":\"doc-tail\",\"updatedAt\":\"2026-01-01T00:00:00.000Z\"}]}",
+                calls);
 
         List<?> metas = client.listDocuments(SERVER_URL, TOKEN, COLLECTION_ID);
 
@@ -99,9 +93,9 @@ class OutlineApiClientPagingTest extends BaseUnitTest {
         OutlineApiClient client = clientAnswering(call -> (call == 0 ? fullPage(0) : "{}"), calls);
 
         assertThatThrownBy(() -> client.listDocuments(SERVER_URL, TOKEN, COLLECTION_ID))
-            .isInstanceOf(OutlineApiException.class)
-            .hasMessageContaining("documents.list")
-            .hasMessageContaining(COLLECTION_ID);
+                .isInstanceOf(OutlineApiException.class)
+                .hasMessageContaining("documents.list")
+                .hasMessageContaining(COLLECTION_ID);
     }
 
     @Test
@@ -110,8 +104,8 @@ class OutlineApiClientPagingTest extends BaseUnitTest {
         OutlineApiClient client = clientAnswering(call -> "{}", calls);
 
         assertThatThrownBy(() -> client.listArchivedDocuments(SERVER_URL, TOKEN, COLLECTION_ID))
-            .isInstanceOf(OutlineApiException.class)
-            .hasMessageContaining("archived");
+                .isInstanceOf(OutlineApiException.class)
+                .hasMessageContaining("archived");
     }
 
     @Test
@@ -122,7 +116,7 @@ class OutlineApiClientPagingTest extends BaseUnitTest {
         OutlineApiClient client = clientAnswering(OutlineApiClientPagingTest::fullPage, calls);
 
         assertThatThrownBy(() -> client.listDocuments(SERVER_URL, TOKEN, COLLECTION_ID))
-            .isInstanceOf(OutlineApiException.class)
-            .hasMessageContaining("page cap");
+                .isInstanceOf(OutlineApiException.class)
+                .hasMessageContaining("page cap");
     }
 }

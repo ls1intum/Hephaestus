@@ -17,18 +17,19 @@ import org.springframework.web.server.ResponseStatusException;
  * three surfaces under {@code /practices/reviews} answer a pasted date range identically.
  */
 public record ReviewRunFilterParams(
-    @RequestParam(required = false) @Nullable AgentJobStatus status,
-    @Parameter(description = "Inclusive lower bound on when the review was requested")
-    @RequestParam(required = false)
-    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-    @Nullable
-    Instant from,
-    @Parameter(description = "Exclusive upper bound on when the review was requested")
-    @RequestParam(required = false)
-    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
-    @Nullable
-    Instant to
-) {
+        @RequestParam(required = false) @Nullable AgentJobStatus status,
+
+        @Parameter(description = "Inclusive lower bound on when the review was requested")
+        @RequestParam(required = false)
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+        @Nullable
+        Instant from,
+
+        @Parameter(description = "Exclusive upper bound on when the review was requested")
+        @RequestParam(required = false)
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+        @Nullable
+        Instant to) {
     /** Rejects a backwards window, which would otherwise return an empty page for no visible reason. */
     public ReviewRunFilterParams validated() {
         if (from != null && to != null && from.isAfter(to)) {

@@ -52,13 +52,12 @@ public class WorkspaceStartupListener {
     private final List<WorkspaceProvisioningHook> provisioningHooks;
 
     public WorkspaceStartupListener(
-        WorkspaceProvisioningService provisioningService,
-        WorkspaceActivationService workspaceActivationService,
-        WorkspaceRepository workspaceRepository,
-        ApplicationEventPublisher eventPublisher,
-        AsyncTaskExecutor applicationTaskExecutor,
-        List<WorkspaceProvisioningHook> provisioningHooks
-    ) {
+            WorkspaceProvisioningService provisioningService,
+            WorkspaceActivationService workspaceActivationService,
+            WorkspaceRepository workspaceRepository,
+            ApplicationEventPublisher eventPublisher,
+            AsyncTaskExecutor applicationTaskExecutor,
+            List<WorkspaceProvisioningHook> provisioningHooks) {
         this.provisioningService = provisioningService;
         this.workspaceActivationService = workspaceActivationService;
         this.workspaceRepository = workspaceRepository;

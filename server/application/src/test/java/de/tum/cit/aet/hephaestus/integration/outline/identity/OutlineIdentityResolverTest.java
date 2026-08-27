@@ -49,7 +49,9 @@ class OutlineIdentityResolverTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         resolver = new OutlineIdentityResolver(gitProviderRegistry, accountIdentityQuery, workspaceMembershipQuery);
-        lenient().when(gitProviderRegistry.resolveProviderId("OUTLINE", SERVER_URL)).thenReturn(PROVIDER_ID);
+        lenient()
+                .when(gitProviderRegistry.resolveProviderId("OUTLINE", SERVER_URL))
+                .thenReturn(PROVIDER_ID);
     }
 
     private static AccountIdentityQuery.IdentityLinkView link(String subject, String login) {
@@ -57,26 +59,19 @@ class OutlineIdentityResolverTest extends BaseUnitTest {
     }
 
     private static AccountWorkspaceMembershipQuery.WorkspaceMembershipView membership(
-        long workspaceId,
-        @Nullable Long memberId
-    ) {
+            long workspaceId, @Nullable Long memberId) {
         return new AccountWorkspaceMembershipQuery.WorkspaceMembershipView(
-            workspaceId,
-            "ws",
-            "Workspace",
-            "MEMBER",
-            memberId
-        );
+                workspaceId, "ws", "Workspace", "MEMBER", memberId);
     }
 
     @Test
     @DisplayName("a linked author with membership in the workspace resolves to the view's member id")
     void happyPath_resolvesMemberId() {
-        when(accountIdentityQuery.resolveAccountId(PROVIDER_ID, SUBJECT, TEAM_ID)).thenReturn(Optional.of(ACCOUNT_ID));
+        when(accountIdentityQuery.resolveAccountId(PROVIDER_ID, SUBJECT, TEAM_ID))
+                .thenReturn(Optional.of(ACCOUNT_ID));
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(List.of(link("gh-123", "octocat")));
-        when(workspaceMembershipQuery.membershipsForLogins(Set.of("octocat"))).thenReturn(
-            List.of(membership(WORKSPACE_ID, 555L))
-        );
+        when(workspaceMembershipQuery.membershipsForLogins(Set.of("octocat")))
+                .thenReturn(List.of(membership(WORKSPACE_ID, 555L)));
 
         Optional<Long> memberId = resolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, SUBJECT);
 
@@ -88,22 +83,25 @@ class OutlineIdentityResolverTest extends BaseUnitTest {
     @Test
     @DisplayName("an unknown / unlinked Outline subject resolves to empty")
     void unknownSubject_resolvesEmpty() {
-        when(accountIdentityQuery.resolveAccountId(PROVIDER_ID, SUBJECT, TEAM_ID)).thenReturn(Optional.empty());
+        when(accountIdentityQuery.resolveAccountId(PROVIDER_ID, SUBJECT, TEAM_ID))
+                .thenReturn(Optional.empty());
 
-        assertThat(resolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, SUBJECT)).isEmpty();
+        assertThat(resolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, SUBJECT))
+                .isEmpty();
         verifyNoInteractions(workspaceMembershipQuery);
     }
 
     @Test
     @DisplayName("membership in a different workspace is filtered out — never a cross-workspace attribution")
     void crossWorkspaceMembership_isFiltered() {
-        when(accountIdentityQuery.resolveAccountId(PROVIDER_ID, SUBJECT, TEAM_ID)).thenReturn(Optional.of(ACCOUNT_ID));
+        when(accountIdentityQuery.resolveAccountId(PROVIDER_ID, SUBJECT, TEAM_ID))
+                .thenReturn(Optional.of(ACCOUNT_ID));
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(List.of(link("gh-123", "octocat")));
-        when(workspaceMembershipQuery.membershipsForLogins(Set.of("octocat"))).thenReturn(
-            List.of(membership(WORKSPACE_ID + 1, 555L))
-        );
+        when(workspaceMembershipQuery.membershipsForLogins(Set.of("octocat")))
+                .thenReturn(List.of(membership(WORKSPACE_ID + 1, 555L)));
 
-        assertThat(resolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, SUBJECT)).isEmpty();
+        assertThat(resolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, SUBJECT))
+                .isEmpty();
     }
 
     @Test
@@ -111,34 +109,37 @@ class OutlineIdentityResolverTest extends BaseUnitTest {
     void picksTheScmLoginWithMembership() {
         // The Outline link's usernameAtSignup is a display name and matches no SCM membership — it must not
         // shadow the real SCM login that IS a member of the workspace.
-        when(accountIdentityQuery.resolveAccountId(PROVIDER_ID, SUBJECT, TEAM_ID)).thenReturn(Optional.of(ACCOUNT_ID));
-        when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(
-            List.of(link(SUBJECT, "Ada Lovelace"), link("gh-123", "octocat"))
-        );
-        when(workspaceMembershipQuery.membershipsForLogins(Set.of("Ada Lovelace"))).thenReturn(List.of());
-        when(workspaceMembershipQuery.membershipsForLogins(Set.of("octocat"))).thenReturn(
-            List.of(membership(WORKSPACE_ID, 555L))
-        );
+        when(accountIdentityQuery.resolveAccountId(PROVIDER_ID, SUBJECT, TEAM_ID))
+                .thenReturn(Optional.of(ACCOUNT_ID));
+        when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID))
+                .thenReturn(List.of(link(SUBJECT, "Ada Lovelace"), link("gh-123", "octocat")));
+        when(workspaceMembershipQuery.membershipsForLogins(Set.of("Ada Lovelace")))
+                .thenReturn(List.of());
+        when(workspaceMembershipQuery.membershipsForLogins(Set.of("octocat")))
+                .thenReturn(List.of(membership(WORKSPACE_ID, 555L)));
 
-        assertThat(resolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, SUBJECT)).contains(555L);
+        assertThat(resolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, SUBJECT))
+                .contains(555L);
     }
 
     @Test
     @DisplayName("a membership view without a member id resolves to empty rather than a bogus attribution")
     void membershipWithoutMemberId_resolvesEmpty() {
-        when(accountIdentityQuery.resolveAccountId(PROVIDER_ID, SUBJECT, TEAM_ID)).thenReturn(Optional.of(ACCOUNT_ID));
+        when(accountIdentityQuery.resolveAccountId(PROVIDER_ID, SUBJECT, TEAM_ID))
+                .thenReturn(Optional.of(ACCOUNT_ID));
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(List.of(link("gh-123", "octocat")));
-        when(workspaceMembershipQuery.membershipsForLogins(Set.of("octocat"))).thenReturn(
-            List.of(membership(WORKSPACE_ID, null))
-        );
+        when(workspaceMembershipQuery.membershipsForLogins(Set.of("octocat")))
+                .thenReturn(List.of(membership(WORKSPACE_ID, null)));
 
-        assertThat(resolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, SUBJECT)).isEmpty();
+        assertThat(resolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, SUBJECT))
+                .isEmpty();
     }
 
     @Test
     @DisplayName("blank subject or server URL short-circuits to empty without touching the registry")
     void blankInputs_shortCircuit() {
-        assertThat(resolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, " ")).isEmpty();
+        assertThat(resolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, " "))
+                .isEmpty();
         assertThat(resolver.resolveMemberId(WORKSPACE_ID, "", TEAM_ID, SUBJECT)).isEmpty();
         verifyNoInteractions(gitProviderRegistry);
         verify(accountIdentityQuery, org.mockito.Mockito.never()).resolveAccountId(any(), any(), any());

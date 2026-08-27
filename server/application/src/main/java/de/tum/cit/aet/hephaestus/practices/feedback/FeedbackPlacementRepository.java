@@ -22,8 +22,7 @@ import org.springframework.stereotype.Repository;
 public interface FeedbackPlacementRepository extends JpaRepository<FeedbackPlacement, UUID> {
     List<FeedbackPlacement> findByFeedbackId(UUID feedbackId);
 
-    @Query(
-        """
+    @Query("""
         SELECT p FROM FeedbackPlacement p
         WHERE p.feedback.threadKey = :threadKey
           AND p.feedback.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.DELIVERED
@@ -31,12 +30,10 @@ public interface FeedbackPlacementRepository extends JpaRepository<FeedbackPlace
           AND p.postedCommentRef IS NOT NULL
         ORDER BY p.feedback.createdAt DESC
         LIMIT 1
-        """
-    )
+        """)
     Optional<FeedbackPlacement> findLatestDeliveredSummary(@Param("threadKey") String threadKey);
 
-    @Query(
-        value = """
+    @Query(value = """
         SELECT fp.*
         FROM feedback_placement fp
         WHERE fp.feedback_id = :feedbackId
@@ -51,8 +48,6 @@ public interface FeedbackPlacementRepository extends JpaRepository<FeedbackPlace
                  fp.anchor_end_line NULLS FIRST,
                  fp.created_at,
                  fp.id
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     List<FeedbackPlacement> findByFeedbackIdInDisplayOrder(@Param("feedbackId") UUID feedbackId);
 }

@@ -58,23 +58,22 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.sync")
 public record SyncSchedulerProperties(
-    /** Whether to trigger a sync run immediately when the application starts. */
-    @DefaultValue("true") boolean runOnStartup,
-    /** Number of days to look back when synchronizing pull requests. */
-    @Min(1) @Max(365) @DefaultValue("7") int timeframeDays,
-    /** Cron expression for scheduled sync execution. Default: daily at 3 AM. */
-    @NotBlank @DefaultValue("0 0 3 * * *") String cron,
-    /** Minimum minutes between consecutive sync operations. */
-    @Min(1) @Max(1440) @DefaultValue("15") int cooldownMinutes,
-    /** Configuration for historical data backfill operations. */
-    @Valid BackfillProperties backfill,
-    /** Configuration for filtering which organizations and repositories to sync. */
-    @Valid FilterProperties filters,
-    /** Configuration for GitHub Discussions sync (disabled by default). */
-    @Valid DiscussionsProperties discussions,
-    /** Configuration for GitHub Projects V2 sync (disabled by default). */
-    @Valid ProjectsProperties projects
-) {
+        /** Whether to trigger a sync run immediately when the application starts. */
+        @DefaultValue("true") boolean runOnStartup,
+        /** Number of days to look back when synchronizing pull requests. */
+        @Min(1) @Max(365) @DefaultValue("7") int timeframeDays,
+        /** Cron expression for scheduled sync execution. Default: daily at 3 AM. */
+        @NotBlank @DefaultValue("0 0 3 * * *") String cron,
+        /** Minimum minutes between consecutive sync operations. */
+        @Min(1) @Max(1440) @DefaultValue("15") int cooldownMinutes,
+        /** Configuration for historical data backfill operations. */
+        @Valid BackfillProperties backfill,
+        /** Configuration for filtering which organizations and repositories to sync. */
+        @Valid FilterProperties filters,
+        /** Configuration for GitHub Discussions sync (disabled by default). */
+        @Valid DiscussionsProperties discussions,
+        /** Configuration for GitHub Projects V2 sync (disabled by default). */
+        @Valid ProjectsProperties projects) {
     /**
      * Configuration for the backfill subsystem that handles historical data synchronization.
      *
@@ -91,11 +90,10 @@ public record SyncSchedulerProperties(
      * @param intervalSeconds Seconds between backfill cycles (default: 60s)
      */
     public record BackfillProperties(
-        @DefaultValue("false") boolean enabled,
-        @Min(1) @Max(1000) @DefaultValue("50") int batchSize,
-        @Min(0) @DefaultValue("100") int rateLimitThreshold,
-        @Min(10) @Max(86400) @DefaultValue("60") int intervalSeconds
-    ) {}
+            @DefaultValue("false") boolean enabled,
+            @Min(1) @Max(1000) @DefaultValue("50") int batchSize,
+            @Min(0) @DefaultValue("100") int rateLimitThreshold,
+            @Min(10) @Max(86400) @DefaultValue("60") int intervalSeconds) {}
 
     /**
      * Configuration for filtering which organizations, repositories, and projects are synced.
@@ -105,10 +103,7 @@ public record SyncSchedulerProperties(
      * @param allowedProjects Set of project identifiers (org/number) to include (empty = all)
      */
     public record FilterProperties(
-        Set<String> allowedOrganizations,
-        Set<String> allowedRepositories,
-        Set<String> allowedProjects
-    ) {
+            Set<String> allowedOrganizations, Set<String> allowedRepositories, Set<String> allowedProjects) {
         /** Compact constructor ensuring null safety. */
         public FilterProperties {
             if (allowedOrganizations == null) {
@@ -157,7 +152,8 @@ public record SyncSchedulerProperties(
      *
      * @param enabled whether discussion sync runs (default {@code false})
      */
-    public record DiscussionsProperties(@DefaultValue("false") boolean enabled) {}
+    public record DiscussionsProperties(
+            @DefaultValue("false") boolean enabled) {}
 
     /**
      * Toggle for GitHub Projects V2 sync.
@@ -172,15 +168,14 @@ public record SyncSchedulerProperties(
 
     /** Compact constructor ensuring nested records are never null. */
     public SyncSchedulerProperties(
-        boolean runOnStartup,
-        int timeframeDays,
-        String cron,
-        int cooldownMinutes,
-        @Nullable BackfillProperties backfill,
-        @Nullable FilterProperties filters,
-        @Nullable DiscussionsProperties discussions,
-        @Nullable ProjectsProperties projects
-    ) {
+            boolean runOnStartup,
+            int timeframeDays,
+            String cron,
+            int cooldownMinutes,
+            @Nullable BackfillProperties backfill,
+            @Nullable FilterProperties filters,
+            @Nullable DiscussionsProperties discussions,
+            @Nullable ProjectsProperties projects) {
         this.runOnStartup = runOnStartup;
         this.timeframeDays = timeframeDays;
         this.cron = cron;

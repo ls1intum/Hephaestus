@@ -19,13 +19,12 @@ import java.util.List;
  *                            (workaround for <a href="https://gitlab.com/gitlab-org/gitlab/-/issues/33419">GitLab #33419</a>)
  */
 public record GitLabSyncResult(
-    Status status,
-    List<Repository> synced,
-    int pagesCompleted,
-    int projectsSkipped,
-    int projectsRedacted,
-    int projectsReconciled
-) {
+        Status status,
+        List<Repository> synced,
+        int pagesCompleted,
+        int projectsSkipped,
+        int projectsRedacted,
+        int projectsReconciled) {
     public enum Status {
         /** All projects synced successfully. */
         COMPLETED,
@@ -39,53 +38,36 @@ public record GitLabSyncResult(
 
     /** Successful sync with no errors. */
     public static GitLabSyncResult completed(
-        List<Repository> synced,
-        int pagesCompleted,
-        int projectsRedacted,
-        int projectsReconciled
-    ) {
+            List<Repository> synced, int pagesCompleted, int projectsRedacted, int projectsReconciled) {
         return new GitLabSyncResult(
-            Status.COMPLETED,
-            Collections.unmodifiableList(synced),
-            pagesCompleted,
-            0,
-            projectsRedacted,
-            projectsReconciled
-        );
+                Status.COMPLETED,
+                Collections.unmodifiableList(synced),
+                pagesCompleted,
+                0,
+                projectsRedacted,
+                projectsReconciled);
     }
 
     /** Sync finished but some projects or pages had errors. */
     public static GitLabSyncResult withErrors(
-        List<Repository> synced,
-        int pagesCompleted,
-        int projectsSkipped,
-        int projectsRedacted,
-        int projectsReconciled
-    ) {
+            List<Repository> synced,
+            int pagesCompleted,
+            int projectsSkipped,
+            int projectsRedacted,
+            int projectsReconciled) {
         return new GitLabSyncResult(
-            Status.COMPLETED_WITH_ERRORS,
-            Collections.unmodifiableList(synced),
-            pagesCompleted,
-            projectsSkipped,
-            projectsRedacted,
-            projectsReconciled
-        );
+                Status.COMPLETED_WITH_ERRORS,
+                Collections.unmodifiableList(synced),
+                pagesCompleted,
+                projectsSkipped,
+                projectsRedacted,
+                projectsReconciled);
     }
 
     /** Sync aborted (returns whatever was synced before the abort). */
     public static GitLabSyncResult aborted(
-        Status status,
-        List<Repository> syncedSoFar,
-        int pagesCompleted,
-        int projectsSkipped
-    ) {
+            Status status, List<Repository> syncedSoFar, int pagesCompleted, int projectsSkipped) {
         return new GitLabSyncResult(
-            status,
-            Collections.unmodifiableList(syncedSoFar),
-            pagesCompleted,
-            projectsSkipped,
-            0,
-            0
-        );
+                status, Collections.unmodifiableList(syncedSoFar), pagesCompleted, projectsSkipped, 0, 0);
     }
 }

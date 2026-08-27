@@ -45,18 +45,19 @@ class InstanceAdminGateExemptionTest {
 
     static Stream<Arguments> gates() {
         return Stream.of(
-            Arguments.of(InstanceAdminOnly.class, true, "the exact app_admin gate is cross-workspace by design"),
-            Arguments.of(AppAdminOrMember.class, false, "reachable by a workspace member"),
-            Arguments.of(AppAdminOrOwner.class, false, "reachable by a workspace owner"),
-            Arguments.of(NotAppAdmin.class, false, "negated gate excludes instance admins entirely"),
-            Arguments.of(Ungated.class, false, "no gate at all")
-        );
+                Arguments.of(InstanceAdminOnly.class, true, "the exact app_admin gate is cross-workspace by design"),
+                Arguments.of(AppAdminOrMember.class, false, "reachable by a workspace member"),
+                Arguments.of(AppAdminOrOwner.class, false, "reachable by a workspace owner"),
+                Arguments.of(NotAppAdmin.class, false, "negated gate excludes instance admins entirely"),
+                Arguments.of(Ungated.class, false, "no gate at all"));
     }
 
     @ParameterizedTest(name = "{2}")
     @MethodSource("gates")
     void exemptsOnlyTheExactInstanceAdminGate(Class<?> type, boolean expected, String why) {
         JavaClass javaClass = new ClassFileImporter().importClasses(type).get(type);
-        assertThat(MultiTenancyArchitectureTest.isInstanceAdminGated(javaClass)).as(why).isEqualTo(expected);
+        assertThat(MultiTenancyArchitectureTest.isInstanceAdminGated(javaClass))
+                .as(why)
+                .isEqualTo(expected);
     }
 }

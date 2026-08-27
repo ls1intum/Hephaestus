@@ -6,9 +6,7 @@ import java.util.List;
 import java.util.Objects;
 
 public record AutomatedReviewReadinessResult(
-    List<Practice> readyPractices,
-    List<AutomatedReviewReadinessDecision> decisions
-) {
+        List<Practice> readyPractices, List<AutomatedReviewReadinessDecision> decisions) {
     public AutomatedReviewReadinessResult {
         readyPractices = List.copyOf(Objects.requireNonNull(readyPractices, "readyPractices"));
         decisions = List.copyOf(Objects.requireNonNull(decisions, "decisions"));

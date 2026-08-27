@@ -62,7 +62,8 @@ class FeatureFlagServiceTest extends BaseUnitTest {
 
             assertThat(featureFlagService.isEnabled(FeatureFlag.ADMIN)).isTrue();
             assertThat(featureFlagService.isEnabled(FeatureFlag.MENTOR_ACCESS)).isTrue();
-            assertThat(featureFlagService.isEnabled(FeatureFlag.NOTIFICATION_ACCESS)).isFalse();
+            assertThat(featureFlagService.isEnabled(FeatureFlag.NOTIFICATION_ACCESS))
+                    .isFalse();
         }
     }
 
@@ -71,16 +72,20 @@ class FeatureFlagServiceTest extends BaseUnitTest {
 
         @Test
         void returnsTrueWhenConfigEnabled() {
-            when(featureProperties.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION.key())).thenReturn(true);
+            when(featureProperties.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION.key()))
+                    .thenReturn(true);
 
-            assertThat(featureFlagService.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION)).isTrue();
+            assertThat(featureFlagService.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION))
+                    .isTrue();
         }
 
         @Test
         void returnsFalseWhenConfigDisabled() {
-            when(featureProperties.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION.key())).thenReturn(false);
+            when(featureProperties.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION.key()))
+                    .thenReturn(false);
 
-            assertThat(featureFlagService.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION)).isFalse();
+            assertThat(featureFlagService.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION))
+                    .isFalse();
         }
     }
 
@@ -90,21 +95,21 @@ class FeatureFlagServiceTest extends BaseUnitTest {
         @Test
         void returnsTrueWhenAllEnabled() {
             setSecurityContext("admin", FeatureFlag.ADMIN.key());
-            when(featureProperties.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION.key())).thenReturn(true);
+            when(featureProperties.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION.key()))
+                    .thenReturn(true);
 
-            assertThat(
-                featureFlagService.allEnabled(FeatureFlag.ADMIN, FeatureFlag.GITLAB_WORKSPACE_CREATION)
-            ).isTrue();
+            assertThat(featureFlagService.allEnabled(FeatureFlag.ADMIN, FeatureFlag.GITLAB_WORKSPACE_CREATION))
+                    .isTrue();
         }
 
         @Test
         void returnsFalseWhenOneDisabled() {
             setSecurityContext("admin", FeatureFlag.ADMIN.key());
-            when(featureProperties.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION.key())).thenReturn(false);
+            when(featureProperties.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION.key()))
+                    .thenReturn(false);
 
-            assertThat(
-                featureFlagService.allEnabled(FeatureFlag.ADMIN, FeatureFlag.GITLAB_WORKSPACE_CREATION)
-            ).isFalse();
+            assertThat(featureFlagService.allEnabled(FeatureFlag.ADMIN, FeatureFlag.GITLAB_WORKSPACE_CREATION))
+                    .isFalse();
         }
 
         @Test
@@ -121,18 +126,16 @@ class FeatureFlagServiceTest extends BaseUnitTest {
             // ADMIN role flag is checked first and returns true (short-circuits)
             setSecurityContext("admin", FeatureFlag.ADMIN.key());
 
-            assertThat(
-                featureFlagService.anyEnabled(FeatureFlag.ADMIN, FeatureFlag.GITLAB_WORKSPACE_CREATION)
-            ).isTrue();
+            assertThat(featureFlagService.anyEnabled(FeatureFlag.ADMIN, FeatureFlag.GITLAB_WORKSPACE_CREATION))
+                    .isTrue();
         }
 
         @Test
         void returnsFalseWhenNoneEnabled() {
             // No security context → ROLE flags return false
             // CONFIG flags also return false (Mockito defaults unstubbed boolean to false)
-            assertThat(
-                featureFlagService.anyEnabled(FeatureFlag.ADMIN, FeatureFlag.GITLAB_WORKSPACE_CREATION)
-            ).isFalse();
+            assertThat(featureFlagService.anyEnabled(FeatureFlag.ADMIN, FeatureFlag.GITLAB_WORKSPACE_CREATION))
+                    .isFalse();
         }
 
         @Test
@@ -147,7 +150,8 @@ class FeatureFlagServiceTest extends BaseUnitTest {
         @Test
         void returnsAllFlags() {
             setSecurityContext("testuser", FeatureFlag.MENTOR_ACCESS.key());
-            when(featureProperties.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION.key())).thenReturn(true);
+            when(featureProperties.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION.key()))
+                    .thenReturn(true);
 
             Map<FeatureFlag, Boolean> result = featureFlagService.evaluateAll();
 
@@ -164,14 +168,13 @@ class FeatureFlagServiceTest extends BaseUnitTest {
         @Test
         void throwsForNullFlag() {
             assertThatThrownBy(() -> featureFlagService.isEnabled(null))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessage("flag must not be null");
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessage("flag must not be null");
         }
     }
 
     private void setSecurityContext(String username, String... authorities) {
         SecurityContextHolder.setContext(
-            MockSecurityContextUtils.createSecurityContext(username, username + "-id", authorities, "mock-token")
-        );
+                MockSecurityContextUtils.createSecurityContext(username, username + "-id", authorities, "mock-token"));
     }
 }

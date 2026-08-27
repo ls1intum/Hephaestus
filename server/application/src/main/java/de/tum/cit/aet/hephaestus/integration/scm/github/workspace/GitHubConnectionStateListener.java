@@ -41,10 +41,9 @@ public class GitHubConnectionStateListener {
     private final AsyncTaskExecutor monitoringExecutor;
 
     public GitHubConnectionStateListener(
-        ConnectionService connectionService,
-        GitHubWorkspaceDataSyncTrigger dataSyncTrigger,
-        @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
-    ) {
+            ConnectionService connectionService,
+            GitHubWorkspaceDataSyncTrigger dataSyncTrigger,
+            @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor) {
         this.connectionService = connectionService;
         this.dataSyncTrigger = dataSyncTrigger;
         this.monitoringExecutor = monitoringExecutor;

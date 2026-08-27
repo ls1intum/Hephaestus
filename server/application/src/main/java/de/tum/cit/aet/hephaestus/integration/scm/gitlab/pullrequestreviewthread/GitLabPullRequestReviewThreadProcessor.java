@@ -43,9 +43,7 @@ public class GitLabPullRequestReviewThreadProcessor {
     private final ApplicationEventPublisher eventPublisher;
 
     public GitLabPullRequestReviewThreadProcessor(
-        PullRequestReviewThreadRepository threadRepository,
-        ApplicationEventPublisher eventPublisher
-    ) {
+            PullRequestReviewThreadRepository threadRepository, ApplicationEventPublisher eventPublisher) {
         this.threadRepository = threadRepository;
         this.eventPublisher = eventPublisher;
     }
@@ -60,20 +58,6 @@ public class GitLabPullRequestReviewThreadProcessor {
      * joining through comments.
      */
     public record ThreadData(
-        String discussionGlobalId,
-        boolean resolved,
-        @Nullable User resolvedBy,
-        @Nullable String filePath,
-        @Nullable Integer newLine,
-        @Nullable Integer oldLine,
-        PullRequestReviewComment.@Nullable Side side,
-        @Nullable String commitSha,
-        @Nullable String originalCommitSha,
-        @Nullable Boolean outdated,
-        @Nullable Instant createdAt
-    ) {
-        /** Backward-compatible overload for callers that don't carry outdated data. */
-        public ThreadData(
             String discussionGlobalId,
             boolean resolved,
             @Nullable User resolvedBy,
@@ -83,32 +67,42 @@ public class GitLabPullRequestReviewThreadProcessor {
             PullRequestReviewComment.@Nullable Side side,
             @Nullable String commitSha,
             @Nullable String originalCommitSha,
-            @Nullable Instant createdAt
-        ) {
+            @Nullable Boolean outdated,
+            @Nullable Instant createdAt) {
+        /** Backward-compatible overload for callers that don't carry outdated data. */
+        public ThreadData(
+                String discussionGlobalId,
+                boolean resolved,
+                @Nullable User resolvedBy,
+                @Nullable String filePath,
+                @Nullable Integer newLine,
+                @Nullable Integer oldLine,
+                PullRequestReviewComment.@Nullable Side side,
+                @Nullable String commitSha,
+                @Nullable String originalCommitSha,
+                @Nullable Instant createdAt) {
             this(
-                discussionGlobalId,
-                resolved,
-                resolvedBy,
-                filePath,
-                newLine,
-                oldLine,
-                side,
-                commitSha,
-                originalCommitSha,
-                null,
-                createdAt
-            );
+                    discussionGlobalId,
+                    resolved,
+                    resolvedBy,
+                    filePath,
+                    newLine,
+                    oldLine,
+                    side,
+                    commitSha,
+                    originalCommitSha,
+                    null,
+                    createdAt);
         }
 
         /** Backward-compatible overload for callers that don't carry side/SHA data. */
         public ThreadData(
-            String discussionGlobalId,
-            boolean resolved,
-            @Nullable User resolvedBy,
-            @Nullable String filePath,
-            @Nullable Integer newLine,
-            @Nullable Instant createdAt
-        ) {
+                String discussionGlobalId,
+                boolean resolved,
+                @Nullable User resolvedBy,
+                @Nullable String filePath,
+                @Nullable Integer newLine,
+                @Nullable Instant createdAt) {
             this(discussionGlobalId, resolved, resolvedBy, filePath, newLine, null, null, null, null, null, createdAt);
         }
     }
@@ -117,12 +111,11 @@ public class GitLabPullRequestReviewThreadProcessor {
      * Groups the webhook-level data needed to find or create a webhook thread.
      */
     public record WebhookThreadData(
-        long noteNativeId,
-        @Nullable String filePath,
-        @Nullable Integer newLine,
-        @Nullable Instant createdAt,
-        @Nullable Instant updatedAt
-    ) {}
+            long noteNativeId,
+            @Nullable String filePath,
+            @Nullable Integer newLine,
+            @Nullable Instant createdAt,
+            @Nullable Instant updatedAt) {}
 
     /**
      * Finds or creates a review thread from a GitLab discussion.
@@ -138,17 +131,13 @@ public class GitLabPullRequestReviewThreadProcessor {
      */
     @Transactional
     public PullRequestReviewThread findOrCreateThread(
-        ThreadData data,
-        PullRequest pr,
-        IdentityProvider provider,
-        Long scopeId
-    ) {
+            ThreadData data, PullRequest pr, IdentityProvider provider, Long scopeId) {
         Long providerId = Objects.requireNonNull(provider.getId());
 
         return threadRepository
-            .findByNodeIdAndProviderId(data.discussionGlobalId(), providerId)
-            .map(existing -> updateThread(existing, data, pr, scopeId))
-            .orElseGet(() -> createThread(data, pr, provider, scopeId));
+                .findByNodeIdAndProviderId(data.discussionGlobalId(), providerId)
+                .map(existing -> updateThread(existing, data, pr, scopeId))
+                .orElseGet(() -> createThread(data, pr, provider, scopeId));
     }
 
     /**
@@ -165,43 +154,35 @@ public class GitLabPullRequestReviewThreadProcessor {
      */
     @Transactional
     public PullRequestReviewThread findOrCreateWebhookThread(
-        WebhookThreadData data,
-        PullRequest pr,
-        IdentityProvider provider
-    ) {
+            WebhookThreadData data, PullRequest pr, IdentityProvider provider) {
         Long providerId = Objects.requireNonNull(provider.getId());
 
         return threadRepository
-            .findByNativeIdAndProviderId(data.noteNativeId(), providerId)
-            .orElseGet(() -> {
-                PullRequestReviewThread thread = new PullRequestReviewThread();
-                thread.setNativeId(data.noteNativeId());
-                thread.setProvider(provider);
-                thread.setPullRequest(pr);
-                thread.setPath(data.filePath());
-                thread.setLine(data.newLine());
-                thread.setState(PullRequestReviewThread.State.UNRESOLVED);
-                thread.setCreatedAt(data.createdAt());
-                thread.setUpdatedAt(data.updatedAt());
+                .findByNativeIdAndProviderId(data.noteNativeId(), providerId)
+                .orElseGet(() -> {
+                    PullRequestReviewThread thread = new PullRequestReviewThread();
+                    thread.setNativeId(data.noteNativeId());
+                    thread.setProvider(provider);
+                    thread.setPullRequest(pr);
+                    thread.setPath(data.filePath());
+                    thread.setLine(data.newLine());
+                    thread.setState(PullRequestReviewThread.State.UNRESOLVED);
+                    thread.setCreatedAt(data.createdAt());
+                    thread.setUpdatedAt(data.updatedAt());
 
-                PullRequestReviewThread saved = threadRepository.save(thread);
-                log.debug("Created webhook thread: nativeId={}, path={}", data.noteNativeId(), data.filePath());
-                return saved;
-            });
+                    PullRequestReviewThread saved = threadRepository.save(thread);
+                    log.debug("Created webhook thread: nativeId={}, path={}", data.noteNativeId(), data.filePath());
+                    return saved;
+                });
     }
 
     private PullRequestReviewThread updateThread(
-        PullRequestReviewThread existing,
-        ThreadData data,
-        PullRequest pr,
-        Long scopeId
-    ) {
+            PullRequestReviewThread existing, ThreadData data, PullRequest pr, Long scopeId) {
         PullRequestReviewThread.State previousState = existing.getState();
         boolean changed = false;
 
-        PullRequestReviewThread.State newState = data.resolved()
-            ? PullRequestReviewThread.State.RESOLVED
-            : PullRequestReviewThread.State.UNRESOLVED;
+        PullRequestReviewThread.State newState =
+                data.resolved() ? PullRequestReviewThread.State.RESOLVED : PullRequestReviewThread.State.UNRESOLVED;
 
         if (existing.getState() != newState) {
             existing.setState(newState);
@@ -262,11 +243,7 @@ public class GitLabPullRequestReviewThreadProcessor {
     }
 
     private PullRequestReviewThread createThread(
-        ThreadData data,
-        PullRequest pr,
-        IdentityProvider provider,
-        Long scopeId
-    ) {
+            ThreadData data, PullRequest pr, IdentityProvider provider, Long scopeId) {
         long nativeId = deterministicNativeId(data.discussionGlobalId());
 
         PullRequestReviewThread thread = new PullRequestReviewThread();
@@ -284,8 +261,7 @@ public class GitLabPullRequestReviewThreadProcessor {
         thread.setOriginalCommitSha(data.originalCommitSha());
         thread.setOutdated(data.outdated());
         thread.setState(
-            data.resolved() ? PullRequestReviewThread.State.RESOLVED : PullRequestReviewThread.State.UNRESOLVED
-        );
+                data.resolved() ? PullRequestReviewThread.State.RESOLVED : PullRequestReviewThread.State.UNRESOLVED);
         if (data.resolved() && data.resolvedBy() != null) {
             thread.setResolvedBy(data.resolvedBy());
         }
@@ -294,10 +270,9 @@ public class GitLabPullRequestReviewThreadProcessor {
 
         PullRequestReviewThread saved = threadRepository.save(thread);
         log.debug(
-            "Created thread from GitLab discussion: nodeId={}, path={}",
-            data.discussionGlobalId(),
-            data.filePath()
-        );
+                "Created thread from GitLab discussion: nodeId={}, path={}",
+                data.discussionGlobalId(),
+                data.filePath());
 
         // Publish resolved event if the thread was already resolved when first synced
         if (data.resolved()) {

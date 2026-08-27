@@ -17,18 +17,23 @@ import org.jspecify.annotations.Nullable;
  */
 @Schema(description = "Live state of the API token behind the workspace's Outline connection")
 public record OutlineTokenStatusDTO(
-    @NonNull
-    @Schema(description = "Whether Outline still accepts the stored token. False means revoked, expired or rejected.")
-    Boolean accepted,
-    @Schema(
-        description = "The token's name in Outline. Absent when the token cannot list its own key " +
-            "(a scoped key, or one owned by a user who cannot see it) — sync is unaffected."
-    )
-    @Nullable
-    String name,
-    @Schema(description = "Last four characters of the token, as Outline reports them") @Nullable String last4,
-    @Schema(description = "When the token lapses. Absent for a key created without an expiry.")
-    @Nullable
-    Instant expiresAt,
-    @Schema(description = "When Outline last saw the token used") @Nullable Instant lastActiveAt
-) {}
+        @NonNull
+        @Schema(
+                description =
+                        "Whether Outline still accepts the stored token. False means revoked, expired or rejected.")
+        Boolean accepted,
+
+        @Schema(
+                description = "The token's name in Outline. Absent when the token cannot list its own key "
+                        + "(a scoped key, or one owned by a user who cannot see it) — sync is unaffected.")
+        @Nullable
+        String name,
+
+        @Schema(description = "Last four characters of the token, as Outline reports them") @Nullable
+        String last4,
+
+        @Schema(description = "When the token lapses. Absent for a key created without an expiry.") @Nullable
+        Instant expiresAt,
+
+        @Schema(description = "When Outline last saw the token used") @Nullable
+        Instant lastActiveAt) {}

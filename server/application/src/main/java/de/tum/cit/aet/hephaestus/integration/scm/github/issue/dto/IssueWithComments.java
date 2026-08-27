@@ -16,10 +16,7 @@ import org.jspecify.annotations.Nullable;
  * </ul>
  */
 public record IssueWithComments(
-    GitHubIssueDTO issue,
-    EmbeddedCommentsDTO embeddedComments,
-    EmbeddedProjectItemsDTO embeddedProjectItems
-) {
+        GitHubIssueDTO issue, EmbeddedCommentsDTO embeddedComments, EmbeddedProjectItemsDTO embeddedProjectItems) {
     /**
      * Creates an IssueWithComments from a GraphQL GHIssue model.
      *
@@ -36,10 +33,8 @@ public record IssueWithComments(
 
         GitHubIssueDTO dto = Objects.requireNonNull(GitHubIssueDTO.fromIssue(ghIssue));
         EmbeddedCommentsDTO comments = EmbeddedCommentsDTO.fromConnection(ghIssue.getComments(), context);
-        EmbeddedProjectItemsDTO projectItems = EmbeddedProjectItemsDTO.fromConnection(
-            ghIssue.getProjectItems(),
-            context
-        );
+        EmbeddedProjectItemsDTO projectItems =
+                EmbeddedProjectItemsDTO.fromConnection(ghIssue.getProjectItems(), context);
 
         return new IssueWithComments(dto, comments, projectItems);
     }

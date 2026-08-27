@@ -55,13 +55,12 @@ public class ConnectionAdminService {
     private final CredentialBundleConverter credentialConverter;
 
     public ConnectionAdminService(
-        ConnectionRepository connectionRepository,
-        ConnectionAuditRepository auditRepository,
-        ConnectionService connectionService,
-        WorkspaceRepository workspaceRepository,
-        IntegrationManifestRegistry manifests,
-        CredentialBundleConverter credentialConverter
-    ) {
+            ConnectionRepository connectionRepository,
+            ConnectionAuditRepository auditRepository,
+            ConnectionService connectionService,
+            WorkspaceRepository workspaceRepository,
+            IntegrationManifestRegistry manifests,
+            CredentialBundleConverter credentialConverter) {
         this.connectionRepository = connectionRepository;
         this.auditRepository = auditRepository;
         this.connectionService = connectionService;
@@ -84,16 +83,17 @@ public class ConnectionAdminService {
     @Transactional(readOnly = true)
     public Connection findInWorkspaceOrThrow(long workspaceId, long id) {
         Connection connection = connectionRepository
-            .findById(id)
-            .orElseThrow(() -> new NoSuchElementException("Connection not found: id=" + id));
-        Long actualWorkspaceId = connection.getWorkspace() == null ? null : connection.getWorkspace().getId();
+                .findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Connection not found: id=" + id));
+        Long actualWorkspaceId = connection.getWorkspace() == null
+                ? null
+                : connection.getWorkspace().getId();
         if (!Objects.equals(actualWorkspaceId, workspaceId)) {
             log.info(
-                "Cross-workspace read attempt: connection={} actualWorkspace={} requestedWorkspace={}",
-                id,
-                actualWorkspaceId,
-                workspaceId
-            );
+                    "Cross-workspace read attempt: connection={} actualWorkspace={} requestedWorkspace={}",
+                    id,
+                    actualWorkspaceId,
+                    workspaceId);
             throw new NoSuchElementException("Connection not found in workspace " + workspaceId + ": id=" + id);
         }
         return connection;
@@ -101,7 +101,9 @@ public class ConnectionAdminService {
 
     @Transactional(readOnly = true)
     public List<ConnectionAudit> auditForConnection(long connectionId, int limit) {
-        return auditRepository.findByConnectionIdOrderByOccurredAtDesc(connectionId).stream().limit(limit).toList();
+        return auditRepository.findByConnectionIdOrderByOccurredAtDesc(connectionId).stream()
+                .limit(limit)
+                .toList();
     }
 
     public IntegrationManifestRegistry manifests() {
@@ -116,16 +118,15 @@ public class ConnectionAdminService {
      */
     @Transactional
     public Connection createInlineConnection(
-        long workspaceId,
-        IntegrationKind kind,
-        @Nullable String instanceKey,
-        CredentialBundle credentials,
-        Map<String, String> userInput,
-        String actorRef
-    ) {
+            long workspaceId,
+            IntegrationKind kind,
+            @Nullable String instanceKey,
+            CredentialBundle credentials,
+            Map<String, String> userInput,
+            String actorRef) {
         Workspace workspace = workspaceRepository
-            .findById(workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId));
+                .findById(workspaceId)
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId));
 
         ConnectionConfig config = buildConfigForInlineKind(kind, userInput, instanceKey);
         // Reconnect-friendly upsert: (workspace, kind, instance_key) is unique, so a previous
@@ -133,27 +134,25 @@ public class ConnectionAdminService {
         // credentials instead of colliding — the guarded INITIATE reconnect in
         // ConnectionService.transition allows the UNINSTALLED → ACTIVE revival.
         Connection connection = connectionRepository
-            .findByWorkspaceIdAndKindAndInstanceKey(workspaceId, kind, instanceKey)
-            .map(existing -> {
-                existing.setConfig(config);
-                return existing;
-            })
-            .orElseGet(() -> connectionRepository.save(new Connection(workspace, kind, instanceKey, config)));
+                .findByWorkspaceIdAndKindAndInstanceKey(workspaceId, kind, instanceKey)
+                .map(existing -> {
+                    existing.setConfig(config);
+                    return existing;
+                })
+                .orElseGet(() -> connectionRepository.save(new Connection(workspace, kind, instanceKey, config)));
 
         persistCredentials(connection, credentials);
 
         String correlationId = "initiate-" + connection.getId() + "-" + UUID.randomUUID();
         connection = connectionService.transition(
-            connection,
-            new TransitionRequest(
-                IntegrationState.ACTIVE,
-                "INITIATE",
-                "ADMIN",
-                actorRef,
-                correlationId,
-                "Inline credentials accepted"
-            )
-        );
+                connection,
+                new TransitionRequest(
+                        IntegrationState.ACTIVE,
+                        "INITIATE",
+                        "ADMIN",
+                        actorRef,
+                        correlationId,
+                        "Inline credentials accepted"));
         log.info("Initiated inline Connection id={} workspace={} kind={}", connection.getId(), workspaceId, kind);
         return connection;
     }
@@ -169,11 +168,10 @@ public class ConnectionAdminService {
         }
         connection.setCredentials(bundle, credentialConverter);
         log.debug(
-            "Encrypted credentials for connection={} kind={} (bundle type={})",
-            connection.getId(),
-            connection.getKind(),
-            bundle.getClass().getSimpleName()
-        );
+                "Encrypted credentials for connection={} kind={} (bundle type={})",
+                connection.getId(),
+                connection.getKind(),
+                bundle.getClass().getSimpleName());
     }
 
     /**
@@ -182,42 +180,36 @@ public class ConnectionAdminService {
      * this branch because their strategies return {@code RedirectToVendor}.
      */
     private ConnectionConfig buildConfigForInlineKind(
-        IntegrationKind kind,
-        Map<String, String> userInput,
-        @Nullable String instanceKey
-    ) {
+            IntegrationKind kind, Map<String, String> userInput, @Nullable String instanceKey) {
         Set<String> enabledStreams = new HashSet<>();
         return switch (kind) {
             case GITLAB -> {
                 String serverUrl = userInput.getOrDefault("server_url", "https://gitlab.com");
                 Long groupId = parseGroupId(instanceKey);
                 yield new ConnectionConfig.GitLabConfig(
-                    serverUrl,
-                    groupId,
-                    /* gitlabWebhookId */ null,
-                    ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
-                    enabledStreams
-                );
+                        serverUrl,
+                        groupId,
+                        /* gitlabWebhookId */ null,
+                        ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                        enabledStreams);
             }
-            case GITHUB -> new ConnectionConfig.GitHubPatConfig(
-                /* orgLogin */ null,
-                userInput.getOrDefault("server_url", null),
-                enabledStreams
-            );
-            case SLACK -> new ConnectionConfig.SlackConfig(
-                instanceKey,
-                /* teamName */ null,
-                /* notificationChannelId */ null,
-                /* teamLabel */ null,
-                /* retentionDays */ null,
-                enabledStreams
-            );
-            case OUTLINE -> new ConnectionConfig.OutlineConfig(
-                userInput.getOrDefault("server_url", null),
-                /* webhookSubscriptionId */ null,
-                /* webhookSecret */ null,
-                enabledStreams
-            );
+            case GITHUB ->
+                new ConnectionConfig.GitHubPatConfig(
+                        /* orgLogin */ null, userInput.getOrDefault("server_url", null), enabledStreams);
+            case SLACK ->
+                new ConnectionConfig.SlackConfig(
+                        instanceKey,
+                        /* teamName */ null,
+                        /* notificationChannelId */ null,
+                        /* teamLabel */ null,
+                        /* retentionDays */ null,
+                        enabledStreams);
+            case OUTLINE ->
+                new ConnectionConfig.OutlineConfig(
+                        userInput.getOrDefault("server_url", null),
+                        /* webhookSubscriptionId */ null,
+                        /* webhookSecret */ null,
+                        enabledStreams);
         };
     }
 

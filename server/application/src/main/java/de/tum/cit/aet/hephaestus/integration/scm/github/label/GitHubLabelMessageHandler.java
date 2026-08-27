@@ -30,26 +30,23 @@ public class GitHubLabelMessageHandler extends AbstractIntegrationMessageHandler
     private final GitHubLabelProcessor labelProcessor;
 
     GitHubLabelMessageHandler(
-        ProcessingContextFactory contextFactory,
-        GitHubLabelProcessor labelProcessor,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            ProcessingContextFactory contextFactory,
+            GitHubLabelProcessor labelProcessor,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITHUB,
-            "repository." + GitHubEventType.LABEL.getValue(),
-            GitHubLabelEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITHUB,
+                "repository." + GitHubEventType.LABEL.getValue(),
+                GitHubLabelEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.contextFactory = contextFactory;
         this.labelProcessor = labelProcessor;
     }
 
     @Override
     protected void handleEvent(GitHubLabelEventDTO event) {
-        @Nullable
-        GitHubLabelDTO labelDto = event.label();
+        @Nullable GitHubLabelDTO labelDto = event.label();
 
         if (labelDto == null) {
             log.warn("Received label event with missing data: action={}", event.action());
@@ -57,11 +54,10 @@ public class GitHubLabelMessageHandler extends AbstractIntegrationMessageHandler
         }
 
         log.debug(
-            "Received label event: action={}, labelName={}, repoName={}",
-            event.action(),
-            sanitizeForLog(labelDto.name()),
-            event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
-        );
+                "Received label event: action={}, labelName={}, repoName={}",
+                event.action(),
+                sanitizeForLog(labelDto.name()),
+                event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown");
 
         ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);
         if (context == null) {

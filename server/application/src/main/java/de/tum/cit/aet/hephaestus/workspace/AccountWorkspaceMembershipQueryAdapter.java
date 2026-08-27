@@ -34,11 +34,10 @@ public class AccountWorkspaceMembershipQueryAdapter implements AccountWorkspaceM
         if (logins == null || logins.isEmpty()) {
             return List.of();
         }
-        Set<String> normalized = logins
-            .stream()
-            .filter(l -> l != null && !l.isBlank())
-            .map(l -> l.toLowerCase(Locale.ROOT))
-            .collect(Collectors.toSet());
+        Set<String> normalized = logins.stream()
+                .filter(l -> l != null && !l.isBlank())
+                .map(l -> l.toLowerCase(Locale.ROOT))
+                .collect(Collectors.toSet());
         if (normalized.isEmpty()) {
             return List.of();
         }
@@ -46,23 +45,24 @@ public class AccountWorkspaceMembershipQueryAdapter implements AccountWorkspaceM
             // Deduplicate by workspace: a principal may resolve to multiple logins that both map
             // to the same workspace membership graph; the export should list each workspace once.
             Map<Long, WorkspaceMembershipView> byWorkspace = new LinkedHashMap<>();
-            for (WorkspaceMembership membership : workspaceMembershipRepository.findAllWithWorkspaceByUserLoginInLowercase(
-                normalized
-            )) {
+            for (WorkspaceMembership membership :
+                    workspaceMembershipRepository.findAllWithWorkspaceByUserLoginInLowercase(normalized)) {
                 Workspace workspace = membership.getWorkspace();
                 if (workspace == null || workspace.getId() == null) {
                     continue;
                 }
                 byWorkspace.putIfAbsent(
-                    workspace.getId(),
-                    new WorkspaceMembershipView(
                         workspace.getId(),
-                        workspace.getWorkspaceSlug(),
-                        workspace.getDisplayName(),
-                        membership.getRole() != null ? membership.getRole().name() : null,
-                        membership.getUser() != null ? membership.getUser().getId() : null
-                    )
-                );
+                        new WorkspaceMembershipView(
+                                workspace.getId(),
+                                workspace.getWorkspaceSlug(),
+                                workspace.getDisplayName(),
+                                membership.getRole() != null
+                                        ? membership.getRole().name()
+                                        : null,
+                                membership.getUser() != null
+                                        ? membership.getUser().getId()
+                                        : null));
             }
             return List.copyOf(byWorkspace.values());
         } catch (RuntimeException e) {

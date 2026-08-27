@@ -37,15 +37,15 @@ import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(
-    name = "issue",
-    uniqueConstraints = {
-        @UniqueConstraint(
-            name = "uk_issue_repository_type_number",
-            columnNames = { "repository_id", "issue_type", "number" }
-        ),
-        @UniqueConstraint(name = "uq_issue_provider_native_id", columnNames = { "provider_id", "native_id" }),
-    }
-)
+        name = "issue",
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "uk_issue_repository_type_number",
+                    columnNames = {"repository_id", "issue_type", "number"}),
+            @UniqueConstraint(
+                    name = "uq_issue_provider_native_id",
+                    columnNames = {"provider_id", "native_id"}),
+        })
 @Inheritance(strategy = InheritanceType.SINGLE_TABLE)
 @DiscriminatorColumn(name = "issue_type", discriminatorType = DiscriminatorType.STRING)
 @DiscriminatorValue(value = "ISSUE")
@@ -140,19 +140,17 @@ public class Issue extends BaseGitServiceEntity {
 
     @ManyToMany
     @JoinTable(
-        name = "issue_label",
-        joinColumns = @JoinColumn(name = "issue_id"),
-        inverseJoinColumns = @JoinColumn(name = "label_id")
-    )
+            name = "issue_label",
+            joinColumns = @JoinColumn(name = "issue_id"),
+            inverseJoinColumns = @JoinColumn(name = "label_id"))
     @ToString.Exclude
     private Set<Label> labels = new HashSet<>();
 
     @ManyToMany
     @JoinTable(
-        name = "issue_assignee",
-        joinColumns = @JoinColumn(name = "issue_id"),
-        inverseJoinColumns = @JoinColumn(name = "user_id")
-    )
+            name = "issue_assignee",
+            joinColumns = @JoinColumn(name = "issue_id"),
+            inverseJoinColumns = @JoinColumn(name = "user_id"))
     @ToString.Exclude
     private Set<User> assignees = new HashSet<>();
 
@@ -234,10 +232,9 @@ public class Issue extends BaseGitServiceEntity {
      */
     @ManyToMany
     @JoinTable(
-        name = "issue_blocking",
-        joinColumns = @JoinColumn(name = "blocked_issue_id"),
-        inverseJoinColumns = @JoinColumn(name = "blocking_issue_id")
-    )
+            name = "issue_blocking",
+            joinColumns = @JoinColumn(name = "blocked_issue_id"),
+            inverseJoinColumns = @JoinColumn(name = "blocking_issue_id"))
     @ToString.Exclude
     private Set<Issue> blockedBy = new HashSet<>();
 

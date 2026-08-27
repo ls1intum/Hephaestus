@@ -77,7 +77,8 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         // defaults ever change.
         event.setPricingState(PricingState.PRICED);
         event.setFundingSource(FundingSource.INSTANCE);
-        event.setOccurredAt(month.atDay(day).atStartOfDay(ZoneOffset.UTC).toInstant().plusSeconds(3600));
+        event.setOccurredAt(
+                month.atDay(day).atStartOfDay(ZoneOffset.UTC).toInstant().plusSeconds(3600));
         usageRepository.save(event);
     }
 
@@ -92,7 +93,8 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         event.setCostUsd(new BigDecimal(cost));
         event.setPricingState(PricingState.PRICED);
         event.setFundingSource(FundingSource.WORKSPACE);
-        event.setOccurredAt(month.atDay(day).atStartOfDay(ZoneOffset.UTC).toInstant().plusSeconds(3600));
+        event.setOccurredAt(
+                month.atDay(day).atStartOfDay(ZoneOffset.UTC).toInstant().plusSeconds(3600));
         usageRepository.save(event);
     }
 
@@ -107,7 +109,8 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         event.setCostUsd(null);
         event.setPricingState(PricingState.UNPRICED);
         event.setFundingSource(FundingSource.INSTANCE);
-        event.setOccurredAt(month.atDay(day).atStartOfDay(ZoneOffset.UTC).toInstant().plusSeconds(3600));
+        event.setOccurredAt(
+                month.atDay(day).atStartOfDay(ZoneOffset.UTC).toInstant().plusSeconds(3600));
         usageRepository.save(event);
     }
 
@@ -122,7 +125,8 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         event.setCostUsd(null);
         event.setPricingState(PricingState.UNPRICED);
         event.setFundingSource(FundingSource.WORKSPACE);
-        event.setOccurredAt(month.atDay(day).atStartOfDay(ZoneOffset.UTC).toInstant().plusSeconds(3600));
+        event.setOccurredAt(
+                month.atDay(day).atStartOfDay(ZoneOffset.UTC).toInstant().plusSeconds(3600));
         usageRepository.save(event);
     }
 
@@ -141,23 +145,21 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         seedUnpricedEvent(workspace, LlmUsageJobType.PULL_REQUEST_REVIEW, CURRENT, 5);
 
         WorkspaceLlmUsageReportDTO report = webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/usage", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(WorkspaceLlmUsageReportDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces/{slug}/llm/usage", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(WorkspaceLlmUsageReportDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(report).isNotNull();
-        var prReviews = report
-            .byJobType()
-            .stream()
-            .filter(t -> t.jobType() == LlmUsageJobType.PULL_REQUEST_REVIEW)
-            .findFirst()
-            .orElseThrow();
+        var prReviews = report.byJobType().stream()
+                .filter(t -> t.jobType() == LlmUsageJobType.PULL_REQUEST_REVIEW)
+                .findFirst()
+                .orElseThrow();
         assertThat(prReviews.instanceTotalCostUsd()).isEqualByComparingTo("2.00");
         assertThat(prReviews.ownProviderTotalCostUsd()).isEqualByComparingTo("50.00");
         assertThat(prReviews.unpricedEventCount()).isEqualTo(1);
@@ -183,15 +185,15 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         seedEvent(workspace, LlmUsageJobType.ISSUE_REVIEW, "9.99", CURRENT, 1); // outside requested month
 
         WorkspaceLlmUsageReportDTO report = webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/usage?month={month}", workspace.getWorkspaceSlug(), PREVIOUS.toString())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(WorkspaceLlmUsageReportDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces/{slug}/llm/usage?month={month}", workspace.getWorkspaceSlug(), PREVIOUS.toString())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(WorkspaceLlmUsageReportDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(report).isNotNull();
         assertThat(report.month()).isEqualTo(PREVIOUS.toString());
@@ -200,12 +202,10 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         assertThat(report.ownProviderTotalCostUsd()).isEqualByComparingTo("0");
         assertThat(report.instanceBudgetVerdict()).isEqualTo(LlmBudgetVerdict.WITHIN);
         assertThat(report.byJobType()).hasSize(2);
-        var prReviews = report
-            .byJobType()
-            .stream()
-            .filter(t -> t.jobType() == LlmUsageJobType.PULL_REQUEST_REVIEW)
-            .findFirst()
-            .orElseThrow();
+        var prReviews = report.byJobType().stream()
+                .filter(t -> t.jobType() == LlmUsageJobType.PULL_REQUEST_REVIEW)
+                .findFirst()
+                .orElseThrow();
         assertThat(prReviews.instanceTotalCostUsd()).isEqualByComparingTo("2.00");
         assertThat(prReviews.ownProviderTotalCostUsd()).isEqualByComparingTo("0");
         assertThat(prReviews.unpricedEventCount()).isEqualTo(0);
@@ -226,21 +226,21 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         seedEvent(workspace, LlmUsageJobType.MENTOR_TURN, "1.00", CURRENT, 1);
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/usage", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.instanceBudgetVerdict")
-            .isEqualTo("EXHAUSTED")
-            .jsonPath("$.instancePaused")
-            .isEqualTo(true)
-            // The other purse is uncapped and untouched: shared-model exhaustion never pauses work
-            // the workspace pays for itself.
-            .jsonPath("$.ownProviderPaused")
-            .isEqualTo(false);
+                .get()
+                .uri("/workspaces/{slug}/llm/usage", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.instanceBudgetVerdict")
+                .isEqualTo("EXHAUSTED")
+                .jsonPath("$.instancePaused")
+                .isEqualTo(true)
+                // The other purse is uncapped and untouched: shared-model exhaustion never pauses work
+                // the workspace pays for itself.
+                .jsonPath("$.ownProviderPaused")
+                .isEqualTo(false);
     }
 
     /**
@@ -257,17 +257,17 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         seedUnpricedEvent(workspace, LlmUsageJobType.MENTOR_TURN, CURRENT, 1);
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/usage", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.instanceBudgetVerdict")
-            .isEqualTo("UNVERIFIABLE")
-            .jsonPath("$.instancePaused")
-            .isEqualTo(true);
+                .get()
+                .uri("/workspaces/{slug}/llm/usage", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.instanceBudgetVerdict")
+                .isEqualTo("UNVERIFIABLE")
+                .jsonPath("$.instancePaused")
+                .isEqualTo(true);
     }
 
     @Test
@@ -281,25 +281,25 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         seedByoEvent(workspace, LlmUsageJobType.MENTOR_TURN, "10.00", CURRENT, 1);
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/usage", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.instanceMonthlyBudgetUsd")
-            .isEqualTo(100.0)
-            .jsonPath("$.ownProviderMonthlyBudgetUsd")
-            .isEqualTo(10.0)
-            .jsonPath("$.instanceBudgetVerdict")
-            .isEqualTo("WITHIN")
-            .jsonPath("$.ownProviderBudgetVerdict")
-            .isEqualTo("EXHAUSTED")
-            .jsonPath("$.instancePaused")
-            .isEqualTo(false)
-            .jsonPath("$.ownProviderPaused")
-            .isEqualTo(true);
+                .get()
+                .uri("/workspaces/{slug}/llm/usage", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.instanceMonthlyBudgetUsd")
+                .isEqualTo(100.0)
+                .jsonPath("$.ownProviderMonthlyBudgetUsd")
+                .isEqualTo(10.0)
+                .jsonPath("$.instanceBudgetVerdict")
+                .isEqualTo("WITHIN")
+                .jsonPath("$.ownProviderBudgetVerdict")
+                .isEqualTo("EXHAUSTED")
+                .jsonPath("$.instancePaused")
+                .isEqualTo(false)
+                .jsonPath("$.ownProviderPaused")
+                .isEqualTo(true);
     }
 
     @Test
@@ -312,21 +312,21 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         seedUnpricedByoEvent(workspace, LlmUsageJobType.MENTOR_TURN, CURRENT, 1);
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/usage", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.instanceBudgetVerdict")
-            .isEqualTo("WITHIN")
-            .jsonPath("$.instancePaused")
-            .isEqualTo(false)
-            .jsonPath("$.ownProviderBudgetVerdict")
-            .isEqualTo("UNVERIFIABLE")
-            .jsonPath("$.ownProviderPaused")
-            .isEqualTo(true);
+                .get()
+                .uri("/workspaces/{slug}/llm/usage", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.instanceBudgetVerdict")
+                .isEqualTo("WITHIN")
+                .jsonPath("$.instancePaused")
+                .isEqualTo(false)
+                .jsonPath("$.ownProviderBudgetVerdict")
+                .isEqualTo("UNVERIFIABLE")
+                .jsonPath("$.ownProviderPaused")
+                .isEqualTo(true);
     }
 
     @Test
@@ -341,15 +341,15 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         seedEvent(workspace, LlmUsageJobType.MENTOR_TURN, "0.10", PREVIOUS, 1); // PREVIOUS stays well under cap
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/usage?month={month}", workspace.getWorkspaceSlug(), PREVIOUS.toString())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.instancePaused")
-            .isEqualTo(false);
+                .get()
+                .uri("/workspaces/{slug}/llm/usage?month={month}", workspace.getWorkspaceSlug(), PREVIOUS.toString())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.instancePaused")
+                .isEqualTo(false);
     }
 
     @Test
@@ -358,73 +358,66 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         Workspace workspace = setupWorkspaceWithAdmin("usage-badmonth");
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/usage?month=07-2026", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+                .get()
+                .uri("/workspaces/{slug}/llm/usage?month=07-2026", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isBadRequest();
     }
 
     @Test
     @WithAdminUser
     void instanceAdminCanReadAWorkspaceReportWithoutMembership() {
         Workspace workspace = createWorkspace(
-            "usage-instance-admin",
-            "Usage instance admin",
-            "usage-instance-admin-org",
-            AccountType.ORG,
-            persistUser("usage-instance-admin-owner")
-        );
+                "usage-instance-admin",
+                "Usage instance admin",
+                "usage-instance-admin-org",
+                AccountType.ORG,
+                persistUser("usage-instance-admin-owner"));
         seedEvent(workspace, LlmUsageJobType.MENTOR_TURN, "1.25", CURRENT, 1);
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/usage", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.instanceTotalCostUsd")
-            .isEqualTo(1.25);
+                .get()
+                .uri("/workspaces/{slug}/llm/usage", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.instanceTotalCostUsd")
+                .isEqualTo(1.25);
     }
 
     @Test
     @WithMentorUser
     void workspaceAdminCannotReadAnotherWorkspacesReport() {
         User admin = persistUser("mentor");
-        Workspace ownWorkspace = createWorkspace(
-            "usage-own-admin",
-            "Usage own admin",
-            "usage-own-admin-org",
-            AccountType.ORG,
-            admin
-        );
+        Workspace ownWorkspace =
+                createWorkspace("usage-own-admin", "Usage own admin", "usage-own-admin-org", AccountType.ORG, admin);
         ensureWorkspaceMembership(ownWorkspace, admin, WorkspaceMembership.WorkspaceRole.ADMIN);
         Workspace otherWorkspace = createWorkspace(
-            "usage-other-admin",
-            "Usage other admin",
-            "usage-other-admin-org",
-            AccountType.ORG,
-            persistUser("usage-other-admin-owner")
-        );
+                "usage-other-admin",
+                "Usage other admin",
+                "usage-other-admin-org",
+                AccountType.ORG,
+                persistUser("usage-other-admin-owner"));
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/usage", otherWorkspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .get()
+                .uri("/workspaces/{slug}/llm/usage", otherWorkspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isForbidden();
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/usage", ownWorkspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk();
+                .get()
+                .uri("/workspaces/{slug}/llm/usage", ownWorkspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk();
     }
 
     @Test
@@ -433,29 +426,29 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         Workspace workspace = setupWorkspaceWithAdmin("own-provider-budget-set");
 
         webTestClient
-            .put()
-            .uri("/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("monthlyBudgetUsd", "25.00"))
-            .exchange()
-            .expectStatus()
-            .isNoContent();
-        assertThat(
-            workspaceRepository.findById(workspace.getId()).orElseThrow().getMonthlyByoLlmBudgetUsd()
-        ).isEqualByComparingTo("25.00");
+                .put()
+                .uri("/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("monthlyBudgetUsd", "25.00"))
+                .exchange()
+                .expectStatus()
+                .isNoContent();
+        assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getMonthlyByoLlmBudgetUsd())
+                .isEqualByComparingTo("25.00");
 
         // An empty body clears the cap back to uncapped — same shape as the instance-admin endpoint.
         webTestClient
-            .put()
-            .uri("/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of())
-            .exchange()
-            .expectStatus()
-            .isNoContent();
-        assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getMonthlyByoLlmBudgetUsd()).isNull();
+                .put()
+                .uri("/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of())
+                .exchange()
+                .expectStatus()
+                .isNoContent();
+        assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getMonthlyByoLlmBudgetUsd())
+                .isNull();
     }
 
     @Test
@@ -466,14 +459,14 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         workspaceRepository.save(workspace);
 
         webTestClient
-            .put()
-            .uri("/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("monthlyBudgetUsd", "0.00"))
-            .exchange()
-            .expectStatus()
-            .isNoContent();
+                .put()
+                .uri("/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("monthlyBudgetUsd", "0.00"))
+                .exchange()
+                .expectStatus()
+                .isNoContent();
 
         Workspace reloaded = workspaceRepository.findById(workspace.getId()).orElseThrow();
         assertThat(reloaded.getMonthlyByoLlmBudgetUsd()).isEqualByComparingTo("0.00");
@@ -486,44 +479,42 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         Workspace workspace = setupWorkspaceWithAdmin("own-provider-budget-audit");
 
         webTestClient
-            .put()
-            .uri("/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("monthlyBudgetUsd", "12.50"))
-            .exchange()
-            .expectStatus()
-            .isNoContent();
+                .put()
+                .uri("/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("monthlyBudgetUsd", "12.50"))
+                .exchange()
+                .expectStatus()
+                .isNoContent();
 
-        ConfigAuditEvent row = configAuditEventRepository
-            .findAll()
-            .stream()
-            .filter(e -> e.getEntityType() == ConfigAuditEntityType.WORKSPACE_OWN_PROVIDER_LLM_BUDGET)
-            .filter(e -> workspace.getId().equals(e.getWorkspaceId()))
-            .findFirst()
-            .orElseThrow();
+        ConfigAuditEvent row = configAuditEventRepository.findAll().stream()
+                .filter(e -> e.getEntityType() == ConfigAuditEntityType.WORKSPACE_OWN_PROVIDER_LLM_BUDGET)
+                .filter(e -> workspace.getId().equals(e.getWorkspaceId()))
+                .findFirst()
+                .orElseThrow();
         assertThat(row.changedKeyList()).contains("monthlyBudgetUsd");
         assertThat(row.getNewValue()).contains("12.5");
     }
 
     @ParameterizedTest(name = "monthlyBudgetUsd={0} ({1})")
-    @CsvSource({ "1.234, more than two decimals", "-1.00, negative" })
+    @CsvSource({"1.234, more than two decimals", "-1.00, negative"})
     @WithAdminUser
     void anUnusableOwnProviderCapIsRejectedWith400(String cap, String why) {
         Workspace workspace = setupWorkspaceWithAdmin("own-provider-budget-" + why.replace(' ', '-'));
 
         webTestClient
-            .put()
-            .uri("/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("monthlyBudgetUsd", cap))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+                .put()
+                .uri("/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("monthlyBudgetUsd", cap))
+                .exchange()
+                .expectStatus()
+                .isBadRequest();
         assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getMonthlyByoLlmBudgetUsd())
-            .as(why)
-            .isNull();
+                .as(why)
+                .isNull();
     }
 
     @Test
@@ -534,15 +525,16 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         String csrf = TestAuthUtils.fetchCsrfToken(webTestClient);
 
         webTestClient
-            .put()
-            .uri("/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCsrf(csrf))
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("monthlyBudgetUsd", "25.00"))
-            .exchange()
-            .expectStatus()
-            .isUnauthorized();
-        assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getMonthlyByoLlmBudgetUsd()).isNull();
+                .put()
+                .uri("/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCsrf(csrf))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("monthlyBudgetUsd", "25.00"))
+                .exchange()
+                .expectStatus()
+                .isUnauthorized();
+        assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getMonthlyByoLlmBudgetUsd())
+                .isNull();
     }
 
     @Test
@@ -550,34 +542,34 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     void aWorkspaceAdminCannotTouchTheInstanceCap() {
         User admin = persistUser("mentor");
         Workspace workspace = createWorkspace(
-            "own-provider-budget-boundary",
-            "Byo budget boundary",
-            "own-provider-budget-boundary-org",
-            AccountType.ORG,
-            admin
-        );
+                "own-provider-budget-boundary",
+                "Byo budget boundary",
+                "own-provider-budget-boundary-org",
+                AccountType.ORG,
+                admin);
         ensureWorkspaceMembership(workspace, admin, WorkspaceMembership.WorkspaceRole.ADMIN);
 
         webTestClient
-            .put()
-            .uri("/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("monthlyBudgetUsd", "25.00"))
-            .exchange()
-            .expectStatus()
-            .isNoContent();
+                .put()
+                .uri("/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("monthlyBudgetUsd", "25.00"))
+                .exchange()
+                .expectStatus()
+                .isNoContent();
 
         webTestClient
-            .put()
-            .uri("/admin/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("monthlyBudgetUsd", "999.00"))
-            .exchange()
-            .expectStatus()
-            .isForbidden();
-        assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getMonthlyLlmBudgetUsd()).isNull();
+                .put()
+                .uri("/admin/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("monthlyBudgetUsd", "999.00"))
+                .exchange()
+                .expectStatus()
+                .isForbidden();
+        assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getMonthlyLlmBudgetUsd())
+                .isNull();
     }
 
     /**
@@ -596,19 +588,19 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         fxRateRepository.save(rate);
 
         byte[] body = webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/usage", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.fx")
-            .doesNotExist()
-            .jsonPath("$.instanceTotalCostUsd")
-            .isEqualTo(1.00)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces/{slug}/llm/usage", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.fx")
+                .doesNotExist()
+                .jsonPath("$.instanceTotalCostUsd")
+                .isEqualTo(1.00)
+                .returnResult()
+                .getResponseBody();
 
         // Not even as an explicit null: the key is absent from the wire bytes.
         assertThat(new String(body, StandardCharsets.UTF_8)).doesNotContain("\"fx\"");
@@ -622,86 +614,73 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     @WithMentorUser
     void workspaceAdminCannotSetAnotherWorkspacesCap() {
         User admin = persistUser("mentor");
-        Workspace ownWorkspace = createWorkspace(
-            "budget-own-admin",
-            "Budget own admin",
-            "budget-own-admin-org",
-            AccountType.ORG,
-            admin
-        );
+        Workspace ownWorkspace =
+                createWorkspace("budget-own-admin", "Budget own admin", "budget-own-admin-org", AccountType.ORG, admin);
         ensureWorkspaceMembership(ownWorkspace, admin, WorkspaceMembership.WorkspaceRole.ADMIN);
         Workspace otherWorkspace = createWorkspace(
-            "budget-other-admin",
-            "Budget other admin",
-            "budget-other-admin-org",
-            AccountType.ORG,
-            persistUser("budget-other-admin-owner")
-        );
+                "budget-other-admin",
+                "Budget other admin",
+                "budget-other-admin-org",
+                AccountType.ORG,
+                persistUser("budget-other-admin-owner"));
         otherWorkspace.setMonthlyByoLlmBudgetUsd(new BigDecimal("5.00"));
         workspaceRepository.save(otherWorkspace);
 
         webTestClient
-            .put()
-            .uri("/workspaces/{slug}/llm/budget", otherWorkspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("monthlyBudgetUsd", "999.00"))
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .put()
+                .uri("/workspaces/{slug}/llm/budget", otherWorkspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("monthlyBudgetUsd", "999.00"))
+                .exchange()
+                .expectStatus()
+                .isForbidden();
 
-        assertThat(
-            workspaceRepository.findById(otherWorkspace.getId()).orElseThrow().getMonthlyByoLlmBudgetUsd()
-        ).isEqualByComparingTo("5.00");
+        assertThat(workspaceRepository
+                        .findById(otherWorkspace.getId())
+                        .orElseThrow()
+                        .getMonthlyByoLlmBudgetUsd())
+                .isEqualByComparingTo("5.00");
     }
 
     @Test
     @WithMentorUser
     void plainMemberCannotSetTheOwnProviderCap() {
         User owner = persistUser("budget-member-owner");
-        Workspace workspace = createWorkspace(
-            "budget-member",
-            "Budget member",
-            "budget-member-org",
-            AccountType.ORG,
-            owner
-        );
+        Workspace workspace =
+                createWorkspace("budget-member", "Budget member", "budget-member-org", AccountType.ORG, owner);
         User member = persistUser("mentor");
         ensureWorkspaceMembership(workspace, member, WorkspaceMembership.WorkspaceRole.MEMBER);
 
         webTestClient
-            .put()
-            .uri("/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("monthlyBudgetUsd", "1.00"))
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .put()
+                .uri("/workspaces/{slug}/llm/budget", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("monthlyBudgetUsd", "1.00"))
+                .exchange()
+                .expectStatus()
+                .isForbidden();
 
-        assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getMonthlyByoLlmBudgetUsd()).isNull();
+        assertThat(workspaceRepository.findById(workspace.getId()).orElseThrow().getMonthlyByoLlmBudgetUsd())
+                .isNull();
     }
 
     @Test
     @WithMentorUser
     void plainMemberIsForbidden() {
         User owner = persistUser("usage-member-owner");
-        Workspace workspace = createWorkspace(
-            "usage-member",
-            "Usage member",
-            "usage-member-org",
-            AccountType.ORG,
-            owner
-        );
+        Workspace workspace =
+                createWorkspace("usage-member", "Usage member", "usage-member-org", AccountType.ORG, owner);
         User member = persistUser("mentor");
         ensureWorkspaceMembership(workspace, member, WorkspaceMembership.WorkspaceRole.MEMBER);
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/usage", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .get()
+                .uri("/workspaces/{slug}/llm/usage", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isForbidden();
     }
 }

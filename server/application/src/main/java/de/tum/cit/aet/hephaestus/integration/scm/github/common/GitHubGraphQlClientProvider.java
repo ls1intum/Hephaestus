@@ -31,14 +31,13 @@ public class GitHubGraphQlClientProvider {
     private final SilentModeGraphQlClientFactory clientFactory;
 
     public GitHubGraphQlClientProvider(
-        HttpGraphQlClient gitHubGraphQlClient,
-        InstallationTokenProvider tokenProvider,
-        GitHubAppTokenService appTokens,
-        @Qualifier("githubGraphQlCircuitBreaker") CircuitBreaker circuitBreaker,
-        RateLimitTracker rateLimitTracker,
-        GitHubRestRateLimitSeeder rateLimitSeeder,
-        SilentModeGraphQlClientFactory clientFactory
-    ) {
+            HttpGraphQlClient gitHubGraphQlClient,
+            InstallationTokenProvider tokenProvider,
+            GitHubAppTokenService appTokens,
+            @Qualifier("githubGraphQlCircuitBreaker") CircuitBreaker circuitBreaker,
+            RateLimitTracker rateLimitTracker,
+            GitHubRestRateLimitSeeder rateLimitSeeder,
+            SilentModeGraphQlClientFactory clientFactory) {
         this.baseClient = gitHubGraphQlClient;
         this.tokenProvider = tokenProvider;
         this.appTokens = appTokens;
@@ -171,25 +170,23 @@ public class GitHubGraphQlClientProvider {
         // Fail fast for suspended/inactive scopes - don't waste API calls
         if (!tokenProvider.isScopeActive(scopeId)) {
             throw new IllegalStateException(
-                "Scope " + scopeId + " is not active (suspended or purged). Refusing to mint token."
-            );
+                    "Scope " + scopeId + " is not active (suspended or purged). Refusing to mint token.");
         }
 
         AuthMode authMode = tokenProvider.getAuthMode(scopeId);
 
         if (authMode == AuthMode.INSTALLATION_APP) {
             Long installationId = tokenProvider
-                .getInstallationId(scopeId)
-                .orElseThrow(() -> new IllegalStateException("Scope " + scopeId + " has no installation id."));
+                    .getInstallationId(scopeId)
+                    .orElseThrow(() -> new IllegalStateException("Scope " + scopeId + " has no installation id."));
             InstallationToken token = appTokens.getInstallationTokenDetails(installationId);
             return token.token();
         }
 
         return tokenProvider
-            .getPersonalAccessToken(scopeId)
-            .filter(t -> !t.isBlank())
-            .orElseThrow(() ->
-                new IllegalStateException("Scope " + scopeId + " is configured for PAT access but no token is stored.")
-            );
+                .getPersonalAccessToken(scopeId)
+                .filter(t -> !t.isBlank())
+                .orElseThrow(() -> new IllegalStateException(
+                        "Scope " + scopeId + " is configured for PAT access but no token is stored."));
     }
 }

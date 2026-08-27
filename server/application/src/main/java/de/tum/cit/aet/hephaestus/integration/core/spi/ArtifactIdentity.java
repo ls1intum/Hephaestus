@@ -19,13 +19,12 @@ import org.jspecify.annotations.Nullable;
  * @param url       where to open it upstream, when we can build a whole one
  */
 public record ArtifactIdentity(
-    @NonNull ArtifactKind kind,
-    @NonNull Long id,
-    @Nullable Integer number,
-    @NonNull String title,
-    @Nullable String container,
-    @Nullable String url
-) {
+        @NonNull ArtifactKind kind,
+        @NonNull Long id,
+        @Nullable Integer number,
+        @NonNull String title,
+        @Nullable String container,
+        @Nullable String url) {
     public ArtifactIdentity {
         Objects.requireNonNull(kind, "kind");
         Objects.requireNonNull(id, "id");

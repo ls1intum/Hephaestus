@@ -37,20 +37,18 @@ class ReviewFeedbackInAppBodyTest extends BaseUnitTest {
     private static final long WORKSPACE_ID = 7L;
 
     private final FeedbackRepository feedbackRepository = mock(FeedbackRepository.class);
-    private final FeedbackObservationRepository feedbackObservationRepository = mock(
-        FeedbackObservationRepository.class
-    );
+    private final FeedbackObservationRepository feedbackObservationRepository =
+            mock(FeedbackObservationRepository.class);
     private final FeedbackPlacementRepository feedbackPlacementRepository = mock(FeedbackPlacementRepository.class);
     private final ReviewSubjectResolver subjectResolver = mock(ReviewSubjectResolver.class);
     private final ReviewArtifactResolver artifactResolver = mock(ReviewArtifactResolver.class);
 
     private final ReviewFeedbackQueryService service = new ReviewFeedbackQueryService(
-        feedbackRepository,
-        feedbackObservationRepository,
-        feedbackPlacementRepository,
-        subjectResolver,
-        artifactResolver
-    );
+            feedbackRepository,
+            feedbackObservationRepository,
+            feedbackPlacementRepository,
+            subjectResolver,
+            artifactResolver);
 
     @Test
     void withholdsAnInAppBodyFromTheOperatorDetailRoute() {
@@ -79,21 +77,24 @@ class ReviewFeedbackInAppBodyTest extends BaseUnitTest {
     private ReviewFeedbackDetailDTO detailFor(FeedbackChannel channel) {
         UUID feedbackId = UUID.randomUUID();
         Feedback unit = Feedback.builder()
-            .id(feedbackId)
-            .agentJobId(UUID.randomUUID())
-            .workspaceId(WORKSPACE_ID)
-            .recipientUserId(11L)
-            .aboutUserId(11L)
-            .channel(channel)
-            .position(0)
-            .deliveryState(FeedbackDeliveryState.PREPARED)
-            .source(FeedbackSource.AGENT)
-            .body("the composed text")
-            .createdAt(Instant.parse("2026-08-15T12:00:00Z"))
-            .build();
-        when(feedbackRepository.findByIdAndWorkspaceId(feedbackId, WORKSPACE_ID)).thenReturn(Optional.of(unit));
-        when(feedbackObservationRepository.findBoundObservations(WORKSPACE_ID, feedbackId)).thenReturn(List.of());
-        when(feedbackPlacementRepository.findByFeedbackIdInDisplayOrder(feedbackId)).thenReturn(List.of());
+                .id(feedbackId)
+                .agentJobId(UUID.randomUUID())
+                .workspaceId(WORKSPACE_ID)
+                .recipientUserId(11L)
+                .aboutUserId(11L)
+                .channel(channel)
+                .position(0)
+                .deliveryState(FeedbackDeliveryState.PREPARED)
+                .source(FeedbackSource.AGENT)
+                .body("the composed text")
+                .createdAt(Instant.parse("2026-08-15T12:00:00Z"))
+                .build();
+        when(feedbackRepository.findByIdAndWorkspaceId(feedbackId, WORKSPACE_ID))
+                .thenReturn(Optional.of(unit));
+        when(feedbackObservationRepository.findBoundObservations(WORKSPACE_ID, feedbackId))
+                .thenReturn(List.of());
+        when(feedbackPlacementRepository.findByFeedbackIdInDisplayOrder(feedbackId))
+                .thenReturn(List.of());
         when(subjectResolver.resolve(any())).thenReturn(Map.of());
         // The unit is unanchored (a in-app message is about several pieces of work, not one), so the
         // artifact resolver is never reached — deliberately left unstubbed to keep that visible.

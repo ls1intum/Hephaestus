@@ -28,13 +28,17 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Schema(description = "Mentor chat message in AI SDK UIMessage shape.")
 public record ChatMessageDTO(
-    UUID id,
-    @Nullable UUID parentMessageId,
-    String role,
-    @ArraySchema(schema = @Schema(description = "AI SDK UIMessage part (text / data-observation).")) List<Object> parts,
-    @Nullable @Schema(description = "Per-turn metadata: status, model, costUsd, usage, …") Map<String, Object> metadata,
-    Instant createdAt
-) {
+        UUID id,
+        @Nullable UUID parentMessageId,
+        String role,
+
+        @ArraySchema(schema = @Schema(description = "AI SDK UIMessage part (text / data-observation)."))
+        List<Object> parts,
+
+        @Nullable @Schema(description = "Per-turn metadata: status, model, costUsd, usage, …")
+        Map<String, Object> metadata,
+
+        Instant createdAt) {
     /**
      * Build a DTO from the entity + the effective parts {@link JsonNode}. Conversion is via
      * the supplied {@code ObjectMapper} so we honour the application's Jackson config (e.g.
@@ -44,17 +48,18 @@ public record ChatMessageDTO(
      */
     @SuppressWarnings("unchecked")
     public static ChatMessageDTO from(ChatMessage message, JsonNode effectiveParts, ObjectMapper mapper) {
-        List<Object> parts =
-            effectiveParts != null && effectiveParts.isArray()
+        List<Object> parts = effectiveParts != null && effectiveParts.isArray()
                 ? mapper.convertValue(effectiveParts, new TypeReference<List<Object>>() {})
                 : List.of();
-        parts = parts.stream().filter(ChatMessageDTO::isUserVisiblePart).filter(Objects::nonNull).toList();
+        parts = parts.stream()
+                .filter(ChatMessageDTO::isUserVisiblePart)
+                .filter(Objects::nonNull)
+                .toList();
         Map<String, Object> metadata =
-            message.getMetadata() != null && message.getMetadata().isObject()
-                ? new LinkedHashMap<>(
-                      mapper.convertValue(message.getMetadata(), new TypeReference<Map<String, Object>>() {})
-                  )
-                : new LinkedHashMap<>();
+                message.getMetadata() != null && message.getMetadata().isObject()
+                        ? new LinkedHashMap<>(
+                                mapper.convertValue(message.getMetadata(), new TypeReference<Map<String, Object>>() {}))
+                        : new LinkedHashMap<>();
         // Status was promoted to a real column in migration mentor-1071-add-status-column,
         // but the webapp's generated client still reads it from `metadata.status`. Merge the
         // column back into the metadata bag at the API boundary so the wire shape stays
@@ -63,13 +68,12 @@ public record ChatMessageDTO(
         // Read the raw FK column instead of dereferencing the lazy parentMessage proxy — a
         // 100-message thread listing would otherwise issue 100 extra SELECTs.
         return new ChatMessageDTO(
-            message.getId(),
-            message.getParentMessageId(),
-            message.getRole().getValue(),
-            parts,
-            metadata,
-            message.getCreatedAt()
-        );
+                message.getId(),
+                message.getParentMessageId(),
+                message.getRole().getValue(),
+                parts,
+                metadata,
+                message.getCreatedAt());
     }
 
     private static boolean isUserVisiblePart(Object part) {

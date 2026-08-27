@@ -50,19 +50,19 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void spiClassesAreInterfaces() {
             ArchRule rule = classes()
-                .that()
-                .resideInAPackage("..integration.core.spi..")
-                .and()
-                .areNotRecords()
-                .and()
-                .areNotEnums()
-                .and()
-                .areNotMemberClasses()
-                .and()
-                .haveSimpleNameNotEndingWith("Exception")
-                .should()
-                .beInterfaces()
-                .because("SPI classes define contracts and should be interfaces (exceptions excepted)");
+                    .that()
+                    .resideInAPackage("..integration.core.spi..")
+                    .and()
+                    .areNotRecords()
+                    .and()
+                    .areNotEnums()
+                    .and()
+                    .areNotMemberClasses()
+                    .and()
+                    .haveSimpleNameNotEndingWith("Exception")
+                    .should()
+                    .beInterfaces()
+                    .because("SPI classes define contracts and should be interfaces (exceptions excepted)");
             rule.check(classes);
         }
 
@@ -75,21 +75,21 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void workspaceAdaptersImplementSpis() {
             ArchRule rule = classes()
-                .that()
-                .resideInAPackage("..workspace.adapter..")
-                .and()
-                .areNotInterfaces()
-                .and()
-                .areNotMemberClasses() // Exclude anonymous inner classes
-                .and()
-                .areNotAnonymousClasses() // Exclude anonymous classes
-                .and()
-                .haveSimpleNameNotContaining("$") // Exclude generated inner classes
-                .and()
-                .haveSimpleNameNotEndingWith("Test")
-                .should()
-                .implement(JavaClass.Predicates.resideInAPackage("..spi.."))
-                .because("Workspace adapters bridge workspace context to integration.scm via SPIs");
+                    .that()
+                    .resideInAPackage("..workspace.adapter..")
+                    .and()
+                    .areNotInterfaces()
+                    .and()
+                    .areNotMemberClasses() // Exclude anonymous inner classes
+                    .and()
+                    .areNotAnonymousClasses() // Exclude anonymous classes
+                    .and()
+                    .haveSimpleNameNotContaining("$") // Exclude generated inner classes
+                    .and()
+                    .haveSimpleNameNotEndingWith("Test")
+                    .should()
+                    .implement(JavaClass.Predicates.resideInAPackage("..spi.."))
+                    .because("Workspace adapters bridge workspace context to integration.scm via SPIs");
             rule.check(classes);
         }
 
@@ -103,18 +103,17 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         @DisplayName("SPIs do not depend on Spring framework")
         void spiInterfacesAreFrameworkAgnostic() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..integration.core.spi..")
-                .and()
-                .areInterfaces()
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage(
-                    "org.springframework.stereotype..",
-                    "org.springframework.beans..",
-                    "org.springframework.context.."
-                )
-                .because("SPIs should be framework-agnostic contracts");
+                    .that()
+                    .resideInAPackage("..integration.core.spi..")
+                    .and()
+                    .areInterfaces()
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAnyPackage(
+                            "org.springframework.stereotype..",
+                            "org.springframework.beans..",
+                            "org.springframework.context..")
+                    .because("SPIs should be framework-agnostic contracts");
             rule.check(classes);
         }
     }
@@ -139,17 +138,15 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void scmDoesNotDependOnWorkspace() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..integration.scm..")
-                .and()
-                .resideOutsideOfPackages("..integration.scm.github..", "..integration.scm.gitlab..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("..workspace..")
-                .because(
-                    "Vendor-neutral SCM domain must depend on SPIs, not workspace implementation. " +
-                        "Vendor adapters (scm.github/scm.gitlab) are exempt — they bridge workspace concerns."
-                );
+                    .that()
+                    .resideInAPackage("..integration.scm..")
+                    .and()
+                    .resideOutsideOfPackages("..integration.scm.github..", "..integration.scm.gitlab..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAPackage("..workspace..")
+                    .because("Vendor-neutral SCM domain must depend on SPIs, not workspace implementation. "
+                            + "Vendor adapters (scm.github/scm.gitlab) are exempt — they bridge workspace concerns.");
             rule.check(classes);
         }
 
@@ -169,22 +166,22 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void scmDoesNotDependOnFeatureModules() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..integration.scm..")
-                .and()
-                .resideOutsideOfPackages("..integration.scm.github..", "..integration.scm.gitlab..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage(
-                    "..leaderboard..",
-                    "..activity..",
-                    "..mentor..",
-                    "..notification..",
-                    "..profile..",
-                    "..account..",
-                    "..contributors.."
-                )
-                .because("Vendor-neutral SCM domain must be isolated - use domain events for cross-cutting concerns");
+                    .that()
+                    .resideInAPackage("..integration.scm..")
+                    .and()
+                    .resideOutsideOfPackages("..integration.scm.github..", "..integration.scm.gitlab..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAnyPackage(
+                            "..leaderboard..",
+                            "..activity..",
+                            "..mentor..",
+                            "..notification..",
+                            "..profile..",
+                            "..account..",
+                            "..contributors..")
+                    .because(
+                            "Vendor-neutral SCM domain must be isolated - use domain events for cross-cutting concerns");
             rule.check(classes);
         }
 
@@ -198,15 +195,15 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void githubSpecificClassesAreInGithubPackages() {
             ArchRule rule = classes()
-                .that()
-                .haveSimpleNameStartingWith("GitHub")
-                .and()
-                .resideInAPackage("..integration.scm..")
-                .and()
-                .resideOutsideOfPackage("..sync..") // Sync orchestrators can dispatch to providers
-                .should()
-                .resideInAPackage("..github..")
-                .because("GitHub-specific logic should be in github/ subpackages for multi-provider support");
+                    .that()
+                    .haveSimpleNameStartingWith("GitHub")
+                    .and()
+                    .resideInAPackage("..integration.scm..")
+                    .and()
+                    .resideOutsideOfPackage("..sync..") // Sync orchestrators can dispatch to providers
+                    .should()
+                    .resideInAPackage("..github..")
+                    .because("GitHub-specific logic should be in github/ subpackages for multi-provider support");
             rule.check(classes);
         }
     }
@@ -226,19 +223,19 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void domainEventsAreInEventsPackages() {
             ArchRule rule = classes()
-                .that()
-                .haveSimpleNameEndingWith("Event")
-                .and()
-                .resideInAPackage("..integration.scm..")
-                .and()
-                .resideOutsideOfPackage("..graphql..") // Exclude generated GraphQL model
-                .and()
-                .areNotInterfaces()
-                .and()
-                .areNotMemberClasses() // Exclude nested records in SPI interfaces (e.g., callback DTOs)
-                .should()
-                .resideInAPackage("..events..")
-                .because("Domain events should be in events packages");
+                    .that()
+                    .haveSimpleNameEndingWith("Event")
+                    .and()
+                    .resideInAPackage("..integration.scm..")
+                    .and()
+                    .resideOutsideOfPackage("..graphql..") // Exclude generated GraphQL model
+                    .and()
+                    .areNotInterfaces()
+                    .and()
+                    .areNotMemberClasses() // Exclude nested records in SPI interfaces (e.g., callback DTOs)
+                    .should()
+                    .resideInAPackage("..events..")
+                    .because("Domain events should be in events packages");
             rule.check(classes);
         }
     }
@@ -257,14 +254,14 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void utilityClassesAreFinalOrPrivateConstructor() {
             ArchRule rule = classes()
-                .that()
-                .haveSimpleNameEndingWith("Utils")
-                .or()
-                .haveSimpleNameEndingWith("Util")
-                .or()
-                .haveSimpleNameEndingWith("Helper")
-                .should(beFinalOrHaveOnlyPrivateConstructors())
-                .because("Utility classes should not be instantiated or extended");
+                    .that()
+                    .haveSimpleNameEndingWith("Utils")
+                    .or()
+                    .haveSimpleNameEndingWith("Util")
+                    .or()
+                    .haveSimpleNameEndingWith("Helper")
+                    .should(beFinalOrHaveOnlyPrivateConstructors())
+                    .because("Utility classes should not be instantiated or extended");
             rule.check(classes);
         }
     }
@@ -285,12 +282,12 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         @DisplayName("DTOs are records or have final fields")
         void dtosAreImmutable() {
             ArchRule rule = classes()
-                .that()
-                .haveSimpleNameEndingWith("DTO")
-                .or()
-                .haveSimpleNameEndingWith("Dto")
-                .should(beImmutable())
-                .because("DTOs should be immutable for thread safety");
+                    .that()
+                    .haveSimpleNameEndingWith("DTO")
+                    .or()
+                    .haveSimpleNameEndingWith("Dto")
+                    .should(beImmutable())
+                    .because("DTOs should be immutable for thread safety");
             rule.check(classes);
         }
     }
@@ -310,17 +307,17 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void springDataRepositoriesAreInterfaces() {
             ArchRule rule = classes()
-                .that()
-                .haveSimpleNameEndingWith("Repository")
-                .and()
-                .resideInAPackage(BASE_PACKAGE + "..")
-                .and()
-                .resideOutsideOfPackage("..graphql..")
-                .and()
-                .areAssignableTo(Repository.class)
-                .should()
-                .beInterfaces()
-                .because("Spring Data repositories should be interfaces");
+                    .that()
+                    .haveSimpleNameEndingWith("Repository")
+                    .and()
+                    .resideInAPackage(BASE_PACKAGE + "..")
+                    .and()
+                    .resideOutsideOfPackage("..graphql..")
+                    .and()
+                    .areAssignableTo(Repository.class)
+                    .should()
+                    .beInterfaces()
+                    .because("Spring Data repositories should be interfaces");
             rule.check(classes);
         }
     }
@@ -340,13 +337,13 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void customExceptionsExtendRuntimeException() {
             ArchRule rule = classes()
-                .that()
-                .haveSimpleNameEndingWith("Exception")
-                .and()
-                .resideInAPackage(BASE_PACKAGE + "..")
-                .should()
-                .beAssignableTo(RuntimeException.class)
-                .because("Custom exceptions should be unchecked for cleaner APIs");
+                    .that()
+                    .haveSimpleNameEndingWith("Exception")
+                    .and()
+                    .resideInAPackage(BASE_PACKAGE + "..")
+                    .should()
+                    .beAssignableTo(RuntimeException.class)
+                    .because("Custom exceptions should be unchecked for cleaner APIs");
             rule.check(classes);
         }
     }
@@ -409,15 +406,13 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
             };
 
             ArchRule rule = noClasses()
-                .that()
-                .resideInAnyPackage("..leaderboard..", "..activity..", "..profile..", "..practices..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage(forbiddenInternalPackages)
-                .because(
-                    "Feature modules should depend on integration.scm SPIs (..spi..), DTOs (..dto..), " +
-                        "or events (..events..) - not internal packages like sync or installation"
-                );
+                    .that()
+                    .resideInAnyPackage("..leaderboard..", "..activity..", "..profile..", "..practices..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAnyPackage(forbiddenInternalPackages)
+                    .because("Feature modules should depend on integration.scm SPIs (..spi..), DTOs (..dto..), "
+                            + "or events (..events..) - not internal packages like sync or installation");
             rule.check(classes);
         }
 
@@ -444,24 +439,20 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
             // noCyclesBetweenModules). The pragmatic exemption: events are data-only records,
             // they can't bypass an SPI because they don't have one.
             ArchRule rule = noClasses()
-                .that()
-                .resideInAnyPackage("..leaderboard..", "..activity..", "..profile..", "..practices..")
-                .should()
-                .dependOnClassesThat(
-                    DescribedPredicate.describe(
-                        "reside in ..integration.scm.github.. but not ..integration.scm.github.project.. " +
-                            "and not ..integration.scm.github.events..",
-                        cls -> {
-                            String pkg = cls.getPackageName();
-                            return (
-                                pkg.contains(".integration.scm.github") &&
-                                !pkg.contains(".integration.scm.github.project") &&
-                                !pkg.contains(".integration.scm.github.events")
-                            );
-                        }
-                    )
-                )
-                .because("Feature modules should use SPIs, not depend on provider-specific service implementations");
+                    .that()
+                    .resideInAnyPackage("..leaderboard..", "..activity..", "..profile..", "..practices..")
+                    .should()
+                    .dependOnClassesThat(DescribedPredicate.describe(
+                            "reside in ..integration.scm.github.. but not ..integration.scm.github.project.. "
+                                    + "and not ..integration.scm.github.events..",
+                            cls -> {
+                                String pkg = cls.getPackageName();
+                                return (pkg.contains(".integration.scm.github")
+                                        && !pkg.contains(".integration.scm.github.project")
+                                        && !pkg.contains(".integration.scm.github.events"));
+                            }))
+                    .because(
+                            "Feature modules should use SPIs, not depend on provider-specific service implementations");
             rule.check(classes);
         }
     }
@@ -479,12 +470,12 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void leaderboardDoesNotDependOnWorkspaceInternals() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..leaderboard..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage("..workspace..internal..", "..workspace..adapter..")
-                .because("Leaderboard should depend on workspace public API, not internals");
+                    .that()
+                    .resideInAPackage("..leaderboard..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAnyPackage("..workspace..internal..", "..workspace..adapter..")
+                    .because("Leaderboard should depend on workspace public API, not internals");
             rule.check(classes);
         }
 
@@ -497,12 +488,12 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void activityDoesNotDependOnLeaderboardInternals() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..activity..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage("..leaderboard..internal..", "..leaderboard..repository..")
-                .because("Activity should not depend on leaderboard internal classes");
+                    .that()
+                    .resideInAPackage("..activity..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAnyPackage("..leaderboard..internal..", "..leaderboard..repository..")
+                    .because("Activity should not depend on leaderboard internal classes");
             rule.check(classes);
         }
 
@@ -514,12 +505,12 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void mentorHasLimitedDependencies() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..mentor..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage("..leaderboard..", "..activity..", "..notification..")
-                .because("Mentor should be isolated from other feature modules");
+                    .that()
+                    .resideInAPackage("..mentor..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAnyPackage("..leaderboard..", "..activity..", "..notification..")
+                    .because("Mentor should be isolated from other feature modules");
             rule.check(classes);
         }
 
@@ -532,12 +523,12 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void profileDoesNotDependOnSyncInternals() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..profile..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage("..integration.scm.sync..", "..integration.scm.github..")
-                .because("Profile should only read data, not depend on sync internals");
+                    .that()
+                    .resideInAPackage("..profile..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAnyPackage("..integration.scm.sync..", "..integration.scm.github..")
+                    .because("Profile should only read data, not depend on sync internals");
             rule.check(classes);
         }
 
@@ -550,12 +541,12 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void notificationUsesEventsNotDirectDependencies() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..notification..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage("..leaderboard..service..", "..activity..service..", "..mentor..service..")
-                .because("Notification should use domain events for cross-module communication");
+                    .that()
+                    .resideInAPackage("..notification..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAnyPackage("..leaderboard..service..", "..activity..service..", "..mentor..service..")
+                    .because("Notification should use domain events for cross-module communication");
             rule.check(classes);
         }
     }

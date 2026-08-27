@@ -24,7 +24,8 @@ class GitHubGraphQlErrorUtilsTest {
 
         @Test
         void nullResponse() {
-            assertThat(GitHubGraphQlErrorUtils.isNotFoundError(null, "repository.issue")).isFalse();
+            assertThat(GitHubGraphQlErrorUtils.isNotFoundError(null, "repository.issue"))
+                    .isFalse();
         }
 
         @Test
@@ -32,7 +33,8 @@ class GitHubGraphQlErrorUtilsTest {
             ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
             when(response.getErrors()).thenReturn(Collections.emptyList());
 
-            assertThat(GitHubGraphQlErrorUtils.isNotFoundError(response, "repository.issue")).isFalse();
+            assertThat(GitHubGraphQlErrorUtils.isNotFoundError(response, "repository.issue"))
+                    .isFalse();
         }
 
         @Test
@@ -44,7 +46,8 @@ class GitHubGraphQlErrorUtilsTest {
             ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
             when(response.getErrors()).thenReturn(List.of(error));
 
-            assertThat(GitHubGraphQlErrorUtils.isNotFoundError(response, "repository.issue")).isTrue();
+            assertThat(GitHubGraphQlErrorUtils.isNotFoundError(response, "repository.issue"))
+                    .isTrue();
         }
 
         @Test
@@ -56,7 +59,8 @@ class GitHubGraphQlErrorUtilsTest {
             ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
             when(response.getErrors()).thenReturn(List.of(error));
 
-            assertThat(GitHubGraphQlErrorUtils.isNotFoundError(response, "repository.issue")).isFalse();
+            assertThat(GitHubGraphQlErrorUtils.isNotFoundError(response, "repository.issue"))
+                    .isFalse();
         }
 
         @Test
@@ -68,7 +72,8 @@ class GitHubGraphQlErrorUtilsTest {
             ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
             when(response.getErrors()).thenReturn(List.of(error));
 
-            assertThat(GitHubGraphQlErrorUtils.isNotFoundError(response, "repository.issue")).isFalse();
+            assertThat(GitHubGraphQlErrorUtils.isNotFoundError(response, "repository.issue"))
+                    .isFalse();
         }
 
         @Test
@@ -80,7 +85,8 @@ class GitHubGraphQlErrorUtilsTest {
             ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
             when(response.getErrors()).thenReturn(List.of(error));
 
-            assertThat(GitHubGraphQlErrorUtils.isNotFoundError(response, "repository.issue")).isTrue();
+            assertThat(GitHubGraphQlErrorUtils.isNotFoundError(response, "repository.issue"))
+                    .isTrue();
         }
 
         @Test
@@ -93,7 +99,8 @@ class GitHubGraphQlErrorUtilsTest {
             ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
             when(response.getErrors()).thenReturn(List.of(error));
 
-            assertThat(GitHubGraphQlErrorUtils.isNotFoundError(response, "repository.issue")).isFalse();
+            assertThat(GitHubGraphQlErrorUtils.isNotFoundError(response, "repository.issue"))
+                    .isFalse();
         }
 
         @Test
@@ -106,7 +113,8 @@ class GitHubGraphQlErrorUtilsTest {
             ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
             when(response.getErrors()).thenReturn(List.of(error));
 
-            assertThat(GitHubGraphQlErrorUtils.isNotFoundError(response, "repository.issue")).isTrue();
+            assertThat(GitHubGraphQlErrorUtils.isNotFoundError(response, "repository.issue"))
+                    .isTrue();
         }
 
         @Test
@@ -119,7 +127,8 @@ class GitHubGraphQlErrorUtilsTest {
             when(response.getErrors()).thenReturn(List.of(error));
 
             // Error at "repository" should NOT match "repository.issue" - it's a parent path
-            assertThat(GitHubGraphQlErrorUtils.isNotFoundError(response, "repository.issue")).isFalse();
+            assertThat(GitHubGraphQlErrorUtils.isNotFoundError(response, "repository.issue"))
+                    .isFalse();
         }
 
         @Test
@@ -132,7 +141,8 @@ class GitHubGraphQlErrorUtilsTest {
             ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
             when(response.getErrors()).thenReturn(List.of(error));
 
-            assertThat(GitHubGraphQlErrorUtils.isNotFoundError(response, "repository.issue")).isFalse();
+            assertThat(GitHubGraphQlErrorUtils.isNotFoundError(response, "repository.issue"))
+                    .isFalse();
         }
 
         @Test
@@ -145,7 +155,8 @@ class GitHubGraphQlErrorUtilsTest {
             ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
             when(response.getErrors()).thenReturn(List.of(error));
 
-            assertThat(GitHubGraphQlErrorUtils.isNotFoundError(response, "repository.issue")).isFalse();
+            assertThat(GitHubGraphQlErrorUtils.isNotFoundError(response, "repository.issue"))
+                    .isFalse();
         }
 
         @Test
@@ -158,7 +169,8 @@ class GitHubGraphQlErrorUtilsTest {
             ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
             when(response.getErrors()).thenReturn(List.of(error));
 
-            assertThat(GitHubGraphQlErrorUtils.isNotFoundError(response, "repository.issue")).isFalse();
+            assertThat(GitHubGraphQlErrorUtils.isNotFoundError(response, "repository.issue"))
+                    .isFalse();
         }
 
         @Test
@@ -174,7 +186,8 @@ class GitHubGraphQlErrorUtilsTest {
             ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
             when(response.getErrors()).thenReturn(List.of(notFoundError, forbiddenError));
 
-            assertThat(GitHubGraphQlErrorUtils.isNotFoundError(response, "repository.issue")).isTrue();
+            assertThat(GitHubGraphQlErrorUtils.isNotFoundError(response, "repository.issue"))
+                    .isTrue();
         }
 
         @Test
@@ -190,7 +203,8 @@ class GitHubGraphQlErrorUtilsTest {
             ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
             when(response.getErrors()).thenReturn(List.of(forbiddenError, notFoundError));
 
-            assertThat(GitHubGraphQlErrorUtils.isNotFoundError(response, "repository.issue")).isTrue();
+            assertThat(GitHubGraphQlErrorUtils.isNotFoundError(response, "repository.issue"))
+                    .isTrue();
         }
     }
 
@@ -227,9 +241,8 @@ class GitHubGraphQlErrorUtilsTest {
             ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
             when(response.getErrors()).thenReturn(List.of(error));
 
-            assertThat(GitHubGraphQlErrorUtils.getNotFoundErrorMessage(response)).isEqualTo(
-                "Could not resolve to an Issue with the number of 7."
-            );
+            assertThat(GitHubGraphQlErrorUtils.getNotFoundErrorMessage(response))
+                    .isEqualTo("Could not resolve to an Issue with the number of 7.");
         }
 
         @Test
@@ -241,7 +254,8 @@ class GitHubGraphQlErrorUtilsTest {
             ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
             when(response.getErrors()).thenReturn(List.of(error));
 
-            assertThat(GitHubGraphQlErrorUtils.getNotFoundErrorMessage(response)).isNull();
+            assertThat(GitHubGraphQlErrorUtils.getNotFoundErrorMessage(response))
+                    .isNull();
         }
     }
 
@@ -322,10 +336,8 @@ class GitHubGraphQlErrorUtilsTest {
 
         @Test
         void resourceLimitsExceeded() {
-            ClientGraphQlResponse response = responseWithError(
-                "Query too complex",
-                Map.of("type", "RESOURCE_LIMITS_EXCEEDED")
-            );
+            ClientGraphQlResponse response =
+                    responseWithError("Query too complex", Map.of("type", "RESOURCE_LIMITS_EXCEEDED"));
             var result = GitHubGraphQlErrorUtils.detectTransientError(response);
             assertNotNull(result);
             assertThat(result.type()).isEqualTo(GitHubGraphQlErrorUtils.TransientErrorType.RESOURCE_LIMIT);
@@ -333,10 +345,8 @@ class GitHubGraphQlErrorUtilsTest {
 
         @Test
         void maxNodeLimitExceeded() {
-            ClientGraphQlResponse response = responseWithError(
-                "Exceeded max node limit",
-                Map.of("type", "MAX_NODE_LIMIT_EXCEEDED")
-            );
+            ClientGraphQlResponse response =
+                    responseWithError("Exceeded max node limit", Map.of("type", "MAX_NODE_LIMIT_EXCEEDED"));
             var result = GitHubGraphQlErrorUtils.detectTransientError(response);
             assertNotNull(result);
             assertThat(result.type()).isEqualTo(GitHubGraphQlErrorUtils.TransientErrorType.RESOURCE_LIMIT);
@@ -344,10 +354,8 @@ class GitHubGraphQlErrorUtilsTest {
 
         @Test
         void internalError() {
-            ClientGraphQlResponse response = responseWithError(
-                "Internal server error",
-                Map.of("type", "INTERNAL_ERROR")
-            );
+            ClientGraphQlResponse response =
+                    responseWithError("Internal server error", Map.of("type", "INTERNAL_ERROR"));
             var result = GitHubGraphQlErrorUtils.detectTransientError(response);
             assertNotNull(result);
             assertThat(result.type()).isEqualTo(GitHubGraphQlErrorUtils.TransientErrorType.SERVER_ERROR);
@@ -355,10 +363,8 @@ class GitHubGraphQlErrorUtilsTest {
 
         @Test
         void serviceUnavailable() {
-            ClientGraphQlResponse response = responseWithError(
-                "Service unavailable",
-                Map.of("type", "SERVICE_UNAVAILABLE")
-            );
+            ClientGraphQlResponse response =
+                    responseWithError("Service unavailable", Map.of("type", "SERVICE_UNAVAILABLE"));
             var result = GitHubGraphQlErrorUtils.detectTransientError(response);
             assertNotNull(result);
             assertThat(result.type()).isEqualTo(GitHubGraphQlErrorUtils.TransientErrorType.SERVER_ERROR);
@@ -366,10 +372,8 @@ class GitHubGraphQlErrorUtilsTest {
 
         @Test
         void forbiddenWithRateMessage() {
-            ClientGraphQlResponse response = responseWithError(
-                "rate limit exceeded for this resource",
-                Map.of("type", "FORBIDDEN")
-            );
+            ClientGraphQlResponse response =
+                    responseWithError("rate limit exceeded for this resource", Map.of("type", "FORBIDDEN"));
             var result = GitHubGraphQlErrorUtils.detectTransientError(response);
             assertNotNull(result);
             assertThat(result.type()).isEqualTo(GitHubGraphQlErrorUtils.TransientErrorType.RATE_LIMIT);
@@ -426,65 +430,49 @@ class GitHubGraphQlErrorUtilsTest {
         @Test
         void timeoutWait() {
             var error = new GitHubGraphQlErrorUtils.TransientError(
-                GitHubGraphQlErrorUtils.TransientErrorType.TIMEOUT,
-                "test"
-            );
+                    GitHubGraphQlErrorUtils.TransientErrorType.TIMEOUT, "test");
             assertThat(error.getRecommendedWait()).isEqualTo(java.time.Duration.ofSeconds(5));
         }
 
         @Test
         void rateLimitWait() {
             var error = new GitHubGraphQlErrorUtils.TransientError(
-                GitHubGraphQlErrorUtils.TransientErrorType.RATE_LIMIT,
-                "test"
-            );
+                    GitHubGraphQlErrorUtils.TransientErrorType.RATE_LIMIT, "test");
             assertThat(error.getRecommendedWait()).isEqualTo(java.time.Duration.ofMinutes(1));
         }
 
         @Test
         void serverErrorWait() {
             var error = new GitHubGraphQlErrorUtils.TransientError(
-                GitHubGraphQlErrorUtils.TransientErrorType.SERVER_ERROR,
-                "test"
-            );
+                    GitHubGraphQlErrorUtils.TransientErrorType.SERVER_ERROR, "test");
             assertThat(error.getRecommendedWait()).isEqualTo(java.time.Duration.ofSeconds(10));
         }
 
         @Test
         void resourceLimitWait() {
             var error = new GitHubGraphQlErrorUtils.TransientError(
-                GitHubGraphQlErrorUtils.TransientErrorType.RESOURCE_LIMIT,
-                "test"
-            );
+                    GitHubGraphQlErrorUtils.TransientErrorType.RESOURCE_LIMIT, "test");
             assertThat(error.getRecommendedWait()).isEqualTo(java.time.Duration.ofSeconds(0));
         }
 
         @Test
         void shouldReduceComplexity() {
-            assertThat(
-                new GitHubGraphQlErrorUtils.TransientError(
-                    GitHubGraphQlErrorUtils.TransientErrorType.RESOURCE_LIMIT,
-                    "test"
-                ).shouldReduceComplexity()
-            ).isTrue();
-            assertThat(
-                new GitHubGraphQlErrorUtils.TransientError(
-                    GitHubGraphQlErrorUtils.TransientErrorType.TIMEOUT,
-                    "test"
-                ).shouldReduceComplexity()
-            ).isFalse();
-            assertThat(
-                new GitHubGraphQlErrorUtils.TransientError(
-                    GitHubGraphQlErrorUtils.TransientErrorType.RATE_LIMIT,
-                    "test"
-                ).shouldReduceComplexity()
-            ).isFalse();
-            assertThat(
-                new GitHubGraphQlErrorUtils.TransientError(
-                    GitHubGraphQlErrorUtils.TransientErrorType.SERVER_ERROR,
-                    "test"
-                ).shouldReduceComplexity()
-            ).isFalse();
+            assertThat(new GitHubGraphQlErrorUtils.TransientError(
+                                    GitHubGraphQlErrorUtils.TransientErrorType.RESOURCE_LIMIT, "test")
+                            .shouldReduceComplexity())
+                    .isTrue();
+            assertThat(new GitHubGraphQlErrorUtils.TransientError(
+                                    GitHubGraphQlErrorUtils.TransientErrorType.TIMEOUT, "test")
+                            .shouldReduceComplexity())
+                    .isFalse();
+            assertThat(new GitHubGraphQlErrorUtils.TransientError(
+                                    GitHubGraphQlErrorUtils.TransientErrorType.RATE_LIMIT, "test")
+                            .shouldReduceComplexity())
+                    .isFalse();
+            assertThat(new GitHubGraphQlErrorUtils.TransientError(
+                                    GitHubGraphQlErrorUtils.TransientErrorType.SERVER_ERROR, "test")
+                            .shouldReduceComplexity())
+                    .isFalse();
         }
     }
 }

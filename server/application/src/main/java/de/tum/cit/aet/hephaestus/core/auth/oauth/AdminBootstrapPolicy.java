@@ -58,10 +58,9 @@ public class AdminBootstrapPolicy {
         this.usernameKeys = Set.copyOf(usernames);
         if (isConfigured()) {
             log.info(
-                "auth.bootstrap: instance-admin allowlist configured ({} by-username, {} by-subject)",
-                usernameKeys.size(),
-                subjectKeys.size()
-            );
+                    "auth.bootstrap: instance-admin allowlist configured ({} by-username, {} by-subject)",
+                    usernameKeys.size(),
+                    subjectKeys.size());
         }
     }
 
@@ -81,11 +80,9 @@ public class AdminBootstrapPolicy {
         if (subject != null && subjectKeys.contains(registrationId + ":" + subject)) {
             return true;
         }
-        return (
-            login != null &&
-            !login.isBlank() &&
-            usernameKeys.contains(registrationId + ":" + login.toLowerCase(Locale.ROOT))
-        );
+        return (login != null
+                && !login.isBlank()
+                && usernameKeys.contains(registrationId + ":" + login.toLowerCase(Locale.ROOT)));
     }
 
     private static void parse(List<String> raw, Set<String> subjects, Set<String> usernames) {
@@ -103,8 +100,7 @@ public class AdminBootstrapPolicy {
             if (sep <= 0 || sep == trimmed.length() - 1) {
                 if (!trimmed.isEmpty()) {
                     log.warn(
-                        "auth.bootstrap: ignoring malformed bootstrap-admins entry (expected 'provider:@username' or 'provider:subject')"
-                    );
+                            "auth.bootstrap: ignoring malformed bootstrap-admins entry (expected 'provider:@username' or 'provider:subject')");
                 }
                 continue;
             }

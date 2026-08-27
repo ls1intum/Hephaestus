@@ -111,150 +111,144 @@ class GitHubHistoricalBackfillServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         syncProperties = new GitHubSyncProperties(
-            Duration.ofSeconds(30),
-            Duration.ofSeconds(60),
-            Duration.ofSeconds(120),
-            Duration.ZERO, // no throttle in tests
-            true,
-            Duration.ofMinutes(5),
-            10
-        );
+                Duration.ofSeconds(30),
+                Duration.ofSeconds(60),
+                Duration.ofSeconds(120),
+                Duration.ZERO, // no throttle in tests
+                true,
+                Duration.ofMinutes(5),
+                10);
 
         enabledSchedulerProperties = new SyncSchedulerProperties(
-            true,
-            7,
-            "0 0 3 * * *",
-            15,
-            new BackfillProperties(true, 50, 100, 60),
-            new FilterProperties(Set.of(), Set.of(), Set.of()),
-            null,
-            null
-        );
+                true,
+                7,
+                "0 0 3 * * *",
+                15,
+                new BackfillProperties(true, 50, 100, 60),
+                new FilterProperties(Set.of(), Set.of(), Set.of()),
+                null,
+                null);
 
         disabledSchedulerProperties = new SyncSchedulerProperties(
-            true,
-            7,
-            "0 0 3 * * *",
-            15,
-            new BackfillProperties(false, 50, 100, 60),
-            new FilterProperties(Set.of(), Set.of(), Set.of()),
-            null,
-            null
-        );
+                true,
+                7,
+                "0 0 3 * * *",
+                15,
+                new BackfillProperties(false, 50, 100, 60),
+                new FilterProperties(Set.of(), Set.of(), Set.of()),
+                null,
+                null);
 
         // TransactionTemplate: execute callbacks immediately
-        lenient()
-            .when(transactionTemplate.execute(any()))
-            .thenAnswer(invocation -> {
-                TransactionCallback<?> callback = invocation.getArgument(0);
-                return callback.doInTransaction(mock(TransactionStatus.class));
-            });
+        lenient().when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(mock(TransactionStatus.class));
+        });
     }
 
     private GitHubHistoricalBackfillService createService(SyncSchedulerProperties schedulerProps) {
         return new GitHubHistoricalBackfillService(
-            syncTargetProvider,
-            backfillStateProvider,
-            schedulerProps,
-            syncProperties,
-            graphQlClientProvider,
-            issueProcessor,
-            issueCommentProcessor,
-            prProcessor,
-            reviewProcessor,
-            reviewSyncService,
-            reviewCommentSyncService,
-            repositoryRepository,
-            transactionTemplate,
-            Runnable::run // synchronous executor for tests
-        );
+                syncTargetProvider,
+                backfillStateProvider,
+                schedulerProps,
+                syncProperties,
+                graphQlClientProvider,
+                issueProcessor,
+                issueCommentProcessor,
+                prProcessor,
+                reviewProcessor,
+                reviewSyncService,
+                reviewCommentSyncService,
+                repositoryRepository,
+                transactionTemplate,
+                Runnable::run // synchronous executor for tests
+                );
     }
 
     private SyncTarget createTargetWithIncrementalComplete(Long id, String repoName) {
         // Incremental sync completed; backfill high-water marks left null (not initialized).
         return SyncTargetTestBuilder.syncTarget()
-            .id(id)
-            .scopeId(SCOPE_ID)
-            .installationId(INSTALLATION_ID)
-            .authMode(AuthMode.INSTALLATION_APP)
-            .repositoryNameWithOwner(repoName)
-            .lastLabelsSyncedAt(Instant.now())
-            .lastMilestonesSyncedAt(Instant.now())
-            .lastIssuesSyncedAt(Instant.now())
-            .lastPullRequestsSyncedAt(Instant.now())
-            .lastCollaboratorsSyncedAt(Instant.now())
-            .lastFullSyncAt(Instant.now())
-            .build();
+                .id(id)
+                .scopeId(SCOPE_ID)
+                .installationId(INSTALLATION_ID)
+                .authMode(AuthMode.INSTALLATION_APP)
+                .repositoryNameWithOwner(repoName)
+                .lastLabelsSyncedAt(Instant.now())
+                .lastMilestonesSyncedAt(Instant.now())
+                .lastIssuesSyncedAt(Instant.now())
+                .lastPullRequestsSyncedAt(Instant.now())
+                .lastCollaboratorsSyncedAt(Instant.now())
+                .lastFullSyncAt(Instant.now())
+                .build();
     }
 
     private SyncTarget createTargetPendingIncrementalSync(Long id, String repoName) {
         // All sync timestamps null => incremental sync NOT completed.
         return SyncTargetTestBuilder.syncTarget()
-            .id(id)
-            .scopeId(SCOPE_ID)
-            .installationId(INSTALLATION_ID)
-            .authMode(AuthMode.INSTALLATION_APP)
-            .repositoryNameWithOwner(repoName)
-            .build();
+                .id(id)
+                .scopeId(SCOPE_ID)
+                .installationId(INSTALLATION_ID)
+                .authMode(AuthMode.INSTALLATION_APP)
+                .repositoryNameWithOwner(repoName)
+                .build();
     }
 
     private SyncTarget createTargetWithBackfillComplete(Long id, String repoName) {
         // Checkpoints at 0 => backfill complete.
         return SyncTargetTestBuilder.syncTarget()
-            .id(id)
-            .scopeId(SCOPE_ID)
-            .installationId(INSTALLATION_ID)
-            .authMode(AuthMode.INSTALLATION_APP)
-            .repositoryNameWithOwner(repoName)
-            .lastLabelsSyncedAt(Instant.now())
-            .lastMilestonesSyncedAt(Instant.now())
-            .lastIssuesSyncedAt(Instant.now())
-            .lastPullRequestsSyncedAt(Instant.now())
-            .lastCollaboratorsSyncedAt(Instant.now())
-            .lastFullSyncAt(Instant.now())
-            .issueBackfillHighWaterMark(100)
-            .issueBackfillCheckpoint(0)
-            .pullRequestBackfillHighWaterMark(50)
-            .pullRequestBackfillCheckpoint(0)
-            .backfillLastRunAt(Instant.now())
-            .build();
+                .id(id)
+                .scopeId(SCOPE_ID)
+                .installationId(INSTALLATION_ID)
+                .authMode(AuthMode.INSTALLATION_APP)
+                .repositoryNameWithOwner(repoName)
+                .lastLabelsSyncedAt(Instant.now())
+                .lastMilestonesSyncedAt(Instant.now())
+                .lastIssuesSyncedAt(Instant.now())
+                .lastPullRequestsSyncedAt(Instant.now())
+                .lastCollaboratorsSyncedAt(Instant.now())
+                .lastFullSyncAt(Instant.now())
+                .issueBackfillHighWaterMark(100)
+                .issueBackfillCheckpoint(0)
+                .pullRequestBackfillHighWaterMark(50)
+                .pullRequestBackfillCheckpoint(0)
+                .backfillLastRunAt(Instant.now())
+                .build();
     }
 
     private SyncTarget createTargetWithBackfillInProgress(Long id, String repoName) {
         // Checkpoints between 0 and high-water mark => backfill in progress.
         return SyncTargetTestBuilder.syncTarget()
-            .id(id)
-            .scopeId(SCOPE_ID)
-            .installationId(INSTALLATION_ID)
-            .authMode(AuthMode.INSTALLATION_APP)
-            .repositoryNameWithOwner(repoName)
-            .lastLabelsSyncedAt(Instant.now())
-            .lastMilestonesSyncedAt(Instant.now())
-            .lastIssuesSyncedAt(Instant.now())
-            .lastPullRequestsSyncedAt(Instant.now())
-            .lastCollaboratorsSyncedAt(Instant.now())
-            .lastFullSyncAt(Instant.now())
-            .issueBackfillHighWaterMark(100)
-            .issueBackfillCheckpoint(42)
-            .pullRequestBackfillHighWaterMark(50)
-            .pullRequestBackfillCheckpoint(25)
-            .backfillLastRunAt(Instant.now().minusSeconds(120))
-            .issueSyncCursor("cursor-issue-page-3")
-            .pullRequestSyncCursor("cursor-pr-page-2")
-            .build();
+                .id(id)
+                .scopeId(SCOPE_ID)
+                .installationId(INSTALLATION_ID)
+                .authMode(AuthMode.INSTALLATION_APP)
+                .repositoryNameWithOwner(repoName)
+                .lastLabelsSyncedAt(Instant.now())
+                .lastMilestonesSyncedAt(Instant.now())
+                .lastIssuesSyncedAt(Instant.now())
+                .lastPullRequestsSyncedAt(Instant.now())
+                .lastCollaboratorsSyncedAt(Instant.now())
+                .lastFullSyncAt(Instant.now())
+                .issueBackfillHighWaterMark(100)
+                .issueBackfillCheckpoint(42)
+                .pullRequestBackfillHighWaterMark(50)
+                .pullRequestBackfillCheckpoint(25)
+                .backfillLastRunAt(Instant.now().minusSeconds(120))
+                .issueSyncCursor("cursor-issue-page-3")
+                .pullRequestSyncCursor("cursor-pr-page-2")
+                .build();
     }
 
     private SyncSession createSession(List<SyncTarget> targets) {
         return new SyncSession(
-            SCOPE_ID,
-            "test-workspace",
-            "Test Workspace",
-            "test-org",
-            INSTALLATION_ID,
-            null, // serverUrl — GitHub flow doesn't use it; GitLab tests pass the workspace URL
-            targets,
-            new SyncContextProvider.SyncContext(SCOPE_ID, "test-workspace", "Test Workspace", INSTALLATION_ID)
-        );
+                SCOPE_ID,
+                "test-workspace",
+                "Test Workspace",
+                "test-org",
+                INSTALLATION_ID,
+                null, // serverUrl — GitHub flow doesn't use it; GitLab tests pass the workspace URL
+                targets,
+                new SyncContextProvider.SyncContext(SCOPE_ID, "test-workspace", "Test Workspace", INSTALLATION_ID));
     }
 
     @Nested
@@ -309,7 +303,8 @@ class GitHubHistoricalBackfillServiceTest extends BaseUnitTest {
             when(syncTargetProvider.getSyncSessions(IntegrationKind.GITHUB)).thenReturn(List.of(session));
             // Rate limit below threshold (100)
             when(graphQlClientProvider.getRateLimitRemaining(SCOPE_ID)).thenReturn(50);
-            when(graphQlClientProvider.getRateLimitResetAt(SCOPE_ID)).thenReturn(Instant.now().plusSeconds(300));
+            when(graphQlClientProvider.getRateLimitResetAt(SCOPE_ID))
+                    .thenReturn(Instant.now().plusSeconds(300));
 
             BackfillCycleResult result = service.runBackfillCycle();
 
@@ -325,7 +320,8 @@ class GitHubHistoricalBackfillServiceTest extends BaseUnitTest {
             SyncSession session = createSession(List.of(completeTarget, incompleteTarget));
             when(syncTargetProvider.getSyncSessions(IntegrationKind.GITHUB)).thenReturn(List.of(session));
             when(graphQlClientProvider.getRateLimitRemaining(SCOPE_ID)).thenReturn(50);
-            when(graphQlClientProvider.getRateLimitResetAt(SCOPE_ID)).thenReturn(Instant.now().plusSeconds(300));
+            when(graphQlClientProvider.getRateLimitResetAt(SCOPE_ID))
+                    .thenReturn(Instant.now().plusSeconds(300));
 
             BackfillCycleResult result = service.runBackfillCycle();
 
@@ -400,9 +396,9 @@ class GitHubHistoricalBackfillServiceTest extends BaseUnitTest {
             // Second call (re-check before repo A): still above threshold
             // Third call (re-check before repo B): below threshold
             when(graphQlClientProvider.getRateLimitRemaining(SCOPE_ID))
-                .thenReturn(5000)
-                .thenReturn(5000)
-                .thenReturn(50);
+                    .thenReturn(5000)
+                    .thenReturn(5000)
+                    .thenReturn(50);
             // Note: forScope is NOT called because backfillRepository returns false
             // (repo not in DB) before reaching the GraphQL client
             when(repositoryRepository.findByNameWithOwner("org/repo-a")).thenReturn(Optional.empty());
@@ -424,14 +420,14 @@ class GitHubHistoricalBackfillServiceTest extends BaseUnitTest {
         @Test
         void shouldReturnFalseWhenRepoNameIsInvalid() {
             SyncTarget target = SyncTargetTestBuilder.syncTarget()
-                .id(SYNC_TARGET_ID_A)
-                .scopeId(SCOPE_ID)
-                .installationId(INSTALLATION_ID)
-                .authMode(AuthMode.INSTALLATION_APP)
-                .repositoryNameWithOwner("invalid-repo-name") // no owner/name separator
-                .lastIssuesSyncedAt(Instant.now())
-                .lastPullRequestsSyncedAt(Instant.now())
-                .build();
+                    .id(SYNC_TARGET_ID_A)
+                    .scopeId(SCOPE_ID)
+                    .installationId(INSTALLATION_ID)
+                    .authMode(AuthMode.INSTALLATION_APP)
+                    .repositoryNameWithOwner("invalid-repo-name") // no owner/name separator
+                    .lastIssuesSyncedAt(Instant.now())
+                    .lastPullRequestsSyncedAt(Instant.now())
+                    .build();
 
             boolean result = service.backfillRepository(target, 50, BackfillPageObserver.NOOP);
 
@@ -632,19 +628,19 @@ class GitHubHistoricalBackfillServiceTest extends BaseUnitTest {
         @Test
         void shouldReportZeroRemainingWhenHighWaterMarkIsZero() {
             SyncTarget target = SyncTargetTestBuilder.syncTarget()
-                .id(SYNC_TARGET_ID_A)
-                .scopeId(SCOPE_ID)
-                .installationId(INSTALLATION_ID)
-                .authMode(AuthMode.INSTALLATION_APP)
-                .repositoryNameWithOwner("org/empty-repo")
-                .lastIssuesSyncedAt(Instant.now())
-                .lastPullRequestsSyncedAt(Instant.now())
-                .issueBackfillHighWaterMark(0) // no issues
-                .issueBackfillCheckpoint(0)
-                .pullRequestBackfillHighWaterMark(0) // no PRs
-                .pullRequestBackfillCheckpoint(0)
-                .backfillLastRunAt(Instant.now())
-                .build();
+                    .id(SYNC_TARGET_ID_A)
+                    .scopeId(SCOPE_ID)
+                    .installationId(INSTALLATION_ID)
+                    .authMode(AuthMode.INSTALLATION_APP)
+                    .repositoryNameWithOwner("org/empty-repo")
+                    .lastIssuesSyncedAt(Instant.now())
+                    .lastPullRequestsSyncedAt(Instant.now())
+                    .issueBackfillHighWaterMark(0) // no issues
+                    .issueBackfillCheckpoint(0)
+                    .pullRequestBackfillHighWaterMark(0) // no PRs
+                    .pullRequestBackfillCheckpoint(0)
+                    .backfillLastRunAt(Instant.now())
+                    .build();
 
             assertThat(target.isIssueBackfillComplete()).isTrue();
             assertThat(target.isPullRequestBackfillComplete()).isTrue();
@@ -657,17 +653,17 @@ class GitHubHistoricalBackfillServiceTest extends BaseUnitTest {
         void shouldReportHighWaterMarkAsRemainingWhenCheckpointIsNull() {
             // Initialized but checkpoint not yet set (first batch hasn't completed).
             SyncTarget target = SyncTargetTestBuilder.syncTarget()
-                .id(SYNC_TARGET_ID_A)
-                .scopeId(SCOPE_ID)
-                .installationId(INSTALLATION_ID)
-                .authMode(AuthMode.INSTALLATION_APP)
-                .repositoryNameWithOwner("org/repo-a")
-                .lastIssuesSyncedAt(Instant.now())
-                .lastPullRequestsSyncedAt(Instant.now())
-                .issueBackfillHighWaterMark(200)
-                .pullRequestBackfillHighWaterMark(80)
-                // checkpoints left null (not yet set)
-                .build();
+                    .id(SYNC_TARGET_ID_A)
+                    .scopeId(SCOPE_ID)
+                    .installationId(INSTALLATION_ID)
+                    .authMode(AuthMode.INSTALLATION_APP)
+                    .repositoryNameWithOwner("org/repo-a")
+                    .lastIssuesSyncedAt(Instant.now())
+                    .lastPullRequestsSyncedAt(Instant.now())
+                    .issueBackfillHighWaterMark(200)
+                    .pullRequestBackfillHighWaterMark(80)
+                    // checkpoints left null (not yet set)
+                    .build();
 
             assertThat(target.getIssueBackfillRemaining()).isEqualTo(200);
             assertThat(target.getPullRequestBackfillRemaining()).isEqualTo(80);
@@ -732,8 +728,7 @@ class GitHubHistoricalBackfillServiceTest extends BaseUnitTest {
 
         @Test
         @DisplayName(
-            "gates apply even when isEnabled()=false — a manual trigger is the point when the scheduled cycle is off"
-        )
+                "gates apply even when isEnabled()=false — a manual trigger is the point when the scheduled cycle is off")
         void backfillDisabledGlobally_completeGateStillShortCircuits() {
             service = createService(disabledSchedulerProperties);
             SyncTarget target = createTargetWithBackfillComplete(SYNC_TARGET_ID_A, "org/repo-a");
@@ -757,24 +752,23 @@ class GitHubHistoricalBackfillServiceTest extends BaseUnitTest {
 
             SyncTarget targetInScope1 = createTargetPendingIncrementalSync(SYNC_TARGET_ID_A, "org/repo-a");
             SyncTarget targetInScope2 = SyncTargetTestBuilder.syncTarget()
-                .id(SYNC_TARGET_ID_B)
-                .scopeId(scopeId2)
-                .installationId(installationId2)
-                .authMode(AuthMode.INSTALLATION_APP)
-                .repositoryNameWithOwner("org2/repo-b")
-                .build();
+                    .id(SYNC_TARGET_ID_B)
+                    .scopeId(scopeId2)
+                    .installationId(installationId2)
+                    .authMode(AuthMode.INSTALLATION_APP)
+                    .repositoryNameWithOwner("org2/repo-b")
+                    .build();
 
             SyncSession session1 = createSession(List.of(targetInScope1));
             SyncSession session2 = new SyncSession(
-                scopeId2,
-                "workspace-2",
-                "Workspace 2",
-                "org2",
-                installationId2,
-                null,
-                List.of(targetInScope2),
-                new SyncContextProvider.SyncContext(scopeId2, "workspace-2", "Workspace 2", installationId2)
-            );
+                    scopeId2,
+                    "workspace-2",
+                    "Workspace 2",
+                    "org2",
+                    installationId2,
+                    null,
+                    List.of(targetInScope2),
+                    new SyncContextProvider.SyncContext(scopeId2, "workspace-2", "Workspace 2", installationId2));
 
             when(syncTargetProvider.getSyncSessions(IntegrationKind.GITHUB)).thenReturn(List.of(session1, session2));
             // Rate limit is always checked per scope; stub above threshold to reach per-repo iteration
@@ -853,24 +847,20 @@ class GitHubHistoricalBackfillServiceTest extends BaseUnitTest {
             List<String> seen = new ArrayList<>();
 
             GitHubHistoricalBackfillService.notifyPage(
-                (syncTargetId, repositoryName, phase, lowestNumberSeen, itemsSyncedInBatch) ->
-                    seen.add(
-                        syncTargetId +
-                            "|" +
-                            repositoryName +
-                            "|" +
-                            phase +
-                            "|" +
-                            lowestNumberSeen +
-                            "|" +
-                            itemsSyncedInBatch
-                    ),
-                7L,
-                "org/repo",
-                SyncPhase.ISSUES,
-                3200,
-                412
-            );
+                    (syncTargetId, repositoryName, phase, lowestNumberSeen, itemsSyncedInBatch) ->
+                            seen.add(syncTargetId + "|"
+                                    + repositoryName
+                                    + "|"
+                                    + phase
+                                    + "|"
+                                    + lowestNumberSeen
+                                    + "|"
+                                    + itemsSyncedInBatch),
+                    7L,
+                    "org/repo",
+                    SyncPhase.ISSUES,
+                    3200,
+                    412);
 
             assertThat(seen).containsExactly("7|org/repo|ISSUES|3200|412");
         }
@@ -882,13 +872,7 @@ class GitHubHistoricalBackfillServiceTest extends BaseUnitTest {
             // The page loops seed their running minimum at Integer.MAX_VALUE. Reporting that verbatim
             // would read as "remaining = 2147483647" and yank the bar back to zero.
             GitHubHistoricalBackfillService.notifyPage(
-                (a, b, c, d, e) -> calls.incrementAndGet(),
-                7L,
-                "org/repo",
-                SyncPhase.ISSUES,
-                Integer.MAX_VALUE,
-                0
-            );
+                    (a, b, c, d, e) -> calls.incrementAndGet(), 7L, "org/repo", SyncPhase.ISSUES, Integer.MAX_VALUE, 0);
 
             assertThat(calls.get()).isZero();
         }
@@ -897,18 +881,16 @@ class GitHubHistoricalBackfillServiceTest extends BaseUnitTest {
         void observerThrows_isSwallowedSoAProgressTickCannotFailTheBatch() {
             // A progress callback has no business aborting the batch it is only observing: losing a tick
             // is cosmetic, losing the batch means re-fetching every page in it.
-            assertThatCode(() ->
-                GitHubHistoricalBackfillService.notifyPage(
-                    (a, b, c, d, e) -> {
-                        throw new IllegalStateException("observer blew up");
-                    },
-                    7L,
-                    "org/repo",
-                    SyncPhase.PULL_REQUESTS,
-                    100,
-                    5
-                )
-            ).doesNotThrowAnyException();
+            assertThatCode(() -> GitHubHistoricalBackfillService.notifyPage(
+                            (a, b, c, d, e) -> {
+                                throw new IllegalStateException("observer blew up");
+                            },
+                            7L,
+                            "org/repo",
+                            SyncPhase.PULL_REQUESTS,
+                            100,
+                            5))
+                    .doesNotThrowAnyException();
         }
     }
 }

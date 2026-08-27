@@ -84,10 +84,9 @@ public class SlackMessageService {
     private final ConcurrentMap<Long, String> botUserIdCache = new ConcurrentHashMap<>();
 
     public SlackMessageService(
-        SlackCredentialProvider credentialProvider,
-        SlackRateLimitTracker rateLimitTracker,
-        OutboundEgressGuard egressGuard
-    ) {
+            SlackCredentialProvider credentialProvider,
+            SlackRateLimitTracker rateLimitTracker,
+            OutboundEgressGuard egressGuard) {
         this.slack = Slack.getInstance();
         this.credentialProvider = credentialProvider;
         this.rateLimitTracker = rateLimitTracker;
@@ -99,46 +98,37 @@ public class SlackMessageService {
     }
 
     public void sendForWorkspace(
-        long workspaceId,
-        String channelId,
-        @Nullable String threadTs,
-        List<LayoutBlock> blocks,
-        String fallback
-    ) {
+            long workspaceId, String channelId, @Nullable String threadTs, List<LayoutBlock> blocks, String fallback) {
         if (!egressGuard.deliveryAllowed("slack.write")) {
             throw new SlackSendException(workspaceId, channelId, "silent_mode_engaged");
         }
-        String token = resolveToken(workspaceId).orElseThrow(() ->
-            new SlackSendException(workspaceId, channelId, "no_active_slack_connection")
-        );
+        String token = resolveToken(workspaceId)
+                .orElseThrow(() -> new SlackSendException(workspaceId, channelId, "no_active_slack_connection"));
         ChatPostMessageRequest.ChatPostMessageRequestBuilder request = ChatPostMessageRequest.builder()
-            .channel(channelId)
-            .blocks(blocks)
-            .text(fallback); // fallback text shown in notifications + accessibility tools
+                .channel(channelId)
+                .blocks(blocks)
+                .text(fallback); // fallback text shown in notifications + accessibility tools
         if (threadTs != null && !threadTs.isBlank()) {
             request.threadTs(threadTs);
         }
         try {
-            ChatPostMessageResponse response = callOutboundHonoringRateLimit(workspaceId, channelId, () ->
-                slack.methods(token).chatPostMessage(request.build())
-            );
+            ChatPostMessageResponse response = callOutboundHonoringRateLimit(
+                    workspaceId, channelId, () -> slack.methods(token).chatPostMessage(request.build()));
             if (!response.isOk()) {
                 String error = response.getError() == null ? "unknown" : response.getError();
                 log.warn(
-                    "Slack chat.postMessage failed: workspaceId={}, channelId={}, error={}",
-                    workspaceId,
-                    channelId,
-                    error
-                );
+                        "Slack chat.postMessage failed: workspaceId={}, channelId={}, error={}",
+                        workspaceId,
+                        channelId,
+                        error);
                 throw new SlackSendException(workspaceId, channelId, error);
             }
         } catch (SlackApiException | IOException e) {
             log.warn(
-                "Slack chat.postMessage transport failure: workspaceId={}, channelId={}, error={}",
-                workspaceId,
-                channelId,
-                e.getMessage()
-            );
+                    "Slack chat.postMessage transport failure: workspaceId={}, channelId={}, error={}",
+                    workspaceId,
+                    channelId,
+                    e.getMessage());
             throw new SlackSendException(workspaceId, channelId, "transport_failure", e);
         }
     }
@@ -149,46 +139,37 @@ public class SlackMessageService {
      * caller can log-and-swallow (the notice is best-effort).
      */
     public void sendEphemeralForWorkspace(
-        long workspaceId,
-        String channelId,
-        String slackUserId,
-        List<LayoutBlock> blocks,
-        String fallback
-    ) {
+            long workspaceId, String channelId, String slackUserId, List<LayoutBlock> blocks, String fallback) {
         if (!egressGuard.deliveryAllowed("slack.write")) {
             throw new SlackSendException(workspaceId, channelId, "silent_mode_engaged");
         }
-        String token = resolveToken(workspaceId).orElseThrow(() ->
-            new SlackSendException(workspaceId, channelId, "no_active_slack_connection")
-        );
+        String token = resolveToken(workspaceId)
+                .orElseThrow(() -> new SlackSendException(workspaceId, channelId, "no_active_slack_connection"));
         ChatPostEphemeralRequest request = ChatPostEphemeralRequest.builder()
-            .channel(channelId)
-            .user(slackUserId)
-            .blocks(blocks)
-            .text(fallback)
-            .build();
+                .channel(channelId)
+                .user(slackUserId)
+                .blocks(blocks)
+                .text(fallback)
+                .build();
         try {
-            ChatPostEphemeralResponse response = callOutboundHonoringRateLimit(workspaceId, channelId, () ->
-                slack.methods(token).chatPostEphemeral(request)
-            );
+            ChatPostEphemeralResponse response = callOutboundHonoringRateLimit(
+                    workspaceId, channelId, () -> slack.methods(token).chatPostEphemeral(request));
             if (!response.isOk()) {
                 String error = response.getError() == null ? "unknown" : response.getError();
                 log.warn(
-                    "Slack chat.postEphemeral failed: workspaceId={}, channelId={}, userId={}, error={}",
-                    workspaceId,
-                    channelId,
-                    slackUserId,
-                    error
-                );
+                        "Slack chat.postEphemeral failed: workspaceId={}, channelId={}, userId={}, error={}",
+                        workspaceId,
+                        channelId,
+                        slackUserId,
+                        error);
                 throw new SlackSendException(workspaceId, channelId, error);
             }
         } catch (SlackApiException | IOException e) {
             log.warn(
-                "Slack chat.postEphemeral transport failure: workspaceId={}, channelId={}, error={}",
-                workspaceId,
-                channelId,
-                e.getMessage()
-            );
+                    "Slack chat.postEphemeral transport failure: workspaceId={}, channelId={}, error={}",
+                    workspaceId,
+                    channelId,
+                    e.getMessage());
             throw new SlackSendException(workspaceId, channelId, "transport_failure", e);
         }
     }
@@ -218,9 +199,8 @@ public class SlackMessageService {
             return Optional.empty();
         }
         try {
-            AuthTestResponse r = callHonoringRateLimit(workspaceId, () ->
-                slack.methods(token.get()).authTest(req -> req)
-            );
+            AuthTestResponse r = callHonoringRateLimit(
+                    workspaceId, () -> slack.methods(token.get()).authTest(req -> req));
             if (r.isOk() && r.getUserId() != null && !r.getUserId().isBlank()) {
                 botUserIdCache.put(workspaceId, r.getUserId());
                 return Optional.of(r.getUserId());
@@ -241,14 +221,13 @@ public class SlackMessageService {
         if (!egressGuard.deliveryAllowed("slack.write")) {
             throw new SlackSendException(workspaceId, channel, "silent_mode_engaged");
         }
-        String token = resolveToken(workspaceId).orElseThrow(() ->
-            new SlackSendException(workspaceId, channel, "no_active_slack_connection")
-        );
+        String token = resolveToken(workspaceId)
+                .orElseThrow(() -> new SlackSendException(workspaceId, channel, "no_active_slack_connection"));
         try {
             egressGuard.requireDeliveryAllowed("slack.write");
-            ChatStartStreamResponse r = slack
-                .methods(token)
-                .chatStartStream(req -> req.channel(channel).threadTs(threadTs).markdownText(markdownText));
+            ChatStartStreamResponse r = slack.methods(token)
+                    .chatStartStream(
+                            req -> req.channel(channel).threadTs(threadTs).markdownText(markdownText));
             if (!r.isOk()) {
                 throw new SlackSendException(workspaceId, channel, r.getError() == null ? "unknown" : r.getError());
             }
@@ -267,14 +246,12 @@ public class SlackMessageService {
         if (!egressGuard.deliveryAllowed("slack.write")) {
             throw new SlackSendException(workspaceId, channel, "silent_mode_engaged");
         }
-        String token = resolveToken(workspaceId).orElseThrow(() ->
-            new SlackSendException(workspaceId, channel, "no_active_slack_connection")
-        );
+        String token = resolveToken(workspaceId)
+                .orElseThrow(() -> new SlackSendException(workspaceId, channel, "no_active_slack_connection"));
         try {
             egressGuard.requireDeliveryAllowed("slack.write");
-            ChatAppendStreamResponse r = slack
-                .methods(token)
-                .chatAppendStream(req -> req.channel(channel).ts(ts).markdownText(markdownText));
+            ChatAppendStreamResponse r = slack.methods(token)
+                    .chatAppendStream(req -> req.channel(channel).ts(ts).markdownText(markdownText));
             if (!r.isOk()) {
                 throw new SlackSendException(workspaceId, channel, r.getError() == null ? "unknown" : r.getError());
             }
@@ -292,14 +269,12 @@ public class SlackMessageService {
         if (!egressGuard.deliveryAllowed("slack.write")) {
             throw new SlackSendException(workspaceId, channel, "silent_mode_engaged");
         }
-        String token = resolveToken(workspaceId).orElseThrow(() ->
-            new SlackSendException(workspaceId, channel, "no_active_slack_connection")
-        );
+        String token = resolveToken(workspaceId)
+                .orElseThrow(() -> new SlackSendException(workspaceId, channel, "no_active_slack_connection"));
         try {
             egressGuard.requireDeliveryAllowed("slack.write");
-            ChatStopStreamResponse r = slack
-                .methods(token)
-                .chatStopStream(req -> req.channel(channel).ts(ts).blocks(blocks));
+            ChatStopStreamResponse r = slack.methods(token)
+                    .chatStopStream(req -> req.channel(channel).ts(ts).blocks(blocks));
             if (!r.isOk()) {
                 throw new SlackSendException(workspaceId, channel, r.getError() == null ? "unknown" : r.getError());
             }
@@ -321,21 +296,21 @@ public class SlackMessageService {
         if (!egressGuard.deliveryAllowed("slack.write")) {
             return;
         }
-        String token = resolveToken(workspaceId).orElseThrow(() ->
-            new SlackSendException(workspaceId, slackUserId, "no_active_slack_connection")
-        );
+        String token = resolveToken(workspaceId)
+                .orElseThrow(() -> new SlackSendException(workspaceId, slackUserId, "no_active_slack_connection"));
         try {
-            ViewsPublishResponse r = callOutboundHonoringRateLimit(workspaceId, slackUserId, () ->
-                slack.methods(token).viewsPublish(req -> req.userId(slackUserId).view(view))
-            );
+            ViewsPublishResponse r = callOutboundHonoringRateLimit(
+                    workspaceId,
+                    slackUserId,
+                    () -> slack.methods(token)
+                            .viewsPublish(req -> req.userId(slackUserId).view(view)));
             if (!r.isOk()) {
                 String error = r.getError() == null ? "unknown" : r.getError();
                 log.warn(
-                    "Slack views.publish failed: workspaceId={}, userId={}, error={}",
-                    workspaceId,
-                    slackUserId,
-                    error
-                );
+                        "Slack views.publish failed: workspaceId={}, userId={}, error={}",
+                        workspaceId,
+                        slackUserId,
+                        error);
                 throw new SlackSendException(workspaceId, slackUserId, error);
             }
         } catch (SlackSendException e) {
@@ -345,11 +320,10 @@ public class SlackMessageService {
             throw e;
         } catch (SlackApiException | IOException e) {
             log.warn(
-                "Slack views.publish transport failure: workspaceId={}, userId={}, error={}",
-                workspaceId,
-                slackUserId,
-                e.getMessage()
-            );
+                    "Slack views.publish transport failure: workspaceId={}, userId={}, error={}",
+                    workspaceId,
+                    slackUserId,
+                    e.getMessage());
             throw new SlackSendException(workspaceId, slackUserId, "transport_failure", e);
         }
     }
@@ -368,9 +342,9 @@ public class SlackMessageService {
         }
         try {
             egressGuard.requireDeliveryAllowed("slack.write");
-            slack
-                .methods(token.get())
-                .assistantThreadsSetStatus(req -> req.channelId(channel).threadTs(threadTs).status(status));
+            slack.methods(token.get())
+                    .assistantThreadsSetStatus(
+                            req -> req.channelId(channel).threadTs(threadTs).status(status));
         } catch (Exception e) {
             log.debug("Slack setStatus skipped (channel={}): {}", channel, e.getMessage());
         }
@@ -390,9 +364,9 @@ public class SlackMessageService {
         }
         try {
             egressGuard.requireDeliveryAllowed("slack.write");
-            slack
-                .methods(token.get())
-                .assistantThreadsSetSuggestedPrompts(req -> req.channelId(channel).title(title).prompts(prompts));
+            slack.methods(token.get())
+                    .assistantThreadsSetSuggestedPrompts(
+                            req -> req.channelId(channel).title(title).prompts(prompts));
         } catch (Exception e) {
             log.debug("Slack setSuggestedPrompts skipped (channel={}): {}", channel, e.getMessage());
         }
@@ -412,74 +386,71 @@ public class SlackMessageService {
         try {
             do {
                 String pageCursor = cursor;
-                ConversationsListResponse response = callHonoringRateLimit(workspaceId, () ->
-                    methods.conversationsList(req ->
-                        req
-                            .types(List.of(ConversationType.PUBLIC_CHANNEL, ConversationType.PRIVATE_CHANNEL))
-                            .excludeArchived(false)
-                            .limit(CONVERSATIONS_LIST_PAGE_SIZE)
-                            .cursor(pageCursor)
-                    )
-                );
+                ConversationsListResponse response = callHonoringRateLimit(
+                        workspaceId,
+                        () -> methods.conversationsList(req -> req.types(
+                                        List.of(ConversationType.PUBLIC_CHANNEL, ConversationType.PRIVATE_CHANNEL))
+                                .excludeArchived(false)
+                                .limit(CONVERSATIONS_LIST_PAGE_SIZE)
+                                .cursor(pageCursor)));
                 if (!response.isOk()) {
                     log.warn(
-                        "Slack conversations.list returned ok=false: workspaceId={}, error={}",
-                        workspaceId,
-                        response.getError()
-                    );
+                            "Slack conversations.list returned ok=false: workspaceId={}, error={}",
+                            workspaceId,
+                            response.getError());
                     return channels;
                 }
                 if (response.getChannels() != null) {
-                    response.getChannels().stream().map(SlackMessageService::toConversationInfo).forEach(channels::add);
+                    response.getChannels().stream()
+                            .map(SlackMessageService::toConversationInfo)
+                            .forEach(channels::add);
                 }
-                cursor = response.getResponseMetadata() == null ? null : response.getResponseMetadata().getNextCursor();
+                cursor = response.getResponseMetadata() == null
+                        ? null
+                        : response.getResponseMetadata().getNextCursor();
                 pages++;
             } while (cursor != null && !cursor.isBlank() && pages < CONVERSATIONS_LIST_MAX_PAGES);
             if (pages >= CONVERSATIONS_LIST_MAX_PAGES) {
                 log.warn(
-                    "Slack conversations.list pagination hit cap: workspaceId={}, pages={}, channels={}",
-                    workspaceId,
-                    pages,
-                    channels.size()
-                );
+                        "Slack conversations.list pagination hit cap: workspaceId={}, pages={}, channels={}",
+                        workspaceId,
+                        pages,
+                        channels.size());
             }
             return channels;
         } catch (SlackApiException | IOException e) {
             log.warn(
-                "Slack conversations.list transport failure: workspaceId={}, collected={}, error={}",
-                workspaceId,
-                channels.size(),
-                e.getMessage()
-            );
+                    "Slack conversations.list transport failure: workspaceId={}, collected={}, error={}",
+                    workspaceId,
+                    channels.size(),
+                    e.getMessage());
             return channels;
         }
     }
 
     public Optional<SlackConversationInfo> lookupConversation(long workspaceId, String channelId) {
-        String token = resolveToken(workspaceId).orElseThrow(() ->
-            new SlackSendException(workspaceId, channelId, "no_active_slack_connection")
-        );
+        String token = resolveToken(workspaceId)
+                .orElseThrow(() -> new SlackSendException(workspaceId, channelId, "no_active_slack_connection"));
         try {
-            ConversationsInfoResponse response = callHonoringRateLimit(workspaceId, () ->
-                slack.methods(token).conversationsInfo(req -> req.channel(channelId).includeNumMembers(true))
-            );
+            ConversationsInfoResponse response = callHonoringRateLimit(
+                    workspaceId,
+                    () -> slack.methods(token)
+                            .conversationsInfo(req -> req.channel(channelId).includeNumMembers(true)));
             if (!response.isOk()) {
                 log.debug(
-                    "Slack conversations.info returned ok=false: workspaceId={}, channelId={}, error={}",
-                    workspaceId,
-                    channelId,
-                    response.getError()
-                );
+                        "Slack conversations.info returned ok=false: workspaceId={}, channelId={}, error={}",
+                        workspaceId,
+                        channelId,
+                        response.getError());
                 return Optional.empty();
             }
             return Optional.ofNullable(response.getChannel()).map(SlackMessageService::toConversationInfo);
         } catch (SlackApiException | IOException e) {
             log.warn(
-                "Slack conversations.info transport failure: workspaceId={}, channelId={}, error={}",
-                workspaceId,
-                channelId,
-                e.getMessage()
-            );
+                    "Slack conversations.info transport failure: workspaceId={}, channelId={}, error={}",
+                    workspaceId,
+                    channelId,
+                    e.getMessage());
             return Optional.empty();
         }
     }
@@ -495,14 +466,13 @@ public class SlackMessageService {
             return new ConversationLookup.Unavailable("no_active_slack_connection");
         }
         try {
-            ConversationsInfoResponse response = callHonoringRateLimit(workspaceId, () ->
-                slack.methods(token.get()).conversationsInfo(req -> req.channel(channelId))
-            );
+            ConversationsInfoResponse response = callHonoringRateLimit(
+                    workspaceId, () -> slack.methods(token.get()).conversationsInfo(req -> req.channel(channelId)));
             if (!response.isOk()) {
                 String error = response.getError() == null ? "unknown" : response.getError();
                 return "channel_not_found".equals(error)
-                    ? new ConversationLookup.NotFound(error)
-                    : new ConversationLookup.Unavailable(error);
+                        ? new ConversationLookup.NotFound(error)
+                        : new ConversationLookup.Unavailable(error);
             }
             Conversation channel = response.getChannel();
             if (channel == null) {
@@ -511,11 +481,10 @@ public class SlackMessageService {
             return new ConversationLookup.Found(toConversationInfo(channel));
         } catch (SlackApiException | IOException e) {
             log.debug(
-                "Slack conversations.info transport failure: workspaceId={}, channelId={}, error={}",
-                workspaceId,
-                channelId,
-                e.getMessage()
-            );
+                    "Slack conversations.info transport failure: workspaceId={}, channelId={}, error={}",
+                    workspaceId,
+                    channelId,
+                    e.getMessage());
             return new ConversationLookup.Unavailable("transport_failure");
         }
     }
@@ -538,44 +507,29 @@ public class SlackMessageService {
      * {@link SlackSendException} on any failure so the sync can abandon the channel without advancing its watermark.
      */
     public HistoryPage fetchHistoryPage(
-        long workspaceId,
-        String channelId,
-        String oldest,
-        String latest,
-        @Nullable String cursor,
-        int limit
-    ) {
-        String token = resolveToken(workspaceId).orElseThrow(() ->
-            new SlackSendException(workspaceId, channelId, "no_active_slack_connection")
-        );
+            long workspaceId, String channelId, String oldest, String latest, @Nullable String cursor, int limit) {
+        String token = resolveToken(workspaceId)
+                .orElseThrow(() -> new SlackSendException(workspaceId, channelId, "no_active_slack_connection"));
         try {
             var response = callHonoringRateLimit(
-                workspaceId,
-                () ->
-                    slack
-                        .methods(token)
-                        .conversationsHistory(req ->
-                            req
-                                .channel(channelId)
-                                .oldest(oldest)
-                                .latest(latest)
-                                .cursor(cursor == null || cursor.isBlank() ? null : cursor)
-                                .limit(limit)
-                        ),
-                SYNC_RATE_LIMIT_MAX_WAIT_MS,
-                SYNC_RATE_LIMIT_TOTAL_BUDGET_MS
-            );
+                    workspaceId,
+                    () -> slack.methods(token)
+                            .conversationsHistory(req -> req.channel(channelId)
+                                    .oldest(oldest)
+                                    .latest(latest)
+                                    .cursor(cursor == null || cursor.isBlank() ? null : cursor)
+                                    .limit(limit)),
+                    SYNC_RATE_LIMIT_MAX_WAIT_MS,
+                    SYNC_RATE_LIMIT_TOTAL_BUDGET_MS);
             if (!response.isOk()) {
                 throw new SlackSendException(
-                    workspaceId,
-                    channelId,
-                    response.getError() == null ? "unknown" : response.getError()
-                );
+                        workspaceId, channelId, response.getError() == null ? "unknown" : response.getError());
             }
             List<com.slack.api.model.Message> messages =
-                response.getMessages() == null ? List.of() : response.getMessages();
-            String nextCursor =
-                response.getResponseMetadata() == null ? null : response.getResponseMetadata().getNextCursor();
+                    response.getMessages() == null ? List.of() : response.getMessages();
+            String nextCursor = response.getResponseMetadata() == null
+                    ? null
+                    : response.getResponseMetadata().getNextCursor();
             return new HistoryPage(messages, nextCursor == null || nextCursor.isBlank() ? null : nextCursor);
         } catch (SlackApiException | IOException e) {
             throw new SlackSendException(workspaceId, channelId, "transport_failure", e);
@@ -587,44 +541,29 @@ public class SlackMessageService {
      * {@link #fetchHistoryPage}; the parent message is included by Slack and must be filtered by the caller.
      */
     public HistoryPage fetchRepliesPage(
-        long workspaceId,
-        String channelId,
-        String threadTs,
-        String oldest,
-        @Nullable String cursor,
-        int limit
-    ) {
-        String token = resolveToken(workspaceId).orElseThrow(() ->
-            new SlackSendException(workspaceId, channelId, "no_active_slack_connection")
-        );
+            long workspaceId, String channelId, String threadTs, String oldest, @Nullable String cursor, int limit) {
+        String token = resolveToken(workspaceId)
+                .orElseThrow(() -> new SlackSendException(workspaceId, channelId, "no_active_slack_connection"));
         try {
             var response = callHonoringRateLimit(
-                workspaceId,
-                () ->
-                    slack
-                        .methods(token)
-                        .conversationsReplies(req ->
-                            req
-                                .channel(channelId)
-                                .ts(threadTs)
-                                .oldest(oldest)
-                                .cursor(cursor == null || cursor.isBlank() ? null : cursor)
-                                .limit(limit)
-                        ),
-                SYNC_RATE_LIMIT_MAX_WAIT_MS,
-                SYNC_RATE_LIMIT_TOTAL_BUDGET_MS
-            );
+                    workspaceId,
+                    () -> slack.methods(token)
+                            .conversationsReplies(req -> req.channel(channelId)
+                                    .ts(threadTs)
+                                    .oldest(oldest)
+                                    .cursor(cursor == null || cursor.isBlank() ? null : cursor)
+                                    .limit(limit)),
+                    SYNC_RATE_LIMIT_MAX_WAIT_MS,
+                    SYNC_RATE_LIMIT_TOTAL_BUDGET_MS);
             if (!response.isOk()) {
                 throw new SlackSendException(
-                    workspaceId,
-                    channelId,
-                    response.getError() == null ? "unknown" : response.getError()
-                );
+                        workspaceId, channelId, response.getError() == null ? "unknown" : response.getError());
             }
             List<com.slack.api.model.Message> messages =
-                response.getMessages() == null ? List.of() : response.getMessages();
-            String nextCursor =
-                response.getResponseMetadata() == null ? null : response.getResponseMetadata().getNextCursor();
+                    response.getMessages() == null ? List.of() : response.getMessages();
+            String nextCursor = response.getResponseMetadata() == null
+                    ? null
+                    : response.getResponseMetadata().getNextCursor();
             return new HistoryPage(messages, nextCursor == null || nextCursor.isBlank() ? null : nextCursor);
         } catch (SlackApiException | IOException e) {
             throw new SlackSendException(workspaceId, channelId, "transport_failure", e);
@@ -632,25 +571,24 @@ public class SlackMessageService {
     }
 
     /** One page of channel history/replies: the raw SDK messages plus the pagination cursor (null when exhausted). */
-    public record HistoryPage(List<com.slack.api.model.Message> messages, @Nullable String nextCursor) {}
+    public record HistoryPage(
+            List<com.slack.api.model.Message> messages,
+            @Nullable String nextCursor) {}
 
     public void joinPublicChannel(long workspaceId, String channelId) {
         if (!egressGuard.deliveryAllowed("slack.write")) {
             return;
         }
-        String token = resolveToken(workspaceId).orElseThrow(() ->
-            new SlackSendException(workspaceId, channelId, "no_active_slack_connection")
-        );
+        String token = resolveToken(workspaceId)
+                .orElseThrow(() -> new SlackSendException(workspaceId, channelId, "no_active_slack_connection"));
         try {
-            ConversationsJoinResponse response = callOutboundHonoringRateLimit(workspaceId, channelId, () ->
-                slack.methods(token).conversationsJoin(req -> req.channel(channelId))
-            );
-            if (!response.isOk()) {
-                throw new SlackSendException(
+            ConversationsJoinResponse response = callOutboundHonoringRateLimit(
                     workspaceId,
                     channelId,
-                    response.getError() == null ? "unknown" : response.getError()
-                );
+                    () -> slack.methods(token).conversationsJoin(req -> req.channel(channelId)));
+            if (!response.isOk()) {
+                throw new SlackSendException(
+                        workspaceId, channelId, response.getError() == null ? "unknown" : response.getError());
             }
         } catch (SlackSendException e) {
             if ("silent_mode_engaged".equals(e.slackError())) {
@@ -666,14 +604,13 @@ public class SlackMessageService {
 
     private static SlackConversationInfo toConversationInfo(Conversation conversation) {
         return new SlackConversationInfo(
-            conversation.getId(),
-            conversation.getName() == null || conversation.getName().isBlank()
-                ? conversation.getId()
-                : conversation.getName(),
-            conversation.isPrivate(),
-            conversation.isMember(),
-            conversation.isArchived()
-        );
+                conversation.getId(),
+                conversation.getName() == null || conversation.getName().isBlank()
+                        ? conversation.getId()
+                        : conversation.getName(),
+                conversation.isPrivate(),
+                conversation.isMember(),
+                conversation.isArchived());
     }
 
     public List<User> listMembers(long workspaceId) {
@@ -689,50 +626,45 @@ public class SlackMessageService {
         try {
             do {
                 final String pageCursor = cursor;
-                UsersListResponse response = callHonoringRateLimit(workspaceId, () ->
-                    methods.usersList(r -> r.limit(USERS_LIST_PAGE_SIZE).cursor(pageCursor))
-                );
+                UsersListResponse response = callHonoringRateLimit(
+                        workspaceId,
+                        () -> methods.usersList(
+                                r -> r.limit(USERS_LIST_PAGE_SIZE).cursor(pageCursor)));
                 if (!response.isOk()) {
                     log.warn(
-                        "Slack users.list returned ok=false: workspaceId={}, error={}",
-                        workspaceId,
-                        response.getError()
-                    );
+                            "Slack users.list returned ok=false: workspaceId={}, error={}",
+                            workspaceId,
+                            response.getError());
                     return accumulator;
                 }
                 if (response.getMembers() != null) {
                     accumulator.addAll(response.getMembers());
                 }
-                cursor = response.getResponseMetadata() == null ? null : response.getResponseMetadata().getNextCursor();
+                cursor = response.getResponseMetadata() == null
+                        ? null
+                        : response.getResponseMetadata().getNextCursor();
                 pages++;
             } while (cursor != null && !cursor.isBlank() && pages < USERS_LIST_MAX_PAGES);
             if (pages >= USERS_LIST_MAX_PAGES) {
                 log.warn(
-                    "Slack users.list pagination hit cap: workspaceId={}, pages={}, members={}",
-                    workspaceId,
-                    pages,
-                    accumulator.size()
-                );
+                        "Slack users.list pagination hit cap: workspaceId={}, pages={}, members={}",
+                        workspaceId,
+                        pages,
+                        accumulator.size());
             }
             return accumulator;
         } catch (SlackApiException | IOException e) {
             log.warn(
-                "Slack users.list transport failure: workspaceId={}, collected={}, error={}",
-                workspaceId,
-                accumulator.size(),
-                e.getMessage()
-            );
+                    "Slack users.list transport failure: workspaceId={}, collected={}, error={}",
+                    workspaceId,
+                    accumulator.size(),
+                    e.getMessage());
             return accumulator;
         }
     }
 
     public record SlackConversationInfo(
-        String channelId,
-        String channelName,
-        boolean privateChannel,
-        boolean member,
-        boolean archived
-    ) {}
+            String channelId, String channelName, boolean privateChannel, boolean member, boolean archived) {}
 
     /** A synchronous Slack Web API call that may throw the SDK's checked failures. */
     @FunctionalInterface
@@ -752,7 +684,7 @@ public class SlackMessageService {
     }
 
     private <T> T callOutboundHonoringRateLimit(long workspaceId, String target, SlackCall<T> call)
-        throws SlackApiException, IOException {
+            throws SlackApiException, IOException {
         return callHonoringRateLimit(workspaceId, () -> {
             try {
                 egressGuard.requireDeliveryAllowed("slack.write");
@@ -768,7 +700,7 @@ public class SlackMessageService {
      * the nightly reconciliation passes the wider {@code SYNC_*} bounds (see {@link #SYNC_RATE_LIMIT_MAX_WAIT_MS}).
      */
     private <T> T callHonoringRateLimit(long workspaceId, SlackCall<T> call, long maxWaitMs, long totalBudgetMs)
-        throws SlackApiException, IOException {
+            throws SlackApiException, IOException {
         long budgetLeftMs = totalBudgetMs;
         int attempt = 0;
         while (true) {
@@ -787,11 +719,10 @@ public class SlackMessageService {
                 }
                 long waitMs = Math.min(Math.min(backoffWithJitter(retryAfterMs, ++attempt), maxWaitMs), budgetLeftMs);
                 log.warn(
-                    "Slack rate-limited (429); backing off {} ms before retry (attempt {}, budget left {} ms)",
-                    waitMs,
-                    attempt,
-                    budgetLeftMs
-                );
+                        "Slack rate-limited (429); backing off {} ms before retry (attempt {}, budget left {} ms)",
+                        waitMs,
+                        attempt,
+                        budgetLeftMs);
                 budgetLeftMs -= waitMs;
                 sleepQuietly(waitMs);
                 if (Thread.currentThread().isInterrupted()) {
@@ -863,7 +794,7 @@ public class SlackMessageService {
 
     private Optional<String> resolveToken(long workspaceId) {
         return credentialProvider
-            .resolve(new IntegrationRef(IntegrationKind.SLACK, workspaceId, null))
-            .flatMap(b -> b instanceof BearerToken bt ? Optional.of(bt.token()) : Optional.empty());
+                .resolve(new IntegrationRef(IntegrationKind.SLACK, workspaceId, null))
+                .flatMap(b -> b instanceof BearerToken bt ? Optional.of(bt.token()) : Optional.empty());
     }
 }

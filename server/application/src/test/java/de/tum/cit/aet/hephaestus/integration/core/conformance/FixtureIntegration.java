@@ -75,22 +75,24 @@ final class FixtureIntegration {
 
     static ArtifactDescriptor descriptor(boolean reviewable, Set<ActorRole> roles, Set<FeedbackLane> lanes) {
         return descriptor(
-            List.of(
-                new Signal(WIDGET_ASSEMBLED, "Widget assembled", Set.of(ASSEMBLY_EVENT), RevisionScheme.CONTENT_DIGEST),
-                new Signal(WIDGET_SHIPPED, "Widget shipped", Set.of(SHIPMENT_EVENT), RevisionScheme.TERMINAL_STATE)
-            ),
-            reviewable,
-            roles,
-            lanes
-        );
+                List.of(
+                        new Signal(
+                                WIDGET_ASSEMBLED,
+                                "Widget assembled",
+                                Set.of(ASSEMBLY_EVENT),
+                                RevisionScheme.CONTENT_DIGEST),
+                        new Signal(
+                                WIDGET_SHIPPED,
+                                "Widget shipped",
+                                Set.of(SHIPMENT_EVENT),
+                                RevisionScheme.TERMINAL_STATE)),
+                reviewable,
+                roles,
+                lanes);
     }
 
     static ArtifactDescriptor descriptor(
-        List<Signal> signals,
-        boolean reviewable,
-        Set<ActorRole> roles,
-        Set<FeedbackLane> lanes
-    ) {
+            List<Signal> signals, boolean reviewable, Set<ActorRole> roles, Set<FeedbackLane> lanes) {
         return new ArtifactDescriptor() {
             @Override
             public ArtifactKind kind() {
@@ -125,28 +127,23 @@ final class FixtureIntegration {
             @Override
             public List<ReviewLimitation> reviewLimitations() {
                 // A reviewable kind must name what its evidence cannot settle.
-                return List.of(
-                    new ReviewLimitation("FIXTURE_OBSERVES_NOTHING", "A fixture widget has no real work behind it.")
-                );
+                return List.of(new ReviewLimitation(
+                        "FIXTURE_OBSERVES_NOTHING", "A fixture widget has no real work behind it."));
             }
         };
     }
 
     static IntegrationManifest manifest() {
         return manifest(
-            Set.of(Capability.FEEDBACK_DELIVERY),
-            new IntegrationManifest.ReviewContribution(
-                Set.of(WIDGET),
-                Map.of(WIDGET, Set.of(WIDGET_ASSEMBLED, WIDGET_SHIPPED)),
-                Map.of(WIDGET, Set.of(FeedbackLane.IN_CONTEXT_SUMMARY))
-            )
-        );
+                Set.of(Capability.FEEDBACK_DELIVERY),
+                new IntegrationManifest.ReviewContribution(
+                        Set.of(WIDGET),
+                        Map.of(WIDGET, Set.of(WIDGET_ASSEMBLED, WIDGET_SHIPPED)),
+                        Map.of(WIDGET, Set.of(FeedbackLane.IN_CONTEXT_SUMMARY))));
     }
 
     static IntegrationManifest manifest(
-        Set<Capability> capabilities,
-        IntegrationManifest.ReviewContribution contribution
-    ) {
+            Set<Capability> capabilities, IntegrationManifest.ReviewContribution contribution) {
         return manifest(KIND, capabilities, contribution);
     }
 
@@ -155,10 +152,9 @@ final class FixtureIntegration {
      * different signals about one artifact and only one of them is connected.
      */
     static IntegrationManifest manifest(
-        IntegrationKind integrationKind,
-        Set<Capability> capabilities,
-        IntegrationManifest.ReviewContribution contribution
-    ) {
+            IntegrationKind integrationKind,
+            Set<Capability> capabilities,
+            IntegrationManifest.ReviewContribution contribution) {
         return new IntegrationManifest() {
             @Override
             public IntegrationKind kind() {

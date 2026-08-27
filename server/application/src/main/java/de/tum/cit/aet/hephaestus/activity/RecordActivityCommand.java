@@ -32,35 +32,33 @@ import org.jspecify.annotations.Nullable;
  */
 @Builder
 public record RecordActivityCommand(
-    @NotNull Long workspaceId,
-    @NotNull ActivityEventType eventType,
-    @NotNull Instant occurredAt,
-    @Nullable User actor,
-    @Nullable Repository repository,
-    @NotNull ActivityTargetType targetType,
-    @NotNull Long targetId,
-    @Min(0) double xp
-) {
+        @NotNull Long workspaceId,
+        @NotNull ActivityEventType eventType,
+        @NotNull Instant occurredAt,
+        @Nullable User actor,
+        @Nullable Repository repository,
+        @NotNull ActivityTargetType targetType,
+        @NotNull Long targetId,
+        @Min(0) double xp) {
     /**
      * Create a simple command for events without a repository context.
      */
     public static RecordActivityCommand simple(
-        Long workspaceId,
-        ActivityEventType eventType,
-        Instant occurredAt,
-        @Nullable User actor,
-        ActivityTargetType targetType,
-        Long targetId,
-        double xp
-    ) {
+            Long workspaceId,
+            ActivityEventType eventType,
+            Instant occurredAt,
+            @Nullable User actor,
+            ActivityTargetType targetType,
+            Long targetId,
+            double xp) {
         return RecordActivityCommand.builder()
-            .workspaceId(workspaceId)
-            .eventType(eventType)
-            .occurredAt(occurredAt)
-            .actor(actor)
-            .targetType(targetType)
-            .targetId(targetId)
-            .xp(xp)
-            .build();
+                .workspaceId(workspaceId)
+                .eventType(eventType)
+                .occurredAt(occurredAt)
+                .actor(actor)
+                .targetType(targetType)
+                .targetId(targetId)
+                .xp(xp)
+                .build();
     }
 }

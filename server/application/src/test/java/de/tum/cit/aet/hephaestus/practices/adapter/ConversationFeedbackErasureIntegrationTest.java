@@ -22,7 +22,6 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepositor
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure;
@@ -97,10 +96,9 @@ class ConversationFeedbackErasureIntegrationTest extends BaseIntegrationTest {
     void setUp() {
         databaseTestUtils.cleanDatabase();
         IdentityProvider provider = identityProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                identityProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> identityProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
         workspaceA = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("erasure-ws-a"));
         workspaceB = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("erasure-ws-b"));
         practiceA = savePractice(workspaceA);
@@ -114,28 +112,17 @@ class ConversationFeedbackErasureIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @DisplayName(
-        "erases only chat.conversation_thread rows for the given threads/workspace; PR + other-tenant rows survive"
-    )
+            "erases only chat.conversation_thread rows for the given threads/workspace; PR + other-tenant rows survive")
     void erasesConversationRowsForThreadsWithoutOverreaching() {
         long thread1 = 5001L;
         long thread2 = 5002L;
 
         // Workspace A: two conversation threads, each an observation + feedback + join (the erasure targets).
         UUID convObs1 = seedBoundObservationAndFeedback(
-            jobA,
-            practiceA,
-            recipientA,
-            ArtifactKinds.CONVERSATION_THREAD,
-            thread1
-        );
+                jobA, practiceA, recipientA, ArtifactKinds.CONVERSATION_THREAD, thread1);
         UUID convFb1 = lastFeedbackId;
         UUID convObs2 = seedBoundObservationAndFeedback(
-            jobA,
-            practiceA,
-            recipientA,
-            ArtifactKinds.CONVERSATION_THREAD,
-            thread2
-        );
+                jobA, practiceA, recipientA, ArtifactKinds.CONVERSATION_THREAD, thread2);
         UUID convFb2 = lastFeedbackId;
 
         // Workspace A: a PR observation + feedback + join — a different artifact type, MUST survive.
@@ -145,12 +132,7 @@ class ConversationFeedbackErasureIntegrationTest extends BaseIntegrationTest {
         // Workspace B: a conversation observation + feedback on the SAME artifact_id as thread1 — a different
         // tenant, MUST survive (proves the workspace predicate, not just the artifact_id, is load-bearing).
         UUID otherWsObs = seedBoundObservationAndFeedback(
-            jobB,
-            practiceB,
-            recipientB,
-            ArtifactKinds.CONVERSATION_THREAD,
-            thread1
-        );
+                jobB, practiceB, recipientB, ArtifactKinds.CONVERSATION_THREAD, thread1);
         UUID otherWsFb = lastFeedbackId;
 
         assertThat(feedbackObservationRepository.count()).isEqualTo(4);
@@ -180,37 +162,21 @@ class ConversationFeedbackErasureIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @DisplayName(
-        "eraseAllConversationForWorkspace deletes every CONVERSATION row for the workspace; PR + other tenant survive"
-    )
+            "eraseAllConversationForWorkspace deletes every CONVERSATION row for the workspace; PR + other tenant survive")
     void eraseAllConversationForWorkspaceScopedToTenantAndArtifactKind() {
         // Workspace A: two CONVERSATION threads (different artifact ids) + one PR unit (must survive).
-        UUID convObs1 = seedBoundObservationAndFeedback(
-            jobA,
-            practiceA,
-            recipientA,
-            ArtifactKinds.CONVERSATION_THREAD,
-            8001L
-        );
+        UUID convObs1 =
+                seedBoundObservationAndFeedback(jobA, practiceA, recipientA, ArtifactKinds.CONVERSATION_THREAD, 8001L);
         UUID convFb1 = lastFeedbackId;
-        UUID convObs2 = seedBoundObservationAndFeedback(
-            jobA,
-            practiceA,
-            recipientA,
-            ArtifactKinds.CONVERSATION_THREAD,
-            8002L
-        );
+        UUID convObs2 =
+                seedBoundObservationAndFeedback(jobA, practiceA, recipientA, ArtifactKinds.CONVERSATION_THREAD, 8002L);
         UUID convFb2 = lastFeedbackId;
         UUID prObs = seedBoundObservationAndFeedback(jobA, practiceA, recipientA, ArtifactKinds.PULL_REQUEST, 8001L);
         UUID prFb = lastFeedbackId;
 
         // Workspace B: an IN_CHAT unit — a different tenant, MUST survive.
-        UUID otherWsObs = seedBoundObservationAndFeedback(
-            jobB,
-            practiceB,
-            recipientB,
-            ArtifactKinds.CONVERSATION_THREAD,
-            8003L
-        );
+        UUID otherWsObs =
+                seedBoundObservationAndFeedback(jobB, practiceB, recipientB, ArtifactKinds.CONVERSATION_THREAD, 8003L);
         UUID otherWsFb = lastFeedbackId;
 
         assertThat(feedbackObservationRepository.count()).isEqualTo(4);
@@ -238,17 +204,11 @@ class ConversationFeedbackErasureIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @DisplayName(
-        "eraseConversationFeedbackAboutUser deletes only that subject's CONVERSATION rows; other user + PR/ISSUE + other tenant survive"
-    )
+            "eraseConversationFeedbackAboutUser deletes only that subject's CONVERSATION rows; other user + PR/ISSUE + other tenant survive")
     void eraseConversationFeedbackAboutUserScopedToSubject() {
         // Workspace A, subject = recipientA: one IN_CHAT unit (target) + one PR unit + one ISSUE unit (survive).
-        UUID convObsA = seedBoundObservationAndFeedback(
-            jobA,
-            practiceA,
-            recipientA,
-            ArtifactKinds.CONVERSATION_THREAD,
-            9001L
-        );
+        UUID convObsA =
+                seedBoundObservationAndFeedback(jobA, practiceA, recipientA, ArtifactKinds.CONVERSATION_THREAD, 9001L);
         UUID convFbA = lastFeedbackId;
         UUID prObsA = seedBoundObservationAndFeedback(jobA, practiceA, recipientA, ArtifactKinds.PULL_REQUEST, 9001L);
         UUID prFbA = lastFeedbackId;
@@ -256,23 +216,13 @@ class ConversationFeedbackErasureIntegrationTest extends BaseIntegrationTest {
         UUID issueFbA = lastFeedbackId;
 
         // Workspace A, subject = recipientC: an IN_CHAT unit for a DIFFERENT person — MUST survive.
-        UUID convObsOther = seedBoundObservationAndFeedback(
-            jobA,
-            practiceA,
-            recipientC,
-            ArtifactKinds.CONVERSATION_THREAD,
-            9003L
-        );
+        UUID convObsOther =
+                seedBoundObservationAndFeedback(jobA, practiceA, recipientC, ArtifactKinds.CONVERSATION_THREAD, 9003L);
         UUID convFbOther = lastFeedbackId;
 
         // Workspace B, subject = recipientA (same user id, different tenant): an IN_CHAT unit — MUST survive.
-        UUID convObsWsB = seedBoundObservationAndFeedback(
-            jobB,
-            practiceB,
-            recipientA,
-            ArtifactKinds.CONVERSATION_THREAD,
-            9004L
-        );
+        UUID convObsWsB =
+                seedBoundObservationAndFeedback(jobB, practiceB, recipientA, ArtifactKinds.CONVERSATION_THREAD, 9004L);
         UUID convFbWsB = lastFeedbackId;
 
         int deleted = erasure.eraseConversationFeedbackAboutUser(workspaceA.getId(), recipientA.getId());
@@ -300,13 +250,8 @@ class ConversationFeedbackErasureIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("idempotent: empty thread set and threads with no derived rows delete nothing")
     void idempotentOnEmptyOrUnmatchedInput() {
-        UUID convObs = seedBoundObservationAndFeedback(
-            jobA,
-            practiceA,
-            recipientA,
-            ArtifactKinds.CONVERSATION_THREAD,
-            7001L
-        );
+        UUID convObs =
+                seedBoundObservationAndFeedback(jobA, practiceA, recipientA, ArtifactKinds.CONVERSATION_THREAD, 7001L);
 
         assertThat(erasure.eraseForThreads(workspaceA.getId(), List.of())).isZero();
         assertThat(erasure.eraseForThreads(workspaceA.getId(), List.of(9999L))).isZero();
@@ -322,35 +267,28 @@ class ConversationFeedbackErasureIntegrationTest extends BaseIntegrationTest {
 
     /** Save an observation, a feedback unit anchored to the same (artifactKind, artifactId), and the join between them. */
     private UUID seedBoundObservationAndFeedback(
-        AgentJob job,
-        Practice practice,
-        User recipient,
-        ArtifactKind artifactKind,
-        long artifactId
-    ) {
+            AgentJob job, Practice practice, User recipient, ArtifactKind artifactKind, long artifactId) {
         UUID observationId = UUID.randomUUID();
         observationRepository.insertIfAbsent(
-            observationId,
-            "occ-" + observationId,
-            job.getId(),
-            practice.getId(),
-            null,
-            artifactKind.value(),
-            artifactId,
-            recipient.getId(),
-            "Observation title",
-            "ABSENT",
-            "BAD",
-            "MAJOR",
-            null,
-            null,
-            null,
-            Instant.now(),
-            "LIVE"
-        );
+                observationId,
+                "occ-" + observationId,
+                job.getId(),
+                practice.getId(),
+                null,
+                artifactKind.value(),
+                artifactId,
+                recipient.getId(),
+                "Observation title",
+                "ABSENT",
+                "BAD",
+                "MAJOR",
+                null,
+                null,
+                null,
+                Instant.now(),
+                "LIVE");
 
-        Feedback feedback = feedbackRepository.save(
-            Feedback.builder()
+        Feedback feedback = feedbackRepository.save(Feedback.builder()
                 .agentJobId(job.getId())
                 .workspaceId(practice.getWorkspace().getId())
                 .artifactKind(artifactKind)
@@ -362,8 +300,7 @@ class ConversationFeedbackErasureIntegrationTest extends BaseIntegrationTest {
                 .deliveryState(FeedbackDeliveryState.PREPARED)
                 .source(FeedbackSource.AGENT)
                 .createdAt(Instant.now())
-                .build()
-        );
+                .build());
         lastFeedbackId = feedback.getId();
 
         feedbackObservationRepository.insertIfAbsent(feedback.getId(), observationId, EvidenceRole.PRIMARY.name(), 0);

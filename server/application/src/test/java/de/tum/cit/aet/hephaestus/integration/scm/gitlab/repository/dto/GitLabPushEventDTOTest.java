@@ -115,16 +115,15 @@ class GitLabPushEventDTOTest extends BaseUnitTest {
         @Test
         void allZeroAfter_isBranchDeletion() {
             var dto = new GitLabPushEventDTO(
-                "push",
-                "refs/heads/feature",
-                "abc123",
-                "0000000000000000000000000000000000000000",
-                null,
-                1L,
-                null,
-                0,
-                null
-            );
+                    "push",
+                    "refs/heads/feature",
+                    "abc123",
+                    "0000000000000000000000000000000000000000",
+                    null,
+                    1L,
+                    null,
+                    0,
+                    null);
 
             assertThat(dto.isBranchDeletion()).isTrue();
         }

@@ -29,13 +29,12 @@ class ConfigAuditSnapshotSecretDetectionTest {
 
     static java.util.stream.Stream<Arguments> snapshots() {
         return java.util.stream.Stream.of(
-            // Neither the component name (`gateway`) nor the record name trips the deny-list, so only
-            // the recursion can catch this — the snapshot is serialized whole.
-            Arguments.of(NestedSecretSnapshot.class, "gateway.apiKey", "a secret one level down"),
-            Arguments.of(TopLevelSecretSnapshot.class, "apiKey", "a secret on the snapshot itself"),
-            // Recording that a key exists is the sanctioned alternative to recording the key.
-            Arguments.of(PresenceFlagSnapshot.class, null, "a presence flag is allowed")
-        );
+                // Neither the component name (`gateway`) nor the record name trips the deny-list, so only
+                // the recursion can catch this — the snapshot is serialized whole.
+                Arguments.of(NestedSecretSnapshot.class, "gateway.apiKey", "a secret one level down"),
+                Arguments.of(TopLevelSecretSnapshot.class, "apiKey", "a secret on the snapshot itself"),
+                // Recording that a key exists is the sanctioned alternative to recording the key.
+                Arguments.of(PresenceFlagSnapshot.class, null, "a presence flag is allowed"));
     }
 
     @ParameterizedTest(name = "{2}")
@@ -47,14 +46,15 @@ class ConfigAuditSnapshotSecretDetectionTest {
             assertThat(violations).as(why).isEmpty();
         } else {
             assertThat(violations)
-                .as(why)
-                .anySatisfy(violation -> assertThat(violation).contains(expectedComponent));
+                    .as(why)
+                    .anySatisfy(violation -> assertThat(violation).contains(expectedComponent));
         }
     }
 
     private static List<String> violationsFor(Class<?> snapshot) {
         var imported = new ClassFileImporter().importClasses(snapshot, Gateway.class);
-        EvaluationResult result = ConfigAuditSnapshotArchTest.secretLikeComponentRule().evaluate(imported);
+        EvaluationResult result =
+                ConfigAuditSnapshotArchTest.secretLikeComponentRule().evaluate(imported);
         return result.getFailureReport().getDetails();
     }
 }

@@ -42,20 +42,13 @@ public class AuthJwtConfig {
 
     @Bean
     public RevocationAwareJwtDecoder hephaestusJwtDecoder(
-        IssuedJwtRepository issuedJwtRepository,
-        AuthProperties properties,
-        CacheManager cacheManager,
-        Clock clock,
-        AuthMetrics authMetrics
-    ) {
+            IssuedJwtRepository issuedJwtRepository,
+            AuthProperties properties,
+            CacheManager cacheManager,
+            Clock clock,
+            AuthMetrics authMetrics) {
         return new RevocationAwareJwtDecoder(
-            keyService,
-            issuedJwtRepository,
-            properties,
-            cacheManager,
-            clock,
-            authMetrics
-        );
+                keyService, issuedJwtRepository, properties, cacheManager, clock, authMetrics);
     }
 
     /**
@@ -76,9 +69,7 @@ public class AuthJwtConfig {
     @Bean
     public StaleAuthCookieFilter staleAuthCookieFilter(AuthProperties properties) {
         return new StaleAuthCookieFilter(
-            properties.cookieName(),
-            RevocationAwareJwtDecoder.localSignatureDecoder(keyService, properties)
-        );
+                properties.cookieName(), RevocationAwareJwtDecoder.localSignatureDecoder(keyService, properties));
     }
 
     /**

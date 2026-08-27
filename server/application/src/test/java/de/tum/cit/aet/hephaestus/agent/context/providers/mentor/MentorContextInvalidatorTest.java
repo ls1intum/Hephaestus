@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -106,62 +105,56 @@ class MentorContextInvalidatorTest extends BaseUnitTest {
     }
 
     private static ScmDomainEvent.PullRequestUpdated buildPrUpdated(
-        long repoId,
-        Long authorId,
-        @Nullable Long mergedById
-    ) {
+            long repoId, Long authorId, @Nullable Long mergedById) {
         ScmEventPayload.PullRequestData pr = new ScmEventPayload.PullRequestData(
-            1L,
-            42,
-            "title",
-            "body",
-            PullRequest.State.OPEN,
-            false,
-            mergedById != null,
-            10,
-            5,
-            1,
-            "https://example.com/pr/42",
-            new RepositoryRef(repoId, "acme/repo", "main"),
-            authorId,
-            Instant.now().minusSeconds(60),
-            Instant.now(),
-            null,
-            mergedById != null ? Instant.now() : null,
-            mergedById
-        );
+                1L,
+                42,
+                "title",
+                "body",
+                PullRequest.State.OPEN,
+                false,
+                mergedById != null,
+                10,
+                5,
+                1,
+                "https://example.com/pr/42",
+                new RepositoryRef(repoId, "acme/repo", "main"),
+                authorId,
+                Instant.now().minusSeconds(60),
+                Instant.now(),
+                null,
+                mergedById != null ? Instant.now() : null,
+                mergedById);
         return new ScmDomainEvent.PullRequestUpdated(pr, Set.of(), buildContext(repoId));
     }
 
     private static ScmDomainEvent.IssueUpdated buildIssueUpdated(long repoId, Long authorId) {
         ScmEventPayload.IssueData issue = new ScmEventPayload.IssueData(
-            1L,
-            17,
-            "title",
-            "body",
-            Issue.State.OPEN,
-            null,
-            "https://example.com/issue/17",
-            false,
-            new RepositoryRef(repoId, "acme/repo", "main"),
-            authorId,
-            Instant.now(),
-            Instant.now(),
-            null
-        );
+                1L,
+                17,
+                "title",
+                "body",
+                Issue.State.OPEN,
+                null,
+                "https://example.com/issue/17",
+                false,
+                new RepositoryRef(repoId, "acme/repo", "main"),
+                authorId,
+                Instant.now(),
+                Instant.now(),
+                null);
         return new ScmDomainEvent.IssueUpdated(issue, Set.of(), buildContext(repoId));
     }
 
     private static EventContext buildContext(long repoId) {
         return new EventContext(
-            UUID.randomUUID(),
-            Instant.now(),
-            null,
-            new RepositoryRef(repoId, "acme/repo", "main"),
-            DataSource.WEBHOOK,
-            "synchronize",
-            UUID.randomUUID().toString(),
-            IdentityProviderType.GITHUB
-        );
+                UUID.randomUUID(),
+                Instant.now(),
+                null,
+                new RepositoryRef(repoId, "acme/repo", "main"),
+                DataSource.WEBHOOK,
+                "synchronize",
+                UUID.randomUUID().toString(),
+                IdentityProviderType.GITHUB);
     }
 }

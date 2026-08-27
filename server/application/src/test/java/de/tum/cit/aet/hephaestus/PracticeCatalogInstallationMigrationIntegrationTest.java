@@ -47,9 +47,8 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
     private static final String BEFORE_CATALOG_TAG = "before-instance-curated-catalog";
     private static final String MASTER = "db/practice-catalog-installation-migration-test.xml";
 
-    private static final TestDatabase DATABASE = PostgreSQLTestContainer.createDatabase(
-        "hephaestus_practice_catalog_installation_migration"
-    );
+    private static final TestDatabase DATABASE =
+            PostgreSQLTestContainer.createDatabase("hephaestus_practice_catalog_installation_migration");
 
     @Test
     void shouldMigrateCatalogStateAndWorkspaceRevisionPointers() throws Exception {
@@ -57,8 +56,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
         seedExistingWorkspaces();
         updateOnly(MARKER_CHANGELOG);
         execute("DELETE FROM practice_catalog_installation WHERE workspace_id = 136104");
-        execute(
-            """
+        execute("""
             UPDATE practice_catalog_installation
             SET installed_at = (
                 SELECT dateexecuted + INTERVAL '1 second'
@@ -66,20 +64,18 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                 WHERE id = '1785274902740-4' AND author = 'hephaestus'
             )
             WHERE workspace_id = 136103
-            """
-        );
+            """);
 
         try (Liquibase liquibase = liquibase()) {
             liquibase.tag(BEFORE_CATALOG_TAG);
         }
         updateThrough("1785743133884-4");
         execute(
-            "UPDATE practice_revision SET detection_fingerprint = repeat('a', 64) " +
-                "WHERE practice_id = 136301 AND revision_number = " +
-                "(SELECT max(revision_number) FROM practice_revision WHERE practice_id = 136301)",
-            "UPDATE practice SET source_curated_slug = 'second-practice', " +
-                "source_curated_fingerprint = repeat('c', 64) WHERE id = 136302"
-        );
+                "UPDATE practice_revision SET detection_fingerprint = repeat('a', 64) "
+                        + "WHERE practice_id = 136301 AND revision_number = "
+                        + "(SELECT max(revision_number) FROM practice_revision WHERE practice_id = 136301)",
+                "UPDATE practice SET source_curated_slug = 'second-practice', "
+                        + "source_curated_fingerprint = repeat('c', 64) WHERE id = 136302");
         // Asserted here, not at the end of the chain: later change sets deliberately clear the
         // review-rule fingerprint, so a stored one is no longer observable once they have run.
         updateThrough("1785743133884-5");
@@ -108,8 +104,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
     }
 
     private static void seedLegacyAuditVocabulary() throws SQLException {
-        execute(
-            """
+        execute("""
             INSERT INTO config_audit_event (
                 occurred_at, workspace_id, actor_kind, entity_type, entity_id,
                 action, changed_keys, old_value, new_value
@@ -121,20 +116,17 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                 'UPDATED', ARRAY['purpose'], '{"purpose":"PRACTICE_DETECTION"}'::jsonb,
                 '{"purpose":"PRACTICE_DETECTION"}'::jsonb
             )
-            """
-        );
+            """);
     }
 
     private static void seedLegacyCuratedOverrides() throws SQLException {
-        execute(
-            """
+        execute("""
             INSERT INTO curated_area_override (
                 slug, name, description, based_on_digest, created_at, updated_at, version
             ) VALUES (
                 'real-area', 'Real area override', 'Preserve this curated intent', repeat('a', 64), now(), now(), 0
             )
-            """,
-            """
+            """, """
             INSERT INTO curated_practice_override (
                 slug, name, applies_to, trigger_events, criteria, automated_review_policy,
                 based_on_digest, created_at, updated_at, version
@@ -155,8 +147,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                 '{"sourceContractVersion":"1.0.0","automatedReview":{"mode":"LANGUAGE_MODEL","evidenceSufficiency":"SUFFICIENT_WHEN_REQUIREMENTS_MET"},"requiredEvidence":[{"sourceKind":"slack.conversation.thread","completeness":"COMPLETE","freshness":"CURRENT"}],"optionalContext":[],"whenEvidenceIsInsufficient":"SKIP_AUTOMATED_REVIEW","knownLimitations":[]}'::jsonb,
                 NULL, now(), now(), 0
             )
-            """
-        );
+            """);
     }
 
     private static void assertMigratedCuratedPoliciesAreValid() throws Exception {
@@ -164,25 +155,17 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
         var sources = new ClasspathArtifactSourceCatalogRegistry(mapper, Clock.systemUTC());
         var validator = new PracticeDefinitionValidator(sources, PracticeSignalOptionsFixture.real());
         int validated = 0;
-        try (
-            Connection connection = connect();
-            Statement statement = connection.createStatement();
-            ResultSet rows = statement.executeQuery(
-                "SELECT slug, name, bindings::text, criteria, automated_review_policy::text, area_slug " +
-                    "FROM curated_practice_override ORDER BY slug"
-            )
-        ) {
+        try (Connection connection = connect();
+                Statement statement = connection.createStatement();
+                ResultSet rows = statement.executeQuery(
+                        "SELECT slug, name, bindings::text, criteria, automated_review_policy::text, area_slug "
+                                + "FROM curated_practice_override ORDER BY slug")) {
             while (rows.next()) {
-                List<PracticeBinding> bindings = mapper.readValue(
-                    rows.getString("bindings"),
-                    new TypeReference<List<PracticeBinding>>() {}
-                );
+                List<PracticeBinding> bindings =
+                        mapper.readValue(rows.getString("bindings"), new TypeReference<List<PracticeBinding>>() {});
                 PracticeAutomatedReviewPolicy policy = mapper.readValue(
-                    rows.getString("automated_review_policy"),
-                    PracticeAutomatedReviewPolicy.class
-                );
-                validator.validate(
-                    new PracticeDefinition(
+                        rows.getString("automated_review_policy"), PracticeAutomatedReviewPolicy.class);
+                validator.validate(new PracticeDefinition(
                         rows.getString("name"),
                         bindings,
                         rows.getString("criteria"),
@@ -190,71 +173,52 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                         policy,
                         null,
                         null,
-                        rows.getString("area_slug")
-                    )
-                );
+                        rows.getString("area_slug")));
                 if (rows.getString("slug").equals("real-practice")) {
-                    assertThat(bindings)
-                        .flatExtracting(PracticeBinding::needs)
-                        .anySatisfy(need -> {
-                            assertThat(need.sourceKind()).isEqualTo(new SourceKind("scm.pull-request.diff"));
-                            assertThat(need.stance()).isEqualTo(EvidenceStance.REQUIRED);
-                        });
+                    assertThat(bindings).flatExtracting(PracticeBinding::needs).anySatisfy(need -> {
+                        assertThat(need.sourceKind()).isEqualTo(new SourceKind("scm.pull-request.diff"));
+                        assertThat(need.stance()).isEqualTo(EvidenceStance.REQUIRED);
+                    });
                 }
                 validated++;
             }
         }
         assertThat(validated).isEqualTo(3);
-        assertThat(scalar("SELECT criteria FROM curated_practice_override WHERE slug = 'real-practice'")).isEqualTo(
-            "Keep the effective override"
-        );
-        assertThat(
-            sources
-                .requireSource(
-                    new de.tum.cit.aet.hephaestus.evidence.SourceContractVersion("1.0.0"),
-                    new SourceKind("scm.pull-request.diff")
-                )
-                .requiredQuality()
-        ).isEqualTo(RequiredCaptureQuality.COMPLETE_AND_NON_EMPTY);
+        assertThat(scalar("SELECT criteria FROM curated_practice_override WHERE slug = 'real-practice'"))
+                .isEqualTo("Keep the effective override");
+        assertThat(sources.requireSource(
+                                new de.tum.cit.aet.hephaestus.evidence.SourceContractVersion("1.0.0"),
+                                new SourceKind("scm.pull-request.diff"))
+                        .requiredQuality())
+                .isEqualTo(RequiredCaptureQuality.COMPLETE_AND_NON_EMPTY);
     }
 
     private static void assertLegacyCuratedDigestsVersioned() throws SQLException {
-        assertThat(scalar("SELECT based_on_digest FROM curated_area_override WHERE slug = 'real-area'")).isEqualTo(
-            "area:v1:" + "a".repeat(64)
-        );
-        assertThat(
-            scalar("SELECT based_on_digest FROM curated_practice_override WHERE slug = 'real-practice'")
-        ).isEqualTo("practice:v1:" + "b".repeat(64));
+        assertThat(scalar("SELECT based_on_digest FROM curated_area_override WHERE slug = 'real-area'"))
+                .isEqualTo("area:v1:" + "a".repeat(64));
+        assertThat(scalar("SELECT based_on_digest FROM curated_practice_override WHERE slug = 'real-practice'"))
+                .isEqualTo("practice:v1:" + "b".repeat(64));
     }
 
     private static void assertAuditHistoryPreserved() throws SQLException {
-        assertThat(
-            scalar("SELECT count(*)::text FROM config_audit_event WHERE entity_type = 'PRACTICE_ACTIVE'")
-        ).isEqualTo("1");
-        assertThat(
-            scalar(
-                """
+        assertThat(scalar("SELECT count(*)::text FROM config_audit_event WHERE entity_type = 'PRACTICE_ACTIVE'"))
+                .isEqualTo("1");
+        assertThat(scalar("""
                 SELECT count(*)::text
                 FROM config_audit_event
                 WHERE entity_id = 'PRACTICE_DETECTION'
                   AND old_value->>'purpose' = 'PRACTICE_DETECTION'
                   AND new_value->>'purpose' = 'PRACTICE_DETECTION'
-                """
-            )
-        ).isEqualTo("1");
+                """)).isEqualTo("1");
     }
 
     /** Straight after {@code -5}, which stamps a scheme onto every fingerprint stored without one. */
     private static void assertHistoricalFingerprintsVersioned() throws SQLException {
-        assertThat(
-            scalar(
-                "SELECT detection_fingerprint FROM practice_revision " +
-                    "WHERE practice_id = 136301 ORDER BY revision_number DESC LIMIT 1"
-            )
-        ).isEqualTo("v1:" + "a".repeat(64));
-        assertThat(scalar("SELECT source_curated_fingerprint FROM practice WHERE id = 136302")).isEqualTo(
-            "v1:" + "c".repeat(64)
-        );
+        assertThat(scalar("SELECT detection_fingerprint FROM practice_revision "
+                        + "WHERE practice_id = 136301 ORDER BY revision_number DESC LIMIT 1"))
+                .isEqualTo("v1:" + "a".repeat(64));
+        assertThat(scalar("SELECT source_curated_fingerprint FROM practice WHERE id = 136302"))
+                .isEqualTo("v1:" + "c".repeat(64));
     }
 
     /**
@@ -266,15 +230,11 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
      * from, which no rename changes.
      */
     private static void assertHistoricalFingerprintsClearedForRecomputation() throws SQLException {
-        assertThat(
-            scalar(
-                "SELECT count(*)::text FROM practice_revision " +
-                    "WHERE practice_id = 136301 AND slug IS NOT NULL AND review_rule_fingerprint IS NOT NULL"
-            )
-        ).isEqualTo("0");
-        assertThat(scalar("SELECT source_curated_fingerprint FROM practice WHERE id = 136302")).isEqualTo(
-            "v1:" + "c".repeat(64)
-        );
+        assertThat(scalar("SELECT count(*)::text FROM practice_revision "
+                        + "WHERE practice_id = 136301 AND slug IS NOT NULL AND review_rule_fingerprint IS NOT NULL"))
+                .isEqualTo("0");
+        assertThat(scalar("SELECT source_curated_fingerprint FROM practice WHERE id = 136302"))
+                .isEqualTo("v1:" + "c".repeat(64));
     }
 
     private static void assertMarkerRepair() throws SQLException {
@@ -282,28 +242,24 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
     }
 
     private static void assertCatalogBootstrap(int practices, int areas) throws SQLException {
-        assertThat(scalar("SELECT count(*)::text FROM curated_practice_override")).isEqualTo(String.valueOf(practices));
+        assertThat(scalar("SELECT count(*)::text FROM curated_practice_override"))
+                .isEqualTo(String.valueOf(practices));
         assertThat(scalar("SELECT count(*)::text FROM curated_area_override")).isEqualTo(String.valueOf(areas));
         assertThat(
-            scalar("SELECT count(*)::text FROM practice_catalog_installation WHERE provenance_linked_at IS NOT NULL")
-        ).isEqualTo("1");
-        assertThat(
-            scalar("SELECT count(*)::text FROM practice_catalog_installation WHERE provenance_linked_at IS NULL")
-        ).isEqualTo("1");
-        assertThatThrownBy(() ->
-            execute(
-                """
+                        scalar(
+                                "SELECT count(*)::text FROM practice_catalog_installation WHERE provenance_linked_at IS NOT NULL"))
+                .isEqualTo("1");
+        assertThat(scalar(
+                        "SELECT count(*)::text FROM practice_catalog_installation WHERE provenance_linked_at IS NULL"))
+                .isEqualTo("1");
+        assertThatThrownBy(() -> execute("""
                 INSERT INTO curated_practice_override (slug, created_at, updated_at, version)
                 VALUES ('says-nothing', now(), now(), 0)
-                """
-            )
-        ).isInstanceOf(SQLException.class);
+                """)).isInstanceOf(SQLException.class);
     }
 
     private static void assertWorkspaceRevisionBackfill() throws SQLException {
-        assertThat(
-            scalar(
-                """
+        assertThat(scalar("""
                 SELECT count(*)::text
                 FROM practice practice
                 JOIN practice_revision revision ON revision.id = practice.current_revision_id
@@ -319,22 +275,14 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                   AND revision.why_it_matters IS NOT DISTINCT FROM practice.why_it_matters
                   AND revision.what_good_looks_like IS NOT DISTINCT FROM practice.what_good_looks_like
                   AND revision.area_slug IS NOT DISTINCT FROM area.slug
-                """
-            )
-        ).isEqualTo("2");
-        assertThat(
-            scalar(
-                """
+                """)).isEqualTo("2");
+        assertThat(scalar("""
                 SELECT revision.revision_number::text
                 FROM practice practice
                 JOIN practice_revision revision ON revision.id = practice.current_revision_id
                 WHERE practice.id = 136301
-                """
-            )
-        ).isEqualTo("3");
-        assertThat(
-            scalar(
-                """
+                """)).isEqualTo("3");
+        assertThat(scalar("""
                 SELECT count(*)::text
                 FROM practice_revision
                 WHERE practice_id = 136301
@@ -342,89 +290,68 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                   AND criteria = 'legacy criteria'
                   AND slug IS NULL
                   AND name IS NULL
-                """
-            )
-        ).isEqualTo("1");
+                """)).isEqualTo("1");
     }
 
     private static void assertPointerOwnership() {
-        assertThatThrownBy(() ->
-            execute(
-                """
+        assertThatThrownBy(() -> execute("""
                 UPDATE practice
                 SET current_revision_id = (
                     SELECT current_revision_id FROM practice WHERE id = 136302
                 )
                 WHERE id = 136301
-                """
-            )
-        ).isInstanceOf(SQLException.class);
+                """)).isInstanceOf(SQLException.class);
     }
 
     private static void assertAggregateDeletion() throws SQLException {
         execute("DELETE FROM practice WHERE id = 136302");
-        assertThat(scalar("SELECT count(*)::text FROM practice WHERE id = 136302")).isEqualTo("0");
-        assertThat(scalar("SELECT count(*)::text FROM practice_revision WHERE practice_id = 136302")).isEqualTo("0");
+        assertThat(scalar("SELECT count(*)::text FROM practice WHERE id = 136302"))
+                .isEqualTo("0");
+        assertThat(scalar("SELECT count(*)::text FROM practice_revision WHERE practice_id = 136302"))
+                .isEqualTo("0");
     }
 
     private static void assertControlledProvenanceUpdate() throws SQLException {
-        execute(
-            """
+        execute("""
             UPDATE practice_revision
             SET review_rule_fingerprint = ('v2:' || repeat('b', 64))
             WHERE id = (SELECT current_revision_id FROM practice WHERE id = 136302)
-            """
-        );
-        assertThat(
-            scalar(
-                """
+            """);
+        assertThat(scalar("""
                 SELECT count(*)::text
                 FROM practice_revision
                 WHERE id = (SELECT current_revision_id FROM practice WHERE id = 136302)
                   AND review_rule_fingerprint = ('v2:' || repeat('b', 64))
-                """
-            )
-        ).isEqualTo("1");
-        assertThatThrownBy(() ->
-            execute(
-                """
+                """)).isEqualTo("1");
+        assertThatThrownBy(() -> execute("""
                 UPDATE practice_revision
                 SET review_rule_fingerprint = ('v2:' || repeat('d', 64))
                 WHERE id = (SELECT current_revision_id FROM practice WHERE id = 136302)
-                """
-            )
-        ).isInstanceOf(SQLException.class);
+                """)).isInstanceOf(SQLException.class);
 
-        execute(
-            """
+        execute("""
             UPDATE practice
             SET source_curated_slug = 'second-practice', source_curated_fingerprint = ('v2:' || repeat('b', 64))
             WHERE id = 136302
-            """
-        );
-        assertThatThrownBy(() ->
-            execute("UPDATE practice SET source_curated_fingerprint = NULL WHERE id = 136302")
-        ).isInstanceOf(SQLException.class);
+            """);
+        assertThatThrownBy(() -> execute("UPDATE practice SET source_curated_fingerprint = NULL WHERE id = 136302"))
+                .isInstanceOf(SQLException.class);
     }
 
     private static void assertProjectionInvariant() {
         assertThatThrownBy(() -> execute("UPDATE practice SET name = 'Diverged' WHERE id = 136301"))
-            .isInstanceOf(SQLException.class)
-            .hasMessageContaining("practice current revision does not match its current projection");
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("practice current revision does not match its current projection");
         assertThatThrownBy(() -> execute("UPDATE practice SET current_revision_id = NULL WHERE id = 136301"))
-            .isInstanceOf(SQLException.class)
-            .hasMessageContaining("practice current revision does not match its current projection");
-        assertThatThrownBy(() ->
-            execute(
-                "UPDATE practice SET automated_review_policy = " +
-                    "jsonb_set(automated_review_policy, '{whenEvidenceIsInsufficient}', '\"NEVER\"') WHERE id = 136301"
-            )
-        )
-            .isInstanceOf(SQLException.class)
-            .hasMessageContaining("practice current revision does not match its current projection");
-        assertThatThrownBy(() ->
-            execute(
-                """
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("practice current revision does not match its current projection");
+        assertThatThrownBy(
+                        () -> execute(
+                                "UPDATE practice SET automated_review_policy = "
+                                        + "jsonb_set(automated_review_policy, '{whenEvidenceIsInsufficient}', '\"NEVER\"') WHERE id = 136301"))
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("practice current revision does not match its current projection");
+        assertThatThrownBy(() -> execute("""
                 INSERT INTO practice (
                     workspace_id, slug, name, applies_to, display_order, bindings,
                     criteria, automated_review_policy, autonomy, created_at
@@ -432,62 +359,47 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                     136103, 'missing-current-revision', 'Missing revision', 'scm.pull_request', 3,
                     '[]'::jsonb, 'criteria', '{}'::jsonb, 'AUTOMATIC', now()
                 )
-                """
-            )
-        )
-            .isInstanceOf(SQLException.class)
-            .hasMessageContaining("practice current revision does not match its current projection");
+                """))
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("practice current revision does not match its current projection");
     }
 
     private static void assertRevisionImmutability() throws SQLException {
-        assertThatThrownBy(() ->
-            execute("UPDATE practice_revision SET criteria = 'mutated' WHERE practice_id = 136301")
-        )
-            .isInstanceOf(SQLException.class)
-            .hasMessageContaining("practice revisions are immutable");
+        assertThatThrownBy(
+                        () -> execute("UPDATE practice_revision SET criteria = 'mutated' WHERE practice_id = 136301"))
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("practice revisions are immutable");
 
-        assertThatThrownBy(() ->
-            execute(
-                "UPDATE practice_revision SET automated_review_policy = '{}'::jsonb " +
-                    "WHERE id = (SELECT current_revision_id FROM practice WHERE id = 136301)"
-            )
-        )
-            .isInstanceOf(SQLException.class)
-            .hasMessageContaining("practice revisions are immutable");
+        assertThatThrownBy(() -> execute("UPDATE practice_revision SET automated_review_policy = '{}'::jsonb "
+                        + "WHERE id = (SELECT current_revision_id FROM practice WHERE id = 136301)"))
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("practice revisions are immutable");
 
         // Scoped to the current revision: the migration clears the fingerprint on every stored revision,
         // so "whichever one is still null" would otherwise name more than one row.
-        execute(
-            """
+        execute("""
             UPDATE practice_revision
             SET review_rule_fingerprint = ('v2:' || repeat('a', 64))
             WHERE id = (SELECT current_revision_id FROM practice WHERE id = 136301)
               AND review_rule_fingerprint IS NULL
-            """
-        );
-        assertThat(
-            scalar(
-                "SELECT count(*)::text FROM practice_revision WHERE practice_id = 136301" +
-                    " AND review_rule_fingerprint = ('v2:' || repeat('a', 64))"
-            )
-        ).isEqualTo("1");
+            """);
+        assertThat(scalar("SELECT count(*)::text FROM practice_revision WHERE practice_id = 136301"
+                        + " AND review_rule_fingerprint = ('v2:' || repeat('a', 64))"))
+                .isEqualTo("1");
 
         assertThatThrownBy(() ->
-            execute(
-                "UPDATE practice_revision SET review_rule_fingerprint = ('v2:' || repeat('b', 64))" +
-                    " WHERE practice_id = 136301 AND slug IS NOT NULL"
-            )
-        )
-            .isInstanceOf(SQLException.class)
-            .hasMessageContaining("practice revisions are immutable");
+                        execute("UPDATE practice_revision SET review_rule_fingerprint = ('v2:' || repeat('b', 64))"
+                                + " WHERE practice_id = 136301 AND slug IS NOT NULL"))
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("practice revisions are immutable");
     }
 
     private static void appendValidCurrentRevision() throws SQLException {
-        try (Connection connection = connect(); Statement statement = connection.createStatement()) {
+        try (Connection connection = connect();
+                Statement statement = connection.createStatement()) {
             connection.setAutoCommit(false);
             statement.execute("UPDATE practice SET name = 'Updated practice' WHERE id = 136301");
-            statement.execute(
-                """
+            statement.execute("""
                 INSERT INTO practice_revision (
                     practice_id, revision_number, criteria, created_at,
                     slug, name, applies_to, bindings, precompute_script,
@@ -516,10 +428,8 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                 FROM practice
                 LEFT JOIN practice_area area ON area.id = practice.practice_area_id
                 WHERE practice.id = 136301
-                """
-            );
-            statement.execute(
-                """
+                """);
+            statement.execute("""
                 UPDATE practice
                 SET current_revision_id = (
                     SELECT id
@@ -529,59 +439,45 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                     LIMIT 1
                 )
                 WHERE id = 136301
-                """
-            );
+                """);
             connection.commit();
         }
         assertThat(scalar("SELECT name FROM practice WHERE id = 136301")).isEqualTo("Updated practice");
-        assertThat(
-            scalar(
-                """
+        assertThat(scalar("""
                 SELECT revision_number::text
                 FROM practice_revision
                 WHERE id = (SELECT current_revision_id FROM practice WHERE id = 136301)
-                """
-            )
-        ).isEqualTo("4");
+                """)).isEqualTo("4");
     }
 
     private static void assertRollbackAndReapply() throws Exception {
-        execute(
-            "UPDATE curated_practice_override SET based_on_digest = 'practice:v2:' || repeat('e', 64) " +
-                "WHERE slug = 'real-practice'"
-        );
+        execute("UPDATE curated_practice_override SET based_on_digest = 'practice:v2:' || repeat('e', 64) "
+                + "WHERE slug = 'real-practice'");
         try (Liquibase liquibase = liquibase()) {
-            assertThatThrownBy(() ->
-                liquibase.rollback(BEFORE_CATALOG_TAG, contexts(), new LabelExpression())
-            ).hasMessageContaining("ck_curated_practice_override_rollback_v1");
+            assertThatThrownBy(() -> liquibase.rollback(BEFORE_CATALOG_TAG, contexts(), new LabelExpression()))
+                    .hasMessageContaining("ck_curated_practice_override_rollback_v1");
         }
-        assertThat(
-            scalar("SELECT based_on_digest FROM curated_practice_override WHERE slug = 'real-practice'")
-        ).startsWith("practice:v2:");
-        execute(
-            "UPDATE curated_practice_override SET based_on_digest = 'practice:v1:' || repeat('b', 64) " +
-                "WHERE slug = 'real-practice'"
-        );
+        assertThat(scalar("SELECT based_on_digest FROM curated_practice_override WHERE slug = 'real-practice'"))
+                .startsWith("practice:v2:");
+        execute("UPDATE curated_practice_override SET based_on_digest = 'practice:v1:' || repeat('b', 64) "
+                + "WHERE slug = 'real-practice'");
         try (Liquibase liquibase = liquibase()) {
             liquibase.rollback(BEFORE_CATALOG_TAG, contexts(), new LabelExpression());
         }
 
-        assertThat(scalar("SELECT to_regclass('curated_practice_override')::text")).isNull();
-        assertThat(
-            scalar(
-                """
+        assertThat(scalar("SELECT to_regclass('curated_practice_override')::text"))
+                .isNull();
+        assertThat(scalar("""
                 SELECT count(*)::text
                 FROM information_schema.columns
                 WHERE table_schema = 'public'
                   AND table_name = 'practice'
                   AND column_name = 'current_revision_id'
-                """
-            )
-        ).isEqualTo("0");
-        assertThat(scalar("SELECT count(*)::text FROM practice_revision WHERE practice_id = 136301")).isEqualTo("1");
-        assertThat(scalar("SELECT count(*)::text FROM practice_revision WHERE criteria = 'legacy criteria'")).isEqualTo(
-            "1"
-        );
+                """)).isEqualTo("0");
+        assertThat(scalar("SELECT count(*)::text FROM practice_revision WHERE practice_id = 136301"))
+                .isEqualTo("1");
+        assertThat(scalar("SELECT count(*)::text FROM practice_revision WHERE criteria = 'legacy criteria'"))
+                .isEqualTo("1");
 
         try (Liquibase liquibase = liquibase()) {
             liquibase.update(contexts());
@@ -589,19 +485,13 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
 
         assertMarkerRepair();
         assertCatalogBootstrap(0, 0);
-        assertThat(
-            scalar(
-                """
+        assertThat(scalar("""
                 SELECT revision.revision_number::text
                 FROM practice practice
                 JOIN practice_revision revision ON revision.id = practice.current_revision_id
                 WHERE practice.id = 136301
-                """
-            )
-        ).isEqualTo("3");
-        assertThat(
-            scalar(
-                """
+                """)).isEqualTo("3");
+        assertThat(scalar("""
                 SELECT count(*)::text
                 FROM practice_revision
                 WHERE practice_id IN (136301, 136302)
@@ -620,53 +510,40 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                   AND NOT automated_review_policy ? 'detectorCapability'
                   AND NOT automated_review_policy ? 'optionalEvidence'
                   AND jsonb_path_exists(bindings, '$[*].signals')
-                """
-            )
-        ).isEqualTo("1");
+                """)).isEqualTo("1");
     }
 
     private static void assertEvidenceRevisionBackfill() throws SQLException {
-        assertThat(
-            scalar(
-                """
+        assertThat(scalar("""
                 SELECT count(*)::text
                 FROM practice practice
                 JOIN practice_revision revision ON revision.id = practice.current_revision_id
                 WHERE practice.id IN (136301, 136302)
                   AND revision.automated_review_policy = practice.automated_review_policy
                   AND revision.automated_review_policy IS NOT NULL
-                """
-            )
-        ).isEqualTo("2");
-        assertThat(
-            scalar(
-                """
+                """)).isEqualTo("2");
+        assertThat(scalar("""
                 SELECT count(*)::text
                 FROM practice_revision
                 WHERE practice_id IN (136301, 136302)
                   AND automated_review_policy IS NULL
-                """
-            )
-        ).isEqualTo("3");
+                """)).isEqualTo("3");
     }
 
     private static void seedExistingWorkspaces() throws SQLException {
-        execute(
-            """
+        execute("""
             INSERT INTO workspace (id, account_login, account_type, display_name, slug, status, is_publicly_viewable)
             VALUES (136101, 'migration-empty-marked',   'ORG', 'Empty marked',   'empty-marked',   'ACTIVE', false),
                    (136102, 'migration-area-only',      'ORG', 'Area only',      'area-only',      'ACTIVE', false),
                    (136103, 'migration-practice-only',  'ORG', 'Practice only',  'practice-only',  'ACTIVE', false),
                    (136104, 'migration-empty-unmarked', 'ORG', 'Empty unmarked', 'empty-unmarked', 'ACTIVE', false)
-            """,
-            """
+            """, """
             INSERT INTO practice_area (
                 id, workspace_id, slug, name, is_active, display_order, icon, color, created_at
             ) VALUES
                 (136201, 136102, 'existing-area', 'Existing area', true, 0, 'Package', 'sky', now()),
                 (136202, 136103, 'practice-area', 'Practice area', true, 0, 'Package', 'sky', now())
-            """,
-            """
+            """, """
             INSERT INTO practice (
                 id, workspace_id, practice_area_id, slug, name, applies_to, display_order,
                 trigger_events, criteria, precompute_script, why_it_matters, what_good_looks_like,
@@ -676,19 +553,19 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                  '["PullRequestCreated"]'::jsonb, 'Current criteria', NULL, 'Why', 'Good', true, now()),
                 (136302, 136103, NULL, 'second-practice', 'Second practice', 'ISSUE', 1,
                  '["IssuesEvent"]'::jsonb, 'Second criteria', NULL, NULL, NULL, true, now())
-            """,
-            """
+            """, """
             INSERT INTO practice_revision (practice_id, revision_number, criteria, created_at)
             VALUES (136301, 1, 'legacy criteria', now())
-            """
-        );
+            """);
     }
 
     private static void updateUntilBefore(String changelogName) throws Exception {
         try (Liquibase liquibase = liquibase()) {
             List<ChangeSet> pending = liquibase.listUnrunChangeSets(contexts(), new LabelExpression());
             List<Integer> indexes = indexesOf(pending, changelogName);
-            assertThat(indexes).as("%s must be present in the pending changelog", changelogName).isNotEmpty();
+            assertThat(indexes)
+                    .as("%s must be present in the pending changelog", changelogName)
+                    .isNotEmpty();
             liquibase.update(indexes.getFirst(), contexts(), new LabelExpression());
         }
     }
@@ -697,7 +574,10 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
         try (Liquibase liquibase = liquibase()) {
             List<ChangeSet> pending = liquibase.listUnrunChangeSets(contexts(), new LabelExpression());
             List<Integer> indexes = indexesOf(pending, changelogName);
-            assertThat(indexes).as("%s must be the next pending changelog", changelogName).isNotEmpty().startsWith(0);
+            assertThat(indexes)
+                    .as("%s must be the next pending changelog", changelogName)
+                    .isNotEmpty()
+                    .startsWith(0);
             liquibase.update(indexes.size(), contexts(), new LabelExpression());
         }
     }
@@ -706,9 +586,9 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
         try (Liquibase liquibase = liquibase()) {
             List<ChangeSet> pending = liquibase.listUnrunChangeSets(contexts(), new LabelExpression());
             int index = java.util.stream.IntStream.range(0, pending.size())
-                .filter(candidate -> pending.get(candidate).getId().equals(changeSetId))
-                .findFirst()
-                .orElseThrow();
+                    .filter(candidate -> pending.get(candidate).getId().equals(changeSetId))
+                    .findFirst()
+                    .orElseThrow();
             liquibase.update(index + 1, contexts(), new LabelExpression());
         }
     }
@@ -725,19 +605,15 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
 
     private static List<String> markedWorkspaceSlugs() throws SQLException {
         List<String> slugs = new ArrayList<>();
-        try (
-            Connection connection = connect();
-            Statement statement = connection.createStatement();
-            ResultSet rows = statement.executeQuery(
-                """
+        try (Connection connection = connect();
+                Statement statement = connection.createStatement();
+                ResultSet rows = statement.executeQuery("""
                 SELECT workspace.slug
                 FROM practice_catalog_installation installation
                 JOIN workspace workspace ON workspace.id = installation.workspace_id
                 WHERE workspace.id BETWEEN 136101 AND 136104
                 ORDER BY workspace.slug
-                """
-            )
-        ) {
+                """)) {
             while (rows.next()) {
                 slugs.add(rows.getString(1));
             }
@@ -746,9 +622,8 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
     }
 
     private static Liquibase liquibase() throws Exception {
-        Database database = DatabaseFactory.getInstance().findCorrectDatabaseImplementation(
-            new JdbcConnection(connect())
-        );
+        Database database =
+                DatabaseFactory.getInstance().findCorrectDatabaseImplementation(new JdbcConnection(connect()));
         return new Liquibase(MASTER, new ClassLoaderResourceAccessor(), database);
     }
 
@@ -761,7 +636,8 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
     }
 
     private static void execute(String... statements) throws SQLException {
-        try (Connection connection = connect(); Statement statement = connection.createStatement()) {
+        try (Connection connection = connect();
+                Statement statement = connection.createStatement()) {
             for (String sql : statements) {
                 statement.execute(sql);
             }
@@ -769,11 +645,9 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
     }
 
     private static @Nullable String scalar(String sql) throws SQLException {
-        try (
-            Connection connection = connect();
-            Statement statement = connection.createStatement();
-            ResultSet rows = statement.executeQuery(sql)
-        ) {
+        try (Connection connection = connect();
+                Statement statement = connection.createStatement();
+                ResultSet rows = statement.executeQuery(sql)) {
             return rows.next() ? rows.getString(1) : null;
         }
     }

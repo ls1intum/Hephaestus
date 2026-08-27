@@ -15,8 +15,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 class FeatureFlagConfigTest extends BaseUnitTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-        .withUserConfiguration(FeatureFlagConfiguration.class)
-        .withPropertyValues("hephaestus.features.flags.gitlab-workspace-creation=true");
+            .withUserConfiguration(FeatureFlagConfiguration.class)
+            .withPropertyValues("hephaestus.features.flags.gitlab-workspace-creation=true");
 
     @AfterEach
     void clearSecurityContext() {
@@ -26,8 +26,7 @@ class FeatureFlagConfigTest extends BaseUnitTest {
     @Test
     void shouldExposeEnabledConfigFlagWhenPropertyIsTrue() {
         SecurityContextHolder.setContext(
-            MockSecurityContextUtils.createSecurityContext("user", "user-id", new String[0], "mock-token")
-        );
+                MockSecurityContextUtils.createSecurityContext("user", "user-id", new String[0], "mock-token"));
 
         contextRunner.run(context -> {
             FeatureFlagsDTO response = FeatureFlagsDTO.from(context.getBean(FeatureFlagService.class));

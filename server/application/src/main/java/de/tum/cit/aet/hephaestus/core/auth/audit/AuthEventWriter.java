@@ -33,11 +33,7 @@ public class AuthEventWriter {
     private final Clock clock;
 
     public AuthEventWriter(
-        AuthEventRepository repository,
-        AuthEventSequence sequence,
-        AuthMetrics metrics,
-        Clock clock
-    ) {
+            AuthEventRepository repository, AuthEventSequence sequence, AuthMetrics metrics, Clock clock) {
         this.repository = repository;
         this.sequence = sequence;
         this.metrics = metrics;

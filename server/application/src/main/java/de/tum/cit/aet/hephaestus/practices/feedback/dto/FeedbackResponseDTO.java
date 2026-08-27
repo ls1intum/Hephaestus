@@ -11,20 +11,18 @@ import org.jspecify.annotations.Nullable;
 
 @Schema(description = "The recipient's current assessment and resolution of delivered feedback")
 public record FeedbackResponseDTO(
-    @NonNull UUID feedbackId,
-    @Nullable FeedbackUsefulness usefulness,
-    @Nullable FeedbackResolution resolution,
-    @Nullable String comment,
-    @Nullable Instant respondedAt
-) {
+        @NonNull UUID feedbackId,
+        @Nullable FeedbackUsefulness usefulness,
+        @Nullable FeedbackResolution resolution,
+        @Nullable String comment,
+        @Nullable Instant respondedAt) {
     public static FeedbackResponseDTO from(UUID feedbackId, CurrentResponseProjection current) {
         return new FeedbackResponseDTO(
-            feedbackId,
-            current.getUsefulness() == null ? null : FeedbackUsefulness.valueOf(current.getUsefulness()),
-            current.getResolution() == null ? null : FeedbackResolution.valueOf(current.getResolution()),
-            current.getComment(),
-            current.getRespondedAt()
-        );
+                feedbackId,
+                current.getUsefulness() == null ? null : FeedbackUsefulness.valueOf(current.getUsefulness()),
+                current.getResolution() == null ? null : FeedbackResolution.valueOf(current.getResolution()),
+                current.getComment(),
+                current.getRespondedAt());
     }
 
     public static FeedbackResponseDTO none(UUID feedbackId) {

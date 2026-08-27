@@ -38,12 +38,11 @@ public class MentorContextInvalidator {
 
     /** Caches scoped by {@code workspaceId + ":" + userId}. */
     private static final List<String> PER_USER_CACHES = List.of(
-        "mentor_user_context",
-        "mentor_workspace_context",
-        // The authored-work context (RecentAuthoredWorkContentSource) is keyed per
-        // workspaceId:developerId and goes stale on the same PR/issue/review events.
-        "mentor_authored_work_context"
-    );
+            "mentor_user_context",
+            "mentor_workspace_context",
+            // The authored-work context (RecentAuthoredWorkContentSource) is keyed per
+            // workspaceId:developerId and goes stale on the same PR/issue/review events.
+            "mentor_authored_work_context");
 
     private final CacheManager cacheManager;
     private final WorkspaceRepository workspaceRepository;
@@ -119,9 +118,9 @@ public class MentorContextInvalidator {
         if (workspaceId == null || review == null) return;
         evictPerUser(workspaceId, review.authorId());
         Long prAuthorId = pullRequestRepository
-            .findById(review.pullRequestId())
-            .map(pr -> pr.getAuthor() != null ? pr.getAuthor().getId() : null)
-            .orElse(null);
+                .findById(review.pullRequestId())
+                .map(pr -> pr.getAuthor() != null ? pr.getAuthor().getId() : null)
+                .orElse(null);
         if (prAuthorId != null && !prAuthorId.equals(review.authorId())) {
             evictPerUser(workspaceId, prAuthorId);
         }
@@ -135,7 +134,9 @@ public class MentorContextInvalidator {
         if (context == null || context.repository() == null) return null;
         // The ScmDomainEvent context carries a RepositoryRef — we resolve to workspace via the
         // RepositoryToMonitor join (same approach the context queries use).
-        return workspaceRepository.findWorkspaceIdByRepositoryId(context.repository().id()).orElse(null);
+        return workspaceRepository
+                .findWorkspaceIdByRepositoryId(context.repository().id())
+                .orElse(null);
     }
 
     private void evictPerUser(Long workspaceId, @Nullable Long userId) {

@@ -44,8 +44,8 @@ public class ChatThreadService {
     private ChatThread requireOwnedThread(Long workspaceId, UUID threadId) {
         User user = userRepository.getCurrentUserElseThrow();
         ChatThread thread = chatThreadRepository
-            .findByIdAndWorkspaceId(threadId, workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("ChatThread", threadId.toString()));
+                .findByIdAndWorkspaceId(threadId, workspaceId)
+                .orElseThrow(() -> new EntityNotFoundException("ChatThread", threadId.toString()));
         if (thread.getUser() == null || !thread.getUser().getId().equals(user.getId())) {
             throw new EntityNotFoundException("ChatThread", threadId.toString());
         }
@@ -66,11 +66,9 @@ public class ChatThreadService {
     @Transactional(readOnly = true)
     public ThreadDetail loadOwnedThreadDetail(Long workspaceId, UUID threadId) {
         ChatThread thread = requireOwnedThread(workspaceId, threadId);
-        List<ChatMessageDTO> messages = thread
-            .getAllMessages()
-            .stream()
-            .map(msg -> ChatMessageDTO.from(msg, msg.getParts(), objectMapper))
-            .toList();
+        List<ChatMessageDTO> messages = thread.getAllMessages().stream()
+                .map(msg -> ChatMessageDTO.from(msg, msg.getParts(), objectMapper))
+                .toList();
         return new ThreadDetail(thread.getId(), thread.getTitle(), thread.getCreatedAt(), messages);
     }
 

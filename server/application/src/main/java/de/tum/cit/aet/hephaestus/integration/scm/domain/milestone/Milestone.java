@@ -26,12 +26,15 @@ import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(
-    name = "milestone",
-    uniqueConstraints = {
-        @UniqueConstraint(name = "uk_milestone_number_repository", columnNames = { "number", "repository_id" }),
-        @UniqueConstraint(name = "uq_milestone_provider_native_id", columnNames = { "provider_id", "native_id" }),
-    }
-)
+        name = "milestone",
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "uk_milestone_number_repository",
+                    columnNames = {"number", "repository_id"}),
+            @UniqueConstraint(
+                    name = "uq_milestone_provider_native_id",
+                    columnNames = {"provider_id", "native_id"}),
+        })
 @Getter
 @Setter
 @NoArgsConstructor

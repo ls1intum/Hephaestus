@@ -38,9 +38,9 @@ final class PiProcessHandle {
         this.stdout = new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8);
         this.stdin = process.getOutputStream();
         this.stderrDrainer = Thread.ofVirtual()
-            .name("mentor-stderr-" + containerId)
-            .uncaughtExceptionHandler((t, ex) -> log.debug("Stderr drainer died", ex))
-            .start(this::drainStderr);
+                .name("mentor-stderr-" + containerId)
+                .uncaughtExceptionHandler((t, ex) -> log.debug("Stderr drainer died", ex))
+                .start(this::drainStderr);
     }
 
     /**
@@ -49,12 +49,11 @@ final class PiProcessHandle {
      * {@link de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec}.
      */
     static PiProcessHandle spawn(
-        String dockerCli,
-        String containerId,
-        String containerUser,
-        List<String> command,
-        Map<String, String> environment
-    ) {
+            String dockerCli,
+            String containerId,
+            String containerUser,
+            List<String> command,
+            Map<String, String> environment) {
         List<String> argv = new ArrayList<>();
         argv.add(dockerCli);
         argv.add("exec");
@@ -76,9 +75,7 @@ final class PiProcessHandle {
             return new PiProcessHandle(p, containerId);
         } catch (IOException e) {
             throw new InteractiveSandboxException(
-                "Failed to spawn docker exec for container " + containerId + ": " + e.getMessage(),
-                e
-            );
+                    "Failed to spawn docker exec for container " + containerId + ": " + e.getMessage(), e);
         }
     }
 
@@ -130,23 +127,23 @@ final class PiProcessHandle {
         stderrDrainer.interrupt();
         try {
             stdout.close();
-        } catch (IOException ignored) {}
+        } catch (IOException ignored) {
+        }
         try {
             stdin.close();
-        } catch (IOException ignored) {}
+        } catch (IOException ignored) {
+        }
         // Closes the stderr pipe FD on the kernel side — only way to unblock the drainer VT if the
         // process did not exit and destroyForcibly was a no-op (zombie docker-cli relay).
         try {
             process.getErrorStream().close();
-        } catch (IOException ignored) {}
+        } catch (IOException ignored) {
+        }
     }
 
     private void drainStderr() {
-        try (
-            BufferedReader err = new BufferedReader(
-                new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8)
-            )
-        ) {
+        try (BufferedReader err =
+                new BufferedReader(new InputStreamReader(process.getErrorStream(), StandardCharsets.UTF_8))) {
             String line;
             while ((line = err.readLine()) != null) {
                 if (line.isEmpty()) continue;

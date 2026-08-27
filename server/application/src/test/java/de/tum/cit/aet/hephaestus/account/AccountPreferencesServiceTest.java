@@ -53,11 +53,7 @@ class AccountPreferencesServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         service = new AccountPreferencesService(
-            userPreferencesRepository,
-            userRepository,
-            posthogClientProvider,
-            researchConsentAuditProvider
-        );
+                userPreferencesRepository, userRepository, posthogClientProvider, researchConsentAuditProvider);
     }
 
     private static User user(long id, String login) {
@@ -86,18 +82,17 @@ class AccountPreferencesServiceTest extends BaseUnitTest {
         when(userRepository.findByLogin("octocat")).thenReturn(Optional.of(u));
         when(userPreferencesRepository.findByUserId(42L)).thenReturn(Optional.of(p));
         when(posthogClientProvider.getIfAvailable()).thenReturn(posthogClient);
-        // Fallback (user-id) distinct id: no matching person (false) or a PostHog outage — neither may fail the opt-out.
+        // Fallback (user-id) distinct id: no matching person (false) or a PostHog outage — neither may fail the
+        // opt-out.
         switch (outcome) {
             case RETURNS_FALSE -> when(posthogClient.deletePersonData("42")).thenReturn(false);
-            case THROWS -> when(posthogClient.deletePersonData("42")).thenThrow(
-                new PosthogClientException("posthog down")
-            );
+            case THROWS ->
+                when(posthogClient.deletePersonData("42")).thenThrow(new PosthogClientException("posthog down"));
         }
         when(researchConsentAuditProvider.getIfAvailable()).thenReturn(audit);
 
-        assertThatCode(() ->
-            service.setForLogin("octocat", false, ConsentSource.SLACK_APP_HOME)
-        ).doesNotThrowAnyException();
+        assertThatCode(() -> service.setForLogin("octocat", false, ConsentSource.SLACK_APP_HOME))
+                .doesNotThrowAnyException();
 
         assertThat(p.isParticipateInResearch()).isFalse();
         verify(userPreferencesRepository).save(p);
@@ -114,9 +109,8 @@ class AccountPreferencesServiceTest extends BaseUnitTest {
         when(posthogClientProvider.getIfAvailable()).thenReturn(null); // analytics disabled off-server-role
         when(researchConsentAuditProvider.getIfAvailable()).thenReturn(null); // audit adapter absent
 
-        assertThatCode(() ->
-            service.setForLogin("octocat", false, ConsentSource.SLACK_APP_HOME)
-        ).doesNotThrowAnyException();
+        assertThatCode(() -> service.setForLogin("octocat", false, ConsentSource.SLACK_APP_HOME))
+                .doesNotThrowAnyException();
 
         assertThat(p.isParticipateInResearch()).isFalse();
         verify(userPreferencesRepository).save(p);
@@ -141,20 +135,15 @@ class AccountPreferencesServiceTest extends BaseUnitTest {
         service.setForLogin("   ", false, ConsentSource.SLACK_APP_HOME);
 
         verifyNoInteractions(
-            userRepository,
-            userPreferencesRepository,
-            posthogClientProvider,
-            researchConsentAuditProvider
-        );
+                userRepository, userPreferencesRepository, posthogClientProvider, researchConsentAuditProvider);
     }
 
     @Test
     void unknownLogin_isLenientNoOp() {
         when(userRepository.findByLogin("ghost")).thenReturn(Optional.empty());
 
-        assertThatCode(() ->
-            service.setForLogin("ghost", false, ConsentSource.SLACK_APP_HOME)
-        ).doesNotThrowAnyException();
+        assertThatCode(() -> service.setForLogin("ghost", false, ConsentSource.SLACK_APP_HOME))
+                .doesNotThrowAnyException();
 
         verify(userPreferencesRepository, never()).save(any());
         verifyNoInteractions(researchConsentAuditProvider);

@@ -18,7 +18,9 @@ import org.springframework.transaction.annotation.Transactional;
 @WorkspaceAgnostic("Configuration table mapping repositories to workspaces")
 public interface RepositoryToMonitorRepository extends JpaRepository<RepositoryToMonitor, Long> {
     boolean existsByWorkspaceIdAndNameWithOwner(Long workspaceId, String nameWithOwner);
+
     Optional<RepositoryToMonitor> findByWorkspaceIdAndNameWithOwner(Long workspaceId, String nameWithOwner);
+
     List<RepositoryToMonitor> findByWorkspaceId(Long workspaceId);
 
     /** Resolves which workspace a repository belongs to during sync, by full name (owner/name). */

@@ -14,11 +14,10 @@ import org.jspecify.annotations.Nullable;
  * to determine if additional API calls are needed.
  */
 public record EmbeddedReviewsDTO(
-    List<GitHubReviewDTO> reviews,
-    int totalCount,
-    boolean hasNextPage,
-    @Nullable String endCursor
-) {
+        List<GitHubReviewDTO> reviews,
+        int totalCount,
+        boolean hasNextPage,
+        @Nullable String endCursor) {
     /**
      * Creates an EmbeddedReviewsDTO from a GraphQL GHPullRequestReviewConnection.
      *
@@ -27,27 +26,23 @@ public record EmbeddedReviewsDTO(
      * @return EmbeddedReviewsDTO or empty DTO if connection is null
      */
     public static EmbeddedReviewsDTO fromConnection(
-        @Nullable GHPullRequestReviewConnection connection,
-        String context
-    ) {
+            @Nullable GHPullRequestReviewConnection connection, String context) {
         if (connection == null) {
             return empty();
         }
 
-        List<GitHubReviewDTO> reviews =
-            connection.getNodes() != null
-                ? connection
-                      .getNodes()
-                      .stream()
-                      .map(GitHubReviewDTO::fromPullRequestReview)
-                      .filter(Objects::nonNull)
-                      .toList()
+        List<GitHubReviewDTO> reviews = connection.getNodes() != null
+                ? connection.getNodes().stream()
+                        .map(GitHubReviewDTO::fromPullRequestReview)
+                        .filter(Objects::nonNull)
+                        .toList()
                 : Collections.emptyList();
 
-        boolean hasNextPage =
-            connection.getPageInfo() != null && Boolean.TRUE.equals(connection.getPageInfo().getHasNextPage());
+        boolean hasNextPage = connection.getPageInfo() != null
+                && Boolean.TRUE.equals(connection.getPageInfo().getHasNextPage());
 
-        String endCursor = connection.getPageInfo() != null ? connection.getPageInfo().getEndCursor() : null;
+        String endCursor =
+                connection.getPageInfo() != null ? connection.getPageInfo().getEndCursor() : null;
 
         return new EmbeddedReviewsDTO(reviews, connection.getTotalCount(), hasNextPage, endCursor);
     }

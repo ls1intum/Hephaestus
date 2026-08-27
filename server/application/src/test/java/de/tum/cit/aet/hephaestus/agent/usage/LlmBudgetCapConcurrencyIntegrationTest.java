@@ -64,9 +64,8 @@ class LlmBudgetCapConcurrencyIntegrationTest extends AbstractWorkspaceIntegratio
 
     static Stream<Arguments> writeOrder() {
         return Stream.of(
-            Arguments.of("the instance admin gets there first"),
-            Arguments.of("the workspace admin gets there first")
-        );
+                Arguments.of("the instance admin gets there first"),
+                Arguments.of("the workspace admin gets there first"));
     }
 
     /**
@@ -83,21 +82,19 @@ class LlmBudgetCapConcurrencyIntegrationTest extends AbstractWorkspaceIntegratio
         boolean instanceAdminHoldsTheRow = scenario.startsWith("the instance admin");
         User owner = persistUser("cap-race-owner-" + (instanceAdminHoldsTheRow ? "instance" : "workspace"));
         Workspace workspace = createWorkspace(
-            "cap-race-" + (instanceAdminHoldsTheRow ? "instance" : "workspace"),
-            "Cap Race",
-            "cap-race-org-" + (instanceAdminHoldsTheRow ? "instance" : "workspace"),
-            AccountType.ORG,
-            owner
-        );
+                "cap-race-" + (instanceAdminHoldsTheRow ? "instance" : "workspace"),
+                "Cap Race",
+                "cap-race-org-" + (instanceAdminHoldsTheRow ? "instance" : "workspace"),
+                AccountType.ORG,
+                owner);
         Consumer<Workspace> setInstanceCap = ws -> adminService.updateBudget(ws.getWorkspaceSlug(), INSTANCE_CAP);
-        Consumer<Workspace> setOwnProviderCap = ws ->
-            llmUsageService.updateOwnProviderBudget(ws.getId(), OWN_PROVIDER_CAP);
+        Consumer<Workspace> setOwnProviderCap =
+                ws -> llmUsageService.updateOwnProviderBudget(ws.getId(), OWN_PROVIDER_CAP);
 
         race(
-            workspace,
-            instanceAdminHoldsTheRow ? setInstanceCap : setOwnProviderCap,
-            instanceAdminHoldsTheRow ? setOwnProviderCap : setInstanceCap
-        );
+                workspace,
+                instanceAdminHoldsTheRow ? setInstanceCap : setOwnProviderCap,
+                instanceAdminHoldsTheRow ? setOwnProviderCap : setInstanceCap);
 
         Workspace reloaded = workspaceRepository.findById(workspace.getId()).orElseThrow();
         assertThat(reloaded.getMonthlyLlmBudgetUsd()).isEqualByComparingTo(INSTANCE_CAP);
@@ -114,14 +111,12 @@ class LlmBudgetCapConcurrencyIntegrationTest extends AbstractWorkspaceIntegratio
         CountDownLatch followerDispatched = new CountDownLatch(1);
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
-            Future<?> holding = pool.submit(() ->
-                transactionTemplate.executeWithoutResult(tx -> {
-                    holder.accept(workspace);
-                    holderHasTheRow.countDown();
-                    await(followerDispatched);
-                    awaitFollowerBlockedOnThisRow();
-                })
-            );
+            Future<?> holding = pool.submit(() -> transactionTemplate.executeWithoutResult(tx -> {
+                holder.accept(workspace);
+                holderHasTheRow.countDown();
+                await(followerDispatched);
+                awaitFollowerBlockedOnThisRow();
+            }));
             Future<?> following = pool.submit(() -> {
                 await(holderHasTheRow);
                 followerDispatched.countDown();
@@ -146,10 +141,9 @@ class LlmBudgetCapConcurrencyIntegrationTest extends AbstractWorkspaceIntegratio
             // the clear lets a backend that connects after that first poll still be seen.
             jdbcTemplate.execute("SELECT pg_stat_clear_snapshot()");
             Integer blocked = jdbcTemplate.queryForObject(
-                "SELECT count(*) FROM pg_stat_activity WHERE CAST(? AS integer) = ANY(pg_blocking_pids(pid))",
-                Integer.class,
-                holderPid
-            );
+                    "SELECT count(*) FROM pg_stat_activity WHERE CAST(? AS integer) = ANY(pg_blocking_pids(pid))",
+                    Integer.class,
+                    holderPid);
             if (blocked != null && blocked > 0) {
                 return;
             }
@@ -160,7 +154,9 @@ class LlmBudgetCapConcurrencyIntegrationTest extends AbstractWorkspaceIntegratio
 
     private static void await(CountDownLatch latch) {
         try {
-            assertThat(latch.await(JOIN_TIMEOUT_SECONDS, TimeUnit.SECONDS)).as("handoff timed out").isTrue();
+            assertThat(latch.await(JOIN_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+                    .as("handoff timed out")
+                    .isTrue();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(e);

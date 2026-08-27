@@ -48,30 +48,23 @@ public class PracticeGroupReviewRunService {
 
     @Transactional(readOnly = true)
     public PracticeGroupReviewRunsPageDTO list(
-        WorkspaceContext workspaceContext,
-        String groupSlug,
-        @Nullable String practiceSlug,
-        @Nullable List<ArtifactKind> artifactKinds,
-        @Nullable List<Severity> severities,
-        Pageable pageable
-    ) {
+            WorkspaceContext workspaceContext,
+            String groupSlug,
+            @Nullable String practiceSlug,
+            @Nullable List<ArtifactKind> artifactKinds,
+            @Nullable List<Severity> severities,
+            Pageable pageable) {
         practiceGroupService.getGroup(workspaceContext, groupSlug);
         var currentDeveloperId = currentDeveloperLookup.currentDeveloperId();
         if (currentDeveloperId.isEmpty()) {
             return new PracticeGroupReviewRunsPageDTO(
-                List.of(),
-                pageable.getPageNumber(),
-                pageable.getPageSize(),
-                false
-            );
+                    List.of(), pageable.getPageNumber(), pageable.getPageSize(), false);
         }
 
-        String artifactFilter =
-            artifactKinds == null || artifactKinds.isEmpty()
+        String artifactFilter = artifactKinds == null || artifactKinds.isEmpty()
                 ? null
                 : artifactKinds.stream().map(ArtifactKind::value).collect(Collectors.joining(","));
-        String severityFilter =
-            severities == null || severities.isEmpty()
+        String severityFilter = severities == null || severities.isEmpty()
                 ? null
                 : severities.stream().map(Enum::name).collect(Collectors.joining(","));
 
@@ -82,65 +75,42 @@ public class PracticeGroupReviewRunService {
         boolean moreCandidates;
         do {
             Slice<ReviewRunRow> runs = observationRepository.findPracticeGroupReviewRuns(
-                currentDeveloperId.get(),
-                workspaceContext.id(),
-                groupSlug,
-                practiceSlug,
-                artifactFilter,
-                severityFilter,
-                PageRequest.of(candidatePage++, Math.max(pageable.getPageSize(), 50))
-            );
+                    currentDeveloperId.get(),
+                    workspaceContext.id(),
+                    groupSlug,
+                    practiceSlug,
+                    artifactFilter,
+                    severityFilter,
+                    PageRequest.of(candidatePage++, Math.max(pageable.getPageSize(), 50)));
             visibleRuns.addAll(
-                toVisibleRuns(workspaceContext.id(), currentDeveloperId.get(), runs.getContent(), groupSlug)
-            );
+                    toVisibleRuns(workspaceContext.id(), currentDeveloperId.get(), runs.getContent(), groupSlug));
             moreCandidates = runs.hasNext();
         } while (visibleRuns.size() < required && moreCandidates);
 
         int end = Math.min(first + pageable.getPageSize(), visibleRuns.size());
         List<PracticeGroupReviewRunDTO> content =
-            first >= visibleRuns.size() ? List.of() : List.copyOf(visibleRuns.subList(first, end));
+                first >= visibleRuns.size() ? List.of() : List.copyOf(visibleRuns.subList(first, end));
         return new PracticeGroupReviewRunsPageDTO(
-            content,
-            pageable.getPageNumber(),
-            pageable.getPageSize(),
-            visibleRuns.size() > end
-        );
+                content, pageable.getPageNumber(), pageable.getPageSize(), visibleRuns.size() > end);
     }
 
     private List<PracticeGroupReviewRunDTO> toVisibleRuns(
-        long workspaceId,
-        long developerId,
-        List<ReviewRunRow> runs,
-        String groupSlug
-    ) {
+            long workspaceId, long developerId, List<ReviewRunRow> runs, String groupSlug) {
         if (runs.isEmpty()) {
             return List.of();
         }
 
         List<UUID> jobIds = runs.stream().map(ReviewRunRow::getJobId).toList();
         List<Observation> found = observationRepository.findPracticeGroupReviewRunObservations(
-            jobIds,
-            developerId,
-            workspaceId,
-            groupSlug
-        );
-        Set<UUID> visible = visibilityPolicy.permitsAll(
-            workspaceId,
-            found,
-            SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY
-        );
-        List<Observation> observations = found
-            .stream()
-            .filter(row -> visible.contains(row.getId()))
-            .toList();
-        Map<UUID, List<Observation>> observationsByJob = observations
-            .stream()
-            .collect(Collectors.groupingBy(Observation::getAgentJobId));
-        Map<UUID, DeliveredFeedbackBinding> feedbackByObservation = feedbackByObservation(
-            workspaceId,
-            developerId,
-            observations
-        );
+                jobIds, developerId, workspaceId, groupSlug);
+        Set<UUID> visible =
+                visibilityPolicy.permitsAll(workspaceId, found, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
+        List<Observation> observations =
+                found.stream().filter(row -> visible.contains(row.getId())).toList();
+        Map<UUID, List<Observation>> observationsByJob =
+                observations.stream().collect(Collectors.groupingBy(Observation::getAgentJobId));
+        Map<UUID, DeliveredFeedbackBinding> feedbackByObservation =
+                feedbackByObservation(workspaceId, developerId, observations);
         Map<UUID, ReviewRunTargetLookup.Target> targets = reviewRunTargetLookup.findByJobIds(workspaceId, jobIds);
 
         List<PracticeGroupReviewRunDTO> reviewRuns = new ArrayList<>();
@@ -154,60 +124,52 @@ public class PracticeGroupReviewRunService {
     }
 
     private Map<UUID, DeliveredFeedbackBinding> feedbackByObservation(
-        Long workspaceId,
-        Long recipientUserId,
-        Collection<Observation> observations
-    ) {
+            Long workspaceId, Long recipientUserId, Collection<Observation> observations) {
         if (observations.isEmpty()) {
             return Map.of();
         }
         return feedbackObservationRepository
-            .findDeliveredFeedbackBindings(
-                workspaceId,
-                recipientUserId,
-                observations.stream().map(Observation::getId).toList()
-            )
-            .stream()
-            .collect(Collectors.toMap(DeliveredFeedbackBinding::getObservationId, Function.identity()));
+                .findDeliveredFeedbackBindings(
+                        workspaceId,
+                        recipientUserId,
+                        observations.stream().map(Observation::getId).toList())
+                .stream()
+                .collect(Collectors.toMap(DeliveredFeedbackBinding::getObservationId, Function.identity()));
     }
 
     private PracticeGroupReviewRunDTO toReviewRun(
-        ReviewRunRow run,
-        List<Observation> observations,
-        Map<UUID, DeliveredFeedbackBinding> feedbackByObservation,
-        Map<UUID, ReviewRunTargetLookup.Target> targets
-    ) {
+            ReviewRunRow run,
+            List<Observation> observations,
+            Map<UUID, DeliveredFeedbackBinding> feedbackByObservation,
+            Map<UUID, ReviewRunTargetLookup.Target> targets) {
         Observation first = observations.getFirst();
         var target = targets.get(run.getJobId());
-        PracticeGroupReviewedWorkDTO reviewedWork =
-            target == null
+        PracticeGroupReviewedWorkDTO reviewedWork = target == null
                 ? PracticeGroupReviewedWorkDTO.fallback(first.getArtifactKind(), first.getArtifactId())
                 : PracticeGroupReviewedWorkDTO.from(target, first.getArtifactId());
-        List<PracticeGroupReviewObservationDTO> reviewObservations = observations
-            .stream()
-            .map(observation -> {
-                DeliveredFeedbackBinding binding = feedbackByObservation.get(observation.getId());
-                return PracticeGroupReviewObservationDTO.from(
-                    observation,
-                    binding == null ? null : binding.getFeedbackId(),
-                    usefulness(binding),
-                    resolution(binding),
-                    binding == null ? null : binding.getResponseComment()
-                );
-            })
-            .toList();
+        List<PracticeGroupReviewObservationDTO> reviewObservations = observations.stream()
+                .map(observation -> {
+                    DeliveredFeedbackBinding binding = feedbackByObservation.get(observation.getId());
+                    return PracticeGroupReviewObservationDTO.from(
+                            observation,
+                            binding == null ? null : binding.getFeedbackId(),
+                            usefulness(binding),
+                            resolution(binding),
+                            binding == null ? null : binding.getResponseComment());
+                })
+                .toList();
         return new PracticeGroupReviewRunDTO(run.getJobId(), run.getReviewedAt(), reviewedWork, reviewObservations);
     }
 
     private @Nullable FeedbackUsefulness usefulness(@Nullable DeliveredFeedbackBinding binding) {
         return binding == null || binding.getResponseUsefulness() == null
-            ? null
-            : FeedbackUsefulness.valueOf(binding.getResponseUsefulness());
+                ? null
+                : FeedbackUsefulness.valueOf(binding.getResponseUsefulness());
     }
 
     private @Nullable FeedbackResolution resolution(@Nullable DeliveredFeedbackBinding binding) {
         return binding == null || binding.getResponseResolution() == null
-            ? null
-            : FeedbackResolution.valueOf(binding.getResponseResolution());
+                ? null
+                : FeedbackResolution.valueOf(binding.getResponseResolution());
     }
 }

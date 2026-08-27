@@ -81,14 +81,13 @@ public interface AccountIdentityQuery {
      * @param teamId          the multi-instance tenant id (Slack workspace id), or {@code null}
      */
     record IdentityLinkView(
-        Long identityLinkId,
-        Long gitProviderId,
-        String subject,
-        @Nullable String usernameAtSignup,
-        @Nullable String displayName,
-        @Nullable String avatarUrl,
-        @Nullable String profileUrl,
-        @Nullable Long externalActorId,
-        @Nullable String teamId
-    ) {}
+            Long identityLinkId,
+            Long gitProviderId,
+            String subject,
+            @Nullable String usernameAtSignup,
+            @Nullable String displayName,
+            @Nullable String avatarUrl,
+            @Nullable String profileUrl,
+            @Nullable Long externalActorId,
+            @Nullable String teamId) {}
 }

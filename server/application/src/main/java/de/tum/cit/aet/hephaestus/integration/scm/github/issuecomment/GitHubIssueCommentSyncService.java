@@ -79,12 +79,11 @@ public class GitHubIssueCommentSyncService {
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
     public GitHubIssueCommentSyncService(
-        GitHubGraphQlClientProvider graphQlClientProvider,
-        GitHubIssueCommentProcessor commentProcessor,
-        GitHubSyncProperties syncProperties,
-        GitHubExceptionClassifier exceptionClassifier,
-        GitHubGraphQlSyncCoordinator graphQlSyncHelper
-    ) {
+            GitHubGraphQlClientProvider graphQlClientProvider,
+            GitHubIssueCommentProcessor commentProcessor,
+            GitHubSyncProperties syncProperties,
+            GitHubExceptionClassifier exceptionClassifier,
+            GitHubGraphQlSyncCoordinator graphQlSyncHelper) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.commentProcessor = commentProcessor;
         this.syncProperties = syncProperties;
@@ -103,9 +102,8 @@ public class GitHubIssueCommentSyncService {
     public int syncForIssue(Long scopeId, Issue issue) {
         if (issue == null || issue.getRepository() == null) {
             log.warn(
-                "Skipped comment sync: reason=issueOrRepositoryNull, issueId={}",
-                issue != null ? issue.getId() : "null"
-            );
+                    "Skipped comment sync: reason=issueOrRepositoryNull, issueId={}",
+                    issue != null ? issue.getId() : "null");
             return 0;
         }
 
@@ -134,106 +132,85 @@ public class GitHubIssueCommentSyncService {
             pageCount++;
             if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
-                    "Reached maximum pagination limit for comment sync: repoName={}, issueNumber={}, limit={}",
-                    safeNameWithOwner,
-                    issue.getNumber(),
-                    MAX_PAGINATION_PAGES
-                );
+                        "Reached maximum pagination limit for comment sync: repoName={}, issueNumber={}, limit={}",
+                        safeNameWithOwner,
+                        issue.getNumber(),
+                        MAX_PAGINATION_PAGES);
                 break;
             }
 
             try {
                 final String currentCursor = cursor;
                 final int currentPage = pageCount;
-                ClientGraphQlResponse response = Mono.defer(() ->
-                    client
-                        .documentName(QUERY_DOCUMENT)
-                        .variable("owner", ownerAndName.owner())
-                        .variable("name", ownerAndName.name())
-                        .variable("number", issue.getNumber())
-                        .variable(
-                            "first",
-                            adaptPageSize(DEFAULT_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
-                        )
-                        .variable("after", currentCursor)
-                        .execute()
-                )
-                    .retryWhen(
-                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                            .jitter(JITTER_FACTOR)
-                            .filter(ScmTransportErrors::isTransportError)
-                            .doBeforeRetry(signal ->
-                                log.warn(
-                                    "Retrying comment sync after transport error: repoName={}, issueNumber={}, page={}, attempt={}, error={}",
-                                    safeNameWithOwner,
-                                    issue.getNumber(),
-                                    currentPage,
-                                    signal.totalRetries() + 1,
-                                    signal.failure().getMessage()
-                                )
-                            )
-                    )
-                    .block(syncProperties.graphqlTimeout());
+                ClientGraphQlResponse response = Mono.defer(() -> client.documentName(QUERY_DOCUMENT)
+                                .variable("owner", ownerAndName.owner())
+                                .variable("name", ownerAndName.name())
+                                .variable("number", issue.getNumber())
+                                .variable(
+                                        "first",
+                                        adaptPageSize(
+                                                DEFAULT_PAGE_SIZE,
+                                                graphQlClientProvider.getRateLimitRemaining(scopeId)))
+                                .variable("after", currentCursor)
+                                .execute())
+                        .retryWhen(Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                                .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                                .jitter(JITTER_FACTOR)
+                                .filter(ScmTransportErrors::isTransportError)
+                                .doBeforeRetry(signal -> log.warn(
+                                        "Retrying comment sync after transport error: repoName={}, issueNumber={}, page={}, attempt={}, error={}",
+                                        safeNameWithOwner,
+                                        issue.getNumber(),
+                                        currentPage,
+                                        signal.totalRetries() + 1,
+                                        signal.failure().getMessage())))
+                        .block(syncProperties.graphqlTimeout());
 
                 if (response == null || !response.isValid()) {
                     if (isNotFoundError(response, "repository.issue")) {
                         log.debug(
-                            "Skipped comment sync: reason=issueDeletedFromGitHub, repoName={}, issueNumber={}",
-                            safeNameWithOwner,
-                            issue.getNumber()
-                        );
+                                "Skipped comment sync: reason=issueDeletedFromGitHub, repoName={}, issueNumber={}",
+                                safeNameWithOwner,
+                                issue.getNumber());
                         return 0;
                     }
                     ClassificationResult classification = graphQlSyncHelper.classifyGraphQlErrors(response);
                     if (classification != null) {
-                        if (
-                            graphQlSyncHelper.handleGraphQlClassification(
-                                new GraphQlClassificationContext(
-                                    classification,
-                                    retryAttempt,
-                                    MAX_RETRY_ATTEMPTS,
-                                    "comment sync",
-                                    "issueNumber",
-                                    issue.getNumber(),
-                                    log
-                                )
-                            )
-                        ) {
+                        if (graphQlSyncHelper.handleGraphQlClassification(new GraphQlClassificationContext(
+                                classification,
+                                retryAttempt,
+                                MAX_RETRY_ATTEMPTS,
+                                "comment sync",
+                                "issueNumber",
+                                issue.getNumber(),
+                                log))) {
                             retryAttempt++;
                             continue;
                         }
                         break;
                     }
                     log.warn(
-                        "Invalid GraphQL response for comment sync: repoName={}, issueNumber={}",
-                        safeNameWithOwner,
-                        issue.getNumber()
-                    );
+                            "Invalid GraphQL response for comment sync: repoName={}, issueNumber={}",
+                            safeNameWithOwner,
+                            issue.getNumber());
                     break;
                 }
 
                 graphQlClientProvider.trackRateLimit(scopeId, response);
 
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    if (
-                        !graphQlSyncHelper.waitForRateLimitIfNeeded(
-                            scopeId,
-                            "comment sync",
-                            "issueNumber",
-                            issue.getNumber(),
-                            log
-                        )
-                    ) {
+                    if (!graphQlSyncHelper.waitForRateLimitIfNeeded(
+                            scopeId, "comment sync", "issueNumber", issue.getNumber(), log)) {
                         break;
                     }
                 }
 
-                GHIssueCommentConnection connection = response
-                    .field("repository.issue.comments")
-                    .toEntity(GHIssueCommentConnection.class);
+                GHIssueCommentConnection connection =
+                        response.field("repository.issue.comments").toEntity(GHIssueCommentConnection.class);
 
-                if (connection == null || connection.getNodes() == null || connection.getNodes().isEmpty()) {
+                if (connection == null
+                        || connection.getNodes() == null
+                        || connection.getNodes().isEmpty()) {
                     break;
                 }
 
@@ -262,34 +239,27 @@ public class GitHubIssueCommentSyncService {
                 if (isNotFoundError(e.getResponse(), "repository.issue")) {
                     // Deleted issues are expected during sync; DEBUG rather than ERROR since it's not actionable.
                     log.debug(
-                        "Skipped comment sync: reason=issueDeletedFromGitHub, repoName={}, issueNumber={}",
-                        safeNameWithOwner,
-                        issue.getNumber()
-                    );
+                            "Skipped comment sync: reason=issueDeletedFromGitHub, repoName={}, issueNumber={}",
+                            safeNameWithOwner,
+                            issue.getNumber());
                     return 0;
                 }
                 log.error(
-                    "Failed to sync comments: repoName={}, issueNumber={}",
-                    safeNameWithOwner,
-                    issue.getNumber(),
-                    e
-                );
+                        "Failed to sync comments: repoName={}, issueNumber={}",
+                        safeNameWithOwner,
+                        issue.getNumber(),
+                        e);
                 break;
             } catch (Exception e) {
                 ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
-                if (
-                    !graphQlSyncHelper.handleGraphQlClassification(
-                        new GraphQlClassificationContext(
-                            classification,
-                            retryAttempt,
-                            MAX_RETRY_ATTEMPTS,
-                            "comment sync",
-                            "issueNumber",
-                            issue.getNumber(),
-                            log
-                        )
-                    )
-                ) {
+                if (!graphQlSyncHelper.handleGraphQlClassification(new GraphQlClassificationContext(
+                        classification,
+                        retryAttempt,
+                        MAX_RETRY_ATTEMPTS,
+                        "comment sync",
+                        "issueNumber",
+                        issue.getNumber(),
+                        log))) {
                     break;
                 }
                 retryAttempt++;
@@ -299,20 +269,14 @@ public class GitHubIssueCommentSyncService {
         // Raw nodes received vs comments.totalCount (totalSynced is post-filter).
         if (reportedTotalCount >= 0) {
             GraphQlConnectionOverflowDetector.checkPaginated(
-                "issueComments",
-                commentsReceived,
-                reportedTotalCount,
-                hasMore,
-                "issueNumber=" + issue.getNumber()
-            );
+                    "issueComments", commentsReceived, reportedTotalCount, hasMore, "issueNumber=" + issue.getNumber());
         }
 
         log.debug(
-            "Completed comment sync for issue: repoName={}, issueNumber={}, commentCount={}",
-            safeNameWithOwner,
-            issue.getNumber(),
-            totalSynced
-        );
+                "Completed comment sync for issue: repoName={}, issueNumber={}, commentCount={}",
+                safeNameWithOwner,
+                issue.getNumber(),
+                totalSynced);
         return totalSynced;
     }
 
@@ -337,9 +301,8 @@ public class GitHubIssueCommentSyncService {
     public int syncRemainingComments(Long scopeId, Issue issue, String startCursor) {
         if (issue == null || issue.getRepository() == null) {
             log.warn(
-                "Skipped remaining comment sync: reason=issueOrRepositoryNull, issueId={}",
-                issue != null ? issue.getId() : "null"
-            );
+                    "Skipped remaining comment sync: reason=issueOrRepositoryNull, issueId={}",
+                    issue != null ? issue.getId() : "null");
             return 0;
         }
 
@@ -371,117 +334,95 @@ public class GitHubIssueCommentSyncService {
         int reportedTotalCount = -1;
 
         log.debug(
-            "Starting remaining comment sync: repoName={}, issueNumber={}, isPullRequest={}, startCursor={}",
-            safeNameWithOwner,
-            issue.getNumber(),
-            isPullRequest,
-            startCursor != null ? startCursor.substring(0, Math.min(20, startCursor.length())) + "..." : "null"
-        );
+                "Starting remaining comment sync: repoName={}, issueNumber={}, isPullRequest={}, startCursor={}",
+                safeNameWithOwner,
+                issue.getNumber(),
+                isPullRequest,
+                startCursor != null ? startCursor.substring(0, Math.min(20, startCursor.length())) + "..." : "null");
 
         while (hasMore) {
             pageCount++;
             if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
-                    "Reached maximum pagination limit for remaining comment sync: repoName={}, issueNumber={}, limit={}",
-                    safeNameWithOwner,
-                    issue.getNumber(),
-                    MAX_PAGINATION_PAGES
-                );
+                        "Reached maximum pagination limit for remaining comment sync: repoName={}, issueNumber={}, limit={}",
+                        safeNameWithOwner,
+                        issue.getNumber(),
+                        MAX_PAGINATION_PAGES);
                 break;
             }
 
             try {
                 final String currentCursor = cursor;
                 final int currentPage = pageCount;
-                ClientGraphQlResponse response = Mono.defer(() ->
-                    client
-                        .documentName(queryDocument)
-                        .variable("owner", ownerAndName.owner())
-                        .variable("name", ownerAndName.name())
-                        .variable("number", issue.getNumber())
-                        .variable(
-                            "first",
-                            adaptPageSize(DEFAULT_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
-                        )
-                        .variable("after", currentCursor)
-                        .execute()
-                )
-                    .retryWhen(
-                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                            .jitter(JITTER_FACTOR)
-                            .filter(ScmTransportErrors::isTransportError)
-                            .doBeforeRetry(signal ->
-                                log.warn(
-                                    "Retrying remaining comment sync after transport error: repoName={}, issueNumber={}, page={}, attempt={}, error={}",
-                                    safeNameWithOwner,
-                                    issue.getNumber(),
-                                    currentPage,
-                                    signal.totalRetries() + 1,
-                                    signal.failure().getMessage()
-                                )
-                            )
-                    )
-                    .block(syncProperties.graphqlTimeout());
+                ClientGraphQlResponse response = Mono.defer(() -> client.documentName(queryDocument)
+                                .variable("owner", ownerAndName.owner())
+                                .variable("name", ownerAndName.name())
+                                .variable("number", issue.getNumber())
+                                .variable(
+                                        "first",
+                                        adaptPageSize(
+                                                DEFAULT_PAGE_SIZE,
+                                                graphQlClientProvider.getRateLimitRemaining(scopeId)))
+                                .variable("after", currentCursor)
+                                .execute())
+                        .retryWhen(Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                                .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                                .jitter(JITTER_FACTOR)
+                                .filter(ScmTransportErrors::isTransportError)
+                                .doBeforeRetry(signal -> log.warn(
+                                        "Retrying remaining comment sync after transport error: repoName={}, issueNumber={}, page={}, attempt={}, error={}",
+                                        safeNameWithOwner,
+                                        issue.getNumber(),
+                                        currentPage,
+                                        signal.totalRetries() + 1,
+                                        signal.failure().getMessage())))
+                        .block(syncProperties.graphqlTimeout());
 
                 if (response == null || !response.isValid()) {
                     if (isNotFoundError(response, parentPath)) {
                         log.debug(
-                            "Skipped remaining comment sync: reason=issueDeletedFromGitHub, repoName={}, issueNumber={}",
-                            safeNameWithOwner,
-                            issue.getNumber()
-                        );
+                                "Skipped remaining comment sync: reason=issueDeletedFromGitHub, repoName={}, issueNumber={}",
+                                safeNameWithOwner,
+                                issue.getNumber());
                         return 0;
                     }
                     ClassificationResult classification = graphQlSyncHelper.classifyGraphQlErrors(response);
                     if (classification != null) {
-                        if (
-                            graphQlSyncHelper.handleGraphQlClassification(
-                                new GraphQlClassificationContext(
-                                    classification,
-                                    retryAttempt,
-                                    MAX_RETRY_ATTEMPTS,
-                                    "remaining comment sync",
-                                    "issueNumber",
-                                    issue.getNumber(),
-                                    log
-                                )
-                            )
-                        ) {
+                        if (graphQlSyncHelper.handleGraphQlClassification(new GraphQlClassificationContext(
+                                classification,
+                                retryAttempt,
+                                MAX_RETRY_ATTEMPTS,
+                                "remaining comment sync",
+                                "issueNumber",
+                                issue.getNumber(),
+                                log))) {
                             retryAttempt++;
                             continue;
                         }
                         break;
                     }
                     log.warn(
-                        "Invalid GraphQL response for remaining comment sync: repoName={}, issueNumber={}",
-                        safeNameWithOwner,
-                        issue.getNumber()
-                    );
+                            "Invalid GraphQL response for remaining comment sync: repoName={}, issueNumber={}",
+                            safeNameWithOwner,
+                            issue.getNumber());
                     break;
                 }
 
                 graphQlClientProvider.trackRateLimit(scopeId, response);
 
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    if (
-                        !graphQlSyncHelper.waitForRateLimitIfNeeded(
-                            scopeId,
-                            "remaining comment sync",
-                            "issueNumber",
-                            issue.getNumber(),
-                            log
-                        )
-                    ) {
+                    if (!graphQlSyncHelper.waitForRateLimitIfNeeded(
+                            scopeId, "remaining comment sync", "issueNumber", issue.getNumber(), log)) {
                         break;
                     }
                 }
 
-                GHIssueCommentConnection connection = response
-                    .field(commentsPath)
-                    .toEntity(GHIssueCommentConnection.class);
+                GHIssueCommentConnection connection =
+                        response.field(commentsPath).toEntity(GHIssueCommentConnection.class);
 
-                if (connection == null || connection.getNodes() == null || connection.getNodes().isEmpty()) {
+                if (connection == null
+                        || connection.getNodes() == null
+                        || connection.getNodes().isEmpty()) {
                     break;
                 }
 
@@ -509,34 +450,27 @@ public class GitHubIssueCommentSyncService {
             } catch (FieldAccessException e) {
                 if (isNotFoundError(e.getResponse(), parentPath)) {
                     log.debug(
-                        "Skipped remaining comment sync: reason=issueDeletedFromGitHub, repoName={}, issueNumber={}",
-                        safeNameWithOwner,
-                        issue.getNumber()
-                    );
+                            "Skipped remaining comment sync: reason=issueDeletedFromGitHub, repoName={}, issueNumber={}",
+                            safeNameWithOwner,
+                            issue.getNumber());
                     return 0;
                 }
                 log.error(
-                    "Failed to sync remaining comments: repoName={}, issueNumber={}",
-                    safeNameWithOwner,
-                    issue.getNumber(),
-                    e
-                );
+                        "Failed to sync remaining comments: repoName={}, issueNumber={}",
+                        safeNameWithOwner,
+                        issue.getNumber(),
+                        e);
                 break;
             } catch (Exception e) {
                 ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
-                if (
-                    !graphQlSyncHelper.handleGraphQlClassification(
-                        new GraphQlClassificationContext(
-                            classification,
-                            retryAttempt,
-                            MAX_RETRY_ATTEMPTS,
-                            "remaining comment sync",
-                            "issueNumber",
-                            issue.getNumber(),
-                            log
-                        )
-                    )
-                ) {
+                if (!graphQlSyncHelper.handleGraphQlClassification(new GraphQlClassificationContext(
+                        classification,
+                        retryAttempt,
+                        MAX_RETRY_ATTEMPTS,
+                        "remaining comment sync",
+                        "issueNumber",
+                        issue.getNumber(),
+                        log))) {
                     break;
                 }
                 retryAttempt++;
@@ -546,20 +480,14 @@ public class GitHubIssueCommentSyncService {
         // Raw nodes received vs comments.totalCount (totalSynced is post-filter).
         if (reportedTotalCount >= 0) {
             GraphQlConnectionOverflowDetector.checkPaginated(
-                "issueComments",
-                commentsReceived,
-                reportedTotalCount,
-                hasMore,
-                "issueNumber=" + issue.getNumber()
-            );
+                    "issueComments", commentsReceived, reportedTotalCount, hasMore, "issueNumber=" + issue.getNumber());
         }
 
         log.debug(
-            "Completed remaining comment sync: repoName={}, issueNumber={}, additionalComments={}",
-            safeNameWithOwner,
-            issue.getNumber(),
-            totalSynced
-        );
+                "Completed remaining comment sync: repoName={}, issueNumber={}, additionalComments={}",
+                safeNameWithOwner,
+                issue.getNumber(),
+                totalSynced);
         return totalSynced;
     }
 }

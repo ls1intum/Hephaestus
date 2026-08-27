@@ -28,12 +28,11 @@ public class ProxyTrustGuard {
     private final String internalProxies;
 
     public ProxyTrustGuard(
-        Environment environment,
-        @Value("${server.forward-headers-strategy:none}") String forwardHeadersStrategy,
-        // Empty when the property is unset — Boot still applies its wildcard RFC-1918 default at the
-        // valve, but an unset property is itself a misconfiguration in prod, so blank trips the guard.
-        @Value("${server.tomcat.remoteip.internal-proxies:}") String internalProxies
-    ) {
+            Environment environment,
+            @Value("${server.forward-headers-strategy:none}") String forwardHeadersStrategy,
+            // Empty when the property is unset — Boot still applies its wildcard RFC-1918 default at the
+            // valve, but an unset property is itself a misconfiguration in prod, so blank trips the guard.
+            @Value("${server.tomcat.remoteip.internal-proxies:}") String internalProxies) {
         this.environment = environment;
         this.forwardHeadersStrategy = forwardHeadersStrategy;
         this.internalProxies = internalProxies;
@@ -51,11 +50,10 @@ public class ProxyTrustGuard {
         // operator-chosen value (the yaml binds it from HEPHAESTUS_TRUSTED_PROXIES, empty when unset).
         if (internalProxies == null || internalProxies.isBlank()) {
             throw new IllegalStateException(
-                "server.tomcat.remoteip.internal-proxies is unset while forward-headers-strategy=native in " +
-                    "prod. Boot's default trusts ALL of RFC-1918, so a client behind in-cluster ingress can " +
-                    "spoof X-Forwarded-For and forge getRemoteAddr(), defeating the pre-auth IP rate limit. " +
-                    "Pin the ingress address via HEPHAESTUS_TRUSTED_PROXIES (a Tomcat internal-proxies regex)."
-            );
+                    "server.tomcat.remoteip.internal-proxies is unset while forward-headers-strategy=native in "
+                            + "prod. Boot's default trusts ALL of RFC-1918, so a client behind in-cluster ingress can "
+                            + "spoof X-Forwarded-For and forge getRemoteAddr(), defeating the pre-auth IP rate limit. "
+                            + "Pin the ingress address via HEPHAESTUS_TRUSTED_PROXIES (a Tomcat internal-proxies regex).");
         }
     }
 

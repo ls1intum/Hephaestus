@@ -20,9 +20,7 @@ public class GitlabCredentialProvider implements ApiCredentialProvider {
     private final CredentialBundleConverter credentialConverter;
 
     public GitlabCredentialProvider(
-        ConnectionService connectionService,
-        CredentialBundleConverter credentialConverter
-    ) {
+            ConnectionService connectionService, CredentialBundleConverter credentialConverter) {
         this.connectionService = connectionService;
         this.credentialConverter = credentialConverter;
     }

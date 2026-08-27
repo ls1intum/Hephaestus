@@ -40,14 +40,14 @@ class ApprovedFeedbackDeliveryListenerTest {
         approve(approvalRepository, feedback);
 
         new ApprovedFeedbackDeliveryListener(
-            feedbackRepository,
-            approvalRepository,
-            mock(AgentJobRepository.class),
-            mock(PracticeFeedbackDeliveryPolicy.class),
-            mock(PullRequestCommentPoster.class),
-            formatter(),
-            eligibility
-        ).deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
+                        feedbackRepository,
+                        approvalRepository,
+                        mock(AgentJobRepository.class),
+                        mock(PracticeFeedbackDeliveryPolicy.class),
+                        mock(PullRequestCommentPoster.class),
+                        formatter(),
+                        eligibility)
+                .deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
 
         verify(feedbackRepository).markApprovedSuppressed(7L, feedbackId, "APPROVAL_NO_LONGER_ELIGIBLE");
     }
@@ -65,19 +65,13 @@ class ApprovedFeedbackDeliveryListenerTest {
         when(feedbackRepository.lockByIdAndWorkspaceId(feedbackId, 7L)).thenReturn(Optional.of(feedback));
         approve(approvalRepository, feedback);
         when(jobRepository.findByIdAndWorkspaceId(feedback.getAgentJobId(), 7L)).thenReturn(Optional.of(job));
-        when(policy.evaluatePullRequest(job)).thenReturn(
-            PracticeFeedbackDeliveryPolicy.Decision.suppressed(FeedbackSuppressionReason.INSTANCE_SILENCED)
-        );
+        when(policy.evaluatePullRequest(job))
+                .thenReturn(PracticeFeedbackDeliveryPolicy.Decision.suppressed(
+                        FeedbackSuppressionReason.INSTANCE_SILENCED));
 
         new ApprovedFeedbackDeliveryListener(
-            feedbackRepository,
-            approvalRepository,
-            jobRepository,
-            policy,
-            poster,
-            formatter(),
-            eligible()
-        ).deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
+                        feedbackRepository, approvalRepository, jobRepository, policy, poster, formatter(), eligible())
+                .deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
 
         verify(feedbackRepository).markApprovedSuppressed(7L, feedbackId, "INSTANCE_SILENCED");
         verifyNoInteractions(poster);
@@ -96,23 +90,16 @@ class ApprovedFeedbackDeliveryListenerTest {
         when(feedbackRepository.lockByIdAndWorkspaceId(feedbackId, 7L)).thenReturn(Optional.of(feedback));
         approve(approvalRepository, feedback);
         when(jobRepository.findByIdAndWorkspaceId(feedback.getAgentJobId(), 7L)).thenReturn(Optional.of(job));
-        when(policy.evaluatePullRequest(job)).thenReturn(
-            PracticeFeedbackDeliveryPolicy.Decision.allowed(new PullRequest())
-        );
+        when(policy.evaluatePullRequest(job))
+                .thenReturn(PracticeFeedbackDeliveryPolicy.Decision.allowed(new PullRequest()));
         when(poster.findApprovedProposal(job, feedbackId)).thenReturn(ExistingDeliveryLookup.absent());
         doThrow(new JobDeliverySuppressedException("silent", new RuntimeException("silent")))
-            .when(poster)
-            .postApprovedProposal(eq(job), eq(feedbackId), contains("AI-generated and can be inaccurate"));
+                .when(poster)
+                .postApprovedProposal(eq(job), eq(feedbackId), contains("AI-generated and can be inaccurate"));
 
         new ApprovedFeedbackDeliveryListener(
-            feedbackRepository,
-            approvalRepository,
-            jobRepository,
-            policy,
-            poster,
-            formatter(),
-            eligible()
-        ).deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
+                        feedbackRepository, approvalRepository, jobRepository, policy, poster, formatter(), eligible())
+                .deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
 
         verify(feedbackRepository).markApprovedSuppressed(7L, feedbackId, "INSTANCE_SILENCED");
         verify(feedbackRepository, never()).markApprovedDelivered(anyLong(), any());
@@ -132,20 +119,13 @@ class ApprovedFeedbackDeliveryListenerTest {
         when(feedbackRepository.lockByIdAndWorkspaceId(feedbackId, 7L)).thenReturn(Optional.of(feedback));
         approve(approvalRepository, feedback);
         when(jobRepository.findByIdAndWorkspaceId(jobId, 7L)).thenReturn(Optional.of(job));
-        when(policy.evaluatePullRequest(job)).thenReturn(
-            PracticeFeedbackDeliveryPolicy.Decision.allowed(new PullRequest())
-        );
+        when(policy.evaluatePullRequest(job))
+                .thenReturn(PracticeFeedbackDeliveryPolicy.Decision.allowed(new PullRequest()));
         when(poster.findApprovedProposal(job, feedbackId)).thenReturn(ExistingDeliveryLookup.absent());
 
         new ApprovedFeedbackDeliveryListener(
-            feedbackRepository,
-            approvalRepository,
-            jobRepository,
-            policy,
-            poster,
-            formatter(),
-            eligible()
-        ).deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
+                        feedbackRepository, approvalRepository, jobRepository, policy, poster, formatter(), eligible())
+                .deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
 
         verify(poster).postApprovedProposal(eq(job), eq(feedbackId), contains("AI-generated and can be inaccurate"));
         verify(feedbackRepository).markApprovedDelivered(7L, feedbackId);
@@ -165,20 +145,13 @@ class ApprovedFeedbackDeliveryListenerTest {
         when(feedbackRepository.lockByIdAndWorkspaceId(feedbackId, 7L)).thenReturn(Optional.of(feedback));
         approve(approvalRepository, feedback);
         when(jobRepository.findByIdAndWorkspaceId(jobId, 7L)).thenReturn(Optional.of(job));
-        when(policy.evaluatePullRequest(job)).thenReturn(
-            PracticeFeedbackDeliveryPolicy.Decision.allowed(new PullRequest())
-        );
+        when(policy.evaluatePullRequest(job))
+                .thenReturn(PracticeFeedbackDeliveryPolicy.Decision.allowed(new PullRequest()));
         when(poster.findApprovedProposal(job, feedbackId)).thenReturn(ExistingDeliveryLookup.absent());
 
         new ApprovedFeedbackDeliveryListener(
-            feedbackRepository,
-            approvalRepository,
-            jobRepository,
-            policy,
-            poster,
-            formatter(),
-            eligible()
-        ).deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
+                        feedbackRepository, approvalRepository, jobRepository, policy, poster, formatter(), eligible())
+                .deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
 
         verify(poster, never()).postApprovedProposal(any(), any(), any());
         verify(feedbackRepository).markApprovedSuppressed(7L, feedbackId, "APPROVAL_STALE");
@@ -199,20 +172,13 @@ class ApprovedFeedbackDeliveryListenerTest {
         when(feedbackRepository.lockByIdAndWorkspaceId(feedbackId, 7L)).thenReturn(Optional.of(feedback));
         approve(approvalRepository, feedback);
         when(jobRepository.findByIdAndWorkspaceId(jobId, 7L)).thenReturn(Optional.of(job));
-        when(policy.evaluatePullRequest(job)).thenReturn(
-            PracticeFeedbackDeliveryPolicy.Decision.allowed(new PullRequest())
-        );
+        when(policy.evaluatePullRequest(job))
+                .thenReturn(PracticeFeedbackDeliveryPolicy.Decision.allowed(new PullRequest()));
         when(poster.findApprovedProposal(job, feedbackId)).thenReturn(ExistingDeliveryLookup.absent());
 
         new ApprovedFeedbackDeliveryListener(
-            feedbackRepository,
-            approvalRepository,
-            jobRepository,
-            policy,
-            poster,
-            formatter(),
-            eligible()
-        ).deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
+                        feedbackRepository, approvalRepository, jobRepository, policy, poster, formatter(), eligible())
+                .deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
 
         verify(poster, never()).postApprovedProposal(any(), any(), any());
         verify(feedbackRepository).markApprovedSuppressed(7L, feedbackId, "EMPTY_AFTER_SANITIZE");
@@ -233,20 +199,13 @@ class ApprovedFeedbackDeliveryListenerTest {
         when(feedbackRepository.lockByIdAndWorkspaceId(feedbackId, 7L)).thenReturn(Optional.of(feedback));
         approve(approvalRepository, feedback);
         when(jobRepository.findByIdAndWorkspaceId(jobId, 7L)).thenReturn(Optional.of(job));
-        when(policy.evaluatePullRequest(job)).thenReturn(
-            PracticeFeedbackDeliveryPolicy.Decision.allowed(new PullRequest())
-        );
+        when(policy.evaluatePullRequest(job))
+                .thenReturn(PracticeFeedbackDeliveryPolicy.Decision.allowed(new PullRequest()));
         when(poster.findApprovedProposal(job, feedbackId)).thenReturn(ExistingDeliveryLookup.found("already-there"));
 
         new ApprovedFeedbackDeliveryListener(
-            feedbackRepository,
-            approvalRepository,
-            jobRepository,
-            policy,
-            poster,
-            formatter(),
-            eligible()
-        ).deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
+                        feedbackRepository, approvalRepository, jobRepository, policy, poster, formatter(), eligible())
+                .deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
 
         verify(poster, never()).postApprovedProposal(any(), any(), any());
         verify(feedbackRepository).markApprovedDelivered(7L, feedbackId);
@@ -266,27 +225,18 @@ class ApprovedFeedbackDeliveryListenerTest {
         when(feedbackRepository.lockByIdAndWorkspaceId(feedbackId, 7L)).thenReturn(Optional.of(feedback));
         approve(approvalRepository, feedback);
         when(jobRepository.findByIdAndWorkspaceId(jobId, 7L)).thenReturn(Optional.of(job));
-        when(policy.evaluatePullRequest(job)).thenReturn(
-            PracticeFeedbackDeliveryPolicy.Decision.suppressed(FeedbackSuppressionReason.RECIPIENT_OPTED_OUT)
-        );
+        when(policy.evaluatePullRequest(job))
+                .thenReturn(PracticeFeedbackDeliveryPolicy.Decision.suppressed(
+                        FeedbackSuppressionReason.RECIPIENT_OPTED_OUT));
 
         new ApprovedFeedbackDeliveryListener(
-            feedbackRepository,
-            approvalRepository,
-            jobRepository,
-            policy,
-            poster,
-            formatter(),
-            eligible()
-        ).deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
+                        feedbackRepository, approvalRepository, jobRepository, policy, poster, formatter(), eligible())
+                .deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
 
         verifyNoInteractions(poster);
         verify(feedbackRepository, never()).markApprovedDelivered(anyLong(), any());
-        verify(feedbackRepository).markApprovedSuppressed(
-            7L,
-            feedbackId,
-            FeedbackSuppressionReason.RECIPIENT_OPTED_OUT.name()
-        );
+        verify(feedbackRepository)
+                .markApprovedSuppressed(7L, feedbackId, FeedbackSuppressionReason.RECIPIENT_OPTED_OUT.name());
     }
 
     @Test
@@ -299,46 +249,34 @@ class ApprovedFeedbackDeliveryListenerTest {
         UUID feedbackId = UUID.randomUUID();
         Feedback feedback = proposal(feedbackId, UUID.randomUUID());
         when(feedbackRepository.lockByIdAndWorkspaceId(feedbackId, 7L)).thenReturn(Optional.of(feedback));
-        when(approvalRepository.findByFeedbackIdAndWorkspaceId(feedbackId, 7L)).thenReturn(
-            Optional.of(
-                FeedbackApproval.builder().feedbackId(feedbackId).workspaceId(7L).contentDigest("0".repeat(64)).build()
-            )
-        );
+        when(approvalRepository.findByFeedbackIdAndWorkspaceId(feedbackId, 7L))
+                .thenReturn(Optional.of(FeedbackApproval.builder()
+                        .feedbackId(feedbackId)
+                        .workspaceId(7L)
+                        .contentDigest("0".repeat(64))
+                        .build()));
 
         new ApprovedFeedbackDeliveryListener(
-            feedbackRepository,
-            approvalRepository,
-            jobRepository,
-            policy,
-            poster,
-            formatter(),
-            eligible()
-        ).deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
+                        feedbackRepository, approvalRepository, jobRepository, policy, poster, formatter(), eligible())
+                .deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
 
-        verify(feedbackRepository).markApprovedSuppressed(
-            7L,
-            feedbackId,
-            FeedbackSuppressionReason.APPROVAL_STALE.name()
-        );
+        verify(feedbackRepository)
+                .markApprovedSuppressed(7L, feedbackId, FeedbackSuppressionReason.APPROVAL_STALE.name());
         verifyNoInteractions(jobRepository, policy, poster);
     }
 
     private static PracticeFeedbackCommentFormatter formatter() {
         return new PracticeFeedbackCommentFormatter(
-            new ApplicationProperties(null, new ApplicationProperties.Webapp("https://hephaestus.example"))
-        );
+                new ApplicationProperties(null, new ApplicationProperties.Webapp("https://hephaestus.example")));
     }
 
     private static void approve(FeedbackApprovalRepository repository, Feedback feedback) {
-        when(repository.findByFeedbackIdAndWorkspaceId(feedback.getId(), 7L)).thenReturn(
-            Optional.of(
-                FeedbackApproval.builder()
-                    .feedbackId(feedback.getId())
-                    .workspaceId(7L)
-                    .contentDigest(FeedbackApprovalDigest.of(feedback))
-                    .build()
-            )
-        );
+        when(repository.findByFeedbackIdAndWorkspaceId(feedback.getId(), 7L))
+                .thenReturn(Optional.of(FeedbackApproval.builder()
+                        .feedbackId(feedback.getId())
+                        .workspaceId(7L)
+                        .contentDigest(FeedbackApprovalDigest.of(feedback))
+                        .build()));
     }
 
     private static FeedbackApprovalEligibility eligible() {
@@ -353,17 +291,17 @@ class ApprovedFeedbackDeliveryListenerTest {
 
     private static Feedback proposal(UUID feedbackId, UUID jobId, String body) {
         return Feedback.builder()
-            .id(feedbackId)
-            .agentJobId(jobId)
-            .workspaceId(7L)
-            .artifactKind(ArtifactKinds.PULL_REQUEST)
-            .recipientUserId(8L)
-            .aboutUserId(8L)
-            .channel(FeedbackChannel.IN_CONTEXT)
-            .position(7_000)
-            .deliveryState(FeedbackDeliveryState.PREPARED)
-            .body(body)
-            .source(FeedbackSource.AGENT)
-            .build();
+                .id(feedbackId)
+                .agentJobId(jobId)
+                .workspaceId(7L)
+                .artifactKind(ArtifactKinds.PULL_REQUEST)
+                .recipientUserId(8L)
+                .aboutUserId(8L)
+                .channel(FeedbackChannel.IN_CONTEXT)
+                .position(7_000)
+                .deliveryState(FeedbackDeliveryState.PREPARED)
+                .body(body)
+                .source(FeedbackSource.AGENT)
+                .build();
     }
 }

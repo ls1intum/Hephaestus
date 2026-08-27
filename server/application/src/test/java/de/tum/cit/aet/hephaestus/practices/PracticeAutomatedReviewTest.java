@@ -10,36 +10,29 @@ class PracticeAutomatedReviewTest extends BaseUnitTest {
 
     @Test
     void shouldRejectIncoherentNoneCombinations() {
-        assertThatIllegalArgumentException().isThrownBy(() ->
-            new PracticeAutomatedReview(
-                PracticeAutomatedReviewMode.NONE,
-                PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
-            )
-        );
-        assertThatIllegalArgumentException().isThrownBy(() ->
-            new PracticeAutomatedReview(PracticeAutomatedReviewMode.LANGUAGE_MODEL, PracticeEvidenceSufficiency.NONE)
-        );
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new PracticeAutomatedReview(
+                        PracticeAutomatedReviewMode.NONE,
+                        PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET));
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new PracticeAutomatedReview(
+                        PracticeAutomatedReviewMode.LANGUAGE_MODEL, PracticeEvidenceSufficiency.NONE));
     }
 
     @Test
     void shouldAttemptOnlySupportedLanguageModelReview() {
-        assertThat(
-            new PracticeAutomatedReview(
-                PracticeAutomatedReviewMode.LANGUAGE_MODEL,
-                PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
-            ).canAttemptAutomatedReview()
-        ).isTrue();
-        assertThat(
-            new PracticeAutomatedReview(
-                PracticeAutomatedReviewMode.LANGUAGE_MODEL,
-                PracticeEvidenceSufficiency.DECLARED_EVIDENCE_INSUFFICIENT
-            ).canAttemptAutomatedReview()
-        ).isFalse();
-        assertThat(
-            new PracticeAutomatedReview(
-                PracticeAutomatedReviewMode.NONE,
-                PracticeEvidenceSufficiency.NONE
-            ).canAttemptAutomatedReview()
-        ).isFalse();
+        assertThat(new PracticeAutomatedReview(
+                                PracticeAutomatedReviewMode.LANGUAGE_MODEL,
+                                PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET)
+                        .canAttemptAutomatedReview())
+                .isTrue();
+        assertThat(new PracticeAutomatedReview(
+                                PracticeAutomatedReviewMode.LANGUAGE_MODEL,
+                                PracticeEvidenceSufficiency.DECLARED_EVIDENCE_INSUFFICIENT)
+                        .canAttemptAutomatedReview())
+                .isFalse();
+        assertThat(new PracticeAutomatedReview(PracticeAutomatedReviewMode.NONE, PracticeEvidenceSufficiency.NONE)
+                        .canAttemptAutomatedReview())
+                .isFalse();
     }
 }

@@ -23,12 +23,11 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitLabMilestoneEventDTO(
-    @JsonProperty("object_kind") String objectKind,
-    @JsonProperty("event_type") String eventType,
-    String action,
-    GitLabWebhookProject project,
-    @JsonProperty("object_attributes") ObjectAttributes objectAttributes
-) {
+        @JsonProperty("object_kind") String objectKind,
+        @JsonProperty("event_type") String eventType,
+        String action,
+        GitLabWebhookProject project,
+        @JsonProperty("object_attributes") ObjectAttributes objectAttributes) {
     /**
      * Returns the parsed action type.
      */
@@ -52,15 +51,14 @@ public record GitLabMilestoneEventDTO(
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record ObjectAttributes(
-        long id,
-        int iid,
-        String title,
-        @Nullable String description,
-        @Nullable String state,
-        @JsonProperty("created_at") @Nullable String createdAt,
-        @JsonProperty("updated_at") @Nullable String updatedAt,
-        @JsonProperty("due_date") @Nullable String dueDate,
-        @JsonProperty("project_id") @Nullable Long projectId,
-        @JsonProperty("group_id") @Nullable Long groupId
-    ) {}
+            long id,
+            int iid,
+            String title,
+            @Nullable String description,
+            @Nullable String state,
+            @JsonProperty("created_at") @Nullable String createdAt,
+            @JsonProperty("updated_at") @Nullable String updatedAt,
+            @JsonProperty("due_date") @Nullable String dueDate,
+            @JsonProperty("project_id") @Nullable Long projectId,
+            @JsonProperty("group_id") @Nullable Long groupId) {}
 }

@@ -122,12 +122,11 @@ public class GitLabDeletionSweepService {
     private final GitLabProperties gitLabProperties;
 
     public GitLabDeletionSweepService(
-        IssueRepository issueRepository,
-        RepositoryRepository repositoryRepository,
-        GitLabGraphQlClientProvider graphQlClientProvider,
-        GitLabGraphQlResponseHandler responseHandler,
-        GitLabProperties gitLabProperties
-    ) {
+            IssueRepository issueRepository,
+            RepositoryRepository repositoryRepository,
+            GitLabGraphQlClientProvider graphQlClientProvider,
+            GitLabGraphQlResponseHandler responseHandler,
+            GitLabProperties gitLabProperties) {
         this.issueRepository = issueRepository;
         this.repositoryRepository = repositoryRepository;
         this.graphQlClientProvider = graphQlClientProvider;
@@ -139,11 +138,10 @@ public class GitLabDeletionSweepService {
     private enum SweptEntity {
         ISSUE("issues", ISSUE_QUERY_DOCUMENT, "project.issues", "project.issuesEnabled"),
         MERGE_REQUEST(
-            "merge requests",
-            MERGE_REQUEST_QUERY_DOCUMENT,
-            "project.mergeRequests",
-            "project.mergeRequestsEnabled"
-        );
+                "merge requests",
+                MERGE_REQUEST_QUERY_DOCUMENT,
+                "project.mergeRequests",
+                "project.mergeRequestsEnabled");
 
         private final String plural;
         private final String document;
@@ -189,7 +187,10 @@ public class GitLabDeletionSweepService {
      * @param complete whether the listing is provably the entire upstream set
      * @param reason   why the listing is incomplete; {@code null} when {@code complete}
      */
-    record UpstreamListing(Set<Integer> numbers, boolean complete, @Nullable String reason) {
+    record UpstreamListing(
+            Set<Integer> numbers,
+            boolean complete,
+            @Nullable String reason) {
         static UpstreamListing complete(Set<Integer> numbers) {
             return new UpstreamListing(numbers, true, null);
         }
@@ -241,20 +242,18 @@ public class GitLabDeletionSweepService {
         for (Repository repository : repositories) {
             if (isCancelled(handle)) {
                 log.info(
-                    "GitLab deletion sweep cancelled between projects: scopeId={}, projectsSwept={}, projectsRemaining={}",
-                    scopeId,
-                    done,
-                    total - done
-                );
+                        "GitLab deletion sweep cancelled between projects: scopeId={}, projectsSwept={}, projectsRemaining={}",
+                        scopeId,
+                        done,
+                        total - done);
                 break;
             }
             report(
-                handle,
-                done,
-                total,
-                "Checking " + repository.getNameWithOwner() + " for deleted items",
-                repository.getNameWithOwner()
-            );
+                    handle,
+                    done,
+                    total,
+                    "Checking " + repository.getNameWithOwner() + " for deleted items",
+                    repository.getNameWithOwner());
 
             SweepOutcome outcome;
             try {
@@ -263,11 +262,10 @@ public class GitLabDeletionSweepService {
                 // sweepRepository is written not to throw, but a sweep must never be the reason a
                 // reconciliation job fails — it is drift repair, not the sync itself.
                 log.warn(
-                    "GitLab deletion sweep failed for project, continuing: projectPath={}, scopeId={}, message={}",
-                    sanitizeForLog(repository.getNameWithOwner()),
-                    scopeId,
-                    e.toString()
-                );
+                        "GitLab deletion sweep failed for project, continuing: projectPath={}, scopeId={}, message={}",
+                        sanitizeForLog(repository.getNameWithOwner()),
+                        scopeId,
+                        e.toString());
                 skipped = true;
                 done++;
                 continue;
@@ -282,13 +280,12 @@ public class GitLabDeletionSweepService {
         SweepOutcome scopeOutcome = new SweepOutcome(issues, mergeRequests, skipped);
         report(handle, done, total, sweepSummary(scopeOutcome), null);
         log.info(
-            "GitLab deletion sweep finished: scopeId={}, projectsSwept={}, issuesTombstoned={}, mergeRequestsTombstoned={}, degraded={}",
-            scopeId,
-            done,
-            issues,
-            mergeRequests,
-            skipped
-        );
+                "GitLab deletion sweep finished: scopeId={}, projectsSwept={}, issuesTombstoned={}, mergeRequestsTombstoned={}, degraded={}",
+                scopeId,
+                done,
+                issues,
+                mergeRequests,
+                skipped);
         return scopeOutcome;
     }
 
@@ -296,19 +293,14 @@ public class GitLabDeletionSweepService {
     static String sweepSummary(SweepOutcome outcome) {
         if (outcome.total() == 0) {
             return outcome.skipped()
-                ? "Checked for deleted items — some projects could not be verified"
-                : "Checked for deleted items — none found";
+                    ? "Checked for deleted items — some projects could not be verified"
+                    : "Checked for deleted items — none found";
         }
         return "Retired " + outcome.total() + " item" + (outcome.total() == 1 ? "" : "s") + " deleted upstream";
     }
 
     private static void report(
-        @Nullable SyncExecutionHandle handle,
-        int done,
-        int total,
-        String step,
-        @Nullable String projectName
-    ) {
+            @Nullable SyncExecutionHandle handle, int done, int total, String step, @Nullable String projectName) {
         if (handle != null) {
             handle.progress(done, total, SyncProgress.ofResource(SyncPhase.SWEEP, step, projectName, done, total));
         }
@@ -370,21 +362,15 @@ public class GitLabDeletionSweepService {
             if (!listing.complete()) {
                 skipped = true;
                 log.warn(
-                    "Skipped GitLab deletion sweep, deleted nothing: reason={}, entity={}, projectPath={}, scopeId={}",
-                    listing.reason(),
-                    entity.plural,
-                    safeProjectPath,
-                    scopeId
-                );
+                        "Skipped GitLab deletion sweep, deleted nothing: reason={}, entity={}, projectPath={}, scopeId={}",
+                        listing.reason(),
+                        entity.plural,
+                        safeProjectPath,
+                        scopeId);
                 continue;
             }
             int tombstoned = tombstoneMissing(
-                repository.getId(),
-                entity,
-                localBeforeListing,
-                listing.numbers(),
-                safeProjectPath
-            );
+                    repository.getId(), entity, localBeforeListing, listing.numbers(), safeProjectPath);
             if (entity == SweptEntity.ISSUE) {
                 issuesTombstoned = tombstoned;
             } else {
@@ -398,8 +384,8 @@ public class GitLabDeletionSweepService {
     /** The live local numbers for one entity class of one repository. */
     private List<Integer> localLiveNumbers(Long repositoryId, SweptEntity entity) {
         return entity == SweptEntity.ISSUE
-            ? issueRepository.findLiveIssueNumbersByRepositoryId(repositoryId)
-            : issueRepository.findLivePullRequestNumbersByRepositoryId(repositoryId);
+                ? issueRepository.findLiveIssueNumbersByRepositoryId(repositoryId)
+                : issueRepository.findLivePullRequestNumbersByRepositoryId(repositoryId);
     }
 
     /**
@@ -410,24 +396,16 @@ public class GitLabDeletionSweepService {
      * @param local the local live numbers as of before the upstream listing started
      */
     private int tombstoneMissing(
-        Long repositoryId,
-        SweptEntity entity,
-        List<Integer> local,
-        Set<Integer> upstream,
-        String safeProjectPath
-    ) {
-        List<Integer> missing = local
-            .stream()
-            .filter(number -> !upstream.contains(number))
-            .toList();
+            Long repositoryId, SweptEntity entity, List<Integer> local, Set<Integer> upstream, String safeProjectPath) {
+        List<Integer> missing =
+                local.stream().filter(number -> !upstream.contains(number)).toList();
         if (missing.isEmpty()) {
             log.debug(
-                "GitLab deletion sweep found no drift: entity={}, projectPath={}, localCount={}, upstreamCount={}",
-                entity.plural,
-                safeProjectPath,
-                local.size(),
-                upstream.size()
-            );
+                    "GitLab deletion sweep found no drift: entity={}, projectPath={}, localCount={}, upstreamCount={}",
+                    entity.plural,
+                    safeProjectPath,
+                    local.size(),
+                    upstream.size());
             return 0;
         }
 
@@ -435,19 +413,17 @@ public class GitLabDeletionSweepService {
         // namespaces (issue #5 and MR !5 coexist), and both share the single-table `issue` table. A
         // type-blind UPDATE keyed on (repository_id, number) would tombstone a live MR when an issue with
         // the same IID is swept (and vice versa). Target only the class this pass proved complete.
-        int tombstoned =
-            entity == SweptEntity.ISSUE
+        int tombstoned = entity == SweptEntity.ISSUE
                 ? issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(repositoryId, missing, Instant.now())
                 : issueRepository.tombstonePullRequestsByRepositoryIdAndNumbers(repositoryId, missing, Instant.now());
         log.info(
-            "GitLab deletion sweep tombstoned upstream-deleted items: entity={}, projectPath={}, repoId={}, tombstoned={}, localCount={}, upstreamCount={}",
-            entity.plural,
-            safeProjectPath,
-            repositoryId,
-            tombstoned,
-            local.size(),
-            upstream.size()
-        );
+                "GitLab deletion sweep tombstoned upstream-deleted items: entity={}, projectPath={}, repoId={}, tombstoned={}, localCount={}, upstreamCount={}",
+                entity.plural,
+                safeProjectPath,
+                repositoryId,
+                tombstoned,
+                local.size(),
+                upstream.size());
         return tombstoned;
     }
 
@@ -459,12 +435,11 @@ public class GitLabDeletionSweepService {
      * new failure mode and forgets about it fails safe by default rather than authorizing a deletion.
      */
     private UpstreamListing listUpstreamNumbers(
-        Long scopeId,
-        String fullPath,
-        SweptEntity entity,
-        String safeProjectPath,
-        @Nullable SyncExecutionHandle handle
-    ) {
+            Long scopeId,
+            String fullPath,
+            SweptEntity entity,
+            String safeProjectPath,
+            @Nullable SyncExecutionHandle handle) {
         String context = entity.plural + " numbers for " + safeProjectPath;
 
         Set<Integer> numbers = new LinkedHashSet<>();
@@ -504,23 +479,21 @@ public class GitLabDeletionSweepService {
             ClientGraphQlResponse response;
             try {
                 HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
-                response = client
-                    .documentName(entity.document)
-                    .variable("fullPath", fullPath)
-                    .variable("first", pageSize)
-                    .variable("after", cursor)
-                    .execute()
-                    .block(gitLabProperties.extendedGraphqlTimeout());
+                response = client.documentName(entity.document)
+                        .variable("fullPath", fullPath)
+                        .variable("first", pageSize)
+                        .variable("after", cursor)
+                        .execute()
+                        .block(gitLabProperties.extendedGraphqlTimeout());
             } catch (RuntimeException e) {
                 // Includes the block() timeout and any transport failure. Whatever the cause, the set is
                 // short — refuse it.
                 graphQlClientProvider.recordFailure(e);
                 log.warn(
-                    "GitLab deletion sweep listing failed: context={}, page={}, message={}",
-                    context,
-                    page,
-                    e.toString()
-                );
+                        "GitLab deletion sweep listing failed: context={}, page={}, message={}",
+                        context,
+                        page,
+                        e.toString());
                 return UpstreamListing.incomplete("listingThrew");
             }
 
@@ -536,8 +509,7 @@ public class GitLabDeletionSweepService {
             }
             if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
                 graphQlClientProvider.recordFailure(
-                    new GitLabSyncException("Invalid GraphQL response during deletion sweep")
-                );
+                        new GitLabSyncException("Invalid GraphQL response during deletion sweep"));
                 return UpstreamListing.incomplete("graphQlError");
             }
             graphQlClientProvider.recordSuccess();
@@ -549,10 +521,9 @@ public class GitLabDeletionSweepService {
             // field) leaves the decision to the emptiness guard rather than blocking every sweep.
             if (Boolean.FALSE.equals(readBooleanField(Objects.requireNonNull(response), entity.featureFlagPath))) {
                 log.warn(
-                    "GitLab deletion sweep listing refused, feature disabled upstream: context={}, flag={}",
-                    context,
-                    entity.featureFlagPath
-                );
+                        "GitLab deletion sweep listing refused, feature disabled upstream: context={}, flag={}",
+                        context,
+                        entity.featureFlagPath);
                 return UpstreamListing.incomplete("featureDisabled");
             }
 
@@ -560,13 +531,15 @@ public class GitLabDeletionSweepService {
             List<Integer> pageNumbers;
             GitLabPageInfo pageInfo;
             try {
-                Object countField = Objects.requireNonNull(response).field(entity.countPath()).getValue();
+                Object countField = Objects.requireNonNull(response)
+                        .field(entity.countPath())
+                        .getValue();
                 pageCount = countField instanceof Number n ? n.intValue() : -1;
 
-                @SuppressWarnings({ "unchecked", "rawtypes" })
+                @SuppressWarnings({"unchecked", "rawtypes"})
                 List<Map<String, Object>> nodes = (List) Objects.requireNonNull(response)
-                    .field(entity.nodesPath())
-                    .toEntityList(Map.class);
+                        .field(entity.nodesPath())
+                        .toEntityList(Map.class);
                 pageNumbers = new ArrayList<>(nodes == null ? 0 : nodes.size());
                 if (nodes != null) {
                     for (Map<String, Object> node : nodes) {
@@ -575,25 +548,23 @@ public class GitLabDeletionSweepService {
                             // A node whose IID we cannot read would be silently absent from the upstream
                             // set and could make a live local row look deleted. Refuse the whole listing.
                             log.warn(
-                                "GitLab deletion sweep saw an unparseable IID: context={}, page={}",
-                                context,
-                                page
-                            );
+                                    "GitLab deletion sweep saw an unparseable IID: context={}, page={}", context, page);
                             return UpstreamListing.incomplete("unparseableIid");
                         }
                         pageNumbers.add(iid);
                     }
                 }
 
-                pageInfo = Objects.requireNonNull(response).field(entity.pageInfoPath()).toEntity(GitLabPageInfo.class);
+                pageInfo = Objects.requireNonNull(response)
+                        .field(entity.pageInfoPath())
+                        .toEntity(GitLabPageInfo.class);
             } catch (RuntimeException e) {
                 log.warn(
-                    "GitLab deletion sweep decode failed: context={}, page={}, message={}, cause={}",
-                    context,
-                    page,
-                    e.toString(),
-                    rootCauseOf(e).toString()
-                );
+                        "GitLab deletion sweep decode failed: context={}, page={}, message={}, cause={}",
+                        context,
+                        page,
+                        e.toString(),
+                        rootCauseOf(e).toString());
                 return UpstreamListing.incomplete("decodeFailed");
             }
 
@@ -634,11 +605,10 @@ public class GitLabDeletionSweepService {
         // small project and would otherwise authorize deleting everything past the cut.
         if (numbers.size() != reportedCount) {
             log.warn(
-                "GitLab deletion sweep listing did not reconcile with upstream count, deleting nothing: context={}, received={}, count={}",
-                context,
-                numbers.size(),
-                reportedCount
-            );
+                    "GitLab deletion sweep listing did not reconcile with upstream count, deleting nothing: context={}, received={}, count={}",
+                    context,
+                    numbers.size(),
+                    reportedCount);
             return UpstreamListing.incomplete("countMismatch");
         }
 

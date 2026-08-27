@@ -20,15 +20,15 @@ public class WorkspaceSyncContextProvider implements SyncContextProvider {
         // Convert SyncContext to WorkspaceContext
         // For sync operations, we use empty roles since this is a system operation
         WorkspaceContext workspaceContext = new WorkspaceContext(
-            context.scopeId(),
-            context.slug(),
-            context.displayName(),
-            null, // accountType not needed for sync operations
-            context.installationId(),
-            false, // publiclyViewable not relevant for sync
-            false, // mentorEnabled not relevant for sync
-            Set.of() // No roles for system sync operations
-        );
+                context.scopeId(),
+                context.slug(),
+                context.displayName(),
+                null, // accountType not needed for sync operations
+                context.installationId(),
+                false, // publiclyViewable not relevant for sync
+                false, // mentorEnabled not relevant for sync
+                Set.of() // No roles for system sync operations
+                );
 
         WorkspaceContextHolder.setContext(workspaceContext);
     }

@@ -30,11 +30,11 @@ public class LlmAdmissionService {
     /** Admit a per-purpose binding: row-lock it (against activation/reprice) and freeze its price. */
     @Transactional
     public AdmittedLlmModel admit(WorkspaceAgentBinding binding) {
-        WorkspaceAgentBinding locked =
-            binding.getId() != null
+        WorkspaceAgentBinding locked = binding.getId() != null
                 ? bindingRepository
-                      .findByWorkspaceIdAndPurposeForUpdate(binding.getWorkspace().getId(), binding.getPurpose())
-                      .orElseThrow(LlmAdmissionService::modelUnavailable)
+                        .findByWorkspaceIdAndPurposeForUpdate(
+                                binding.getWorkspace().getId(), binding.getPurpose())
+                        .orElseThrow(LlmAdmissionService::modelUnavailable)
                 : binding;
         return admitLocked(locked);
     }
@@ -51,94 +51,93 @@ public class LlmAdmissionService {
         // activation/reprice half-state.
         if (locked.getInstanceModel() != null) {
             modelRepository
-                .findByIdForUpdate(locked.getInstanceModel().getId())
-                .orElseThrow(LlmAdmissionService::modelUnavailable);
+                    .findByIdForUpdate(locked.getInstanceModel().getId())
+                    .orElseThrow(LlmAdmissionService::modelUnavailable);
         } else if (locked.getWorkspaceModel() != null) {
             workspaceModelRepository
-                .findByIdAndWorkspaceIdForUpdate(locked.getWorkspaceModel().getId(), locked.getWorkspace().getId())
-                .orElseThrow(LlmAdmissionService::modelUnavailable);
+                    .findByIdAndWorkspaceIdForUpdate(
+                            locked.getWorkspaceModel().getId(),
+                            locked.getWorkspace().getId())
+                    .orElseThrow(LlmAdmissionService::modelUnavailable);
         }
         var resolved = resolver.resolve(locked);
         var ref = resolver.connectionRef(locked);
         if (ref.scope() == null || ref.modelId() == null || ref.workspaceId() == null) {
             throw modelUnavailable();
         }
-        LlmPriceSnapshot price = switch (ref.scope()) {
-            case INSTANCE -> instancePrice(ref.modelId());
-            case WORKSPACE -> workspacePrice(ref.modelId(), ref.workspaceId());
-        };
+        LlmPriceSnapshot price =
+                switch (ref.scope()) {
+                    case INSTANCE -> instancePrice(ref.modelId());
+                    case WORKSPACE -> workspacePrice(ref.modelId(), ref.workspaceId());
+                };
         return new AdmittedLlmModel(resolved, ref, price);
     }
 
     private LlmPriceSnapshot instancePrice(Long modelId) {
         return priceRepository
-            .findByModelIdAndEffectiveToIsNull(modelId)
-            .map(price -> snapshot(price.getPricingMode(), FundingSource.INSTANCE, price.getId(), null, price))
-            .orElseThrow(() -> new IllegalStateException("The configured OpenAI-compatible model has no usable price"));
+                .findByModelIdAndEffectiveToIsNull(modelId)
+                .map(price -> snapshot(price.getPricingMode(), FundingSource.INSTANCE, price.getId(), null, price))
+                .orElseThrow(
+                        () -> new IllegalStateException("The configured OpenAI-compatible model has no usable price"));
     }
 
     private LlmPriceSnapshot workspacePrice(Long modelId, Long workspaceId) {
         WorkspaceLlmModel model = workspaceModelRepository
-            .findByIdAndWorkspaceId(modelId, workspaceId)
-            .orElseThrow(LlmAdmissionService::modelUnavailable);
+                .findByIdAndWorkspaceId(modelId, workspaceId)
+                .orElseThrow(LlmAdmissionService::modelUnavailable);
         return snapshot(model.getPricingMode(), FundingSource.WORKSPACE, null, model.getId(), model);
     }
 
     private static LlmPriceSnapshot snapshot(
-        PricingMode mode,
-        FundingSource source,
-        @Nullable Long priceId,
-        @Nullable Long workspaceModelId,
-        LlmModelPrice price
-    ) {
+            PricingMode mode,
+            FundingSource source,
+            @Nullable Long priceId,
+            @Nullable Long workspaceModelId,
+            LlmModelPrice price) {
         return snapshot(
-            mode,
-            source,
-            priceId,
-            workspaceModelId,
-            price.getPer1mInputUsd(),
-            price.getPer1mOutputUsd(),
-            price.getPer1mCacheReadUsd(),
-            price.getPer1mCacheWriteUsd()
-        );
+                mode,
+                source,
+                priceId,
+                workspaceModelId,
+                price.getPer1mInputUsd(),
+                price.getPer1mOutputUsd(),
+                price.getPer1mCacheReadUsd(),
+                price.getPer1mCacheWriteUsd());
     }
 
     private static LlmPriceSnapshot snapshot(
-        PricingMode mode,
-        FundingSource source,
-        @Nullable Long priceId,
-        @Nullable Long workspaceModelId,
-        WorkspaceLlmModel model
-    ) {
+            PricingMode mode,
+            FundingSource source,
+            @Nullable Long priceId,
+            @Nullable Long workspaceModelId,
+            WorkspaceLlmModel model) {
         return snapshot(
-            mode,
-            source,
-            priceId,
-            workspaceModelId,
-            model.getPer1mInputUsd(),
-            model.getPer1mOutputUsd(),
-            model.getPer1mCacheReadUsd(),
-            model.getPer1mCacheWriteUsd()
-        );
+                mode,
+                source,
+                priceId,
+                workspaceModelId,
+                model.getPer1mInputUsd(),
+                model.getPer1mOutputUsd(),
+                model.getPer1mCacheReadUsd(),
+                model.getPer1mCacheWriteUsd());
     }
 
     private static LlmPriceSnapshot snapshot(
-        PricingMode mode,
-        FundingSource source,
-        @Nullable Long priceId,
-        @Nullable Long workspaceModelId,
-        @Nullable BigDecimal input,
-        @Nullable BigDecimal output,
-        @Nullable BigDecimal cacheRead,
-        @Nullable BigDecimal cacheWrite
-    ) {
-        PricingState state = switch (mode) {
-            case PRICED -> PricingState.PRICED;
-            case NO_CHARGE -> PricingState.NO_CHARGE;
-            case UNPRICED -> throw new IllegalStateException(
-                "The configured OpenAI-compatible model has no usable price"
-            );
-        };
+            PricingMode mode,
+            FundingSource source,
+            @Nullable Long priceId,
+            @Nullable Long workspaceModelId,
+            @Nullable BigDecimal input,
+            @Nullable BigDecimal output,
+            @Nullable BigDecimal cacheRead,
+            @Nullable BigDecimal cacheWrite) {
+        PricingState state =
+                switch (mode) {
+                    case PRICED -> PricingState.PRICED;
+                    case NO_CHARGE -> PricingState.NO_CHARGE;
+                    case UNPRICED ->
+                        throw new IllegalStateException("The configured OpenAI-compatible model has no usable price");
+                };
         return new LlmPriceSnapshot(source, state, priceId, workspaceModelId, input, output, cacheRead, cacheWrite);
     }
 }

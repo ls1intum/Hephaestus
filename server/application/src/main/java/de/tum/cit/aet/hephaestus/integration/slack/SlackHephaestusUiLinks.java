@@ -13,9 +13,7 @@ public class SlackHephaestusUiLinks {
     private final String webappUrl;
 
     public SlackHephaestusUiLinks(
-        WorkspaceSummaryQuery workspaceSummaryQuery,
-        @Value("${hephaestus.webapp.url:}") String webappUrl
-    ) {
+            WorkspaceSummaryQuery workspaceSummaryQuery, @Value("${hephaestus.webapp.url:}") String webappUrl) {
         this.workspaceSummaryQuery = workspaceSummaryQuery;
         this.webappUrl = normalize(webappUrl);
     }
@@ -25,11 +23,11 @@ public class SlackHephaestusUiLinks {
             return "";
         }
         return workspaceSummaryQuery
-            .findById(workspaceId)
-            .map(WorkspaceSummaryQuery.WorkspaceSummary::slug)
-            .filter(slug -> !slug.isBlank())
-            .map(slug -> webappUrl + "/w/" + slug)
-            .orElse(webappUrl);
+                .findById(workspaceId)
+                .map(WorkspaceSummaryQuery.WorkspaceSummary::slug)
+                .filter(slug -> !slug.isBlank())
+                .map(slug -> webappUrl + "/w/" + slug)
+                .orElse(webappUrl);
     }
 
     public String userSettingsUrl() {

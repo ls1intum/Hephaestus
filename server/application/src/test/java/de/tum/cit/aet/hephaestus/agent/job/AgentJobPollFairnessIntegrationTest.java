@@ -65,14 +65,12 @@ class AgentJobPollFairnessIntegrationTest extends BaseIntegrationTest {
 
         LlmConnection connection = llmConnectionRepository.save(LlmCatalogTestFixtures.connection("poll-fairness"));
         instanceModel = llmModelRepository.save(
-            LlmCatalogTestFixtures.model(connection, "poll-fairness-model", "gpt-poll-fairness")
-        );
+                LlmCatalogTestFixtures.model(connection, "poll-fairness-model", "gpt-poll-fairness"));
     }
 
     @Test
     @DisplayName(
-        "a saturated (workspace, purpose)'s older QUEUED backlog does not starve a younger, runnable job from another workspace"
-    )
+            "a saturated (workspace, purpose)'s older QUEUED backlog does not starve a younger, runnable job from another workspace")
     void youngerRunnableJobFromAnotherWorkspaceIsNotStarved() {
         Workspace cappedWs = activeWorkspace("capped-ws");
         Workspace openWs = activeWorkspace("open-ws");
@@ -93,11 +91,9 @@ class AgentJobPollFairnessIntegrationTest extends BaseIntegrationTest {
         List<UUID> candidates = jobRepository.findQueuedIdsOldestFirst(5);
 
         assertThat(candidates)
-            .as(
-                "the open workspace's runnable job must be a poll candidate even though 5 older, unclaimable " +
-                    "jobs exist ahead of it"
-            )
-            .contains(youngerRunnableJobId);
+                .as("the open workspace's runnable job must be a poll candidate even though 5 older, unclaimable "
+                        + "jobs exist ahead of it")
+                .contains(youngerRunnableJobId);
     }
 
     @Test
@@ -133,9 +129,8 @@ class AgentJobPollFairnessIntegrationTest extends BaseIntegrationTest {
         workspaceRepository.saveAndFlush(workspace);
 
         assertThat(jobRepository.findQueuedIdsOldestFirst(10)).doesNotContain(jobId);
-        Optional<AgentJob> claimed = transactionTemplate.execute(status ->
-            jobRepository.findByIdQueuedForUpdateSkipLocked(jobId, Instant.now())
-        );
+        Optional<AgentJob> claimed = transactionTemplate.execute(
+                status -> jobRepository.findByIdQueuedForUpdateSkipLocked(jobId, Instant.now()));
         assertThat(claimed).isEmpty();
     }
 

@@ -8,11 +8,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
-@WorkspaceAgnostic(
-    "Team has no workspace_id; the statement inspector cannot scope it. Workspace read/authorization " +
-        "paths MUST scope by (organization, provider_id) via the *AndProviderId finders below — the bare " +
-        "organization-string finders match same-named orgs across providers and leak across tenants."
-)
+@WorkspaceAgnostic("Team has no workspace_id; the statement inspector cannot scope it. Workspace read/authorization "
+        + "paths MUST scope by (organization, provider_id) via the *AndProviderId finders below — the bare "
+        + "organization-string finders match same-named orgs across providers and leak across tenants.")
 public interface TeamRepository extends JpaRepository<Team, Long> {
     Optional<Team> findByNativeIdAndProviderId(Long nativeId, Long providerId);
 
@@ -79,9 +77,7 @@ public interface TeamRepository extends JpaRepository<Team, Long> {
      * <p>Note: Team labels are managed via scope-specific settings
      * (via consuming module) and are fetched separately.
      */
-    @EntityGraph(
-        attributePaths = { "repoPermissions", "repoPermissions.repository", "memberships", "memberships.user" }
-    )
+    @EntityGraph(attributePaths = {"repoPermissions", "repoPermissions.repository", "memberships", "memberships.user"})
     List<Team> findWithCollectionsByOrganizationIgnoreCaseAndProviderId(String organization, Long providerId);
 
     /**
@@ -94,8 +90,6 @@ public interface TeamRepository extends JpaRepository<Team, Long> {
      * <p>Note: Team labels are managed via scope-specific settings
      * (via consuming module) and are fetched separately.
      */
-    @EntityGraph(
-        attributePaths = { "repoPermissions", "repoPermissions.repository", "memberships", "memberships.user" }
-    )
+    @EntityGraph(attributePaths = {"repoPermissions", "repoPermissions.repository", "memberships", "memberships.user"})
     Optional<Team> findWithCollectionsById(Long id);
 }

@@ -32,15 +32,12 @@ public final class InAppFeedbackBody {
 
     /** The stored body for one composed message. */
     public static String render(String headline, String message, String nextStep) {
-        return (
-            HEADLINE_PREFIX +
-            oneLine(headline) +
-            "\n\n" +
-            message.strip() +
-            "\n\n" +
-            NEXT_STEP_PREFIX +
-            oneLine(nextStep)
-        );
+        return (HEADLINE_PREFIX + oneLine(headline)
+                + "\n\n"
+                + message.strip()
+                + "\n\n"
+                + NEXT_STEP_PREFIX
+                + oneLine(nextStep));
     }
 
     /**

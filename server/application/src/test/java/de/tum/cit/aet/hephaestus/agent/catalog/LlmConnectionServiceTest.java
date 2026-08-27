@@ -38,14 +38,13 @@ class LlmConnectionServiceTest extends BaseUnitTest {
 
     private CreateLlmConnectionRequestDTO createRequest() {
         return new CreateLlmConnectionRequestDTO(
-            "openai-prod",
-            "OpenAI",
-            "https://api.openai.com",
-            "openai-completions",
-            LlmAuthMode.BEARER,
-            "sk-abc",
-            null
-        );
+                "openai-prod",
+                "OpenAI",
+                "https://api.openai.com",
+                "openai-completions",
+                LlmAuthMode.BEARER,
+                "sk-abc",
+                null);
     }
 
     @Nested
@@ -70,9 +69,8 @@ class LlmConnectionServiceTest extends BaseUnitTest {
         void rejectsDuplicateSlugWithoutAuditing() {
             when(connectionRepository.findBySlug("openai-prod")).thenReturn(Optional.of(new LlmConnection()));
 
-            assertThatThrownBy(() -> connectionService.create(createRequest())).isInstanceOf(
-                LlmConnectionSlugConflictException.class
-            );
+            assertThatThrownBy(() -> connectionService.create(createRequest()))
+                    .isInstanceOf(LlmConnectionSlugConflictException.class);
 
             verify(connectionRepository, never()).save(any());
             verifyNoInteractions(llmConnectionAudit);
@@ -82,12 +80,12 @@ class LlmConnectionServiceTest extends BaseUnitTest {
         void doesNotCreateAConnectionWhoseBaseUrlTheEgressPolicyRejects() {
             when(connectionRepository.findBySlug("openai-prod")).thenReturn(Optional.empty());
             doThrow(new IllegalArgumentException("Provider host must be a public HTTPS URL"))
-                .when(egressPolicy)
-                .validate("https://api.openai.com");
+                    .when(egressPolicy)
+                    .validate("https://api.openai.com");
 
             assertThatThrownBy(() -> connectionService.create(createRequest()))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("public HTTPS URL");
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("public HTTPS URL");
 
             verify(connectionRepository, never()).save(any());
             verifyNoInteractions(llmConnectionAudit);
@@ -96,14 +94,7 @@ class LlmConnectionServiceTest extends BaseUnitTest {
         @Test
         void generatesCollisionSafeSlugWhenSlugIsOmitted() {
             CreateLlmConnectionRequestDTO request = new CreateLlmConnectionRequestDTO(
-                null,
-                "OpenAI",
-                "https://api.openai.com",
-                "openai-completions",
-                LlmAuthMode.BEARER,
-                null,
-                null
-            );
+                    null, "OpenAI", "https://api.openai.com", "openai-completions", LlmAuthMode.BEARER, null, null);
             when(connectionRepository.findBySlug("openai")).thenReturn(Optional.of(new LlmConnection()));
             when(connectionRepository.findBySlug("openai-2")).thenReturn(Optional.empty());
             when(connectionRepository.save(any(LlmConnection.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -131,7 +122,9 @@ class LlmConnectionServiceTest extends BaseUnitTest {
             verify(connectionRepository).delete(deleted.capture());
             assertThat(deleted.getValue().getId()).isEqualTo(5L);
             assertThat(deleted.getValue().getSlug()).isEqualTo("openai-prod");
-            verify(llmConnectionAudit).connectionDeleted(deleted.getValue().getId(), deleted.getValue().getSlug());
+            verify(llmConnectionAudit)
+                    .connectionDeleted(
+                            deleted.getValue().getId(), deleted.getValue().getSlug());
         }
 
         @Test
@@ -175,10 +168,8 @@ class LlmConnectionServiceTest extends BaseUnitTest {
         void appliesTheSuppliedFieldsAndAuditsTheUpdate() {
             LlmConnection connection = stored();
 
-            LlmConnection saved = connectionService.update(
-                5L,
-                new UpdateLlmConnectionRequestDTO("New name", null, null, false)
-            );
+            LlmConnection saved =
+                    connectionService.update(5L, new UpdateLlmConnectionRequestDTO("New name", null, null, false));
 
             assertThat(saved.getDisplayName()).isEqualTo("New name");
             assertThat(saved.isEnabled()).isFalse();
@@ -219,9 +210,9 @@ class LlmConnectionServiceTest extends BaseUnitTest {
         void unknownConnectionRaisesNotFoundWithoutAuditing() {
             when(connectionRepository.findById(404L)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() ->
-                connectionService.update(404L, new UpdateLlmConnectionRequestDTO("New name", null, null, null))
-            ).isInstanceOf(EntityNotFoundException.class);
+            assertThatThrownBy(() -> connectionService.update(
+                            404L, new UpdateLlmConnectionRequestDTO("New name", null, null, null)))
+                    .isInstanceOf(EntityNotFoundException.class);
             verifyNoInteractions(llmConnectionAudit);
         }
     }

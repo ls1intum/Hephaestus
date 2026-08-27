@@ -121,10 +121,9 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
         agentBindingRepository.save(binding);
 
         provider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
 
         assignee = TestUserFactory.createUser(400L, "assignee-user", provider);
         assignee = userRepository.save(assignee);
@@ -156,41 +155,43 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
         Long providerId = provider.getId();
         assertNotNull(providerId);
         pullRequestRepository.upsertCore(
-            7001L,
-            providerId,
-            100,
-            "Gate Test PR",
-            "Body",
-            "OPEN",
-            null,
-            "https://github.com/org/gate-repo/pull/100",
-            false, // isLocked
-            null, // closedAt
-            0, // commentsCount
-            now, // lastSyncAt
-            now, // createdAt
-            now, // updatedAt
-            assignee.getId(),
-            repo.getId(),
-            null, // milestoneId
-            null, // mergedAt
-            isDraft, // isDraft
-            false, // isMerged
-            1,
-            10,
-            5,
-            3,
-            null,
-            null,
-            null,
-            "feature/gate",
-            "main",
-            "gatesha",
-            "basesha",
-            null,
-            null // mergeCommitSha
-        );
-        PullRequest pr = pullRequestRepository.findByRepositoryIdAndNumber(repo.getId(), 100).orElseThrow();
+                7001L,
+                providerId,
+                100,
+                "Gate Test PR",
+                "Body",
+                "OPEN",
+                null,
+                "https://github.com/org/gate-repo/pull/100",
+                false, // isLocked
+                null, // closedAt
+                0, // commentsCount
+                now, // lastSyncAt
+                now, // createdAt
+                now, // updatedAt
+                assignee.getId(),
+                repo.getId(),
+                null, // milestoneId
+                null, // mergedAt
+                isDraft, // isDraft
+                false, // isMerged
+                1,
+                10,
+                5,
+                3,
+                null,
+                null,
+                null,
+                "feature/gate",
+                "main",
+                "gatesha",
+                "basesha",
+                null,
+                null // mergeCommitSha
+                );
+        PullRequest pr = pullRequestRepository
+                .findByRepositoryIdAndNumber(repo.getId(), 100)
+                .orElseThrow();
 
         // Attach relationships that the gate reads (these are on the Issue superclass)
         pr.setLabels(labels != null ? labels : Set.of());
@@ -243,11 +244,10 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
         void matchesMultiple() {
             createPractice("practice-a", "Practice A", List.of(ScmSignals.PULL_REQUEST_OPENED), true);
             createPractice(
-                "practice-b",
-                "Practice B",
-                List.of(ScmSignals.PULL_REQUEST_OPENED, ScmSignals.PULL_REQUEST_REVIEWED),
-                true
-            );
+                    "practice-b",
+                    "Practice B",
+                    List.of(ScmSignals.PULL_REQUEST_OPENED, ScmSignals.PULL_REQUEST_REVIEWED),
+                    true);
             createPractice("practice-c", "Practice C", List.of(ScmSignals.PULL_REQUEST_REVIEWED), true);
             PullRequest pr = createPullRequest(false, Set.of(), Set.of(assignee));
 
@@ -257,8 +257,8 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
             var detect = (GateDecision.Detect) decision;
             assertThat(detect.matchedPractices()).hasSize(2);
             assertThat(detect.matchedPractices())
-                .extracting(Practice::getSlug)
-                .containsExactlyInAnyOrder("practice-a", "practice-b");
+                    .extracting(Practice::getSlug)
+                    .containsExactlyInAnyOrder("practice-a", "practice-b");
         }
     }
 

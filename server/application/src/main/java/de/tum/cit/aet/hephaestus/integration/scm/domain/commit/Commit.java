@@ -44,18 +44,17 @@ import org.jspecify.annotations.Nullable;
  */
 @Entity
 @Table(
-    name = "git_commit",
-    uniqueConstraints = @UniqueConstraint(
-        name = "uq_git_commit_sha_repository",
-        columnNames = { "sha", "repository_id" }
-    ),
-    indexes = {
-        @Index(name = "idx_git_commit_repository_id", columnList = "repository_id"),
-        @Index(name = "idx_git_commit_author_id", columnList = "author_id"),
-        @Index(name = "idx_git_commit_committer_id", columnList = "committer_id"),
-        @Index(name = "idx_git_commit_authored_at", columnList = "authored_at"),
-    }
-)
+        name = "git_commit",
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uq_git_commit_sha_repository",
+                        columnNames = {"sha", "repository_id"}),
+        indexes = {
+            @Index(name = "idx_git_commit_repository_id", columnList = "repository_id"),
+            @Index(name = "idx_git_commit_author_id", columnList = "author_id"),
+            @Index(name = "idx_git_commit_committer_id", columnList = "committer_id"),
+            @Index(name = "idx_git_commit_authored_at", columnList = "authored_at"),
+        })
 @Getter
 @Setter
 @NoArgsConstructor
@@ -319,10 +318,9 @@ public class Commit {
      */
     @ManyToMany
     @JoinTable(
-        name = "commit_pull_request",
-        joinColumns = @JoinColumn(name = "commit_id"),
-        inverseJoinColumns = @JoinColumn(name = "pull_request_id")
-    )
+            name = "commit_pull_request",
+            joinColumns = @JoinColumn(name = "commit_id"),
+            inverseJoinColumns = @JoinColumn(name = "pull_request_id"))
     @ToString.Exclude
     private Set<PullRequest> associatedPullRequests = new HashSet<>();
 

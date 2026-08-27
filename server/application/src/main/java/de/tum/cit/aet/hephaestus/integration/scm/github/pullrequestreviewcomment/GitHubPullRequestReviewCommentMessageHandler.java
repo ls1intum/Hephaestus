@@ -32,8 +32,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Component
 public class GitHubPullRequestReviewCommentMessageHandler
-    extends AbstractIntegrationMessageHandler<GitHubPullRequestReviewCommentEventDTO>
-{
+        extends AbstractIntegrationMessageHandler<GitHubPullRequestReviewCommentEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubPullRequestReviewCommentMessageHandler.class);
 
@@ -41,18 +40,16 @@ public class GitHubPullRequestReviewCommentMessageHandler
     private final GitHubPullRequestReviewCommentProcessor commentProcessor;
 
     GitHubPullRequestReviewCommentMessageHandler(
-        ProcessingContextFactory contextFactory,
-        GitHubPullRequestReviewCommentProcessor commentProcessor,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            ProcessingContextFactory contextFactory,
+            GitHubPullRequestReviewCommentProcessor commentProcessor,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITHUB,
-            "repository." + GitHubEventType.PULL_REQUEST_REVIEW_COMMENT.getValue(),
-            GitHubPullRequestReviewCommentEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITHUB,
+                "repository." + GitHubEventType.PULL_REQUEST_REVIEW_COMMENT.getValue(),
+                GitHubPullRequestReviewCommentEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.contextFactory = contextFactory;
         this.commentProcessor = commentProcessor;
     }
@@ -68,12 +65,11 @@ public class GitHubPullRequestReviewCommentMessageHandler
         }
 
         log.debug(
-            "Received pull_request_review_comment event: action={}, prNumber={}, commentId={}, repoName={}",
-            event.action(),
-            prDto.number(),
-            commentDto.id(),
-            event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
-        );
+                "Received pull_request_review_comment event: action={}, prNumber={}, commentId={}, repoName={}",
+                event.action(),
+                prDto.number(),
+                commentDto.id(),
+                event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown");
 
         ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);
         if (context == null) {
@@ -91,25 +87,15 @@ public class GitHubPullRequestReviewCommentMessageHandler
         // hasn't arrived yet. This creates a minimal PR stub from the webhook data
         // instead of losing the comment.
         switch (event.actionType()) {
-            case GitHubEventAction.PullRequestReviewComment.DELETED -> commentProcessor.processDeleted(
-                commentDto.id(),
-                Objects.requireNonNull(prId),
-                context
-            );
-            case GitHubEventAction.PullRequestReviewComment.CREATED -> commentProcessor.processCreatedWithParentCreation(
-                commentDto,
-                prDto,
-                context
-            );
-            case GitHubEventAction.PullRequestReviewComment.EDITED -> commentProcessor.processEdited(
-                commentDto,
-                Objects.requireNonNull(prId),
-                context
-            );
-            default -> log.debug(
-                "Skipped pull_request_review_comment event: reason=unhandledAction, action={}",
-                event.action()
-            );
+            case GitHubEventAction.PullRequestReviewComment.DELETED ->
+                commentProcessor.processDeleted(commentDto.id(), Objects.requireNonNull(prId), context);
+            case GitHubEventAction.PullRequestReviewComment.CREATED ->
+                commentProcessor.processCreatedWithParentCreation(commentDto, prDto, context);
+            case GitHubEventAction.PullRequestReviewComment.EDITED ->
+                commentProcessor.processEdited(commentDto, Objects.requireNonNull(prId), context);
+            default ->
+                log.debug(
+                        "Skipped pull_request_review_comment event: reason=unhandledAction, action={}", event.action());
         }
     }
 }

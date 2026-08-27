@@ -70,10 +70,9 @@ class GeneralReviewCommentContentSourceIntegrationTest extends BaseIntegrationTe
         databaseTestUtils.cleanDatabase();
 
         provider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
 
         repository = new Repository();
         repository.setNativeId(nextNativeId());
@@ -98,14 +97,11 @@ class GeneralReviewCommentContentSourceIntegrationTest extends BaseIntegrationTe
         persistComment(pr, human, "split persistence out so each unit is testable", at("10:00"));
 
         List<IssueComment> rows = issueCommentRepository.findRecentHumanByIssueIdWithAuthor(
-            pr.getId(),
-            GeneralReviewCommentContentSource.HEPHAESTUS_MARKER,
-            PageRequest.of(0, 50)
-        );
+                pr.getId(), GeneralReviewCommentContentSource.HEPHAESTUS_MARKER, PageRequest.of(0, 50));
 
         assertThat(rows)
-            .extracting(IssueComment::getBody)
-            .containsExactly("split persistence out so each unit is testable");
+                .extracting(IssueComment::getBody)
+                .containsExactly("split persistence out so each unit is testable");
     }
 
     @Test
@@ -193,8 +189,7 @@ class GeneralReviewCommentContentSourceIntegrationTest extends BaseIntegrationTe
         comment.setProvider(provider);
         comment.setBody(body);
         comment.setHtmlUrl(
-            "https://github.com/acme/repo/pull/" + pullRequest.getNumber() + "#c" + comment.getNativeId()
-        );
+                "https://github.com/acme/repo/pull/" + pullRequest.getNumber() + "#c" + comment.getNativeId());
         comment.setAuthorAssociation(AuthorAssociation.MEMBER);
         comment.setCreatedAt(createdAt);
         comment.setIssue(pullRequest);

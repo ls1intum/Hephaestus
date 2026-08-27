@@ -41,20 +41,18 @@ public class GitHubInstallationMessageHandler extends AbstractIntegrationMessage
     private final IdentityProviderRepository gitProviderRepository;
 
     GitHubInstallationMessageHandler(
-        ProvisioningListener provisioningListener,
-        OrganizationService organizationService,
-        GitHubAppTokenService gitHubAppTokenService,
-        IdentityProviderRepository gitProviderRepository,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            ProvisioningListener provisioningListener,
+            OrganizationService organizationService,
+            GitHubAppTokenService gitHubAppTokenService,
+            IdentityProviderRepository gitProviderRepository,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITHUB,
-            "installation." + GitHubEventType.INSTALLATION.getValue(),
-            GitHubInstallationEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITHUB,
+                "installation." + GitHubEventType.INSTALLATION.getValue(),
+                GitHubInstallationEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.provisioningListener = provisioningListener;
         this.organizationService = organizationService;
         this.gitHubAppTokenService = gitHubAppTokenService;
@@ -75,21 +73,19 @@ public class GitHubInstallationMessageHandler extends AbstractIntegrationMessage
         Long installationId = installation.id();
 
         log.debug(
-            "Received installation event: action={}, installationId={}, accountLogin={}",
-            event.action(),
-            installationId,
-            accountLogin != null ? sanitizeForLog(accountLogin) : "unknown"
-        );
+                "Received installation event: action={}, installationId={}, accountLogin={}",
+                event.action(),
+                installationId,
+                accountLogin != null ? sanitizeForLog(accountLogin) : "unknown");
 
         GitHubEventAction.Installation action = event.actionType();
 
         // Handle deletion early - no scope provisioning needed
         if (action == GitHubEventAction.Installation.DELETED) {
             log.info(
-                "Processed installation deletion: installationId={}, accountLogin={}",
-                installationId,
-                sanitizeForLog(accountLogin)
-            );
+                    "Processed installation deletion: installationId={}, accountLogin={}",
+                    installationId,
+                    sanitizeForLog(accountLogin));
             provisioningListener.onInstallationDeleted(installationId);
             return;
         }
@@ -105,37 +101,21 @@ public class GitHubInstallationMessageHandler extends AbstractIntegrationMessage
         String repositorySelection = installation.repositorySelection();
         String avatarUrl = account != null ? account.avatarUrl() : null;
         Long accountId = account != null ? account.id() : null;
-        AccountType accountType =
-            account != null && "Organization".equalsIgnoreCase(account.type())
+        AccountType accountType = account != null && "Organization".equalsIgnoreCase(account.type())
                 ? AccountType.ORGANIZATION
                 : AccountType.USER;
 
         // Extract repository snapshots from the installation event payload
         // These are provided for "created" events with "selected" repository selection
-        List<RepositorySnapshot> repositories =
-            event.repositories() != null
-                ? event
-                      .repositories()
-                      .stream()
-                      .map(ref ->
-                          new RepositorySnapshot(
-                              Objects.requireNonNull(ref.id()),
-                              ref.fullName(),
-                              ref.name(),
-                              ref.isPrivate()
-                          )
-                      )
-                      .toList()
+        List<RepositorySnapshot> repositories = event.repositories() != null
+                ? event.repositories().stream()
+                        .map(ref -> new RepositorySnapshot(
+                                Objects.requireNonNull(ref.id()), ref.fullName(), ref.name(), ref.isPrivate()))
+                        .toList()
                 : Collections.emptyList();
 
-        InstallationData installationData = new InstallationData(
-            installationId,
-            accountId,
-            accountLogin,
-            accountType,
-            avatarUrl,
-            repositories
-        );
+        InstallationData installationData =
+                new InstallationData(installationId, accountId, accountLogin, accountType, avatarUrl, repositories);
 
         // For CREATED events - verify current installation status first
         // This prevents reactivating suspended installations from stale NATS replay events
@@ -144,9 +124,8 @@ public class GitHubInstallationMessageHandler extends AbstractIntegrationMessage
                 boolean currentlySuspended = gitHubAppTokenService.isInstallationSuspended(installationId);
                 if (currentlySuspended) {
                     log.info(
-                        "Installation created event received but installation is currently suspended, marking suspended: installationId={}",
-                        installationId
-                    );
+                            "Installation created event received but installation is currently suspended, marking suspended: installationId={}",
+                            installationId);
                     gitHubAppTokenService.markInstallationSuspended(installationId);
                     // Still create the workspace but don't activate it
                     provisioningListener.onInstallationCreated(installationData);
@@ -157,18 +136,16 @@ public class GitHubInstallationMessageHandler extends AbstractIntegrationMessage
             } catch (InstallationNotFoundException e) {
                 // Installation no longer exists on GitHub - do NOT create workspace for deleted installation
                 log.info(
-                    "Installation no longer exists on GitHub, skipping workspace creation: installationId={}",
-                    installationId
-                );
+                        "Installation no longer exists on GitHub, skipping workspace creation: installationId={}",
+                        installationId);
                 return;
             } catch (RuntimeException e) {
                 // Network errors, credentials not configured, or other transient issues
                 // Proceed with activation - if installation is truly suspended, token minting will fail fast
                 log.warn(
-                    "Could not verify installation status for created event, proceeding with activation: installationId={}, error={}",
-                    installationId,
-                    e.getMessage()
-                );
+                        "Could not verify installation status for created event, proceeding with activation: installationId={}, error={}",
+                        installationId,
+                        e.getMessage());
             }
         }
 
@@ -178,14 +155,13 @@ public class GitHubInstallationMessageHandler extends AbstractIntegrationMessage
         // Ensure organization identity is up-to-date if applicable
         if (account != null && "Organization".equalsIgnoreCase(account.type())) {
             Long providerId = gitProviderRepository
-                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
-                .orElseThrow(() -> new IllegalStateException("IdentityProvider not found for GitHub"))
-                .getId();
+                    .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
+                    .orElseThrow(() -> new IllegalStateException("IdentityProvider not found for GitHub"))
+                    .getId();
             organizationService.upsertIdentity(
-                Objects.requireNonNull(account.id()),
-                Objects.requireNonNull(accountLogin),
-                Objects.requireNonNull(providerId)
-            );
+                    Objects.requireNonNull(account.id()),
+                    Objects.requireNonNull(accountLogin),
+                    Objects.requireNonNull(providerId));
         }
 
         // Handle activation for CREATED events
@@ -220,10 +196,9 @@ public class GitHubInstallationMessageHandler extends AbstractIntegrationMessage
         } catch (RuntimeException e) {
             // Network errors or other transient issues - don't update status if we can't verify
             log.warn(
-                "Failed to verify installation status via API, skipping status update: installationId={}, error={}",
-                installationId,
-                e.getMessage()
-            );
+                    "Failed to verify installation status via API, skipping status update: installationId={}, error={}",
+                    installationId,
+                    e.getMessage());
         }
     }
 }

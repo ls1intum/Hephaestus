@@ -21,11 +21,8 @@ class ReviewRunTargetLookupAdapter implements ReviewRunTargetLookup {
         if (jobIds.isEmpty()) {
             return Map.of();
         }
-        return repository
-            .findReviewRunTargets(workspaceId, jobIds)
-            .stream()
-            .collect(
-                Collectors.toUnmodifiableMap(AgentJobRepository.ReviewRunTargetRow::getId, ReviewRunTargetMapper::from)
-            );
+        return repository.findReviewRunTargets(workspaceId, jobIds).stream()
+                .collect(Collectors.toUnmodifiableMap(
+                        AgentJobRepository.ReviewRunTargetRow::getId, ReviewRunTargetMapper::from));
     }
 }

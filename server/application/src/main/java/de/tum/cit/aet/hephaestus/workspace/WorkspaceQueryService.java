@@ -38,9 +38,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class WorkspaceQueryService {
 
     private static final Comparator<Workspace> ACCESSIBLE_WORKSPACE_COMPARATOR = Comparator.comparing(
-        Workspace::getDisplayName,
-        String.CASE_INSENSITIVE_ORDER
-    ).thenComparing(Workspace::getWorkspaceSlug, String.CASE_INSENSITIVE_ORDER);
+                    Workspace::getDisplayName, String.CASE_INSENSITIVE_ORDER)
+            .thenComparing(Workspace::getWorkspaceSlug, String.CASE_INSENSITIVE_ORDER);
 
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMembershipRepository workspaceMembershipRepository;
@@ -54,17 +53,17 @@ public class WorkspaceQueryService {
      * delegates the "is this provider exposable to the wizard?" decision back to the adapter.
      */
     private final Map<IntegrationKind, WorkspaceProviderAvailability> providerAvailability;
+
     private final WorkspaceProperties workspaceProperties;
 
     public WorkspaceQueryService(
-        WorkspaceRepository workspaceRepository,
-        WorkspaceMembershipRepository workspaceMembershipRepository,
-        RepositoryToMonitorRepository repositoryToMonitorRepository,
-        CurrentAccountUsers currentAccountUsers,
-        ConnectionService connectionService,
-        WorkspaceProperties workspaceProperties,
-        List<WorkspaceProviderAvailability> providerAvailabilityList
-    ) {
+            WorkspaceRepository workspaceRepository,
+            WorkspaceMembershipRepository workspaceMembershipRepository,
+            RepositoryToMonitorRepository repositoryToMonitorRepository,
+            CurrentAccountUsers currentAccountUsers,
+            ConnectionService connectionService,
+            WorkspaceProperties workspaceProperties,
+            List<WorkspaceProviderAvailability> providerAvailabilityList) {
         this.workspaceRepository = workspaceRepository;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
@@ -93,10 +92,9 @@ public class WorkspaceQueryService {
      * current authenticated user.
      */
     public List<WorkspaceListItemDTO> findAccessibleWorkspaceListItems() {
-        return findAccessibleWorkspaces()
-            .stream()
-            .map(w -> WorkspaceListItemDTO.from(w, connectionService))
-            .toList();
+        return findAccessibleWorkspaces().stream()
+                .map(w -> WorkspaceListItemDTO.from(w, connectionService))
+                .toList();
     }
 
     /**
@@ -108,16 +106,18 @@ public class WorkspaceQueryService {
      * between SPI and DTO is the {@code installationUrl} / {@code defaultServerUrl} string.
      */
     public WorkspaceProvidersDTO getAvailableProviders() {
-        var github =
-            providerAvailability.getOrDefault(IntegrationKind.GITHUB, null) instanceof
-                WorkspaceProviderAvailability ghAvail
-                ? ghAvail.hintUrl().map(WorkspaceProvidersDTO.GitHubProviderDTO::new).orElse(null)
+        var github = providerAvailability.getOrDefault(IntegrationKind.GITHUB, null)
+                        instanceof WorkspaceProviderAvailability ghAvail
+                ? ghAvail.hintUrl()
+                        .map(WorkspaceProvidersDTO.GitHubProviderDTO::new)
+                        .orElse(null)
                 : null;
 
-        var gitlab =
-            providerAvailability.getOrDefault(IntegrationKind.GITLAB, null) instanceof
-                WorkspaceProviderAvailability glAvail
-                ? glAvail.hintUrl().map(WorkspaceProvidersDTO.GitLabProviderDTO::new).orElse(null)
+        var gitlab = providerAvailability.getOrDefault(IntegrationKind.GITLAB, null)
+                        instanceof WorkspaceProviderAvailability glAvail
+                ? glAvail.hintUrl()
+                        .map(WorkspaceProvidersDTO.GitLabProviderDTO::new)
+                        .orElse(null)
                 : null;
 
         return new WorkspaceProvidersDTO(github, gitlab, workspaceProperties.creationPolicy());
@@ -166,46 +166,42 @@ public class WorkspaceQueryService {
      */
     public List<Workspace> findAccessibleWorkspaces(Collection<User> currentUsers) {
         // Always include public, active workspaces
-        List<Workspace> publicWorkspaces = workspaceRepository.findByStatusAndIsPubliclyViewableTrue(
-            Workspace.WorkspaceStatus.ACTIVE
-        );
+        List<Workspace> publicWorkspaces =
+                workspaceRepository.findByStatusAndIsPubliclyViewableTrue(Workspace.WorkspaceStatus.ACTIVE);
 
-        Set<Long> userIds = currentUsers
-            .stream()
-            .filter(u -> u != null && u.getId() != null)
-            .map(User::getId)
-            .collect(Collectors.toSet());
+        Set<Long> userIds = currentUsers.stream()
+                .filter(u -> u != null && u.getId() != null)
+                .map(User::getId)
+                .collect(Collectors.toSet());
 
         if (userIds.isEmpty()) {
-            return publicWorkspaces.stream().sorted(ACCESSIBLE_WORKSPACE_COMPARATOR).toList();
+            return publicWorkspaces.stream()
+                    .sorted(ACCESSIBLE_WORKSPACE_COMPARATOR)
+                    .toList();
         }
 
         // Fetch memberships across every identity and load workspaces by ID
         var memberships = workspaceMembershipRepository.findByUser_IdIn(userIds);
-        var workspaceIds = memberships
-            .stream()
-            .map(WorkspaceMembership::getWorkspace)
-            .map(Workspace::getId)
-            .distinct()
-            .toList();
+        var workspaceIds = memberships.stream()
+                .map(WorkspaceMembership::getWorkspace)
+                .map(Workspace::getId)
+                .distinct()
+                .toList();
 
         List<Workspace> memberWorkspaces = workspaceIds.isEmpty()
-            ? List.of()
-            : workspaceRepository
-                  .findAllById(workspaceIds)
-                  .stream()
-                  .filter(w -> w.getStatus() == Workspace.WorkspaceStatus.ACTIVE)
-                  .toList();
+                ? List.of()
+                : workspaceRepository.findAllById(workspaceIds).stream()
+                        .filter(w -> w.getStatus() == Workspace.WorkspaceStatus.ACTIVE)
+                        .toList();
 
         // Merge and de-duplicate by ID to avoid duplicate entities with different instances
         return Stream.concat(publicWorkspaces.stream(), memberWorkspaces.stream())
-            .collect(
-                Collectors.toMap(Workspace::getId, w -> w, (existing, replacement) -> existing, LinkedHashMap::new)
-            )
-            .values()
-            .stream()
-            .sorted(ACCESSIBLE_WORKSPACE_COMPARATOR)
-            .toList();
+                .collect(Collectors.toMap(
+                        Workspace::getId, w -> w, (existing, replacement) -> existing, LinkedHashMap::new))
+                .values()
+                .stream()
+                .sorted(ACCESSIBLE_WORKSPACE_COMPARATOR)
+                .toList();
     }
 
     /**

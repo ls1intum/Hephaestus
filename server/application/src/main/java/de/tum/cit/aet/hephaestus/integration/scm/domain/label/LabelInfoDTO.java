@@ -9,11 +9,16 @@ import org.jspecify.annotations.Nullable;
 
 @Schema(description = "Information about a label from a repository")
 public record LabelInfoDTO(
-    @NonNull @Schema(description = "Unique identifier of the label") Long id,
-    @NonNull @Schema(description = "Name of the label") String name,
-    @NonNull @Schema(description = "Hex color code of the label (without #)", example = "d73a4a") String color,
-    @Nullable @Schema(description = "Repository the label belongs to") RepositoryInfoDTO repository
-) {
+        @NonNull @Schema(description = "Unique identifier of the label")
+        Long id,
+
+        @NonNull @Schema(description = "Name of the label") String name,
+
+        @NonNull @Schema(description = "Hex color code of the label (without #)", example = "d73a4a")
+        String color,
+
+        @Nullable @Schema(description = "Repository the label belongs to")
+        RepositoryInfoDTO repository) {
     /**
      * Create a LabelInfoDTO from a Label entity.
      * Uses minimal repository info to avoid circular references and lazy loading issues.
@@ -21,11 +26,7 @@ public record LabelInfoDTO(
      */
     public static LabelInfoDTO fromLabel(Label label) {
         return new LabelInfoDTO(
-            label.getId(),
-            label.getName(),
-            label.getColor(),
-            createMinimalRepositoryInfo(label.getRepository())
-        );
+                label.getId(), label.getName(), label.getColor(), createMinimalRepositoryInfo(label.getRepository()));
     }
 
     /**
@@ -37,13 +38,12 @@ public record LabelInfoDTO(
             return null;
         }
         return new RepositoryInfoDTO(
-            repository.getId(),
-            repository.getName(),
-            repository.getNameWithOwner(),
-            repository.getDescription(),
-            repository.getHtmlUrl(),
-            List.of(), // Do NOT load repository.getLabels() - would cause circular reference
-            Boolean.FALSE
-        );
+                repository.getId(),
+                repository.getName(),
+                repository.getNameWithOwner(),
+                repository.getDescription(),
+                repository.getHtmlUrl(),
+                List.of(), // Do NOT load repository.getLabels() - would cause circular reference
+                Boolean.FALSE);
     }
 }

@@ -33,15 +33,14 @@ public final class ProxyStreamingUtils {
 
     /** HTTP hop-by-hop headers that must not be forwarded through a proxy (lowercase for case-insensitive matching). */
     private static final Set<String> HOP_BY_HOP_HEADERS_LOWER = Set.of(
-        HttpHeaders.CONNECTION.toLowerCase(Locale.ROOT),
-        "keep-alive",
-        HttpHeaders.PROXY_AUTHENTICATE.toLowerCase(Locale.ROOT),
-        HttpHeaders.PROXY_AUTHORIZATION.toLowerCase(Locale.ROOT),
-        HttpHeaders.TE.toLowerCase(Locale.ROOT),
-        HttpHeaders.TRAILER.toLowerCase(Locale.ROOT),
-        HttpHeaders.TRANSFER_ENCODING.toLowerCase(Locale.ROOT),
-        HttpHeaders.UPGRADE.toLowerCase(Locale.ROOT)
-    );
+            HttpHeaders.CONNECTION.toLowerCase(Locale.ROOT),
+            "keep-alive",
+            HttpHeaders.PROXY_AUTHENTICATE.toLowerCase(Locale.ROOT),
+            HttpHeaders.PROXY_AUTHORIZATION.toLowerCase(Locale.ROOT),
+            HttpHeaders.TE.toLowerCase(Locale.ROOT),
+            HttpHeaders.TRAILER.toLowerCase(Locale.ROOT),
+            HttpHeaders.TRANSFER_ENCODING.toLowerCase(Locale.ROOT),
+            HttpHeaders.UPGRADE.toLowerCase(Locale.ROOT));
 
     private ProxyStreamingUtils() {}
 
@@ -97,14 +96,15 @@ public final class ProxyStreamingUtils {
             // SSE: eagerly subscribe to the body Flux via replay().autoConnect(0).
             // Without this, Mono.just() completes immediately and WebClient's exchangeToMono
             // auto-releases the unconsumed response body, causing empty SSE streams.
-            Flux<DataBuffer> replayed = clientResp.bodyToFlux(DataBuffer.class).replay().autoConnect(0);
+            Flux<DataBuffer> replayed =
+                    clientResp.bodyToFlux(DataBuffer.class).replay().autoConnect(0);
             return Mono.just(new UpstreamResult(status, rh, null, replayed));
         } else {
             // Non-SSE: consume body inside callback as required by WebClient contract.
             return clientResp
-                .bodyToMono(byte[].class)
-                .defaultIfEmpty(new byte[0])
-                .map(bytes -> new UpstreamResult(status, rh, bytes, null));
+                    .bodyToMono(byte[].class)
+                    .defaultIfEmpty(new byte[0])
+                    .map(bytes -> new UpstreamResult(status, rh, bytes, null));
         }
     }
 
@@ -125,11 +125,7 @@ public final class ProxyStreamingUtils {
      * @param statusCode  HTTP status code from upstream
      */
     public static void streamSseToResponse(
-        Flux<DataBuffer> dataFlux,
-        HttpHeaders respHeaders,
-        HttpServletResponse response,
-        int statusCode
-    ) {
+            Flux<DataBuffer> dataFlux, HttpHeaders respHeaders, HttpServletResponse response, int statusCode) {
         streamSseToResponse(dataFlux, respHeaders, response, statusCode, null);
     }
 
@@ -141,12 +137,11 @@ public final class ProxyStreamingUtils {
      * @param tap receives a copy of each chunk's bytes; {@code null} to stream without observing
      */
     public static void streamSseToResponse(
-        Flux<DataBuffer> dataFlux,
-        HttpHeaders respHeaders,
-        HttpServletResponse response,
-        int statusCode,
-        @Nullable Consumer<byte[]> tap
-    ) {
+            Flux<DataBuffer> dataFlux,
+            HttpHeaders respHeaders,
+            HttpServletResponse response,
+            int statusCode,
+            @Nullable Consumer<byte[]> tap) {
         try {
             response.setStatus(statusCode);
             response.setContentType(MediaType.TEXT_EVENT_STREAM_VALUE);
@@ -160,12 +155,10 @@ public final class ProxyStreamingUtils {
 
             // Copy upstream headers (excluding ones we set ourselves)
             respHeaders.forEach((name, values) -> {
-                if (
-                    !HttpHeaders.CONTENT_TYPE.equalsIgnoreCase(name) &&
-                    !HttpHeaders.CONTENT_LENGTH.equalsIgnoreCase(name) &&
-                    !HttpHeaders.TRANSFER_ENCODING.equalsIgnoreCase(name) &&
-                    !HttpHeaders.CACHE_CONTROL.equalsIgnoreCase(name)
-                ) {
+                if (!HttpHeaders.CONTENT_TYPE.equalsIgnoreCase(name)
+                        && !HttpHeaders.CONTENT_LENGTH.equalsIgnoreCase(name)
+                        && !HttpHeaders.TRANSFER_ENCODING.equalsIgnoreCase(name)
+                        && !HttpHeaders.CACHE_CONTROL.equalsIgnoreCase(name)) {
                     for (String value : values) {
                         response.addHeader(name, value);
                     }
@@ -176,43 +169,43 @@ public final class ProxyStreamingUtils {
             OutputStream outputStream = response.getOutputStream();
 
             dataFlux
-                // Release any prefetched DataBuffers on cancellation/error to prevent native memory leaks
-                .doOnDiscard(DataBuffer.class, DataBufferUtils::release)
-                // Move blocking servlet I/O off the Netty event loop thread
-                .publishOn(Schedulers.boundedElastic())
-                .doOnNext(buffer -> {
-                    try {
-                        byte[] bytes = new byte[buffer.readableByteCount()];
-                        buffer.read(bytes);
-                        outputStream.write(bytes);
-                        outputStream.flush();
-                        if (tap != null) {
-                            try {
-                                tap.accept(bytes);
-                            } catch (RuntimeException tapFailure) {
-                                log.warn("SSE tap failed; stream continues: {}", tapFailure.toString());
+                    // Release any prefetched DataBuffers on cancellation/error to prevent native memory leaks
+                    .doOnDiscard(DataBuffer.class, DataBufferUtils::release)
+                    // Move blocking servlet I/O off the Netty event loop thread
+                    .publishOn(Schedulers.boundedElastic())
+                    .doOnNext(buffer -> {
+                        try {
+                            byte[] bytes = new byte[buffer.readableByteCount()];
+                            buffer.read(bytes);
+                            outputStream.write(bytes);
+                            outputStream.flush();
+                            if (tap != null) {
+                                try {
+                                    tap.accept(bytes);
+                                } catch (RuntimeException tapFailure) {
+                                    log.warn("SSE tap failed; stream continues: {}", tapFailure.toString());
+                                }
                             }
+                        } catch (IOException e) {
+                            log.debug("Client disconnected during SSE streaming: {}", e.getMessage());
+                            throw new StreamingException("Client disconnected", e);
+                        } finally {
+                            DataBufferUtils.release(buffer);
                         }
-                    } catch (IOException e) {
-                        log.debug("Client disconnected during SSE streaming: {}", e.getMessage());
-                        throw new StreamingException("Client disconnected", e);
-                    } finally {
-                        DataBufferUtils.release(buffer);
-                    }
-                })
-                .doOnError(e -> {
-                    if (!(e instanceof StreamingException)) {
-                        log.debug("SSE stream error: {}", e.getMessage());
-                    }
-                })
-                .doOnComplete(() -> {
-                    try {
-                        outputStream.flush();
-                    } catch (IOException e) {
-                        log.debug("Error flushing final SSE output: {}", e.getMessage());
-                    }
-                })
-                .blockLast(DEFAULT_SSE_TIMEOUT); // Safe: servlet thread, not Netty event loop
+                    })
+                    .doOnError(e -> {
+                        if (!(e instanceof StreamingException)) {
+                            log.debug("SSE stream error: {}", e.getMessage());
+                        }
+                    })
+                    .doOnComplete(() -> {
+                        try {
+                            outputStream.flush();
+                        } catch (IOException e) {
+                            log.debug("Error flushing final SSE output: {}", e.getMessage());
+                        }
+                    })
+                    .blockLast(DEFAULT_SSE_TIMEOUT); // Safe: servlet thread, not Netty event loop
         } catch (IOException e) {
             log.debug("SSE streaming initialization failed: {}", e.getMessage());
         } catch (StreamingException e) {
@@ -235,9 +228,8 @@ public final class ProxyStreamingUtils {
      * @param sseBody streaming body flux (null for non-SSE)
      */
     public record UpstreamResult(
-        int status,
-        HttpHeaders headers,
-        byte@Nullable [] body,
-        @Nullable Flux<DataBuffer> sseBody
-    ) {}
+            int status,
+            HttpHeaders headers,
+            byte @Nullable [] body,
+            @Nullable Flux<DataBuffer> sseBody) {}
 }

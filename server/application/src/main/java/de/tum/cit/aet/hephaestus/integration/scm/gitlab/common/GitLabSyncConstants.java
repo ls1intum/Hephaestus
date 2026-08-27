@@ -209,8 +209,7 @@ public final class GitLabSyncConstants {
         Matcher matcher = GID_PATTERN.matcher(globalId);
         if (!matcher.matches()) {
             throw new IllegalArgumentException(
-                "Invalid GitLab Global ID format: '" + globalId + "'. Expected: gid://gitlab/<Type>/<numericId>"
-            );
+                    "Invalid GitLab Global ID format: '" + globalId + "'. Expected: gid://gitlab/<Type>/<numericId>");
         }
 
         return Long.parseLong(matcher.group(1));

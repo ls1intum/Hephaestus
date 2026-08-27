@@ -66,15 +66,14 @@ class SlackInteractivityHandlerTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         handler = new SlackInteractivityHandler(
-            workspaceResolver,
-            identityResolver,
-            researchParticipationCommand,
-            appHomeService,
-            participantConsentService,
-            personErasureService,
-            messageService,
-            directExecutor()
-        );
+                workspaceResolver,
+                identityResolver,
+                researchParticipationCommand,
+                appHomeService,
+                participantConsentService,
+                personErasureService,
+                messageService,
+                directExecutor());
         when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(WORKSPACE_ID));
     }
 
@@ -135,13 +134,9 @@ class SlackInteractivityHandlerTest extends BaseUnitTest {
 
         verify(participantConsentService).recordChannelMessageOptOut(WORKSPACE_ID, USER);
         verify(personErasureService).erasePerson(WORKSPACE_ID, RATER_ID, USER);
-        verify(messageService).sendEphemeralForWorkspace(
-            eq(WORKSPACE_ID),
-            eq(CHANNEL),
-            eq(USER),
-            anyList(),
-            eq(SlackConsentBlocks.confirmationText())
-        );
+        verify(messageService)
+                .sendEphemeralForWorkspace(
+                        eq(WORKSPACE_ID), eq(CHANNEL), eq(USER), anyList(), eq(SlackConsentBlocks.confirmationText()));
         verify(appHomeService).onHomeOpened(TEAM, USER);
         verifyNoInteractions(researchParticipationCommand);
     }
@@ -163,13 +158,9 @@ class SlackInteractivityHandlerTest extends BaseUnitTest {
 
         verify(participantConsentService).recordChannelMessageOptOut(WORKSPACE_ID, USER);
         verify(personErasureService).erasePerson(WORKSPACE_ID, RATER_ID, USER);
-        verify(messageService).sendEphemeralForWorkspace(
-            eq(WORKSPACE_ID),
-            eq(CHANNEL),
-            eq(USER),
-            anyList(),
-            eq(SlackConsentBlocks.confirmationText())
-        );
+        verify(messageService)
+                .sendEphemeralForWorkspace(
+                        eq(WORKSPACE_ID), eq(CHANNEL), eq(USER), anyList(), eq(SlackConsentBlocks.confirmationText()));
         verifyNoInteractions(researchParticipationCommand, appHomeService);
     }
 
@@ -178,12 +169,11 @@ class SlackInteractivityHandlerTest extends BaseUnitTest {
         handler.handleBlockActions(blockActions("unknown_action", MESSAGE_TS));
 
         verifyNoInteractions(
-            participantConsentService,
-            researchParticipationCommand,
-            appHomeService,
-            personErasureService,
-            messageService
-        );
+                participantConsentService,
+                researchParticipationCommand,
+                appHomeService,
+                personErasureService,
+                messageService);
     }
 
     /** Runs Slack follow-ups inline so the tests can verify them synchronously. */

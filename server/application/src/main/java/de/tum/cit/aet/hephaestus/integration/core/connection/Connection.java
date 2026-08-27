@@ -40,12 +40,15 @@ import org.jspecify.annotations.Nullable;
  */
 @Entity
 @Table(
-    name = "connection",
-    uniqueConstraints = {
-        @UniqueConstraint(name = "uq_connection", columnNames = { "workspace_id", "kind", "instance_key" }),
-        @UniqueConstraint(name = "ux_connection_id_workspace", columnNames = { "id", "workspace_id" }),
-    }
-)
+        name = "connection",
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "uq_connection",
+                    columnNames = {"workspace_id", "kind", "instance_key"}),
+            @UniqueConstraint(
+                    name = "ux_connection_id_workspace",
+                    columnNames = {"id", "workspace_id"}),
+        })
 public class Connection {
 
     @Id
@@ -82,7 +85,7 @@ public class Connection {
     private ConnectionConfig config;
 
     @Column(name = "credentials_encrypted")
-    private byte@Nullable [] credentialsEncrypted;
+    private byte @Nullable [] credentialsEncrypted;
 
     @Column(name = "credentials_alg", length = 64)
     @Nullable
@@ -104,11 +107,7 @@ public class Connection {
     protected Connection() {}
 
     public Connection(
-        Workspace workspace,
-        IntegrationKind kind,
-        @Nullable String instanceKey,
-        ConnectionConfig config
-    ) {
+            Workspace workspace, IntegrationKind kind, @Nullable String instanceKey, ConnectionConfig config) {
         this.workspace = workspace;
         this.kind = kind;
         this.instanceKey = instanceKey;
@@ -132,8 +131,7 @@ public class Connection {
         }
         if (!this.instanceKey.equals(instanceKey)) {
             throw new IllegalStateException(
-                "Cannot rebind Connection " + id + " from instance_key=" + this.instanceKey + " to " + instanceKey
-            );
+                    "Cannot rebind Connection " + id + " from instance_key=" + this.instanceKey + " to " + instanceKey);
         }
     }
 
@@ -176,7 +174,7 @@ public class Connection {
         return config;
     }
 
-    public byte@Nullable [] getCredentialsEncrypted() {
+    public byte @Nullable [] getCredentialsEncrypted() {
         return credentialsEncrypted;
     }
 
@@ -213,7 +211,7 @@ public class Connection {
         this.config = config;
     }
 
-    public void setCredentialsEncrypted(byte@Nullable [] credentialsEncrypted) {
+    public void setCredentialsEncrypted(byte @Nullable [] credentialsEncrypted) {
         this.credentialsEncrypted = credentialsEncrypted;
     }
 
@@ -270,23 +268,21 @@ public class Connection {
         if (kind == null || config == null) {
             return;
         }
-        IntegrationKind expected = switch (config) {
-            case ConnectionConfig.GitHubAppConfig __ -> IntegrationKind.GITHUB;
-            case ConnectionConfig.GitHubPatConfig __ -> IntegrationKind.GITHUB;
-            case ConnectionConfig.GitLabConfig __ -> IntegrationKind.GITLAB;
-            case ConnectionConfig.SlackConfig __ -> IntegrationKind.SLACK;
-            case ConnectionConfig.OutlineConfig __ -> IntegrationKind.OUTLINE;
-        };
+        IntegrationKind expected =
+                switch (config) {
+                    case ConnectionConfig.GitHubAppConfig __ -> IntegrationKind.GITHUB;
+                    case ConnectionConfig.GitHubPatConfig __ -> IntegrationKind.GITHUB;
+                    case ConnectionConfig.GitLabConfig __ -> IntegrationKind.GITLAB;
+                    case ConnectionConfig.SlackConfig __ -> IntegrationKind.SLACK;
+                    case ConnectionConfig.OutlineConfig __ -> IntegrationKind.OUTLINE;
+                };
         if (kind != expected) {
-            throw new IllegalStateException(
-                "Connection kind=" +
-                    kind +
-                    " incompatible with config=" +
-                    config.getClass().getSimpleName() +
-                    " (expected " +
-                    expected +
-                    ")"
-            );
+            throw new IllegalStateException("Connection kind=" + kind
+                    + " incompatible with config="
+                    + config.getClass().getSimpleName()
+                    + " (expected "
+                    + expected
+                    + ")");
         }
     }
 }

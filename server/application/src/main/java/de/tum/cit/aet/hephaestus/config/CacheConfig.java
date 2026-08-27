@@ -59,17 +59,16 @@ public class CacheConfig {
      * map. Keep alphabetical for diff hygiene.
      */
     static final List<CacheSpec> SPECS = List.of(
-        new CacheSpec(AchievementService.ACHIEVEMENT_PROGRESS_CACHE, LONG_TTL, LONG_MAX),
-        // Name mirrors core.auth.jwt.RevocationAwareJwtDecoder.CACHE_NAME (kept as a literal to
-        // avoid a config→core.auth internal-type dependency; the decoder owns the canonical const).
-        new CacheSpec("auth_jwt_revoked", AUTH_JWT_REVOKED_TTL, AUTH_JWT_REVOKED_MAX),
-        new CacheSpec("contributors", LONG_TTL, LONG_MAX),
-        new CacheSpec("mentor_authored_work_context", MENTOR_CONTEXT_TTL, MENTOR_MAX),
-        new CacheSpec("mentor_practice_context", MENTOR_CONTEXT_TTL, MENTOR_MAX),
-        new CacheSpec("mentor_user_context", MENTOR_CONTEXT_TTL, MENTOR_MAX),
-        new CacheSpec("mentor_workspace_context", MENTOR_CONTEXT_TTL, MENTOR_MAX),
-        new CacheSpec("pullRequestTemplates", LONG_TTL, LONG_MAX)
-    );
+            new CacheSpec(AchievementService.ACHIEVEMENT_PROGRESS_CACHE, LONG_TTL, LONG_MAX),
+            // Name mirrors core.auth.jwt.RevocationAwareJwtDecoder.CACHE_NAME (kept as a literal to
+            // avoid a config→core.auth internal-type dependency; the decoder owns the canonical const).
+            new CacheSpec("auth_jwt_revoked", AUTH_JWT_REVOKED_TTL, AUTH_JWT_REVOKED_MAX),
+            new CacheSpec("contributors", LONG_TTL, LONG_MAX),
+            new CacheSpec("mentor_authored_work_context", MENTOR_CONTEXT_TTL, MENTOR_MAX),
+            new CacheSpec("mentor_practice_context", MENTOR_CONTEXT_TTL, MENTOR_MAX),
+            new CacheSpec("mentor_user_context", MENTOR_CONTEXT_TTL, MENTOR_MAX),
+            new CacheSpec("mentor_workspace_context", MENTOR_CONTEXT_TTL, MENTOR_MAX),
+            new CacheSpec("pullRequestTemplates", LONG_TTL, LONG_MAX));
 
     @Bean
     public CacheManager cacheManager(MeterRegistry meterRegistry) {
@@ -93,10 +92,10 @@ public class CacheConfig {
      */
     private static CaffeineCache buildCache(CacheSpec spec, MeterRegistry meterRegistry) {
         com.github.benmanes.caffeine.cache.Cache<Object, Object> cache = Caffeine.newBuilder()
-            .expireAfterWrite(spec.ttl())
-            .maximumSize(spec.maxSize())
-            .recordStats()
-            .build();
+                .expireAfterWrite(spec.ttl())
+                .maximumSize(spec.maxSize())
+                .recordStats()
+                .build();
         CaffeineCacheMetrics.monitor(meterRegistry, cache, spec.name(), List.of());
         return new CaffeineCache(spec.name(), cache);
     }

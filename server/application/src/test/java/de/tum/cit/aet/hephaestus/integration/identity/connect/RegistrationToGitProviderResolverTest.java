@@ -41,9 +41,8 @@ class RegistrationToGitProviderResolverTest {
     @Test
     void upsertsGithubComOrigin() {
         stubSaveStampsId(7L);
-        when(
-            gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-        ).thenReturn(Optional.empty());
+        when(gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com"))
+                .thenReturn(Optional.empty());
 
         assertThat(resolver.resolveProviderId("GITHUB", "https://github.com")).isEqualTo(7L);
     }
@@ -51,39 +50,36 @@ class RegistrationToGitProviderResolverTest {
     @Test
     void selfHostedGitlabOriginStripsPath() {
         stubSaveStampsId(8L);
-        when(
-            gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.example.test")
-        ).thenReturn(Optional.empty());
+        when(gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.example.test"))
+                .thenReturn(Optional.empty());
 
         resolver.resolveProviderId("GITLAB", "https://gitlab.example.test/sub/path");
 
         // Save is keyed on the bare origin, not the full base URL.
-        when(
-            gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.example.test")
-        ).thenReturn(Optional.of(stamped(IdentityProviderType.GITLAB, "https://gitlab.example.test", 8L)));
-        assertThat(resolver.resolveProviderId("GITLAB", "https://gitlab.example.test/sub/path")).isEqualTo(8L);
+        when(gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.example.test"))
+                .thenReturn(Optional.of(stamped(IdentityProviderType.GITLAB, "https://gitlab.example.test", 8L)));
+        assertThat(resolver.resolveProviderId("GITLAB", "https://gitlab.example.test/sub/path"))
+                .isEqualTo(8L);
     }
 
     @Test
     void preservesExplicitPort() {
         stubSaveStampsId(9L);
-        when(
-            gitProviderRepository.findByTypeAndServerUrl(
-                IdentityProviderType.GITLAB,
-                "https://gitlab.example.test:8443"
-            )
-        ).thenReturn(Optional.empty());
+        when(gitProviderRepository.findByTypeAndServerUrl(
+                        IdentityProviderType.GITLAB, "https://gitlab.example.test:8443"))
+                .thenReturn(Optional.empty());
 
-        assertThat(resolver.resolveProviderId("GITLAB", "https://gitlab.example.test:8443")).isEqualTo(9L);
+        assertThat(resolver.resolveProviderId("GITLAB", "https://gitlab.example.test:8443"))
+                .isEqualTo(9L);
     }
 
     @Test
     void reusesExistingProviderRow() {
-        when(
-            gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.lrz.de")
-        ).thenReturn(Optional.of(stamped(IdentityProviderType.GITLAB, "https://gitlab.lrz.de", 3L)));
+        when(gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.lrz.de"))
+                .thenReturn(Optional.of(stamped(IdentityProviderType.GITLAB, "https://gitlab.lrz.de", 3L)));
 
-        assertThat(resolver.resolveProviderId("GITLAB", "https://gitlab.lrz.de")).isEqualTo(3L);
+        assertThat(resolver.resolveProviderId("GITLAB", "https://gitlab.lrz.de"))
+                .isEqualTo(3L);
     }
 
     @Test

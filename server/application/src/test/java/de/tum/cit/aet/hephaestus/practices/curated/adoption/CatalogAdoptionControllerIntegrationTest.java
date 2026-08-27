@@ -67,17 +67,17 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         assertThat(practiceRepository.existsByWorkspaceId(workspace.getId())).isFalse();
         webTestClient
-            .get()
-            .uri(BASE, workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectHeader()
-            .valueMatches(HttpHeaders.CACHE_CONTROL, ".*no-store.*private.*|.*private.*no-store.*")
-            .expectBody()
-            .jsonPath("$[?(@.slug == '" + PRACTICE + "')].availability")
-            .isEqualTo("AVAILABLE");
+                .get()
+                .uri(BASE, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectHeader()
+                .valueMatches(HttpHeaders.CACHE_CONTROL, ".*no-store.*private.*|.*private.*no-store.*")
+                .expectBody()
+                .jsonPath("$[?(@.slug == '" + PRACTICE + "')].availability")
+                .isEqualTo("AVAILABLE");
     }
 
     @Test
@@ -86,31 +86,31 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
         ensureAdminMembership(workspace);
 
         webTestClient
-            .get()
-            .uri(BASE + "/" + PRACTICE, workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectHeader()
-            .exists(HttpHeaders.ETAG)
-            .expectBody()
-            .jsonPath("$.definition.criteria")
-            .isNotEmpty()
-            .jsonPath("$.definition.bindings.length()")
-            .value(value -> assertThat((Integer) value).isPositive())
-            .jsonPath("$.group.disposition")
-            .isEqualTo("CREATE_CATALOG_GROUP")
-            .jsonPath("$.group.slug")
-            .isEqualTo(GROUP)
-            .jsonPath("$.group.definition.name")
-            .isNotEmpty()
-            .jsonPath("$.initialAutonomy")
-            .isEqualTo("HUMAN_APPROVAL")
-            .jsonPath("$.sourceReviewRuleFingerprint")
-            .value(value -> assertThat((String) value).matches("v3:[0-9a-f]{64}"))
-            .jsonPath("$.definition.automatedReviewValidation.status")
-            .isEqualTo("AUTHOR_DECLARED");
+                .get()
+                .uri(BASE + "/" + PRACTICE, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectHeader()
+                .exists(HttpHeaders.ETAG)
+                .expectBody()
+                .jsonPath("$.definition.criteria")
+                .isNotEmpty()
+                .jsonPath("$.definition.bindings.length()")
+                .value(value -> assertThat((Integer) value).isPositive())
+                .jsonPath("$.group.disposition")
+                .isEqualTo("CREATE_CATALOG_GROUP")
+                .jsonPath("$.group.slug")
+                .isEqualTo(GROUP)
+                .jsonPath("$.group.definition.name")
+                .isNotEmpty()
+                .jsonPath("$.initialAutonomy")
+                .isEqualTo("HUMAN_APPROVAL")
+                .jsonPath("$.sourceReviewRuleFingerprint")
+                .value(value -> assertThat((String) value).matches("v3:[0-9a-f]{64}"))
+                .jsonPath("$.definition.automatedReviewValidation.status")
+                .isEqualTo("AUTHOR_DECLARED");
     }
 
     @Test
@@ -119,37 +119,37 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
         ensureAdminMembership(workspace);
 
         webTestClient
-            .post()
-            .uri(BASE + "/" + PRACTICE, workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isEqualTo(428)
-            .expectHeader()
-            .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
-            .expectBody()
-            .jsonPath("$.status")
-            .isEqualTo(428)
-            .jsonPath("$.title")
-            .isEqualTo("Practice adoption preview required");
+                .post()
+                .uri(BASE + "/" + PRACTICE, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isEqualTo(428)
+                .expectHeader()
+                .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
+                .expectBody()
+                .jsonPath("$.status")
+                .isEqualTo(428)
+                .jsonPath("$.title")
+                .isEqualTo("Practice adoption preview required");
 
         webTestClient
-            .post()
-            .uri(BASE + "/" + PRACTICE, workspace.getWorkspaceSlug())
-            .headers(headers -> {
-                TestAuthUtils.withCurrentUser().accept(headers);
-                headers.set(HttpHeaders.IF_MATCH, "\"stale\"");
-            })
-            .exchange()
-            .expectStatus()
-            .isEqualTo(412)
-            .expectHeader()
-            .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
-            .expectBody()
-            .jsonPath("$.status")
-            .isEqualTo(412)
-            .jsonPath("$.title")
-            .isEqualTo("Practice adoption preview changed");
+                .post()
+                .uri(BASE + "/" + PRACTICE, workspace.getWorkspaceSlug())
+                .headers(headers -> {
+                    TestAuthUtils.withCurrentUser().accept(headers);
+                    headers.set(HttpHeaders.IF_MATCH, "\"stale\"");
+                })
+                .exchange()
+                .expectStatus()
+                .isEqualTo(412)
+                .expectHeader()
+                .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
+                .expectBody()
+                .jsonPath("$.status")
+                .isEqualTo(412)
+                .jsonPath("$.title")
+                .isEqualTo("Practice adoption preview changed");
 
         adopt("W/" + previewEtag()).expectStatus().isEqualTo(412);
         adopt("malformed").expectStatus().isEqualTo(412);
@@ -170,55 +170,53 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
         String etag = previewEtag();
 
         webTestClient
-            .post()
-            .uri(BASE + "/" + PRACTICE, workspace.getWorkspaceSlug())
-            .headers(headers -> {
-                TestAuthUtils.withCurrentUser().accept(headers);
-                headers.set(HttpHeaders.IF_MATCH, etag);
-            })
-            .exchange()
-            .expectStatus()
-            .isCreated()
-            .expectHeader()
-            .valueMatches(HttpHeaders.LOCATION, ".*/workspaces/adoption/practices/" + PRACTICE)
-            .expectBody()
-            .jsonPath("$.autonomy.effective")
-            .isEqualTo("HUMAN_APPROVAL")
-            .jsonPath("$.catalogOrigin.link")
-            .isEqualTo("IN_SYNC")
-            .jsonPath("$.catalogOrigin.slug")
-            .isEqualTo(PRACTICE);
+                .post()
+                .uri(BASE + "/" + PRACTICE, workspace.getWorkspaceSlug())
+                .headers(headers -> {
+                    TestAuthUtils.withCurrentUser().accept(headers);
+                    headers.set(HttpHeaders.IF_MATCH, etag);
+                })
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectHeader()
+                .valueMatches(HttpHeaders.LOCATION, ".*/workspaces/adoption/practices/" + PRACTICE)
+                .expectBody()
+                .jsonPath("$.autonomy.effective")
+                .isEqualTo("HUMAN_APPROVAL")
+                .jsonPath("$.catalogOrigin.link")
+                .isEqualTo("IN_SYNC")
+                .jsonPath("$.catalogOrigin.slug")
+                .isEqualTo(PRACTICE);
 
-        var practice = practiceRepository.findByWorkspaceIdAndSlug(workspace.getId(), PRACTICE).orElseThrow();
+        var practice = practiceRepository
+                .findByWorkspaceIdAndSlug(workspace.getId(), PRACTICE)
+                .orElseThrow();
         assertThat(practice.getSourceCuratedSlug()).isEqualTo(PRACTICE);
         assertThat(practice.getSourceCuratedFingerprint()).matches("v3:[0-9a-f]{64}");
         assertThat(practice.getAutonomy()).isEqualTo(PracticeAutonomy.HUMAN_APPROVAL);
-        assertThat(groupRepository.findByWorkspaceIdAndSlug(workspace.getId(), GROUP)).isPresent();
+        assertThat(groupRepository.findByWorkspaceIdAndSlug(workspace.getId(), GROUP))
+                .isPresent();
         assertThat(revisionRepository.findFirstByPracticeIdOrderByRevisionNumberDesc(practice.getId()))
-            .get()
-            .extracting(revision -> revision.getReviewRuleFingerprint())
-            .asString()
-            .matches("v3:[0-9a-f]{64}");
-        assertThat(
-            jdbcTemplate.queryForObject(
-                "SELECT count(*) FROM config_audit_event WHERE workspace_id = ? AND entity_type IN ('PRACTICE_GROUP', 'PRACTICE_DEFINITION', 'PRACTICE_USAGE')",
-                Long.class,
-                workspace.getId()
-            )
-        ).isEqualTo(3);
+                .get()
+                .extracting(revision -> revision.getReviewRuleFingerprint())
+                .asString()
+                .matches("v3:[0-9a-f]{64}");
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT count(*) FROM config_audit_event WHERE workspace_id = ? AND entity_type IN ('PRACTICE_GROUP', 'PRACTICE_DEFINITION', 'PRACTICE_USAGE')",
+                        Long.class,
+                        workspace.getId()))
+                .isEqualTo(3);
         String practiceSnapshot = jdbcTemplate.queryForObject(
-            "SELECT new_value::text FROM config_audit_event WHERE workspace_id = ? AND entity_type = 'PRACTICE_DEFINITION'",
-            String.class,
-            workspace.getId()
-        );
-        assertThat(practiceSnapshot).contains(PRACTICE, "sourceCuratedSlug", "sourceCuratedFingerprint");
-        assertThat(
-            jdbcTemplate.queryForObject(
-                "SELECT new_value::text FROM config_audit_event WHERE workspace_id = ? AND entity_type = 'PRACTICE_USAGE'",
+                "SELECT new_value::text FROM config_audit_event WHERE workspace_id = ? AND entity_type = 'PRACTICE_DEFINITION'",
                 String.class,
-                workspace.getId()
-            )
-        ).contains("HUMAN_APPROVAL");
+                workspace.getId());
+        assertThat(practiceSnapshot).contains(PRACTICE, "sourceCuratedSlug", "sourceCuratedFingerprint");
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT new_value::text FROM config_audit_event WHERE workspace_id = ? AND entity_type = 'PRACTICE_USAGE'",
+                        String.class,
+                        workspace.getId()))
+                .contains("HUMAN_APPROVAL");
     }
 
     @Test
@@ -227,23 +225,25 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
         ensureAdminMembership(workspace);
         String etag = previewEtag();
         adopt(etag).expectStatus().isCreated();
-        var practice = practiceRepository.findByWorkspaceIdAndSlug(workspace.getId(), PRACTICE).orElseThrow();
+        var practice = practiceRepository
+                .findByWorkspaceIdAndSlug(workspace.getId(), PRACTICE)
+                .orElseThrow();
         String sourceFingerprint = practice.getSourceCuratedFingerprint();
 
         String adoptedPreviewEtag = previewEtag();
         adopt(adoptedPreviewEtag)
-            .expectStatus()
-            .isEqualTo(409)
-            .expectHeader()
-            .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
-            .expectBody()
-            .jsonPath("$.status")
-            .isEqualTo(409);
+                .expectStatus()
+                .isEqualTo(409)
+                .expectHeader()
+                .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
+                .expectBody()
+                .jsonPath("$.status")
+                .isEqualTo(409);
 
         assertThat(practiceRepository.findByWorkspaceIdAndSlug(workspace.getId(), PRACTICE))
-            .get()
-            .extracting(candidate -> candidate.getSourceCuratedFingerprint())
-            .isEqualTo(sourceFingerprint);
+                .get()
+                .extracting(candidate -> candidate.getSourceCuratedFingerprint())
+                .isEqualTo(sourceFingerprint);
         assertThat(practiceRepository.findAllForCatalog(workspace.getId())).hasSize(1);
     }
 
@@ -254,28 +254,29 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
         adopt(previewEtag()).expectStatus().isCreated();
 
         webTestClient
-            .delete()
-            .uri("/workspaces/{workspaceSlug}/practices/{practiceSlug}", workspace.getWorkspaceSlug(), PRACTICE)
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isNoContent();
+                .delete()
+                .uri("/workspaces/{workspaceSlug}/practices/{practiceSlug}", workspace.getWorkspaceSlug(), PRACTICE)
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNoContent();
 
         webTestClient
-            .get()
-            .uri(BASE, workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$[?(@.slug == '" + PRACTICE + "')].availability")
-            .isEqualTo("AVAILABLE");
+                .get()
+                .uri(BASE, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$[?(@.slug == '" + PRACTICE + "')].availability")
+                .isEqualTo("AVAILABLE");
 
         adopt(previewEtag()).expectStatus().isCreated();
 
         assertThat(practiceRepository.findAllForCatalog(workspace.getId())).hasSize(1);
-        assertThat(groupRepository.findByWorkspaceIdAndSlug(workspace.getId(), GROUP)).isPresent();
+        assertThat(groupRepository.findByWorkspaceIdAndSlug(workspace.getId(), GROUP))
+                .isPresent();
     }
 
     @Test
@@ -283,40 +284,42 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
     void shouldAdoptEveryAvailablePracticeInGroupAtomically() {
         ensureAdminMembership(workspace);
         var preview = webTestClient
-            .get()
-            .uri(BASE + "/groups/" + GROUP, workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectHeader()
-            .exists(HttpHeaders.ETAG)
-            .expectBody(CatalogGroupAdoptionPreviewDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri(BASE + "/groups/" + GROUP, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectHeader()
+                .exists(HttpHeaders.ETAG)
+                .expectBody(CatalogGroupAdoptionPreviewDTO.class)
+                .returnResult()
+                .getResponseBody();
         assertThat(preview).isNotNull();
         assertThat(preview.practices())
-            .isNotEmpty()
-            .allMatch(practice -> practice.availability() == CatalogAdoptionAvailability.AVAILABLE);
+                .isNotEmpty()
+                .allMatch(practice -> practice.availability() == CatalogAdoptionAvailability.AVAILABLE);
 
         webTestClient
-            .post()
-            .uri(BASE + "/groups/" + GROUP, workspace.getWorkspaceSlug())
-            .headers(headers -> {
-                TestAuthUtils.withCurrentUser().accept(headers);
-                headers.set(HttpHeaders.IF_MATCH, preview.etag());
-            })
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.added.length()")
-            .isEqualTo(preview.practices().size())
-            .jsonPath("$.moved.length()")
-            .isEqualTo(0);
+                .post()
+                .uri(BASE + "/groups/" + GROUP, workspace.getWorkspaceSlug())
+                .headers(headers -> {
+                    TestAuthUtils.withCurrentUser().accept(headers);
+                    headers.set(HttpHeaders.IF_MATCH, preview.etag());
+                })
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.added.length()")
+                .isEqualTo(preview.practices().size())
+                .jsonPath("$.moved.length()")
+                .isEqualTo(0);
 
-        assertThat(groupRepository.findByWorkspaceIdAndSlug(workspace.getId(), GROUP)).isPresent();
-        assertThat(practiceRepository.findAllForCatalog(workspace.getId())).hasSize(preview.practices().size());
+        assertThat(groupRepository.findByWorkspaceIdAndSlug(workspace.getId(), GROUP))
+                .isPresent();
+        assertThat(practiceRepository.findAllForCatalog(workspace.getId()))
+                .hasSize(preview.practices().size());
     }
 
     @Test
@@ -327,28 +330,29 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
         adoptGroup(firstPreview.etag()).expectStatus().isOk();
 
         webTestClient
-            .delete()
-            .uri(
-                "/workspaces/{workspaceSlug}/practice-groups/{groupSlug}?deletePractices=true",
-                workspace.getWorkspaceSlug(),
-                GROUP
-            )
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isNoContent();
+                .delete()
+                .uri(
+                        "/workspaces/{workspaceSlug}/practice-groups/{groupSlug}?deletePractices=true",
+                        workspace.getWorkspaceSlug(),
+                        GROUP)
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNoContent();
 
-        assertThat(groupRepository.findByWorkspaceIdAndSlug(workspace.getId(), GROUP)).isEmpty();
+        assertThat(groupRepository.findByWorkspaceIdAndSlug(workspace.getId(), GROUP))
+                .isEmpty();
         assertThat(practiceRepository.findAllForCatalog(workspace.getId())).isEmpty();
         CatalogGroupAdoptionPreviewDTO secondPreview = previewGroup();
-        assertThat(secondPreview.practices()).allMatch(
-            practice -> practice.availability() == CatalogAdoptionAvailability.AVAILABLE
-        );
+        assertThat(secondPreview.practices())
+                .allMatch(practice -> practice.availability() == CatalogAdoptionAvailability.AVAILABLE);
 
         adoptGroup(secondPreview.etag()).expectStatus().isOk();
 
-        assertThat(groupRepository.findByWorkspaceIdAndSlug(workspace.getId(), GROUP)).isPresent();
-        assertThat(practiceRepository.findAllForCatalog(workspace.getId())).hasSize(secondPreview.practices().size());
+        assertThat(groupRepository.findByWorkspaceIdAndSlug(workspace.getId(), GROUP))
+                .isPresent();
+        assertThat(practiceRepository.findAllForCatalog(workspace.getId()))
+                .hasSize(secondPreview.practices().size());
     }
 
     @Test
@@ -359,32 +363,30 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
         adoptGroup(firstPreview.etag()).expectStatus().isOk();
 
         webTestClient
-            .delete()
-            .uri("/workspaces/{workspaceSlug}/practice-groups/{groupSlug}", workspace.getWorkspaceSlug(), GROUP)
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isNoContent();
+                .delete()
+                .uri("/workspaces/{workspaceSlug}/practice-groups/{groupSlug}", workspace.getWorkspaceSlug(), GROUP)
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNoContent();
 
         CatalogGroupAdoptionPreviewDTO restorePreview = previewGroup();
-        assertThat(restorePreview.actions()).allMatch(
-            action -> action.action() == CatalogGroupPracticeAction.MOVE_TO_GROUP
-        );
+        assertThat(restorePreview.actions())
+                .allMatch(action -> action.action() == CatalogGroupPracticeAction.MOVE_TO_GROUP);
         adoptGroup(restorePreview.etag())
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.added.length()")
-            .isEqualTo(0)
-            .jsonPath("$.moved.length()")
-            .isEqualTo(restorePreview.practices().size());
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.added.length()")
+                .isEqualTo(0)
+                .jsonPath("$.moved.length()")
+                .isEqualTo(restorePreview.practices().size());
 
-        assertThat(
-            practiceRepository
-                .findAllForCatalog(workspace.getId())
-                .stream()
-                .map(practice -> practice.getGroup() == null ? null : practice.getGroup().getSlug())
-        ).containsOnly(GROUP);
+        assertThat(practiceRepository.findAllForCatalog(workspace.getId()).stream()
+                        .map(practice -> practice.getGroup() == null
+                                ? null
+                                : practice.getGroup().getSlug()))
+                .containsOnly(GROUP);
     }
 
     @Test
@@ -398,34 +400,33 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         try (var executor = Executors.newFixedThreadPool(2)) {
             var attempts = List.of(
-                executor.submit(() -> adoptAfter(ready, start, etag, token)),
-                executor.submit(() -> adoptAfter(ready, start, etag, token))
-            );
-            assertThat(ready.await(5, TimeUnit.SECONDS)).as("both adoption requests are ready").isTrue();
+                    executor.submit(() -> adoptAfter(ready, start, etag, token)),
+                    executor.submit(() -> adoptAfter(ready, start, etag, token)));
+            assertThat(ready.await(5, TimeUnit.SECONDS))
+                    .as("both adoption requests are ready")
+                    .isTrue();
             start.countDown();
 
-            assertThat(
-                List.of(attempts.get(0).get(30, TimeUnit.SECONDS), attempts.get(1).get(30, TimeUnit.SECONDS))
-            ).containsExactlyInAnyOrder(HttpStatus.CREATED, HttpStatus.PRECONDITION_FAILED);
+            assertThat(List.of(
+                            attempts.get(0).get(30, TimeUnit.SECONDS),
+                            attempts.get(1).get(30, TimeUnit.SECONDS)))
+                    .containsExactlyInAnyOrder(HttpStatus.CREATED, HttpStatus.PRECONDITION_FAILED);
         }
 
         assertThat(practiceRepository.findAllForCatalog(workspace.getId())).hasSize(1);
-        assertThat(groupRepository.findByWorkspaceIdAndSlug(workspace.getId(), GROUP)).isPresent();
-        var practice = practiceRepository.findByWorkspaceIdAndSlug(workspace.getId(), PRACTICE).orElseThrow();
-        assertThat(
-            jdbcTemplate.queryForObject(
-                "SELECT count(*) FROM practice_revision WHERE practice_id = ?",
-                Long.class,
-                practice.getId()
-            )
-        ).isEqualTo(1);
-        assertThat(
-            jdbcTemplate.queryForObject(
-                "SELECT count(*) FROM config_audit_event WHERE workspace_id = ? AND entity_type IN ('PRACTICE_GROUP', 'PRACTICE_DEFINITION', 'PRACTICE_USAGE')",
-                Long.class,
-                workspace.getId()
-            )
-        ).isEqualTo(3);
+        assertThat(groupRepository.findByWorkspaceIdAndSlug(workspace.getId(), GROUP))
+                .isPresent();
+        var practice = practiceRepository
+                .findByWorkspaceIdAndSlug(workspace.getId(), PRACTICE)
+                .orElseThrow();
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT count(*) FROM practice_revision WHERE practice_id = ?", Long.class, practice.getId()))
+                .isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT count(*) FROM config_audit_event WHERE workspace_id = ? AND entity_type IN ('PRACTICE_GROUP', 'PRACTICE_DEFINITION', 'PRACTICE_USAGE')",
+                        Long.class,
+                        workspace.getId()))
+                .isEqualTo(3);
     }
 
     @Test
@@ -435,36 +436,35 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
         ensureWorkspaceMembership(workspace, member, WorkspaceMembership.WorkspaceRole.MEMBER);
 
         webTestClient
-            .get()
-            .uri(BASE, workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .get()
+                .uri(BASE, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isForbidden();
 
         webTestClient
-            .get()
-            .uri(BASE + "/" + PRACTICE, workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .get()
+                .uri(BASE + "/" + PRACTICE, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isForbidden();
 
         webTestClient
-            .post()
-            .uri(BASE + "/" + PRACTICE, workspace.getWorkspaceSlug())
-            .headers(headers -> {
-                TestAuthUtils.withCurrentUser().accept(headers);
-                headers.set(HttpHeaders.IF_MATCH, "\"untrusted\"");
-            })
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .post()
+                .uri(BASE + "/" + PRACTICE, workspace.getWorkspaceSlug())
+                .headers(headers -> {
+                    TestAuthUtils.withCurrentUser().accept(headers);
+                    headers.set(HttpHeaders.IF_MATCH, "\"untrusted\"");
+                })
+                .exchange()
+                .expectStatus()
+                .isForbidden();
     }
 
     private String previewEtag() {
-        return required(
-            webTestClient
+        return required(webTestClient
                 .get()
                 .uri(BASE + "/" + PRACTICE, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
@@ -473,13 +473,11 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .isOk()
                 .returnResult(CatalogPracticePreviewDTO.class)
                 .getResponseHeaders()
-                .getETag()
-        );
+                .getETag());
     }
 
     private CatalogGroupAdoptionPreviewDTO previewGroup() {
-        return required(
-            webTestClient
+        return required(webTestClient
                 .get()
                 .uri(BASE + "/groups/" + GROUP, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
@@ -488,48 +486,47 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .isOk()
                 .expectBody(CatalogGroupAdoptionPreviewDTO.class)
                 .returnResult()
-                .getResponseBody()
-        );
+                .getResponseBody());
     }
 
     private WebTestClient.ResponseSpec adoptGroup(String etag) {
         return webTestClient
-            .post()
-            .uri(BASE + "/groups/" + GROUP, workspace.getWorkspaceSlug())
-            .headers(headers -> {
-                TestAuthUtils.withCurrentUser().accept(headers);
-                headers.set(HttpHeaders.IF_MATCH, etag);
-            })
-            .exchange();
+                .post()
+                .uri(BASE + "/groups/" + GROUP, workspace.getWorkspaceSlug())
+                .headers(headers -> {
+                    TestAuthUtils.withCurrentUser().accept(headers);
+                    headers.set(HttpHeaders.IF_MATCH, etag);
+                })
+                .exchange();
     }
 
     private WebTestClient.ResponseSpec adopt(String etag) {
         return webTestClient
-            .post()
-            .uri(BASE + "/" + PRACTICE, workspace.getWorkspaceSlug())
-            .headers(headers -> {
-                TestAuthUtils.withCurrentUser().accept(headers);
-                headers.set(HttpHeaders.IF_MATCH, etag);
-            })
-            .exchange();
+                .post()
+                .uri(BASE + "/" + PRACTICE, workspace.getWorkspaceSlug())
+                .headers(headers -> {
+                    TestAuthUtils.withCurrentUser().accept(headers);
+                    headers.set(HttpHeaders.IF_MATCH, etag);
+                })
+                .exchange();
     }
 
     private HttpStatus adoptAfter(CountDownLatch ready, CountDownLatch start, String etag, String token)
-        throws InterruptedException {
+            throws InterruptedException {
         ready.countDown();
         if (!start.await(10, TimeUnit.SECONDS)) {
             throw new IllegalStateException("Timed out waiting to start concurrent adoption");
         }
         return (HttpStatus) webTestClient
-            .post()
-            .uri(BASE + "/" + PRACTICE, workspace.getWorkspaceSlug())
-            .headers(headers -> {
-                headers.setBearerAuth(token);
-                headers.set(HttpHeaders.IF_MATCH, etag);
-            })
-            .exchange()
-            .returnResult(Void.class)
-            .getStatus();
+                .post()
+                .uri(BASE + "/" + PRACTICE, workspace.getWorkspaceSlug())
+                .headers(headers -> {
+                    headers.setBearerAuth(token);
+                    headers.set(HttpHeaders.IF_MATCH, etag);
+                })
+                .exchange()
+                .returnResult(Void.class)
+                .getStatus();
     }
 
     private static <T> T required(@Nullable T value) {

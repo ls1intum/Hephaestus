@@ -47,11 +47,10 @@ public class OutlineDocumentSyncScheduler {
     private final SyncJobService syncJobService;
 
     public OutlineDocumentSyncScheduler(
-        ConnectionService connectionService,
-        OutlineDocumentSyncService syncService,
-        OutlineCollectionRepository collectionRepository,
-        SyncJobService syncJobService
-    ) {
+            ConnectionService connectionService,
+            OutlineDocumentSyncService syncService,
+            OutlineCollectionRepository collectionRepository,
+            SyncJobService syncJobService) {
         this.connectionService = connectionService;
         this.syncService = syncService;
         this.collectionRepository = collectionRepository;
@@ -127,34 +126,27 @@ public class OutlineDocumentSyncScheduler {
      */
     private void runReconcileJob(long workspaceId, SyncJobTrigger trigger, Consumer<SyncExecutionHandle> body) {
         connectionService
-            .findActive(workspaceId, IntegrationKind.OUTLINE)
-            .ifPresent(connection -> runJob(workspaceId, connection, trigger, body));
+                .findActive(workspaceId, IntegrationKind.OUTLINE)
+                .ifPresent(connection -> runJob(workspaceId, connection, trigger, body));
     }
 
     private void runJob(
-        long workspaceId,
-        Connection connection,
-        SyncJobTrigger trigger,
-        Consumer<SyncExecutionHandle> body
-    ) {
+            long workspaceId, Connection connection, SyncJobTrigger trigger, Consumer<SyncExecutionHandle> body) {
         try {
             syncJobService.run(
-                new SyncJobRequest(
-                    workspaceId,
-                    connection.getId(),
-                    IntegrationKind.OUTLINE,
-                    SyncJobType.RECONCILIATION,
-                    trigger,
-                    null
-                ),
-                body
-            );
+                    new SyncJobRequest(
+                            workspaceId,
+                            connection.getId(),
+                            IntegrationKind.OUTLINE,
+                            SyncJobType.RECONCILIATION,
+                            trigger,
+                            null),
+                    body);
         } catch (SyncJobConflictException e) {
             log.debug(
-                "outline.sync: reconcile skipped for workspaceId={} — job {} already active",
-                workspaceId,
-                e.activeJob().getId()
-            );
+                    "outline.sync: reconcile skipped for workspaceId={} — job {} already active",
+                    workspaceId,
+                    e.activeJob().getId());
         }
     }
 
@@ -198,11 +190,7 @@ public class OutlineDocumentSyncScheduler {
      * round-trip when the model is usable. Workspace-scoped, no bypass — see {@link #syncWorkspaceNow}.
      */
     public void refreshDocumentNow(
-        long workspaceId,
-        String eventName,
-        String documentId,
-        @Nullable OutlineDocumentModel prefetchedMeta
-    ) {
+            long workspaceId, String eventName, String documentId, @Nullable OutlineDocumentModel prefetchedMeta) {
         syncService.refreshDocument(workspaceId, eventName, documentId, prefetchedMeta);
     }
 

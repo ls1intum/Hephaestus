@@ -14,14 +14,12 @@ import org.jspecify.annotations.NonNull;
  * the system decided or something a person did, never a mixture.
  */
 public record UpdateReviewBackfillRunStatusRequestDTO(
-    @NonNull
-    @NotNull
-    @Schema(
-        description = "RUNNING confirms the estimate and starts the campaign; CANCELLED stops it for good",
-        allowableValues = { "RUNNING", "CANCELLED" }
-    )
-    RequestedReviewBackfillStatus status
-) {
+        @NonNull
+        @NotNull
+        @Schema(
+                description = "RUNNING confirms the estimate and starts the campaign; CANCELLED stops it for good",
+                allowableValues = {"RUNNING", "CANCELLED"})
+        RequestedReviewBackfillStatus status) {
     public enum RequestedReviewBackfillStatus {
         RUNNING,
         CANCELLED,

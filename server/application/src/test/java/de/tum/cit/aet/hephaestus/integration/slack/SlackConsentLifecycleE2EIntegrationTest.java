@@ -5,7 +5,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -21,7 +20,6 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.channel.SlackChannelConsentService;
 import de.tum.cit.aet.hephaestus.integration.slack.channel.SlackMonitoredChannelDTO;
@@ -171,14 +169,17 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
         support.ensureUnmappedSlackThreadColumns();
 
         IdentityProvider provider = identityProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                identityProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> identityProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
         Workspace workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("slack-e2e-lifecycle"));
         workspaceId = workspace.getId();
-        u1MemberId = userRepository.save(TestUserFactory.createUser(100L, "e2e-u1", provider)).getId();
-        u2MemberId = userRepository.save(TestUserFactory.createUser(200L, "e2e-u2", provider)).getId();
+        u1MemberId = userRepository
+                .save(TestUserFactory.createUser(100L, "e2e-u1", provider))
+                .getId();
+        u2MemberId = userRepository
+                .save(TestUserFactory.createUser(200L, "e2e-u2", provider))
+                .getId();
         practice = savePractice(workspace);
         job = newJob(workspace);
 
@@ -188,57 +189,55 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
         SlackMentorIdentityResolver identityResolver = mock(SlackMentorIdentityResolver.class);
         when(identityResolver.resolveMemberId(workspaceId, TEAM, "U1")).thenReturn(Optional.of(u1MemberId));
         when(identityResolver.resolveMemberId(workspaceId, TEAM, "U2")).thenReturn(Optional.of(u2MemberId));
-        when(identityResolver.resolveDeveloperLogin(any(Long.class), any(), any())).thenReturn(Optional.empty());
+        when(identityResolver.resolveDeveloperLogin(any(Long.class), any(), any()))
+                .thenReturn(Optional.empty());
 
         slackMessageService = mock(SlackMessageService.class);
         ConnectionService connectionService = mock(ConnectionService.class);
-        when(connectionService.findSlackNotificationConfig(workspaceId)).thenReturn(
-            Optional.of(new ConnectionConfig.SlackConfig(TEAM, null, null, null, null, Set.of()))
-        );
+        when(connectionService.findSlackNotificationConfig(workspaceId))
+                .thenReturn(Optional.of(new ConnectionConfig.SlackConfig(TEAM, null, null, null, null, Set.of())));
 
         ingestService = new SlackIngestService(
-            workspaceResolver,
-            monitoredChannelRepository,
-            new SlackChannelConsentGate(monitoredChannelRepository),
-            new SlackParticipantConsentGate(participantConsentRepository),
-            messageRepository,
-            threadRepository,
-            identityResolver,
-            conversationFeedbackErasure,
-            /* conversationIngestEnabled */ true
-        );
+                workspaceResolver,
+                monitoredChannelRepository,
+                new SlackChannelConsentGate(monitoredChannelRepository),
+                new SlackParticipantConsentGate(participantConsentRepository),
+                messageRepository,
+                threadRepository,
+                identityResolver,
+                conversationFeedbackErasure,
+                /* conversationIngestEnabled */ true);
         consentService = new SlackChannelConsentService(
-            monitoredChannelRepository,
-            consentEventRepository,
-            participantConsentRepository,
-            ingestService,
-            slackMessageService,
-            connectionService,
-            userRepository,
-            new SlackHephaestusUiLinks(
-                workspaceId ->
-                    Optional.of(new WorkspaceSummaryQuery.WorkspaceSummary(workspaceId, "hephaestus", "Hephaestus")),
-                "https://hephaestus.test"
-            ),
-            new TransactionTemplate(transactionManager),
-            event -> {} // activation kick intentionally not asserted here
-        );
+                monitoredChannelRepository,
+                consentEventRepository,
+                participantConsentRepository,
+                ingestService,
+                slackMessageService,
+                connectionService,
+                userRepository,
+                new SlackHephaestusUiLinks(
+                        workspaceId -> Optional.of(
+                                new WorkspaceSummaryQuery.WorkspaceSummary(workspaceId, "hephaestus", "Hephaestus")),
+                        "https://hephaestus.test"),
+                new TransactionTemplate(transactionManager),
+                event -> {} // activation kick intentionally not asserted here
+                );
         handler = new SlackInteractivityHandler(
-            workspaceResolver,
-            identityResolver,
-            mock(ResearchParticipationCommand.class),
-            mock(SlackAppHomeService.class),
-            new SlackParticipantConsentService(participantConsentRepository),
-            new SlackPersonErasureService(messageRepository, threadRepository, conversationFeedbackErasure),
-            slackMessageService
-        );
+                workspaceResolver,
+                identityResolver,
+                mock(ResearchParticipationCommand.class),
+                mock(SlackAppHomeService.class),
+                new SlackParticipantConsentService(participantConsentRepository),
+                new SlackPersonErasureService(messageRepository, threadRepository, conversationFeedbackErasure),
+                slackMessageService);
     }
 
     @Test
     @DisplayName("register → activate → forward-only ingest → detect → person opt-out → revoke, asserted at every hop")
     void fullConsentLifecycleComposes() {
         // Hop 1 — register lands in PENDING (announced_at null). A sibling C2 is registered for isolation.
-        SlackMonitoredChannelDTO registered = consentService.register(workspaceId, C1, "general").channel();
+        SlackMonitoredChannelDTO registered =
+                consentService.register(workspaceId, C1, "general").channel();
         assertThat(registered.consentState()).isEqualTo(ConsentState.PENDING);
         assertThat(currentChannel(C1).getConsentAnnouncedAt()).isNull();
         consentService.register(workspaceId, C2, "random");
@@ -253,8 +252,8 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
         var fallbackText = ArgumentCaptor.forClass(String.class);
         verify(slackMessageService).sendForWorkspace(eq(workspaceId), eq(C1), any(), fallbackText.capture());
         assertThat(fallbackText.getValue())
-            .contains("Hephaestus is now active in this channel")
-            .contains("does not read earlier history");
+                .contains("Hephaestus is now active in this channel")
+                .contains("does not read earlier history");
         assertThat(auditToStates(C1)).containsExactly(ConsentState.ACTIVE);
 
         // Hop 3 — forward-only ingest: ts strictly after the announcement is stored, ts before it is not.
@@ -263,10 +262,10 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
         String tsBefore = (announcedEpoch - 300) + ".000100";
         ingestService.ingestChannelMessage(TEAM, C1, tsAfter, null, "U1", "after announcement");
         ingestService.ingestChannelMessage(TEAM, C1, tsBefore, null, "U1", "pre-announcement backlog");
-        assertThat(messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, C1, tsAfter)).isTrue();
-        assertThat(
-            messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, C1, tsBefore)
-        ).isFalse();
+        assertThat(messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, C1, tsAfter))
+                .isTrue();
+        assertThat(messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, C1, tsBefore))
+                .isFalse();
 
         // Hop 4 — detection over a seeded settled deep thread with real bigint[] participants {U1,U2}.
         long baseSecond = Instant.now().getEpochSecond() - 1200; // 20 min ago → past quiescence
@@ -277,9 +276,9 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
             support.seedMessage(workspaceId, C1, s + ".000000", s == baseSecond ? null : rootTs, "turn");
         }
         long settledThreadId = threadRepository
-            .findByWorkspaceIdAndSlackChannelIdAndSlackThreadTs(workspaceId, C1, rootTs)
-            .orElseThrow()
-            .getId();
+                .findByWorkspaceIdAndSlackChannelIdAndSlackThreadTs(workspaceId, C1, rootTs)
+                .orElseThrow()
+                .getId();
         SlackConversationTestSupport.BoundConversation u1Conv = seedBoundConversation(settledThreadId, u1MemberId);
         UUID u1Obs = u1Conv.observationId();
         UUID u1Fb = u1Conv.feedbackId();
@@ -296,17 +295,15 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
 
         // Hop 5 — U1 opts out: ingestion stops AND U1's channel data is erased, U2's survives.
         handler.handleBlockActions(optOut("U1"));
-        assertThat(
-            participantConsentRepository.existsByWorkspaceIdAndSlackUserIdAndIngestionOptedOutTrue(workspaceId, "U1")
-        ).isTrue();
+        assertThat(participantConsentRepository.existsByWorkspaceIdAndSlackUserIdAndIngestionOptedOutTrue(
+                        workspaceId, "U1"))
+                .isTrue();
         String tsAfterOptOut = (announcedEpoch + 60) + ".000100";
         ingestService.ingestChannelMessage(TEAM, C1, tsAfterOptOut, null, "U1", "post opt-out");
-        assertThat(
-            messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, C1, tsAfterOptOut)
-        ).isFalse();
-        assertThat(
-            messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, C1, tsAfter)
-        ).isFalse();
+        assertThat(messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, C1, tsAfterOptOut))
+                .isFalse();
+        assertThat(messageRepository.existsByWorkspaceIdAndSlackChannelIdAndSlackTs(workspaceId, C1, tsAfter))
+                .isFalse();
         assertThat(participantIds(settledThreadId)).containsExactly(u2MemberId);
         assertThat(observationRepository.findById(u1Obs)).isEmpty();
         assertThat(feedbackRepository.findById(u1Fb)).isEmpty();
@@ -322,9 +319,9 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
         // Hop 6 — revoke C1: all C1 raw + derived rows gone; both audit rows survive; C2 untouched. The manually
         // constructed service is not a @Transactional proxy, so wrap this call in one transaction — exactly the single
         // tx the production `@Transactional transition → eraseChannel` runs in (the erasure port removes entities).
-        new TransactionTemplate(transactionManager).executeWithoutResult(s ->
-            consentService.transition(workspaceId, C1, ConsentState.REVOKED, "wind down")
-        );
+        new TransactionTemplate(transactionManager)
+                .executeWithoutResult(
+                        s -> consentService.transition(workspaceId, C1, ConsentState.REVOKED, "wind down"));
         assertThat(currentChannel(C1).getConsentState()).isEqualTo(ConsentState.REVOKED);
         assertThat(threadCount(C1)).isZero();
         assertThat(messageCount(C1)).isZero();
@@ -338,11 +335,10 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
 
     private long threadCount(String channelId) {
         Long n = jdbcTemplate.queryForObject(
-            "SELECT count(*) FROM slack_thread WHERE workspace_id = ? AND slack_channel_id = ?",
-            Long.class,
-            workspaceId,
-            channelId
-        );
+                "SELECT count(*) FROM slack_thread WHERE workspace_id = ? AND slack_channel_id = ?",
+                Long.class,
+                workspaceId,
+                channelId);
         return n == null ? 0 : n;
     }
 
@@ -360,47 +356,46 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
     }
 
     private SlackMonitoredChannel currentChannel(String channelId) {
-        return monitoredChannelRepository.findByWorkspaceIdAndSlackChannelId(workspaceId, channelId).orElseThrow();
+        return monitoredChannelRepository
+                .findByWorkspaceIdAndSlackChannelId(workspaceId, channelId)
+                .orElseThrow();
     }
 
     private List<ConsentState> auditToStates(String channelId) {
         return consentEventRepository
-            .findByWorkspaceIdAndSlackChannelIdOrderByCreatedAtAscIdAsc(workspaceId, channelId)
-            .stream()
-            .map(e -> e.getToState())
-            .toList();
+                .findByWorkspaceIdAndSlackChannelIdOrderByCreatedAtAscIdAsc(workspaceId, channelId)
+                .stream()
+                .map(e -> e.getToState())
+                .toList();
     }
 
     private List<Long> participantIds(long threadId) {
         Long[] ids = jdbcTemplate.queryForObject(
-            "SELECT participant_member_ids FROM slack_thread WHERE id = ?",
-            (rs, n) -> (Long[]) rs.getArray(1).getArray(),
-            threadId
-        );
+                "SELECT participant_member_ids FROM slack_thread WHERE id = ?",
+                (rs, n) -> (Long[]) rs.getArray(1).getArray(),
+                threadId);
         return List.of(ids);
     }
 
     private long messageCount(String channelId) {
         Long n = jdbcTemplate.queryForObject(
-            "SELECT count(*) FROM slack_message WHERE workspace_id = ? AND slack_channel_id = ?",
-            Long.class,
-            workspaceId,
-            channelId
-        );
+                "SELECT count(*) FROM slack_message WHERE workspace_id = ? AND slack_channel_id = ?",
+                Long.class,
+                workspaceId,
+                channelId);
         return n == null ? 0 : n;
     }
 
     private SlackConversationTestSupport.BoundConversation seedBoundConversation(long threadId, long aboutUserId) {
         return SlackConversationTestSupport.seedBoundConversation(
-            observationRepository,
-            feedbackRepository,
-            feedbackObservationRepository,
-            workspaceId,
-            job.getId(),
-            practice.getId(),
-            threadId,
-            aboutUserId
-        );
+                observationRepository,
+                feedbackRepository,
+                feedbackObservationRepository,
+                workspaceId,
+                job.getId(),
+                practice.getId(),
+                threadId,
+                aboutUserId);
     }
 
     private Practice savePractice(Workspace ws) {

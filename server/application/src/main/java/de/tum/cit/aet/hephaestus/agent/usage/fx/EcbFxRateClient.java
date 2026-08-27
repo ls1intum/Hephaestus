@@ -54,10 +54,9 @@ public class EcbFxRateClient {
             body = restClient.get().uri(dailyUrl).retrieve().body(String.class);
         } catch (Exception e) {
             log.warn(
-                "fx: ECB rate fetch failed, keeping the last stored rate: url={} reason={}",
-                dailyUrl,
-                e.toString()
-            );
+                    "fx: ECB rate fetch failed, keeping the last stored rate: url={} reason={}",
+                    dailyUrl,
+                    e.toString());
             return Optional.empty();
         }
         if (body == null || body.isBlank()) {

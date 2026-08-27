@@ -58,10 +58,8 @@ class OutlineWorkspacePurgeAdapterIntegrationTest extends BaseIntegrationTest {
 
     /** Total mirrored rows (tombstoned or not) for a workspace — the erase target the purge must zero out. */
     private long rowsFor(long workspaceId) {
-        return repository
-            .findAll()
-            .stream()
-            .filter(d -> d.getWorkspaceId() == workspaceId)
-            .count();
+        return repository.findAll().stream()
+                .filter(d -> d.getWorkspaceId() == workspaceId)
+                .count();
     }
 }

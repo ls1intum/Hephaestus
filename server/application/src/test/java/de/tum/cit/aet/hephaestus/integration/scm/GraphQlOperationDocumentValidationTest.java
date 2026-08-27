@@ -43,43 +43,37 @@ class GraphQlOperationDocumentValidationTest extends BaseUnitTest {
 
     private record Vendor(String name, String schema, String operations, List<String> fragments) {
         List<Resource> fragmentResources() {
-            return fragments
-                .stream()
-                .map(location -> (Resource) new ClassPathResource(location))
-                .toList();
+            return fragments.stream()
+                    .map(location -> (Resource) new ClassPathResource(location))
+                    .toList();
         }
     }
 
     private static final List<Vendor> VENDORS = List.of(
-        new Vendor(
-            "github",
-            "graphql/github/schema.github.graphql",
-            "graphql/github/operations/",
-            List.of(
-                GitHubGraphQlFragments.PROJECT_FRAGMENTS_RESOURCE,
-                GitHubGraphQlFragments.COMMIT_ENRICHMENT_FIELDS_RESOURCE
-            )
-        ),
-        new Vendor(
-            "gitlab",
-            "graphql/gitlab/schema.gitlab.graphql",
-            "graphql/gitlab/operations/",
-            List.of("graphql/gitlab/fragments/GitLabUserFields.graphql")
-        )
-    );
+            new Vendor(
+                    "github",
+                    "graphql/github/schema.github.graphql",
+                    "graphql/github/operations/",
+                    List.of(
+                            GitHubGraphQlFragments.PROJECT_FRAGMENTS_RESOURCE,
+                            GitHubGraphQlFragments.COMMIT_ENRICHMENT_FIELDS_RESOURCE)),
+            new Vendor(
+                    "gitlab",
+                    "graphql/gitlab/schema.gitlab.graphql",
+                    "graphql/gitlab/operations/",
+                    List.of("graphql/gitlab/fragments/GitLabUserFields.graphql")));
 
     static Stream<Arguments> operationDocuments() {
         List<Arguments> arguments = new ArrayList<>();
         for (Vendor vendor : VENDORS) {
             GraphQLSchema schema = loadSchema(vendor.schema());
             FragmentMergingDocumentSource documentSource = new FragmentMergingDocumentSource(
-                Stream.concat(
-                    Stream.of((Resource) new ClassPathResource(vendor.operations())),
-                    vendor.fragmentResources().stream()
-                ).toList(),
-                List.of(".graphql", ".gql"),
-                vendor.fragmentResources()
-            );
+                    Stream.concat(
+                                    Stream.of((Resource) new ClassPathResource(vendor.operations())),
+                                    vendor.fragmentResources().stream())
+                            .toList(),
+                    List.of(".graphql", ".gql"),
+                    vendor.fragmentResources());
             for (String name : operationNames(vendor.operations())) {
                 arguments.add(Arguments.of(vendor.name() + "/" + name, schema, documentSource, name));
             }
@@ -90,29 +84,23 @@ class GraphQlOperationDocumentValidationTest extends BaseUnitTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("operationDocuments")
     void operationDocumentIsValidAgainstTheVendorSchema(
-        String label,
-        GraphQLSchema schema,
-        FragmentMergingDocumentSource documentSource,
-        String documentName
-    ) {
+            String label, GraphQLSchema schema, FragmentMergingDocumentSource documentSource, String documentName) {
         String documentText = documentSource.getDocument(documentName).block();
         assertThat(documentText).as("document %s could not be loaded", label).isNotNull();
 
         ParseAndValidateResult result = ParseAndValidate.parseAndValidate(
-            schema,
-            ExecutionInput.newExecutionInput(documentText).build()
-        );
+                schema, ExecutionInput.newExecutionInput(documentText).build());
 
         assertThat(result.getSyntaxException())
-            .as("%s failed to parse: %s", label, result.getSyntaxException())
-            .isNull();
-        List<GraphQLError> errors = result
-            .getValidationErrors()
-            .stream()
-            .filter(error -> !isAcceptedByTheVendor(error))
-            .map(GraphQLError.class::cast)
-            .toList();
-        assertThat(errors).as("%s is invalid against the checked-in schema: %s", label, describe(errors)).isEmpty();
+                .as("%s failed to parse: %s", label, result.getSyntaxException())
+                .isNull();
+        List<GraphQLError> errors = result.getValidationErrors().stream()
+                .filter(error -> !isAcceptedByTheVendor(error))
+                .map(GraphQLError.class::cast)
+                .toList();
+        assertThat(errors)
+                .as("%s is invalid against the checked-in schema: %s", label, describe(errors))
+                .isEmpty();
     }
 
     /**
@@ -138,8 +126,8 @@ class GraphQlOperationDocumentValidationTest extends BaseUnitTest {
     void everyVendorContributesDocumentsSoTheScanIsNotVacuous() {
         for (Vendor vendor : VENDORS) {
             assertThat(operationNames(vendor.operations()))
-                .as("no operation documents found for %s", vendor.name())
-                .isNotEmpty();
+                    .as("no operation documents found for %s", vendor.name())
+                    .isNotEmpty();
         }
     }
 
@@ -156,15 +144,14 @@ class GraphQlOperationDocumentValidationTest extends BaseUnitTest {
 
     private static List<String> operationNames(String operationsLocation) {
         try {
-            Resource[] resources = new PathMatchingResourcePatternResolver().getResources(
-                "classpath:" + operationsLocation + "*.graphql"
-            );
+            Resource[] resources = new PathMatchingResourcePatternResolver()
+                    .getResources("classpath:" + operationsLocation + "*.graphql");
             return Stream.of(resources)
-                .map(Resource::getFilename)
-                .filter(Objects::nonNull)
-                .map(filename -> filename.substring(0, filename.lastIndexOf('.')))
-                .sorted(Comparator.naturalOrder())
-                .toList();
+                    .map(Resource::getFilename)
+                    .filter(Objects::nonNull)
+                    .map(filename -> filename.substring(0, filename.lastIndexOf('.')))
+                    .sorted(Comparator.naturalOrder())
+                    .toList();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

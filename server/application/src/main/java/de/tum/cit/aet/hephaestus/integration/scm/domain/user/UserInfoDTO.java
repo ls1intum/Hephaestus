@@ -20,20 +20,31 @@ import org.jspecify.annotations.Nullable;
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 @Schema(description = "Information about a user from the git provider")
 public record UserInfoDTO(
-    @NonNull @Schema(description = "Unique identifier of the user") Long id,
-    @NonNull @Schema(description = "Login/username of the user") String login,
-    @Schema(description = "Email address of the user, if public") String email,
-    @NonNull @Schema(description = "URL to the user's avatar image") String avatarUrl,
-    @NonNull @Schema(description = "Display name of the user") String name,
-    @NonNull @Schema(description = "URL to the user's profile on the git provider") String htmlUrl,
-    /**
-     * League points earned by the user in the current scope.
-     * <p>
-     * <b>Note:</b> This field is scope-specific business logic and should be moved
-     * to a leaderboard-specific DTO during ETL extraction.
-     */
-    @Schema(description = "League points earned by the user in the current scope", example = "150") int leaguePoints
-) {
+        @NonNull @Schema(description = "Unique identifier of the user")
+        Long id,
+
+        @NonNull @Schema(description = "Login/username of the user")
+        String login,
+
+        @Schema(description = "Email address of the user, if public")
+        String email,
+
+        @NonNull @Schema(description = "URL to the user's avatar image")
+        String avatarUrl,
+
+        @NonNull @Schema(description = "Display name of the user")
+        String name,
+
+        @NonNull @Schema(description = "URL to the user's profile on the git provider")
+        String htmlUrl,
+        /**
+         * League points earned by the user in the current scope.
+         * <p>
+         * <b>Note:</b> This field is scope-specific business logic and should be moved
+         * to a leaderboard-specific DTO during ETL extraction.
+         */
+        @Schema(description = "League points earned by the user in the current scope", example = "150")
+        int leaguePoints) {
     @Nullable
     public static UserInfoDTO fromUser(@Nullable User user) {
         return fromUser(user, 0);
@@ -45,13 +56,12 @@ public record UserInfoDTO(
             return null;
         }
         return new UserInfoDTO(
-            user.getId(),
-            user.getLogin(),
-            user.getEmail(),
-            user.getAvatarUrl(),
-            user.getName() != null ? user.getName() : user.getLogin(),
-            user.getHtmlUrl(),
-            leaguePoints
-        );
+                user.getId(),
+                user.getLogin(),
+                user.getEmail(),
+                user.getAvatarUrl(),
+                user.getName() != null ? user.getName() : user.getLogin(),
+                user.getHtmlUrl(),
+                leaguePoints);
     }
 }

@@ -55,12 +55,11 @@ class GitHubWorkspaceProvisioningAdapterDeletionTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         adapter = new GitHubWorkspaceProvisioningAdapter(
-            githubLifecycleListener,
-            repositoryMonitorService,
-            workspaceScopeFilter,
-            dataSyncTrigger,
-            monitoringExecutor
-        );
+                githubLifecycleListener,
+                repositoryMonitorService,
+                workspaceScopeFilter,
+                dataSyncTrigger,
+                monitoringExecutor);
     }
 
     @Test
@@ -108,9 +107,8 @@ class GitHubWorkspaceProvisioningAdapterDeletionTest extends BaseUnitTest {
         Workspace workspace = new Workspace();
         workspace.setId(11L);
         workspace.setStatus(Workspace.WorkspaceStatus.PURGED);
-        when(
-            githubLifecycleListener.updateWorkspaceStatus(INSTALLATION_ID, Workspace.WorkspaceStatus.ACTIVE)
-        ).thenReturn(Optional.of(workspace));
+        when(githubLifecycleListener.updateWorkspaceStatus(INSTALLATION_ID, Workspace.WorkspaceStatus.ACTIVE))
+                .thenReturn(Optional.of(workspace));
 
         adapter.onInstallationActivated(INSTALLATION_ID);
 

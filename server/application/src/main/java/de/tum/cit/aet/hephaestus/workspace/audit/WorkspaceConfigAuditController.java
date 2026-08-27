@@ -34,24 +34,17 @@ public class WorkspaceConfigAuditController {
 
     @GetMapping
     @Operation(
-        summary = "List this workspace's admin configuration changes (paged, newest first)",
-        operationId = "listWorkspaceConfigAuditEvents"
-    )
+            summary = "List this workspace's admin configuration changes (paged, newest first)",
+            operationId = "listWorkspaceConfigAuditEvents")
     @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<Page<ConfigAuditEntryViewDTO>> list(
-        WorkspaceContext workspaceContext,
-        @RequestParam(defaultValue = "0") int page,
-        @RequestParam(defaultValue = "50") int size,
-        @ParameterObject ConfigAuditFilterParams filter
-    ) {
+            WorkspaceContext workspaceContext,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size,
+            @ParameterObject ConfigAuditFilterParams filter) {
         // The workspace comes from the resolved context, never from a request param — it is the
         // tenancy boundary, so a caller must not be able to widen it.
-        return ResponseEntity.ok(
-            configAuditQuery.listForWorkspace(
-                workspaceContext.id(),
-                filter.toFilter(),
-                ConfigAuditFilterParams.pageable(page, size)
-            )
-        );
+        return ResponseEntity.ok(configAuditQuery.listForWorkspace(
+                workspaceContext.id(), filter.toFilter(), ConfigAuditFilterParams.pageable(page, size)));
     }
 }

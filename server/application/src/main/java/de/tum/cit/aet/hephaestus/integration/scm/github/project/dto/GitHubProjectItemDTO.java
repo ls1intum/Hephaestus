@@ -33,24 +33,23 @@ import org.jspecify.annotations.Nullable;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Slf4j
 public record GitHubProjectItemDTO(
-    @JsonProperty("id") @Nullable Long id,
-    @JsonProperty("database_id") @Nullable Long databaseId,
-    @JsonProperty("node_id") @Nullable String nodeId,
-    @JsonProperty("project_node_id") @Nullable String projectNodeId,
-    @JsonProperty("content_type") @Nullable String contentType,
-    @JsonProperty("issue_id") @Nullable Long issueId,
-    @JsonProperty("issue_number") @Nullable Integer issueNumber,
-    @JsonProperty("draft_title") @Nullable String draftTitle,
-    @JsonProperty("draft_body") @Nullable String draftBody,
-    @JsonProperty("archived") boolean archived,
-    @JsonProperty("creator") @Nullable GitHubUserDTO creator,
-    @JsonProperty("field_values") List<GitHubProjectFieldValueDTO> fieldValues,
-    @JsonProperty("field_values_truncated") boolean fieldValuesTruncated,
-    @JsonProperty("field_values_total_count") int fieldValuesTotalCount,
-    @JsonProperty("field_values_end_cursor") @Nullable String fieldValuesEndCursor,
-    @JsonProperty("created_at") @Nullable Instant createdAt,
-    @JsonProperty("updated_at") @Nullable Instant updatedAt
-) {
+        @JsonProperty("id") @Nullable Long id,
+        @JsonProperty("database_id") @Nullable Long databaseId,
+        @JsonProperty("node_id") @Nullable String nodeId,
+        @JsonProperty("project_node_id") @Nullable String projectNodeId,
+        @JsonProperty("content_type") @Nullable String contentType,
+        @JsonProperty("issue_id") @Nullable Long issueId,
+        @JsonProperty("issue_number") @Nullable Integer issueNumber,
+        @JsonProperty("draft_title") @Nullable String draftTitle,
+        @JsonProperty("draft_body") @Nullable String draftBody,
+        @JsonProperty("archived") boolean archived,
+        @JsonProperty("creator") @Nullable GitHubUserDTO creator,
+        @JsonProperty("field_values") List<GitHubProjectFieldValueDTO> fieldValues,
+        @JsonProperty("field_values_truncated") boolean fieldValuesTruncated,
+        @JsonProperty("field_values_total_count") int fieldValuesTotalCount,
+        @JsonProperty("field_values_end_cursor") @Nullable String fieldValuesEndCursor,
+        @JsonProperty("created_at") @Nullable Instant createdAt,
+        @JsonProperty("updated_at") @Nullable Instant updatedAt) {
     /**
      * Get the database ID, preferring databaseId over id for GraphQL responses.
      */
@@ -73,24 +72,23 @@ public record GitHubProjectItemDTO(
             return this;
         }
         return new GitHubProjectItemDTO(
-            id,
-            databaseId,
-            nodeId,
-            projectNodeId,
-            contentType,
-            parentIssueId,
-            issueNumber,
-            draftTitle,
-            draftBody,
-            archived,
-            creator,
-            fieldValues,
-            fieldValuesTruncated,
-            fieldValuesTotalCount,
-            fieldValuesEndCursor,
-            createdAt,
-            updatedAt
-        );
+                id,
+                databaseId,
+                nodeId,
+                projectNodeId,
+                contentType,
+                parentIssueId,
+                issueNumber,
+                draftTitle,
+                draftBody,
+                archived,
+                creator,
+                fieldValues,
+                fieldValuesTruncated,
+                fieldValuesTotalCount,
+                fieldValuesEndCursor,
+                createdAt,
+                updatedAt);
     }
 
     /**
@@ -109,24 +107,23 @@ public record GitHubProjectItemDTO(
             return this;
         }
         return new GitHubProjectItemDTO(
-            id,
-            databaseId,
-            nodeId,
-            projectNodeId,
-            contentType,
-            issueId,
-            issueNumber,
-            draftTitle,
-            draftBody,
-            archived,
-            creator,
-            fieldValues,
-            fieldValuesTruncated,
-            fieldValuesTotalCount,
-            fieldValuesEndCursor,
-            createdAt,
-            updatedAt
-        );
+                id,
+                databaseId,
+                nodeId,
+                projectNodeId,
+                contentType,
+                issueId,
+                issueNumber,
+                draftTitle,
+                draftBody,
+                archived,
+                creator,
+                fieldValues,
+                fieldValuesTruncated,
+                fieldValuesTotalCount,
+                fieldValuesEndCursor,
+                createdAt,
+                updatedAt);
     }
 
     /**
@@ -202,24 +199,23 @@ public record GitHubProjectItemDTO(
         GitHubUserDTO creator = GitHubUserDTO.fromActor(item.getCreator());
 
         return new GitHubProjectItemDTO(
-            null,
-            toLong(item.getFullDatabaseId()),
-            item.getId(),
-            null, // projectNodeId not available from GraphQL item query
-            contentType,
-            issueId,
-            issueNumber,
-            draftTitle,
-            draftBody,
-            item.getIsArchived(),
-            creator,
-            fieldValues,
-            fieldValuesTruncated,
-            fieldValuesTotalCount,
-            fieldValuesEndCursor,
-            toInstant(item.getCreatedAt()),
-            toInstant(item.getUpdatedAt())
-        );
+                null,
+                toLong(item.getFullDatabaseId()),
+                item.getId(),
+                null, // projectNodeId not available from GraphQL item query
+                contentType,
+                issueId,
+                issueNumber,
+                draftTitle,
+                draftBody,
+                item.getIsArchived(),
+                creator,
+                fieldValues,
+                fieldValuesTruncated,
+                fieldValuesTotalCount,
+                fieldValuesEndCursor,
+                toInstant(item.getCreatedAt()),
+                toInstant(item.getUpdatedAt()));
     }
 
     /**
@@ -229,8 +225,7 @@ public record GitHubProjectItemDTO(
      * @return list of field value DTOs, or empty list if no values
      */
     private static List<GitHubProjectFieldValueDTO> extractFieldValues(
-        @Nullable GHProjectV2ItemFieldValueConnection fieldValuesConnection
-    ) {
+            @Nullable GHProjectV2ItemFieldValueConnection fieldValuesConnection) {
         if (fieldValuesConnection == null || fieldValuesConnection.getNodes() == null) {
             return Collections.emptyList();
         }

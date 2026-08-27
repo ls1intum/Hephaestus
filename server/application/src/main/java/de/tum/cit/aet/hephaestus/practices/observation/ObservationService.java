@@ -64,14 +64,29 @@ public class ObservationService {
         }
         // An IN () over an empty list is invalid SQL. The flags disable empty filters, while the placeholder
         // values keep the query parseable.
-        boolean hasArtifactKinds = query.artifactKinds() != null && !query.artifactKinds().isEmpty();
-        boolean hasSeverities = query.severities() != null && !query.severities().isEmpty();
-        List<ArtifactKind> artifactKinds = hasArtifactKinds
-            ? Objects.requireNonNull(query.artifactKinds())
-            : List.of(ArtifactKinds.PULL_REQUEST);
+        boolean hasArtifactKinds =
+                query.artifactKinds() != null && !query.artifactKinds().isEmpty();
+        boolean hasSeverities =
+                query.severities() != null && !query.severities().isEmpty();
+        List<ArtifactKind> artifactKinds =
+                hasArtifactKinds ? Objects.requireNonNull(query.artifactKinds()) : List.of(ArtifactKinds.PULL_REQUEST);
         List<Severity> severities = hasSeverities ? Objects.requireNonNull(query.severities()) : List.of(Severity.INFO);
         if (query.sort() == ObservationSort.SEVERITY) {
             return observationRepository.findByAboutUserAndWorkspaceSeverityFirst(
+                    currentUser.get().getId(),
+                    workspaceId,
+                    query.practiceSlug(),
+                    query.groupSlug(),
+                    query.presence(),
+                    hasArtifactKinds,
+                    artifactKinds,
+                    hasSeverities,
+                    severities,
+                    query.displayableOnly(),
+                    query.mostSevereFirst() ? 1 : -1,
+                    pageable);
+        }
+        return observationRepository.findByAboutUserAndWorkspace(
                 currentUser.get().getId(),
                 workspaceId,
                 query.practiceSlug(),
@@ -82,23 +97,7 @@ public class ObservationService {
                 hasSeverities,
                 severities,
                 query.displayableOnly(),
-                query.mostSevereFirst() ? 1 : -1,
-                pageable
-            );
-        }
-        return observationRepository.findByAboutUserAndWorkspace(
-            currentUser.get().getId(),
-            workspaceId,
-            query.practiceSlug(),
-            query.groupSlug(),
-            query.presence(),
-            hasArtifactKinds,
-            artifactKinds,
-            hasSeverities,
-            severities,
-            query.displayableOnly(),
-            pageable
-        );
+                pageable);
     }
 
     /**
@@ -107,11 +106,10 @@ public class ObservationService {
      */
     @Transactional(readOnly = true)
     public Optional<String> getArtifactUrl(Long workspaceId, Observation observation) {
-        return Optional.ofNullable(
-            reviewRunTargetLookup
-                .findByJobIds(workspaceId, List.of(observation.getAgentJobId()))
-                .get(observation.getAgentJobId())
-        ).map(ReviewRunTargetLookup.Target::url);
+        return Optional.ofNullable(reviewRunTargetLookup
+                        .findByJobIds(workspaceId, List.of(observation.getAgentJobId()))
+                        .get(observation.getAgentJobId()))
+                .map(ReviewRunTargetLookup.Target::url);
     }
 
     /** Per-practice observation counts for the current user in a workspace. */
@@ -121,7 +119,8 @@ public class ObservationService {
         if (currentUser.isEmpty()) {
             return List.of();
         }
-        return observationRepository.findSummaryByDeveloperAndWorkspace(currentUser.get().getId(), workspaceId);
+        return observationRepository.findSummaryByDeveloperAndWorkspace(
+                currentUser.get().getId(), workspaceId);
     }
 
     /**
@@ -131,10 +130,8 @@ public class ObservationService {
      * answer "what did you tell me about this observation" with a paragraph that is explicitly not about it.
      * Named here rather than defaulted in the query so a fourth lane has to be admitted deliberately.
      */
-    private static final List<String> FEEDBACK_CHANNELS = List.of(
-        FeedbackChannel.IN_CONTEXT.name(),
-        FeedbackChannel.IN_CHAT.name()
-    );
+    private static final List<String> FEEDBACK_CHANNELS =
+            List.of(FeedbackChannel.IN_CONTEXT.name(), FeedbackChannel.IN_CHAT.name());
 
     /**
      * Single observation detail. Ownership is enforced in the SQL query itself —
@@ -150,8 +147,9 @@ public class ObservationService {
             throw new EntityNotFoundException("Observation", observationId.toString());
         }
         return observationRepository
-            .findByIdAndDeveloperAndWorkspace(observationId, currentUser.get().getId(), workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("Observation", observationId.toString()));
+                .findByIdAndDeveloperAndWorkspace(
+                        observationId, currentUser.get().getId(), workspaceId)
+                .orElseThrow(() -> new EntityNotFoundException("Observation", observationId.toString()));
     }
 
     /**
@@ -164,9 +162,8 @@ public class ObservationService {
      */
     @Transactional(readOnly = true)
     public Optional<String> getDeliveredGuidance(Long workspaceId, UUID observationId) {
-        return Optional.ofNullable(
-            deliveredFeedbackByObservation(workspaceId, Set.of(observationId)).get(observationId)
-        );
+        return Optional.ofNullable(deliveredFeedbackByObservation(workspaceId, Set.of(observationId))
+                .get(observationId));
     }
 
     private Map<UUID, String> deliveredFeedbackByObservation(Long workspaceId, Set<UUID> observationIds) {
@@ -174,9 +171,9 @@ public class ObservationService {
             return Map.of();
         }
         return feedbackObservationRepository
-            .findLatestFeedbackBodiesByObservationIds(workspaceId, observationIds, FEEDBACK_CHANNELS)
-            .stream()
-            .collect(Collectors.toMap(ObservationFeedbackBody::getObservationId, ObservationFeedbackBody::getBody));
+                .findLatestFeedbackBodiesByObservationIds(workspaceId, observationIds, FEEDBACK_CHANNELS)
+                .stream()
+                .collect(Collectors.toMap(ObservationFeedbackBody::getObservationId, ObservationFeedbackBody::getBody));
     }
 
     /**
@@ -186,9 +183,6 @@ public class ObservationService {
     @Transactional(readOnly = true)
     public List<Observation> getObservationsForPullRequest(Long workspaceId, Long pullRequestId) {
         return observationRepository.findByPullRequestAndWorkspace(
-            ArtifactKinds.PULL_REQUEST,
-            pullRequestId,
-            workspaceId
-        );
+                ArtifactKinds.PULL_REQUEST, pullRequestId, workspaceId);
     }
 }

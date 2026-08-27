@@ -14,43 +14,46 @@ import org.jspecify.annotations.Nullable;
 
 @Schema(description = "An observation that contributed to a piece of feedback")
 public record ReviewBoundObservationDTO(
-    @NonNull UUID observationId,
-    @NonNull @Schema(description = "Whether the observation leads the feedback or reinforces it") EvidenceRole role,
-    @NonNull @Schema(description = "Render order within the feedback (lower renders earlier)") Integer ordinal,
-    @NonNull String practiceSlug,
-    @NonNull String practiceName,
-    @Schema(description = "Practice group; null when the practice is Unassigned")
-    @Nullable
-    ReviewPracticeGroupDTO group,
-    @NonNull String summary,
-    @NonNull Presence presence,
-    @Schema(description = "Assessment: GOOD or BAD (null when NOT_APPLICABLE)") @Nullable Assessment assessment,
-    @Schema(description = "Severity band (null unless assessment is BAD)") @Nullable Severity severity,
-    @NonNull ReviewClaimCurrentness claimCurrentness,
-    @NonNull Instant observedAt
-) {
+        @NonNull UUID observationId,
+
+        @NonNull @Schema(description = "Whether the observation leads the feedback or reinforces it")
+        EvidenceRole role,
+
+        @NonNull @Schema(description = "Render order within the feedback (lower renders earlier)")
+        Integer ordinal,
+
+        @NonNull String practiceSlug,
+        @NonNull String practiceName,
+
+        @Schema(description = "Practice group; null when the practice is Unassigned") @Nullable
+        ReviewPracticeGroupDTO group,
+
+        @NonNull String summary,
+        @NonNull Presence presence,
+
+        @Schema(description = "Assessment: GOOD or BAD (null when NOT_APPLICABLE)") @Nullable
+        Assessment assessment,
+
+        @Schema(description = "Severity band (null unless assessment is BAD)") @Nullable
+        Severity severity,
+
+        @NonNull ReviewClaimCurrentness claimCurrentness,
+        @NonNull Instant observedAt) {
     public static ReviewBoundObservationDTO from(BoundObservation row) {
         return new ReviewBoundObservationDTO(
-            row.getObservationId(),
-            row.getRole(),
-            row.getOrdinal(),
-            row.getPracticeSlug(),
-            row.getPracticeName(),
-            ReviewPracticeGroupDTO.from(
-                row.getGroupSlug(),
-                row.getGroupName(),
-                row.getGroupIcon(),
-                row.getGroupColor()
-            ),
-            row.getSummary(),
-            row.getPresence(),
-            row.getAssessment(),
-            row.getSeverity(),
-            ReviewClaimCurrentness.of(
-                row.getPracticeRevisionFingerprint(),
-                row.getCurrentPracticeRevisionFingerprint()
-            ),
-            row.getObservedAt()
-        );
+                row.getObservationId(),
+                row.getRole(),
+                row.getOrdinal(),
+                row.getPracticeSlug(),
+                row.getPracticeName(),
+                ReviewPracticeGroupDTO.from(
+                        row.getGroupSlug(), row.getGroupName(), row.getGroupIcon(), row.getGroupColor()),
+                row.getSummary(),
+                row.getPresence(),
+                row.getAssessment(),
+                row.getSeverity(),
+                ReviewClaimCurrentness.of(
+                        row.getPracticeRevisionFingerprint(), row.getCurrentPracticeRevisionFingerprint()),
+                row.getObservedAt());
     }
 }

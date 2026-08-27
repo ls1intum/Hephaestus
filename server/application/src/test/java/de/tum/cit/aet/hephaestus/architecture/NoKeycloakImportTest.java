@@ -22,10 +22,10 @@ class NoKeycloakImportTest extends HephaestusArchitectureTest {
     @DisplayName("no class imports org.keycloak.* (Keycloak removed — ADR 0017)")
     void noKeycloakImports() {
         ArchRule rule = noClasses()
-            .should()
-            .dependOnClassesThat()
-            .resideInAnyPackage("org.keycloak..")
-            .because("Keycloak was removed in favour of Hephaestus-native auth (core.auth, ADR 0017)");
+                .should()
+                .dependOnClassesThat()
+                .resideInAnyPackage("org.keycloak..")
+                .because("Keycloak was removed in favour of Hephaestus-native auth (core.auth, ADR 0017)");
         rule.check(classes);
     }
 }

@@ -38,12 +38,11 @@ public class RuntimeRoleStartupLogger {
 
         if (enabled.isEmpty()) {
             log.warn(
-                "All runtime roles disabled — this JVM will accept no work. Set at least one of " +
-                    "{}=true, {}=true, or {}=true.",
-                RuntimeRole.SERVER_PROPERTY,
-                RuntimeRole.WORKER_PROPERTY,
-                RuntimeRole.WEBHOOK_PROPERTY
-            );
+                    "All runtime roles disabled — this JVM will accept no work. Set at least one of "
+                            + "{}=true, {}=true, or {}=true.",
+                    RuntimeRole.SERVER_PROPERTY,
+                    RuntimeRole.WORKER_PROPERTY,
+                    RuntimeRole.WEBHOOK_PROPERTY);
             return;
         }
         log.info("Runtime roles enabled: {}", enabled);

@@ -42,8 +42,7 @@ public interface OrganizationRepository extends JpaRepository<Organization, Long
      */
     @Modifying
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO organization (native_id, provider_id, login, name, avatar_url, html_url)
         VALUES (:nativeId, :providerId, :login, :name, :avatarUrl, :htmlUrl)
         ON CONFLICT (provider_id, native_id) DO UPDATE SET
@@ -51,15 +50,12 @@ public interface OrganizationRepository extends JpaRepository<Organization, Long
             name = EXCLUDED.name,
             avatar_url = EXCLUDED.avatar_url,
             html_url = EXCLUDED.html_url
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     void upsert(
-        @Param("nativeId") Long nativeId,
-        @Param("providerId") Long providerId,
-        @Param("login") String login,
-        @Param("name") String name,
-        @Param("avatarUrl") @Nullable String avatarUrl,
-        @Param("htmlUrl") @Nullable String htmlUrl
-    );
+            @Param("nativeId") Long nativeId,
+            @Param("providerId") Long providerId,
+            @Param("login") String login,
+            @Param("name") String name,
+            @Param("avatarUrl") @Nullable String avatarUrl,
+            @Param("htmlUrl") @Nullable String htmlUrl);
 }

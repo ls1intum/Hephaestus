@@ -27,7 +27,7 @@ public final class SlackInteractivityRawBodyFilter extends OncePerRequestFilter 
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
-        throws ServletException, IOException {
+            throws ServletException, IOException {
         byte[] rawBody = request.getInputStream().readAllBytes();
         HttpServletRequest wrapped = new CachedBodyRequest(request, rawBody);
         wrapped.setAttribute(RAW_BODY_ATTRIBUTE, rawBody);

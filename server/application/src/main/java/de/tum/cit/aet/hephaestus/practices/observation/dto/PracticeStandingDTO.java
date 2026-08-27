@@ -10,32 +10,41 @@ import org.jspecify.annotations.Nullable;
 /** Current standing and supporting practice feedback for one developer and practice. */
 @Schema(description = "A developer's readable feedback for one practice")
 public record PracticeStandingDTO(
-    @NonNull @Schema(description = "Practice slug") String slug,
-    @NonNull @Schema(description = "Practice name") String name,
-    @Nullable @Schema(description = "Group slug this practice belongs to, if any") String groupSlug,
-    @Nullable @Schema(description = "Group name this practice belongs to, if any") String groupName,
-    @Nullable @Schema(description = "Why this practice matters, in plain language") String whyItMatters,
-    @Nullable @Schema(description = "A concrete picture of doing this well") String whatGoodLooksLike,
-    @NonNull
-    @Schema(
-        description = "Where the developer stands on this practice, or why no standing could be formed",
-        allowableValues = { "DEVELOPING", "STRENGTH", "MIXED", "NOT_OBSERVED", "NO_OPPORTUNITY" }
-    )
-    Standing standing,
-    @NonNull
-    @Schema(description = "Specific feedback to act on (highest-impact first)")
-    List<PracticeStandingObservationDTO> toWorkOn,
-    @NonNull
-    @Schema(description = "What the developer already does well here")
-    List<PracticeStandingObservationDTO> strengths,
-    @Nullable
-    @Schema(
-        description = "Opportunity-indexed direction of this practice's recent evidence",
-        allowableValues = { "IMPROVING", "DECLINING", "UNCERTAIN", "INSUFFICIENT_EVIDENCE" }
-    )
-    TrendDirection direction,
-    @Nullable @Schema(description = "Evidence support and provenance for the direction") TrendSupportDTO trendSupport
-) {
+        @NonNull @Schema(description = "Practice slug") String slug,
+        @NonNull @Schema(description = "Practice name") String name,
+
+        @Nullable @Schema(description = "Group slug this practice belongs to, if any")
+        String groupSlug,
+
+        @Nullable @Schema(description = "Group name this practice belongs to, if any")
+        String groupName,
+
+        @Nullable @Schema(description = "Why this practice matters, in plain language")
+        String whyItMatters,
+
+        @Nullable @Schema(description = "A concrete picture of doing this well")
+        String whatGoodLooksLike,
+
+        @NonNull
+        @Schema(
+                description = "Where the developer stands on this practice, or why no standing could be formed",
+                allowableValues = {"DEVELOPING", "STRENGTH", "MIXED", "NOT_OBSERVED", "NO_OPPORTUNITY"})
+        Standing standing,
+
+        @NonNull @Schema(description = "Specific feedback to act on (highest-impact first)")
+        List<PracticeStandingObservationDTO> toWorkOn,
+
+        @NonNull @Schema(description = "What the developer already does well here")
+        List<PracticeStandingObservationDTO> strengths,
+
+        @Nullable
+        @Schema(
+                description = "Opportunity-indexed direction of this practice's recent evidence",
+                allowableValues = {"IMPROVING", "DECLINING", "UNCERTAIN", "INSUFFICIENT_EVIDENCE"})
+        TrendDirection direction,
+
+        @Nullable @Schema(description = "Evidence support and provenance for the direction")
+        TrendSupportDTO trendSupport) {
     /**
      * Coarse, human standing derived from the developer's most recent evidence for this practice.
      *

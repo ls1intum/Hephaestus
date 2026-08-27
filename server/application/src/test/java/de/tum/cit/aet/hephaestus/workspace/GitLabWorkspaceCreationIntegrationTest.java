@@ -96,9 +96,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         link.setExternalActorId(persistedId(scmUser.getId()));
         identityLinkRepository.save(link);
         return new GitLabCaller(
-            headers -> headers.setBearerAuth("mock-jwt-sub-" + persistedId(account.getId())),
-            scmUser
-        );
+                headers -> headers.setBearerAuth("mock-jwt-sub-" + persistedId(account.getId())), scmUser);
     }
 
     @Test
@@ -107,28 +105,27 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         Consumer<HttpHeaders> auth = gitLabCaller("mentor");
 
         var request = new CreateWorkspaceRequestDTO(
-            "gitlab-space",
-            "My GitLab Workspace",
-            "my-group/my-project",
-            AccountType.ORG,
-            persistedId(owner.getId()),
-            IntegrationKind.GITLAB,
-            "glpat-test-token-12345",
-            "https://gitlab.example.com"
-        );
+                "gitlab-space",
+                "My GitLab Workspace",
+                "my-group/my-project",
+                AccountType.ORG,
+                persistedId(owner.getId()),
+                IntegrationKind.GITLAB,
+                "glpat-test-token-12345",
+                "https://gitlab.example.com");
 
         WorkspaceDTO created = webTestClient
-            .post()
-            .uri("/workspaces")
-            .headers(auth)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus()
-            .isCreated()
-            .expectBody(WorkspaceDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .post()
+                .uri("/workspaces")
+                .headers(auth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody(WorkspaceDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         WorkspaceDTO workspace = Objects.requireNonNull(created);
         assertThat(workspace.workspaceSlug()).isEqualTo("gitlab-space");
@@ -154,28 +151,27 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         Consumer<HttpHeaders> auth = gitLabCaller("mentor");
 
         var request = new CreateWorkspaceRequestDTO(
-            "gitlab-default",
-            "Default GitLab",
-            "my-group",
-            AccountType.ORG,
-            persistedId(owner.getId()),
-            IntegrationKind.GITLAB,
-            "glpat-test-token-67890",
-            null
-        );
+                "gitlab-default",
+                "Default GitLab",
+                "my-group",
+                AccountType.ORG,
+                persistedId(owner.getId()),
+                IntegrationKind.GITLAB,
+                "glpat-test-token-67890",
+                null);
 
         WorkspaceDTO created = webTestClient
-            .post()
-            .uri("/workspaces")
-            .headers(auth)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus()
-            .isCreated()
-            .expectBody(WorkspaceDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .post()
+                .uri("/workspaces")
+                .headers(auth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody(WorkspaceDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         WorkspaceDTO workspace = Objects.requireNonNull(created);
         assertThat(workspace.providerType()).isEqualTo(IdentityProviderType.GITLAB);
@@ -188,35 +184,34 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         Consumer<HttpHeaders> auth = gitLabCaller("admin");
 
         var request = new CreateWorkspaceRequestDTO(
-            "gitlab-notoken",
-            "No Token",
-            "my-group",
-            AccountType.ORG,
-            persistedId(owner.getId()),
-            IntegrationKind.GITLAB,
-            null, // missing token
-            null
-        );
+                "gitlab-notoken",
+                "No Token",
+                "my-group",
+                AccountType.ORG,
+                persistedId(owner.getId()),
+                IntegrationKind.GITLAB,
+                null, // missing token
+                null);
 
         ProblemDetail problem = webTestClient
-            .post()
-            .uri("/workspaces")
-            .headers(auth)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus()
-            .isBadRequest()
-            .expectBody(ProblemDetail.class)
-            .returnResult()
-            .getResponseBody();
+                .post()
+                .uri("/workspaces")
+                .headers(auth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isBadRequest()
+                .expectBody(ProblemDetail.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(problem).isNotNull();
         assertThat(problem.getTitle()).isEqualTo("Validation failed");
         assertNotNull(problem.getProperties());
         assertThat(problem.getProperties().get("errors"))
-            .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
-            .containsKey("tokenProvided");
+                .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
+                .containsKey("tokenProvided");
 
         assertThat(workspaceRepository.findByWorkspaceSlug("gitlab-notoken")).isEmpty();
     }
@@ -227,35 +222,35 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         Consumer<HttpHeaders> auth = gitLabCaller("admin");
 
         var request = new CreateWorkspaceRequestDTO(
-            "gitlab-http",
-            "HTTP GitLab",
-            "my-group",
-            AccountType.ORG,
-            persistedId(owner.getId()),
-            IntegrationKind.GITLAB,
-            "glpat-test-token",
-            "http://insecure.example.com" // not HTTPS
-        );
+                "gitlab-http",
+                "HTTP GitLab",
+                "my-group",
+                AccountType.ORG,
+                persistedId(owner.getId()),
+                IntegrationKind.GITLAB,
+                "glpat-test-token",
+                "http://insecure.example.com" // not HTTPS
+                );
 
         ProblemDetail problem = webTestClient
-            .post()
-            .uri("/workspaces")
-            .headers(auth)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus()
-            .isBadRequest()
-            .expectBody(ProblemDetail.class)
-            .returnResult()
-            .getResponseBody();
+                .post()
+                .uri("/workspaces")
+                .headers(auth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isBadRequest()
+                .expectBody(ProblemDetail.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(problem).isNotNull();
         assertThat(problem.getTitle()).isEqualTo("Validation failed");
         assertNotNull(problem.getProperties());
         assertThat(problem.getProperties().get("errors"))
-            .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
-            .containsKey("serverUrlSafe");
+                .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
+                .containsKey("serverUrlSafe");
 
         assertThat(workspaceRepository.findByWorkspaceSlug("gitlab-http")).isEmpty();
     }
@@ -266,34 +261,33 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         Consumer<HttpHeaders> auth = gitLabCaller("mentor");
 
         var request = new CreateWorkspaceRequestDTO(
-            "gitlab-ownership",
-            "Owner Test",
-            "owner-group",
-            AccountType.ORG,
-            persistedId(owner.getId()),
-            IntegrationKind.GITLAB,
-            "glpat-owner-token",
-            null
-        );
+                "gitlab-ownership",
+                "Owner Test",
+                "owner-group",
+                AccountType.ORG,
+                persistedId(owner.getId()),
+                IntegrationKind.GITLAB,
+                "glpat-owner-token",
+                null);
 
         WorkspaceDTO created = webTestClient
-            .post()
-            .uri("/workspaces")
-            .headers(auth)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus()
-            .isCreated()
-            .expectBody(WorkspaceDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .post()
+                .uri("/workspaces")
+                .headers(auth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody(WorkspaceDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         WorkspaceDTO workspace = Objects.requireNonNull(created);
 
         var membership = workspaceMembershipRepository
-            .findByWorkspace_IdAndUser_Id(workspace.id(), persistedId(owner.getId()))
-            .orElseThrow(() -> new AssertionError("Owner membership not created"));
+                .findByWorkspace_IdAndUser_Id(workspace.id(), persistedId(owner.getId()))
+                .orElseThrow(() -> new AssertionError("Owner membership not created"));
         assertThat(membership.getRole()).isEqualTo(WorkspaceMembership.WorkspaceRole.OWNER);
     }
 
@@ -304,28 +298,27 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         String secretToken = "test-token-placeholder";
 
         var request = new CreateWorkspaceRequestDTO(
-            "gitlab-secret",
-            "Secret Test",
-            "secret-group",
-            AccountType.ORG,
-            persistedId(owner.getId()),
-            IntegrationKind.GITLAB,
-            secretToken,
-            null
-        );
+                "gitlab-secret",
+                "Secret Test",
+                "secret-group",
+                AccountType.ORG,
+                persistedId(owner.getId()),
+                IntegrationKind.GITLAB,
+                secretToken,
+                null);
 
         String responseBody = webTestClient
-            .post()
-            .uri("/workspaces")
-            .headers(auth)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus()
-            .isCreated()
-            .expectBody(String.class)
-            .returnResult()
-            .getResponseBody();
+                .post()
+                .uri("/workspaces")
+                .headers(auth)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody(String.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(responseBody).isNotNull();
         assertThat(responseBody).doesNotContain(secretToken);
@@ -340,36 +333,35 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
         GitLabCaller caller = gitLabCallerWithMirror("mentor");
 
         var gitlabRequest = new CreateWorkspaceRequestDTO(
-            "gitlab-ws",
-            "GitLab WS",
-            "gitlab-group",
-            AccountType.ORG,
-            caller.scmUser().getId(),
-            IntegrationKind.GITLAB,
-            "glpat-list-token",
-            null
-        );
+                "gitlab-ws",
+                "GitLab WS",
+                "gitlab-group",
+                AccountType.ORG,
+                caller.scmUser().getId(),
+                IntegrationKind.GITLAB,
+                "glpat-list-token",
+                null);
 
         webTestClient
-            .post()
-            .uri("/workspaces")
-            .headers(caller.headers())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(gitlabRequest)
-            .exchange()
-            .expectStatus()
-            .isCreated();
+                .post()
+                .uri("/workspaces")
+                .headers(caller.headers())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(gitlabRequest)
+                .exchange()
+                .expectStatus()
+                .isCreated();
 
         List<WorkspaceListItemDTO> workspaces = webTestClient
-            .get()
-            .uri("/workspaces")
-            .headers(caller.headers())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBodyList(WorkspaceListItemDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces")
+                .headers(caller.headers())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBodyList(WorkspaceListItemDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(workspaces).isNotNull();
         // providerType is derived from the active Connection: the GitLab workspace created via the REST
@@ -381,8 +373,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
     @WithAdminUser
     void gitLabWorkspaceLifecycleSuspendAndPurgeWorkCorrectly() {
         User owner = persistUser("lifecycle-owner");
-        Workspace workspace = workspaceService.createWorkspace(
-            new CreateWorkspaceRequestDTO(
+        Workspace workspace = workspaceService.createWorkspace(new CreateWorkspaceRequestDTO(
                 "gitlab-lifecycle",
                 "Lifecycle Test",
                 "lifecycle-group",
@@ -390,9 +381,7 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
                 persistedId(owner.getId()),
                 IntegrationKind.GITLAB,
                 "glpat-lifecycle-token",
-                null
-            )
-        );
+                null));
         ensureOwnerMembership(workspace);
 
         // Verify it's ACTIVE
@@ -400,17 +389,20 @@ class GitLabWorkspaceCreationIntegrationTest extends AbstractWorkspaceIntegratio
 
         // Suspend
         workspaceLifecycleService.suspendWorkspace(workspace.getWorkspaceSlug());
-        Workspace suspended = workspaceRepository.findById(persistedId(workspace.getId())).orElseThrow();
+        Workspace suspended =
+                workspaceRepository.findById(persistedId(workspace.getId())).orElseThrow();
         assertThat(suspended.getStatus()).isEqualTo(Workspace.WorkspaceStatus.SUSPENDED);
 
         // Resume
         workspaceLifecycleService.resumeWorkspace(workspace.getWorkspaceSlug());
-        Workspace resumed = workspaceRepository.findById(persistedId(workspace.getId())).orElseThrow();
+        Workspace resumed =
+                workspaceRepository.findById(persistedId(workspace.getId())).orElseThrow();
         assertThat(resumed.getStatus()).isEqualTo(Workspace.WorkspaceStatus.ACTIVE);
 
         // Purge
         workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug());
-        Workspace purged = workspaceRepository.findById(persistedId(workspace.getId())).orElseThrow();
+        Workspace purged =
+                workspaceRepository.findById(persistedId(workspace.getId())).orElseThrow();
         assertThat(purged.getStatus()).isEqualTo(Workspace.WorkspaceStatus.PURGED);
     }
 

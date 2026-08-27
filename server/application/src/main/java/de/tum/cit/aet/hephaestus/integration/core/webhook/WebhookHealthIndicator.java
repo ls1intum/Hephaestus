@@ -18,7 +18,7 @@ import org.springframework.boot.health.contributor.HealthIndicator;
 public class WebhookHealthIndicator implements HealthIndicator {
 
     private static final Logger log = LoggerFactory.getLogger(WebhookHealthIndicator.class);
-    private static final String[] STREAMS = { "gitlab", "github", "slack", "outline" };
+    private static final String[] STREAMS = {"gitlab", "github", "slack", "outline"};
 
     private final Connection connection;
     private final JetStreamManagement jsm;
@@ -40,9 +40,10 @@ public class WebhookHealthIndicator implements HealthIndicator {
             } catch (JetStreamApiException | IOException e) {
                 log.warn("JetStream health probe failed: stream={}", streamName, e);
                 return Health.down()
-                    .withDetail("natsStatus", "CONNECTED")
-                    .withDetail("stream." + streamName + ".error", e.getClass().getSimpleName())
-                    .build();
+                        .withDetail("natsStatus", "CONNECTED")
+                        .withDetail(
+                                "stream." + streamName + ".error", e.getClass().getSimpleName())
+                        .build();
             }
         }
         return Health.up().withDetail("natsStatus", "CONNECTED").build();

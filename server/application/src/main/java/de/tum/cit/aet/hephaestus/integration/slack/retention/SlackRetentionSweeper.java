@@ -45,10 +45,9 @@ public class SlackRetentionSweeper {
     private final SlackRetentionPurger retentionPurger;
 
     public SlackRetentionSweeper(
-        SlackMessageRepository slackMessageRepository,
-        ConnectionService connectionService,
-        SlackRetentionPurger retentionPurger
-    ) {
+            SlackMessageRepository slackMessageRepository,
+            ConnectionService connectionService,
+            SlackRetentionPurger retentionPurger) {
         this.slackMessageRepository = slackMessageRepository;
         this.connectionService = connectionService;
         this.retentionPurger = retentionPurger;
@@ -88,9 +87,9 @@ public class SlackRetentionSweeper {
 
     private int retentionWindowDays(long workspaceId) {
         int configured = connectionService
-            .findSlackNotificationConfig(workspaceId)
-            .map(ConnectionConfig.SlackConfig::retentionDaysOrDefault)
-            .orElse(ConnectionConfig.SlackConfig.DEFAULT_RETENTION_DAYS);
+                .findSlackNotificationConfig(workspaceId)
+                .map(ConnectionConfig.SlackConfig::retentionDaysOrDefault)
+                .orElse(ConnectionConfig.SlackConfig.DEFAULT_RETENTION_DAYS);
         return Math.min(configured, MAX_RETENTION_DAYS);
     }
 }

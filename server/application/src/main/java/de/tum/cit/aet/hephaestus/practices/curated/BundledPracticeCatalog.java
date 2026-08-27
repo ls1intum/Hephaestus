@@ -5,9 +5,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import java.util.List;
 
 record BundledPracticeCatalog(
-    List<BundledEntry<GroupDefinition>> groups,
-    List<BundledEntry<PracticeDefinition>> practices
-) {
+        List<BundledEntry<GroupDefinition>> groups, List<BundledEntry<PracticeDefinition>> practices) {
     BundledPracticeCatalog {
         groups = List.copyOf(groups);
         practices = List.copyOf(practices);

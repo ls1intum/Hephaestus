@@ -29,8 +29,7 @@ public record SignalName(String value) {
         }
         if (!GRAMMAR.matcher(value).matches()) {
             throw new IllegalArgumentException(
-                "signal name must be <domain>.<kind>.<signal> in lowercase snake_case, got: " + value
-            );
+                    "signal name must be <domain>.<kind>.<signal> in lowercase snake_case, got: " + value);
         }
     }
 

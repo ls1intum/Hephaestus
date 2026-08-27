@@ -29,10 +29,9 @@ public class BundledPracticeCatalogLoader {
     private final BundledPracticeCatalog catalog;
 
     BundledPracticeCatalogLoader(
-        JsonMapper objectMapper,
-        PracticeDefinitionValidator definitionValidator,
-        PracticeEvidenceDefaults evidenceDefaults
-    ) {
+            JsonMapper objectMapper,
+            PracticeDefinitionValidator definitionValidator,
+            PracticeEvidenceDefaults evidenceDefaults) {
         this.catalog = parse(objectMapper, definitionValidator, evidenceDefaults);
     }
 
@@ -41,10 +40,9 @@ public class BundledPracticeCatalogLoader {
     }
 
     private static BundledPracticeCatalog parse(
-        JsonMapper objectMapper,
-        PracticeDefinitionValidator definitionValidator,
-        PracticeEvidenceDefaults evidenceDefaults
-    ) {
+            JsonMapper objectMapper,
+            PracticeDefinitionValidator definitionValidator,
+            PracticeEvidenceDefaults evidenceDefaults) {
         JsonNode root = readCatalog(objectMapper);
         List<BundledEntry<GroupDefinition>> groups = new ArrayList<>();
         List<BundledEntry<PracticeDefinition>> practices = new ArrayList<>();
@@ -60,18 +58,14 @@ public class BundledPracticeCatalogLoader {
             if (!groupSlugs.add(groupSlug)) {
                 throw new IllegalStateException("duplicate bundled practice group slug: " + groupSlug);
             }
-            groups.add(
-                new BundledEntry<>(
+            groups.add(new BundledEntry<>(
                     groupSlug,
                     new GroupDefinition(
-                        requiredText(groupNode, "name"),
-                        text(groupNode, "description"),
-                        text(groupNode, "icon"),
-                        text(groupNode, "color")
-                    ),
-                    groupPosition++
-                )
-            );
+                            requiredText(groupNode, "name"),
+                            text(groupNode, "description"),
+                            text(groupNode, "icon"),
+                            text(groupNode, "color")),
+                    groupPosition++));
 
             JsonNode practicesNode = groupNode.path("practices");
             if (!practicesNode.isArray()) {
@@ -83,21 +77,17 @@ public class BundledPracticeCatalogLoader {
                 if (!practiceSlugs.add(slug)) {
                     throw new IllegalStateException("duplicate bundled practice slug: " + slug);
                 }
-                practices.add(
-                    new BundledEntry<>(
+                practices.add(new BundledEntry<>(
                         slug,
                         definition(
-                            objectMapper,
-                            definitionValidator,
-                            evidenceDefaults,
-                            root,
-                            groupSlug,
-                            practiceNode,
-                            slug
-                        ),
-                        practicePosition++
-                    )
-                );
+                                objectMapper,
+                                definitionValidator,
+                                evidenceDefaults,
+                                root,
+                                groupSlug,
+                                practiceNode,
+                                slug),
+                        practicePosition++));
             }
         }
         if (groups.isEmpty() || practices.isEmpty()) {
@@ -107,14 +97,13 @@ public class BundledPracticeCatalogLoader {
     }
 
     private static PracticeDefinition definition(
-        JsonMapper objectMapper,
-        PracticeDefinitionValidator definitionValidator,
-        PracticeEvidenceDefaults evidenceDefaults,
-        JsonNode catalog,
-        String groupSlug,
-        JsonNode node,
-        String slug
-    ) {
+            JsonMapper objectMapper,
+            PracticeDefinitionValidator definitionValidator,
+            PracticeEvidenceDefaults evidenceDefaults,
+            JsonNode catalog,
+            String groupSlug,
+            JsonNode node,
+            String slug) {
         List<PracticeBinding> bindings = bindings(objectMapper, evidenceDefaults, node, slug);
         ArtifactKind artifactKind = PracticeBinding.artifactKindOf(bindings);
         String preambleKey = text(node, "preamble");
@@ -125,17 +114,16 @@ public class BundledPracticeCatalogLoader {
         String whyItMatters = text(node, "whyItMatters");
         String whatGoodLooksLike = text(node, "whatGoodLooksLike");
         PracticeDefinition definition = new PracticeDefinition(
-            requiredText(node, "name"),
-            bindings,
-            criteria,
-            loadPrecomputeScript(node, slug),
-            // The authoring file cannot override the review frame: every bundled practice takes its
-            // kind's default contract, mode and limits.
-            evidenceDefaults.policyFor(artifactKind),
-            whyItMatters,
-            whatGoodLooksLike,
-            groupSlug
-        );
+                requiredText(node, "name"),
+                bindings,
+                criteria,
+                loadPrecomputeScript(node, slug),
+                // The authoring file cannot override the review frame: every bundled practice takes its
+                // kind's default contract, mode and limits.
+                evidenceDefaults.policyFor(artifactKind),
+                whyItMatters,
+                whatGoodLooksLike,
+                groupSlug);
         definitionValidator.validate(definition);
         return definition;
     }
@@ -149,11 +137,7 @@ public class BundledPracticeCatalogLoader {
      * licenses the claim.
      */
     private static List<PracticeBinding> bindings(
-        JsonMapper objectMapper,
-        PracticeEvidenceDefaults evidenceDefaults,
-        JsonNode node,
-        String slug
-    ) {
+            JsonMapper objectMapper, PracticeEvidenceDefaults evidenceDefaults, JsonNode node, String slug) {
         JsonNode on = node.path("on");
         if (!on.isArray() || on.isEmpty()) {
             throw new IllegalStateException("bundled practice must declare a non-empty 'on' array: " + slug);
@@ -178,12 +162,11 @@ public class BundledPracticeCatalogLoader {
                 // Every component but `needs` is carried through: filling in the kind's default evidence
                 // must not quietly reset whose conduct the occasion judges.
                 binding = new PracticeBinding(
-                    binding.signals(),
-                    evidenceDefaults.needsFor(binding.artifactKind()),
-                    binding.onDrafts(),
-                    binding.subject(),
-                    binding.appliesWhen()
-                );
+                        binding.signals(),
+                        evidenceDefaults.needsFor(binding.artifactKind()),
+                        binding.onDrafts(),
+                        binding.subject(),
+                        binding.appliesWhen());
             }
             bindings.add(binding);
         }

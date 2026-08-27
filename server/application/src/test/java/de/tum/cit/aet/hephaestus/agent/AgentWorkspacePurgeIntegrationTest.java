@@ -82,9 +82,8 @@ class AgentWorkspacePurgeIntegrationTest extends BaseIntegrationTest {
     void setUp() {
         databaseTestUtils.cleanDatabase();
         LlmConnection connection = instanceConnectionRepository.save(LlmCatalogTestFixtures.connection("purge-shared"));
-        sharedModel = instanceModelRepository.save(
-            LlmCatalogTestFixtures.model(connection, "purge-shared", "shared-model")
-        );
+        sharedModel =
+                instanceModelRepository.save(LlmCatalogTestFixtures.model(connection, "purge-shared", "shared-model"));
     }
 
     @Test
@@ -96,21 +95,22 @@ class AgentWorkspacePurgeIntegrationTest extends BaseIntegrationTest {
 
         lifecycleService.purgeWorkspace(purgedWorkspace.getWorkspaceSlug());
 
-        assertThat(jobRepository.findByWorkspaceId(purgedWorkspace.getId(), Pageable.unpaged())).isEmpty();
+        assertThat(jobRepository.findByWorkspaceId(purgedWorkspace.getId(), Pageable.unpaged()))
+                .isEmpty();
         assertThat(bindingRepository.findByWorkspaceId(purgedWorkspace.getId())).isEmpty();
         assertThat(modelRepository.findByWorkspaceId(purgedWorkspace.getId())).isEmpty();
-        assertThat(connectionRepository.findByWorkspaceId(purgedWorkspace.getId())).isEmpty();
-        assertThat(
-            grantRepository.existsByIdModelIdAndIdWorkspaceId(sharedModel.getId(), purgedWorkspace.getId())
-        ).isFalse();
+        assertThat(connectionRepository.findByWorkspaceId(purgedWorkspace.getId()))
+                .isEmpty();
+        assertThat(grantRepository.existsByIdModelIdAndIdWorkspaceId(sharedModel.getId(), purgedWorkspace.getId()))
+                .isFalse();
 
         assertThat(jobRepository.findById(otherData.jobId())).isPresent();
         assertThat(bindingRepository.findByWorkspaceId(otherWorkspace.getId())).hasSize(1);
         assertThat(modelRepository.findByWorkspaceId(otherWorkspace.getId())).hasSize(1);
-        assertThat(connectionRepository.findByWorkspaceId(otherWorkspace.getId())).hasSize(1);
-        assertThat(
-            grantRepository.existsByIdModelIdAndIdWorkspaceId(sharedModel.getId(), otherWorkspace.getId())
-        ).isTrue();
+        assertThat(connectionRepository.findByWorkspaceId(otherWorkspace.getId()))
+                .hasSize(1);
+        assertThat(grantRepository.existsByIdModelIdAndIdWorkspaceId(sharedModel.getId(), otherWorkspace.getId()))
+                .isTrue();
 
         assertThat(usageRepository.findById(purgedData.usageEventId())).isPresent();
         assertThat(usageRepository.findById(otherData.usageEventId())).isPresent();
@@ -130,11 +130,10 @@ class AgentWorkspacePurgeIntegrationTest extends BaseIntegrationTest {
         jobRepository.save(job);
 
         assertThatThrownBy(() -> lifecycleService.purgeWorkspace(workspace.getWorkspaceSlug()))
-            .isInstanceOf(WorkspacePurgeBlockedException.class)
-            .hasMessage(
-                "Workspace deletion is blocked while AI runs are queued, running, or awaiting feedback delivery. " +
-                    "Cancel queued or running runs, and wait for pending feedback delivery to finish, then try again."
-            );
+                .isInstanceOf(WorkspacePurgeBlockedException.class)
+                .hasMessage(
+                        "Workspace deletion is blocked while AI runs are queued, running, or awaiting feedback delivery. "
+                                + "Cancel queued or running runs, and wait for pending feedback delivery to finish, then try again.");
     }
 
     private AgentData seedAgentData(Workspace workspace, String suffix) {

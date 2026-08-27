@@ -45,20 +45,14 @@ public class DevLoginController {
         this.authSessionService = authSessionService;
     }
 
-    public record DevLoginRequestDTO(@NotBlank String username, @Nullable String displayName, boolean admin) {}
+    public record DevLoginRequestDTO(
+            @NotBlank String username, @Nullable String displayName, boolean admin) {}
 
     @PostMapping("/dev-login")
     public ResponseEntity<Void> devLogin(
-        @Valid @RequestBody DevLoginRequestDTO body,
-        HttpServletRequest request,
-        HttpServletResponse response
-    ) {
-        HephaestusJwtIssuer.Token token = devLoginService.devLogin(
-            body.username(),
-            body.displayName(),
-            body.admin(),
-            request
-        );
+            @Valid @RequestBody DevLoginRequestDTO body, HttpServletRequest request, HttpServletResponse response) {
+        HephaestusJwtIssuer.Token token =
+                devLoginService.devLogin(body.username(), body.displayName(), body.admin(), request);
         authSessionService.setCookie(response, token);
         return ResponseEntity.noContent().build();
     }

@@ -65,10 +65,9 @@ public class ConversationFeedbackTtlSweeper {
         }
         if (totalExpired > 0) {
             log.info(
-                "conversation.ttl: expired {} prepared unit(s) across {} workspace(s)",
-                totalExpired,
-                workspaceIds.size()
-            );
+                    "conversation.ttl: expired {} prepared unit(s) across {} workspace(s)",
+                    totalExpired,
+                    workspaceIds.size());
         }
         return totalExpired;
     }

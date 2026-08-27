@@ -19,8 +19,8 @@ class CuratedCatalogOrderingTest extends BaseUnitTest {
         var second = CatalogEntry.shippedOnly("second", group("Second", "Second"), 1);
 
         assertThat(CuratedCatalogModel.orderGroups(List.of(second, first), Set.of()))
-            .extracting(CatalogEntry::slug)
-            .containsExactly("first", "second");
+                .extracting(CatalogEntry::slug)
+                .containsExactly("first", "second");
     }
 
     @Test
@@ -41,28 +41,20 @@ class CuratedCatalogOrderingTest extends BaseUnitTest {
         var second = positionedPractice("second", practice("Second", "Second", "Second"), 0);
         var newlyShipped = CatalogEntry.shippedOnly("new", practice("A new practice", "New", "New"), 0);
 
-        var ordered = CuratedCatalogModel.orderPractices(
-            List.of(first, newlyShipped, second),
-            Set.of("first", "second")
-        );
+        var ordered =
+                CuratedCatalogModel.orderPractices(List.of(first, newlyShipped, second), Set.of("first", "second"));
 
         assertThat(ordered).extracting(CatalogEntry::slug).containsExactly("second", "first", "new");
         assertThat(ordered).extracting(CatalogEntry::position).containsExactly(0, 1, 2);
     }
 
     private static CatalogEntry<GroupDefinition> positionedGroup(
-        String slug,
-        GroupDefinition definition,
-        int position
-    ) {
+            String slug, GroupDefinition definition, int position) {
         return new CatalogEntry<>(slug, definition, definition, null, null, false, position, null);
     }
 
     private static CatalogEntry<PracticeDefinition> positionedPractice(
-        String slug,
-        PracticeDefinition definition,
-        int position
-    ) {
+            String slug, PracticeDefinition definition, int position) {
         return new CatalogEntry<>(slug, definition, definition, null, null, false, position, null);
     }
 }

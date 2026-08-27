@@ -58,9 +58,11 @@ class AccountBootstrapServiceIntegrationTest extends BaseIntegrationTest {
 
         inTransaction(() -> bootstrapService.bootstrapFirstAdmin(persistedId(user.getId()), TOKEN));
 
-        assertThat(accountRepository.findById(persistedId(user.getId())).orElseThrow().getAppRole()).isEqualTo(
-            Account.AppRole.APP_ADMIN
-        );
+        assertThat(accountRepository
+                        .findById(persistedId(user.getId()))
+                        .orElseThrow()
+                        .getAppRole())
+                .isEqualTo(Account.AppRole.APP_ADMIN);
     }
 
     @Test
@@ -69,13 +71,15 @@ class AccountBootstrapServiceIntegrationTest extends BaseIntegrationTest {
         Account user = persistUser("Late Hopeful");
 
         assertThatThrownBy(() ->
-            inTransaction(() -> bootstrapService.bootstrapFirstAdmin(persistedId(user.getId()), TOKEN))
-        ).isInstanceOfSatisfying(ResponseStatusException.class, e ->
-            assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT)
-        );
-        assertThat(accountRepository.findById(persistedId(user.getId())).orElseThrow().getAppRole()).isEqualTo(
-            Account.AppRole.USER
-        );
+                        inTransaction(() -> bootstrapService.bootstrapFirstAdmin(persistedId(user.getId()), TOKEN)))
+                .isInstanceOfSatisfying(
+                        ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+        assertThat(accountRepository
+                        .findById(persistedId(user.getId()))
+                        .orElseThrow()
+                        .getAppRole())
+                .isEqualTo(Account.AppRole.USER);
     }
 
     private static long persistedId(@Nullable Long id) {

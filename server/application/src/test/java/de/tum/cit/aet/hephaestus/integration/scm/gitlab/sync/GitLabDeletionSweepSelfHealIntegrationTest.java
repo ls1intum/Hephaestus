@@ -56,10 +56,9 @@ class GitLabDeletionSweepSelfHealIntegrationTest extends BaseIntegrationTest {
         databaseTestUtils.cleanDatabase();
 
         IdentityProvider provider = providerRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.com")
-            .orElseGet(() ->
-                providerRepository.save(new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.com")
+                .orElseGet(() -> providerRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.com")));
         Long savedProviderId = provider.getId();
         assertNotNull(savedProviderId);
         providerId = savedProviderId;
@@ -94,43 +93,39 @@ class GitLabDeletionSweepSelfHealIntegrationTest extends BaseIntegrationTest {
     void tombstonedIssueIsRevivedWhenTheUpstreamUpsertSeesItAgain() {
         int number = 5;
         upsertIssue(number);
-        assertThat(issueRepository.findLiveIssueNumbersByRepositoryId(repository.getId())).containsExactly(number);
+        assertThat(issueRepository.findLiveIssueNumbersByRepositoryId(repository.getId()))
+                .containsExactly(number);
 
         int tombstoned = issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(
-            repository.getId(),
-            java.util.List.of(number),
-            Instant.now()
-        );
+                repository.getId(), java.util.List.of(number), Instant.now());
         assertThat(tombstoned).isEqualTo(1);
-        assertThat(issueRepository.findLiveIssueNumbersByRepositoryId(repository.getId())).isEmpty();
+        assertThat(issueRepository.findLiveIssueNumbersByRepositoryId(repository.getId()))
+                .isEmpty();
 
         // Upstream hands the issue back through the ordinary upsert path.
         upsertIssue(number);
 
-        assertThat(issueRepository.findLiveIssueNumbersByRepositoryId(repository.getId())).containsExactly(number);
+        assertThat(issueRepository.findLiveIssueNumbersByRepositoryId(repository.getId()))
+                .containsExactly(number);
     }
 
     @Test
     void tombstonedMergeRequestIsRevivedWhenTheUpstreamUpsertSeesItAgain() {
         int number = 7;
         upsertMergeRequest(number);
-        assertThat(issueRepository.findLivePullRequestNumbersByRepositoryId(repository.getId())).containsExactly(
-            number
-        );
+        assertThat(issueRepository.findLivePullRequestNumbersByRepositoryId(repository.getId()))
+                .containsExactly(number);
 
         int tombstoned = issueRepository.tombstonePullRequestsByRepositoryIdAndNumbers(
-            repository.getId(),
-            java.util.List.of(number),
-            Instant.now()
-        );
+                repository.getId(), java.util.List.of(number), Instant.now());
         assertThat(tombstoned).isEqualTo(1);
-        assertThat(issueRepository.findLivePullRequestNumbersByRepositoryId(repository.getId())).isEmpty();
+        assertThat(issueRepository.findLivePullRequestNumbersByRepositoryId(repository.getId()))
+                .isEmpty();
 
         upsertMergeRequest(number);
 
-        assertThat(issueRepository.findLivePullRequestNumbersByRepositoryId(repository.getId())).containsExactly(
-            number
-        );
+        assertThat(issueRepository.findLivePullRequestNumbersByRepositoryId(repository.getId()))
+                .containsExactly(number);
     }
 
     /**
@@ -147,20 +142,21 @@ class GitLabDeletionSweepSelfHealIntegrationTest extends BaseIntegrationTest {
         int iid = 5;
         upsertIssue(iid);
         upsertMergeRequest(iid);
-        assertThat(issueRepository.findLiveIssueNumbersByRepositoryId(repository.getId())).containsExactly(iid);
-        assertThat(issueRepository.findLivePullRequestNumbersByRepositoryId(repository.getId())).containsExactly(iid);
+        assertThat(issueRepository.findLiveIssueNumbersByRepositoryId(repository.getId()))
+                .containsExactly(iid);
+        assertThat(issueRepository.findLivePullRequestNumbersByRepositoryId(repository.getId()))
+                .containsExactly(iid);
 
         // Issue #5 was deleted upstream; the issue sweep computed missing=[5] and tombstones the ISSUE.
         int tombstoned = issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(
-            repository.getId(),
-            java.util.List.of(iid),
-            Instant.now()
-        );
+                repository.getId(), java.util.List.of(iid), Instant.now());
 
         assertThat(tombstoned).isEqualTo(1);
-        assertThat(issueRepository.findLiveIssueNumbersByRepositoryId(repository.getId())).isEmpty();
+        assertThat(issueRepository.findLiveIssueNumbersByRepositoryId(repository.getId()))
+                .isEmpty();
         // The merge request in the other namespace must remain live.
-        assertThat(issueRepository.findLivePullRequestNumbersByRepositoryId(repository.getId())).containsExactly(iid);
+        assertThat(issueRepository.findLivePullRequestNumbersByRepositoryId(repository.getId()))
+                .containsExactly(iid);
     }
 
     /** The symmetric direction: sweeping a deleted MR !5 must not hide a live issue #5. */
@@ -171,14 +167,13 @@ class GitLabDeletionSweepSelfHealIntegrationTest extends BaseIntegrationTest {
         upsertMergeRequest(iid);
 
         int tombstoned = issueRepository.tombstonePullRequestsByRepositoryIdAndNumbers(
-            repository.getId(),
-            java.util.List.of(iid),
-            Instant.now()
-        );
+                repository.getId(), java.util.List.of(iid), Instant.now());
 
         assertThat(tombstoned).isEqualTo(1);
-        assertThat(issueRepository.findLivePullRequestNumbersByRepositoryId(repository.getId())).isEmpty();
-        assertThat(issueRepository.findLiveIssueNumbersByRepositoryId(repository.getId())).containsExactly(iid);
+        assertThat(issueRepository.findLivePullRequestNumbersByRepositoryId(repository.getId()))
+                .isEmpty();
+        assertThat(issueRepository.findLiveIssueNumbersByRepositoryId(repository.getId()))
+                .containsExactly(iid);
     }
 
     /**
@@ -202,67 +197,65 @@ class GitLabDeletionSweepSelfHealIntegrationTest extends BaseIntegrationTest {
     private void upsertIssue(int number) {
         Instant now = Instant.now();
         issueRepository.upsertCore(
-            1000L + number,
-            providerId,
-            number,
-            "Issue " + number,
-            "body",
-            "OPEN",
-            null,
-            "https://gitlab.com/acme/widgets/-/issues/" + number,
-            null,
-            null,
-            0,
-            now,
-            now,
-            now,
-            null,
-            repository.getId(),
-            null,
-            null,
-            null,
-            null,
-            null,
-            null
-        );
+                1000L + number,
+                providerId,
+                number,
+                "Issue " + number,
+                "body",
+                "OPEN",
+                null,
+                "https://gitlab.com/acme/widgets/-/issues/" + number,
+                null,
+                null,
+                0,
+                now,
+                now,
+                now,
+                null,
+                repository.getId(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
     }
 
     private void upsertMergeRequest(int number) {
         Instant now = Instant.now();
         pullRequestRepository.upsertCore(
-            2000L + number,
-            providerId,
-            number,
-            "MR " + number,
-            "body",
-            "OPEN",
-            null,
-            "https://gitlab.com/acme/widgets/-/merge_requests/" + number,
-            null,
-            null,
-            0,
-            now,
-            now,
-            now,
-            null,
-            repository.getId(),
-            null,
-            null,
-            false,
-            false,
-            0,
-            0,
-            0,
-            0,
-            null,
-            null,
-            null,
-            "feature",
-            "main",
-            null,
-            null,
-            null,
-            null
-        );
+                2000L + number,
+                providerId,
+                number,
+                "MR " + number,
+                "body",
+                "OPEN",
+                null,
+                "https://gitlab.com/acme/widgets/-/merge_requests/" + number,
+                null,
+                null,
+                0,
+                now,
+                now,
+                now,
+                null,
+                repository.getId(),
+                null,
+                null,
+                false,
+                false,
+                0,
+                0,
+                0,
+                0,
+                null,
+                null,
+                null,
+                "feature",
+                "main",
+                null,
+                null,
+                null,
+                null);
     }
 }

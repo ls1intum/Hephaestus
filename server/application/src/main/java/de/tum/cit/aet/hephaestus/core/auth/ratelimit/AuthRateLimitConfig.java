@@ -67,12 +67,11 @@ public class AuthRateLimitConfig {
     @ConditionalOnProperty(prefix = "hephaestus.auth.rate-limit", name = "postgres-backed", matchIfMissing = true)
     ProxyManager<String> authRateLimitProxyManager(DataSource dataSource) {
         ProxyManager<String> proxyManager = Bucket4jPostgreSQL.selectForUpdateBasedBuilder(dataSource)
-            .primaryKeyMapper(PrimaryKeyMapper.STRING)
-            .table(BUCKET_TABLE)
-            .expirationAfterWrite(
-                ExpirationAfterWriteStrategy.basedOnTimeForRefillingBucketUpToMax(Duration.ofMinutes(1))
-            )
-            .build();
+                .primaryKeyMapper(PrimaryKeyMapper.STRING)
+                .table(BUCKET_TABLE)
+                .expirationAfterWrite(
+                        ExpirationAfterWriteStrategy.basedOnTimeForRefillingBucketUpToMax(Duration.ofMinutes(1)))
+                .build();
         log.info("Auth rate limiting: Postgres-backed (table={}) — limits SHARED across replicas.", BUCKET_TABLE);
         return proxyManager;
     }
@@ -104,29 +103,28 @@ public class AuthRateLimitConfig {
     @Bean
     @ConditionalOnMissingBean(BucketResolver.class)
     BucketResolver inMemoryBucketResolver() {
-        log.warn(
-            "Auth rate limiting: in-JVM fallback — limits are PER-REPLICA, NOT shared across the " +
-                "cluster. Acceptable for dev / specs / worker-only pods; production must run " +
-                "Postgres-backed (hephaestus.auth.rate-limit.postgres-backed=true with a DataSource)."
-        );
+        log.warn("Auth rate limiting: in-JVM fallback — limits are PER-REPLICA, NOT shared across the "
+                + "cluster. Acceptable for dev / specs / worker-only pods; production must run "
+                + "Postgres-backed (hephaestus.auth.rate-limit.postgres-backed=true with a DataSource).");
         var store = new ConcurrentHashMap<String, io.github.bucket4j.Bucket>();
         return (key, config) -> {
             if (store.size() >= IN_MEMORY_MAX_BUCKETS && !store.containsKey(key)) {
                 store.clear();
             }
-            return store.computeIfAbsent(key, k ->
-                io.github.bucket4j.Bucket.builder().addLimit(config.getBandwidths()[0]).build()
-            );
+            return store.computeIfAbsent(
+                    key,
+                    k -> io.github.bucket4j.Bucket.builder()
+                            .addLimit(config.getBandwidths()[0])
+                            .build());
         };
     }
 
     @Bean
     AuthRateLimitFilter authRateLimitFilter(
-        AuthRateLimitProperties properties,
-        BucketResolver bucketResolver,
-        ObjectMapper objectMapper,
-        AuthMetrics metrics
-    ) {
+            AuthRateLimitProperties properties,
+            BucketResolver bucketResolver,
+            ObjectMapper objectMapper,
+            AuthMetrics metrics) {
         return new AuthRateLimitFilter(properties, bucketResolver, objectMapper, metrics);
     }
 }

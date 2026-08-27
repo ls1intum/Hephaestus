@@ -30,13 +30,12 @@ public class LlmModelResolver {
             }
             LlmConnection c = instance.getConnection();
             return new ResolvedLlmModel(
-                c.getBaseUrl(),
-                c.getApiProtocol(),
-                instance.getUpstreamModelId(),
-                instance.getContextWindow(),
-                instance.getMaxOutputTokens(),
-                instance.isSupportsReasoning()
-            );
+                    c.getBaseUrl(),
+                    c.getApiProtocol(),
+                    instance.getUpstreamModelId(),
+                    instance.getContextWindow(),
+                    instance.getMaxOutputTokens(),
+                    instance.isSupportsReasoning());
         }
         WorkspaceLlmModel byo = config.getWorkspaceModel();
         if (byo != null) {
@@ -45,13 +44,12 @@ public class LlmModelResolver {
             }
             WorkspaceLlmConnection c = byo.getConnection();
             return new ResolvedLlmModel(
-                c.getBaseUrl(),
-                c.getApiProtocol(),
-                byo.getUpstreamModelId(),
-                byo.getContextWindow(),
-                byo.getMaxOutputTokens(),
-                byo.isSupportsReasoning()
-            );
+                    c.getBaseUrl(),
+                    c.getApiProtocol(),
+                    byo.getUpstreamModelId(),
+                    byo.getContextWindow(),
+                    byo.getMaxOutputTokens(),
+                    byo.isSupportsReasoning());
         }
         throw new IllegalStateException("The agent config must bind an available OpenAI-compatible model");
     }
@@ -71,24 +69,19 @@ public class LlmModelResolver {
     }
 
     private boolean isUsable(LlmModel model, Long workspaceId) {
-        boolean visible =
-            model.getVisibility() == ModelVisibility.PUBLIC ||
-            grantRepository.existsByIdModelIdAndIdWorkspaceId(model.getId(), workspaceId);
-        return (
-            model.isEnabled() &&
-            model.getConnection().isEnabled() &&
-            isSupportedProtocol(model.getConnection().getApiProtocol()) &&
-            visible
-        );
+        boolean visible = model.getVisibility() == ModelVisibility.PUBLIC
+                || grantRepository.existsByIdModelIdAndIdWorkspaceId(model.getId(), workspaceId);
+        return (model.isEnabled()
+                && model.getConnection().isEnabled()
+                && isSupportedProtocol(model.getConnection().getApiProtocol())
+                && visible);
     }
 
     private boolean isUsable(WorkspaceLlmModel model, Long workspaceId) {
-        return (
-            model.isEnabled() &&
-            model.getConnection().isEnabled() &&
-            isSupportedProtocol(model.getConnection().getApiProtocol()) &&
-            model.getWorkspace().getId().equals(workspaceId)
-        );
+        return (model.isEnabled()
+                && model.getConnection().isEnabled()
+                && isSupportedProtocol(model.getConnection().getApiProtocol())
+                && model.getWorkspace().getId().equals(workspaceId));
     }
 
     private static IllegalStateException unavailable() {
@@ -115,11 +108,10 @@ public class LlmModelResolver {
      * (possibly since-changed) current binding.
      */
     public record ConnectionRef(
-        @Nullable FundingSource scope,
-        @Nullable Long connectionId,
-        @Nullable Long modelId,
-        @Nullable Long workspaceId
-    ) {
+            @Nullable FundingSource scope,
+            @Nullable Long connectionId,
+            @Nullable Long modelId,
+            @Nullable Long workspaceId) {
         public static final ConnectionRef NONE = new ConnectionRef(null, null, null, null);
     }
 
@@ -132,32 +124,29 @@ public class LlmModelResolver {
      *     gateway) — the caller forwards without an auth header rather than refusing
      */
     public record ProxyCredential(
-        String baseUrl,
-        String apiProtocol,
-        LlmAuthMode authMode,
-        String upstreamModelId,
-        @Nullable String apiKey
-    ) {}
+            String baseUrl,
+            String apiProtocol,
+            LlmAuthMode authMode,
+            String upstreamModelId,
+            @Nullable String apiKey) {}
 
     @Transactional(readOnly = true)
     public ConnectionRef connectionRef(ModelBindingSource config) {
         LlmModel instance = config.getInstanceModel();
         if (instance != null) {
             return new ConnectionRef(
-                FundingSource.INSTANCE,
-                instance.getConnection().getId(),
-                instance.getId(),
-                config.getWorkspace().getId()
-            );
+                    FundingSource.INSTANCE,
+                    instance.getConnection().getId(),
+                    instance.getId(),
+                    config.getWorkspace().getId());
         }
         WorkspaceLlmModel byo = config.getWorkspaceModel();
         if (byo != null) {
             return new ConnectionRef(
-                FundingSource.WORKSPACE,
-                byo.getConnection().getId(),
-                byo.getId(),
-                config.getWorkspace().getId()
-            );
+                    FundingSource.WORKSPACE,
+                    byo.getConnection().getId(),
+                    byo.getId(),
+                    config.getWorkspace().getId());
         }
         return ConnectionRef.NONE;
     }
@@ -178,19 +167,16 @@ public class LlmModelResolver {
             LlmModel model = llmModelRepository.findById(modelId).orElse(null);
             if (model == null) return null;
             return llmConnectionRepository
-                .findById(ref.connectionId())
-                .filter(LlmConnection::isEnabled)
-                .filter(c -> isSupportedProtocol(c.getApiProtocol()))
-                .map(c ->
-                    new ProxyCredential(
-                        c.getBaseUrl(),
-                        c.getApiProtocol(),
-                        c.getAuthMode(),
-                        model.getUpstreamModelId(),
-                        blankToNull(c.getApiKey())
-                    )
-                )
-                .orElse(null);
+                    .findById(ref.connectionId())
+                    .filter(LlmConnection::isEnabled)
+                    .filter(c -> isSupportedProtocol(c.getApiProtocol()))
+                    .map(c -> new ProxyCredential(
+                            c.getBaseUrl(),
+                            c.getApiProtocol(),
+                            c.getAuthMode(),
+                            model.getUpstreamModelId(),
+                            blankToNull(c.getApiKey())))
+                    .orElse(null);
         }
         if (ref.scope() == FundingSource.WORKSPACE && ref.connectionId() != null) {
             if (!isUsableWorkspaceModel(ref)) {
@@ -200,23 +186,20 @@ public class LlmModelResolver {
             Long workspaceId = ref.workspaceId();
             if (modelId == null || workspaceId == null) return null;
             WorkspaceLlmModel model = workspaceLlmModelRepository
-                .findByIdAndWorkspaceId(modelId, workspaceId)
-                .orElse(null);
+                    .findByIdAndWorkspaceId(modelId, workspaceId)
+                    .orElse(null);
             if (model == null) return null;
             return workspaceLlmConnectionRepository
-                .findById(ref.connectionId())
-                .filter(WorkspaceLlmConnection::isEnabled)
-                .filter(c -> isSupportedProtocol(c.getApiProtocol()))
-                .map(c ->
-                    new ProxyCredential(
-                        c.getBaseUrl(),
-                        c.getApiProtocol(),
-                        c.getAuthMode(),
-                        model.getUpstreamModelId(),
-                        blankToNull(c.getApiKey())
-                    )
-                )
-                .orElse(null);
+                    .findById(ref.connectionId())
+                    .filter(WorkspaceLlmConnection::isEnabled)
+                    .filter(c -> isSupportedProtocol(c.getApiProtocol()))
+                    .map(c -> new ProxyCredential(
+                            c.getBaseUrl(),
+                            c.getApiProtocol(),
+                            c.getAuthMode(),
+                            model.getUpstreamModelId(),
+                            blankToNull(c.getApiKey())))
+                    .orElse(null);
         }
         return null;
     }
@@ -228,15 +211,12 @@ public class LlmModelResolver {
             return false;
         }
         return llmModelRepository
-            .findById(modelId)
-            .filter(LlmModel::isEnabled)
-            .filter(model -> model.getConnection().getId().equals(ref.connectionId()))
-            .filter(
-                model ->
-                    model.getVisibility() == ModelVisibility.PUBLIC ||
-                    grantRepository.existsByIdModelIdAndIdWorkspaceId(model.getId(), workspaceId)
-            )
-            .isPresent();
+                .findById(modelId)
+                .filter(LlmModel::isEnabled)
+                .filter(model -> model.getConnection().getId().equals(ref.connectionId()))
+                .filter(model -> model.getVisibility() == ModelVisibility.PUBLIC
+                        || grantRepository.existsByIdModelIdAndIdWorkspaceId(model.getId(), workspaceId))
+                .isPresent();
     }
 
     private boolean isUsableWorkspaceModel(ConnectionRef ref) {
@@ -246,10 +226,10 @@ public class LlmModelResolver {
             return false;
         }
         return workspaceLlmModelRepository
-            .findByIdAndWorkspaceId(modelId, workspaceId)
-            .filter(WorkspaceLlmModel::isEnabled)
-            .filter(model -> model.getConnection().getId().equals(ref.connectionId()))
-            .isPresent();
+                .findByIdAndWorkspaceId(modelId, workspaceId)
+                .filter(WorkspaceLlmModel::isEnabled)
+                .filter(model -> model.getConnection().getId().equals(ref.connectionId()))
+                .isPresent();
     }
 
     private static @Nullable String blankToNull(@Nullable String value) {

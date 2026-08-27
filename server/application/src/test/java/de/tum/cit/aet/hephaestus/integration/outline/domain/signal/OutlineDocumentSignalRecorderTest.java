@@ -46,12 +46,7 @@ class OutlineDocumentSignalRecorderTest extends BaseUnitTest {
         when(ledger.record(any(), eq(OCCURRED_AT), eq(DiscoveredVia.EVENT))).thenReturn(true);
 
         Optional<SignalKey> recorded = recorder.record(
-            WORKSPACE_ID,
-            snapshot(11L, "hash-a", null),
-            "documents.publish",
-            OCCURRED_AT,
-            DiscoveredVia.EVENT
-        );
+                WORKSPACE_ID, snapshot(11L, "hash-a", null), "documents.publish", OCCURRED_AT, DiscoveredVia.EVENT);
 
         ArgumentCaptor<SignalKey> key = ArgumentCaptor.forClass(SignalKey.class);
         verify(ledger).record(key.capture(), eq(OCCURRED_AT), eq(DiscoveredVia.EVENT));
@@ -68,29 +63,25 @@ class OutlineDocumentSignalRecorderTest extends BaseUnitTest {
     void reportsWhatTheLedgerDecided() {
         when(ledger.record(any(), any(), any())).thenReturn(false);
 
-        assertThat(
-            recorder.record(
-                WORKSPACE_ID,
-                snapshot(11L, "hash-a", null),
-                "documents.publish",
-                OCCURRED_AT,
-                DiscoveredVia.EVENT
-            )
-        ).isEmpty();
+        assertThat(recorder.record(
+                        WORKSPACE_ID,
+                        snapshot(11L, "hash-a", null),
+                        "documents.publish",
+                        OCCURRED_AT,
+                        DiscoveredVia.EVENT))
+                .isEmpty();
     }
 
     @Test
     @DisplayName("an event with no review meaning never reaches the ledger")
     void ignoresEventsThatChangeNothingADocumentSays() {
-        assertThat(
-            recorder.record(
-                WORKSPACE_ID,
-                snapshot(11L, "hash-a", null),
-                "documents.move",
-                OCCURRED_AT,
-                DiscoveredVia.EVENT
-            )
-        ).isEmpty();
+        assertThat(recorder.record(
+                        WORKSPACE_ID,
+                        snapshot(11L, "hash-a", null),
+                        "documents.move",
+                        OCCURRED_AT,
+                        DiscoveredVia.EVENT))
+                .isEmpty();
 
         verifyNoInteractions(ledger);
     }
@@ -98,18 +89,15 @@ class OutlineDocumentSignalRecorderTest extends BaseUnitTest {
     @Test
     @DisplayName("a tombstoned or absent subject is not an occurrence")
     void ignoresASubjectThatIsNotThere() {
-        assertThat(
-            recorder.record(WORKSPACE_ID, null, "documents.publish", OCCURRED_AT, DiscoveredVia.EVENT)
-        ).isEmpty();
-        assertThat(
-            recorder.record(
-                WORKSPACE_ID,
-                snapshot(11L, "hash-a", Instant.parse("2026-08-06T00:00:00Z")),
-                "documents.publish",
-                OCCURRED_AT,
-                DiscoveredVia.EVENT
-            )
-        ).isEmpty();
+        assertThat(recorder.record(WORKSPACE_ID, null, "documents.publish", OCCURRED_AT, DiscoveredVia.EVENT))
+                .isEmpty();
+        assertThat(recorder.record(
+                        WORKSPACE_ID,
+                        snapshot(11L, "hash-a", Instant.parse("2026-08-06T00:00:00Z")),
+                        "documents.publish",
+                        OCCURRED_AT,
+                        DiscoveredVia.EVENT))
+                .isEmpty();
 
         verifyNoInteractions(ledger);
     }
@@ -117,38 +105,28 @@ class OutlineDocumentSignalRecorderTest extends BaseUnitTest {
     @Test
     @DisplayName("an evicted body has no revision, so nothing is recorded rather than something wrong")
     void skipsAContentSignalItCannotKey() {
-        assertThat(
-            recorder.record(
-                WORKSPACE_ID,
-                snapshot(11L, null, null),
-                "documents.publish",
-                OCCURRED_AT,
-                DiscoveredVia.EVENT
-            )
-        ).isEmpty();
+        assertThat(recorder.record(
+                        WORKSPACE_ID, snapshot(11L, null, null), "documents.publish", OCCURRED_AT, DiscoveredVia.EVENT))
+                .isEmpty();
 
         verify(ledger, never()).record(any(), any(), any());
     }
 
     private static OutlineDocumentSnapshot snapshot(
-        Long id,
-        @Nullable String contentHash,
-        @Nullable Instant deletedAt
-    ) {
+            Long id, @Nullable String contentHash, @Nullable Instant deletedAt) {
         return new OutlineDocumentSnapshot(
-            id,
-            "outline-uuid",
-            "collection-uuid",
-            "engineering",
-            null,
-            "Architecture decision",
-            "architecture-decision",
-            null,
-            Instant.parse("2026-08-05T00:00:00Z"),
-            contentHash,
-            deletedAt,
-            contentHash == null ? null : 128,
-            1L
-        );
+                id,
+                "outline-uuid",
+                "collection-uuid",
+                "engineering",
+                null,
+                "Architecture decision",
+                "architecture-decision",
+                null,
+                Instant.parse("2026-08-05T00:00:00Z"),
+                contentHash,
+                deletedAt,
+                contentHash == null ? null : 128,
+                1L);
     }
 }

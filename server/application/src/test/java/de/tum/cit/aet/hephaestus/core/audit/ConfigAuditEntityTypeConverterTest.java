@@ -13,13 +13,13 @@ class ConfigAuditEntityTypeConverterTest extends BaseUnitTest {
     @Test
     void readsHistoricalPracticeGroupNames() {
         assertThat(converter.convertToEntityAttribute("PRACTICE_AREA")).isEqualTo(ConfigAuditEntityType.PRACTICE_GROUP);
-        assertThat(converter.convertToEntityAttribute("CURATED_PRACTICE_AREA")).isEqualTo(
-            ConfigAuditEntityType.CURATED_PRACTICE_GROUP
-        );
+        assertThat(converter.convertToEntityAttribute("CURATED_PRACTICE_AREA"))
+                .isEqualTo(ConfigAuditEntityType.CURATED_PRACTICE_GROUP);
     }
 
     @Test
     void writesCurrentNames() {
-        assertThat(converter.convertToDatabaseColumn(ConfigAuditEntityType.PRACTICE_GROUP)).isEqualTo("PRACTICE_GROUP");
+        assertThat(converter.convertToDatabaseColumn(ConfigAuditEntityType.PRACTICE_GROUP))
+                .isEqualTo("PRACTICE_GROUP");
     }
 }

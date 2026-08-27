@@ -26,16 +26,15 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitLabProjectEventDTO(
-    @JsonProperty("event_name") String eventName,
-    @JsonProperty("name") String name,
-    @JsonProperty("path") @Nullable String path,
-    @JsonProperty("path_with_namespace") @Nullable String pathWithNamespace,
-    @JsonProperty("old_path_with_namespace") @Nullable String oldPathWithNamespace,
-    @JsonProperty("project_id") long projectId,
-    @JsonProperty("project_visibility") @Nullable String projectVisibility,
-    @JsonProperty("created_at") @Nullable String createdAt,
-    @JsonProperty("updated_at") @Nullable String updatedAt
-) {
+        @JsonProperty("event_name") String eventName,
+        @JsonProperty("name") String name,
+        @JsonProperty("path") @Nullable String path,
+        @JsonProperty("path_with_namespace") @Nullable String pathWithNamespace,
+        @JsonProperty("old_path_with_namespace") @Nullable String oldPathWithNamespace,
+        @JsonProperty("project_id") long projectId,
+        @JsonProperty("project_visibility") @Nullable String projectVisibility,
+        @JsonProperty("created_at") @Nullable String createdAt,
+        @JsonProperty("updated_at") @Nullable String updatedAt) {
     public static final String EVENT_PROJECT_CREATE = "project_create";
     public static final String EVENT_PROJECT_DESTROY = "project_destroy";
     public static final String EVENT_PROJECT_RENAME = "project_rename";

@@ -22,28 +22,26 @@ import org.junit.jupiter.api.Test;
 class EncryptionContextTest extends BaseUnitTest {
 
     private static byte[] aad(
-        long ws,
-        IntegrationKind kind,
-        @org.jspecify.annotations.Nullable String instanceKey,
-        String column
-    ) {
+            long ws, IntegrationKind kind, @org.jspecify.annotations.Nullable String instanceKey, String column) {
         return new EncryptionContext(ws, kind, instanceKey, column).toAad();
     }
 
     @Test
     void aadDiffersForEachDistinguishingField() {
         List<byte[]> aads = List.of(
-            aad(1L, IntegrationKind.GITHUB, "inst", "col"),
-            aad(2L, IntegrationKind.GITHUB, "inst", "col"), // workspaceId differs
-            aad(1L, IntegrationKind.GITLAB, "inst", "col"), // kind differs
-            aad(1L, IntegrationKind.GITHUB, "other", "col"), // instanceKey differs
-            aad(1L, IntegrationKind.GITHUB, "inst", "other") // columnFqn differs
-        );
+                aad(1L, IntegrationKind.GITHUB, "inst", "col"),
+                aad(2L, IntegrationKind.GITHUB, "inst", "col"), // workspaceId differs
+                aad(1L, IntegrationKind.GITLAB, "inst", "col"), // kind differs
+                aad(1L, IntegrationKind.GITHUB, "other", "col"), // instanceKey differs
+                aad(1L, IntegrationKind.GITHUB, "inst", "other") // columnFqn differs
+                );
         Set<String> distinct = new HashSet<>();
         for (byte[] a : aads) {
             distinct.add(Arrays.toString(a));
         }
-        assertThat(distinct).as("every distinguishing field must change the AAD").hasSize(aads.size());
+        assertThat(distinct)
+                .as("every distinguishing field must change the AAD")
+                .hasSize(aads.size());
     }
 
     @Test
@@ -68,14 +66,15 @@ class EncryptionContextTest extends BaseUnitTest {
         // of the same AES key. Asserting the marker (not the exact framing offsets) keeps this robust.
         byte[] marker = "hephaestus-credential-bundle".getBytes(java.nio.charset.StandardCharsets.UTF_8);
         assertThat(aad(1L, IntegrationKind.GITHUB, "inst", "col")).startsWith(marker);
-        assertThat(aad(999L, IntegrationKind.SLACK, "other-instance", "other.column")).startsWith(marker);
+        assertThat(aad(999L, IntegrationKind.SLACK, "other-instance", "other.column"))
+                .startsWith(marker);
     }
 
     @Test
     void rejectsFieldExceedingU16LengthLimit() {
         EncryptionContext oversized = new EncryptionContext(1L, IntegrationKind.GITHUB, "inst", "c".repeat(70_000));
         assertThatThrownBy(oversized::toAad)
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("u16 length limit");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("u16 length limit");
     }
 }

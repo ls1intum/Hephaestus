@@ -15,11 +15,10 @@ import org.jspecify.annotations.Nullable;
  * Each thread contains comments (first 10), which may also need pagination.
  */
 public record EmbeddedReviewThreadsDTO(
-    List<GitHubReviewThreadDTO> threads,
-    int totalCount,
-    boolean hasNextPage,
-    @Nullable String endCursor
-) {
+        List<GitHubReviewThreadDTO> threads,
+        int totalCount,
+        boolean hasNextPage,
+        @Nullable String endCursor) {
     /**
      * Creates an EmbeddedReviewThreadsDTO from a GraphQL GHPullRequestReviewThreadConnection.
      *
@@ -28,27 +27,23 @@ public record EmbeddedReviewThreadsDTO(
      * @return EmbeddedReviewThreadsDTO or empty DTO if connection is null
      */
     public static EmbeddedReviewThreadsDTO fromConnection(
-        @Nullable GHPullRequestReviewThreadConnection connection,
-        String context
-    ) {
+            @Nullable GHPullRequestReviewThreadConnection connection, String context) {
         if (connection == null) {
             return empty();
         }
 
-        List<GitHubReviewThreadDTO> threads =
-            connection.getNodes() != null
-                ? connection
-                      .getNodes()
-                      .stream()
-                      .map(GitHubReviewThreadDTO::fromReviewThread)
-                      .filter(Objects::nonNull)
-                      .toList()
+        List<GitHubReviewThreadDTO> threads = connection.getNodes() != null
+                ? connection.getNodes().stream()
+                        .map(GitHubReviewThreadDTO::fromReviewThread)
+                        .filter(Objects::nonNull)
+                        .toList()
                 : Collections.emptyList();
 
-        boolean hasNextPage =
-            connection.getPageInfo() != null && Boolean.TRUE.equals(connection.getPageInfo().getHasNextPage());
+        boolean hasNextPage = connection.getPageInfo() != null
+                && Boolean.TRUE.equals(connection.getPageInfo().getHasNextPage());
 
-        String endCursor = connection.getPageInfo() != null ? connection.getPageInfo().getEndCursor() : null;
+        String endCursor =
+                connection.getPageInfo() != null ? connection.getPageInfo().getEndCursor() : null;
 
         return new EmbeddedReviewThreadsDTO(threads, connection.getTotalCount(), hasNextPage, endCursor);
     }

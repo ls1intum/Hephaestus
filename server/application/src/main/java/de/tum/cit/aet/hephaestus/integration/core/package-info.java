@@ -8,8 +8,7 @@
  * inventory. Nothing here may know an {@code IntegrationKind} by name.
  */
 @org.springframework.modulith.ApplicationModule(
-    displayName = "Integration · Core",
-    type = org.springframework.modulith.ApplicationModule.Type.OPEN
-)
+        displayName = "Integration · Core",
+        type = org.springframework.modulith.ApplicationModule.Type.OPEN)
 @org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.integration.core;

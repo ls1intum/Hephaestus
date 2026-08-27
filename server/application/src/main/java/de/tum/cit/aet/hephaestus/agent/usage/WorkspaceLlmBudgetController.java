@@ -33,16 +33,13 @@ public class WorkspaceLlmBudgetController {
 
     @PutMapping
     @Operation(
-        summary = "Set or clear this workspace's monthly cap on its own-provider LLM spend",
-        operationId = "updateWorkspaceLlmBudget"
-    )
+            summary = "Set or clear this workspace's monthly cap on its own-provider LLM spend",
+            operationId = "updateWorkspaceLlmBudget")
     @ApiResponse(responseCode = "204", description = "Cap updated")
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "WORKSPACE_OWN_PROVIDER_LLM_BUDGET")
     public ResponseEntity<Void> updateBudget(
-        WorkspaceContext workspaceContext,
-        @Valid @RequestBody UpdateLlmBudgetRequestDTO request
-    ) {
+            WorkspaceContext workspaceContext, @Valid @RequestBody UpdateLlmBudgetRequestDTO request) {
         llmUsageService.updateOwnProviderBudget(workspaceContext.id(), request.monthlyBudgetUsd());
         return ResponseEntity.noContent().build();
     }

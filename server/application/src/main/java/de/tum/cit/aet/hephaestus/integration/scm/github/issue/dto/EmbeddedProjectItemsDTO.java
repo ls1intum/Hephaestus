@@ -30,11 +30,10 @@ import org.jspecify.annotations.Nullable;
  * Draft Issues are an exception - they have no parent Issue and must be synced from project side.
  */
 public record EmbeddedProjectItemsDTO(
-    List<EmbeddedProjectItem> items,
-    int totalCount,
-    boolean hasNextPage,
-    @Nullable String endCursor
-) {
+        List<EmbeddedProjectItem> items,
+        int totalCount,
+        boolean hasNextPage,
+        @Nullable String endCursor) {
     /**
      * Creates an EmbeddedProjectItemsDTO from a GraphQL GHProjectV2ItemConnection.
      *
@@ -43,27 +42,23 @@ public record EmbeddedProjectItemsDTO(
      * @return EmbeddedProjectItemsDTO or empty DTO if connection is null
      */
     public static EmbeddedProjectItemsDTO fromConnection(
-        @Nullable GHProjectV2ItemConnection connection,
-        String context
-    ) {
+            @Nullable GHProjectV2ItemConnection connection, String context) {
         if (connection == null) {
             return empty();
         }
 
-        List<EmbeddedProjectItem> items =
-            connection.getNodes() != null
-                ? connection
-                      .getNodes()
-                      .stream()
-                      .map(EmbeddedProjectItem::fromProjectV2Item)
-                      .filter(Objects::nonNull)
-                      .toList()
+        List<EmbeddedProjectItem> items = connection.getNodes() != null
+                ? connection.getNodes().stream()
+                        .map(EmbeddedProjectItem::fromProjectV2Item)
+                        .filter(Objects::nonNull)
+                        .toList()
                 : Collections.emptyList();
 
-        boolean hasNextPage =
-            connection.getPageInfo() != null && Boolean.TRUE.equals(connection.getPageInfo().getHasNextPage());
+        boolean hasNextPage = connection.getPageInfo() != null
+                && Boolean.TRUE.equals(connection.getPageInfo().getHasNextPage());
 
-        String endCursor = connection.getPageInfo() != null ? connection.getPageInfo().getEndCursor() : null;
+        String endCursor =
+                connection.getPageInfo() != null ? connection.getPageInfo().getEndCursor() : null;
 
         return new EmbeddedProjectItemsDTO(items, connection.getTotalCount(), hasNextPage, endCursor);
     }
@@ -88,7 +83,8 @@ public record EmbeddedProjectItemsDTO(
      * This includes the project info needed to link the item to the correct project
      * without requiring additional API calls.
      */
-    public record EmbeddedProjectItem(@Nullable GitHubProjectItemDTO item, @Nullable EmbeddedProjectReference project) {
+    public record EmbeddedProjectItem(
+            @Nullable GitHubProjectItemDTO item, @Nullable EmbeddedProjectReference project) {
         /**
          * Creates an EmbeddedProjectItem from a GraphQL GHProjectV2Item.
          *
@@ -119,15 +115,14 @@ public record EmbeddedProjectItemsDTO(
      * without duplicating the full project entity.
      */
     public record EmbeddedProjectReference(
-        String nodeId,
-        @Nullable Long databaseId,
-        int number,
-        String title,
-        @Nullable String url,
-        @Nullable String ownerLogin,
-        @Nullable Long ownerDatabaseId,
-        @Nullable String ownerType
-    ) {
+            String nodeId,
+            @Nullable Long databaseId,
+            int number,
+            String title,
+            @Nullable String url,
+            @Nullable String ownerLogin,
+            @Nullable Long ownerDatabaseId,
+            @Nullable String ownerType) {
         /**
          * Creates an EmbeddedProjectReference from a GraphQL GHProjectV2.
          *
@@ -136,13 +131,14 @@ public record EmbeddedProjectItemsDTO(
          */
         @Nullable
         public static EmbeddedProjectReference fromProjectV2(
-            de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.@Nullable GHProjectV2 project
-        ) {
+                de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.@Nullable GHProjectV2 project) {
             if (project == null || project.getId() == null) {
                 return null;
             }
 
-            Long databaseId = project.getFullDatabaseId() != null ? project.getFullDatabaseId().longValue() : null;
+            Long databaseId = project.getFullDatabaseId() != null
+                    ? project.getFullDatabaseId().longValue()
+                    : null;
 
             // Extract owner info
             String ownerLogin = null;
@@ -164,15 +160,14 @@ public record EmbeddedProjectItemsDTO(
             }
 
             return new EmbeddedProjectReference(
-                project.getId(),
-                databaseId,
-                project.getNumber(),
-                project.getTitle(),
-                project.getUrl() != null ? project.getUrl().toString() : null,
-                ownerLogin,
-                ownerDatabaseId,
-                ownerType
-            );
+                    project.getId(),
+                    databaseId,
+                    project.getNumber(),
+                    project.getTitle(),
+                    project.getUrl() != null ? project.getUrl().toString() : null,
+                    ownerLogin,
+                    ownerDatabaseId,
+                    ownerType);
         }
     }
 }

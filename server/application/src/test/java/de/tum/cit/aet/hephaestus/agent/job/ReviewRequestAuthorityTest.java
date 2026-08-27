@@ -44,17 +44,21 @@ class ReviewRequestAuthorityTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         authority = new ReviewRequestAuthority(memberships);
-        lenient().when(memberships.findByWorkspace_IdAndUser_Id(anyLong(), anyLong())).thenReturn(Optional.empty());
+        lenient()
+                .when(memberships.findByWorkspace_IdAndUser_Id(anyLong(), anyLong()))
+                .thenReturn(Optional.empty());
     }
 
     @Test
     void theAuthorOfTheWorkMayAskAboutIt() {
-        assertThat(authority.mayRequest(WORKSPACE_ID, artifact(), user(AUTHOR_ID))).isTrue();
+        assertThat(authority.mayRequest(WORKSPACE_ID, artifact(), user(AUTHOR_ID)))
+                .isTrue();
     }
 
     @Test
     void anAssigneeMayAskAboutIt() {
-        assertThat(authority.mayRequest(WORKSPACE_ID, artifact(), user(ASSIGNEE_ID))).isTrue();
+        assertThat(authority.mayRequest(WORKSPACE_ID, artifact(), user(ASSIGNEE_ID)))
+                .isTrue();
     }
 
     /**
@@ -66,25 +70,30 @@ class ReviewRequestAuthorityTest extends BaseUnitTest {
     void aWorkspaceMemberWhoIsNeitherAuthorNorAssigneeMayNot() {
         givenMembership(BYSTANDER_ID, WorkspaceRole.MEMBER);
 
-        assertThat(authority.mayRequest(WORKSPACE_ID, artifact(), user(BYSTANDER_ID))).isFalse();
+        assertThat(authority.mayRequest(WORKSPACE_ID, artifact(), user(BYSTANDER_ID)))
+                .isFalse();
     }
 
     @ParameterizedTest(name = "a workspace {0} may ask about anyone''s work")
-    @EnumSource(value = WorkspaceRole.class, names = { "ADMIN", "OWNER" })
+    @EnumSource(
+            value = WorkspaceRole.class,
+            names = {"ADMIN", "OWNER"})
     void anAdminMayAskAboutAnyonesWork(WorkspaceRole role) {
         givenMembership(BYSTANDER_ID, role);
 
-        assertThat(authority.mayRequest(WORKSPACE_ID, artifact(), user(BYSTANDER_ID))).isTrue();
+        assertThat(authority.mayRequest(WORKSPACE_ID, artifact(), user(BYSTANDER_ID)))
+                .isTrue();
     }
 
     /** Standing is per workspace: admin somewhere else is not admin here. */
     @Test
     void adminOfADifferentWorkspaceMayNot() {
         lenient()
-            .when(memberships.findByWorkspace_IdAndUser_Id(99L, BYSTANDER_ID))
-            .thenReturn(Optional.of(membership(WorkspaceRole.OWNER)));
+                .when(memberships.findByWorkspace_IdAndUser_Id(99L, BYSTANDER_ID))
+                .thenReturn(Optional.of(membership(WorkspaceRole.OWNER)));
 
-        assertThat(authority.mayRequest(WORKSPACE_ID, artifact(), user(BYSTANDER_ID))).isFalse();
+        assertThat(authority.mayRequest(WORKSPACE_ID, artifact(), user(BYSTANDER_ID)))
+                .isFalse();
     }
 
     /** An ask nobody can be named for cannot be shown to be an authorized one. */
@@ -106,7 +115,8 @@ class ReviewRequestAuthorityTest extends BaseUnitTest {
         orphan.setId(500L);
         orphan.setAssignees(Set.of());
 
-        assertThat(authority.mayRequest(WORKSPACE_ID, orphan, user(BYSTANDER_ID))).isFalse();
+        assertThat(authority.mayRequest(WORKSPACE_ID, orphan, user(BYSTANDER_ID)))
+                .isFalse();
     }
 
     /**
@@ -118,11 +128,8 @@ class ReviewRequestAuthorityTest extends BaseUnitTest {
     void anAdminUnderOneOfTheirLinkedIdentitiesMayAsk() {
         givenMembership(BYSTANDER_ID, WorkspaceRole.ADMIN);
 
-        Optional<User> standing = authority.standingOf(
-            WORKSPACE_ID,
-            artifact(),
-            List.of(user(999L), user(BYSTANDER_ID))
-        );
+        Optional<User> standing =
+                authority.standingOf(WORKSPACE_ID, artifact(), List.of(user(999L), user(BYSTANDER_ID)));
 
         assertThat(standing).map(User::getId).contains(BYSTANDER_ID);
     }
@@ -134,11 +141,8 @@ class ReviewRequestAuthorityTest extends BaseUnitTest {
      */
     @Test
     void theIdentityHandedBackIsTheOneThatQualified() {
-        Optional<User> standing = authority.standingOf(
-            WORKSPACE_ID,
-            artifact(),
-            List.of(user(BYSTANDER_ID), user(AUTHOR_ID))
-        );
+        Optional<User> standing =
+                authority.standingOf(WORKSPACE_ID, artifact(), List.of(user(BYSTANDER_ID), user(AUTHOR_ID)));
 
         assertThat(standing).map(User::getId).contains(AUTHOR_ID);
     }

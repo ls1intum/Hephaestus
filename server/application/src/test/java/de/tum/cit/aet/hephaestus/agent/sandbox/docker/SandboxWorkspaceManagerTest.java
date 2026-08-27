@@ -26,7 +26,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 
 class SandboxWorkspaceManagerTest extends BaseUnitTest {
@@ -72,58 +71,55 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
             Map<String, Long> fileUid = new HashMap<>();
             Map<String, Integer> fileMode = new HashMap<>();
             doAnswer(invocation -> {
-                try (
-                    var tis = new org.apache.commons.compress.archivers.tar.TarArchiveInputStream(
-                        invocation.getArgument(2, InputStream.class)
-                    )
-                ) {
-                    TarArchiveEntry e;
-                    while ((e = tis.getNextEntry()) != null) {
-                        if (e.isDirectory()) {
-                            dirUid.put(e.getName(), e.getLongUserId());
-                            dirMode.put(e.getName(), e.getMode());
-                        } else {
-                            fileUid.put(e.getName(), e.getLongUserId());
-                            fileMode.put(e.getName(), e.getMode());
+                        try (var tis = new org.apache.commons.compress.archivers.tar.TarArchiveInputStream(
+                                invocation.getArgument(2, InputStream.class))) {
+                            TarArchiveEntry e;
+                            while ((e = tis.getNextEntry()) != null) {
+                                if (e.isDirectory()) {
+                                    dirUid.put(e.getName(), e.getLongUserId());
+                                    dirMode.put(e.getName(), e.getMode());
+                                } else {
+                                    fileUid.put(e.getName(), e.getLongUserId());
+                                    fileMode.put(e.getName(), e.getMode());
+                                }
+                            }
                         }
-                    }
-                }
-                return null;
-            })
-                .when(fileOps)
-                .copyArchiveToContainer(any(), any(), any());
+                        return null;
+                    })
+                    .when(fileOps)
+                    .copyArchiveToContainer(any(), any(), any());
 
             manager.injectFiles(CONTAINER_ID, files);
 
             assertThat(dirUid)
-                .containsEntry(".pi/", 1000L)
-                .containsEntry(".sessions/", 1000L)
-                .containsEntry("out/", 1000L)
-                .containsEntry("inputs/", 0L)
-                .containsEntry("inputs/context/", 0L)
-                .containsEntry("work/", 1000L)
-                .containsEntry("work/analysis/", 1000L)
-                .containsEntry("work/analysis/practices/", 1000L)
-                .containsEntry("work/precompute/", 1000L)
-                .containsEntry("work/precompute/practices/", 1000L);
+                    .containsEntry(".pi/", 1000L)
+                    .containsEntry(".sessions/", 1000L)
+                    .containsEntry("out/", 1000L)
+                    .containsEntry("inputs/", 0L)
+                    .containsEntry("inputs/context/", 0L)
+                    .containsEntry("work/", 1000L)
+                    .containsEntry("work/analysis/", 1000L)
+                    .containsEntry("work/analysis/practices/", 1000L)
+                    .containsEntry("work/precompute/", 1000L)
+                    .containsEntry("work/precompute/practices/", 1000L);
             assertThat(dirMode)
-                .containsEntry(".pi/", 0755)
-                .containsEntry(".sessions/", 0755)
-                .containsEntry("out/", 0755)
-                .containsEntry("inputs/context/", 0555)
-                .containsEntry("work/analysis/", 0755);
+                    .containsEntry(".pi/", 0755)
+                    .containsEntry(".sessions/", 0755)
+                    .containsEntry("out/", 0755)
+                    .containsEntry("inputs/context/", 0555)
+                    .containsEntry("work/analysis/", 0755);
             assertThat(fileUid)
-                .containsEntry("inputs/context/diff.patch", 0L)
-                .containsEntry(".pi/settings.json", 1000L)
-                .containsEntry(".sessions/thread.jsonl", 1000L)
-                .containsEntry("out/.gitkeep", 1000L)
-                .containsEntry("work/analysis/practices/.gitkeep", 1000L);
+                    .containsEntry("inputs/context/diff.patch", 0L)
+                    .containsEntry(".pi/settings.json", 1000L)
+                    .containsEntry(".sessions/thread.jsonl", 1000L)
+                    .containsEntry("out/.gitkeep", 1000L)
+                    .containsEntry("work/analysis/practices/.gitkeep", 1000L);
             assertThat(fileMode)
-                .containsEntry("inputs/context/diff.patch", 0444)
-                .containsEntry(".pi/settings.json", 0644)
-                .containsEntry(".sessions/thread.jsonl", 0644)
-                .containsEntry("out/.gitkeep", 0644)
-                .containsEntry("work/analysis/practices/.gitkeep", 0644);
+                    .containsEntry("inputs/context/diff.patch", 0444)
+                    .containsEntry(".pi/settings.json", 0644)
+                    .containsEntry(".sessions/thread.jsonl", 0644)
+                    .containsEntry("out/.gitkeep", 0644)
+                    .containsEntry("work/analysis/practices/.gitkeep", 0644);
         }
 
         @Test
@@ -145,8 +141,8 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
             Map<String, byte[]> files = Map.of("../../etc/passwd", "malicious".getBytes());
 
             assertThatThrownBy(() -> manager.injectFiles(CONTAINER_ID, files))
-                .isInstanceOf(SandboxException.class)
-                .hasMessageContaining("traversal");
+                    .isInstanceOf(SandboxException.class)
+                    .hasMessageContaining("traversal");
         }
 
         @Test
@@ -154,8 +150,8 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
             Map<String, byte[]> files = Map.of("/etc/shadow", "malicious".getBytes());
 
             assertThatThrownBy(() -> manager.injectFiles(CONTAINER_ID, files))
-                .isInstanceOf(SandboxException.class)
-                .hasMessageContaining("Absolute");
+                    .isInstanceOf(SandboxException.class)
+                    .hasMessageContaining("Absolute");
         }
 
         @Test
@@ -172,24 +168,21 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
                 }
             }
 
-            long[] staged = { 0 };
+            long[] staged = {0};
             doAnswer(invocation -> {
-                try (
-                    var tis = new org.apache.commons.compress.archivers.tar.TarArchiveInputStream(
-                        invocation.getArgument(2, InputStream.class)
-                    )
-                ) {
-                    TarArchiveEntry entry;
-                    while ((entry = tis.getNextEntry()) != null) {
-                        if (!entry.isDirectory()) {
-                            staged[0] += entry.getSize();
+                        try (var tis = new org.apache.commons.compress.archivers.tar.TarArchiveInputStream(
+                                invocation.getArgument(2, InputStream.class))) {
+                            TarArchiveEntry entry;
+                            while ((entry = tis.getNextEntry()) != null) {
+                                if (!entry.isDirectory()) {
+                                    staged[0] += entry.getSize();
+                                }
+                            }
                         }
-                    }
-                }
-                return null;
-            })
-                .when(fileOps)
-                .copyArchiveToContainer(any(), any(), any());
+                        return null;
+                    })
+                    .when(fileOps)
+                    .copyArchiveToContainer(any(), any(), any());
 
             manager.injectFiles(CONTAINER_ID, Map.of(), Map.of("inputs/large.bin", large));
 
@@ -204,31 +197,28 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
 
             Map<String, byte[]> captured = new HashMap<>();
             doAnswer(invocation -> {
-                try (
-                    var tis = new org.apache.commons.compress.archivers.tar.TarArchiveInputStream(
-                        invocation.getArgument(2, InputStream.class)
-                    )
-                ) {
-                    TarArchiveEntry entry;
-                    while ((entry = tis.getNextEntry()) != null) {
-                        if (!entry.isDirectory()) {
-                            captured.put(entry.getName(), tis.readAllBytes());
+                        try (var tis = new org.apache.commons.compress.archivers.tar.TarArchiveInputStream(
+                                invocation.getArgument(2, InputStream.class))) {
+                            TarArchiveEntry entry;
+                            while ((entry = tis.getNextEntry()) != null) {
+                                if (!entry.isDirectory()) {
+                                    captured.put(entry.getName(), tis.readAllBytes());
+                                }
+                            }
                         }
-                    }
-                }
-                return null;
-            })
-                .when(fileOps)
-                .copyArchiveToContainer(any(), any(), any());
+                        return null;
+                    })
+                    .when(fileOps)
+                    .copyArchiveToContainer(any(), any(), any());
 
             manager.injectFiles(
-                CONTAINER_ID,
-                Map.of("inputs/context/diff.patch", "diff".getBytes()),
-                Map.of("inputs/sources/scm/repo/App.java", source)
-            );
+                    CONTAINER_ID,
+                    Map.of("inputs/context/diff.patch", "diff".getBytes()),
+                    Map.of("inputs/sources/scm/repo/App.java", source));
 
             assertThat(captured).containsOnlyKeys("inputs/context/diff.patch", "inputs/sources/scm/repo/App.java");
-            assertThat(new String(captured.get("inputs/sources/scm/repo/App.java"))).isEqualTo("class App {}");
+            assertThat(new String(captured.get("inputs/sources/scm/repo/App.java")))
+                    .isEqualTo("class App {}");
         }
     }
 
@@ -238,9 +228,8 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         @Test
         void shouldExtractFiles() throws Exception {
             byte[] tarBytes = createTestTar(Map.of("out/result.json", "{\"status\":\"ok\"}".getBytes()));
-            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out")).thenReturn(
-                new ByteArrayInputStream(tarBytes)
-            );
+            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out"))
+                    .thenReturn(new ByteArrayInputStream(tarBytes));
 
             Map<String, byte[]> output = manager.collectOutput(CONTAINER_ID, "/workspace/out");
 
@@ -251,9 +240,8 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         @Test
         @DisplayName("should return empty map when docker cp fails")
         void shouldReturnEmptyOnFailure() {
-            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out")).thenThrow(
-                new SandboxException("No such path")
-            );
+            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out"))
+                    .thenThrow(new SandboxException("No such path"));
 
             Map<String, byte[]> output = manager.collectOutput(CONTAINER_ID, "/workspace/out");
 
@@ -264,20 +252,18 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         void shouldEnforceOutputSizeLimit() throws Exception {
             // Use a small limit (1 KB) for this test to avoid allocating megabytes in CI
             var limitedManager = new SandboxWorkspaceManager(
-                fileOps,
-                1024,
-                SandboxWorkspaceManager.MAX_SINGLE_FILE_BYTES,
-                SandboxWorkspaceManager.MAX_DIRECTORY_BYTES,
-                SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES
-            );
+                    fileOps,
+                    1024,
+                    SandboxWorkspaceManager.MAX_SINGLE_FILE_BYTES,
+                    SandboxWorkspaceManager.MAX_DIRECTORY_BYTES,
+                    SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES);
 
             byte[] largeContent = new byte[800];
             byte[] secondContent = new byte[500];
 
             byte[] tarBytes = createTestTar(Map.of("out/first.bin", largeContent, "out/second.bin", secondContent));
-            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out")).thenReturn(
-                new ByteArrayInputStream(tarBytes)
-            );
+            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out"))
+                    .thenReturn(new ByteArrayInputStream(tarBytes));
 
             Map<String, byte[]> output = limitedManager.collectOutput(CONTAINER_ID, "/workspace/out");
 
@@ -287,12 +273,10 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
 
         @Test
         void shouldSkipTraversalPathsInOutput() throws Exception {
-            byte[] tarBytes = createTestTar(
-                Map.of("out/../../../etc/passwd", "malicious".getBytes(), "out/safe.txt", "safe content".getBytes())
-            );
-            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out")).thenReturn(
-                new ByteArrayInputStream(tarBytes)
-            );
+            byte[] tarBytes = createTestTar(Map.of(
+                    "out/../../../etc/passwd", "malicious".getBytes(), "out/safe.txt", "safe content".getBytes()));
+            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out"))
+                    .thenReturn(new ByteArrayInputStream(tarBytes));
 
             Map<String, byte[]> output = manager.collectOutput(CONTAINER_ID, "/workspace/out");
 
@@ -305,9 +289,8 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         @DisplayName("should skip symbolic links in output archive")
         void shouldSkipSymlinks() throws Exception {
             byte[] tarBytes = createTestTarWithSymlink("out/evil", "/etc/shadow");
-            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out")).thenReturn(
-                new ByteArrayInputStream(tarBytes)
-            );
+            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out"))
+                    .thenReturn(new ByteArrayInputStream(tarBytes));
 
             Map<String, byte[]> output = manager.collectOutput(CONTAINER_ID, "/workspace/out");
 
@@ -317,9 +300,8 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         @Test
         void shouldSkipHardLinks() throws Exception {
             byte[] tarBytes = createTestTarWithHardLink("out/link", "out/target");
-            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out")).thenReturn(
-                new ByteArrayInputStream(tarBytes)
-            );
+            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out"))
+                    .thenReturn(new ByteArrayInputStream(tarBytes));
 
             Map<String, byte[]> output = manager.collectOutput(CONTAINER_ID, "/workspace/out");
 
@@ -330,20 +312,18 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         void shouldSkipOversizedSingleFile() throws Exception {
             // Use a manager with a 10-byte per-file limit to avoid allocating megabytes in tests
             var limitedManager = new SandboxWorkspaceManager(
-                fileOps,
-                10_000,
-                10,
-                SandboxWorkspaceManager.MAX_DIRECTORY_BYTES,
-                SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES
-            );
+                    fileOps,
+                    10_000,
+                    10,
+                    SandboxWorkspaceManager.MAX_DIRECTORY_BYTES,
+                    SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES);
 
             byte[] smallContent = "small".getBytes();
             byte[] oversizedContent = "this is way too big".getBytes();
 
             byte[] tarBytes = createTestTar(Map.of("out/small.txt", smallContent, "out/toobig.txt", oversizedContent));
-            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out")).thenReturn(
-                new ByteArrayInputStream(tarBytes)
-            );
+            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out"))
+                    .thenReturn(new ByteArrayInputStream(tarBytes));
 
             Map<String, byte[]> output = limitedManager.collectOutput(CONTAINER_ID, "/workspace/out");
 
@@ -355,9 +335,8 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         @DisplayName("should skip directory entries in tar")
         void shouldSkipDirectories() throws Exception {
             byte[] tarBytes = createTestTarWithDir("result.json", "{}".getBytes());
-            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out")).thenReturn(
-                new ByteArrayInputStream(tarBytes)
-            );
+            when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out"))
+                    .thenReturn(new ByteArrayInputStream(tarBytes));
 
             Map<String, byte[]> output = manager.collectOutput(CONTAINER_ID, "/workspace/out");
 
@@ -378,44 +357,28 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         void shouldRejectDirectoryExceedingSizeLimit() throws Exception {
             // Use a tiny limit (1 KB) to avoid allocating megabytes in CI
             var limitedManager = new SandboxWorkspaceManager(
-                fileOps,
-                50L * 1024 * 1024,
-                10L * 1024 * 1024,
-                1024,
-                SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES
-            );
+                    fileOps, 50L * 1024 * 1024, 10L * 1024 * 1024, 1024, SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES);
 
             // Create two files totaling > 1024 bytes
             Files.write(tempDir.resolve("file1.txt"), new byte[600]);
             Files.write(tempDir.resolve("file2.txt"), new byte[600]);
 
-            assertThatThrownBy(() ->
-                limitedManager.injectDirectories(
-                    CONTAINER_ID,
-                    Map.of(tempDir.toAbsolutePath().toString(), "/workspace/repo")
-                )
-            )
-                .isInstanceOf(SandboxException.class)
-                .hasMessageContaining("size limit");
+            assertThatThrownBy(() -> limitedManager.injectDirectories(
+                            CONTAINER_ID, Map.of(tempDir.toAbsolutePath().toString(), "/workspace/repo")))
+                    .isInstanceOf(SandboxException.class)
+                    .hasMessageContaining("size limit");
         }
 
         @Test
         void shouldAcceptDirectoryAtExactSizeLimit() throws Exception {
             // Exactly 100 bytes of content — limit is 100
             var limitedManager = new SandboxWorkspaceManager(
-                fileOps,
-                50L * 1024 * 1024,
-                10L * 1024 * 1024,
-                100,
-                SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES
-            );
+                    fileOps, 50L * 1024 * 1024, 10L * 1024 * 1024, 100, SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES);
 
             Files.write(tempDir.resolve("exact.txt"), new byte[100]);
 
             limitedManager.injectDirectories(
-                CONTAINER_ID,
-                Map.of(tempDir.toAbsolutePath().toString(), "/workspace/repo")
-            );
+                    CONTAINER_ID, Map.of(tempDir.toAbsolutePath().toString(), "/workspace/repo"));
 
             verify(fileOps).copyArchiveToContainer(eq(CONTAINER_ID), eq("/workspace"), any(InputStream.class));
         }
@@ -423,19 +386,12 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         @Test
         void shouldAcceptDirectoryWithinSizeLimit() throws Exception {
             var limitedManager = new SandboxWorkspaceManager(
-                fileOps,
-                50L * 1024 * 1024,
-                10L * 1024 * 1024,
-                4096,
-                SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES
-            );
+                    fileOps, 50L * 1024 * 1024, 10L * 1024 * 1024, 4096, SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES);
 
             Files.write(tempDir.resolve("small.txt"), "hello".getBytes());
 
             limitedManager.injectDirectories(
-                CONTAINER_ID,
-                Map.of(tempDir.toAbsolutePath().toString(), "/workspace/repo")
-            );
+                    CONTAINER_ID, Map.of(tempDir.toAbsolutePath().toString(), "/workspace/repo"));
 
             verify(fileOps).copyArchiveToContainer(eq(CONTAINER_ID), eq("/workspace"), any(InputStream.class));
         }
@@ -443,12 +399,7 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         @Test
         void shouldInjectNestedSubdirectories() throws Exception {
             var limitedManager = new SandboxWorkspaceManager(
-                fileOps,
-                50L * 1024 * 1024,
-                10L * 1024 * 1024,
-                4096,
-                SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES
-            );
+                    fileOps, 50L * 1024 * 1024, 10L * 1024 * 1024, 4096, SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES);
 
             // Create a nested directory structure: sub/nested.txt
             Path subDir = Files.createDirectory(tempDir.resolve("sub"));
@@ -456,9 +407,7 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
             Files.write(tempDir.resolve("root.txt"), "root content".getBytes());
 
             limitedManager.injectDirectories(
-                CONTAINER_ID,
-                Map.of(tempDir.toAbsolutePath().toString(), "/workspace/repo")
-            );
+                    CONTAINER_ID, Map.of(tempDir.toAbsolutePath().toString(), "/workspace/repo"));
 
             verify(fileOps).copyArchiveToContainer(eq(CONTAINER_ID), eq("/workspace"), any(InputStream.class));
         }
@@ -488,24 +437,23 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
             mounts.put(null, "/container/path");
 
             assertThatThrownBy(() -> manager.injectDirectories(CONTAINER_ID, mounts))
-                .isInstanceOf(SandboxException.class)
-                .hasMessageContaining("Host path must not be empty");
+                    .isInstanceOf(SandboxException.class)
+                    .hasMessageContaining("Host path must not be empty");
         }
 
         @Test
         void shouldRejectEmptyHostPath() {
             assertThatThrownBy(() -> manager.injectDirectories(CONTAINER_ID, Map.of("", "/container/path")))
-                .isInstanceOf(SandboxException.class)
-                .hasMessageContaining("Host path must not be empty");
+                    .isInstanceOf(SandboxException.class)
+                    .hasMessageContaining("Host path must not be empty");
         }
 
         @Test
         void shouldRejectRelativeHostPath() {
-            assertThatThrownBy(() ->
-                manager.injectDirectories(CONTAINER_ID, Map.of("relative/path", "/container/path"))
-            )
-                .isInstanceOf(SandboxException.class)
-                .hasMessageContaining("Host path must be absolute");
+            assertThatThrownBy(
+                            () -> manager.injectDirectories(CONTAINER_ID, Map.of("relative/path", "/container/path")))
+                    .isInstanceOf(SandboxException.class)
+                    .hasMessageContaining("Host path must be absolute");
         }
 
         @Test
@@ -513,8 +461,8 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
             String nonExistent = tempDir.resolve("does-not-exist").toString();
 
             assertThatThrownBy(() -> manager.injectDirectories(CONTAINER_ID, Map.of(nonExistent, "/container/path")))
-                .isInstanceOf(SandboxException.class)
-                .hasMessageContaining("Host path does not exist");
+                    .isInstanceOf(SandboxException.class)
+                    .hasMessageContaining("Host path does not exist");
         }
 
         @Test
@@ -523,10 +471,9 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
             Path symlink = Files.createSymbolicLink(tempDir.resolve("symlink-dir"), realDir);
 
             assertThatThrownBy(() ->
-                manager.injectDirectories(CONTAINER_ID, Map.of(symlink.toString(), "/container/path"))
-            )
-                .isInstanceOf(SandboxException.class)
-                .hasMessageContaining("Host path must not be a symlink");
+                            manager.injectDirectories(CONTAINER_ID, Map.of(symlink.toString(), "/container/path")))
+                    .isInstanceOf(SandboxException.class)
+                    .hasMessageContaining("Host path must not be a symlink");
         }
 
         @Test
@@ -535,24 +482,23 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
             mounts.put(tempDir.toString(), null);
 
             assertThatThrownBy(() -> manager.injectDirectories(CONTAINER_ID, mounts))
-                .isInstanceOf(SandboxException.class)
-                .hasMessageContaining("Container path must not be empty");
+                    .isInstanceOf(SandboxException.class)
+                    .hasMessageContaining("Container path must not be empty");
         }
 
         @Test
         void shouldRejectEmptyContainerPath() {
             assertThatThrownBy(() -> manager.injectDirectories(CONTAINER_ID, Map.of(tempDir.toString(), "")))
-                .isInstanceOf(SandboxException.class)
-                .hasMessageContaining("Container path must not be empty");
+                    .isInstanceOf(SandboxException.class)
+                    .hasMessageContaining("Container path must not be empty");
         }
 
         @Test
         void shouldRejectRelativeContainerPath() {
             assertThatThrownBy(() ->
-                manager.injectDirectories(CONTAINER_ID, Map.of(tempDir.toString(), "relative/container"))
-            )
-                .isInstanceOf(SandboxException.class)
-                .hasMessageContaining("Container path must be absolute");
+                            manager.injectDirectories(CONTAINER_ID, Map.of(tempDir.toString(), "relative/container")))
+                    .isInstanceOf(SandboxException.class)
+                    .hasMessageContaining("Container path must be absolute");
         }
 
         @Test

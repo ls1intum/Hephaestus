@@ -11,47 +11,41 @@ import org.jspecify.annotations.Nullable;
  * deserialises the discriminator below back into the right record subtype.
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
-@JsonSubTypes(
-    {
-        @JsonSubTypes.Type(value = ConnectionConfig.GitHubAppConfig.class, name = "GITHUB_APP"),
-        @JsonSubTypes.Type(value = ConnectionConfig.GitHubPatConfig.class, name = "GITHUB_PAT"),
-        @JsonSubTypes.Type(value = ConnectionConfig.GitLabConfig.class, name = "GITLAB"),
-        @JsonSubTypes.Type(value = ConnectionConfig.SlackConfig.class, name = "SLACK"),
-        @JsonSubTypes.Type(value = ConnectionConfig.OutlineConfig.class, name = "OUTLINE"),
-    }
-)
+@JsonSubTypes({
+    @JsonSubTypes.Type(value = ConnectionConfig.GitHubAppConfig.class, name = "GITHUB_APP"),
+    @JsonSubTypes.Type(value = ConnectionConfig.GitHubPatConfig.class, name = "GITHUB_PAT"),
+    @JsonSubTypes.Type(value = ConnectionConfig.GitLabConfig.class, name = "GITLAB"),
+    @JsonSubTypes.Type(value = ConnectionConfig.SlackConfig.class, name = "SLACK"),
+    @JsonSubTypes.Type(value = ConnectionConfig.OutlineConfig.class, name = "OUTLINE"),
+})
 public sealed interface ConnectionConfig
-    permits
-        ConnectionConfig.GitHubAppConfig,
-        ConnectionConfig.GitHubPatConfig,
-        ConnectionConfig.GitLabConfig,
-        ConnectionConfig.SlackConfig,
-        ConnectionConfig.OutlineConfig
-{
+        permits ConnectionConfig.GitHubAppConfig,
+                ConnectionConfig.GitHubPatConfig,
+                ConnectionConfig.GitLabConfig,
+                ConnectionConfig.SlackConfig,
+                ConnectionConfig.OutlineConfig {
     /** Enabled sync streams (subset of the source's catalog). */
     Set<String> enabledStreams();
 
     record GitHubAppConfig(
-        @Nullable Long installationId,
-        @Nullable String orgLogin,
-        @Nullable String serverUrl, // null for github.com, set for GHES
-        Set<String> enabledStreams
-    ) implements ConnectionConfig {}
+            @Nullable Long installationId,
+            @Nullable String orgLogin,
+            @Nullable String serverUrl, // null for github.com, set for GHES
+            Set<String> enabledStreams)
+            implements ConnectionConfig {}
 
     record GitHubPatConfig(
-        @Nullable String orgLogin,
-        @Nullable String serverUrl,
-        Set<String> enabledStreams
-    ) implements ConnectionConfig {}
+            @Nullable String orgLogin, @Nullable String serverUrl, Set<String> enabledStreams)
+            implements ConnectionConfig {}
 
     /** GitLab — supports both legacy plaintext token verifier and 19.0+ HMAC whsec_*. */
     record GitLabConfig(
-        @Nullable String serverUrl,
-        @Nullable Long gitlabGroupId,
-        @Nullable Long gitlabWebhookId,
-        SigningMode signingMode,
-        Set<String> enabledStreams
-    ) implements ConnectionConfig {
+            @Nullable String serverUrl,
+            @Nullable Long gitlabGroupId,
+            @Nullable Long gitlabWebhookId,
+            SigningMode signingMode,
+            Set<String> enabledStreams)
+            implements ConnectionConfig {
         public enum SigningMode {
             PLAINTEXT,
             WHSEC,
@@ -77,13 +71,13 @@ public sealed interface ConnectionConfig
 
     /** Slack bot identity, notification channel, enabled streams, and message-retention configuration. */
     record SlackConfig(
-        @Nullable String teamId,
-        @Nullable String teamName,
-        @Nullable String notificationChannelId,
-        @Nullable String teamLabel,
-        @Nullable Integer retentionDays,
-        Set<String> enabledStreams
-    ) implements ConnectionConfig {
+            @Nullable String teamId,
+            @Nullable String teamName,
+            @Nullable String notificationChannelId,
+            @Nullable String teamLabel,
+            @Nullable Integer retentionDays,
+            Set<String> enabledStreams)
+            implements ConnectionConfig {
         /** Default bounded-retention window for ingested Slack messages, in days. */
         public static final int DEFAULT_RETENTION_DAYS = 30;
 
@@ -103,11 +97,11 @@ public sealed interface ConnectionConfig
      * The webhook fields stay {@code null} until a change-notification subscription is registered.
      */
     record OutlineConfig(
-        @Nullable String serverUrl,
-        @Nullable String webhookSubscriptionId,
-        @Nullable String webhookSecret,
-        Set<String> enabledStreams
-    ) implements ConnectionConfig {
+            @Nullable String serverUrl,
+            @Nullable String webhookSubscriptionId,
+            @Nullable String webhookSecret,
+            Set<String> enabledStreams)
+            implements ConnectionConfig {
         /**
          * Returns a copy with the change-notification subscription id and signing secret
          * replaced, stamped after the subscription is registered. Pair with

@@ -12,14 +12,23 @@ import org.jspecify.annotations.Nullable;
  */
 @Schema(description = "Bind a model and execution limits to an agent purpose")
 public record AgentBindingRequestDTO(
-    @Nullable @Schema(description = "Shared (instance-catalog) model id to run this purpose on") Long instanceModelId,
-    @Nullable @Schema(description = "Workspace-owned model id to run this purpose on") Long workspaceModelId,
-    @Nullable
-    @Min(AgentBindingLimits.MIN_TIMEOUT_SECONDS)
-    @Max(AgentBindingLimits.MAX_TIMEOUT_SECONDS)
-    @Schema(description = "Per-run timeout in seconds (30–10800; three hours is the longest a single run may take)")
-    Integer timeoutSeconds,
-    @Nullable @Min(1) @Schema(description = "Maximum concurrent runs for this purpose") Integer maxConcurrentJobs,
-    @Nullable @Schema(description = "Whether the sandbox may reach the public internet") Boolean allowInternet,
-    @Nullable @Schema(description = "Whether this purpose is active (paused when false)") Boolean enabled
-) {}
+        @Nullable @Schema(description = "Shared (instance-catalog) model id to run this purpose on")
+        Long instanceModelId,
+
+        @Nullable @Schema(description = "Workspace-owned model id to run this purpose on")
+        Long workspaceModelId,
+
+        @Nullable
+        @Min(AgentBindingLimits.MIN_TIMEOUT_SECONDS)
+        @Max(AgentBindingLimits.MAX_TIMEOUT_SECONDS)
+        @Schema(description = "Per-run timeout in seconds (30–10800; three hours is the longest a single run may take)")
+        Integer timeoutSeconds,
+
+        @Nullable @Min(1) @Schema(description = "Maximum concurrent runs for this purpose")
+        Integer maxConcurrentJobs,
+
+        @Nullable @Schema(description = "Whether the sandbox may reach the public internet")
+        Boolean allowInternet,
+
+        @Nullable @Schema(description = "Whether this purpose is active (paused when false)")
+        Boolean enabled) {}

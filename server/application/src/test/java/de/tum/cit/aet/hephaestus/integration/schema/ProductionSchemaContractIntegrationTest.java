@@ -55,23 +55,20 @@ import tools.jackson.databind.node.ObjectNode;
 
 /** Validates the production schema, its JPA mappings, and database-enforced contracts. */
 @DataJpaTest(
-    properties = {
-        "spring.liquibase.enabled=true",
-        "spring.liquibase.change-log=classpath:db/master.xml",
-        "spring.liquibase.contexts=dev,prod",
-        "spring.jpa.hibernate.ddl-auto=validate",
-    }
-)
+        properties = {
+            "spring.liquibase.enabled=true",
+            "spring.liquibase.change-log=classpath:db/master.xml",
+            "spring.liquibase.contexts=dev,prod",
+            "spring.jpa.hibernate.ddl-auto=validate",
+        })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import(
-    {
-        TestCacheConfiguration.class,
-        SlackConversationProjector.class,
-        ConfigAuditRetentionJob.class,
-        ShedLockConfig.class,
-        ProductionSchemaContractIntegrationTest.JsonConfiguration.class,
-    }
-)
+@Import({
+    TestCacheConfiguration.class,
+    SlackConversationProjector.class,
+    ConfigAuditRetentionJob.class,
+    ShedLockConfig.class,
+    ProductionSchemaContractIntegrationTest.JsonConfiguration.class,
+})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @ActiveProfiles("test")
 @Tag("database")
@@ -80,9 +77,8 @@ class ProductionSchemaContractIntegrationTest {
     private static final String ACCOUNT_FEATURE = "run_practice_review";
     private static final String IDENTITY_SUBJECT = "583231";
 
-    private static final TestDatabase DATABASE = PostgreSQLTestContainer.createDatabase(
-        "hephaestus_liquibase_validation"
-    );
+    private static final TestDatabase DATABASE =
+            PostgreSQLTestContainer.createDatabase("hephaestus_liquibase_validation");
 
     @DynamicPropertySource
     static void configureDatabase(DynamicPropertyRegistry registry) {
@@ -125,18 +121,18 @@ class ProductionSchemaContractIntegrationTest {
         link(enabled, providerA);
         link(disabled, providerB);
 
-        assertThat(
-            accountFeatureRepository.existsActiveFeatureForProviderSubject(providerA, IDENTITY_SUBJECT, ACCOUNT_FEATURE)
-        ).isTrue();
-        assertThat(
-            accountFeatureRepository.existsActiveFeatureForProviderSubject(providerB, IDENTITY_SUBJECT, ACCOUNT_FEATURE)
-        ).isFalse();
-        assertThat(
-            accountFeatureRepository.existsActiveFeatureForProviderSubject(providerA, IDENTITY_SUBJECT, "mentor_access")
-        ).isFalse();
-        assertThat(
-            accountFeatureRepository.existsActiveFeatureForProviderSubject(999L, IDENTITY_SUBJECT, ACCOUNT_FEATURE)
-        ).isFalse();
+        assertThat(accountFeatureRepository.existsActiveFeatureForProviderSubject(
+                        providerA, IDENTITY_SUBJECT, ACCOUNT_FEATURE))
+                .isTrue();
+        assertThat(accountFeatureRepository.existsActiveFeatureForProviderSubject(
+                        providerB, IDENTITY_SUBJECT, ACCOUNT_FEATURE))
+                .isFalse();
+        assertThat(accountFeatureRepository.existsActiveFeatureForProviderSubject(
+                        providerA, IDENTITY_SUBJECT, "mentor_access"))
+                .isFalse();
+        assertThat(accountFeatureRepository.existsActiveFeatureForProviderSubject(
+                        999L, IDENTITY_SUBJECT, ACCOUNT_FEATURE))
+                .isFalse();
     }
 
     @Test
@@ -146,16 +142,16 @@ class ProductionSchemaContractIntegrationTest {
         accountFeatureRepository.save(new AccountFeature(Objects.requireNonNull(account.getId()), ACCOUNT_FEATURE));
         IdentityLink identity = link(account, provider);
 
-        assertThat(
-            accountFeatureRepository.existsActiveFeatureForProviderSubject(provider, IDENTITY_SUBJECT, ACCOUNT_FEATURE)
-        ).isTrue();
+        assertThat(accountFeatureRepository.existsActiveFeatureForProviderSubject(
+                        provider, IDENTITY_SUBJECT, ACCOUNT_FEATURE))
+                .isTrue();
 
         identity.setDisabledAt(java.time.Instant.now());
         identityLinkRepository.save(identity);
 
-        assertThat(
-            accountFeatureRepository.existsActiveFeatureForProviderSubject(provider, IDENTITY_SUBJECT, ACCOUNT_FEATURE)
-        ).isFalse();
+        assertThat(accountFeatureRepository.existsActiveFeatureForProviderSubject(
+                        provider, IDENTITY_SUBJECT, ACCOUNT_FEATURE))
+                .isFalse();
     }
 
     private IdentityLink link(Account account, long providerId) {
@@ -168,22 +164,20 @@ class ProductionSchemaContractIntegrationTest {
     }
 
     private long provider(String serverUrl) {
-        return Objects.requireNonNull(
-            identityProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, serverUrl)).getId()
-        );
+        return Objects.requireNonNull(identityProviderRepository
+                .save(new IdentityProvider(IdentityProviderType.GITHUB, serverUrl))
+                .getId());
     }
 
     @Test
     @DisplayName("Production Liquibase schema applies cleanly and the JPA entities validate against it")
     void productionSchemaAppliesAndEntitiesValidate() {
-        Integer appliedChangesets = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM databasechangelog",
-            Integer.class
-        );
+        Integer appliedChangesets =
+                jdbcTemplate.queryForObject("SELECT COUNT(*) FROM databasechangelog", Integer.class);
         assertThat(appliedChangesets)
-            .as("Liquibase DATABASECHANGELOG ledger should record the full production migration set")
-            .isNotNull()
-            .isGreaterThan(500);
+                .as("Liquibase DATABASECHANGELOG ledger should record the full production migration set")
+                .isNotNull()
+                .isGreaterThan(500);
 
         assertColumnExists("workspace", "account_login");
         assertColumnExists("connection", "credentials_encrypted");
@@ -209,75 +203,66 @@ class ProductionSchemaContractIntegrationTest {
         long workspaceId = insertWorkspace("review-scope-check");
 
         assertThatCode(() -> setReviewScope(workspaceId, "{\"targetBranches\": [\"main\"], \"repositories\": []}"))
-            .as("the two declared keys, each an array, are the shape the entity writes")
-            .doesNotThrowAnyException();
+                .as("the two declared keys, each an array, are the shape the entity writes")
+                .doesNotThrowAnyException();
 
-        assertThatThrownBy(() ->
-            setReviewScope(workspaceId, "{\"targetBranches\": [\"main\"], \"paths\": [\"src/**\"]}")
-        )
-            .as("a third key would be read as no restriction at all on that axis")
-            .isInstanceOf(DataIntegrityViolationException.class)
-            .hasMessageContaining("chk_workspace_review_scope");
+        assertThatThrownBy(
+                        () -> setReviewScope(workspaceId, "{\"targetBranches\": [\"main\"], \"paths\": [\"src/**\"]}"))
+                .as("a third key would be read as no restriction at all on that axis")
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("chk_workspace_review_scope");
 
         assertThatThrownBy(() -> setReviewScope(workspaceId, "{\"targetBranches\": \"main\"}"))
-            .as("an axis that is not an array cannot be read as the list it claims to be")
-            .isInstanceOf(DataIntegrityViolationException.class)
-            .hasMessageContaining("chk_workspace_review_scope");
+                .as("an axis that is not an array cannot be read as the list it claims to be")
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("chk_workspace_review_scope");
 
-        assertThat(
-            jdbcTemplate.queryForObject(
-                "SELECT practice_review_scope::text FROM workspace WHERE id = ?",
-                String.class,
-                workspaceId
-            )
-        )
-            .as("a refused write leaves the last accepted scope in force")
-            .contains("targetBranches")
-            .doesNotContain("paths");
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT practice_review_scope::text FROM workspace WHERE id = ?", String.class, workspaceId))
+                .as("a refused write leaves the last accepted scope in force")
+                .contains("targetBranches")
+                .doesNotContain("paths");
     }
 
     /** A workspace row with only the columns the schema demands; every setting below is left at its default. */
     private long insertWorkspace(String slug) {
         Long id = jdbcTemplate.queryForObject(
-            "INSERT INTO workspace (slug, display_name, status, account_type, account_login, is_publicly_viewable) " +
-                "VALUES (?, ?, 'ACTIVE', 'ORG', ?, false) RETURNING id",
-            Long.class,
-            slug,
-            "Review scope constraint fixture",
-            slug
-        );
+                "INSERT INTO workspace (slug, display_name, status, account_type, account_login, is_publicly_viewable) "
+                        + "VALUES (?, ?, 'ACTIVE', 'ORG', ?, false) RETURNING id",
+                Long.class,
+                slug,
+                "Review scope constraint fixture",
+                slug);
         return Objects.requireNonNull(id, "workspace insert returned no id");
     }
 
     private void setReviewScope(long workspaceId, String json) {
         jdbcTemplate.update(
-            "UPDATE workspace SET practice_review_scope = CAST(? AS jsonb) WHERE id = ?",
-            json,
-            workspaceId
-        );
+                "UPDATE workspace SET practice_review_scope = CAST(? AS jsonb) WHERE id = ?", json, workspaceId);
     }
 
     private void assertIndexExists(String indexName) {
         Integer count = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'public' AND indexname = ?",
-            Integer.class,
-            indexName
-        );
-        assertThat(count).as("Liquibase-built schema must contain index %s", indexName).isNotNull().isEqualTo(1);
+                "SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'public' AND indexname = ?",
+                Integer.class,
+                indexName);
+        assertThat(count)
+                .as("Liquibase-built schema must contain index %s", indexName)
+                .isNotNull()
+                .isEqualTo(1);
     }
 
     private void assertColumnExists(String table, String column) {
         Integer count = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM information_schema.columns " +
-                "WHERE table_schema = 'public' AND table_name = ? AND column_name = ?",
-            Integer.class,
-            table,
-            column
-        );
+                "SELECT COUNT(*) FROM information_schema.columns "
+                        + "WHERE table_schema = 'public' AND table_name = ? AND column_name = ?",
+                Integer.class,
+                table,
+                column);
         assertThat(count)
-            .as("Liquibase-built schema must contain column %s.%s", table, column)
-            .isNotNull()
-            .isEqualTo(1);
+                .as("Liquibase-built schema must contain column %s.%s", table, column)
+                .isNotNull()
+                .isEqualTo(1);
     }
 
     @Test
@@ -292,10 +277,9 @@ class ProductionSchemaContractIntegrationTest {
             support.seedMessage(workspaceId, channel, "100.000000", null, "root");
             support.seedMessage(workspaceId, channel, "100.500000", "100.000000", "reply");
             jdbcTemplate.update(
-                "UPDATE slack_message SET author_member_id = 100 WHERE workspace_id = ? AND slack_channel_id = ?",
-                workspaceId,
-                channel
-            );
+                    "UPDATE slack_message SET author_member_id = 100 WHERE workspace_id = ? AND slack_channel_id = ?",
+                    workspaceId,
+                    channel);
         } finally {
             jdbcTemplate.execute("SET session_replication_role = 'origin'");
         }
@@ -305,15 +289,12 @@ class ProductionSchemaContractIntegrationTest {
         assertThat(conversations).hasSize(1);
         assertThat(conversations.get(0).get("channelName").asString()).isEqualTo("engineering");
         ArrayNode messages = (ArrayNode) conversations.get(0).get("messages");
-        assertThat(messages)
-            .hasSize(2)
-            .allSatisfy(message -> {
-                assertThat(message.get("text").asString()).isIn("root", "reply");
-                assertThat(message.has("authorMemberId")).isFalse();
-            });
-        ArrayNode outsiderConversations = (ArrayNode) slackConversationProjector
-            .buildPayload(workspaceId, 999L)
-            .get("conversations");
+        assertThat(messages).hasSize(2).allSatisfy(message -> {
+            assertThat(message.get("text").asString()).isIn("root", "reply");
+            assertThat(message.has("authorMemberId")).isFalse();
+        });
+        ArrayNode outsiderConversations = (ArrayNode)
+                slackConversationProjector.buildPayload(workspaceId, 999L).get("conversations");
         assertThat(outsiderConversations).isEmpty();
     }
 
@@ -321,37 +302,28 @@ class ProductionSchemaContractIntegrationTest {
     void configAuditRowsAreAppendOnlyWithTheRetentionException() {
         long workspaceId = auditWorkspaceId();
         long current = insertAuditRow(workspaceId, 0);
-        assertThatThrownBy(() ->
-            jdbcTemplate.update("UPDATE config_audit_event SET entity_type = 'AGENT_CONFIG' WHERE id = ?", current)
-        ).hasMessageContaining("append-only");
-        assertThatThrownBy(() ->
-            jdbcTemplate.update("DELETE FROM config_audit_event WHERE id = ?", current)
-        ).hasMessageContaining("append-only");
-        assertThatThrownBy(() -> jdbcTemplate.execute("TRUNCATE config_audit_event")).hasMessageContaining(
-            "append-only"
-        );
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                        "UPDATE config_audit_event SET entity_type = 'AGENT_CONFIG' WHERE id = ?", current))
+                .hasMessageContaining("append-only");
+        assertThatThrownBy(() -> jdbcTemplate.update("DELETE FROM config_audit_event WHERE id = ?", current))
+                .hasMessageContaining("append-only");
+        assertThatThrownBy(() -> jdbcTemplate.execute("TRUNCATE config_audit_event"))
+                .hasMessageContaining("append-only");
 
-        assertThatCode(() ->
-            jdbcTemplate.update("UPDATE config_audit_event SET actor_account_id = NULL WHERE id = ?", current)
-        ).doesNotThrowAnyException();
-        assertThat(
-            jdbcTemplate.queryForObject(
-                "SELECT new_value::text FROM config_audit_event WHERE id = ?",
-                String.class,
-                current
-            )
-        ).contains("cooldownMinutes");
-        assertThatThrownBy(() ->
-            jdbcTemplate.update(
-                "UPDATE config_audit_event SET actor_account_id = NULL, entity_type = 'AGENT_CONFIG' WHERE id = ?",
-                current
-            )
-        ).hasMessageContaining("append-only");
+        assertThatCode(() -> jdbcTemplate.update(
+                        "UPDATE config_audit_event SET actor_account_id = NULL WHERE id = ?", current))
+                .doesNotThrowAnyException();
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT new_value::text FROM config_audit_event WHERE id = ?", String.class, current))
+                .contains("cooldownMinutes");
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                        "UPDATE config_audit_event SET actor_account_id = NULL, entity_type = 'AGENT_CONFIG' WHERE id = ?",
+                        current))
+                .hasMessageContaining("append-only");
 
         long directlyExpired = insertAuditRow(workspaceId, ConfigAuditRetentionJob.RETENTION_DAYS + 1);
-        assertThatCode(() ->
-            jdbcTemplate.update("DELETE FROM config_audit_event WHERE id = ?", directlyExpired)
-        ).doesNotThrowAnyException();
+        assertThatCode(() -> jdbcTemplate.update("DELETE FROM config_audit_event WHERE id = ?", directlyExpired))
+                .doesNotThrowAnyException();
         long stale = insertAuditRow(workspaceId, ConfigAuditRetentionJob.RETENTION_DAYS + 1);
         long inside = insertAuditRow(workspaceId, ConfigAuditRetentionJob.RETENTION_DAYS - 1);
         retentionJob.sweep();
@@ -362,25 +334,22 @@ class ProductionSchemaContractIntegrationTest {
 
     static Stream<Arguments> auditEnumConstraints() {
         return Stream.of(
-            Arguments.of("ck_config_audit_event_entity_type", ConfigAuditEntityType.values()),
-            Arguments.of("ck_config_audit_event_action", ConfigAuditAction.values()),
-            Arguments.of("ck_config_audit_event_actor_kind", ConfigAuditActorKind.values())
-        );
+                Arguments.of("ck_config_audit_event_entity_type", ConfigAuditEntityType.values()),
+                Arguments.of("ck_config_audit_event_action", ConfigAuditAction.values()),
+                Arguments.of("ck_config_audit_event_actor_kind", ConfigAuditActorKind.values()));
     }
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("auditEnumConstraints")
     void auditConstraintsAcceptEveryApplicationValue(String constraintName, Enum<?>[] values) {
         String definition = jdbcTemplate.queryForObject(
-            "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = ?",
-            String.class,
-            constraintName
-        );
+                "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = ?", String.class, constraintName);
         List<String> accepted = Arrays.stream(Objects.requireNonNull(definition).split("'"))
-            .filter(part -> part.matches("[A-Z_]{2,}"))
-            .distinct()
-            .toList();
-        List<String> expected = new ArrayList<>(Arrays.stream(values).map(Enum::name).toList());
+                .filter(part -> part.matches("[A-Z_]{2,}"))
+                .distinct()
+                .toList();
+        List<String> expected =
+                new ArrayList<>(Arrays.stream(values).map(Enum::name).toList());
         if (constraintName.equals("ck_config_audit_event_entity_type")) {
             expected.addAll(List.of("PRACTICE_AREA", "CURATED_PRACTICE_AREA"));
         }
@@ -389,22 +358,20 @@ class ProductionSchemaContractIntegrationTest {
 
     private long auditWorkspaceId() {
         return workspaceRepository
-            .findByWorkspaceSlug("audit-immutability")
-            .orElseGet(() -> {
-                Workspace workspace = new Workspace();
-                workspace.setWorkspaceSlug("audit-immutability");
-                workspace.setDisplayName("Immutability");
-                workspace.setAccountLogin("audit-immutability-org");
-                workspace.setAccountType(AccountType.ORG);
-                return workspaceRepository.save(workspace);
-            })
-            .getId();
+                .findByWorkspaceSlug("audit-immutability")
+                .orElseGet(() -> {
+                    Workspace workspace = new Workspace();
+                    workspace.setWorkspaceSlug("audit-immutability");
+                    workspace.setDisplayName("Immutability");
+                    workspace.setAccountLogin("audit-immutability-org");
+                    workspace.setAccountType(AccountType.ORG);
+                    return workspaceRepository.save(workspace);
+                })
+                .getId();
     }
 
     private long insertAuditRow(long workspaceId, int ageInDays) {
-        return Objects.requireNonNull(
-            jdbcTemplate.queryForObject(
-                """
+        return Objects.requireNonNull(jdbcTemplate.queryForObject("""
                 INSERT INTO config_audit_event
                     (workspace_id, entity_type, entity_id, action, actor_kind, actor_account_id,
                      old_value, new_value, changed_keys, occurred_at)
@@ -412,20 +379,12 @@ class ProductionSchemaContractIntegrationTest {
                         '{"cooldownMinutes":30}'::jsonb, '{"cooldownMinutes":10}'::jsonb,
                         ARRAY['cooldownMinutes'], now() - make_interval(days => ?))
                 RETURNING id
-                """,
-                Long.class,
-                workspaceId,
-                ageInDays
-            )
-        );
+                """, Long.class, workspaceId, ageInDays));
     }
 
     private boolean auditRowExists(long id) {
-        Integer count = jdbcTemplate.queryForObject(
-            "SELECT count(*) FROM config_audit_event WHERE id = ?",
-            Integer.class,
-            id
-        );
+        Integer count =
+                jdbcTemplate.queryForObject("SELECT count(*) FROM config_audit_event WHERE id = ?", Integer.class, id);
         return count != null && count > 0;
     }
 

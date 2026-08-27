@@ -7,11 +7,11 @@ import java.util.Map;
 import java.util.Objects;
 
 public record PreparedEvidence(
-    Map<String, byte[]> files,
-    Map<String, java.nio.file.Path> filesOnDisk,
-    java.util.List<AutoCloseable> cleanups,
-    ArtifactSourceManifest manifest
-) implements AutoCloseable {
+        Map<String, byte[]> files,
+        Map<String, java.nio.file.Path> filesOnDisk,
+        java.util.List<AutoCloseable> cleanups,
+        ArtifactSourceManifest manifest)
+        implements AutoCloseable {
     public PreparedEvidence(Map<String, byte[]> files, ArtifactSourceManifest manifest) {
         this(files, Map.of(), java.util.List.of(), manifest);
     }

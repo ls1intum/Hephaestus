@@ -78,9 +78,8 @@ class MentorSseChannelTest extends BaseUnitTest {
     @Test
     void send_onIoException_throwsAndFlips() {
         emitter.failOnNextSend();
-        assertThatThrownBy(() -> channel.send(new UIMessageChunk.StartStep())).isInstanceOf(
-            ClientDisconnectedException.class
-        );
+        assertThatThrownBy(() -> channel.send(new UIMessageChunk.StartStep()))
+                .isInstanceOf(ClientDisconnectedException.class);
         assertThat(channel.isClientGone()).isTrue();
     }
 
@@ -122,11 +121,11 @@ class MentorSseChannelTest extends BaseUnitTest {
     void completeWithError_emitsErrorThenSentinel() {
         channel.completeWithError("boom");
         assertThat(emitter.dataFrames())
-            .hasSize(2)
-            .first()
-            .asString()
-            .contains("\"type\":\"error\"")
-            .contains("\"errorText\":\"boom\"");
+                .hasSize(2)
+                .first()
+                .asString()
+                .contains("\"type\":\"error\"")
+                .contains("\"errorText\":\"boom\"");
         assertThat(emitter.dataFrames().get(1)).isEqualTo("[DONE]");
         assertThat(emitter.completed()).isTrue();
     }

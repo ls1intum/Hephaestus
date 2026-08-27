@@ -31,23 +31,10 @@ class AuthEventWriterTest extends BaseUnitTest {
         AuthEventRepository repository = mock(AuthEventRepository.class);
         when(repository.save(any())).thenThrow(new DataIntegrityViolationException("boom"));
         AuthEventWriter writer = new AuthEventWriter(
-            repository,
-            sequence,
-            metrics,
-            Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC)
-        );
+                repository, sequence, metrics, Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC));
 
         AuthEventData data = new AuthEventData(
-            AuthEvent.EventType.LOGIN,
-            AuthEvent.Result.SUCCESS,
-            1L,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null
-        );
+                AuthEvent.EventType.LOGIN, AuthEvent.Result.SUCCESS, 1L, null, null, null, null, null, null);
 
         // The swallow invariant: the request must not see the audit failure.
         assertThatCode(() -> writer.write(data)).doesNotThrowAnyException();

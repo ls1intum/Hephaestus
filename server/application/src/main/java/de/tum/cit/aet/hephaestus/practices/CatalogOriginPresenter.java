@@ -28,36 +28,28 @@ public class CatalogOriginPresenter {
 
     public PracticeDTO present(Long workspaceId, Practice practice) {
         return PracticeDTO.from(
-            practice,
-            CatalogOrigin.of(practice, catalogService.catalog()),
-            defaultAutonomy(workspaceId)
-        );
+                practice, CatalogOrigin.of(practice, catalogService.catalog()), defaultAutonomy(workspaceId));
     }
 
     public PracticeGroupDTO present(Long workspaceId, PracticeGroup group) {
         return PracticeGroupDTO.from(
-            group,
-            CatalogOrigin.of(group, catalogService.catalog()),
-            defaultAutonomy(workspaceId)
-        );
+                group, CatalogOrigin.of(group, catalogService.catalog()), defaultAutonomy(workspaceId));
     }
 
     public List<PracticeDTO> presentPractices(Long workspaceId, List<Practice> practices) {
         EffectiveCatalog catalog = catalogService.catalog();
         PracticeAutonomy workspaceDefault = defaultAutonomy(workspaceId);
-        return practices
-            .stream()
-            .map(practice -> PracticeDTO.from(practice, CatalogOrigin.of(practice, catalog), workspaceDefault))
-            .toList();
+        return practices.stream()
+                .map(practice -> PracticeDTO.from(practice, CatalogOrigin.of(practice, catalog), workspaceDefault))
+                .toList();
     }
 
     public List<PracticeGroupDTO> presentGroups(Long workspaceId, List<PracticeGroup> groups) {
         EffectiveCatalog catalog = catalogService.catalog();
         PracticeAutonomy workspaceDefault = defaultAutonomy(workspaceId);
-        return groups
-            .stream()
-            .map(group -> PracticeGroupDTO.from(group, CatalogOrigin.of(group, catalog), workspaceDefault))
-            .toList();
+        return groups.stream()
+                .map(group -> PracticeGroupDTO.from(group, CatalogOrigin.of(group, catalog), workspaceDefault))
+                .toList();
     }
 
     private PracticeAutonomy defaultAutonomy(Long workspaceId) {

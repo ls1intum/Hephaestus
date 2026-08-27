@@ -81,19 +81,15 @@ public class HmacOAuthStateService implements OAuthStateService {
      */
     @Autowired
     public HmacOAuthStateService(
-        OAuthStateProperties properties,
-        WebhookProperties webhookProperties,
-        Environment environment,
-        @Nullable OAuthStateNonceStore nonceStore
-    ) {
+            OAuthStateProperties properties,
+            WebhookProperties webhookProperties,
+            Environment environment,
+            @Nullable OAuthStateNonceStore nonceStore) {
         this(resolveSecret(properties, webhookProperties, environment), properties.ttl(), nonceStore);
     }
 
     private static String resolveSecret(
-        OAuthStateProperties properties,
-        WebhookProperties webhookProperties,
-        Environment environment
-    ) {
+            OAuthStateProperties properties, WebhookProperties webhookProperties, Environment environment) {
         String configured = properties.secret();
         if (configured != null && !configured.isBlank()) {
             return configured;
@@ -104,14 +100,11 @@ public class HmacOAuthStateService implements OAuthStateService {
         }
         if (environment.matchesProfiles("prod")) {
             throw new IllegalStateException(
-                "Set hephaestus.integration.oauth-state.secret (or hephaestus.webhook.secret) — required for OAuth state HMAC in production."
-            );
+                    "Set hephaestus.integration.oauth-state.secret (or hephaestus.webhook.secret) — required for OAuth state HMAC in production.");
         }
-        log.warn(
-            "No hephaestus.integration.oauth-state.secret / hephaestus.webhook.secret configured; " +
-                "generating an EPHEMERAL dev-only OAuth-state secret. State tokens won't survive a restart " +
-                "and webhook HMAC will not match any vendor secret — set the secret for real integration testing."
-        );
+        log.warn("No hephaestus.integration.oauth-state.secret / hephaestus.webhook.secret configured; "
+                + "generating an EPHEMERAL dev-only OAuth-state secret. State tokens won't survive a restart "
+                + "and webhook HMAC will not match any vendor secret — set the secret for real integration testing.");
         byte[] ephemeral = new byte[32];
         RANDOM.nextBytes(ephemeral);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(ephemeral);
@@ -122,14 +115,10 @@ public class HmacOAuthStateService implements OAuthStateService {
      * is present — same fail-fast contract as before.
      */
     private HmacOAuthStateService(
-        @Nullable String configuredSecret,
-        @Nullable Duration ttl,
-        @Nullable OAuthStateNonceStore nonceStore
-    ) {
+            @Nullable String configuredSecret, @Nullable Duration ttl, @Nullable OAuthStateNonceStore nonceStore) {
         if (configuredSecret == null || configuredSecret.isBlank()) {
             throw new IllegalStateException(
-                "Set hephaestus.integration.oauth-state.secret (or hephaestus.webhook.secret) — required for OAuth state HMAC."
-            );
+                    "Set hephaestus.integration.oauth-state.secret (or hephaestus.webhook.secret) — required for OAuth state HMAC.");
         }
         this.secret = configuredSecret.getBytes(StandardCharsets.UTF_8);
         this.ttl = ttl == null ? DEFAULT_TTL : ttl;
@@ -164,8 +153,8 @@ public class HmacOAuthStateService implements OAuthStateService {
             nonceStore.issue(nonce, workspaceId, kind, Instant.ofEpochSecond(issuedAt));
         }
         return Base64.getUrlEncoder()
-            .withoutPadding()
-            .encodeToString((payload + "|" + sig).getBytes(StandardCharsets.UTF_8));
+                .withoutPadding()
+                .encodeToString((payload + "|" + sig).getBytes(StandardCharsets.UTF_8));
     }
 
     @Override
@@ -194,12 +183,8 @@ public class HmacOAuthStateService implements OAuthStateService {
         String suppliedSig = parts[5];
         String payload = workspaceIdStr + "|" + kindStr + "|" + issuedAtStr + "|" + nonce + "|" + actorSegment;
         String expectedSig = hmac(payload);
-        if (
-            !MessageDigest.isEqual(
-                expectedSig.getBytes(StandardCharsets.UTF_8),
-                suppliedSig.getBytes(StandardCharsets.UTF_8)
-            )
-        ) {
+        if (!MessageDigest.isEqual(
+                expectedSig.getBytes(StandardCharsets.UTF_8), suppliedSig.getBytes(StandardCharsets.UTF_8))) {
             throw new IllegalArgumentException("OAuth state signature mismatch");
         }
         long issuedAt;

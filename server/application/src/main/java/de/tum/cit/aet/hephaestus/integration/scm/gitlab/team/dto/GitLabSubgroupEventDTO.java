@@ -21,18 +21,17 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitLabSubgroupEventDTO(
-    @JsonProperty("event_name") String eventName,
-    @JsonProperty("name") String name,
-    @JsonProperty("path") String path,
-    @JsonProperty("full_path") String fullPath,
-    @JsonProperty("group_id") long groupId,
-    @JsonProperty("parent_group_id") long parentGroupId,
-    @JsonProperty("parent_name") @Nullable String parentName,
-    @JsonProperty("parent_path") @Nullable String parentPath,
-    @JsonProperty("parent_full_path") @Nullable String parentFullPath,
-    @JsonProperty("created_at") @Nullable String createdAt,
-    @JsonProperty("updated_at") @Nullable String updatedAt
-) {
+        @JsonProperty("event_name") String eventName,
+        @JsonProperty("name") String name,
+        @JsonProperty("path") String path,
+        @JsonProperty("full_path") String fullPath,
+        @JsonProperty("group_id") long groupId,
+        @JsonProperty("parent_group_id") long parentGroupId,
+        @JsonProperty("parent_name") @Nullable String parentName,
+        @JsonProperty("parent_path") @Nullable String parentPath,
+        @JsonProperty("parent_full_path") @Nullable String parentFullPath,
+        @JsonProperty("created_at") @Nullable String createdAt,
+        @JsonProperty("updated_at") @Nullable String updatedAt) {
     public static final String EVENT_SUBGROUP_CREATE = "subgroup_create";
     public static final String EVENT_SUBGROUP_DESTROY = "subgroup_destroy";
 

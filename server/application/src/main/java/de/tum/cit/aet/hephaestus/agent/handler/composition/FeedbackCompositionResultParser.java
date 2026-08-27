@@ -69,17 +69,13 @@ public class FeedbackCompositionResultParser {
     }
 
     public List<ComposedFeedbackUnit> parse(@Nullable JsonNode jobOutput, FeedbackChannel channel) {
-        return parse(jobOutput)
-            .stream()
-            .filter(unit -> unit.channel() == channel)
-            .toList();
+        return parse(jobOutput).stream()
+                .filter(unit -> unit.channel() == channel)
+                .toList();
     }
 
     private static @Nullable ComposedFeedbackUnit read(
-        JsonNode unit,
-        Map<String, StagedObservation> observations,
-        Set<PreparedTarget> preparedTargets
-    ) {
+            JsonNode unit, Map<String, StagedObservation> observations, Set<PreparedTarget> preparedTargets) {
         if (unit == null || !unit.isObject()) {
             return null;
         }
@@ -95,51 +91,46 @@ public class FeedbackCompositionResultParser {
         }
         String normalizedPracticeSlug = normalizeSlug(practiceSlug);
         boolean grounded = basedOn.stream().allMatch(observations::containsKey);
-        boolean ownsEvidence = basedOn
-            .stream()
-            .map(observations::get)
-            .filter(Objects::nonNull)
-            .anyMatch(observation -> normalizedPracticeSlug.equals(observation.practiceSlug()));
+        boolean ownsEvidence = basedOn.stream()
+                .map(observations::get)
+                .filter(Objects::nonNull)
+                .anyMatch(observation -> normalizedPracticeSlug.equals(observation.practiceSlug()));
         if (!grounded || !ownsEvidence) {
             log.warn(
-                "Composed unit is not grounded in admitted evidence for its practice: channel={}, practice={}",
-                channel,
-                practiceSlug
-            );
+                    "Composed unit is not grounded in admitted evidence for its practice: channel={}, practice={}",
+                    channel,
+                    practiceSlug);
             return null;
         }
 
         if (action == ComposedFeedbackUnit.Action.WITHHOLD) {
             ComposedFeedbackUnit.WithholdReason reason = withholdReasonOf(unit);
             return reason == null
-                ? null
-                : new ComposedFeedbackUnit(
-                      channel,
-                      normalizedPracticeSlug,
-                      basedOn,
-                      action,
-                      null,
-                      reason,
-                      null,
-                      null,
-                      null,
-                      null,
-                      null
-                  );
+                    ? null
+                    : new ComposedFeedbackUnit(
+                            channel,
+                            normalizedPracticeSlug,
+                            basedOn,
+                            action,
+                            null,
+                            reason,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null);
         }
 
         String supersedesThreadKey = null;
         if (action == ComposedFeedbackUnit.Action.SUPERSEDE) {
             supersedesThreadKey = text(unit, "supersedesThreadKey", ComposedFeedbackUnit.MAX_THREAD_KEY_LENGTH);
-            if (
-                supersedesThreadKey == null ||
-                !preparedTargets.contains(new PreparedTarget(supersedesThreadKey, channel, normalizedPracticeSlug))
-            ) {
+            if (supersedesThreadKey == null
+                    || !preparedTargets.contains(
+                            new PreparedTarget(supersedesThreadKey, channel, normalizedPracticeSlug))) {
                 log.warn(
-                    "Composed unit names a supersession target that was not staged: channel={}, practice={}",
-                    channel,
-                    practiceSlug
-                );
+                        "Composed unit names a supersession target that was not staged: channel={}, practice={}",
+                        channel,
+                        practiceSlug);
                 return null;
             }
         }
@@ -152,25 +143,23 @@ public class FeedbackCompositionResultParser {
         if (channel == FeedbackChannel.IN_CHAT) {
             ComposedFeedbackUnit.ConversationBrief brief = notesOf(unit);
             return brief == null
-                ? null
-                : new ComposedFeedbackUnit(
-                      channel,
-                      normalizedPracticeSlug,
-                      basedOn,
-                      action,
-                      supersedesThreadKey,
-                      null,
-                      title,
-                      null,
-                      null,
-                      brief,
-                      null
-                  );
+                    ? null
+                    : new ComposedFeedbackUnit(
+                            channel,
+                            normalizedPracticeSlug,
+                            basedOn,
+                            action,
+                            supersedesThreadKey,
+                            null,
+                            title,
+                            null,
+                            null,
+                            brief,
+                            null);
         }
 
-        String nextStep = DeveloperTextSanitizer.sanitize(
-            text(unit, "nextStep", ComposedFeedbackUnit.MAX_NEXT_STEP_LENGTH)
-        );
+        String nextStep =
+                DeveloperTextSanitizer.sanitize(text(unit, "nextStep", ComposedFeedbackUnit.MAX_NEXT_STEP_LENGTH));
         if (nextStep == null) return null;
 
         String body = null;
@@ -192,55 +181,46 @@ public class FeedbackCompositionResultParser {
         }
 
         ComposedFeedbackUnit composed = new ComposedFeedbackUnit(
-            channel,
-            normalizedPracticeSlug,
-            basedOn,
-            action,
-            supersedesThreadKey,
-            null,
-            title,
-            body,
-            nextStep,
-            null,
-            placement
-        );
+                channel,
+                normalizedPracticeSlug,
+                basedOn,
+                action,
+                supersedesThreadKey,
+                null,
+                title,
+                body,
+                nextStep,
+                null,
+                placement);
         return composed.isComplete() ? composed : null;
     }
 
     private static ComposedFeedbackUnit.@Nullable InContextPlacement resolvePlacement(
-        @Nullable JsonNode placement,
-        Map<String, StagedObservation> observations,
-        List<String> basedOn,
-        String practiceSlug
-    ) {
+            @Nullable JsonNode placement,
+            Map<String, StagedObservation> observations,
+            List<String> basedOn,
+            String practiceSlug) {
         if (placement == null || !placement.isObject()) return null;
         String kind = text(placement, "kind", 16);
         if ("ARTIFACT".equals(kind)) {
             if (placement.hasNonNull("observationId") || placement.hasNonNull("citationIndex")) return null;
-            boolean grounded = basedOn
-                .stream()
-                .map(observations::get)
-                .anyMatch(observation -> observation != null && practiceSlug.equals(observation.practiceSlug()));
+            boolean grounded = basedOn.stream()
+                    .map(observations::get)
+                    .anyMatch(observation -> observation != null && practiceSlug.equals(observation.practiceSlug()));
             if (!grounded) return null;
             return new ComposedFeedbackUnit.InContextPlacement(
-                ComposedFeedbackUnit.InContextPlacement.PlacementKind.ARTIFACT,
-                null
-            );
+                    ComposedFeedbackUnit.InContextPlacement.PlacementKind.ARTIFACT, null);
         }
         if (!"DIFF".equals(kind)) return null;
         ComposedFeedbackUnit.ResolvedAnchor anchor = resolveAnchor(placement, observations);
         return anchor == null
-            ? null
-            : new ComposedFeedbackUnit.InContextPlacement(
-                  ComposedFeedbackUnit.InContextPlacement.PlacementKind.DIFF,
-                  anchor
-              );
+                ? null
+                : new ComposedFeedbackUnit.InContextPlacement(
+                        ComposedFeedbackUnit.InContextPlacement.PlacementKind.DIFF, anchor);
     }
 
     private static ComposedFeedbackUnit.@Nullable ResolvedAnchor resolveAnchor(
-        @Nullable JsonNode anchor,
-        Map<String, StagedObservation> observations
-    ) {
+            @Nullable JsonNode anchor, Map<String, StagedObservation> observations) {
         if (anchor == null || !anchor.isObject()) {
             return null;
         }
@@ -258,22 +238,14 @@ public class FeedbackCompositionResultParser {
             return null;
         }
         StagedCitation citation = observation.citations().get(index);
-        if (
-            !observation.anchorable() ||
-            !citation.anchorable() ||
-            citation.path() == null ||
-            citation.startLine() == null
-        ) {
+        if (!observation.anchorable()
+                || !citation.anchorable()
+                || citation.path() == null
+                || citation.startLine() == null) {
             return null;
         }
         return new ComposedFeedbackUnit.ResolvedAnchor(
-            observationId,
-            index,
-            citation.path(),
-            citation.side(),
-            citation.startLine(),
-            citation.endLine()
-        );
+                observationId, index, citation.path(), citation.side(), citation.startLine(), citation.endLine());
     }
 
     /** How the review opens, in the composer's words; null when it wrote none. */
@@ -296,25 +268,20 @@ public class FeedbackCompositionResultParser {
             JsonNode citationNodes = entry.get("citations");
             if (citationNodes != null && citationNodes.isArray()) {
                 for (JsonNode citation : citationNodes) {
-                    citations.add(
-                        new StagedCitation(
+                    citations.add(new StagedCitation(
                             text(citation, "path", 1024),
                             text(citation, "side", 8),
                             integer(citation, "startLine"),
                             integer(citation, "endLine"),
-                            citation.path("anchorable").asBoolean(false)
-                        )
-                    );
+                            citation.path("anchorable").asBoolean(false)));
                 }
             }
             observations.put(
-                id,
-                new StagedObservation(
-                    normalizedSlug(text(entry, "practiceSlug", MAX_PRACTICE_SLUG_LENGTH)),
-                    entry.path("anchorable").asBoolean(false),
-                    citations
-                )
-            );
+                    id,
+                    new StagedObservation(
+                            normalizedSlug(text(entry, "practiceSlug", MAX_PRACTICE_SLUG_LENGTH)),
+                            entry.path("anchorable").asBoolean(false),
+                            citations));
         }
         return observations;
     }
@@ -359,12 +326,11 @@ public class FeedbackCompositionResultParser {
             return null;
         }
         return new ComposedFeedbackUnit.ConversationBrief(
-            situation,
-            capability,
-            evidenceSummary,
-            inConversationSignal,
-            note(notes, "alreadySaid", ComposedFeedbackUnit.MAX_AIM_LENGTH)
-        );
+                situation,
+                capability,
+                evidenceSummary,
+                inConversationSignal,
+                note(notes, "alreadySaid", ComposedFeedbackUnit.MAX_AIM_LENGTH));
     }
 
     private static @Nullable String note(JsonNode notes, String field, int maxLength) {
@@ -437,18 +403,14 @@ public class FeedbackCompositionResultParser {
     }
 
     private record StagedObservation(
-        @Nullable String practiceSlug,
-        boolean anchorable,
-        List<StagedCitation> citations
-    ) {}
+            @Nullable String practiceSlug, boolean anchorable, List<StagedCitation> citations) {}
 
     private record PreparedTarget(String threadKey, FeedbackChannel channel, String practiceSlug) {}
 
     private record StagedCitation(
-        @Nullable String path,
-        @Nullable String side,
-        @Nullable Integer startLine,
-        @Nullable Integer endLine,
-        boolean anchorable
-    ) {}
+            @Nullable String path,
+            @Nullable String side,
+            @Nullable Integer startLine,
+            @Nullable Integer endLine,
+            boolean anchorable) {}
 }

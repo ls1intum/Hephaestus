@@ -174,11 +174,10 @@ public class ScopedRateLimitTracker implements RateLimitTracker, RateLimitObserv
 
         if (currentRemaining >= CRITICAL_THRESHOLD) {
             log.info(
-                "Rate limit low but continuing: scopeId={}, remaining={}, threshold={}",
-                scopeId,
-                currentRemaining,
-                DEFAULT_LOW_THRESHOLD
-            );
+                    "Rate limit low but continuing: scopeId={}, remaining={}, threshold={}",
+                    scopeId,
+                    currentRemaining,
+                    DEFAULT_LOW_THRESHOLD);
             return false;
         }
 
@@ -205,12 +204,11 @@ public class ScopedRateLimitTracker implements RateLimitTracker, RateLimitObserv
         }
 
         log.warn(
-            "Pausing due to critical rate limit: scopeId={}, remaining={}, waitSeconds={}, resetAt={}",
-            scopeId,
-            currentRemaining,
-            waitTime.getSeconds(),
-            reset
-        );
+                "Pausing due to critical rate limit: scopeId={}, remaining={}, waitSeconds={}, resetAt={}",
+                scopeId,
+                currentRemaining,
+                waitTime.getSeconds(),
+                reset);
 
         Thread.sleep(waitTime.toMillis());
         return true;
@@ -274,12 +272,7 @@ public class ScopedRateLimitTracker implements RateLimitTracker, RateLimitObserv
      */
     @Override
     public void updateFromRestRateLimit(
-        Long scopeId,
-        int limit,
-        int remaining,
-        @Nullable Instant resetAt,
-        Instant observedAt
-    ) {
+            Long scopeId, int limit, int remaining, @Nullable Instant resetAt, Instant observedAt) {
         if (scopeId == null) {
             return;
         }
@@ -290,12 +283,11 @@ public class ScopedRateLimitTracker implements RateLimitTracker, RateLimitObserv
         }
         state.applyRest(limit, remaining, resetAt, observedAt);
         log.debug(
-            "Seeded GitHub GraphQL rate limit from REST /rate_limit: scopeId={}, limit={}, remaining={}, resetAt={}",
-            scopeId,
-            limit,
-            remaining,
-            resetAt
-        );
+                "Seeded GitHub GraphQL rate limit from REST /rate_limit: scopeId={}, limit={}, remaining={}, resetAt={}",
+                scopeId,
+                limit,
+                remaining,
+                resetAt);
     }
 
     @Override
@@ -329,15 +321,14 @@ public class ScopedRateLimitTracker implements RateLimitTracker, RateLimitObserv
             return null;
         }
         return RateLimitSnapshot.observed(
-            state.limit.get(),
-            state.remaining.get(),
-            state.resetAt.get(),
-            observedAt,
-            // GitHub's secondary (abuse) limits are the only 429-style back-off signal it sends, and they
-            // surface on the REST/GraphQL transport rather than in the rateLimit field this tracker reads.
-            // Left null until GitHubExceptionClassifier's secondary-limit detection is wired through.
-            null
-        );
+                state.limit.get(),
+                state.remaining.get(),
+                state.resetAt.get(),
+                observedAt,
+                // GitHub's secondary (abuse) limits are the only 429-style back-off signal it sends, and they
+                // surface on the REST/GraphQL transport rather than in the rateLimit field this tracker reads.
+                // Left null until GitHubExceptionClassifier's secondary-limit detection is wired through.
+                null);
     }
 
     public int getTrackedScopeCount() {
@@ -375,17 +366,15 @@ public class ScopedRateLimitTracker implements RateLimitTracker, RateLimitObserv
         String scopeTag = String.valueOf(scopeId);
         List<Meter.Id> toRemove = new ArrayList<>();
 
-        meterRegistry
-            .getMeters()
-            .forEach(meter -> {
-                String meterName = meter.getId().getName();
-                if (meterName.startsWith(METRIC_PREFIX)) {
-                    String tagValue = meter.getId().getTag("scope_id");
-                    if (scopeTag.equals(tagValue)) {
-                        toRemove.add(meter.getId());
-                    }
+        meterRegistry.getMeters().forEach(meter -> {
+            String meterName = meter.getId().getName();
+            if (meterName.startsWith(METRIC_PREFIX)) {
+                String tagValue = meter.getId().getTag("scope_id");
+                if (scopeTag.equals(tagValue)) {
+                    toRemove.add(meter.getId());
                 }
-            });
+            }
+        });
 
         for (Meter.Id meterId : toRemove) {
             meterRegistry.remove(meterId);
@@ -408,36 +397,36 @@ public class ScopedRateLimitTracker implements RateLimitTracker, RateLimitObserv
 
         // NaN, not 0, while unobserved: a gauge is a measurement too, and 0 would read as "exhausted".
         Gauge.builder("github.graphql.ratelimit.points.remaining", state, s -> asDouble(s.remaining.get()))
-            .tags(tags)
-            .description("GitHub GraphQL API rate limit points remaining")
-            .register(meterRegistry);
+                .tags(tags)
+                .description("GitHub GraphQL API rate limit points remaining")
+                .register(meterRegistry);
 
         Gauge.builder("github.graphql.ratelimit.points.limit", state, s -> asDouble(s.limit.get()))
-            .tags(tags)
-            .description("GitHub GraphQL API rate limit total points per hour")
-            .register(meterRegistry);
+                .tags(tags)
+                .description("GitHub GraphQL API rate limit total points per hour")
+                .register(meterRegistry);
 
         Gauge.builder("github.graphql.ratelimit.points.used", state.used, AtomicInteger::get)
-            .tags(tags)
-            .description("GitHub GraphQL API rate limit points used in current window")
-            .register(meterRegistry);
+                .tags(tags)
+                .description("GitHub GraphQL API rate limit points used in current window")
+                .register(meterRegistry);
 
         Gauge.builder("github.graphql.ratelimit.last_query_cost", state.lastQueryCost, AtomicInteger::get)
-            .tags(tags)
-            .description("Cost of the last GitHub GraphQL query")
-            .register(meterRegistry);
+                .tags(tags)
+                .description("Cost of the last GitHub GraphQL query")
+                .register(meterRegistry);
 
         Gauge.builder("github.graphql.ratelimit.seconds_until_reset", state, s -> {
-            Instant reset = s.resetAt.get();
-            if (reset == null) {
-                return 0.0;
-            }
-            long seconds = Duration.between(Instant.now(), reset).getSeconds();
-            return Math.max(0, seconds);
-        })
-            .tags(tags)
-            .description("Seconds until GitHub GraphQL rate limit resets")
-            .register(meterRegistry);
+                    Instant reset = s.resetAt.get();
+                    if (reset == null) {
+                        return 0.0;
+                    }
+                    long seconds = Duration.between(Instant.now(), reset).getSeconds();
+                    return Math.max(0, seconds);
+                })
+                .tags(tags)
+                .description("Seconds until GitHub GraphQL rate limit resets")
+                .register(meterRegistry);
     }
 
     /** Renders an unobserved value as NaN rather than a number that would be read as a measurement. */
@@ -492,24 +481,22 @@ public class ScopedRateLimitTracker implements RateLimitTracker, RateLimitObserv
 
             if (newRemaining < CRITICAL_THRESHOLD) {
                 log.error(
-                    "CRITICAL: GitHub GraphQL rate limit nearly exhausted: scopeId={}, remaining={}, limit={}, used={}, cost={}, resetAt={}",
-                    scopeId,
-                    newRemaining,
-                    newLimit,
-                    actualUsed,
-                    cost,
-                    resetTime
-                );
+                        "CRITICAL: GitHub GraphQL rate limit nearly exhausted: scopeId={}, remaining={}, limit={}, used={}, cost={}, resetAt={}",
+                        scopeId,
+                        newRemaining,
+                        newLimit,
+                        actualUsed,
+                        cost,
+                        resetTime);
             } else if (newRemaining < DEFAULT_LOW_THRESHOLD) {
                 log.warn(
-                    "GitHub GraphQL rate limit low: scopeId={}, remaining={}, limit={}, used={}, cost={}, resetAt={}",
-                    scopeId,
-                    newRemaining,
-                    newLimit,
-                    actualUsed,
-                    cost,
-                    resetTime
-                );
+                        "GitHub GraphQL rate limit low: scopeId={}, remaining={}, limit={}, used={}, cost={}, resetAt={}",
+                        scopeId,
+                        newRemaining,
+                        newLimit,
+                        actualUsed,
+                        cost,
+                        resetTime);
             }
         }
     }

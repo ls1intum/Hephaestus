@@ -22,20 +22,19 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitLabMemberEventDTO(
-    @JsonProperty("event_name") String eventName,
-    @JsonProperty("group_name") String groupName,
-    @JsonProperty("group_path") String groupPath,
-    @JsonProperty("group_id") long groupId,
-    @JsonProperty("user_username") String userUsername,
-    @JsonProperty("user_name") String userName,
-    @JsonProperty("user_email") @Nullable String userEmail,
-    @JsonProperty("user_id") long userId,
-    @JsonProperty("group_access") @Nullable String groupAccess,
-    @JsonProperty("user_avatar") @Nullable String userAvatar,
-    @JsonProperty("created_at") @Nullable String createdAt,
-    @JsonProperty("updated_at") @Nullable String updatedAt,
-    @JsonProperty("expires_at") @Nullable String expiresAt
-) {
+        @JsonProperty("event_name") String eventName,
+        @JsonProperty("group_name") String groupName,
+        @JsonProperty("group_path") String groupPath,
+        @JsonProperty("group_id") long groupId,
+        @JsonProperty("user_username") String userUsername,
+        @JsonProperty("user_name") String userName,
+        @JsonProperty("user_email") @Nullable String userEmail,
+        @JsonProperty("user_id") long userId,
+        @JsonProperty("group_access") @Nullable String groupAccess,
+        @JsonProperty("user_avatar") @Nullable String userAvatar,
+        @JsonProperty("created_at") @Nullable String createdAt,
+        @JsonProperty("updated_at") @Nullable String updatedAt,
+        @JsonProperty("expires_at") @Nullable String expiresAt) {
     public static final String EVENT_USER_ADD = "user_add_to_group";
     public static final String EVENT_USER_REMOVE = "user_remove_from_group";
     public static final String EVENT_USER_UPDATE = "user_update_for_group";

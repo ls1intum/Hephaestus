@@ -37,10 +37,9 @@ public class GitHubOrganizationProcessor {
     private final ProjectIntegrityService projectIntegrityService;
 
     public GitHubOrganizationProcessor(
-        OrganizationRepository organizationRepository,
-        IdentityProviderRepository gitProviderRepository,
-        ProjectIntegrityService projectIntegrityService
-    ) {
+            OrganizationRepository organizationRepository,
+            IdentityProviderRepository gitProviderRepository,
+            ProjectIntegrityService projectIntegrityService) {
         this.organizationRepository = organizationRepository;
         this.gitProviderRepository = gitProviderRepository;
         this.projectIntegrityService = projectIntegrityService;
@@ -63,13 +62,13 @@ public class GitHubOrganizationProcessor {
         Long organizationId = Objects.requireNonNull(dto.id());
 
         Organization organization = organizationRepository
-            .findByNativeIdAndProviderId(organizationId, providerId)
-            .orElseGet(() -> {
-                Organization org = new Organization();
-                org.setNativeId(organizationId);
-                org.setProvider(gitProviderRepository.getReferenceById(providerId));
-                return org;
-            });
+                .findByNativeIdAndProviderId(organizationId, providerId)
+                .orElseGet(() -> {
+                    Organization org = new Organization();
+                    org.setNativeId(organizationId);
+                    org.setProvider(gitProviderRepository.getReferenceById(providerId));
+                    return org;
+                });
 
         boolean isNew = organization.getId() == null;
 
@@ -120,15 +119,19 @@ public class GitHubOrganizationProcessor {
         }
 
         return organizationRepository
-            .findByNativeIdAndProviderId(nativeId, providerId)
-            .map(org -> {
-                String oldLogin = org.getLogin();
-                org.setLogin(newLogin);
-                Organization saved = organizationRepository.save(org);
-                log.info("Renamed organization: nativeId={}, oldLogin={}, newLogin={}", nativeId, oldLogin, newLogin);
-                return saved;
-            })
-            .orElse(null);
+                .findByNativeIdAndProviderId(nativeId, providerId)
+                .map(org -> {
+                    String oldLogin = org.getLogin();
+                    org.setLogin(newLogin);
+                    Organization saved = organizationRepository.save(org);
+                    log.info(
+                            "Renamed organization: nativeId={}, oldLogin={}, newLogin={}",
+                            nativeId,
+                            oldLogin,
+                            newLogin);
+                    return saved;
+                })
+                .orElse(null);
     }
 
     /**
@@ -153,27 +156,24 @@ public class GitHubOrganizationProcessor {
             return;
         }
 
-        organizationRepository
-            .findByNativeIdAndProviderId(nativeId, providerId)
-            .ifPresent(org -> {
-                Long orgId = org.getId();
-                String orgLogin = org.getLogin();
+        organizationRepository.findByNativeIdAndProviderId(nativeId, providerId).ifPresent(org -> {
+            Long orgId = org.getId();
+            String orgLogin = org.getLogin();
 
-                // Cascade delete projects owned by this organization
-                // This must be done BEFORE deleting the organization to maintain referential integrity
-                int deletedProjects = projectIntegrityService.cascadeDeleteProjectsForOrganization(orgId);
-                if (deletedProjects > 0) {
-                    log.info(
+            // Cascade delete projects owned by this organization
+            // This must be done BEFORE deleting the organization to maintain referential integrity
+            int deletedProjects = projectIntegrityService.cascadeDeleteProjectsForOrganization(orgId);
+            if (deletedProjects > 0) {
+                log.info(
                         "Cascade deleted projects for organization: orgId={}, orgLogin={}, projectCount={}",
                         orgId,
                         sanitizeForLog(orgLogin),
-                        deletedProjects
-                    );
-                }
+                        deletedProjects);
+            }
 
-                // Now delete the organization
-                organizationRepository.delete(org);
-                log.info("Deleted organization: nativeId={}, orgLogin={}", nativeId, sanitizeForLog(orgLogin));
-            });
+            // Now delete the organization
+            organizationRepository.delete(org);
+            log.info("Deleted organization: nativeId={}, orgLogin={}", nativeId, sanitizeForLog(orgLogin));
+        });
     }
 }

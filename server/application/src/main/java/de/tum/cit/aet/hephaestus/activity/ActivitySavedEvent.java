@@ -21,10 +21,9 @@ import java.util.Optional;
  * @see ActivityEventService
  */
 public record ActivitySavedEvent(
-    Optional<User> user,
-    ActivityEventType eventType,
-    Instant occurredAt,
-    Long workspaceId,
-    ActivityTargetType targetType,
-    Long targetId
-) {}
+        Optional<User> user,
+        ActivityEventType eventType,
+        Instant occurredAt,
+        Long workspaceId,
+        ActivityTargetType targetType,
+        Long targetId) {}

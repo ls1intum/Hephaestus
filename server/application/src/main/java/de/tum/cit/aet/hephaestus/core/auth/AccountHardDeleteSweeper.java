@@ -58,11 +58,7 @@ public class AccountHardDeleteSweeper {
     private final Clock clock;
 
     public AccountHardDeleteSweeper(
-        AccountRepository accountRepository,
-        AccountPurger accountPurger,
-        AuthProperties properties,
-        Clock clock
-    ) {
+            AccountRepository accountRepository, AccountPurger accountPurger, AuthProperties properties, Clock clock) {
         this.accountRepository = accountRepository;
         this.accountPurger = accountPurger;
         this.properties = properties;
@@ -105,10 +101,9 @@ public class AccountHardDeleteSweeper {
                     purgedThisPage++;
                 } catch (RuntimeException e) {
                     log.error(
-                        "auth.account: hard-delete FAILED for accountId={} (skipped, will retry next sweep)",
-                        id,
-                        e
-                    );
+                            "auth.account: hard-delete FAILED for accountId={} (skipped, will retry next sweep)",
+                            id,
+                            e);
                 }
             }
             if (purgedThisPage == 0) {

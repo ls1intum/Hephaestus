@@ -16,9 +16,8 @@ class SlackHephaestusUiLinksTest extends BaseUnitTest {
 
     @Test
     void workspaceHomeUrl_usesWorkspaceSlug() {
-        when(workspaceSummaryQuery.findById(7L)).thenReturn(
-            Optional.of(new WorkspaceSummaryQuery.WorkspaceSummary(7L, "team-alpha", "Team Alpha"))
-        );
+        when(workspaceSummaryQuery.findById(7L))
+                .thenReturn(Optional.of(new WorkspaceSummaryQuery.WorkspaceSummary(7L, "team-alpha", "Team Alpha")));
 
         SlackHephaestusUiLinks links = new SlackHephaestusUiLinks(workspaceSummaryQuery, "https://heph.example/");
 

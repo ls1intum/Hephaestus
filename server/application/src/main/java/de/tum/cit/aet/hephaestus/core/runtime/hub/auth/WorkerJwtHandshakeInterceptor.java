@@ -33,11 +33,10 @@ public class WorkerJwtHandshakeInterceptor implements HandshakeInterceptor {
 
     @Override
     public boolean beforeHandshake(
-        ServerHttpRequest request,
-        ServerHttpResponse response,
-        WebSocketHandler wsHandler,
-        Map<String, Object> attributes
-    ) {
+            ServerHttpRequest request,
+            ServerHttpResponse response,
+            WebSocketHandler wsHandler,
+            Map<String, Object> attributes) {
         String token = extractBearer(request.getHeaders().get(HttpHeaders.AUTHORIZATION));
         if (token == null) {
             log.debug("worker handshake rejected: missing or non-Bearer Authorization header");
@@ -62,11 +61,10 @@ public class WorkerJwtHandshakeInterceptor implements HandshakeInterceptor {
 
     @Override
     public void afterHandshake(
-        ServerHttpRequest request,
-        ServerHttpResponse response,
-        WebSocketHandler wsHandler,
-        @Nullable Exception exception
-    ) {
+            ServerHttpRequest request,
+            ServerHttpResponse response,
+            WebSocketHandler wsHandler,
+            @Nullable Exception exception) {
         // no-op; handler takes over after upgrade
     }
 

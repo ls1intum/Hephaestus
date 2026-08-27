@@ -44,8 +44,8 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
     void setUp() {
         provider = new GeneralReviewCommentContentSource(objectMapper, issueCommentRepository);
         lenient()
-            .when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any()))
-            .thenReturn(List.of());
+                .when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any()))
+                .thenReturn(List.of());
     }
 
     private ObjectNode metadataWithPr() {
@@ -84,8 +84,8 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
         // Writing nothing would be misread downstream as "no review comments", a claim about the
         // work rather than the collection — so a missing pull_request_id must throw instead.
         assertThatThrownBy(() -> provider.contribute(request(metadata), new HashMap<>()))
-            .isInstanceOf(EvidenceCollectionException.class)
-            .hasRootCauseMessage("Review-comment collection has no pull_request_id");
+                .isInstanceOf(EvidenceCollectionException.class)
+                .hasRootCauseMessage("Review-comment collection has no pull_request_id");
     }
 
     /**
@@ -106,16 +106,16 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
 
     @Test
     void contribute_generalDiscussion_emittedWithAuthorAndBody() throws Exception {
-        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any())).thenReturn(
-            List.of(
-                comment(
-                    "reviewer-a",
-                    "I think this is always going to pass since confidence is always >= 0.3",
-                    Instant.parse("2025-06-01T10:00:00Z")
-                ),
-                comment("author-x", "added confidence scoring to address this", Instant.parse("2025-06-01T11:00:00Z"))
-            )
-        );
+        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any()))
+                .thenReturn(List.of(
+                        comment(
+                                "reviewer-a",
+                                "I think this is always going to pass since confidence is always >= 0.3",
+                                Instant.parse("2025-06-01T10:00:00Z")),
+                        comment(
+                                "author-x",
+                                "added confidence scoring to address this",
+                                Instant.parse("2025-06-01T11:00:00Z"))));
 
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
@@ -131,20 +131,16 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
 
     @Test
     void contribute_excludesHephaestusOwnComments() throws Exception {
-        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any())).thenReturn(
-            List.of(
-                comment(
-                    "bot",
-                    "<!-- hephaestus:practice-review:abc --> 2 issues to fix before merging",
-                    Instant.parse("2025-06-01T09:00:00Z")
-                ),
-                comment(
-                    "reviewer-b",
-                    "Nit: split persistence out so each unit is testable",
-                    Instant.parse("2025-06-01T10:00:00Z")
-                )
-            )
-        );
+        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any()))
+                .thenReturn(List.of(
+                        comment(
+                                "bot",
+                                "<!-- hephaestus:practice-review:abc --> 2 issues to fix before merging",
+                                Instant.parse("2025-06-01T09:00:00Z")),
+                        comment(
+                                "reviewer-b",
+                                "Nit: split persistence out so each unit is testable",
+                                Instant.parse("2025-06-01T10:00:00Z"))));
 
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
@@ -156,11 +152,11 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
 
     @Test
     void contribute_onlyHephaestusComments_stagesAnEmptyCommentList() {
-        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any())).thenReturn(
-            List.of(
-                comment("bot", "<!-- hephaestus:practice-review:abc --> summary", Instant.parse("2025-06-01T09:00:00Z"))
-            )
-        );
+        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any()))
+                .thenReturn(List.of(comment(
+                        "bot",
+                        "<!-- hephaestus:practice-review:abc --> summary",
+                        Instant.parse("2025-06-01T09:00:00Z"))));
 
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
@@ -172,14 +168,13 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
 
     @Test
     void contribute_reportsRepositoryFailure() {
-        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any())).thenThrow(
-            new RuntimeException("db down")
-        );
+        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any()))
+                .thenThrow(new RuntimeException("db down"));
 
         Map<String, byte[]> files = new HashMap<>();
         assertThatThrownBy(() -> provider.contribute(request(metadataWithPr()), files))
-            .isInstanceOf(EvidenceCollectionException.class)
-            .hasMessageContaining("General-review-comment collection failed");
+                .isInstanceOf(EvidenceCollectionException.class)
+                .hasMessageContaining("General-review-comment collection failed");
         assertThat(files).doesNotContainKey(FILE_KEY);
     }
 
@@ -192,7 +187,8 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
             comments.add(comment("reviewer-" + i, "comment-" + i, base.plusSeconds(i)));
         }
         java.util.Collections.reverse(comments);
-        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any())).thenReturn(comments);
+        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any()))
+                .thenReturn(comments);
 
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
@@ -210,9 +206,8 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
 
     @Test
     void contribute_underCap_flagsNotTruncated() throws Exception {
-        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any())).thenReturn(
-            List.of(comment("reviewer-a", "looks good", Instant.parse("2025-06-01T10:00:00Z")))
-        );
+        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any()))
+                .thenReturn(List.of(comment("reviewer-a", "looks good", Instant.parse("2025-06-01T10:00:00Z"))));
 
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
@@ -223,14 +218,14 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
 
     @Test
     void contribute_nullAuthor_omitsAuthorKey() throws Exception {
-        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any())).thenReturn(
-            List.of(comment(null, "anonymous note", Instant.parse("2025-06-01T10:00:00Z")))
-        );
+        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any()))
+                .thenReturn(List.of(comment(null, "anonymous note", Instant.parse("2025-06-01T10:00:00Z"))));
 
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
 
-        JsonNode first = objectMapper.readTree(files.get(FILE_KEY)).get("comments").get(0);
+        JsonNode first =
+                objectMapper.readTree(files.get(FILE_KEY)).get("comments").get(0);
         // login()==null → the author key is omitted entirely, never serialised as JSON null.
         assertThat(first.has("author")).isFalse();
         assertThat(first.get("body").asString()).isEqualTo("anonymous note");
@@ -238,26 +233,24 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
 
     @Test
     void contribute_nullCreatedAt_omitsCreatedAtKey() throws Exception {
-        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any())).thenReturn(
-            List.of(comment("reviewer-a", "no timestamp", null))
-        );
+        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any()))
+                .thenReturn(List.of(comment("reviewer-a", "no timestamp", null)));
 
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
 
-        JsonNode first = objectMapper.readTree(files.get(FILE_KEY)).get("comments").get(0);
+        JsonNode first =
+                objectMapper.readTree(files.get(FILE_KEY)).get("comments").get(0);
         assertThat(first.has("createdAt")).isFalse();
         assertThat(first.get("author").asString()).isEqualTo("reviewer-a");
     }
 
     @Test
     void contribute_blankBody_isSkipped() throws Exception {
-        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any())).thenReturn(
-            List.of(
-                comment("reviewer-a", "   ", Instant.parse("2025-06-01T09:00:00Z")),
-                comment("reviewer-b", "real feedback", Instant.parse("2025-06-01T10:00:00Z"))
-            )
-        );
+        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any()))
+                .thenReturn(List.of(
+                        comment("reviewer-a", "   ", Instant.parse("2025-06-01T09:00:00Z")),
+                        comment("reviewer-b", "real feedback", Instant.parse("2025-06-01T10:00:00Z"))));
 
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
@@ -272,15 +265,11 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
         // The hyphen-form diff-note marker is NOT matched by HEPHAESTUS_MARKER (colon form only) — correctly
         // so, since diff notes are stored as PullRequestReviewComment, which this IssueComment-only provider
         // never sees.
-        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any())).thenReturn(
-            List.of(
-                comment(
-                    "reviewer-a",
-                    "<!-- hephaestus-diff-note --> human follow-up",
-                    Instant.parse("2025-06-01T10:00:00Z")
-                )
-            )
-        );
+        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any()))
+                .thenReturn(List.of(comment(
+                        "reviewer-a",
+                        "<!-- hephaestus-diff-note --> human follow-up",
+                        Instant.parse("2025-06-01T10:00:00Z"))));
 
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);

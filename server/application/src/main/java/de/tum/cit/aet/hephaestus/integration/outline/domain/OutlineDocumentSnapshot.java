@@ -24,20 +24,19 @@ import org.jspecify.annotations.Nullable;
  *                   (never exported, size-cap evicted, or tombstoned) — see {@link #hasBody()}
  */
 public record OutlineDocumentSnapshot(
-    Long id,
-    String documentId,
-    String collectionId,
-    @Nullable String collectionSlug,
-    @Nullable String parentDocumentId,
-    @Nullable String title,
-    @Nullable String slug,
-    @Nullable Instant archivedAt,
-    @Nullable Instant outlineUpdatedAt,
-    @Nullable String contentHash,
-    @Nullable Instant deletedAt,
-    @Nullable Integer bodyLength,
-    @Nullable Long version
-) {
+        Long id,
+        String documentId,
+        String collectionId,
+        @Nullable String collectionSlug,
+        @Nullable String parentDocumentId,
+        @Nullable String title,
+        @Nullable String slug,
+        @Nullable Instant archivedAt,
+        @Nullable Instant outlineUpdatedAt,
+        @Nullable String contentHash,
+        @Nullable Instant deletedAt,
+        @Nullable Integer bodyLength,
+        @Nullable Long version) {
     /** Whether the document has been tombstoned (removed upstream). Mirrors {@link OutlineDocument#isDeleted()}. */
     public boolean isDeleted() {
         return deletedAt != null;
@@ -51,19 +50,18 @@ public record OutlineDocumentSnapshot(
     /** The snapshot of a full entity, taken right after a write so the caller's diff map stays current. */
     public static OutlineDocumentSnapshot of(OutlineDocument doc) {
         return new OutlineDocumentSnapshot(
-            doc.getId(),
-            doc.getDocumentId(),
-            doc.getCollectionId(),
-            doc.getCollectionSlug(),
-            doc.getParentDocumentId(),
-            doc.getTitle(),
-            doc.getSlug(),
-            doc.getArchivedAt(),
-            doc.getOutlineUpdatedAt(),
-            doc.getContentHash(),
-            doc.getDeletedAt(),
-            doc.getBodyMarkdown() == null ? null : doc.getBodyMarkdown().length(),
-            doc.getVersion()
-        );
+                doc.getId(),
+                doc.getDocumentId(),
+                doc.getCollectionId(),
+                doc.getCollectionSlug(),
+                doc.getParentDocumentId(),
+                doc.getTitle(),
+                doc.getSlug(),
+                doc.getArchivedAt(),
+                doc.getOutlineUpdatedAt(),
+                doc.getContentHash(),
+                doc.getDeletedAt(),
+                doc.getBodyMarkdown() == null ? null : doc.getBodyMarkdown().length(),
+                doc.getVersion());
     }
 }

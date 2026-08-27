@@ -30,15 +30,14 @@ public class PracticeGroupStandingController {
 
     @GetMapping
     @Operation(
-        operationId = "listPracticeGroupStandings",
-        summary = "List the current developer's practice group standings",
-        description = "Returns every active practice group's standing, direction, guidance, and supporting observations."
-    )
+            operationId = "listPracticeGroupStandings",
+            summary = "List the current developer's practice group standings",
+            description =
+                    "Returns every active practice group's standing, direction, guidance, and supporting observations.")
     @ApiResponse(
-        responseCode = "200",
-        description = "Practice group standings returned",
-        content = @Content(array = @ArraySchema(schema = @Schema(implementation = PracticeGroupStandingDTO.class)))
-    )
+            responseCode = "200",
+            description = "Practice group standings returned",
+            content = @Content(array = @ArraySchema(schema = @Schema(implementation = PracticeGroupStandingDTO.class))))
     public ResponseEntity<List<PracticeGroupStandingDTO>> listPracticeGroupStandings(WorkspaceContext context) {
         List<PracticeGroup> groups = practiceGroupService.listGroups(context, true);
         return ResponseEntity.ok(practiceGroupStandingService.getGroupStandings(context.id(), groups));

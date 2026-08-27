@@ -19,9 +19,8 @@ class OutboundEgressGuardTest extends BaseUnitTest {
     void shouldBlockDeliveryWhenSilentModeIsEngaged() {
         OutboundEgressGuard guard = new OutboundEgressGuard(() -> true);
 
-        assertThatThrownBy(() -> guard.requireDeliveryAllowed("test")).isInstanceOf(
-            OutboundEgressSuppressedException.class
-        );
+        assertThatThrownBy(() -> guard.requireDeliveryAllowed("test"))
+                .isInstanceOf(OutboundEgressSuppressedException.class);
     }
 
     @Test
@@ -31,7 +30,7 @@ class OutboundEgressGuardTest extends BaseUnitTest {
         });
 
         assertThatThrownBy(() -> guard.requireDeliveryAllowed("test"))
-            .isInstanceOf(OutboundEgressSuppressedException.class)
-            .hasCauseInstanceOf(IllegalStateException.class);
+                .isInstanceOf(OutboundEgressSuppressedException.class)
+                .hasCauseInstanceOf(IllegalStateException.class);
     }
 }

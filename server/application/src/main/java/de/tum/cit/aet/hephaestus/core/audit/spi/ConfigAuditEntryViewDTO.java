@@ -14,18 +14,17 @@ import org.jspecify.annotations.Nullable;
  * @param changedKeys  dot-paths that differ between {@code oldValue} and {@code newValue}
  */
 public record ConfigAuditEntryViewDTO(
-    Long id,
-    Instant occurredAt,
-    @Nullable Long workspaceId,
-    ConfigAuditEntityType entityType,
-    String entityId,
-    ConfigAuditAction action,
-    ConfigAuditActorKind actorKind,
-    @Nullable Long actorAccountId,
-    @Nullable Long actingAccountId,
-    @Nullable ConfigAuditActorRefDTO actor,
-    @Nullable ConfigAuditActorRefDTO actingActor,
-    List<String> changedKeys,
-    @Nullable String oldValue,
-    @Nullable String newValue
-) {}
+        Long id,
+        Instant occurredAt,
+        @Nullable Long workspaceId,
+        ConfigAuditEntityType entityType,
+        String entityId,
+        ConfigAuditAction action,
+        ConfigAuditActorKind actorKind,
+        @Nullable Long actorAccountId,
+        @Nullable Long actingAccountId,
+        @Nullable ConfigAuditActorRefDTO actor,
+        @Nullable ConfigAuditActorRefDTO actingActor,
+        List<String> changedKeys,
+        @Nullable String oldValue,
+        @Nullable String newValue) {}

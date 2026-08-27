@@ -14,15 +14,15 @@ import org.jspecify.annotations.Nullable;
  * it as a prefix, so there is nothing for a second statement of it to disagree with.
  */
 public record PracticeDefinition(
-    String name,
-    List<PracticeBinding> bindings,
-    String criteria,
-    @Nullable String precomputeScript,
-    PracticeAutomatedReviewPolicy automatedReviewPolicy,
-    @Nullable String whyItMatters,
-    @Nullable String whatGoodLooksLike,
-    @Nullable String groupSlug
-) implements CatalogDefinition {
+        String name,
+        List<PracticeBinding> bindings,
+        String criteria,
+        @Nullable String precomputeScript,
+        PracticeAutomatedReviewPolicy automatedReviewPolicy,
+        @Nullable String whyItMatters,
+        @Nullable String whatGoodLooksLike,
+        @Nullable String groupSlug)
+        implements CatalogDefinition {
     public static final int MAX_PRECOMPUTE_SCRIPT_LENGTH = 100_000;
 
     public PracticeDefinition {
@@ -34,7 +34,7 @@ public record PracticeDefinition(
         Objects.requireNonNull(criteria, "criteria");
         Objects.requireNonNull(automatedReviewPolicy, "automatedReviewPolicy");
         boolean automatedReviewDisabled =
-            automatedReviewPolicy.automatedReview().mode() == PracticeAutomatedReviewMode.NONE;
+                automatedReviewPolicy.automatedReview().mode() == PracticeAutomatedReviewMode.NONE;
         for (PracticeBinding binding : bindings) {
             if (automatedReviewDisabled && !binding.needs().isEmpty()) {
                 throw new IllegalArgumentException("A practice without automated review cannot declare evidence");
@@ -42,8 +42,7 @@ public record PracticeDefinition(
             // Contextual sources alone would let a review run having read nothing it must read.
             if (!automatedReviewDisabled && binding.needs().stream().noneMatch(PracticeEvidenceRequirement::refuses)) {
                 throw new IllegalArgumentException(
-                    "Automated review requires at least one required evidence source per binding"
-                );
+                        "Automated review requires at least one required evidence source per binding");
             }
         }
         precomputeScript = blankToNull(precomputeScript);
@@ -53,15 +52,14 @@ public record PracticeDefinition(
 
     public static PracticeDefinition from(Practice practice) {
         return new PracticeDefinition(
-            practice.getName(),
-            practice.getBindings(),
-            practice.getCriteria(),
-            practice.getPrecomputeScript(),
-            practice.getAutomatedReviewPolicy(),
-            practice.getWhyItMatters(),
-            practice.getWhatGoodLooksLike(),
-            practice.getGroup() == null ? null : practice.getGroup().getSlug()
-        );
+                practice.getName(),
+                practice.getBindings(),
+                practice.getCriteria(),
+                practice.getPrecomputeScript(),
+                practice.getAutomatedReviewPolicy(),
+                practice.getWhyItMatters(),
+                practice.getWhatGoodLooksLike(),
+                practice.getGroup() == null ? null : practice.getGroup().getSlug());
     }
 
     public ArtifactKind artifactKind() {
@@ -71,14 +69,7 @@ public record PracticeDefinition(
     @Override
     public String provenanceFingerprint(String slug) {
         return ReviewRuleFingerprint.of(
-            slug,
-            name,
-            bindings,
-            criteria,
-            precomputeScript,
-            automatedReviewPolicy,
-            groupSlug
-        );
+                slug, name, bindings, criteria, precomputeScript, automatedReviewPolicy, groupSlug);
     }
 
     @Override

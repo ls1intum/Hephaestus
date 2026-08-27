@@ -26,9 +26,9 @@ public class SyncJobConflictException extends RuntimeException {
 
     public SyncJobConflictException(SyncJob activeJob, @Nullable Throwable cause) {
         super(
-            "Connection " + activeJob.getConnection().getId() + " already has an active sync job: " + activeJob.getId(),
-            cause
-        );
+                "Connection " + activeJob.getConnection().getId() + " already has an active sync job: "
+                        + activeJob.getId(),
+                cause);
         this.activeJob = activeJob;
     }
 

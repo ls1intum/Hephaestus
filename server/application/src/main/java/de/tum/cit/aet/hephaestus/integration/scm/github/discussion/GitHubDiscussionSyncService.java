@@ -92,11 +92,7 @@ public class GitHubDiscussionSyncService {
      * after the original transaction has ended.
      */
     private record DiscussionWithCommentCursor(
-        Long discussionId,
-        int discussionNumber,
-        Long repositoryId,
-        String commentCursor
-    ) {}
+            Long discussionId, int discussionNumber, Long repositoryId, String commentCursor) {}
 
     /**
      * Container for discussion comments that need additional reply pagination.
@@ -106,13 +102,12 @@ public class GitHubDiscussionSyncService {
      * {@link #syncRemainingReplies}.
      */
     private record CommentWithReplyCursor(
-        String commentNodeId,
-        @Nullable Long commentDatabaseId,
-        Long discussionId,
-        int discussionNumber,
-        Long repositoryId,
-        String replyCursor
-    ) {}
+            String commentNodeId,
+            @Nullable Long commentDatabaseId,
+            Long discussionId,
+            int discussionNumber,
+            Long repositoryId,
+            String replyCursor) {}
 
     private final RepositoryRepository repositoryRepository;
     private final DiscussionRepository discussionRepository;
@@ -156,11 +151,7 @@ public class GitHubDiscussionSyncService {
      * @return sync result containing status and count of discussions synced
      */
     public SyncResult syncForRepository(
-        Long scopeId,
-        Long repositoryId,
-        @Nullable Long syncTargetId,
-        @Nullable String initialCursor
-    ) {
+            Long scopeId, Long repositoryId, @Nullable Long syncTargetId, @Nullable String initialCursor) {
         return syncForRepository(scopeId, repositoryId, syncTargetId, initialCursor, null);
     }
 
@@ -191,18 +182,15 @@ public class GitHubDiscussionSyncService {
      * @return sync result containing status and count of discussions synced
      */
     public SyncResult syncForRepository(
-        Long scopeId,
-        Long repositoryId,
-        @Nullable Long syncTargetId,
-        @Nullable String initialCursor,
-        @Nullable Instant lastSyncTimestamp
-    ) {
+            Long scopeId,
+            Long repositoryId,
+            @Nullable Long syncTargetId,
+            @Nullable String initialCursor,
+            @Nullable Instant lastSyncTimestamp) {
         // Fetch repository outside of transaction
-        Optional<Repository> repositoryResult = transactionTemplate.execute(status ->
-            repositoryRepository.findById(repositoryId)
-        );
-        @Nullable
-        Repository repository = repositoryResult == null ? null : repositoryResult.orElse(null);
+        Optional<Repository> repositoryResult =
+                transactionTemplate.execute(status -> repositoryRepository.findById(repositoryId));
+        @Nullable Repository repository = repositoryResult == null ? null : repositoryResult.orElse(null);
         if (repository == null) {
             log.debug("Skipped discussion sync: reason=repositoryNotFound, repoId={}", repositoryId);
             return SyncResult.completed(0);
@@ -231,11 +219,10 @@ public class GitHubDiscussionSyncService {
             effectiveSyncTimestamp = lastSyncTimestamp.minus(syncProperties.incrementalSyncBuffer());
             isIncrementalSync = true;
             log.info(
-                "Starting incremental discussion sync: repoName={}, since={}, buffer={}",
-                safeNameWithOwner,
-                effectiveSyncTimestamp,
-                syncProperties.incrementalSyncBuffer()
-            );
+                    "Starting incremental discussion sync: repoName={}, since={}, buffer={}",
+                    safeNameWithOwner,
+                    effectiveSyncTimestamp,
+                    syncProperties.incrementalSyncBuffer());
         } else {
             log.info("Starting full discussion sync (no timeframe filter): repoName={}", safeNameWithOwner);
         }
@@ -257,73 +244,59 @@ public class GitHubDiscussionSyncService {
 
         if (initialCursor != null) {
             log.info(
-                "Resuming discussion sync from checkpoint: repoName={}, cursor={}",
-                safeNameWithOwner,
-                initialCursor.substring(0, Math.min(20, initialCursor.length())) + "..."
-            );
+                    "Resuming discussion sync from checkpoint: repoName={}, cursor={}",
+                    safeNameWithOwner,
+                    initialCursor.substring(0, Math.min(20, initialCursor.length())) + "...");
         }
 
         while (hasMore) {
             pageCount++;
             if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
-                    "Reached maximum pagination limit for discussion sync: repoName={}, limit={}",
-                    safeNameWithOwner,
-                    MAX_PAGINATION_PAGES
-                );
+                        "Reached maximum pagination limit for discussion sync: repoName={}, limit={}",
+                        safeNameWithOwner,
+                        MAX_PAGINATION_PAGES);
                 break;
             }
 
             try {
                 final String currentCursor = cursor;
                 final int currentPage = pageCount;
-                ClientGraphQlResponse response = Mono.defer(() ->
-                    client
-                        .documentName(QUERY_DOCUMENT)
-                        .variable("owner", ownerAndName.owner())
-                        .variable("name", ownerAndName.name())
-                        .variable(
-                            "first",
-                            adaptPageSize(
-                                DISCUSSION_SYNC_PAGE_SIZE,
-                                graphQlClientProvider.getRateLimitRemaining(scopeId)
-                            )
-                        )
-                        .variable("after", currentCursor)
-                        .execute()
-                )
-                    .retryWhen(
-                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                            .jitter(JITTER_FACTOR)
-                            .filter(ScmTransportErrors::isTransportError)
-                            .doBeforeRetry(signal ->
-                                log.warn(
-                                    "Retrying discussion sync after transport error: repoName={}, page={}, attempt={}, error={}",
-                                    safeNameWithOwner,
-                                    currentPage,
-                                    signal.totalRetries() + 1,
-                                    signal.failure().getMessage()
-                                )
-                            )
-                            .onRetryExhaustedThrow((spec, signal) -> signal.failure())
-                    )
-                    .block(timeout);
+                ClientGraphQlResponse response = Mono.defer(() -> client.documentName(QUERY_DOCUMENT)
+                                .variable("owner", ownerAndName.owner())
+                                .variable("name", ownerAndName.name())
+                                .variable(
+                                        "first",
+                                        adaptPageSize(
+                                                DISCUSSION_SYNC_PAGE_SIZE,
+                                                graphQlClientProvider.getRateLimitRemaining(scopeId)))
+                                .variable("after", currentCursor)
+                                .execute())
+                        .retryWhen(Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                                .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                                .jitter(JITTER_FACTOR)
+                                .filter(ScmTransportErrors::isTransportError)
+                                .doBeforeRetry(signal -> log.warn(
+                                        "Retrying discussion sync after transport error: repoName={}, page={}, attempt={}, error={}",
+                                        safeNameWithOwner,
+                                        currentPage,
+                                        signal.totalRetries() + 1,
+                                        signal.failure().getMessage()))
+                                .onRetryExhaustedThrow((spec, signal) -> signal.failure()))
+                        .block(timeout);
 
                 if (response == null || !response.isValid()) {
                     var classification = graphQlSyncHelper.classifyGraphQlErrors(response);
                     if (classification != null) {
-                        boolean shouldRetry = graphQlSyncHelper.handleGraphQlClassification(
-                            new GraphQlClassificationContext(
-                                classification,
-                                retryAttempt,
-                                MAX_RETRY_ATTEMPTS,
-                                "discussion sync",
-                                "repoName",
-                                safeNameWithOwner,
-                                log
-                            )
-                        );
+                        boolean shouldRetry =
+                                graphQlSyncHelper.handleGraphQlClassification(new GraphQlClassificationContext(
+                                        classification,
+                                        retryAttempt,
+                                        MAX_RETRY_ATTEMPTS,
+                                        "discussion sync",
+                                        "repoName",
+                                        safeNameWithOwner,
+                                        log));
                         if (shouldRetry) {
                             retryAttempt++;
                             continue;
@@ -337,23 +310,19 @@ public class GitHubDiscussionSyncService {
                 graphQlClientProvider.trackRateLimit(scopeId, response);
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
                     boolean canContinue = graphQlSyncHelper.waitForRateLimitIfNeeded(
-                        scopeId,
-                        "discussion sync",
-                        "repoName",
-                        safeNameWithOwner,
-                        log
-                    );
+                            scopeId, "discussion sync", "repoName", safeNameWithOwner, log);
                     if (!canContinue) {
                         abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
                         break;
                     }
                 }
 
-                GHDiscussionConnection connection = response
-                    .field("repository.discussions")
-                    .toEntity(GHDiscussionConnection.class);
+                GHDiscussionConnection connection =
+                        response.field("repository.discussions").toEntity(GHDiscussionConnection.class);
 
-                if (connection == null || connection.getNodes() == null || connection.getNodes().isEmpty()) {
+                if (connection == null
+                        || connection.getNodes() == null
+                        || connection.getNodes().isEmpty()) {
                     break;
                 }
 
@@ -374,11 +343,7 @@ public class GitHubDiscussionSyncService {
                     }
                     ProcessingContext context = ProcessingContext.forSync(scopeId, repo);
                     return processDiscussionPage(
-                        connection,
-                        context,
-                        pageDiscussionsNeedingPagination,
-                        pageCommentsNeedingReplyPagination
-                    );
+                            connection, context, pageDiscussionsNeedingPagination, pageCommentsNeedingReplyPagination);
                 });
 
                 if (pageResult != null) {
@@ -400,12 +365,12 @@ public class GitHubDiscussionSyncService {
                     if (!nodes.isEmpty()) {
                         var oldestDiscussion = nodes.get(nodes.size() - 1);
                         OffsetDateTime oldestUpdatedAt = oldestDiscussion.getUpdatedAt();
-                        if (oldestUpdatedAt != null && oldestUpdatedAt.toInstant().isBefore(effectiveSyncTimestamp)) {
+                        if (oldestUpdatedAt != null
+                                && oldestUpdatedAt.toInstant().isBefore(effectiveSyncTimestamp)) {
                             log.debug(
-                                "Stopping incremental discussion sync: oldestUpdatedAt={} is before effectiveSyncTimestamp={}",
-                                oldestUpdatedAt,
-                                effectiveSyncTimestamp
-                            );
+                                    "Stopping incremental discussion sync: oldestUpdatedAt={} is before effectiveSyncTimestamp={}",
+                                    oldestUpdatedAt,
+                                    effectiveSyncTimestamp);
                             hasMore = false;
                             stoppedByIncrementalSync = true;
                         }
@@ -444,11 +409,10 @@ public class GitHubDiscussionSyncService {
                         if (retryAttempt < MAX_RETRY_ATTEMPTS) {
                             retryAttempt++;
                             log.warn(
-                                "Retrying discussion sync after transient error: repoName={}, attempt={}, error={}",
-                                safeNameWithOwner,
-                                retryAttempt,
-                                classification.message()
-                            );
+                                    "Retrying discussion sync after transient error: repoName={}, attempt={}, error={}",
+                                    safeNameWithOwner,
+                                    retryAttempt,
+                                    classification.message());
                             try {
                                 ExponentialBackoff.sleep(retryAttempt);
                             } catch (InterruptedException ie) {
@@ -460,11 +424,10 @@ public class GitHubDiscussionSyncService {
                             continue; // Retry the same page
                         }
                         log.error(
-                            "Failed to sync discussions after {} retries: repoName={}, error={}",
-                            MAX_RETRY_ATTEMPTS,
-                            safeNameWithOwner,
-                            classification.message()
-                        );
+                                "Failed to sync discussions after {} retries: repoName={}, error={}",
+                                MAX_RETRY_ATTEMPTS,
+                                safeNameWithOwner,
+                                classification.message());
                         abortReason = SyncResult.Status.ABORTED_ERROR;
                     }
                     case RATE_LIMITED -> {
@@ -472,66 +435,58 @@ public class GitHubDiscussionSyncService {
                         if (retryAttempt < MAX_RETRY_ATTEMPTS && classification.suggestedWait() != null) {
                             retryAttempt++;
                             long waitMs = Math.min(
-                                classification.suggestedWait().toMillis(),
-                                300_000 // Cap at 5 minutes
-                            );
+                                    classification.suggestedWait().toMillis(), 300_000 // Cap at 5 minutes
+                                    );
                             log.warn(
-                                "Rate limited during discussion sync, waiting: repoName={}, waitMs={}, attempt={}",
-                                safeNameWithOwner,
-                                waitMs,
-                                retryAttempt
-                            );
+                                    "Rate limited during discussion sync, waiting: repoName={}, waitMs={}, attempt={}",
+                                    safeNameWithOwner,
+                                    waitMs,
+                                    retryAttempt);
                             try {
                                 Thread.sleep(waitMs);
                             } catch (InterruptedException ie) {
                                 Thread.currentThread().interrupt();
                                 log.warn(
-                                    "Discussion sync interrupted during rate limit wait: repoName={}",
-                                    safeNameWithOwner
-                                );
+                                        "Discussion sync interrupted during rate limit wait: repoName={}",
+                                        safeNameWithOwner);
                                 abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
                                 break;
                             }
                             continue; // Retry the same page
                         }
                         log.error(
-                            "Aborting discussion sync due to rate limiting: repoName={}, error={}",
-                            safeNameWithOwner,
-                            classification.message()
-                        );
+                                "Aborting discussion sync due to rate limiting: repoName={}, error={}",
+                                safeNameWithOwner,
+                                classification.message());
                         abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
                     }
                     case NOT_FOUND -> {
                         log.warn(
-                            "Resource not found during discussion sync, skipping: repoName={}, error={}",
-                            safeNameWithOwner,
-                            classification.message()
-                        );
+                                "Resource not found during discussion sync, skipping: repoName={}, error={}",
+                                safeNameWithOwner,
+                                classification.message());
                         abortReason = SyncResult.Status.ABORTED_ERROR;
                     }
                     case AUTH_ERROR -> {
                         log.error(
-                            "Aborting discussion sync due to auth error: repoName={}, error={}",
-                            safeNameWithOwner,
-                            classification.message()
-                        );
+                                "Aborting discussion sync due to auth error: repoName={}, error={}",
+                                safeNameWithOwner,
+                                classification.message());
                         abortReason = SyncResult.Status.ABORTED_ERROR;
                     }
                     case CLIENT_ERROR -> {
                         log.error(
-                            "Aborting discussion sync due to client error: repoName={}, error={}",
-                            safeNameWithOwner,
-                            classification.message()
-                        );
+                                "Aborting discussion sync due to client error: repoName={}, error={}",
+                                safeNameWithOwner,
+                                classification.message());
                         abortReason = SyncResult.Status.ABORTED_ERROR;
                     }
                     case UNKNOWN -> {
                         log.error(
-                            "Aborting discussion sync due to unknown error: repoName={}, error={}",
-                            safeNameWithOwner,
-                            classification.message(),
-                            e
-                        );
+                                "Aborting discussion sync due to unknown error: repoName={}, error={}",
+                                safeNameWithOwner,
+                                classification.message(),
+                                e);
                         abortReason = SyncResult.Status.ABORTED_ERROR;
                     }
                 }
@@ -542,33 +497,30 @@ public class GitHubDiscussionSyncService {
         // Full-sync only; compare raw nodes received (not the post-process count) against totalCount.
         if (reportedTotalCount >= 0 && !incrementalSync) {
             GraphQlConnectionOverflowDetector.checkPaginated(
-                "discussions",
-                discussionsReceived,
-                reportedTotalCount,
-                abortReason != null || hasMore,
-                safeNameWithOwner
-            );
+                    "discussions",
+                    discussionsReceived,
+                    reportedTotalCount,
+                    abortReason != null || hasMore,
+                    safeNameWithOwner);
         }
 
         // Fetch remaining comments for discussions with >10 comments
         if (!discussionsNeedingCommentPagination.isEmpty()) {
             log.debug(
-                "Starting additional comment fetch for discussions with pagination: repoName={}, discussionCount={}",
-                safeNameWithOwner,
-                discussionsNeedingCommentPagination.size()
-            );
+                    "Starting additional comment fetch for discussions with pagination: repoName={}, discussionCount={}",
+                    safeNameWithOwner,
+                    discussionsNeedingCommentPagination.size());
             for (DiscussionWithCommentCursor discussionWithCursor : discussionsNeedingCommentPagination) {
                 int additionalComments = syncRemainingComments(
-                    scopeId,
-                    discussionWithCursor.discussionId(),
-                    discussionWithCursor.discussionNumber(),
-                    discussionWithCursor.repositoryId(),
-                    discussionWithCursor.commentCursor(),
-                    ownerAndName,
-                    client,
-                    timeout,
-                    commentsNeedingReplyPagination
-                );
+                        scopeId,
+                        discussionWithCursor.discussionId(),
+                        discussionWithCursor.discussionNumber(),
+                        discussionWithCursor.repositoryId(),
+                        discussionWithCursor.commentCursor(),
+                        ownerAndName,
+                        client,
+                        timeout,
+                        commentsNeedingReplyPagination);
                 totalCommentsSynced += additionalComments;
             }
 
@@ -582,22 +534,20 @@ public class GitHubDiscussionSyncService {
         // Fetch remaining replies for comments with >100 replies
         if (!commentsNeedingReplyPagination.isEmpty()) {
             log.debug(
-                "Starting additional reply fetch for comments with pagination: repoName={}, commentCount={}",
-                safeNameWithOwner,
-                commentsNeedingReplyPagination.size()
-            );
+                    "Starting additional reply fetch for comments with pagination: repoName={}, commentCount={}",
+                    safeNameWithOwner,
+                    commentsNeedingReplyPagination.size());
             for (CommentWithReplyCursor commentWithCursor : commentsNeedingReplyPagination) {
                 int additionalReplies = syncRemainingReplies(
-                    scopeId,
-                    commentWithCursor.commentNodeId(),
-                    commentWithCursor.commentDatabaseId(),
-                    commentWithCursor.discussionId(),
-                    commentWithCursor.discussionNumber(),
-                    commentWithCursor.repositoryId(),
-                    commentWithCursor.replyCursor(),
-                    client,
-                    timeout
-                );
+                        scopeId,
+                        commentWithCursor.commentNodeId(),
+                        commentWithCursor.commentDatabaseId(),
+                        commentWithCursor.discussionId(),
+                        commentWithCursor.discussionNumber(),
+                        commentWithCursor.repositoryId(),
+                        commentWithCursor.replyCursor(),
+                        client,
+                        timeout);
                 totalCommentsSynced += additionalReplies;
             }
         }
@@ -610,16 +560,15 @@ public class GitHubDiscussionSyncService {
 
         SyncResult.Status finalStatus = abortReason != null ? abortReason : SyncResult.Status.COMPLETED;
         log.info(
-            "Completed discussion sync: repoName={}, discussionCount={}, commentCount={}, discussionsWithPagination={}, commentsWithReplyPagination={}, resumed={}, stoppedByIncrementalSync={}, status={}",
-            safeNameWithOwner,
-            totalDiscussionsSynced,
-            totalCommentsSynced,
-            discussionsNeedingCommentPagination.size(),
-            commentsNeedingReplyPagination.size(),
-            resuming,
-            stoppedByIncrementalSync,
-            finalStatus
-        );
+                "Completed discussion sync: repoName={}, discussionCount={}, commentCount={}, discussionsWithPagination={}, commentsWithReplyPagination={}, resumed={}, stoppedByIncrementalSync={}, status={}",
+                safeNameWithOwner,
+                totalDiscussionsSynced,
+                totalCommentsSynced,
+                discussionsNeedingCommentPagination.size(),
+                commentsNeedingReplyPagination.size(),
+                resuming,
+                stoppedByIncrementalSync,
+                finalStatus);
         return new SyncResult(finalStatus, totalDiscussionsSynced);
     }
 
@@ -639,11 +588,10 @@ public class GitHubDiscussionSyncService {
      * @param commentsNeedingReplyPagination  list to populate with comments needing reply pagination
      */
     private PageResult processDiscussionPage(
-        GHDiscussionConnection connection,
-        ProcessingContext context,
-        List<DiscussionWithCommentCursor> discussionsNeedingPagination,
-        List<CommentWithReplyCursor> commentsNeedingReplyPagination
-    ) {
+            GHDiscussionConnection connection,
+            ProcessingContext context,
+            List<DiscussionWithCommentCursor> discussionsNeedingPagination,
+            List<CommentWithReplyCursor> commentsNeedingReplyPagination) {
         int discussionsSynced = 0;
         int commentsSynced = 0;
 
@@ -666,7 +614,7 @@ public class GitHubDiscussionSyncService {
             GHDiscussionCommentConnection commentConn = graphQlDiscussion.getComments();
             if (commentConn != null && commentConn.getNodes() != null) {
                 List<GitHubDiscussionCommentDTO> commentDTOs =
-                    GitHubDiscussionCommentDTO.fromDiscussionCommentConnection(commentConn);
+                        GitHubDiscussionCommentDTO.fromDiscussionCommentConnection(commentConn);
 
                 for (GitHubDiscussionCommentDTO commentDTO : commentDTOs) {
                     DiscussionComment comment = commentProcessor.process(commentDTO, discussion, context);
@@ -688,12 +636,11 @@ public class GitHubDiscussionSyncService {
                             commentProcessor.resolveParentComment(comment, parent);
                         } else if (comment != null && parent == null) {
                             log.warn(
-                                "Cross-page reply threading miss: could not resolve parent comment." +
-                                    " commentNodeId={}, replyToNodeId={}, discussionNumber={}",
-                                commentDTO.nodeId(),
-                                commentDTO.replyToNodeId(),
-                                graphQlDiscussion.getNumber()
-                            );
+                                    "Cross-page reply threading miss: could not resolve parent comment."
+                                            + " commentNodeId={}, replyToNodeId={}, discussionNumber={}",
+                                    commentDTO.nodeId(),
+                                    commentDTO.replyToNodeId(),
+                                    graphQlDiscussion.getNumber());
                         }
                     }
                 }
@@ -705,27 +652,27 @@ public class GitHubDiscussionSyncService {
                         if (repliesPageInfo != null && Boolean.TRUE.equals(repliesPageInfo.getHasNextPage())) {
                             // No overflow warning: truncated replies are enqueued for follow-up pagination below.
                             if (node.getId() != null && repliesPageInfo.getEndCursor() != null) {
-                                commentsNeedingReplyPagination.add(
-                                    new CommentWithReplyCursor(
+                                commentsNeedingReplyPagination.add(new CommentWithReplyCursor(
                                         node.getId(),
-                                        node.getDatabaseId() != null ? node.getDatabaseId().longValue() : null,
+                                        node.getDatabaseId() != null
+                                                ? node.getDatabaseId().longValue()
+                                                : null,
                                         discussion.getId(),
                                         discussion.getNumber(),
                                         Objects.requireNonNull(
-                                            context.repository(),
-                                            "Discussion sync requires a repository"
-                                        ).getId(),
-                                        repliesPageInfo.getEndCursor()
-                                    )
-                                );
+                                                        context.repository(), "Discussion sync requires a repository")
+                                                .getId(),
+                                        repliesPageInfo.getEndCursor()));
                             }
                         }
                     }
                 }
 
                 // Update answer comment if this discussion has one
-                if (discussionDTO.answerComment() != null && discussionDTO.answerComment().nodeId() != null) {
-                    DiscussionComment answerComment = nodeIdToComment.get(discussionDTO.answerComment().nodeId());
+                if (discussionDTO.answerComment() != null
+                        && discussionDTO.answerComment().nodeId() != null) {
+                    DiscussionComment answerComment =
+                            nodeIdToComment.get(discussionDTO.answerComment().nodeId());
                     if (answerComment != null) {
                         discussion.setAnswerComment(answerComment);
                         discussionRepository.save(discussion);
@@ -736,17 +683,12 @@ public class GitHubDiscussionSyncService {
                 // Store primitive IDs to avoid LazyInitializationException after transaction ends
                 GHPageInfo commentPageInfo = commentConn.getPageInfo();
                 if (commentPageInfo != null && commentPageInfo.getHasNextPage()) {
-                    discussionsNeedingPagination.add(
-                        new DiscussionWithCommentCursor(
+                    discussionsNeedingPagination.add(new DiscussionWithCommentCursor(
                             discussion.getId(),
                             discussion.getNumber(),
-                            Objects.requireNonNull(
-                                context.repository(),
-                                "Discussion sync requires a repository"
-                            ).getId(),
-                            commentPageInfo.getEndCursor()
-                        )
-                    );
+                            Objects.requireNonNull(context.repository(), "Discussion sync requires a repository")
+                                    .getId(),
+                            commentPageInfo.getEndCursor()));
                 }
             }
         }
@@ -777,26 +719,24 @@ public class GitHubDiscussionSyncService {
      * @return number of additional comments synced
      */
     private int syncRemainingComments(
-        Long scopeId,
-        Long discussionId,
-        int discussionNumber,
-        Long repositoryId,
-        String startCursor,
-        RepositoryOwnerAndName ownerAndName,
-        HttpGraphQlClient client,
-        Duration timeout,
-        List<CommentWithReplyCursor> commentsNeedingReplyPagination
-    ) {
+            Long scopeId,
+            Long discussionId,
+            int discussionNumber,
+            Long repositoryId,
+            String startCursor,
+            RepositoryOwnerAndName ownerAndName,
+            HttpGraphQlClient client,
+            Duration timeout,
+            List<CommentWithReplyCursor> commentsNeedingReplyPagination) {
         int totalSynced = 0;
         String cursor = startCursor;
         boolean hasMore = true;
         int pageCount = 0;
 
         log.debug(
-            "Starting remaining comment sync: discussionNumber={}, startCursor={}",
-            discussionNumber,
-            startCursor != null ? startCursor.substring(0, Math.min(20, startCursor.length())) + "..." : "null"
-        );
+                "Starting remaining comment sync: discussionNumber={}, startCursor={}",
+                discussionNumber,
+                startCursor != null ? startCursor.substring(0, Math.min(20, startCursor.length())) + "..." : "null");
 
         // Map to track node ID -> processed comment for reply threading within this pagination
         Map<String, DiscussionComment> nodeIdToComment = new HashMap<>();
@@ -805,30 +745,27 @@ public class GitHubDiscussionSyncService {
             pageCount++;
             if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
-                    "Reached maximum pagination limit for remaining comment sync: discussionNumber={}, limit={}",
-                    discussionNumber,
-                    MAX_PAGINATION_PAGES
-                );
+                        "Reached maximum pagination limit for remaining comment sync: discussionNumber={}, limit={}",
+                        discussionNumber,
+                        MAX_PAGINATION_PAGES);
                 break;
             }
 
             try {
-                ClientGraphQlResponse response = client
-                    .documentName(COMMENTS_QUERY_DOCUMENT)
-                    .variable("owner", ownerAndName.owner())
-                    .variable("name", ownerAndName.name())
-                    .variable("discussionNumber", discussionNumber)
-                    .variable("first", DEFAULT_PAGE_SIZE)
-                    .variable("after", cursor)
-                    .execute()
-                    .block(timeout);
+                ClientGraphQlResponse response = client.documentName(COMMENTS_QUERY_DOCUMENT)
+                        .variable("owner", ownerAndName.owner())
+                        .variable("name", ownerAndName.name())
+                        .variable("discussionNumber", discussionNumber)
+                        .variable("first", DEFAULT_PAGE_SIZE)
+                        .variable("after", cursor)
+                        .execute()
+                        .block(timeout);
 
                 if (response == null || !response.isValid()) {
                     log.warn(
-                        "Invalid GraphQL response for remaining comment sync: discussionNumber={}, errors={}",
-                        discussionNumber,
-                        response != null ? response.getErrors() : "null"
-                    );
+                            "Invalid GraphQL response for remaining comment sync: discussionNumber={}, errors={}",
+                            discussionNumber,
+                            response != null ? response.getErrors() : "null");
                     break;
                 }
 
@@ -836,17 +773,17 @@ public class GitHubDiscussionSyncService {
                 graphQlClientProvider.trackRateLimit(scopeId, response);
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
                     log.warn(
-                        "Aborting remaining comment sync due to critical rate limit: discussionNumber={}",
-                        discussionNumber
-                    );
+                            "Aborting remaining comment sync due to critical rate limit: discussionNumber={}",
+                            discussionNumber);
                     break;
                 }
 
-                GHDiscussionCommentConnection connection = response
-                    .field("repository.discussion.comments")
-                    .toEntity(GHDiscussionCommentConnection.class);
+                GHDiscussionCommentConnection connection =
+                        response.field("repository.discussion.comments").toEntity(GHDiscussionCommentConnection.class);
 
-                if (connection == null || connection.getNodes() == null || connection.getNodes().isEmpty()) {
+                if (connection == null
+                        || connection.getNodes() == null
+                        || connection.getNodes().isEmpty()) {
                     break;
                 }
 
@@ -855,11 +792,13 @@ public class GitHubDiscussionSyncService {
                 final Long finalDiscussionId = discussionId;
                 final Long finalRepositoryId = repositoryId;
                 Integer pageSynced = transactionTemplate.execute(status -> {
-                    Repository repo = repositoryRepository.findById(finalRepositoryId).orElse(null);
+                    Repository repo =
+                            repositoryRepository.findById(finalRepositoryId).orElse(null);
                     if (repo == null) {
                         return 0;
                     }
-                    Discussion discussion = discussionRepository.findById(finalDiscussionId).orElse(null);
+                    Discussion discussion =
+                            discussionRepository.findById(finalDiscussionId).orElse(null);
                     if (discussion == null) {
                         return 0;
                     }
@@ -867,7 +806,7 @@ public class GitHubDiscussionSyncService {
 
                     int synced = 0;
                     List<GitHubDiscussionCommentDTO> commentDTOs =
-                        GitHubDiscussionCommentDTO.fromDiscussionCommentConnection(connection);
+                            GitHubDiscussionCommentDTO.fromDiscussionCommentConnection(connection);
 
                     for (GitHubDiscussionCommentDTO commentDTO : commentDTOs) {
                         DiscussionComment comment = commentProcessor.process(commentDTO, discussion, context);
@@ -890,12 +829,11 @@ public class GitHubDiscussionSyncService {
                                 commentProcessor.resolveParentComment(comment, parent);
                             } else if (comment != null && parent == null) {
                                 log.warn(
-                                    "Cross-page reply threading miss: could not resolve parent comment." +
-                                        " commentNodeId={}, replyToNodeId={}, discussionNumber={}",
-                                    commentDTO.nodeId(),
-                                    commentDTO.replyToNodeId(),
-                                    discussionNumber
-                                );
+                                        "Cross-page reply threading miss: could not resolve parent comment."
+                                                + " commentNodeId={}, replyToNodeId={}, discussionNumber={}",
+                                        commentDTO.nodeId(),
+                                        commentDTO.replyToNodeId(),
+                                        discussionNumber);
                             }
                         }
                     }
@@ -915,16 +853,15 @@ public class GitHubDiscussionSyncService {
                             if (repliesPageInfo != null && Boolean.TRUE.equals(repliesPageInfo.getHasNextPage())) {
                                 // No overflow warning: truncated replies are enqueued for follow-up pagination below.
                                 if (node.getId() != null && repliesPageInfo.getEndCursor() != null) {
-                                    commentsNeedingReplyPagination.add(
-                                        new CommentWithReplyCursor(
+                                    commentsNeedingReplyPagination.add(new CommentWithReplyCursor(
                                             node.getId(),
-                                            node.getDatabaseId() != null ? node.getDatabaseId().longValue() : null,
+                                            node.getDatabaseId() != null
+                                                    ? node.getDatabaseId().longValue()
+                                                    : null,
                                             discussionId,
                                             discussionNumber,
                                             repositoryId,
-                                            repliesPageInfo.getEndCursor()
-                                        )
-                                    );
+                                            repliesPageInfo.getEndCursor()));
                                 }
                             }
                         }
@@ -942,9 +879,8 @@ public class GitHubDiscussionSyncService {
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
                         log.debug(
-                            "Remaining comment sync interrupted during throttle: discussionNumber={}",
-                            discussionNumber
-                        );
+                                "Remaining comment sync interrupted during throttle: discussionNumber={}",
+                                discussionNumber);
                         break;
                     }
                 }
@@ -954,20 +890,18 @@ public class GitHubDiscussionSyncService {
             } catch (Exception e) {
                 ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
                 log.error(
-                    "Failed to sync remaining comments: discussionNumber={}, error={}",
-                    discussionNumber,
-                    classification.message(),
-                    e
-                );
+                        "Failed to sync remaining comments: discussionNumber={}, error={}",
+                        discussionNumber,
+                        classification.message(),
+                        e);
                 break;
             }
         }
 
         log.debug(
-            "Completed remaining comment sync: discussionNumber={}, additionalComments={}",
-            discussionNumber,
-            totalSynced
-        );
+                "Completed remaining comment sync: discussionNumber={}, additionalComments={}",
+                discussionNumber,
+                totalSynced);
         return totalSynced;
     }
 
@@ -994,56 +928,51 @@ public class GitHubDiscussionSyncService {
      * @return number of additional replies synced
      */
     private int syncRemainingReplies(
-        Long scopeId,
-        String commentNodeId,
-        @Nullable Long commentDatabaseId,
-        Long discussionId,
-        int discussionNumber,
-        Long repositoryId,
-        String startCursor,
-        HttpGraphQlClient client,
-        Duration timeout
-    ) {
+            Long scopeId,
+            String commentNodeId,
+            @Nullable Long commentDatabaseId,
+            Long discussionId,
+            int discussionNumber,
+            Long repositoryId,
+            String startCursor,
+            HttpGraphQlClient client,
+            Duration timeout) {
         int totalSynced = 0;
         String cursor = startCursor;
         boolean hasMore = true;
         int pageCount = 0;
 
         log.debug(
-            "Starting remaining reply sync: discussionNumber={}, commentNodeId={}, startCursor={}",
-            discussionNumber,
-            commentNodeId,
-            startCursor != null ? startCursor.substring(0, Math.min(20, startCursor.length())) + "..." : "null"
-        );
+                "Starting remaining reply sync: discussionNumber={}, commentNodeId={}, startCursor={}",
+                discussionNumber,
+                commentNodeId,
+                startCursor != null ? startCursor.substring(0, Math.min(20, startCursor.length())) + "..." : "null");
 
         while (hasMore) {
             pageCount++;
             if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
-                    "Reached maximum pagination limit for remaining reply sync: discussionNumber={}, commentNodeId={}, limit={}",
-                    discussionNumber,
-                    commentNodeId,
-                    MAX_PAGINATION_PAGES
-                );
+                        "Reached maximum pagination limit for remaining reply sync: discussionNumber={}, commentNodeId={}, limit={}",
+                        discussionNumber,
+                        commentNodeId,
+                        MAX_PAGINATION_PAGES);
                 break;
             }
 
             try {
-                ClientGraphQlResponse response = client
-                    .documentName(COMMENT_REPLIES_QUERY_DOCUMENT)
-                    .variable("commentId", commentNodeId)
-                    .variable("first", DEFAULT_PAGE_SIZE)
-                    .variable("after", cursor)
-                    .execute()
-                    .block(timeout);
+                ClientGraphQlResponse response = client.documentName(COMMENT_REPLIES_QUERY_DOCUMENT)
+                        .variable("commentId", commentNodeId)
+                        .variable("first", DEFAULT_PAGE_SIZE)
+                        .variable("after", cursor)
+                        .execute()
+                        .block(timeout);
 
                 if (response == null || !response.isValid()) {
                     log.warn(
-                        "Invalid GraphQL response for remaining reply sync: discussionNumber={}, commentNodeId={}, errors={}",
-                        discussionNumber,
-                        commentNodeId,
-                        response != null ? response.getErrors() : "null"
-                    );
+                            "Invalid GraphQL response for remaining reply sync: discussionNumber={}, commentNodeId={}, errors={}",
+                            discussionNumber,
+                            commentNodeId,
+                            response != null ? response.getErrors() : "null");
                     break;
                 }
 
@@ -1051,18 +980,18 @@ public class GitHubDiscussionSyncService {
                 graphQlClientProvider.trackRateLimit(scopeId, response);
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
                     log.warn(
-                        "Aborting remaining reply sync due to critical rate limit: discussionNumber={}, commentNodeId={}",
-                        discussionNumber,
-                        commentNodeId
-                    );
+                            "Aborting remaining reply sync due to critical rate limit: discussionNumber={}, commentNodeId={}",
+                            discussionNumber,
+                            commentNodeId);
                     break;
                 }
 
-                GHDiscussionCommentConnection connection = response
-                    .field("node.replies")
-                    .toEntity(GHDiscussionCommentConnection.class);
+                GHDiscussionCommentConnection connection =
+                        response.field("node.replies").toEntity(GHDiscussionCommentConnection.class);
 
-                if (connection == null || connection.getNodes() == null || connection.getNodes().isEmpty()) {
+                if (connection == null
+                        || connection.getNodes() == null
+                        || connection.getNodes().isEmpty()) {
                     break;
                 }
 
@@ -1072,17 +1001,20 @@ public class GitHubDiscussionSyncService {
                 final String parentNodeId = commentNodeId;
                 final Long parentDbId = commentDatabaseId;
                 Integer pageSynced = transactionTemplate.execute(status -> {
-                    Repository repo = repositoryRepository.findById(finalRepositoryId).orElse(null);
+                    Repository repo =
+                            repositoryRepository.findById(finalRepositoryId).orElse(null);
                     if (repo == null) {
                         return 0;
                     }
-                    Discussion discussion = discussionRepository.findById(finalDiscussionId).orElse(null);
+                    Discussion discussion =
+                            discussionRepository.findById(finalDiscussionId).orElse(null);
                     if (discussion == null) {
                         return 0;
                     }
                     // Look up the parent comment once for this page
-                    DiscussionComment parentComment =
-                        parentDbId != null ? discussionCommentRepository.findById(parentDbId).orElse(null) : null;
+                    DiscussionComment parentComment = parentDbId != null
+                            ? discussionCommentRepository.findById(parentDbId).orElse(null)
+                            : null;
                     ProcessingContext context = ProcessingContext.forSync(scopeId, repo);
 
                     int synced = 0;
@@ -1092,20 +1024,23 @@ public class GitHubDiscussionSyncService {
                         }
                         // Build DTO for the reply, setting the parent node ID for threading
                         GitHubDiscussionCommentDTO replyDTO = new GitHubDiscussionCommentDTO(
-                            null,
-                            replyNode.getDatabaseId() != null ? replyNode.getDatabaseId().longValue() : null,
-                            replyNode.getId(),
-                            replyNode.getBody(),
-                            uriToString(replyNode.getUrl()),
-                            replyNode.getIsAnswer(),
-                            replyNode.getIsMinimized(),
-                            replyNode.getMinimizedReason(),
-                            replyNode.getAuthorAssociation() != null ? replyNode.getAuthorAssociation().name() : null,
-                            toInstant(replyNode.getCreatedAt()),
-                            toInstant(replyNode.getUpdatedAt()),
-                            GitHubUserDTO.fromActor(replyNode.getAuthor()),
-                            parentNodeId
-                        );
+                                null,
+                                replyNode.getDatabaseId() != null
+                                        ? replyNode.getDatabaseId().longValue()
+                                        : null,
+                                replyNode.getId(),
+                                replyNode.getBody(),
+                                uriToString(replyNode.getUrl()),
+                                replyNode.getIsAnswer(),
+                                replyNode.getIsMinimized(),
+                                replyNode.getMinimizedReason(),
+                                replyNode.getAuthorAssociation() != null
+                                        ? replyNode.getAuthorAssociation().name()
+                                        : null,
+                                toInstant(replyNode.getCreatedAt()),
+                                toInstant(replyNode.getUpdatedAt()),
+                                GitHubUserDTO.fromActor(replyNode.getAuthor()),
+                                parentNodeId);
 
                         DiscussionComment comment = commentProcessor.process(replyDTO, discussion, context);
                         if (comment != null) {
@@ -1135,10 +1070,9 @@ public class GitHubDiscussionSyncService {
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
                         log.debug(
-                            "Remaining reply sync interrupted during throttle: discussionNumber={}, commentNodeId={}",
-                            discussionNumber,
-                            commentNodeId
-                        );
+                                "Remaining reply sync interrupted during throttle: discussionNumber={}, commentNodeId={}",
+                                discussionNumber,
+                                commentNodeId);
                         break;
                     }
                 }
@@ -1148,22 +1082,20 @@ public class GitHubDiscussionSyncService {
             } catch (Exception e) {
                 ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
                 log.error(
-                    "Failed to sync remaining replies: discussionNumber={}, commentNodeId={}, error={}",
-                    discussionNumber,
-                    commentNodeId,
-                    classification.message(),
-                    e
-                );
+                        "Failed to sync remaining replies: discussionNumber={}, commentNodeId={}, error={}",
+                        discussionNumber,
+                        commentNodeId,
+                        classification.message(),
+                        e);
                 break;
             }
         }
 
         log.debug(
-            "Completed remaining reply sync: discussionNumber={}, commentNodeId={}, additionalReplies={}",
-            discussionNumber,
-            commentNodeId,
-            totalSynced
-        );
+                "Completed remaining reply sync: discussionNumber={}, commentNodeId={}, additionalReplies={}",
+                discussionNumber,
+                commentNodeId,
+                totalSynced);
         return totalSynced;
     }
 
@@ -1182,27 +1114,26 @@ public class GitHubDiscussionSyncService {
      * querying for the comment marked as the answer.
      */
     private void resolveAnswerCommentsAfterPagination(
-        List<DiscussionWithCommentCursor> discussionsNeedingCommentPagination
-    ) {
+            List<DiscussionWithCommentCursor> discussionsNeedingCommentPagination) {
         for (DiscussionWithCommentCursor dCursor : discussionsNeedingCommentPagination) {
             transactionTemplate.executeWithoutResult(status -> {
-                Discussion discussion = discussionRepository.findById(dCursor.discussionId()).orElse(null);
+                Discussion discussion =
+                        discussionRepository.findById(dCursor.discussionId()).orElse(null);
                 if (discussion == null) {
                     return;
                 }
                 // Only resolve if the discussion has an answer but no FK set yet
                 if (discussion.getAnswerChosenAt() != null && discussion.getAnswerComment() == null) {
                     discussionCommentRepository
-                        .findByDiscussionIdAndIsAnswerTrue(dCursor.discussionId())
-                        .ifPresent(answerComment -> {
-                            discussion.setAnswerComment(answerComment);
-                            discussionRepository.save(discussion);
-                            log.debug(
-                                "Resolved answer comment FK after pagination: discussionNumber={}, commentId={}",
-                                dCursor.discussionNumber(),
-                                answerComment.getId()
-                            );
-                        });
+                            .findByDiscussionIdAndIsAnswerTrue(dCursor.discussionId())
+                            .ifPresent(answerComment -> {
+                                discussion.setAnswerComment(answerComment);
+                                discussionRepository.save(discussion);
+                                log.debug(
+                                        "Resolved answer comment FK after pagination: discussionNumber={}, commentId={}",
+                                        dCursor.discussionNumber(),
+                                        answerComment.getId());
+                            });
                 }
             });
         }
@@ -1218,9 +1149,8 @@ public class GitHubDiscussionSyncService {
      * to avoid Spring proxy issues with self-invocation.
      */
     private void persistCursorCheckpoint(Long syncTargetId, String cursor) {
-        TransactionTemplate requiresNewTemplate = new TransactionTemplate(
-            Objects.requireNonNull(transactionTemplate.getTransactionManager())
-        );
+        TransactionTemplate requiresNewTemplate =
+                new TransactionTemplate(Objects.requireNonNull(transactionTemplate.getTransactionManager()));
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
             backfillStateProvider.updateSyncCursor(syncTargetId, SyncCursorKind.DISCUSSION, cursor);
@@ -1236,9 +1166,8 @@ public class GitHubDiscussionSyncService {
      * to avoid Spring proxy issues with self-invocation.
      */
     private void clearCursorCheckpoint(Long syncTargetId) {
-        TransactionTemplate requiresNewTemplate = new TransactionTemplate(
-            Objects.requireNonNull(transactionTemplate.getTransactionManager())
-        );
+        TransactionTemplate requiresNewTemplate =
+                new TransactionTemplate(Objects.requireNonNull(transactionTemplate.getTransactionManager()));
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
             backfillStateProvider.updateSyncCursor(syncTargetId, SyncCursorKind.DISCUSSION, null);

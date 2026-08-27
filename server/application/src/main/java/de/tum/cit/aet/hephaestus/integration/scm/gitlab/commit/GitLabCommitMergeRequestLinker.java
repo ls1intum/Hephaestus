@@ -70,14 +70,13 @@ public class GitLabCommitMergeRequestLinker {
     private final ApplicationEventPublisher eventPublisher;
 
     public GitLabCommitMergeRequestLinker(
-        CommitRepository commitRepository,
-        CommitContributorRepository commitContributorRepository,
-        UserRepository userRepository,
-        GitLabGraphQlClientProvider graphQlClientProvider,
-        GitLabGraphQlResponseHandler responseHandler,
-        GitLabProperties gitLabProperties,
-        ApplicationEventPublisher eventPublisher
-    ) {
+            CommitRepository commitRepository,
+            CommitContributorRepository commitContributorRepository,
+            UserRepository userRepository,
+            GitLabGraphQlClientProvider graphQlClientProvider,
+            GitLabGraphQlResponseHandler responseHandler,
+            GitLabProperties gitLabProperties,
+            ApplicationEventPublisher eventPublisher) {
         this.commitRepository = commitRepository;
         this.commitContributorRepository = commitContributorRepository;
         this.userRepository = userRepository;
@@ -101,15 +100,15 @@ public class GitLabCommitMergeRequestLinker {
         String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(projectPath), "<unknown>");
         long repositoryId = repository.getId();
         Long providerId = Objects.requireNonNull(
-            repository.getProvider() != null ? Objects.requireNonNull(repository.getProvider().getId()) : null
-        );
+                repository.getProvider() != null
+                        ? Objects.requireNonNull(repository.getProvider().getId())
+                        : null);
 
         log.info(
-            "Starting commit→MR linking: scopeId={}, projectPath={}, updatedAfter={}",
-            scopeId,
-            safeProjectPath,
-            updatedAfter
-        );
+                "Starting commit→MR linking: scopeId={}, projectPath={}, updatedAfter={}",
+                scopeId,
+                safeProjectPath,
+                updatedAfter);
 
         int totalLinks = 0;
         int mrsProcessed = 0;
@@ -150,14 +149,13 @@ public class GitLabCommitMergeRequestLinker {
 
                 HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
-                ClientGraphQlResponse response = client
-                    .documentName(LINK_COMMITS_DOCUMENT)
-                    .variable("fullPath", projectPath)
-                    .variable("first", pageSize)
-                    .variable("after", cursor)
-                    .variable("updatedAfter", updatedAfter != null ? updatedAfter.toString() : null)
-                    .execute()
-                    .block(gitLabProperties.extendedGraphqlTimeout());
+                ClientGraphQlResponse response = client.documentName(LINK_COMMITS_DOCUMENT)
+                        .variable("fullPath", projectPath)
+                        .variable("first", pageSize)
+                        .variable("after", cursor)
+                        .variable("updatedAfter", updatedAfter != null ? updatedAfter.toString() : null)
+                        .execute()
+                        .block(gitLabProperties.extendedGraphqlTimeout());
 
                 var handleResult = responseHandler.handle(response, "commit→MR link for " + safeProjectPath, log);
                 if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
@@ -171,10 +169,10 @@ public class GitLabCommitMergeRequestLinker {
 
                 graphQlClientProvider.recordSuccess();
 
-                @SuppressWarnings({ "unchecked", "rawtypes" })
+                @SuppressWarnings({"unchecked", "rawtypes"})
                 List<Map<String, Object>> nodes = (List) Objects.requireNonNull(response)
-                    .field("project.mergeRequests.nodes")
-                    .toEntityList(Map.class);
+                        .field("project.mergeRequests.nodes")
+                        .toEntityList(Map.class);
 
                 if (nodes == null || nodes.isEmpty()) break;
 
@@ -186,12 +184,11 @@ public class GitLabCommitMergeRequestLinker {
                         List<CommitNode> commitNodes = extractCommitNodes(mrNode);
                         if (hasMoreCommits(mrNode)) {
                             List<CommitNode> tail = fetchRemainingCommits(
-                                scopeId,
-                                projectPath,
-                                iid,
-                                extractNestedEndCursor(mrNode),
-                                safeProjectPath + "!" + iid
-                            );
+                                    scopeId,
+                                    projectPath,
+                                    iid,
+                                    extractNestedEndCursor(mrNode),
+                                    safeProjectPath + "!" + iid);
                             if (tail == null) {
                                 // Incomplete follow-up pagination: skip the MR to avoid partial links.
                                 continue;
@@ -216,31 +213,23 @@ public class GitLabCommitMergeRequestLinker {
                         // that only have a merge commit, and for squashed MRs where
                         // the squash commit is the only association.
                         if (inserted == 0 && isTerminalState(mrNode)) {
-                            List<CommitNode> fallbackNodes = fetchAllCommitsFallback(
-                                scopeId,
-                                projectPath,
-                                iid,
-                                safeProjectPath + "!" + iid
-                            );
+                            List<CommitNode> fallbackNodes =
+                                    fetchAllCommitsFallback(scopeId, projectPath, iid, safeProjectPath + "!" + iid);
                             if (fallbackNodes != null && !fallbackNodes.isEmpty()) {
                                 List<String> fallbackShas = new ArrayList<>(fallbackNodes.size());
                                 for (CommitNode node : fallbackNodes) {
                                     fallbackShas.add(node.sha());
                                 }
-                                int fallbackInserted = commitRepository.linkPullRequestToCommits(
-                                    repositoryId,
-                                    iid,
-                                    fallbackShas
-                                );
+                                int fallbackInserted =
+                                        commitRepository.linkPullRequestToCommits(repositoryId, iid, fallbackShas);
                                 totalLinks += fallbackInserted;
                                 if (fallbackInserted == 0) {
                                     log.debug(
-                                        "Fallback produced no link rows; referenced SHAs not yet in git_commit: " +
-                                            "projectPath={}, iid={}, shaCount={}",
-                                        safeProjectPath,
-                                        iid,
-                                        fallbackShas.size()
-                                    );
+                                            "Fallback produced no link rows; referenced SHAs not yet in git_commit: "
+                                                    + "projectPath={}, iid={}, shaCount={}",
+                                            safeProjectPath,
+                                            iid,
+                                            fallbackShas.size());
                                 }
                                 harvestEmailLoginPairs(fallbackNodes, loginToEmails);
                             }
@@ -250,36 +239,28 @@ public class GitLabCommitMergeRequestLinker {
                         mrsProcessed++;
                     } catch (Exception e) {
                         log.warn(
-                            "Failed to link commits for MR: projectPath={}, iid={}, error={}",
-                            safeProjectPath,
-                            iid,
-                            e.getMessage()
-                        );
+                                "Failed to link commits for MR: projectPath={}, iid={}, error={}",
+                                safeProjectPath,
+                                iid,
+                                e.getMessage());
                     }
                 }
 
                 GitLabPageInfo pageInfo = Objects.requireNonNull(response)
-                    .field("project.mergeRequests.pageInfo")
-                    .toEntity(GitLabPageInfo.class);
+                        .field("project.mergeRequests.pageInfo")
+                        .toEntity(GitLabPageInfo.class);
 
                 if (pageInfo == null || !pageInfo.hasNextPage()) break;
                 cursor = pageInfo.endCursor();
                 if (cursor == null) {
                     log.warn(
-                        "Pagination cursor is null despite hasNextPage=true: projectPath={}, page={}",
-                        safeProjectPath,
-                        page
-                    );
+                            "Pagination cursor is null despite hasNextPage=true: projectPath={}, page={}",
+                            safeProjectPath,
+                            page);
                     break;
                 }
-                if (
-                    responseHandler.isPaginationLoop(
-                        cursor,
-                        previousCursor,
-                        "commit→MR link for " + safeProjectPath,
-                        log
-                    )
-                ) {
+                if (responseHandler.isPaginationLoop(
+                        cursor, previousCursor, "commit→MR link for " + safeProjectPath, log)) {
                     errorAborted = true;
                     break;
                 }
@@ -300,13 +281,8 @@ public class GitLabCommitMergeRequestLinker {
             errorAborted = true;
         }
 
-        int attributed = reconcileCommitContributorUsers(
-            loginToEmails,
-            providerId,
-            scopeId,
-            repository,
-            safeProjectPath
-        );
+        int attributed =
+                reconcileCommitContributorUsers(loginToEmails, providerId, scopeId, repository, safeProjectPath);
 
         SyncResult result;
         if (errorAborted) {
@@ -318,14 +294,13 @@ public class GitLabCommitMergeRequestLinker {
         }
 
         log.info(
-            "Completed commit→MR linking: scopeId={}, projectPath={}, status={}, mrsProcessed={}, linksInserted={}, attributedContributorRows={}",
-            scopeId,
-            safeProjectPath,
-            result.status(),
-            mrsProcessed,
-            totalLinks,
-            attributed
-        );
+                "Completed commit→MR linking: scopeId={}, projectPath={}, status={}, mrsProcessed={}, linksInserted={}, attributedContributorRows={}",
+                scopeId,
+                safeProjectPath,
+                result.status(),
+                mrsProcessed,
+                totalLinks,
+                attributed);
 
         return result;
     }
@@ -430,14 +405,13 @@ public class GitLabCommitMergeRequestLinker {
                 graphQlClientProvider.waitIfRateLimitLow(scopeId);
 
                 HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
-                ClientGraphQlResponse response = client
-                    .documentName(GET_MR_ALL_COMMITS_DOCUMENT)
-                    .variable("fullPath", projectPath)
-                    .variable("iid", Integer.toString(iid))
-                    .variable("first", GitLabSyncConstants.LARGE_PAGE_SIZE)
-                    .variable("after", cursor)
-                    .execute()
-                    .block(gitLabProperties.graphqlTimeout());
+                ClientGraphQlResponse response = client.documentName(GET_MR_ALL_COMMITS_DOCUMENT)
+                        .variable("fullPath", projectPath)
+                        .variable("iid", Integer.toString(iid))
+                        .variable("first", GitLabSyncConstants.LARGE_PAGE_SIZE)
+                        .variable("after", cursor)
+                        .execute()
+                        .block(gitLabProperties.graphqlTimeout());
 
                 var handleResult = responseHandler.handle(response, "fallback MR commits for " + context, log);
                 if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
@@ -450,15 +424,15 @@ public class GitLabCommitMergeRequestLinker {
 
                 graphQlClientProvider.recordSuccess();
 
-                List<Map<String, Object>> mrNodes = (List<Map<String, Object>>) (List<?>) Objects.requireNonNull(
-                    response
-                )
-                    .field("project.mergeRequests.nodes")
-                    .toEntityList(Map.class);
+                List<Map<String, Object>> mrNodes =
+                        (List<Map<String, Object>>) (List<?>) Objects.requireNonNull(response)
+                                .field("project.mergeRequests.nodes")
+                                .toEntityList(Map.class);
 
                 if (mrNodes == null || mrNodes.isEmpty()) break;
 
-                Map<String, Object> commitsMap = (Map<String, Object>) mrNodes.get(0).get("commits");
+                Map<String, Object> commitsMap =
+                        (Map<String, Object>) mrNodes.get(0).get("commits");
                 if (commitsMap == null) break;
 
                 List<Map<String, Object>> commitNodes = (List<Map<String, Object>>) commitsMap.get("nodes");
@@ -472,9 +446,8 @@ public class GitLabCommitMergeRequestLinker {
                 Map<String, Object> pageInfo = (Map<String, Object>) commitsMap.get("pageInfo");
                 if (pageInfo == null || !Boolean.TRUE.equals(pageInfo.get("hasNextPage"))) break;
                 cursor = (String) pageInfo.get("endCursor");
-                if (
-                    responseHandler.isPaginationLoop(cursor, previousCursor, "fallback MR commits for " + context, log)
-                ) {
+                if (responseHandler.isPaginationLoop(
+                        cursor, previousCursor, "fallback MR commits for " + context, log)) {
                     return collected;
                 }
                 previousCursor = cursor;
@@ -501,12 +474,7 @@ public class GitLabCommitMergeRequestLinker {
     @SuppressWarnings("unchecked")
     @Nullable
     private List<CommitNode> fetchRemainingCommits(
-        Long scopeId,
-        String projectPath,
-        int iid,
-        @Nullable String afterCursor,
-        String context
-    ) {
+            Long scopeId, String projectPath, int iid, @Nullable String afterCursor, String context) {
         if (afterCursor == null) return new ArrayList<>();
 
         List<CommitNode> remaining = new ArrayList<>();
@@ -520,14 +488,13 @@ public class GitLabCommitMergeRequestLinker {
                 graphQlClientProvider.waitIfRateLimitLow(scopeId);
 
                 HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
-                ClientGraphQlResponse response = client
-                    .documentName(GET_MR_COMMITS_DOCUMENT)
-                    .variable("fullPath", projectPath)
-                    .variable("iid", Integer.toString(iid))
-                    .variable("first", GitLabSyncConstants.LARGE_PAGE_SIZE)
-                    .variable("after", cursor)
-                    .execute()
-                    .block(gitLabProperties.graphqlTimeout());
+                ClientGraphQlResponse response = client.documentName(GET_MR_COMMITS_DOCUMENT)
+                        .variable("fullPath", projectPath)
+                        .variable("iid", Integer.toString(iid))
+                        .variable("first", GitLabSyncConstants.LARGE_PAGE_SIZE)
+                        .variable("after", cursor)
+                        .execute()
+                        .block(gitLabProperties.graphqlTimeout());
 
                 var handleResult = responseHandler.handle(response, "remaining MR commits for " + context, log);
                 if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
@@ -540,15 +507,15 @@ public class GitLabCommitMergeRequestLinker {
 
                 graphQlClientProvider.recordSuccess();
 
-                List<Map<String, Object>> mrNodes = (List<Map<String, Object>>) (List<?>) Objects.requireNonNull(
-                    response
-                )
-                    .field("project.mergeRequests.nodes")
-                    .toEntityList(Map.class);
+                List<Map<String, Object>> mrNodes =
+                        (List<Map<String, Object>>) (List<?>) Objects.requireNonNull(response)
+                                .field("project.mergeRequests.nodes")
+                                .toEntityList(Map.class);
 
                 if (mrNodes == null || mrNodes.isEmpty()) break;
 
-                Map<String, Object> commitsMap = (Map<String, Object>) mrNodes.get(0).get("commitsWithoutMergeCommits");
+                Map<String, Object> commitsMap =
+                        (Map<String, Object>) mrNodes.get(0).get("commitsWithoutMergeCommits");
                 if (commitsMap == null) break;
 
                 List<Map<String, Object>> commitNodes = (List<Map<String, Object>>) commitsMap.get("nodes");
@@ -562,14 +529,8 @@ public class GitLabCommitMergeRequestLinker {
                 Map<String, Object> pageInfo = (Map<String, Object>) commitsMap.get("pageInfo");
                 if (pageInfo == null || !Boolean.TRUE.equals(pageInfo.get("hasNextPage"))) break;
                 cursor = (String) pageInfo.get("endCursor");
-                if (
-                    responseHandler.isPaginationLoop(
-                        cursor,
-                        previousNestedCursor,
-                        "remaining MR commits for " + context,
-                        log
-                    )
-                ) {
+                if (responseHandler.isPaginationLoop(
+                        cursor, previousNestedCursor, "remaining MR commits for " + context, log)) {
                     return null;
                 }
                 previousNestedCursor = cursor;
@@ -642,12 +603,11 @@ public class GitLabCommitMergeRequestLinker {
      * commit-centric queries (leaderboards, activity feeds) see the attributed user.
      */
     private int reconcileCommitContributorUsers(
-        Map<String, Set<String>> loginToEmails,
-        @Nullable Long providerId,
-        Long scopeId,
-        Repository repository,
-        String safeProjectPath
-    ) {
+            Map<String, Set<String>> loginToEmails,
+            @Nullable Long providerId,
+            Long scopeId,
+            Repository repository,
+            String safeProjectPath) {
         if (loginToEmails.isEmpty()) return 0;
         long repositoryId = repository.getId();
 
@@ -660,8 +620,7 @@ public class GitLabCommitMergeRequestLinker {
             Set<String> emails = entry.getValue();
             if (emails == null || emails.isEmpty()) continue;
 
-            Optional<User> user =
-                providerId != null
+            Optional<User> user = providerId != null
                     ? userRepository.findByLoginAndProviderId(login, providerId)
                     : userRepository.findByLogin(login);
             Long userId = user.map(User::getId).orElse(null);
@@ -670,11 +629,8 @@ public class GitLabCommitMergeRequestLinker {
             for (String email : emails) {
                 contributorRowsUpdated += commitContributorRepository.backfillUserIdByEmail(email, userId);
                 commitAuthorRowsUpdated += commitRepository.bulkUpdateAuthorIdByEmail(email, repositoryId, userId);
-                commitCommitterRowsUpdated += commitRepository.bulkUpdateCommitterIdByEmail(
-                    email,
-                    repositoryId,
-                    userId
-                );
+                commitCommitterRowsUpdated +=
+                        commitRepository.bulkUpdateCommitterIdByEmail(email, repositoryId, userId);
             }
 
             // Enrich user.email when it is currently null. Harvested emails come from a
@@ -696,33 +652,26 @@ public class GitLabCommitMergeRequestLinker {
         // for this repository have been reconciled. The activity module listens for this
         // event and backfills COMMIT_CREATED rows whose actor_id was NULL at ingest time.
         if (commitAuthorRowsUpdated > 0) {
-            eventPublisher.publishEvent(
-                new ScmDomainEvent.CommitAuthorsReconciled(
+            eventPublisher.publishEvent(new ScmDomainEvent.CommitAuthorsReconciled(
                     repositoryId,
                     EventContext.forSync(
-                        scopeId,
-                        Objects.requireNonNull(RepositoryRef.from(repository)),
-                        IdentityProviderType.GITLAB
-                    )
-                )
-            );
+                            scopeId,
+                            Objects.requireNonNull(RepositoryRef.from(repository)),
+                            IdentityProviderType.GITLAB)));
         }
 
-        if (
-            contributorRowsUpdated > 0 ||
-            commitAuthorRowsUpdated > 0 ||
-            commitCommitterRowsUpdated > 0 ||
-            userEmailsBackfilled > 0
-        ) {
+        if (contributorRowsUpdated > 0
+                || commitAuthorRowsUpdated > 0
+                || commitCommitterRowsUpdated > 0
+                || userEmailsBackfilled > 0) {
             log.info(
-                "Backfilled attribution via GitLab author resolution: projectPath={}, contributorRows={}, commitAuthorRows={}, commitCommitterRows={}, userEmailRows={}, logins={}",
-                safeProjectPath,
-                contributorRowsUpdated,
-                commitAuthorRowsUpdated,
-                commitCommitterRowsUpdated,
-                userEmailsBackfilled,
-                loginToEmails.size()
-            );
+                    "Backfilled attribution via GitLab author resolution: projectPath={}, contributorRows={}, commitAuthorRows={}, commitCommitterRows={}, userEmailRows={}, logins={}",
+                    safeProjectPath,
+                    contributorRowsUpdated,
+                    commitAuthorRowsUpdated,
+                    commitCommitterRowsUpdated,
+                    userEmailsBackfilled,
+                    loginToEmails.size());
         }
 
         return contributorRowsUpdated;
@@ -759,5 +708,8 @@ public class GitLabCommitMergeRequestLinker {
      * Minimal view over a {@code commitsWithoutMergeCommits} node: the SHA used
      * for MR linking plus the author fields that feed the attribution harvest.
      */
-    private record CommitNode(String sha, @Nullable String authorEmail, @Nullable String authorUsername) {}
+    private record CommitNode(
+            String sha,
+            @Nullable String authorEmail,
+            @Nullable String authorUsername) {}
 }

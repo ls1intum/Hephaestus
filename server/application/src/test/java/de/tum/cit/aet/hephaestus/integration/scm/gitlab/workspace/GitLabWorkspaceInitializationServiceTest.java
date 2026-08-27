@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -115,49 +114,43 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         NatsConnectionProperties natsProperties = new NatsConnectionProperties(
-            true,
-            "nats://localhost:4222",
-            null,
-            new NatsConnectionProperties.Consumer(Duration.ofSeconds(60))
-        );
+                true, "nats://localhost:4222", null, new NatsConnectionProperties.Consumer(Duration.ofSeconds(60)));
         SyncSchedulerProperties syncProps = new SyncSchedulerProperties(
-            true,
-            7,
-            "0 0 3 * * *",
-            15,
-            new SyncSchedulerProperties.BackfillProperties(false, 50, 100, 60),
-            new SyncSchedulerProperties.FilterProperties(Set.of(), Set.of(), Set.of()),
-            new SyncSchedulerProperties.DiscussionsProperties(false),
-            new SyncSchedulerProperties.ProjectsProperties(false)
-        );
+                true,
+                7,
+                "0 0 3 * * *",
+                15,
+                new SyncSchedulerProperties.BackfillProperties(false, 50, 100, 60),
+                new SyncSchedulerProperties.FilterProperties(Set.of(), Set.of(), Set.of()),
+                new SyncSchedulerProperties.DiscussionsProperties(false),
+                new SyncSchedulerProperties.ProjectsProperties(false));
 
         lenient()
-            .doAnswer(invocation -> {
-                Consumer<IntegrationNatsConsumer> consumer = invocation.getArgument(0);
-                consumer.accept(natsConsumerService);
-                return null;
-            })
-            .when(natsConsumerServiceProvider)
-            .ifAvailable(any());
+                .doAnswer(invocation -> {
+                    Consumer<IntegrationNatsConsumer> consumer = invocation.getArgument(0);
+                    consumer.accept(natsConsumerService);
+                    return null;
+                })
+                .when(natsConsumerServiceProvider)
+                .ifAvailable(any());
         lenient().when(dataSyncTriggerProvider.getObject()).thenReturn(dataSyncTrigger);
 
         initService = new GitLabWorkspaceInitializationService(
-            workspaceRepository,
-            organizationRepository,
-            repositoryToMonitorRepository,
-            repositoryRepository,
-            natsProperties,
-            syncProps,
-            natsConsumerServiceProvider,
-            syncTargetProvider,
-            gitLabSyncServiceHolderProvider,
-            gitLabWebhookServiceProvider,
-            rateLimitTrackerProvider,
-            dataSyncTriggerProvider,
-            connectionService,
-            new GitLabWorkspaceLinkService(workspaceRepository, organizationRepository),
-            monitoringExecutor
-        );
+                workspaceRepository,
+                organizationRepository,
+                repositoryToMonitorRepository,
+                repositoryRepository,
+                natsProperties,
+                syncProps,
+                natsConsumerServiceProvider,
+                syncTargetProvider,
+                gitLabSyncServiceHolderProvider,
+                gitLabWebhookServiceProvider,
+                rateLimitTrackerProvider,
+                dataSyncTriggerProvider,
+                connectionService,
+                new GitLabWorkspaceLinkService(workspaceRepository, organizationRepository),
+                monitoringExecutor);
 
         workspace = new Workspace();
         workspace.setAccountLogin("my-group/subgroup");
@@ -167,58 +160,47 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         // triggers initialize() needs an active GitLab Connection + bearer token; default-configure that
         // here so the test bodies don't have to know about the Connection registry.
         lenient()
-            .when(connectionService.findActiveGitLabConfig(anyLong()))
-            .thenReturn(
-                Optional.of(
-                    new ConnectionConfig.GitLabConfig(
+                .when(connectionService.findActiveGitLabConfig(anyLong()))
+                .thenReturn(Optional.of(new ConnectionConfig.GitLabConfig(
                         "https://gitlab.com",
                         null,
                         null,
                         ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
-                        Set.of()
-                    )
-                )
-            );
+                        Set.of())));
         lenient()
-            .when(connectionService.findActiveBearerToken(anyLong(), eq(IntegrationKind.GITLAB)))
-            .thenReturn(Optional.of(new BearerToken("glpat-test-token", null)));
+                .when(connectionService.findActiveBearerToken(anyLong(), eq(IntegrationKind.GITLAB)))
+                .thenReturn(Optional.of(new BearerToken("glpat-test-token", null)));
     }
 
     /** Creates a service instance with NATS disabled for testing skip behavior. */
     private GitLabWorkspaceInitializationService createServiceWithNatsDisabled() {
         NatsConnectionProperties disabledNats = new NatsConnectionProperties(
-            false,
-            "nats://localhost:4222",
-            null,
-            new NatsConnectionProperties.Consumer(Duration.ofSeconds(60))
-        );
+                false, "nats://localhost:4222", null, new NatsConnectionProperties.Consumer(Duration.ofSeconds(60)));
         SyncSchedulerProperties syncProps = new SyncSchedulerProperties(
-            true,
-            7,
-            "0 0 3 * * *",
-            15,
-            new SyncSchedulerProperties.BackfillProperties(false, 50, 100, 60),
-            new SyncSchedulerProperties.FilterProperties(Set.of(), Set.of(), Set.of()),
-            new SyncSchedulerProperties.DiscussionsProperties(false),
-            new SyncSchedulerProperties.ProjectsProperties(false)
-        );
+                true,
+                7,
+                "0 0 3 * * *",
+                15,
+                new SyncSchedulerProperties.BackfillProperties(false, 50, 100, 60),
+                new SyncSchedulerProperties.FilterProperties(Set.of(), Set.of(), Set.of()),
+                new SyncSchedulerProperties.DiscussionsProperties(false),
+                new SyncSchedulerProperties.ProjectsProperties(false));
         return new GitLabWorkspaceInitializationService(
-            workspaceRepository,
-            organizationRepository,
-            repositoryToMonitorRepository,
-            repositoryRepository,
-            disabledNats,
-            syncProps,
-            natsConsumerServiceProvider,
-            syncTargetProvider,
-            gitLabSyncServiceHolderProvider,
-            gitLabWebhookServiceProvider,
-            rateLimitTrackerProvider,
-            dataSyncTriggerProvider,
-            connectionService,
-            new GitLabWorkspaceLinkService(workspaceRepository, organizationRepository),
-            monitoringExecutor
-        );
+                workspaceRepository,
+                organizationRepository,
+                repositoryToMonitorRepository,
+                repositoryRepository,
+                disabledNats,
+                syncProps,
+                natsConsumerServiceProvider,
+                syncTargetProvider,
+                gitLabSyncServiceHolderProvider,
+                gitLabWebhookServiceProvider,
+                rateLimitTrackerProvider,
+                dataSyncTriggerProvider,
+                connectionService,
+                new GitLabWorkspaceLinkService(workspaceRepository, organizationRepository),
+                monitoringExecutor);
     }
 
     /** Configures the executor mock to run submitted tasks synchronously. */
@@ -242,13 +224,11 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         when(gitLabWebhookServiceProvider.getIfAvailable()).thenReturn(null);
         when(gitLabSyncServiceHolderProvider.getIfAvailable()).thenReturn(gitLabSyncServiceHolder);
         when(gitLabSyncServiceHolder.getGroupSyncService()).thenReturn(gitLabGroupSyncService);
-        when(gitLabGroupSyncService.syncGroupProjects(eq(1L), eq("my-group/subgroup"), any())).thenReturn(syncResult);
-        when(
-            organizationRepository.findByLoginIgnoreCaseAndProvider_Type(
-                "my-group/subgroup",
-                IdentityProviderType.GITLAB
-            )
-        ).thenReturn(Optional.empty());
+        when(gitLabGroupSyncService.syncGroupProjects(eq(1L), eq("my-group/subgroup"), any()))
+                .thenReturn(syncResult);
+        when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(
+                        "my-group/subgroup", IdentityProviderType.GITLAB))
+                .thenReturn(Optional.empty());
         when(repositoryToMonitorRepository.findByWorkspaceId(1L)).thenReturn(List.of());
     }
 
@@ -279,9 +259,8 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
 
         @Test
         void shouldSkipNullToken() {
-            when(connectionService.findActiveBearerToken(anyLong(), eq(IntegrationKind.GITLAB))).thenReturn(
-                Optional.empty()
-            );
+            when(connectionService.findActiveBearerToken(anyLong(), eq(IntegrationKind.GITLAB)))
+                    .thenReturn(Optional.empty());
 
             initService.initialize(workspace);
 
@@ -290,9 +269,8 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
 
         @Test
         void shouldSkipBlankToken() {
-            when(connectionService.findActiveBearerToken(anyLong(), eq(IntegrationKind.GITLAB))).thenReturn(
-                Optional.of(new BearerToken("   ", null))
-            );
+            when(connectionService.findActiveBearerToken(anyLong(), eq(IntegrationKind.GITLAB)))
+                    .thenReturn(Optional.of(new BearerToken("   ", null)));
 
             initService.initialize(workspace);
 
@@ -315,7 +293,9 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         @Test
         void shouldContinueWhenTokenRotationFails() {
             when(gitLabWebhookServiceProvider.getIfAvailable()).thenReturn(gitLabWebhookService);
-            doThrow(new RuntimeException("rotation failed")).when(gitLabWebhookService).rotateTokenIfNeeded(workspace);
+            doThrow(new RuntimeException("rotation failed"))
+                    .when(gitLabWebhookService)
+                    .rotateTokenIfNeeded(workspace);
             // Webhook registration should still be attempted after rotation failure
             when(gitLabWebhookService.registerWebhook(workspace)).thenReturn(WebhookSetupResult.success(99L, 42L));
             when(gitLabSyncServiceHolderProvider.getIfAvailable()).thenReturn(null);
@@ -332,9 +312,8 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             // Discovery should still be attempted
             when(gitLabSyncServiceHolderProvider.getIfAvailable()).thenReturn(gitLabSyncServiceHolder);
             when(gitLabSyncServiceHolder.getGroupSyncService()).thenReturn(gitLabGroupSyncService);
-            when(gitLabGroupSyncService.syncGroupProjects(eq(1L), eq("my-group/subgroup"), any())).thenReturn(
-                GitLabSyncResult.completed(Collections.emptyList(), 1, 0, 0)
-            );
+            when(gitLabGroupSyncService.syncGroupProjects(eq(1L), eq("my-group/subgroup"), any()))
+                    .thenReturn(GitLabSyncResult.completed(Collections.emptyList(), 1, 0, 0));
 
             initService.initialize(workspace);
 
@@ -354,19 +333,15 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             when(gitLabWebhookService.registerWebhook(workspace)).thenReturn(WebhookSetupResult.success(99L, 42L));
             when(gitLabSyncServiceHolderProvider.getIfAvailable()).thenReturn(gitLabSyncServiceHolder);
             when(gitLabSyncServiceHolder.getGroupSyncService()).thenReturn(gitLabGroupSyncService);
-            when(gitLabGroupSyncService.syncGroupProjects(eq(1L), eq("my-group/subgroup"), any())).thenReturn(
-                syncResult
-            );
+            when(gitLabGroupSyncService.syncGroupProjects(eq(1L), eq("my-group/subgroup"), any()))
+                    .thenReturn(syncResult);
 
             Organization organization = new Organization();
             ReflectionTestUtils.setField(organization, "id", 10L);
             organization.setLogin("my-group/subgroup");
-            when(
-                organizationRepository.findByLoginIgnoreCaseAndProvider_Type(
-                    "my-group/subgroup",
-                    IdentityProviderType.GITLAB
-                )
-            ).thenReturn(Optional.of(organization));
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(
+                            "my-group/subgroup", IdentityProviderType.GITLAB))
+                    .thenReturn(Optional.of(organization));
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
             when(repositoryToMonitorRepository.findByWorkspaceId(1L)).thenReturn(List.of());
 
@@ -377,14 +352,13 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             ArgumentCaptor<RepositoryToMonitor> captor = ArgumentCaptor.forClass(RepositoryToMonitor.class);
             verify(repositoryToMonitorRepository, times(2)).save(captor.capture());
 
-            Set<String> createdNames = captor
-                .getAllValues()
-                .stream()
-                .map(RepositoryToMonitor::getNameWithOwner)
-                .collect(Collectors.toSet());
+            Set<String> createdNames = captor.getAllValues().stream()
+                    .map(RepositoryToMonitor::getNameWithOwner)
+                    .collect(Collectors.toSet());
             assertThat(createdNames).containsExactlyInAnyOrder("my-group/project-a", "my-group/project-b");
 
-            captor.getAllValues().forEach(monitor -> assertThat(monitor.getWorkspace()).isSameAs(workspace));
+            captor.getAllValues()
+                    .forEach(monitor -> assertThat(monitor.getWorkspace()).isSameAs(workspace));
 
             verify(natsConsumerService).updateScopeConsumer(1L);
         }
@@ -396,9 +370,8 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             when(gitLabWebhookServiceProvider.getIfAvailable()).thenReturn(null);
             when(gitLabSyncServiceHolderProvider.getIfAvailable()).thenReturn(gitLabSyncServiceHolder);
             when(gitLabSyncServiceHolder.getGroupSyncService()).thenReturn(gitLabGroupSyncService);
-            when(gitLabGroupSyncService.syncGroupProjects(eq(1L), eq("my-group/subgroup"), any())).thenReturn(
-                emptyResult
-            );
+            when(gitLabGroupSyncService.syncGroupProjects(eq(1L), eq("my-group/subgroup"), any()))
+                    .thenReturn(emptyResult);
 
             initService.initialize(workspace);
 
@@ -437,9 +410,8 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             when(gitLabWebhookServiceProvider.getIfAvailable()).thenReturn(null);
             when(gitLabSyncServiceHolderProvider.getIfAvailable()).thenReturn(gitLabSyncServiceHolder);
             when(gitLabSyncServiceHolder.getGroupSyncService()).thenReturn(gitLabGroupSyncService);
-            when(gitLabGroupSyncService.syncGroupProjects(anyLong(), any(), any())).thenThrow(
-                new RuntimeException("GraphQL timeout")
-            );
+            when(gitLabGroupSyncService.syncGroupProjects(anyLong(), any(), any()))
+                    .thenThrow(new RuntimeException("GraphQL timeout"));
 
             // Should not throw
             initService.initialize(workspace);
@@ -458,9 +430,8 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             when(gitLabWebhookServiceProvider.getIfAvailable()).thenReturn(null);
             when(gitLabSyncServiceHolderProvider.getIfAvailable()).thenReturn(gitLabSyncServiceHolder);
             when(gitLabSyncServiceHolder.getGroupSyncService()).thenReturn(gitLabGroupSyncService);
-            when(gitLabGroupSyncService.syncGroupProjects(eq(1L), eq("my-group/subgroup"), any())).thenReturn(
-                syncResult
-            );
+            when(gitLabGroupSyncService.syncGroupProjects(eq(1L), eq("my-group/subgroup"), any()))
+                    .thenReturn(syncResult);
             when(repositoryToMonitorRepository.findByWorkspaceId(1L)).thenReturn(List.of());
 
             initService.initialize(workspace);
@@ -536,11 +507,8 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
 
         @Test
         void shouldCreateAllMonitorsAndReturnCount() {
-            List<Repository> repos = List.of(
-                createRepo("group/repo-1"),
-                createRepo("group/repo-2"),
-                createRepo("group/repo-3")
-            );
+            List<Repository> repos =
+                    List.of(createRepo("group/repo-1"), createRepo("group/repo-2"), createRepo("group/repo-3"));
 
             when(repositoryToMonitorRepository.findByWorkspaceId(1L)).thenReturn(List.of());
 
@@ -609,12 +577,9 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             Organization organization = new Organization();
             ReflectionTestUtils.setField(organization, "id", 10L);
 
-            when(
-                organizationRepository.findByLoginIgnoreCaseAndProvider_Type(
-                    "my-group/subgroup",
-                    IdentityProviderType.GITLAB
-                )
-            ).thenReturn(Optional.of(organization));
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(
+                            "my-group/subgroup", IdentityProviderType.GITLAB))
+                    .thenReturn(Optional.of(organization));
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             initService.linkWorkspaceToOrganization(workspace);
@@ -629,12 +594,9 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
 
         @Test
         void shouldNotLinkWhenNotFound() {
-            when(
-                organizationRepository.findByLoginIgnoreCaseAndProvider_Type(
-                    "my-group/subgroup",
-                    IdentityProviderType.GITLAB
-                )
-            ).thenReturn(Optional.empty());
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(
+                            "my-group/subgroup", IdentityProviderType.GITLAB))
+                    .thenReturn(Optional.empty());
 
             initService.linkWorkspaceToOrganization(workspace);
 
@@ -644,12 +606,9 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         @Test
         void shouldNotLinkWhenWorkspaceDeleted() {
             Organization organization = new Organization();
-            when(
-                organizationRepository.findByLoginIgnoreCaseAndProvider_Type(
-                    "my-group/subgroup",
-                    IdentityProviderType.GITLAB
-                )
-            ).thenReturn(Optional.of(organization));
+            when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(
+                            "my-group/subgroup", IdentityProviderType.GITLAB))
+                    .thenReturn(Optional.of(organization));
             when(workspaceRepository.findById(1L)).thenReturn(Optional.empty());
 
             initService.linkWorkspaceToOrganization(workspace);

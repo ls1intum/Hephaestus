@@ -36,21 +36,23 @@ import tools.jackson.databind.JsonNode;
 @Entity
 @Immutable
 @Table(
-    name = "observation",
-    uniqueConstraints = { @UniqueConstraint(name = "uk_observation_occurrence", columnNames = { "occurrence_key" }) },
-    indexes = {
-        @Index(name = "idx_observation_practice_observed", columnList = "practice_id, observed_at DESC"),
-        @Index(name = "idx_observation_agent_job", columnList = "agent_job_id"),
-        @Index(name = "idx_observation_target", columnList = "artifact_kind, artifact_id"),
-        @Index(
-            name = "idx_observation_target_run",
-            columnList = "artifact_kind, artifact_id, agent_job_id, observed_at DESC"
-        ),
-        @Index(name = "idx_observation_correlation", columnList = "recurrence_key"),
-        // Observations are filed against the subject (about_user_id); index for subject dashboards.
-        @Index(name = "idx_observation_subject", columnList = "about_user_id"),
-    }
-)
+        name = "observation",
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "uk_observation_occurrence",
+                    columnNames = {"occurrence_key"})
+        },
+        indexes = {
+            @Index(name = "idx_observation_practice_observed", columnList = "practice_id, observed_at DESC"),
+            @Index(name = "idx_observation_agent_job", columnList = "agent_job_id"),
+            @Index(name = "idx_observation_target", columnList = "artifact_kind, artifact_id"),
+            @Index(
+                    name = "idx_observation_target_run",
+                    columnList = "artifact_kind, artifact_id, agent_job_id, observed_at DESC"),
+            @Index(name = "idx_observation_correlation", columnList = "recurrence_key"),
+            // Observations are filed against the subject (about_user_id); index for subject dashboards.
+            @Index(name = "idx_observation_subject", columnList = "about_user_id"),
+        })
 @Getter
 @Builder
 @NoArgsConstructor
@@ -204,21 +206,19 @@ public class Observation {
         }
         if (presence.carriesValence() != (assessment != null)) {
             throw new IllegalStateException(
-                "Observation coherence violation: assessment is required exactly for a presence that carries valence (presence=" +
-                    presence +
-                    ", assessment=" +
-                    assessment +
-                    ")"
-            );
+                    "Observation coherence violation: assessment is required exactly for a presence that carries valence (presence="
+                            + presence
+                            + ", assessment="
+                            + assessment
+                            + ")");
         }
         if (assessment != Assessment.BAD && severity != null) {
             throw new IllegalStateException(
-                "Observation coherence violation: severity must be null unless assessment is BAD (assessment=" +
-                    assessment +
-                    ", severity=" +
-                    severity +
-                    ")"
-            );
+                    "Observation coherence violation: severity must be null unless assessment is BAD (assessment="
+                            + assessment
+                            + ", severity="
+                            + severity
+                            + ")");
         }
     }
 }

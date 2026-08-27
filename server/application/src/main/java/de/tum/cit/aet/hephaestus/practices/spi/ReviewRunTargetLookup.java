@@ -12,13 +12,12 @@ public interface ReviewRunTargetLookup {
     Map<UUID, Target> findByJobIds(long workspaceId, Collection<UUID> jobIds);
 
     record Target(
-        @NonNull ArtifactKind type,
-        @Nullable Long id,
-        @Nullable IntegrationKind provider,
-        @Nullable Integer number,
-        @NonNull String title,
-        @Nullable String repositoryName,
-        @Nullable String channelName,
-        @Nullable String url
-    ) {}
+            @NonNull ArtifactKind type,
+            @Nullable Long id,
+            @Nullable IntegrationKind provider,
+            @Nullable Integer number,
+            @NonNull String title,
+            @Nullable String repositoryName,
+            @Nullable String channelName,
+            @Nullable String url) {}
 }

@@ -44,29 +44,27 @@ public class WorkspaceLlmConnectionService {
 
     private WorkspaceLlmConnection load(WorkspaceContext workspaceContext, Long id) {
         return connectionRepository
-            .findByIdAndWorkspaceId(id, workspaceContext.id())
-            .orElseThrow(() -> new EntityNotFoundException("WorkspaceLlmConnection", id));
+                .findByIdAndWorkspaceId(id, workspaceContext.id())
+                .orElseThrow(() -> new EntityNotFoundException("WorkspaceLlmConnection", id));
     }
 
     @Transactional
     public WorkspaceLlmConnection create(
-        WorkspaceContext workspaceContext,
-        CreateWorkspaceLlmConnectionRequestDTO request
-    ) {
+            WorkspaceContext workspaceContext, CreateWorkspaceLlmConnectionRequestDTO request) {
         requireByoEnabled();
         Long workspaceId = workspaceContext.id();
         String slug = connectionSlug(workspaceId, request.slug(), request.displayName());
-        if (
-            StringUtils.hasText(request.slug()) &&
-            connectionRepository.findByWorkspaceIdAndSlug(workspaceId, slug).isPresent()
-        ) {
+        if (StringUtils.hasText(request.slug())
+                && connectionRepository
+                        .findByWorkspaceIdAndSlug(workspaceId, slug)
+                        .isPresent()) {
             throw new LlmConnectionSlugConflictException(slug);
         }
         egressPolicy.validate(request.baseUrl());
 
         Workspace workspace = workspaceRepository
-            .findById(workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceContext.slug()));
+                .findById(workspaceId)
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceContext.slug()));
 
         WorkspaceLlmConnection connection = new WorkspaceLlmConnection();
         connection.setWorkspace(workspace);
@@ -88,32 +86,29 @@ public class WorkspaceLlmConnectionService {
         } catch (DataIntegrityViolationException e) {
             throw new LlmConnectionSlugConflictException(slug, e);
         }
-        configAudit.record(
-            ConfigAuditEntry.created(
+        configAudit.record(ConfigAuditEntry.created(
                 ConfigAuditEntityType.WORKSPACE_LLM_CONNECTION,
                 saved.getId(),
                 workspaceId,
-                WorkspaceLlmConnectionSnapshot.of(saved)
-            )
-        );
+                WorkspaceLlmConnectionSnapshot.of(saved)));
         return saved;
     }
 
     private String connectionSlug(Long workspaceId, @Nullable String requested, String displayName) {
-        return CatalogSlug.unique(requested, displayName, slug ->
-            connectionRepository.findByWorkspaceIdAndSlug(workspaceId, slug).isPresent()
-        );
+        return CatalogSlug.unique(
+                requested,
+                displayName,
+                slug -> connectionRepository
+                        .findByWorkspaceIdAndSlug(workspaceId, slug)
+                        .isPresent());
     }
 
     @Transactional
     public WorkspaceLlmConnection update(
-        WorkspaceContext workspaceContext,
-        Long id,
-        UpdateWorkspaceLlmConnectionRequestDTO request
-    ) {
+            WorkspaceContext workspaceContext, Long id, UpdateWorkspaceLlmConnectionRequestDTO request) {
         WorkspaceLlmConnection connection = connectionRepository
-            .findByIdAndWorkspaceIdForUpdate(id, workspaceContext.id())
-            .orElseThrow(() -> new EntityNotFoundException("WorkspaceLlmConnection", id));
+                .findByIdAndWorkspaceIdForUpdate(id, workspaceContext.id())
+                .orElseThrow(() -> new EntityNotFoundException("WorkspaceLlmConnection", id));
         WorkspaceLlmConnectionSnapshot before = WorkspaceLlmConnectionSnapshot.of(connection);
 
         if (request.displayName() != null) {
@@ -129,15 +124,12 @@ public class WorkspaceLlmConnectionService {
         }
 
         WorkspaceLlmConnection saved = connectionRepository.save(connection);
-        configAudit.record(
-            ConfigAuditEntry.updated(
+        configAudit.record(ConfigAuditEntry.updated(
                 ConfigAuditEntityType.WORKSPACE_LLM_CONNECTION,
                 saved.getId(),
                 workspaceContext.id(),
                 before,
-                WorkspaceLlmConnectionSnapshot.of(saved)
-            )
-        );
+                WorkspaceLlmConnectionSnapshot.of(saved)));
         return saved;
     }
 
@@ -149,16 +141,15 @@ public class WorkspaceLlmConnectionService {
         }
         WorkspaceLlmConnectionSnapshot before = WorkspaceLlmConnectionSnapshot.of(connection);
         connectionRepository.delete(connection);
-        configAudit.record(
-            ConfigAuditEntry.deleted(ConfigAuditEntityType.WORKSPACE_LLM_CONNECTION, id, workspaceContext.id(), before)
-        );
+        configAudit.record(ConfigAuditEntry.deleted(
+                ConfigAuditEntityType.WORKSPACE_LLM_CONNECTION, id, workspaceContext.id(), before));
     }
 
     /** Deliberately NOT {@code @Transactional} — see {@link LlmConnectionProbeService#probeStored}. */
     public WorkspaceLlmProbeResultDTO probe(WorkspaceContext workspaceContext, Long id) {
         LlmProbeTarget target = connectionRepository
-            .findProbeTargetByIdAndWorkspaceId(id, workspaceContext.id())
-            .orElseThrow(() -> new EntityNotFoundException("WorkspaceLlmConnection", id));
+                .findProbeTargetByIdAndWorkspaceId(id, workspaceContext.id())
+                .orElseThrow(() -> new EntityNotFoundException("WorkspaceLlmConnection", id));
         egressPolicy.validate(target.baseUrl());
         LlmProbeResultDTO raw = probeService.probeCredential(target.baseUrl(), target.authMode(), target.apiKey());
         return WorkspaceLlmProbeResultDTO.from(raw);

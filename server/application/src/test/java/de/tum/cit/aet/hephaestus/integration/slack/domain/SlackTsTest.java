@@ -14,7 +14,8 @@ class SlackTsTest {
 
     @Test
     void ofInstant_rendersTheFixedWidthSlackFormat() {
-        assertThat(SlackTs.ofInstant(Instant.ofEpochSecond(1720000000L, 123_456_000L))).isEqualTo("1720000000.123456");
+        assertThat(SlackTs.ofInstant(Instant.ofEpochSecond(1720000000L, 123_456_000L)))
+                .isEqualTo("1720000000.123456");
         assertThat(SlackTs.ofInstant(Instant.ofEpochSecond(7L))).isEqualTo("0000000007.000000");
     }
 
@@ -28,7 +29,9 @@ class SlackTsTest {
     }
 
     @ParameterizedTest(name = "malformed ts \"{0}\" fails closed")
-    @CsvSource(value = { "''", "abc", "17200.0000001", "-1.000000", "1720000000.12345678" }, emptyValue = "''")
+    @CsvSource(
+            value = {"''", "abc", "17200.0000001", "-1.000000", "1720000000.12345678"},
+            emptyValue = "''")
     void malformedTs_failsClosed(String ts) {
         assertThat(SlackTs.isAfter(ts, Instant.EPOCH)).isFalse();
         assertThat(SlackTs.toEpochMicros(ts)).isNull();

@@ -16,19 +16,22 @@ import org.jspecify.annotations.Nullable;
  */
 @Schema(description = "What came of asking for a review")
 public record ReviewRequestOutcomeDTO(
-    @NonNull @Schema(description = "Whether a review is now running, or nothing was started") Status status,
-    @Schema(description = "The review that is now running; absent when none was started") @Nullable UUID jobId,
-    @Schema(description = "The controlled-vocabulary reason nothing was started; absent when a review was started")
-    @Nullable
-    SignalStateReason reason,
-    @Schema(
-        description = "The reason as one sentence for the person who asked. Render it verbatim: it is " +
-            "written next to the reason it explains so that every surface says the same thing, and a " +
-            "re-worded copy is how a screen and a support answer come to disagree."
-    )
-    @Nullable
-    String reasonDescription
-) {
+        @NonNull @Schema(description = "Whether a review is now running, or nothing was started")
+        Status status,
+
+        @Schema(description = "The review that is now running; absent when none was started") @Nullable
+        UUID jobId,
+
+        @Schema(description = "The controlled-vocabulary reason nothing was started; absent when a review was started")
+        @Nullable
+        SignalStateReason reason,
+
+        @Schema(
+                description = "The reason as one sentence for the person who asked. Render it verbatim: it is "
+                        + "written next to the reason it explains so that every surface says the same thing, and a "
+                        + "re-worded copy is how a screen and a support answer come to disagree.")
+        @Nullable
+        String reasonDescription) {
     /** The DTO's own vocabulary; {@code FORBIDDEN} never reaches a body, since it is answered as a 403. */
     public enum Status {
         /** A review is running, or an identical one already was and this ask joined it. */
@@ -39,10 +42,9 @@ public record ReviewRequestOutcomeDTO(
 
     static ReviewRequestOutcomeDTO from(ManualReviewOutcome outcome) {
         return new ReviewRequestOutcomeDTO(
-            outcome.status() == ManualReviewOutcome.Status.SUBMITTED ? Status.SUBMITTED : Status.REFUSED,
-            outcome.jobId(),
-            outcome.reason(),
-            outcome.describeReason()
-        );
+                outcome.status() == ManualReviewOutcome.Status.SUBMITTED ? Status.SUBMITTED : Status.REFUSED,
+                outcome.jobId(),
+                outcome.reason(),
+                outcome.describeReason());
     }
 }

@@ -48,7 +48,9 @@ class ManualReviewRateLimitsTest extends BaseUnitTest {
     void setUp() {
         workspace = new Workspace();
         workspace.setId(WORKSPACE_ID);
-        lenient().when(signals.existsManualRequestSince(anyLong(), anyString(), anyLong(), any())).thenReturn(false);
+        lenient()
+                .when(signals.existsManualRequestSince(anyLong(), anyString(), anyLong(), any()))
+                .thenReturn(false);
         lenient().when(signals.countRequestsBySince(anyLong(), any(), any())).thenReturn(0L);
     }
 
@@ -59,7 +61,8 @@ class ManualReviewRateLimitsTest extends BaseUnitTest {
 
     @Test
     void aSecondAskAboutTheSameWorkInsideTheCooldownIsRefused() {
-        when(signals.existsManualRequestSince(anyLong(), anyString(), anyLong(), any())).thenReturn(true);
+        when(signals.existsManualRequestSince(anyLong(), anyString(), anyLong(), any()))
+                .thenReturn(true);
 
         assertThat(refusalFrom(limits(15, 5))).contains(SignalStateReason.REQUEST_COOLDOWN_ACTIVE);
     }
@@ -73,16 +76,14 @@ class ManualReviewRateLimitsTest extends BaseUnitTest {
         refusalFrom(limits(15, 5));
 
         ArgumentCaptor<Instant> since = ArgumentCaptor.forClass(Instant.class);
-        verify(signals).existsManualRequestSince(
-            org.mockito.ArgumentMatchers.eq(WORKSPACE_ID),
-            org.mockito.ArgumentMatchers.eq(ScmSignals.PULL_REQUEST.value()),
-            org.mockito.ArgumentMatchers.eq(ARTIFACT_ID),
-            since.capture()
-        );
-        assertThat(since.getValue()).isBetween(
-            before.minus(91, ChronoUnit.MINUTES),
-            before.minus(89, ChronoUnit.MINUTES)
-        );
+        verify(signals)
+                .existsManualRequestSince(
+                        org.mockito.ArgumentMatchers.eq(WORKSPACE_ID),
+                        org.mockito.ArgumentMatchers.eq(ScmSignals.PULL_REQUEST.value()),
+                        org.mockito.ArgumentMatchers.eq(ARTIFACT_ID),
+                        since.capture());
+        assertThat(since.getValue())
+                .isBetween(before.minus(91, ChronoUnit.MINUTES), before.minus(89, ChronoUnit.MINUTES));
     }
 
     @Test
@@ -117,10 +118,8 @@ class ManualReviewRateLimitsTest extends BaseUnitTest {
 
         ArgumentCaptor<Instant> since = ArgumentCaptor.forClass(Instant.class);
         verify(signals).countRequestsBySince(org.mockito.ArgumentMatchers.eq(WORKSPACE_ID), any(), since.capture());
-        assertThat(since.getValue()).isBetween(
-            before.minus(61, ChronoUnit.MINUTES),
-            before.minus(59, ChronoUnit.MINUTES)
-        );
+        assertThat(since.getValue())
+                .isBetween(before.minus(61, ChronoUnit.MINUTES), before.minus(59, ChronoUnit.MINUTES));
     }
 
     @Test
@@ -131,9 +130,7 @@ class ManualReviewRateLimitsTest extends BaseUnitTest {
 
     private ManualReviewRateLimits limits(int cooldownMinutes, int allowance) {
         return new ManualReviewRateLimits(
-            signals,
-            new PracticeReviewProperties(false, cooldownMinutes, allowance, false, false)
-        );
+                signals, new PracticeReviewProperties(false, cooldownMinutes, allowance, false, false));
     }
 
     private Optional<SignalStateReason> refusalFrom(ManualReviewRateLimits limits) {

@@ -13,11 +13,11 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubMilestoneEventDTO(
-    @JsonProperty("action") String action,
-    @JsonProperty("milestone") @Nullable GitHubMilestoneDTO milestone,
-    @JsonProperty("repository") @Nullable GitHubRepositoryRefDTO repository,
-    @JsonProperty("sender") @Nullable GitHubUserDTO sender
-) implements GitHubWebhookEvent {
+        @JsonProperty("action") String action,
+        @JsonProperty("milestone") @Nullable GitHubMilestoneDTO milestone,
+        @JsonProperty("repository") @Nullable GitHubRepositoryRefDTO repository,
+        @JsonProperty("sender") @Nullable GitHubUserDTO sender)
+        implements GitHubWebhookEvent {
     @Override
     public GitHubEventAction.Milestone actionType() {
         return GitHubEventAction.Milestone.fromString(action);

@@ -27,9 +27,7 @@ public class WorkspaceInstallationTokenProvider implements InstallationTokenProv
     private final ConnectionService connectionService;
 
     public WorkspaceInstallationTokenProvider(
-        WorkspaceRepository workspaceRepository,
-        ConnectionService connectionService
-    ) {
+            WorkspaceRepository workspaceRepository, ConnectionService connectionService) {
         this.workspaceRepository = workspaceRepository;
         this.connectionService = connectionService;
     }
@@ -37,8 +35,8 @@ public class WorkspaceInstallationTokenProvider implements InstallationTokenProv
     @Override
     public Optional<Long> getInstallationId(Long scopeId) {
         return connectionService
-            .findActiveGitHubAppConfig(scopeId)
-            .map(ConnectionConfig.GitHubAppConfig::installationId);
+                .findActiveGitHubAppConfig(scopeId)
+                .map(ConnectionConfig.GitHubAppConfig::installationId);
     }
 
     @Override
@@ -46,10 +44,10 @@ public class WorkspaceInstallationTokenProvider implements InstallationTokenProv
         // Prefer GITHUB (PAT mode) → GITLAB. Pure App-mode workspaces have no
         // bearer credential blob; the caller must use the App-token mint path.
         return connectionService
-            .findActiveBearerToken(scopeId, IntegrationKind.GITHUB)
-            .or(() -> connectionService.findActiveBearerToken(scopeId, IntegrationKind.GITLAB))
-            .map(b -> b.token())
-            .filter(token -> token != null && !token.isBlank());
+                .findActiveBearerToken(scopeId, IntegrationKind.GITHUB)
+                .or(() -> connectionService.findActiveBearerToken(scopeId, IntegrationKind.GITLAB))
+                .map(b -> b.token())
+                .filter(token -> token != null && !token.isBlank());
     }
 
     @Override
@@ -60,9 +58,10 @@ public class WorkspaceInstallationTokenProvider implements InstallationTokenProv
             return AuthMode.INSTALLATION_APP;
         }
         return switch (kind.get()) {
-            case GITHUB -> connectionService.findActiveGitHubAppConfig(scopeId).isPresent()
-                ? AuthMode.INSTALLATION_APP
-                : AuthMode.PERSONAL_ACCESS_TOKEN;
+            case GITHUB ->
+                connectionService.findActiveGitHubAppConfig(scopeId).isPresent()
+                        ? AuthMode.INSTALLATION_APP
+                        : AuthMode.PERSONAL_ACCESS_TOKEN;
             case GITLAB -> AuthMode.PERSONAL_ACCESS_TOKEN;
             case SLACK, OUTLINE -> {
                 log.warn("Non-SCM provider for scope {}: kind={}; defaulting to INSTALLATION_APP", scopeId, kind.get());
@@ -74,22 +73,22 @@ public class WorkspaceInstallationTokenProvider implements InstallationTokenProv
     @Override
     public boolean isScopeActive(Long scopeId) {
         return workspaceRepository
-            .findById(scopeId)
-            .map(ws -> ws.getStatus() == Workspace.WorkspaceStatus.ACTIVE)
-            .orElse(false);
+                .findById(scopeId)
+                .map(ws -> ws.getStatus() == Workspace.WorkspaceStatus.ACTIVE)
+                .orElse(false);
     }
 
     @Override
     public Optional<String> getServerUrl(Long scopeId) {
         return connectionService
-            .findActiveGitLabConfig(scopeId)
-            .map(ConnectionConfig.GitLabConfig::serverUrl)
-            .or(() ->
-                connectionService.findActiveGitHubAppConfig(scopeId).map(ConnectionConfig.GitHubAppConfig::serverUrl)
-            )
-            .or(() ->
-                connectionService.findActiveGitHubPatConfig(scopeId).map(ConnectionConfig.GitHubPatConfig::serverUrl)
-            )
-            .filter(url -> url != null && !url.isBlank());
+                .findActiveGitLabConfig(scopeId)
+                .map(ConnectionConfig.GitLabConfig::serverUrl)
+                .or(() -> connectionService
+                        .findActiveGitHubAppConfig(scopeId)
+                        .map(ConnectionConfig.GitHubAppConfig::serverUrl))
+                .or(() -> connectionService
+                        .findActiveGitHubPatConfig(scopeId)
+                        .map(ConnectionConfig.GitHubPatConfig::serverUrl))
+                .filter(url -> url != null && !url.isBlank());
     }
 }

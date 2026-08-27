@@ -42,12 +42,7 @@ public class AccountAdminController {
     }
 
     public record AdminAccountViewDTO(
-        Long id,
-        String displayName,
-        @Nullable String primaryEmail,
-        String appRole,
-        String status
-    ) {}
+            Long id, String displayName, @Nullable String primaryEmail, String appRole, String status) {}
 
     public record UpdateAccountRequestDTO(@Nullable String appRole) {}
 
@@ -56,14 +51,10 @@ public class AccountAdminController {
     @GetMapping
     @Operation(summary = "List accounts (paged)", operationId = "adminListUsers")
     public ResponseEntity<List<AdminAccountViewDTO>> list(
-        @RequestParam(defaultValue = "0") int page,
-        @RequestParam(defaultValue = "50") int size
-    ) {
-        List<AdminAccountViewDTO> views = accountService
-            .adminList(page, size)
-            .stream()
-            .map(AccountAdminController::toView)
-            .toList();
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size) {
+        List<AdminAccountViewDTO> views = accountService.adminList(page, size).stream()
+                .map(AccountAdminController::toView)
+                .toList();
         return ResponseEntity.ok(views);
     }
 
@@ -71,18 +62,15 @@ public class AccountAdminController {
     @Operation(summary = "Update an account's app role", operationId = "adminUpdateUser")
     @Audited(ledger = AuditLedger.AUTH_EVENT, type = "APP_ROLE_CHANGED")
     public ResponseEntity<AdminAccountViewDTO> update(
-        @PathVariable Long id,
-        @Valid @RequestBody UpdateAccountRequestDTO body
-    ) {
+            @PathVariable Long id, @Valid @RequestBody UpdateAccountRequestDTO body) {
         Account account = accountService.adminSetRole(id, body.appRole(), CurrentAccount.requireId());
         return ResponseEntity.ok(toView(account));
     }
 
     @DeleteMapping("/{id}/sessions")
     @Operation(
-        summary = "Force sign-out: revoke all of an account's active sessions",
-        operationId = "adminRevokeUserSessions"
-    )
+            summary = "Force sign-out: revoke all of an account's active sessions",
+            operationId = "adminRevokeUserSessions")
     @Audited(ledger = AuditLedger.AUTH_EVENT, type = "JWT_REVOKED")
     public ResponseEntity<RevokeSessionsResultDTO> revokeSessions(@PathVariable Long id) {
         int revoked = accountService.adminRevokeAllSessions(id, CurrentAccount.requireId());
@@ -91,11 +79,10 @@ public class AccountAdminController {
 
     private static AdminAccountViewDTO toView(Account a) {
         return new AdminAccountViewDTO(
-            Objects.requireNonNull(a.getId()),
-            a.getDisplayName(),
-            a.getPrimaryEmail(),
-            a.getAppRole().name(),
-            a.getStatus().name()
-        );
+                Objects.requireNonNull(a.getId()),
+                a.getDisplayName(),
+                a.getPrimaryEmail(),
+                a.getAppRole().name(),
+                a.getStatus().name());
     }
 }

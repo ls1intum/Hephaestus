@@ -20,12 +20,12 @@ public class SlackAppContextChangedMessageHandler extends AbstractSlackEnvelopeH
 
     @Override
     protected void handleEnvelope(JsonNode root) {
-        JsonNode firstEntity = root.path("event").path("context").path("entities").path(0);
+        JsonNode firstEntity =
+                root.path("event").path("context").path("entities").path(0);
         log.debug(
-            "slack.agent: context changed: teamId={}, entityType={}, entityValue={}",
-            teamId(root),
-            firstEntity.path("type").asString(""),
-            firstEntity.path("value").asString("")
-        );
+                "slack.agent: context changed: teamId={}, entityType={}, entityValue={}",
+                teamId(root),
+                firstEntity.path("type").asString(""),
+                firstEntity.path("value").asString(""));
     }
 }

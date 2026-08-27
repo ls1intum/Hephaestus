@@ -104,17 +104,16 @@ public class OutlineDocumentSyncService {
     private final ObjectProvider<DocumentReviewTrigger> reviewTrigger;
 
     public OutlineDocumentSyncService(
-        ConnectionService connectionService,
-        OutlineContentClient outlineApiClient,
-        OutlineDocumentRepository documentRepository,
-        OutlineCollectionRepository collectionRepository,
-        OutlineWebhookRegistrar webhookRegistrar,
-        OutlineProperties properties,
-        OutlineMirrorWriter mirrorWriter,
-        OutlineMirrorRetentionService retention,
-        OutlineDocumentSignalRecorder signalRecorder,
-        ObjectProvider<DocumentReviewTrigger> reviewTrigger
-    ) {
+            ConnectionService connectionService,
+            OutlineContentClient outlineApiClient,
+            OutlineDocumentRepository documentRepository,
+            OutlineCollectionRepository collectionRepository,
+            OutlineWebhookRegistrar webhookRegistrar,
+            OutlineProperties properties,
+            OutlineMirrorWriter mirrorWriter,
+            OutlineMirrorRetentionService retention,
+            OutlineDocumentSignalRecorder signalRecorder,
+            ObjectProvider<DocumentReviewTrigger> reviewTrigger) {
         this.connectionService = connectionService;
         this.outlineApiClient = outlineApiClient;
         this.documentRepository = documentRepository;
@@ -133,19 +132,13 @@ public class OutlineDocumentSyncService {
      * pass re-offers.
      */
     private void recordAndOffer(
-        long workspaceId,
-        @Nullable OutlineDocumentSnapshot document,
-        String eventName,
-        Instant occurredAt,
-        DiscoveredVia discoveredVia
-    ) {
-        Optional<SignalKey> recorded = signalRecorder.record(
-            workspaceId,
-            document,
-            eventName,
-            occurredAt,
-            discoveredVia
-        );
+            long workspaceId,
+            @Nullable OutlineDocumentSnapshot document,
+            String eventName,
+            Instant occurredAt,
+            DiscoveredVia discoveredVia) {
+        Optional<SignalKey> recorded =
+                signalRecorder.record(workspaceId, document, eventName, occurredAt, discoveredVia);
         if (recorded.isEmpty()) {
             return;
         }
@@ -158,11 +151,10 @@ public class OutlineDocumentSyncService {
             trigger.onDocumentSignal(recorded.get(), discoveredVia);
         } catch (RuntimeException e) {
             log.warn(
-                "Offering a document signal for review failed (signal recorded): workspaceId={}, signal={}",
-                workspaceId,
-                recorded.get().signalName(),
-                e
-            );
+                    "Offering a document signal for review failed (signal recorded): workspaceId={}, signal={}",
+                    workspaceId,
+                    recorded.get().signalName(),
+                    e);
         }
     }
 
@@ -194,11 +186,8 @@ public class OutlineDocumentSyncService {
         BooleanSupplier cancelled = cancellationOf(handle);
         try {
             Map<String, OutlineCollectionModel> live = refreshCatalog(ctx);
-            List<OutlineCollection> collections = collectionRepository.findForSync(
-                workspaceId,
-                ctx.connectionId(),
-                MirrorState.ENABLED
-            );
+            List<OutlineCollection> collections =
+                    collectionRepository.findForSync(workspaceId, ctx.connectionId(), MirrorState.ENABLED);
             ExportBudget budget = new ExportBudget(properties.sync().exportBudget());
             Map<String, OutlineDocumentSnapshot> existing = loadExisting(ctx);
             int synced = 0;
@@ -230,13 +219,12 @@ public class OutlineDocumentSyncService {
             retention.enforceSizeCap(workspaceId);
             long stale = mirrorWriter.dropStaleTombstones(workspaceId, now.minus(properties.staleness()));
             log.info(
-                "outline.sync: workspaceId={} collections={} synced={} budgetLeft={} staleDropped={}",
-                workspaceId,
-                collections.size(),
-                synced,
-                budget.remaining(),
-                stale
-            );
+                    "outline.sync: workspaceId={} collections={} synced={} budgetLeft={} staleDropped={}",
+                    workspaceId,
+                    collections.size(),
+                    synced,
+                    budget.remaining(),
+                    stale);
         } catch (OutlineRateLimitedException e) {
             logRateLimited(workspaceId, e);
             reportWarning(handle);
@@ -263,11 +251,12 @@ public class OutlineDocumentSyncService {
             reportWarning(handle);
             return;
         }
-        List<OutlineCollection> pending = collectionRepository
-            .findByWorkspaceIdAndStateAndSyncStatus(workspaceId, MirrorState.ENABLED, SyncStatus.PENDING)
-            .stream()
-            .filter(c -> c.getConnectionId() == ctx.connectionId())
-            .toList();
+        List<OutlineCollection> pending =
+                collectionRepository
+                        .findByWorkspaceIdAndStateAndSyncStatus(workspaceId, MirrorState.ENABLED, SyncStatus.PENDING)
+                        .stream()
+                        .filter(c -> c.getConnectionId() == ctx.connectionId())
+                        .toList();
         if (pending.isEmpty()) {
             return;
         }
@@ -284,17 +273,8 @@ public class OutlineDocumentSyncService {
                 }
                 // The catch-up tick resumes a collection left PENDING by a budget-exhausted reconcile; it is
                 // itself a RECONCILIATION job, so a clean pass here may sweep.
-                if (
-                    !syncOneCollectionRecordingError(
-                        ctx,
-                        collection,
-                        existing,
-                        budget,
-                        now,
-                        SyncJobType.RECONCILIATION,
-                        cancelled
-                    )
-                ) {
+                if (!syncOneCollectionRecordingError(
+                        ctx, collection, existing, budget, now, SyncJobType.RECONCILIATION, cancelled)) {
                     reportWarning(handle);
                 }
                 done++;
@@ -326,25 +306,19 @@ public class OutlineDocumentSyncService {
 
     /** Reports one collection's finished sync attempt (success or recorded error) to the enclosing job. */
     private static void reportCollectionDone(
-        @Nullable SyncExecutionHandle handle,
-        int done,
-        int total,
-        @Nullable String collectionName
-    ) {
+            @Nullable SyncExecutionHandle handle, int done, int total, @Nullable String collectionName) {
         if (handle != null) {
             handle.progress(
-                done,
-                total,
-                // Just the collection — "N of M" is already the progress bar's own reading
-                // (unitsCompleted/unitsTotal travel on the same record).
-                SyncProgress.ofResource(
-                    SyncPhase.COLLECTIONS,
-                    collectionName == null ? "Syncing collection" : "Syncing " + collectionName,
-                    collectionName,
                     done,
-                    total
-                )
-            );
+                    total,
+                    // Just the collection — "N of M" is already the progress bar's own reading
+                    // (unitsCompleted/unitsTotal travel on the same record).
+                    SyncProgress.ofResource(
+                            SyncPhase.COLLECTIONS,
+                            collectionName == null ? "Syncing collection" : "Syncing " + collectionName,
+                            collectionName,
+                            done,
+                            total));
         }
     }
 
@@ -355,27 +329,23 @@ public class OutlineDocumentSyncService {
             return;
         }
         Optional<OutlineCollection> collection = collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(
-            workspaceId,
-            ctx.connectionId(),
-            collectionId
-        );
+                workspaceId, ctx.connectionId(), collectionId);
         if (collection.isEmpty() || !collection.get().isEnabled()) {
             return;
         }
         try {
             syncOneCollectionRecordingError(
-                ctx,
-                collection.get(),
-                loadExisting(ctx),
-                new ExportBudget(properties.sync().exportBudget()),
-                Instant.now(),
-                // A targeted single-collection pass is a full enumeration of that collection — reconciling
-                // it, not populating a fresh mirror.
-                SyncJobType.RECONCILIATION,
-                // No job owns the targeted kick (fire-and-forget off the admin request thread), so there is
-                // nothing to cancel it from.
-                cancellationOf(null)
-            );
+                    ctx,
+                    collection.get(),
+                    loadExisting(ctx),
+                    new ExportBudget(properties.sync().exportBudget()),
+                    Instant.now(),
+                    // A targeted single-collection pass is a full enumeration of that collection — reconciling
+                    // it, not populating a fresh mirror.
+                    SyncJobType.RECONCILIATION,
+                    // No job owns the targeted kick (fire-and-forget off the admin request thread), so there is
+                    // nothing to cancel it from.
+                    cancellationOf(null));
         } catch (OutlineRateLimitedException e) {
             logRateLimited(workspaceId, e);
         }
@@ -400,38 +370,26 @@ public class OutlineDocumentSyncService {
      * since the payload never carries content.
      */
     public void refreshDocument(
-        long workspaceId,
-        String eventName,
-        String documentId,
-        @Nullable OutlineDocumentModel prefetchedMeta
-    ) {
+            long workspaceId, String eventName, String documentId, @Nullable OutlineDocumentModel prefetchedMeta) {
         SyncContext ctx = resolveContext(workspaceId).orElse(null);
         if (ctx == null || documentId == null || documentId.isBlank()) {
             return;
         }
-        Optional<OutlineDocumentSnapshot> mirrored = documentRepository.findSnapshotByDocumentId(
-            workspaceId,
-            ctx.connectionId(),
-            documentId
-        );
+        Optional<OutlineDocumentSnapshot> mirrored =
+                documentRepository.findSnapshotByDocumentId(workspaceId, ctx.connectionId(), documentId);
         if (TOMBSTONE_EVENTS.contains(eventName)) {
-            mirrored
-                .filter(d -> !d.isDeleted())
-                .ifPresent(d ->
-                    retention.tombstone(ctx.workspaceId(), ctx.connectionId(), documentId, Instant.now(), null)
-                );
+            mirrored.filter(d -> !d.isDeleted())
+                    .ifPresent(d -> retention.tombstone(
+                            ctx.workspaceId(), ctx.connectionId(), documentId, Instant.now(), null));
             return;
         }
         if (ARCHIVE_EVENT.equals(eventName)) {
             Instant archivedAt = Instant.now();
-            mirrored
-                .filter(d -> !d.isDeleted())
-                .ifPresent(d -> {
-                    mirrorWriter.updateDocument(workspaceId, ctx.connectionId(), documentId, doc ->
-                        doc.setArchivedAt(archivedAt)
-                    );
-                    recordAndOffer(workspaceId, d, eventName, archivedAt, DiscoveredVia.EVENT);
-                });
+            mirrored.filter(d -> !d.isDeleted()).ifPresent(d -> {
+                mirrorWriter.updateDocument(
+                        workspaceId, ctx.connectionId(), documentId, doc -> doc.setArchivedAt(archivedAt));
+                recordAndOffer(workspaceId, d, eventName, archivedAt, DiscoveredVia.EVENT);
+            });
             return;
         }
         try {
@@ -439,17 +397,12 @@ public class OutlineDocumentSyncService {
             if (prefetchedMeta != null && prefetchedMeta.getId() != null && prefetchedMeta.getCollectionId() != null) {
                 meta = prefetchedMeta;
             } else {
-                Optional<OutlineDocumentModel> info = outlineApiClient.getDocumentInfo(
-                    ctx.serverUrl(),
-                    ctx.token(),
-                    documentId
-                );
+                Optional<OutlineDocumentModel> info =
+                        outlineApiClient.getDocumentInfo(ctx.serverUrl(), ctx.token(), documentId);
                 if (info.isEmpty()) {
-                    mirrored
-                        .filter(d -> !d.isDeleted())
-                        .ifPresent(d ->
-                            retention.tombstone(ctx.workspaceId(), ctx.connectionId(), documentId, Instant.now(), null)
-                        );
+                    mirrored.filter(d -> !d.isDeleted())
+                            .ifPresent(d -> retention.tombstone(
+                                    ctx.workspaceId(), ctx.connectionId(), documentId, Instant.now(), null));
                     return;
                 }
                 meta = info.get();
@@ -458,11 +411,8 @@ public class OutlineDocumentSyncService {
                 return;
             }
             Optional<OutlineCollection> collection =
-                collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(
-                    workspaceId,
-                    ctx.connectionId(),
-                    meta.getCollectionId()
-                );
+                    collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(
+                            workspaceId, ctx.connectionId(), meta.getCollectionId());
             if (collection.isEmpty() || !collection.get().isEnabled()) {
                 return; // the document lives outside the mirrored collections — not ours to ingest
             }
@@ -473,8 +423,9 @@ public class OutlineDocumentSyncService {
             // Read the row back rather than recording from `mirrored`: a content-shaped signal is keyed on
             // the document's hash, and the whole point of this signal is that the content just changed.
             documentRepository
-                .findSnapshotByDocumentId(workspaceId, ctx.connectionId(), documentId)
-                .ifPresent(refreshed -> recordAndOffer(workspaceId, refreshed, eventName, now, DiscoveredVia.EVENT));
+                    .findSnapshotByDocumentId(workspaceId, ctx.connectionId(), documentId)
+                    .ifPresent(
+                            refreshed -> recordAndOffer(workspaceId, refreshed, eventName, now, DiscoveredVia.EVENT));
         } catch (OutlineRateLimitedException e) {
             logRateLimited(workspaceId, e);
         }
@@ -495,20 +446,17 @@ public class OutlineDocumentSyncService {
                 return;
             }
             collectionRepository
-                .findByWorkspaceIdAndConnectionIdAndCollectionId(workspaceId, ctx.connectionId(), collectionId)
-                .ifPresent(collection -> {
-                    Instant now = Instant.now();
-                    for (OutlineDocumentSnapshot doc : documentRepository.findSnapshotsByCollectionId(
-                        workspaceId,
-                        ctx.connectionId(),
-                        collection.getCollectionId()
-                    )) {
-                        if (!doc.isDeleted()) {
-                            retention.tombstone(ctx.workspaceId(), ctx.connectionId(), doc.documentId(), now, null);
+                    .findByWorkspaceIdAndConnectionIdAndCollectionId(workspaceId, ctx.connectionId(), collectionId)
+                    .ifPresent(collection -> {
+                        Instant now = Instant.now();
+                        for (OutlineDocumentSnapshot doc : documentRepository.findSnapshotsByCollectionId(
+                                workspaceId, ctx.connectionId(), collection.getCollectionId())) {
+                            if (!doc.isDeleted()) {
+                                retention.tombstone(ctx.workspaceId(), ctx.connectionId(), doc.documentId(), now, null);
+                            }
                         }
-                    }
-                    recordCollectionError(ctx, collection, "Collection was deleted in Outline");
-                });
+                        recordCollectionError(ctx, collection, "Collection was deleted in Outline");
+                    });
             return;
         }
         try {
@@ -555,14 +503,13 @@ public class OutlineDocumentSyncService {
      * @return whether the collection synced without an API failure
      */
     private boolean syncOneCollectionRecordingError(
-        SyncContext ctx,
-        OutlineCollection collection,
-        Map<String, OutlineDocumentSnapshot> existing,
-        ExportBudget budget,
-        Instant now,
-        SyncJobType type,
-        BooleanSupplier cancelled
-    ) {
+            SyncContext ctx,
+            OutlineCollection collection,
+            Map<String, OutlineDocumentSnapshot> existing,
+            ExportBudget budget,
+            Instant now,
+            SyncJobType type,
+            BooleanSupplier cancelled) {
         try {
             syncOneCollection(ctx, collection, existing, budget, now, type, cancelled);
             return true;
@@ -572,11 +519,10 @@ public class OutlineDocumentSyncService {
             String message = e.getMessage() == null ? "Outline API call failed" : e.getMessage();
             // A real gap in the mirror — log for ops in addition to the lastSyncError the admin surface reads.
             log.warn(
-                "outline.sync: collection sync failed for workspaceId={}, collectionId={}: {}",
-                ctx.workspaceId(),
-                collection.getCollectionId(),
-                message
-            );
+                    "outline.sync: collection sync failed for workspaceId={}, collectionId={}: {}",
+                    ctx.workspaceId(),
+                    collection.getCollectionId(),
+                    message);
             recordCollectionError(ctx, collection, message);
             return false;
         }
@@ -596,14 +542,13 @@ public class OutlineDocumentSyncService {
      * the tombstone sweep, whose {@code seen} set is the one thing an aborted enumeration renders unsafe.
      */
     private void syncOneCollection(
-        SyncContext ctx,
-        OutlineCollection collection,
-        Map<String, OutlineDocumentSnapshot> existing,
-        ExportBudget budget,
-        Instant now,
-        SyncJobType type,
-        BooleanSupplier cancelled
-    ) {
+            SyncContext ctx,
+            OutlineCollection collection,
+            Map<String, OutlineDocumentSnapshot> existing,
+            ExportBudget budget,
+            Instant now,
+            SyncJobType type,
+            BooleanSupplier cancelled) {
         String collectionId = collection.getCollectionId();
         // documents.list is newest-first, so the budget is spent on the most recently edited documents.
         // A truncated enumeration throws rather than returning a short list — see OutlineApiClient.
@@ -611,10 +556,7 @@ public class OutlineDocumentSyncService {
         Map<String, OutlineSyncMapping.FlatNode> nodeById = new LinkedHashMap<>();
         List<OutlineSyncMapping.FlatNode> flat = new ArrayList<>();
         OutlineSyncMapping.flatten(
-            outlineApiClient.listCollectionDocuments(ctx.serverUrl(), ctx.token(), collectionId),
-            null,
-            flat
-        );
+                outlineApiClient.listCollectionDocuments(ctx.serverUrl(), ctx.token(), collectionId), null, flat);
         for (OutlineSyncMapping.FlatNode node : flat) {
             nodeById.put(node.id(), node);
         }
@@ -630,10 +572,8 @@ public class OutlineDocumentSyncService {
                 continue;
             }
             seen.add(meta.getId());
-            if (
-                upsert(ctx, collection, nodeById.get(meta.getId()), meta, existing, budget, now) ==
-                UpsertOutcome.SKIPPED_FOR_BUDGET
-            ) {
+            if (upsert(ctx, collection, nodeById.get(meta.getId()), meta, existing, budget, now)
+                    == UpsertOutcome.SKIPPED_FOR_BUDGET) {
                 skippedForBudget++;
             }
         }
@@ -677,17 +617,15 @@ public class OutlineDocumentSyncService {
         // so an INITIAL run still populates the mirror fully; it just never infers a deletion from a mirror
         // it is only half-way through building. The budget-exhausted return above is the other, independent
         // guard: an incomplete enumeration deletes nothing regardless of job type.
-        int tombstoned =
-            type == SyncJobType.RECONCILIATION
+        int tombstoned = type == SyncJobType.RECONCILIATION
                 ? retention.tombstoneVanished(ctx.workspaceId(), ctx.connectionId(), collectionId, existing, seen, now)
                 : 0;
         if (tombstoned > 0) {
             log.info(
-                "outline.sync: tombstoned {} vanished document(s) in collection {} (workspaceId={})",
-                tombstoned,
-                collectionId,
-                ctx.workspaceId()
-            );
+                    "outline.sync: tombstoned {} vanished document(s) in collection {} (workspaceId={})",
+                    tombstoned,
+                    collectionId,
+                    ctx.workspaceId());
         }
         writeCollection(ctx, collection, target -> {
             target.setDocumentsUpstream(documentsUpstream);
@@ -707,10 +645,9 @@ public class OutlineDocumentSyncService {
      */
     private void abortIncomplete(SyncContext ctx, OutlineCollection collection, String collectionId) {
         log.info(
-            "outline.sync: collection sync cancelled for workspaceId={}, collectionId={} — left PENDING",
-            ctx.workspaceId(),
-            collectionId
-        );
+                "outline.sync: collection sync cancelled for workspaceId={}, collectionId={} — left PENDING",
+                ctx.workspaceId(),
+                collectionId);
         writeCollection(ctx, collection, target -> target.setSyncStatus(SyncStatus.PENDING));
     }
 
@@ -724,14 +661,13 @@ public class OutlineDocumentSyncService {
      * connection held.
      */
     private UpsertOutcome upsert(
-        SyncContext ctx,
-        OutlineCollection collection,
-        OutlineSyncMapping.@Nullable FlatNode node,
-        @Nullable OutlineDocumentModel meta,
-        Map<String, OutlineDocumentSnapshot> existing,
-        @Nullable ExportBudget budget,
-        Instant now
-    ) {
+            SyncContext ctx,
+            OutlineCollection collection,
+            OutlineSyncMapping.@Nullable FlatNode node,
+            @Nullable OutlineDocumentModel meta,
+            Map<String, OutlineDocumentSnapshot> existing,
+            @Nullable ExportBudget budget,
+            Instant now) {
         String documentId = node != null ? node.id() : (meta == null ? null : meta.getId());
         if (documentId == null) {
             return UpsertOutcome.UNCHANGED;
@@ -742,34 +678,30 @@ public class OutlineDocumentSyncService {
         // Computed once so the skip decision compares against exactly what the mutator would write.
         String desiredCollectionId = collection.getCollectionId();
         String desiredCollectionSlug = OutlineSyncMapping.collectionSlug(collection);
-        String desiredParentDocumentId =
-            node != null && node.parentId() != null
+        String desiredParentDocumentId = node != null && node.parentId() != null
                 ? node.parentId()
                 : (meta == null ? null : meta.getParentDocumentId());
         String desiredTitle =
-            node != null && node.title() != null ? node.title() : (meta == null ? null : meta.getTitle());
+                node != null && node.title() != null ? node.title() : (meta == null ? null : meta.getTitle());
         String desiredSlug = OutlineSyncMapping.resolveSlug(node, meta);
         Instant desiredArchivedAt = meta == null ? null : meta.getArchivedAt();
 
-        boolean bodyUnchanged =
-            existingRow != null &&
-            !existingRow.isDeleted() &&
-            existingRow.contentHash() != null &&
-            existingRow.outlineUpdatedAt() != null &&
-            upstreamUpdatedAt != null &&
-            existingRow.outlineUpdatedAt().equals(upstreamUpdatedAt);
+        boolean bodyUnchanged = existingRow != null
+                && !existingRow.isDeleted()
+                && existingRow.contentHash() != null
+                && existingRow.outlineUpdatedAt() != null
+                && upstreamUpdatedAt != null
+                && existingRow.outlineUpdatedAt().equals(upstreamUpdatedAt);
 
         // Nothing to persist: skip the write transaction and the full-entity load it would incur.
-        if (
-            bodyUnchanged &&
-            existingRow != null &&
-            Objects.equals(existingRow.collectionId(), desiredCollectionId) &&
-            Objects.equals(existingRow.collectionSlug(), desiredCollectionSlug) &&
-            Objects.equals(existingRow.parentDocumentId(), desiredParentDocumentId) &&
-            Objects.equals(existingRow.title(), desiredTitle) &&
-            Objects.equals(existingRow.slug(), desiredSlug) &&
-            Objects.equals(existingRow.archivedAt(), desiredArchivedAt)
-        ) {
+        if (bodyUnchanged
+                && existingRow != null
+                && Objects.equals(existingRow.collectionId(), desiredCollectionId)
+                && Objects.equals(existingRow.collectionSlug(), desiredCollectionSlug)
+                && Objects.equals(existingRow.parentDocumentId(), desiredParentDocumentId)
+                && Objects.equals(existingRow.title(), desiredTitle)
+                && Objects.equals(existingRow.slug(), desiredSlug)
+                && Objects.equals(existingRow.archivedAt(), desiredArchivedAt)) {
             return UpsertOutcome.UNCHANGED;
         }
 
@@ -780,36 +712,32 @@ public class OutlineDocumentSyncService {
         String body = bodyUnchanged ? null : outlineApiClient.exportDocument(ctx.serverUrl(), ctx.token(), documentId);
         String contentHash = body == null ? null : OutlineSyncMapping.sha256Hex(body);
 
-        OutlineDocumentSnapshot written = mirrorWriter.upsertDocument(
-            ctx.workspaceId(),
-            ctx.connectionId(),
-            documentId,
-            doc -> {
-                doc.setCollectionId(desiredCollectionId);
-                doc.setCollectionSlug(desiredCollectionSlug);
-                doc.setParentDocumentId(desiredParentDocumentId);
-                doc.setTitle(desiredTitle);
-                doc.setSlug(desiredSlug);
-                // Listings exclude archived documents, so a document reaching this path is live — clear a
-                // stale archivedAt. A null meta (tree-only node) leaves it untouched.
-                if (meta != null) {
-                    doc.setArchivedAt(desiredArchivedAt);
-                }
-                if (bodyUnchanged) {
-                    // Metadata shifted (renamed/moved) but the body is current — do not re-export.
-                    return;
-                }
-                doc.setBodyMarkdown(body);
-                doc.setContentHash(contentHash);
-                doc.setBodyEvictedAt(null); // the body is back in the mirror — the eviction marker must not linger
-                doc.setOutlineUpdatedAt(upstreamUpdatedAt);
-                if (meta != null) {
-                    OutlineSyncMapping.applyAuthorship(doc, meta);
-                }
-                doc.setDeletedAt(null); // revive a previously tombstoned document that reappeared upstream
-                doc.setLastMaterializedAt(now);
-            }
-        );
+        OutlineDocumentSnapshot written =
+                mirrorWriter.upsertDocument(ctx.workspaceId(), ctx.connectionId(), documentId, doc -> {
+                    doc.setCollectionId(desiredCollectionId);
+                    doc.setCollectionSlug(desiredCollectionSlug);
+                    doc.setParentDocumentId(desiredParentDocumentId);
+                    doc.setTitle(desiredTitle);
+                    doc.setSlug(desiredSlug);
+                    // Listings exclude archived documents, so a document reaching this path is live — clear a
+                    // stale archivedAt. A null meta (tree-only node) leaves it untouched.
+                    if (meta != null) {
+                        doc.setArchivedAt(desiredArchivedAt);
+                    }
+                    if (bodyUnchanged) {
+                        // Metadata shifted (renamed/moved) but the body is current — do not re-export.
+                        return;
+                    }
+                    doc.setBodyMarkdown(body);
+                    doc.setContentHash(contentHash);
+                    doc.setBodyEvictedAt(null); // the body is back in the mirror — the eviction marker must not linger
+                    doc.setOutlineUpdatedAt(upstreamUpdatedAt);
+                    if (meta != null) {
+                        OutlineSyncMapping.applyAuthorship(doc, meta);
+                    }
+                    doc.setDeletedAt(null); // revive a previously tombstoned document that reappeared upstream
+                    doc.setLastMaterializedAt(now);
+                });
         if (written != null) {
             existing.put(documentId, written);
         }
@@ -827,20 +755,16 @@ public class OutlineDocumentSyncService {
      * @return exports skipped for budget among the archived documents enumerated this pass
      */
     private int syncArchivedDocuments(
-        SyncContext ctx,
-        OutlineCollection collection,
-        Map<String, OutlineDocumentSnapshot> existing,
-        Set<String> seen,
-        ExportBudget budget,
-        Instant now,
-        BooleanSupplier cancelled
-    ) {
+            SyncContext ctx,
+            OutlineCollection collection,
+            Map<String, OutlineDocumentSnapshot> existing,
+            Set<String> seen,
+            ExportBudget budget,
+            Instant now,
+            BooleanSupplier cancelled) {
         int skipped = 0;
-        for (OutlineDocumentModel meta : outlineApiClient.listArchivedDocuments(
-            ctx.serverUrl(),
-            ctx.token(),
-            collection.getCollectionId()
-        )) {
+        for (OutlineDocumentModel meta :
+                outlineApiClient.listArchivedDocuments(ctx.serverUrl(), ctx.token(), collection.getCollectionId())) {
             if (cancelled.getAsBoolean()) {
                 return skipped;
             }
@@ -864,13 +788,12 @@ public class OutlineDocumentSyncService {
      * @return {@code false} when an export was needed but the budget denied it (the row is left untouched)
      */
     private boolean upsertArchived(
-        SyncContext ctx,
-        OutlineCollection collection,
-        OutlineDocumentModel meta,
-        Map<String, OutlineDocumentSnapshot> existing,
-        ExportBudget budget,
-        Instant now
-    ) {
+            SyncContext ctx,
+            OutlineCollection collection,
+            OutlineDocumentModel meta,
+            Map<String, OutlineDocumentSnapshot> existing,
+            ExportBudget budget,
+            Instant now) {
         String documentId = Objects.requireNonNull(meta.getId(), "Outline document must have an id");
         OutlineDocumentSnapshot snapshot = existing.get(documentId);
         boolean needsExport = snapshot == null || snapshot.isDeleted() || !snapshot.hasBody();
@@ -880,29 +803,25 @@ public class OutlineDocumentSyncService {
         String body = needsExport ? outlineApiClient.exportDocument(ctx.serverUrl(), ctx.token(), documentId) : null;
         String contentHash = body == null ? null : OutlineSyncMapping.sha256Hex(body);
 
-        OutlineDocumentSnapshot written = mirrorWriter.upsertDocument(
-            ctx.workspaceId(),
-            ctx.connectionId(),
-            documentId,
-            doc -> {
-                doc.setCollectionId(collection.getCollectionId());
-                doc.setCollectionSlug(OutlineSyncMapping.collectionSlug(collection));
-                doc.setParentDocumentId(meta.getParentDocumentId());
-                doc.setTitle(meta.getTitle());
-                doc.setSlug(OutlineSyncMapping.resolveSlug(null, meta));
-                doc.setArchivedAt(meta.getArchivedAt() != null ? meta.getArchivedAt() : now);
-                doc.setDeletedAt(null); // archived is not a tombstone — clear any stale marker
-                if (!needsExport) {
-                    return;
-                }
-                doc.setBodyMarkdown(body);
-                doc.setContentHash(contentHash);
-                doc.setBodyEvictedAt(null);
-                doc.setOutlineUpdatedAt(meta.getUpdatedAt());
-                OutlineSyncMapping.applyAuthorship(doc, meta);
-                doc.setLastMaterializedAt(now);
-            }
-        );
+        OutlineDocumentSnapshot written =
+                mirrorWriter.upsertDocument(ctx.workspaceId(), ctx.connectionId(), documentId, doc -> {
+                    doc.setCollectionId(collection.getCollectionId());
+                    doc.setCollectionSlug(OutlineSyncMapping.collectionSlug(collection));
+                    doc.setParentDocumentId(meta.getParentDocumentId());
+                    doc.setTitle(meta.getTitle());
+                    doc.setSlug(OutlineSyncMapping.resolveSlug(null, meta));
+                    doc.setArchivedAt(meta.getArchivedAt() != null ? meta.getArchivedAt() : now);
+                    doc.setDeletedAt(null); // archived is not a tombstone — clear any stale marker
+                    if (!needsExport) {
+                        return;
+                    }
+                    doc.setBodyMarkdown(body);
+                    doc.setContentHash(contentHash);
+                    doc.setBodyEvictedAt(null);
+                    doc.setOutlineUpdatedAt(meta.getUpdatedAt());
+                    OutlineSyncMapping.applyAuthorship(doc, meta);
+                    doc.setLastMaterializedAt(now);
+                });
         if (written != null) {
             existing.put(documentId, written);
         }
@@ -930,7 +849,8 @@ public class OutlineDocumentSyncService {
             log.warn("outline.sync: no resolvable token for workspaceId={} — skipping", workspaceId);
             return Optional.empty();
         }
-        return Optional.of(new SyncContext(workspaceId, connection.getId(), serverUrl, bearer.get().token()));
+        return Optional.of(new SyncContext(
+                workspaceId, connection.getId(), serverUrl, bearer.get().token()));
     }
 
     /**
@@ -939,10 +859,8 @@ public class OutlineDocumentSyncService {
      */
     private Map<String, OutlineDocumentSnapshot> loadExisting(SyncContext ctx) {
         Map<String, OutlineDocumentSnapshot> existing = new HashMap<>();
-        for (OutlineDocumentSnapshot doc : documentRepository.findSnapshotsByWorkspaceIdAndConnectionId(
-            ctx.workspaceId(),
-            ctx.connectionId()
-        )) {
+        for (OutlineDocumentSnapshot doc :
+                documentRepository.findSnapshotsByWorkspaceIdAndConnectionId(ctx.workspaceId(), ctx.connectionId())) {
             existing.put(doc.documentId(), doc);
         }
         return existing;
@@ -950,11 +868,9 @@ public class OutlineDocumentSyncService {
 
     /** Mirrored collection rows for this install (all states — catalog fields refresh on PAUSED too). */
     private List<OutlineCollection> mirroredCollections(SyncContext ctx) {
-        return collectionRepository
-            .findByWorkspaceIdOrderByCreatedAtAsc(ctx.workspaceId())
-            .stream()
-            .filter(c -> c.getConnectionId() == ctx.connectionId())
-            .toList();
+        return collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(ctx.workspaceId()).stream()
+                .filter(c -> c.getConnectionId() == ctx.connectionId())
+                .toList();
     }
 
     /**
@@ -976,10 +892,9 @@ public class OutlineDocumentSyncService {
         // Pause, don't abort: progress committed so far is kept and the remainder resumes next tick. The
         // tombstone pass is intentionally skipped so a document we did not reach is never dropped.
         log.warn(
-            "outline.sync: rate-limited for workspaceId={} — pausing this pass (retryAfter={})",
-            workspaceId,
-            e.getRetryAfter()
-        );
+                "outline.sync: rate-limited for workspaceId={} — pausing this pass (retryAfter={})",
+                workspaceId,
+                e.getRetryAfter());
     }
 
     /** The resolved per-pass call context: workspace, install, host, and a decrypted token. */

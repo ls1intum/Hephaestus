@@ -40,12 +40,11 @@ class ModulithVerificationTest {
     @Test
     void modulesAreCycleFreeAndRespectNamedInterfaces() {
         ApplicationModules.of(
-            Application.class,
-            resideInAnyPackage(
-                "..integration.scm.github.graphql.model..",
-                "..integration.scm.gitlab.graphql.model..",
-                "..integration.outline.client.model.."
-            )
-        ).verify();
+                        Application.class,
+                        resideInAnyPackage(
+                                "..integration.scm.github.graphql.model..",
+                                "..integration.scm.gitlab.graphql.model..",
+                                "..integration.outline.client.model.."))
+                .verify();
     }
 }

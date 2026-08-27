@@ -35,13 +35,12 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
  *                     the publish path could not resolve a scope
  */
 public record BotCommandReceivedEvent(
-    IntegrationKind kind,
-    long repositoryId,
-    int mrNumber,
-    String noteBody,
-    String noteAuthor,
-    long providerId,
-    long authorNativeId,
-    @org.jspecify.annotations.Nullable Long commentId,
-    @org.jspecify.annotations.Nullable Long scopeId
-) {}
+        IntegrationKind kind,
+        long repositoryId,
+        int mrNumber,
+        String noteBody,
+        String noteAuthor,
+        long providerId,
+        long authorNativeId,
+        @org.jspecify.annotations.Nullable Long commentId,
+        @org.jspecify.annotations.Nullable Long scopeId) {}

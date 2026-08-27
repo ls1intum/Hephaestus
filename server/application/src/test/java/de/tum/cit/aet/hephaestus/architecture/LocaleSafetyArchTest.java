@@ -28,20 +28,20 @@ class LocaleSafetyArchTest extends HephaestusArchitectureTest {
     @Test
     void noLocaleGetDefault() {
         ArchRule rule = noClasses()
-            .that()
-            .resideInAPackage(WEBHOOK_PACKAGE)
-            .should()
-            .callMethod(Locale.class, "getDefault")
-            .because("Locale.getDefault() threads JVM-default locale into case-folds — use Locale.ROOT");
+                .that()
+                .resideInAPackage(WEBHOOK_PACKAGE)
+                .should()
+                .callMethod(Locale.class, "getDefault")
+                .because("Locale.getDefault() threads JVM-default locale into case-folds — use Locale.ROOT");
         rule.check(classes);
     }
 
     private static ArchRule rejectNakedCaseFold(String methodName) {
         return noClasses()
-            .that()
-            .resideInAPackage(WEBHOOK_PACKAGE)
-            .should()
-            .callMethod(String.class, methodName)
-            .because("Default-locale " + methodName + "() — use " + methodName + "(Locale.ROOT)");
+                .that()
+                .resideInAPackage(WEBHOOK_PACKAGE)
+                .should()
+                .callMethod(String.class, methodName)
+                .because("Default-locale " + methodName + "() — use " + methodName + "(Locale.ROOT)");
     }
 }

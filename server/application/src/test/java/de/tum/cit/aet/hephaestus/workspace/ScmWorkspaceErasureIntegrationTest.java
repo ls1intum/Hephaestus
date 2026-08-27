@@ -121,23 +121,20 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
         databaseTestUtils.cleanDatabase();
 
         gitProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
 
         tenantA = WorkspaceTestFixtures.persistInstallationWorkspace(
-            workspaceRepository,
-            connectionRepository,
-            WorkspaceTestFixtures.installationWorkspace(5001L, "acme").withSlug("tenant-a"),
-            5001L
-        );
+                workspaceRepository,
+                connectionRepository,
+                WorkspaceTestFixtures.installationWorkspace(5001L, "acme").withSlug("tenant-a"),
+                5001L);
         tenantB = WorkspaceTestFixtures.persistInstallationWorkspace(
-            workspaceRepository,
-            connectionRepository,
-            WorkspaceTestFixtures.installationWorkspace(5002L, "acme").withSlug("tenant-b"),
-            5002L
-        );
+                workspaceRepository,
+                connectionRepository,
+                WorkspaceTestFixtures.installationWorkspace(5002L, "acme").withSlug("tenant-b"),
+                5002L);
 
         Repository shared = persistRepository(9001L, SHARED_REPO);
         Repository exclusive = persistRepository(9002L, EXCLUSIVE_REPO);
@@ -156,13 +153,17 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
         eraser.eraseWorkspaceScmMirror(tenantA.getId());
 
         assertThat(repositoryRepository.findByNameWithOwner(SHARED_REPO)).isPresent();
-        assertThat(issueRepository.findAll()).singleElement().extracting(Issue::getTitle).isEqualTo("shared issue");
+        assertThat(issueRepository.findAll())
+                .singleElement()
+                .extracting(Issue::getTitle)
+                .isEqualTo("shared issue");
         assertThat(repositoryToMonitorRepository.findByWorkspaceId(tenantB.getId()))
-            .singleElement()
-            .extracting(RepositoryToMonitor::getNameWithOwner)
-            .isEqualTo(SHARED_REPO);
+                .singleElement()
+                .extracting(RepositoryToMonitor::getNameWithOwner)
+                .isEqualTo(SHARED_REPO);
 
-        assertThat(repositoryToMonitorRepository.findByWorkspaceId(tenantA.getId())).isEmpty();
+        assertThat(repositoryToMonitorRepository.findByWorkspaceId(tenantA.getId()))
+                .isEmpty();
         assertThat(repositoryRepository.findByNameWithOwner(EXCLUSIVE_REPO)).isEmpty();
     }
 
@@ -186,7 +187,8 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
         eraser.eraseWorkspaceScmMirror(tenantA.getId());
 
         assertThat(repositoryRepository.count()).isEqualTo(repositoriesAfterFirst);
-        assertThat(repositoryToMonitorRepository.findByWorkspaceId(tenantA.getId())).isEmpty();
+        assertThat(repositoryToMonitorRepository.findByWorkspaceId(tenantA.getId()))
+                .isEmpty();
     }
 
     @Test
@@ -201,7 +203,8 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
 
         SyncJob syncJob = new SyncJob();
         syncJob.setWorkspace(tenantA);
-        syncJob.setConnection(connectionRepository.findByWorkspaceId(tenantA.getId()).getFirst());
+        syncJob.setConnection(
+                connectionRepository.findByWorkspaceId(tenantA.getId()).getFirst());
         syncJob.setKind(IntegrationKind.GITHUB);
         syncJob.setType(SyncJobType.INITIAL);
         syncJob.setTrigger(SyncJobTrigger.MANUAL);
@@ -226,7 +229,8 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
         assertThat(scmWorkspacePurgeAdapter.getOrder()).isEqualTo(-200);
         scmWorkspacePurgeAdapter.deleteWorkspaceData(tenantA.getId());
 
-        assertThat(repositoryToMonitorRepository.findByWorkspaceId(tenantA.getId())).isEmpty();
+        assertThat(repositoryToMonitorRepository.findByWorkspaceId(tenantA.getId()))
+                .isEmpty();
         assertThat(repositoryRepository.findByNameWithOwner(EXCLUSIVE_REPO)).isEmpty();
         assertThat(repositoryRepository.findByNameWithOwner(SHARED_REPO)).isPresent();
 
@@ -243,7 +247,8 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
     void gitlabRevoke_erasesTheMirror() {
         gitlabConnectionStrategy.revoke(new IntegrationRef(IntegrationKind.GITLAB, tenantA.getId(), "group-1"));
 
-        assertThat(repositoryToMonitorRepository.findByWorkspaceId(tenantA.getId())).isEmpty();
+        assertThat(repositoryToMonitorRepository.findByWorkspaceId(tenantA.getId()))
+                .isEmpty();
         assertThat(repositoryRepository.findByNameWithOwner(EXCLUSIVE_REPO)).isEmpty();
         // Still cross-tenant safe on the GitLab path.
         assertThat(repositoryRepository.findByNameWithOwner(SHARED_REPO)).isPresent();
@@ -268,7 +273,8 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
         eraser.eraseWorkspaceScmMirror(tenantA.getId());
 
         assertThat(teamsFor(organization)).isEmpty();
-        assertThat(organizationMembershipRepository.findByOrganizationId(organization.getId())).isEmpty();
+        assertThat(organizationMembershipRepository.findByOrganizationId(organization.getId()))
+                .isEmpty();
 
         // Read the FK column directly: Workspace.organization is LAZY, so asserting on the entity
         // getter outside a session reports a proxy-initialization error instead of the real diff.
@@ -283,9 +289,9 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
         assertThat(organizationIdOf(tenantB)).isEqualTo(organization.getId());
 
         assertThat(repositoryToMonitorRepository.findByWorkspaceId(tenantB.getId()))
-            .singleElement()
-            .extracting(RepositoryToMonitor::getNameWithOwner)
-            .isEqualTo(SHARED_REPO);
+                .singleElement()
+                .extracting(RepositoryToMonitor::getNameWithOwner)
+                .isEqualTo(SHARED_REPO);
         assertThat(repositoryRepository.findByNameWithOwner(SHARED_REPO)).isPresent();
     }
 
@@ -318,18 +324,17 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
         // (ScmWorkspacePurgeAdapter) is gone, and the Connection (ConnectionPurgeContributor) is
         // torn down rather than left ACTIVE behind a "purged" label.
         assertThat(countRows("slack_thread")).isZero();
-        assertThat(repositoryToMonitorRepository.findByWorkspaceId(tenantA.getId())).isEmpty();
+        assertThat(repositoryToMonitorRepository.findByWorkspaceId(tenantA.getId()))
+                .isEmpty();
         assertThat(repositoryRepository.findByNameWithOwner(EXCLUSIVE_REPO)).isEmpty();
-        assertThat(connectionRepository.findByWorkspaceId(tenantA.getId())).allSatisfy(connection ->
-            assertThat(connection.getState()).isEqualTo(IntegrationState.UNINSTALLED)
-        );
+        assertThat(connectionRepository.findByWorkspaceId(tenantA.getId()))
+                .allSatisfy(connection -> assertThat(connection.getState()).isEqualTo(IntegrationState.UNINSTALLED));
 
         // tenantB co-monitors the shared repo and is untouched — a vendor uninstall purges exactly
         // the one workspace that installation backs, never a sibling tenant.
         assertThat(repositoryRepository.findByNameWithOwner(SHARED_REPO)).isPresent();
-        assertThat(workspaceRepository.findById(tenantB.getId()).orElseThrow().getStatus()).isEqualTo(
-            Workspace.WorkspaceStatus.ACTIVE
-        );
+        assertThat(workspaceRepository.findById(tenantB.getId()).orElseThrow().getStatus())
+                .isEqualTo(Workspace.WorkspaceStatus.ACTIVE);
         assertThat(teamsFor(organization)).isEmpty();
     }
 
@@ -342,9 +347,8 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
         provisioningAdapter.onInstallationDeleted(5001L);
 
         assertThat(repositoryRepository.count()).isEqualTo(repositoriesAfterFirst);
-        assertThat(workspaceRepository.findById(tenantA.getId()).orElseThrow().getStatus()).isEqualTo(
-            Workspace.WorkspaceStatus.PURGED
-        );
+        assertThat(workspaceRepository.findById(tenantA.getId()).orElseThrow().getStatus())
+                .isEqualTo(Workspace.WorkspaceStatus.PURGED);
     }
 
     private List<Team> teamsFor(Organization organization) {
@@ -384,10 +388,7 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
     /** The workspace's {@code organization_id} FK, read as a column so no lazy proxy is involved. */
     private @Nullable Long organizationIdOf(Workspace workspace) {
         return jdbcTemplate.queryForObject(
-            "SELECT organization_id FROM workspace WHERE id = ?",
-            Long.class,
-            workspace.getId()
-        );
+                "SELECT organization_id FROM workspace WHERE id = ?", Long.class, workspace.getId());
     }
 
     private long countRows(String table) {

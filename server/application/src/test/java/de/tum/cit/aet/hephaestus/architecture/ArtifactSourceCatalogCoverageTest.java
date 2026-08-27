@@ -25,37 +25,29 @@ import tools.jackson.databind.json.JsonMapper;
 class ArtifactSourceCatalogCoverageTest {
 
     private static final Set<SourceKind> CATALOG_KINDS = new ClasspathArtifactSourceCatalogRegistry(
-        JsonMapper.builder().build(),
-        Clock.systemUTC()
-    )
-        .current()
-        .sources()
-        .stream()
-        .map(ArtifactSourceContract::kind)
-        .collect(Collectors.toUnmodifiableSet());
+                    JsonMapper.builder().build(), Clock.systemUTC())
+            .current().sources().stream().map(ArtifactSourceContract::kind).collect(Collectors.toUnmodifiableSet());
 
     private static final Set<SourceKind> COLLECTED_KINDS = collectedKinds();
 
     private static Set<SourceKind> collectedKinds() {
-        JavaClasses providers = new ClassFileImporter().importPackages(
-            "de.tum.cit.aet.hephaestus.agent.context.providers"
-        );
-        return providers
-            .stream()
-            .filter(javaClass -> javaClass.isAssignableTo(EvidenceSource.class))
-            .map(JavaClass::reflect)
-            .filter(type -> !type.isInterface() && !Modifier.isAbstract(type.getModifiers()))
-            .flatMap(type -> declaredKinds(type).stream())
-            .collect(Collectors.toUnmodifiableSet());
+        JavaClasses providers =
+                new ClassFileImporter().importPackages("de.tum.cit.aet.hephaestus.agent.context.providers");
+        return providers.stream()
+                .filter(javaClass -> javaClass.isAssignableTo(EvidenceSource.class))
+                .map(JavaClass::reflect)
+                .filter(type -> !type.isInterface() && !Modifier.isAbstract(type.getModifiers()))
+                .flatMap(type -> declaredKinds(type).stream())
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     /** Reads the constants a collector declares, without building its bean graph. */
     private static Set<SourceKind> declaredKinds(Class<?> type) {
         return Arrays.stream(type.getDeclaredFields())
-            .filter(field -> Modifier.isStatic(field.getModifiers()))
-            .filter(field -> SourceKind.class.equals(field.getType()))
-            .map(ArtifactSourceCatalogCoverageTest::read)
-            .collect(Collectors.toUnmodifiableSet());
+                .filter(field -> Modifier.isStatic(field.getModifiers()))
+                .filter(field -> SourceKind.class.equals(field.getType()))
+                .map(ArtifactSourceCatalogCoverageTest::read)
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     private static SourceKind read(Field field) {
@@ -71,21 +63,17 @@ class ArtifactSourceCatalogCoverageTest {
     @DisplayName("every collected source kind is governed by the catalog")
     void everyCollectedKindIsGoverned() {
         assertThat(COLLECTED_KINDS)
-            .as(
-                "a kind the catalog omits carries no privacy class, no retention and no use decision — " +
-                    "authorization is looked up by source kind, so it is evidence no governance covers"
-            )
-            .isSubsetOf(CATALOG_KINDS);
+                .as("a kind the catalog omits carries no privacy class, no retention and no use decision — "
+                        + "authorization is looked up by source kind, so it is evidence no governance covers")
+                .isSubsetOf(CATALOG_KINDS);
     }
 
     @Test
     @DisplayName("every catalog source kind has a collector")
     void everyCatalogKindIsCollectable() {
         assertThat(CATALOG_KINDS)
-            .as(
-                "a catalog kind nothing collects can only ever be reported absent: a practice requiring " +
-                    "it abstains on every run, which reads as a broken product rather than a missing collector"
-            )
-            .isSubsetOf(COLLECTED_KINDS);
+                .as("a catalog kind nothing collects can only ever be reported absent: a practice requiring "
+                        + "it abstains on every run, which reads as a broken product rather than a missing collector")
+                .isSubsetOf(COLLECTED_KINDS);
     }
 }

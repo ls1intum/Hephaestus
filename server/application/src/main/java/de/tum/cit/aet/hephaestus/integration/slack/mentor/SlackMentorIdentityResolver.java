@@ -45,11 +45,10 @@ public class SlackMentorIdentityResolver {
     private final UserRepository userRepository;
 
     public SlackMentorIdentityResolver(
-        GitProviderRegistry gitProviderRegistry,
-        AccountIdentityQuery accountIdentityQuery,
-        AccountWorkspaceMembershipQuery workspaceMembershipQuery,
-        UserRepository userRepository
-    ) {
+            GitProviderRegistry gitProviderRegistry,
+            AccountIdentityQuery accountIdentityQuery,
+            AccountWorkspaceMembershipQuery workspaceMembershipQuery,
+            UserRepository userRepository) {
         this.gitProviderRegistry = gitProviderRegistry;
         this.accountIdentityQuery = accountIdentityQuery;
         this.workspaceMembershipQuery = workspaceMembershipQuery;
@@ -69,24 +68,21 @@ public class SlackMentorIdentityResolver {
     }
 
     private Optional<String> resolveDeveloperLoginInternal(
-        long workspaceId,
-        @Nullable String teamId,
-        String slackUserId
-    ) {
+            long workspaceId, @Nullable String teamId, String slackUserId) {
         if (slackUserId == null || slackUserId.isBlank()) {
             return Optional.empty();
         }
         long slackProviderId = gitProviderRegistry.resolveProviderId("SLACK", SLACK_SERVER_URL);
         return accountIdentityQuery
-            .resolveAccountId(slackProviderId, slackUserId, teamId)
-            .map(accountIdentityQuery::activeLinksForAccount)
-            .orElseGet(List::of)
-            .stream()
-            .map(AccountIdentityQuery.IdentityLinkView::usernameAtSignup)
-            .filter(login -> login != null && !login.isBlank())
-            .distinct()
-            .filter(login -> isWorkspaceMember(login, workspaceId))
-            .findFirst();
+                .resolveAccountId(slackProviderId, slackUserId, teamId)
+                .map(accountIdentityQuery::activeLinksForAccount)
+                .orElseGet(List::of)
+                .stream()
+                .map(AccountIdentityQuery.IdentityLinkView::usernameAtSignup)
+                .filter(login -> login != null && !login.isBlank())
+                .distinct()
+                .filter(login -> isWorkspaceMember(login, workspaceId))
+                .findFirst();
     }
 
     /**
@@ -102,8 +98,8 @@ public class SlackMentorIdentityResolver {
     @Transactional(readOnly = true)
     public Optional<Long> resolveMemberId(long workspaceId, @Nullable String teamId, String slackUserId) {
         return resolveDeveloperLoginInternal(workspaceId, teamId, slackUserId)
-            .flatMap(userRepository::findByLogin)
-            .map(User::getId);
+                .flatMap(userRepository::findByLogin)
+                .map(User::getId);
     }
 
     /**
@@ -118,21 +114,19 @@ public class SlackMentorIdentityResolver {
     public Optional<String> resolveSlackUserId(long memberId, @Nullable String teamId) {
         long slackProviderId = gitProviderRegistry.resolveProviderId("SLACK", SLACK_SERVER_URL);
         return accountIdentityQuery
-            .resolveAccountIdForActor(memberId)
-            .map(accountIdentityQuery::activeLinksForAccount)
-            .orElseGet(List::of)
-            .stream()
-            .filter(link -> link.gitProviderId() != null && link.gitProviderId() == slackProviderId)
-            .filter(link -> teamId == null || teamId.equals(link.teamId()))
-            .map(AccountIdentityQuery.IdentityLinkView::subject)
-            .filter(subject -> subject != null && !subject.isBlank())
-            .findFirst();
+                .resolveAccountIdForActor(memberId)
+                .map(accountIdentityQuery::activeLinksForAccount)
+                .orElseGet(List::of)
+                .stream()
+                .filter(link -> link.gitProviderId() != null && link.gitProviderId() == slackProviderId)
+                .filter(link -> teamId == null || teamId.equals(link.teamId()))
+                .map(AccountIdentityQuery.IdentityLinkView::subject)
+                .filter(subject -> subject != null && !subject.isBlank())
+                .findFirst();
     }
 
     private boolean isWorkspaceMember(String login, long workspaceId) {
-        return workspaceMembershipQuery
-            .membershipsForLogins(Set.of(login))
-            .stream()
-            .anyMatch(view -> view.workspaceId() != null && view.workspaceId() == workspaceId);
+        return workspaceMembershipQuery.membershipsForLogins(Set.of(login)).stream()
+                .anyMatch(view -> view.workspaceId() != null && view.workspaceId() == workspaceId);
     }
 }

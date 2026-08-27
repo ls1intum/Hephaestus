@@ -21,9 +21,8 @@ public class SlackMentorDmMessageHandler extends AbstractSlackEnvelopeHandler {
     @Override
     protected void handleEnvelope(JsonNode root) {
         JsonNode event = root.path("event");
-        if (
-            !"message".equals(event.path("type").asString("")) || !"im".equals(event.path("channel_type").asString(""))
-        ) {
+        if (!"message".equals(event.path("type").asString(""))
+                || !"im".equals(event.path("channel_type").asString(""))) {
             return;
         }
         if (event.has("bot_id") || !event.path("subtype").asString("").isEmpty()) {

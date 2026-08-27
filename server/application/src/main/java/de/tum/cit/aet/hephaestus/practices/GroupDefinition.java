@@ -5,11 +5,10 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 public record GroupDefinition(
-    String name,
-    @Nullable String description,
-    @Nullable String icon,
-    @Nullable String color
-) implements CatalogDefinition {
+        String name,
+        @Nullable String description,
+        @Nullable String icon,
+        @Nullable String color) implements CatalogDefinition {
     public GroupDefinition {
         Objects.requireNonNull(name, "name");
         description = blankToNull(description);
@@ -29,12 +28,12 @@ public record GroupDefinition(
     @Override
     public String provenanceFingerprint(String slug) {
         return new CanonicalDigest()
-            .add(slug)
-            .add(name)
-            .addNullable(description)
-            .addNullable(icon)
-            .addNullable(color)
-            .hex();
+                .add(slug)
+                .add(name)
+                .addNullable(description)
+                .addNullable(icon)
+                .addNullable(color)
+                .hex();
     }
 
     private static @Nullable String blankToNull(@Nullable String value) {

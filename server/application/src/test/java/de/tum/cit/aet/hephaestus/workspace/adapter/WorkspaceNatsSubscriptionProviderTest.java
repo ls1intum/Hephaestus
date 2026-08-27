@@ -13,7 +13,6 @@ import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceScopeFilter;
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,12 +53,7 @@ class WorkspaceNatsSubscriptionProviderTest extends BaseUnitTest {
 
     private WorkspaceNatsSubscriptionProvider providerWithFlags(boolean outlineEnabled, boolean slackEnabled) {
         return new WorkspaceNatsSubscriptionProvider(
-            workspaceRepository,
-            workspaceScopeFilter,
-            connectionService,
-            outlineEnabled,
-            slackEnabled
-        );
+                workspaceRepository, workspaceScopeFilter, connectionService, outlineEnabled, slackEnabled);
     }
 
     private void lenientReposAndOrg() {
@@ -68,12 +62,10 @@ class WorkspaceNatsSubscriptionProviderTest extends BaseUnitTest {
     }
 
     private StreamSubscription streamNamed(NatsSubscriptionInfo info, String stream) {
-        return info
-            .streamSubscriptions()
-            .stream()
-            .filter(s -> s.streamName().equals(stream))
-            .findFirst()
-            .orElseThrow(() -> new AssertionError("no subscription for stream " + stream));
+        return info.streamSubscriptions().stream()
+                .filter(s -> s.streamName().equals(stream))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("no subscription for stream " + stream));
     }
 
     @Test
@@ -94,37 +86,35 @@ class WorkspaceNatsSubscriptionProviderTest extends BaseUnitTest {
     @Test
     void outlineOnlyWorkspaceEmitsOnlyTheOutlineStream() {
         when(connectionService.findActiveProviderKind(WS)).thenReturn(Optional.empty());
-        when(connectionService.findActiveOutlineConfig(WS)).thenReturn(
-            Optional.of(new ConnectionConfig.OutlineConfig("https://o.test", "sub-1", "secret", Set.of()))
-        );
+        when(connectionService.findActiveOutlineConfig(WS))
+                .thenReturn(
+                        Optional.of(new ConnectionConfig.OutlineConfig("https://o.test", "sub-1", "secret", Set.of())));
 
         NatsSubscriptionInfo info = provider.getSubscriptionInfo(WS).orElseThrow();
 
-        assertThat(info.streamSubscriptions().stream().map(StreamSubscription::streamName)).containsExactly("outline");
+        assertThat(info.streamSubscriptions().stream().map(StreamSubscription::streamName))
+                .containsExactly("outline");
         assertThat(streamNamed(info, "outline").subjects()).containsExactly("outline.sub-1.>");
     }
 
     @Test
     void dualConnectionWorkspaceEmitsBothStreams() {
         when(connectionService.findActiveProviderKind(WS)).thenReturn(Optional.of(IntegrationKind.GITLAB));
-        when(connectionService.findActiveOutlineConfig(WS)).thenReturn(
-            Optional.of(new ConnectionConfig.OutlineConfig("https://o.test", "sub-9", "secret", Set.of()))
-        );
+        when(connectionService.findActiveOutlineConfig(WS))
+                .thenReturn(
+                        Optional.of(new ConnectionConfig.OutlineConfig("https://o.test", "sub-9", "secret", Set.of())));
 
         NatsSubscriptionInfo info = provider.getSubscriptionInfo(WS).orElseThrow();
 
-        assertThat(info.streamSubscriptions().stream().map(StreamSubscription::streamName)).containsExactlyInAnyOrder(
-            "gitlab",
-            "outline"
-        );
+        assertThat(info.streamSubscriptions().stream().map(StreamSubscription::streamName))
+                .containsExactlyInAnyOrder("gitlab", "outline");
     }
 
     @Test
     void outlineConnectionWithoutRegisteredSubscriptionIsSkipped() {
         when(connectionService.findActiveProviderKind(WS)).thenReturn(Optional.empty());
-        when(connectionService.findActiveOutlineConfig(WS)).thenReturn(
-            Optional.of(new ConnectionConfig.OutlineConfig("https://o.test", null, null, Set.of()))
-        );
+        when(connectionService.findActiveOutlineConfig(WS))
+                .thenReturn(Optional.of(new ConnectionConfig.OutlineConfig("https://o.test", null, null, Set.of())));
 
         NatsSubscriptionInfo info = provider.getSubscriptionInfo(WS).orElseThrow();
 
@@ -135,13 +125,14 @@ class WorkspaceNatsSubscriptionProviderTest extends BaseUnitTest {
     void slackConnectedWorkspaceEmitsAPerTeamSlackFilter() {
         when(connectionService.findActiveProviderKind(WS)).thenReturn(Optional.empty());
         when(connectionService.findActiveOutlineConfig(WS)).thenReturn(Optional.empty());
-        when(connectionService.findSlackNotificationConfig(WS)).thenReturn(
-            Optional.of(new ConnectionConfig.SlackConfig("T0ABC123", "Acme", null, null, null, Set.of()))
-        );
+        when(connectionService.findSlackNotificationConfig(WS))
+                .thenReturn(
+                        Optional.of(new ConnectionConfig.SlackConfig("T0ABC123", "Acme", null, null, null, Set.of())));
 
         NatsSubscriptionInfo info = provider.getSubscriptionInfo(WS).orElseThrow();
 
-        assertThat(info.streamSubscriptions().stream().map(StreamSubscription::streamName)).containsExactly("slack");
+        assertThat(info.streamSubscriptions().stream().map(StreamSubscription::streamName))
+                .containsExactly("slack");
         assertThat(streamNamed(info, "slack").subjects()).containsExactly("slack.T0ABC123.>");
     }
 
@@ -160,7 +151,8 @@ class WorkspaceNatsSubscriptionProviderTest extends BaseUnitTest {
 
         assertThat(info.hasSubscriptions()).isFalse();
         // The disabled arm must not even ask — no connection lookup on a dead code path.
-        org.mockito.Mockito.verify(connectionService, org.mockito.Mockito.never()).findActiveOutlineConfig(WS);
+        org.mockito.Mockito.verify(connectionService, org.mockito.Mockito.never())
+                .findActiveOutlineConfig(WS);
     }
 
     @Test
@@ -172,16 +164,16 @@ class WorkspaceNatsSubscriptionProviderTest extends BaseUnitTest {
         NatsSubscriptionInfo info = provider.getSubscriptionInfo(WS).orElseThrow();
 
         assertThat(info.hasSubscriptions()).isFalse();
-        org.mockito.Mockito.verify(connectionService, org.mockito.Mockito.never()).findSlackNotificationConfig(WS);
+        org.mockito.Mockito.verify(connectionService, org.mockito.Mockito.never())
+                .findSlackNotificationConfig(WS);
     }
 
     @Test
     void slackConnectionWithoutTeamIdIsSkipped() {
         when(connectionService.findActiveProviderKind(WS)).thenReturn(Optional.empty());
         when(connectionService.findActiveOutlineConfig(WS)).thenReturn(Optional.empty());
-        when(connectionService.findSlackNotificationConfig(WS)).thenReturn(
-            Optional.of(new ConnectionConfig.SlackConfig(null, "Acme", null, null, null, Set.of()))
-        );
+        when(connectionService.findSlackNotificationConfig(WS))
+                .thenReturn(Optional.of(new ConnectionConfig.SlackConfig(null, "Acme", null, null, null, Set.of())));
 
         NatsSubscriptionInfo info = provider.getSubscriptionInfo(WS).orElseThrow();
 

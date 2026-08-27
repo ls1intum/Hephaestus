@@ -29,25 +29,22 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
 
     @Test
     void admitsACorroboratedLivePatternNobodyHasBeenShownLately() {
-        assertThat(
-            route(problems(2, ObservationOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null)
-        ).isEqualTo(InAppRoutingDecision.ADMIT);
+        assertThat(route(problems(2, ObservationOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null))
+                .isEqualTo(InAppRoutingDecision.ADMIT);
     }
 
     @Test
     void refusesAMessageMissingItsNextStep() {
         ComposedInAppMessage incomplete = new ComposedInAppMessage("ships-tests", "Title", "Body", "  ", null);
 
-        assertThat(
-            InAppFeedbackRouter.route(
-                incomplete,
-                problems(2, ObservationOrigin.LIVE),
-                PracticeAutonomy.AUTOMATIC,
-                ActorRole.AUTHOR,
-                null,
-                NOW
-            )
-        ).isEqualTo(InAppRoutingDecision.INCOMPLETE);
+        assertThat(InAppFeedbackRouter.route(
+                        incomplete,
+                        problems(2, ObservationOrigin.LIVE),
+                        PracticeAutonomy.AUTOMATIC,
+                        ActorRole.AUTHOR,
+                        null,
+                        NOW))
+                .isEqualTo(InAppRoutingDecision.INCOMPLETE);
     }
 
     /**
@@ -58,33 +55,29 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
      */
     @Test
     void refusesAPracticeThatJudgesSomebodyOtherThanTheAuthor() {
-        assertThat(
-            route(problems(5, ObservationOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.REVIEWER, null)
-        ).isEqualTo(InAppRoutingDecision.REVIEWER_ATTRIBUTED);
+        assertThat(route(problems(5, ObservationOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.REVIEWER, null))
+                .isEqualTo(InAppRoutingDecision.REVIEWER_ATTRIBUTED);
     }
 
     @Test
     void refusesAPracticeWithNoProblemsBehindIt() {
         Observation strength = observation(1L, ObservationOrigin.LIVE, Assessment.GOOD);
 
-        assertThat(route(List.of(strength), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null)).isEqualTo(
-            InAppRoutingDecision.NO_EVIDENCE
-        );
+        assertThat(route(List.of(strength), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null))
+                .isEqualTo(InAppRoutingDecision.NO_EVIDENCE);
     }
 
     @Test
     void refusesAPracticeWhoseTierDoesNotAdmitTheLane() {
-        assertThat(
-            route(problems(2, ObservationOrigin.LIVE), PracticeAutonomy.HUMAN_APPROVAL, ActorRole.AUTHOR, null)
-        ).isEqualTo(InAppRoutingDecision.PRACTICE_REQUIRES_APPROVAL);
+        assertThat(route(problems(2, ObservationOrigin.LIVE), PracticeAutonomy.HUMAN_APPROVAL, ActorRole.AUTHOR, null))
+                .isEqualTo(InAppRoutingDecision.PRACTICE_REQUIRES_APPROVAL);
     }
 
     /** The day-one bound: a sweep over a year of finished work does not become a wall of feedback. */
     @Test
     void refusesAPatternWhoseEveryMeasurementCameFromABackfill() {
-        assertThat(
-            route(problems(4, ObservationOrigin.BACKFILL), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null)
-        ).isEqualTo(InAppRoutingDecision.BACKFILL_HELD);
+        assertThat(route(problems(4, ObservationOrigin.BACKFILL), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null))
+                .isEqualTo(InAppRoutingDecision.BACKFILL_HELD);
     }
 
     /** One live measurement is enough to make the cluster a live one; the refusal is for a wholly backfilled set. */
@@ -93,17 +86,15 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
         Observation backfilled = observation(1L, ObservationOrigin.BACKFILL, Assessment.BAD);
         Observation live = observation(2L, ObservationOrigin.LIVE, Assessment.BAD);
 
-        assertThat(route(List.of(backfilled, live), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null)).isEqualTo(
-            InAppRoutingDecision.ADMIT
-        );
+        assertThat(route(List.of(backfilled, live), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null))
+                .isEqualTo(InAppRoutingDecision.ADMIT);
     }
 
     /** One occurrence is a task-level note; it was already delivered where it belongs. */
     @Test
     void refusesAProblemSeenOnOnlyOnePieceOfWork() {
-        assertThat(
-            route(problems(1, ObservationOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null)
-        ).isEqualTo(InAppRoutingDecision.UNCORROBORATED);
+        assertThat(route(problems(1, ObservationOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null))
+                .isEqualTo(InAppRoutingDecision.UNCORROBORATED);
     }
 
     /** Twice on the same pull request is one occurrence — the unit of proof here is separate work. */
@@ -112,34 +103,30 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
         Observation first = observation(42L, ObservationOrigin.LIVE, Assessment.BAD);
         Observation second = observation(42L, ObservationOrigin.LIVE, Assessment.BAD);
 
-        assertThat(route(List.of(first, second), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null)).isEqualTo(
-            InAppRoutingDecision.UNCORROBORATED
-        );
+        assertThat(route(List.of(first, second), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null))
+                .isEqualTo(InAppRoutingDecision.UNCORROBORATED);
     }
 
     @Test
     void refusesAHabitTheDeveloperWasShownInsideTheCooldown() {
         Instant yesterday = NOW.minus(Duration.ofDays(1));
 
-        assertThat(
-            route(problems(3, ObservationOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, yesterday)
-        ).isEqualTo(InAppRoutingDecision.RECENTLY_SURFACED);
+        assertThat(route(problems(3, ObservationOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, yesterday))
+                .isEqualTo(InAppRoutingDecision.RECENTLY_SURFACED);
     }
 
     @Test
     void admitsAHabitLastShownBeforeTheCooldownElapsed() {
         Instant longAgo = NOW.minus(Duration.ofDays(InAppFeedbackRouter.RESURFACE_COOLDOWN_DAYS + 1));
 
-        assertThat(
-            route(problems(3, ObservationOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, longAgo)
-        ).isEqualTo(InAppRoutingDecision.ADMIT);
+        assertThat(route(problems(3, ObservationOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, longAgo))
+                .isEqualTo(InAppRoutingDecision.ADMIT);
     }
 
     @Test
     void unresolvedAutonomyFailsClosed() {
-        assertThat(route(problems(2, ObservationOrigin.LIVE), null, ActorRole.AUTHOR, null)).isEqualTo(
-            InAppRoutingDecision.PRACTICE_REQUIRES_APPROVAL
-        );
+        assertThat(route(problems(2, ObservationOrigin.LIVE), null, ActorRole.AUTHOR, null))
+                .isEqualTo(InAppRoutingDecision.PRACTICE_REQUIRES_APPROVAL);
     }
 
     /**
@@ -152,53 +139,52 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
         Observation problem = observation(1L, ObservationOrigin.LIVE, Assessment.BAD);
         Observation strength = observation(2L, ObservationOrigin.LIVE, Assessment.GOOD);
         Observation abstention = Observation.builder()
-            .id(UUID.randomUUID())
-            .artifactKind(ArtifactKinds.PULL_REQUEST)
-            .artifactId(3L)
-            .presence(Presence.NOT_APPLICABLE)
-            .origin(ObservationOrigin.LIVE)
-            .observedAt(NOW)
-            .build();
+                .id(UUID.randomUUID())
+                .artifactKind(ArtifactKinds.PULL_REQUEST)
+                .artifactId(3L)
+                .presence(Presence.NOT_APPLICABLE)
+                .origin(ObservationOrigin.LIVE)
+                .observedAt(NOW)
+                .build();
 
-        assertThat(InAppFeedbackRouter.problemsIn(List.of(problem, strength, abstention))).containsExactly(problem);
+        assertThat(InAppFeedbackRouter.problemsIn(List.of(problem, strength, abstention)))
+                .containsExactly(problem);
     }
 
     private static InAppRoutingDecision route(
-        List<Observation> evidence,
-        @Nullable PracticeAutonomy autonomy,
-        ActorRole subjectRole,
-        @Nullable Instant lastSurfaced
-    ) {
+            List<Observation> evidence,
+            @Nullable PracticeAutonomy autonomy,
+            ActorRole subjectRole,
+            @Nullable Instant lastSurfaced) {
         return InAppFeedbackRouter.route(message(), evidence, autonomy, subjectRole, lastSurfaced, NOW);
     }
 
     private static ComposedInAppMessage message() {
         return new ComposedInAppMessage(
-            "ships-tests-with-the-change",
-            "Tests are arriving one commit late",
-            "On your last few changes the test landed a push after the behaviour did.",
-            "Write the assertion that distinguishes the new branch before you write the branch.",
-            null
-        );
+                "ships-tests-with-the-change",
+                "Tests are arriving one commit late",
+                "On your last few changes the test landed a push after the behaviour did.",
+                "Write the assertion that distinguishes the new branch before you write the branch.",
+                null);
     }
 
     /** {@code count} problems, each on a different piece of work. */
     private static List<Observation> problems(int count, ObservationOrigin origin) {
         return java.util.stream.IntStream.rangeClosed(1, count)
-            .mapToObj(i -> observation(i, origin, Assessment.BAD))
-            .toList();
+                .mapToObj(i -> observation(i, origin, Assessment.BAD))
+                .toList();
     }
 
     private static Observation observation(long artifactId, ObservationOrigin origin, Assessment assessment) {
         ArtifactKind kind = ArtifactKinds.PULL_REQUEST;
         return Observation.builder()
-            .id(UUID.randomUUID())
-            .artifactKind(kind)
-            .artifactId(artifactId)
-            .presence(Presence.PRESENT)
-            .assessment(assessment)
-            .origin(origin)
-            .observedAt(NOW)
-            .build();
+                .id(UUID.randomUUID())
+                .artifactKind(kind)
+                .artifactId(artifactId)
+                .presence(Presence.PRESENT)
+                .assessment(assessment)
+                .origin(origin)
+                .observedAt(NOW)
+                .build();
     }
 }

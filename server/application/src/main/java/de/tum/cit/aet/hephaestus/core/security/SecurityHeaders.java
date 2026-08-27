@@ -46,29 +46,25 @@ public final class SecurityHeaders {
      * Because the policy is a compile-time constant with zero configurable hosts, it never reads the
      * {@code login_provider} table — satisfying the no-DB-at-context-refresh constraint by construction.
      */
-    private static final String CONTENT_SECURITY_POLICY =
-        "default-src 'self'; " +
-        "script-src 'self'; " +
-        "style-src 'self' 'unsafe-inline'; " +
-        "img-src 'self' data: https:; " +
-        "connect-src 'self'; " +
-        "frame-ancestors 'none'; " +
-        "base-uri 'self'; " +
-        "form-action 'self'";
+    private static final String CONTENT_SECURITY_POLICY = "default-src 'self'; " + "script-src 'self'; "
+            + "style-src 'self' 'unsafe-inline'; "
+            + "img-src 'self' data: https:; "
+            + "connect-src 'self'; "
+            + "frame-ancestors 'none'; "
+            + "base-uri 'self'; "
+            + "form-action 'self'";
 
     /** Applies the full header set to the given {@link HttpSecurity}. */
     public static void apply(HttpSecurity http) throws Exception {
-        http.headers(headers ->
-            headers
-                .frameOptions(frameOptions -> frameOptions.deny())
+        http.headers(headers -> headers.frameOptions(frameOptions -> frameOptions.deny())
                 .contentTypeOptions(contentType -> {})
-                .httpStrictTransportSecurity(hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000))
+                .httpStrictTransportSecurity(
+                        hsts -> hsts.includeSubDomains(true).maxAgeInSeconds(31536000))
                 .contentSecurityPolicy(csp -> csp.policyDirectives(CONTENT_SECURITY_POLICY))
                 .referrerPolicy(referrer -> referrer.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
                 .crossOriginOpenerPolicy(coop -> coop.policy(CrossOriginOpenerPolicy.SAME_ORIGIN))
                 // COEP credentialless: the builder enum lacks this value on the current Spring
                 // Security version, so emit it directly.
-                .addHeaderWriter(new StaticHeadersWriter("Cross-Origin-Embedder-Policy", "credentialless"))
-        );
+                .addHeaderWriter(new StaticHeadersWriter("Cross-Origin-Embedder-Policy", "credentialless")));
     }
 }

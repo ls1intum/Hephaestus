@@ -61,18 +61,17 @@ public class WorkspaceProvisioningService {
     private final Map<IntegrationKind, WorkspaceProviderAvailability> providerAvailability;
 
     public WorkspaceProvisioningService(
-        WorkspaceProperties workspaceProperties,
-        WorkspaceRepository workspaceRepository,
-        RepositoryToMonitorRepository repositoryToMonitorRepository,
-        WorkspaceService workspaceService,
-        UserRepository userRepository,
-        IdentityProviderRepository gitProviderRepository,
-        WorkspaceMembershipRepository workspaceMembershipRepository,
-        WorkspaceMembershipService workspaceMembershipService,
-        AuthenticatedGitProviderUserService authenticatedGitProviderUserService,
-        ConnectionService connectionService,
-        List<WorkspaceProviderAvailability> providerAvailabilityList
-    ) {
+            WorkspaceProperties workspaceProperties,
+            WorkspaceRepository workspaceRepository,
+            RepositoryToMonitorRepository repositoryToMonitorRepository,
+            WorkspaceService workspaceService,
+            UserRepository userRepository,
+            IdentityProviderRepository gitProviderRepository,
+            WorkspaceMembershipRepository workspaceMembershipRepository,
+            WorkspaceMembershipService workspaceMembershipService,
+            AuthenticatedGitProviderUserService authenticatedGitProviderUserService,
+            ConnectionService connectionService,
+            List<WorkspaceProviderAvailability> providerAvailabilityList) {
         this.workspaceProperties = workspaceProperties;
         this.workspaceRepository = workspaceRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
@@ -89,11 +88,11 @@ public class WorkspaceProvisioningService {
         }
         this.providerAvailability = map;
         this.webClient = WebClient.builder()
-            .clientConnector(WebClientConnectors.systemDns())
-            .baseUrl(GITHUB_API_BASE_URL)
-            .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
-            .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
-            .build();
+                .clientConnector(WebClientConnectors.systemDns())
+                .baseUrl(GITHUB_API_BASE_URL)
+                .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
+                .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
+                .build();
     }
 
     /** Bootstrap a default GitHub PAT workspace from configuration properties. */
@@ -119,15 +118,13 @@ public class WorkspaceProvisioningService {
         }
         if (isBlank(accountLogin)) {
             throw new IllegalStateException(
-                "Failed to derive account login for default workspace bootstrap. Set hephaestus.workspace.default.login."
-            );
+                    "Failed to derive account login for default workspace bootstrap. Set hephaestus.workspace.default.login.");
         }
         accountLogin = Objects.requireNonNull(accountLogin);
 
         if (isBlank(config.token())) {
             throw new IllegalStateException(
-                "Missing PAT for default workspace bootstrap. Configure hephaestus.workspace.default.token or set GITHUB_PAT."
-            );
+                    "Missing PAT for default workspace bootstrap. Configure hephaestus.workspace.default.token or set GITHUB_PAT.");
         }
         String token = Objects.requireNonNull(config.token());
 
@@ -136,13 +133,8 @@ public class WorkspaceProvisioningService {
         String rawSlug = accountLogin;
         String displayName = accountLogin;
 
-        Workspace workspace = workspaceService.createWorkspace(
-            rawSlug,
-            displayName,
-            accountLogin,
-            AccountType.ORG,
-            ownerUserId
-        );
+        Workspace workspace =
+                workspaceService.createWorkspace(rawSlug, displayName, accountLogin, AccountType.ORG, ownerUserId);
 
         workspace.setRepositorySelection(RepositorySelection.SELECTED);
         Workspace savedWorkspace = workspaceRepository.save(workspace);
@@ -150,33 +142,29 @@ public class WorkspaceProvisioningService {
         // instance_key="pat" matches the backfill convention for legacy PAT workspaces;
         // the bearer credential is stored encrypted via the per-row AAD.
         connectionService.provisionPatConnection(
-            savedWorkspace,
-            IntegrationKind.GITHUB,
-            "pat",
-            new ConnectionConfig.GitHubPatConfig(accountLogin, /* serverUrl */ null, Set.of()),
-            token,
-            "bootstrap-pat-workspace-" + savedWorkspace.getId()
-        );
+                savedWorkspace,
+                IntegrationKind.GITHUB,
+                "pat",
+                new ConnectionConfig.GitHubPatConfig(accountLogin, /* serverUrl */ null, Set.of()),
+                token,
+                "bootstrap-pat-workspace-" + savedWorkspace.getId());
 
         log.info(
-            "Created default PAT workspace: accountLogin={}, workspaceId={}",
-            savedWorkspace.getAccountLogin(),
-            savedWorkspace.getId()
-        );
+                "Created default PAT workspace: accountLogin={}, workspaceId={}",
+                savedWorkspace.getAccountLogin(),
+                savedWorkspace.getId());
 
-        config
-            .repositoriesToMonitor()
-            .stream()
-            .map(repo -> repo == null ? null : repo.trim())
-            .filter(nameWithOwner -> !isBlank(nameWithOwner))
-            .forEach(nameWithOwner -> {
-                RepositoryToMonitor monitor = new RepositoryToMonitor();
-                monitor.setNameWithOwner(nameWithOwner);
-                monitor.setWorkspace(savedWorkspace);
-                repositoryToMonitorRepository.save(monitor);
-                savedWorkspace.getRepositoriesToMonitor().add(monitor);
-                log.info("Queued repository for monitoring: repoName={}", nameWithOwner);
-            });
+        config.repositoriesToMonitor().stream()
+                .map(repo -> repo == null ? null : repo.trim())
+                .filter(nameWithOwner -> !isBlank(nameWithOwner))
+                .forEach(nameWithOwner -> {
+                    RepositoryToMonitor monitor = new RepositoryToMonitor();
+                    monitor.setNameWithOwner(nameWithOwner);
+                    monitor.setWorkspace(savedWorkspace);
+                    repositoryToMonitorRepository.save(monitor);
+                    savedWorkspace.getRepositoriesToMonitor().add(monitor);
+                    log.info("Queued repository for monitoring: repoName={}", nameWithOwner);
+                });
 
         workspaceRepository.save(savedWorkspace);
         log.info("Completed PAT workspace provisioning: workspaceId={}", savedWorkspace.getId());
@@ -197,15 +185,13 @@ public class WorkspaceProvisioningService {
         String groupPath = config.login() != null ? config.login().trim() : null;
         if (isBlank(groupPath)) {
             throw new IllegalStateException(
-                "Failed to derive group path for GitLab workspace bootstrap. Set hephaestus.workspace.gitlab-default.login."
-            );
+                    "Failed to derive group path for GitLab workspace bootstrap. Set hephaestus.workspace.gitlab-default.login.");
         }
         groupPath = Objects.requireNonNull(groupPath);
 
         if (isBlank(config.token())) {
             throw new IllegalStateException(
-                "Missing PAT for GitLab workspace bootstrap. Set hephaestus.workspace.gitlab-default.token or GITLAB_PAT."
-            );
+                    "Missing PAT for GitLab workspace bootstrap. Set hephaestus.workspace.gitlab-default.token or GITLAB_PAT.");
         }
         String token = Objects.requireNonNull(config.token());
 
@@ -215,25 +201,22 @@ public class WorkspaceProvisioningService {
         //       attach; falling through to createWorkspace would crash on the slug unique constraint.
         List<Workspace> existing = workspaceRepository.findAllByAccountLoginIgnoreCase(groupPath);
         if (!existing.isEmpty()) {
-            Optional<Workspace> existingGitLab = existing
-                .stream()
-                .filter(workspace ->
-                    connectionService.findActive(workspace.getId(), IntegrationKind.GITLAB).isPresent()
-                )
-                .findFirst();
+            Optional<Workspace> existingGitLab = existing.stream()
+                    .filter(workspace -> connectionService
+                            .findActive(workspace.getId(), IntegrationKind.GITLAB)
+                            .isPresent())
+                    .findFirst();
             if (existingGitLab.isPresent()) {
                 log.debug(
-                    "Skipped GitLab PAT workspace creation, workspace has ACTIVE GitLab Connection: workspaceId={}, groupPath={}",
-                    existingGitLab.get().getId(),
-                    groupPath
-                );
+                        "Skipped GitLab PAT workspace creation, workspace has ACTIVE GitLab Connection: workspaceId={}, groupPath={}",
+                        existingGitLab.get().getId(),
+                        groupPath);
                 return;
             }
             log.warn(
-                "Skipped GitLab PAT workspace creation, matching workspace has no ACTIVE GitLab Connection: workspaceIds={}, groupPath={}",
-                existing.stream().map(Workspace::getId).toList(),
-                groupPath
-            );
+                    "Skipped GitLab PAT workspace creation, matching workspace has no ACTIVE GitLab Connection: workspaceIds={}, groupPath={}",
+                    existing.stream().map(Workspace::getId).toList(),
+                    groupPath);
             return;
         }
 
@@ -243,13 +226,8 @@ public class WorkspaceProvisioningService {
         String slug = groupPath.replace("/", "-");
         String displayName = groupPath.contains("/") ? groupPath.substring(groupPath.lastIndexOf('/') + 1) : groupPath;
 
-        Workspace workspace = workspaceService.createWorkspace(
-            slug,
-            displayName,
-            groupPath,
-            AccountType.ORG,
-            ownerUserId
-        );
+        Workspace workspace =
+                workspaceService.createWorkspace(slug, displayName, groupPath, AccountType.ORG, ownerUserId);
 
         workspace.setRepositorySelection(RepositorySelection.ALL);
         Workspace savedWorkspace = workspaceRepository.save(workspace);
@@ -259,25 +237,22 @@ public class WorkspaceProvisioningService {
         // server URL alone — webhook registration will fill in the group id later.
         String instanceKey = serverUrl;
         connectionService.provisionPatConnection(
-            savedWorkspace,
-            IntegrationKind.GITLAB,
-            instanceKey,
-            new ConnectionConfig.GitLabConfig(
-                serverUrl,
-                /* gitlabGroupId */ null,
-                /* gitlabWebhookId */ null,
-                ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
-                Set.of()
-            ),
-            token,
-            "bootstrap-gitlab-pat-workspace-" + savedWorkspace.getId()
-        );
+                savedWorkspace,
+                IntegrationKind.GITLAB,
+                instanceKey,
+                new ConnectionConfig.GitLabConfig(
+                        serverUrl,
+                        /* gitlabGroupId */ null,
+                        /* gitlabWebhookId */ null,
+                        ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                        Set.of()),
+                token,
+                "bootstrap-gitlab-pat-workspace-" + savedWorkspace.getId());
 
         log.info(
-            "Created default GitLab PAT workspace: groupPath={}, workspaceId={}",
-            savedWorkspace.getAccountLogin(),
-            savedWorkspace.getId()
-        );
+                "Created default GitLab PAT workspace: groupPath={}, workspaceId={}",
+                savedWorkspace.getAccountLogin(),
+                savedWorkspace.getId());
 
         ensureAdminMembership(savedWorkspace);
     }
@@ -333,16 +308,12 @@ public class WorkspaceProvisioningService {
         WorkspaceProviderAvailability gitLabAvailability = providerAvailability.get(IntegrationKind.GITLAB);
         if (gitLabAvailability == null) {
             throw new IllegalStateException(
-                "GitLab provider availability port is not configured; cannot resolve default GitLab server URL"
-            );
+                    "GitLab provider availability port is not configured; cannot resolve default GitLab server URL");
         }
         return gitLabAvailability
-            .hintUrl()
-            .orElseThrow(() ->
-                new IllegalStateException(
-                    "GitLab provider availability has no connection hint; default server URL unavailable"
-                )
-            );
+                .hintUrl()
+                .orElseThrow(() -> new IllegalStateException(
+                        "GitLab provider availability has no connection hint; default server URL unavailable"));
     }
 
     /**
@@ -356,14 +327,12 @@ public class WorkspaceProvisioningService {
     private Long syncGitLabUserForPAT(String patToken, String serverUrl, String groupPath) {
         // Resolve the GitLab provider first so all lookups are provider-scoped
         IdentityProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, serverUrl)
-            .orElse(null);
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, serverUrl)
+                .orElse(null);
 
         if (provider != null) {
-            Optional<User> existing = userRepository.findByLoginAndProviderId(
-                groupPath,
-                Objects.requireNonNull(provider.getId())
-            );
+            Optional<User> existing =
+                    userRepository.findByLoginAndProviderId(groupPath, Objects.requireNonNull(provider.getId()));
             if (existing.isPresent()) {
                 return existing.get().getId();
             }
@@ -372,126 +341,108 @@ public class WorkspaceProvisioningService {
         // ssrfGuarded (not systemDns): serverUrl is user-supplied (workspace config), so the outbound
         // DNS must be filtered at connect time — same SSRF sink as GitLabPreflightService. The string
         // form is additionally validated in resolveGitLabServerUrl.
-        WebClient gitlabClient = WebClient.builder().clientConnector(WebClientConnectors.ssrfGuarded()).build();
+        WebClient gitlabClient = WebClient.builder()
+                .clientConnector(WebClientConnectors.ssrfGuarded())
+                .build();
 
         GitLabTokenUserResponse userInfo = null;
         try {
             userInfo = gitlabClient
-                .get()
-                .uri(serverUrl + "/api/v4/user")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + patToken)
-                .retrieve()
-                .bodyToMono(GitLabTokenUserResponse.class)
-                .block(Duration.ofSeconds(10));
+                    .get()
+                    .uri(serverUrl + "/api/v4/user")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + patToken)
+                    .retrieve()
+                    .bodyToMono(GitLabTokenUserResponse.class)
+                    .block(Duration.ofSeconds(10));
         } catch (Exception e) {
             log.debug(
-                "GET /api/v4/user failed (expected for group/project tokens): serverUrl={}, status={}",
-                serverUrl,
-                e.getMessage()
-            );
+                    "GET /api/v4/user failed (expected for group/project tokens): serverUrl={}, status={}",
+                    serverUrl,
+                    e.getMessage());
         }
 
         if (userInfo != null && userInfo.id() != null) {
             return upsertGitLabUser(
-                userInfo.id(),
-                userInfo.username() != null ? userInfo.username() : groupPath,
-                userInfo.name(),
-                userInfo.avatarUrl(),
-                userInfo.webUrl(),
-                serverUrl
-            );
+                    userInfo.id(),
+                    userInfo.username() != null ? userInfo.username() : groupPath,
+                    userInfo.name(),
+                    userInfo.avatarUrl(),
+                    userInfo.webUrl(),
+                    serverUrl);
         }
 
         log.info("Falling back to group API for token validation: serverUrl={}, groupPath={}", serverUrl, groupPath);
         GitLabGroupResponse groupInfo = gitlabClient
-            .get()
-            .uri(serverUrl + "/api/v4/groups/{groupPath}", groupPath)
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + patToken)
-            .retrieve()
-            .bodyToMono(GitLabGroupResponse.class)
-            .block(Duration.ofSeconds(10));
+                .get()
+                .uri(serverUrl + "/api/v4/groups/{groupPath}", groupPath)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + patToken)
+                .retrieve()
+                .bodyToMono(GitLabGroupResponse.class)
+                .block(Duration.ofSeconds(10));
 
         if (groupInfo == null || groupInfo.id() == null) {
             throw new IllegalStateException(
-                "Failed to validate GitLab token against group '" + groupPath + "' at " + serverUrl
-            );
+                    "Failed to validate GitLab token against group '" + groupPath + "' at " + serverUrl);
         }
 
         return upsertGitLabUser(
-            groupInfo.id(),
-            groupPath,
-            groupInfo.name() != null ? groupInfo.name() : groupPath,
-            groupInfo.avatarUrl(),
-            groupInfo.webUrl(),
-            serverUrl
-        );
+                groupInfo.id(),
+                groupPath,
+                groupInfo.name() != null ? groupInfo.name() : groupPath,
+                groupInfo.avatarUrl(),
+                groupInfo.webUrl(),
+                serverUrl);
     }
 
     private Long upsertGitLabUser(
-        Long nativeId,
-        String login,
-        String name,
-        String avatarUrl,
-        String webUrl,
-        String serverUrl
-    ) {
+            Long nativeId, String login, String name, String avatarUrl, String webUrl, String serverUrl) {
         return upsertGitLabUser(nativeId, login, name, avatarUrl, webUrl, serverUrl, User.Type.BOT);
     }
 
     private Long upsertGitLabUser(
-        Long nativeId,
-        String login,
-        String name,
-        String avatarUrl,
-        String webUrl,
-        String serverUrl,
-        User.Type userType
-    ) {
+            Long nativeId,
+            String login,
+            String name,
+            String avatarUrl,
+            String webUrl,
+            String serverUrl,
+            User.Type userType) {
         String safeName = name != null ? name : login;
         // GitLab self-hosted instances return relative avatar paths (e.g. /uploads/-/system/user/avatar/123/avatar.png)
         String safeAvatar = avatarUrl != null ? (avatarUrl.startsWith("/") ? serverUrl + avatarUrl : avatarUrl) : "";
         String safeWebUrl = webUrl != null ? webUrl : "";
 
         IdentityProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, serverUrl)
-            .orElseGet(() -> {
-                log.info("Creating IdentityProvider for self-hosted GitLab: serverUrl={}", serverUrl);
-                return gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITLAB, serverUrl));
-            });
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, serverUrl)
+                .orElseGet(() -> {
+                    log.info("Creating IdentityProvider for self-hosted GitLab: serverUrl={}", serverUrl);
+                    return gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITLAB, serverUrl));
+                });
         Long providerId = Objects.requireNonNull(provider.getId());
 
         userRepository.acquireLoginLock(login, providerId);
         userRepository.freeLoginConflicts(login, nativeId, providerId);
         userRepository.upsertUser(
-            nativeId,
-            providerId,
-            login,
-            safeName,
-            safeAvatar,
-            safeWebUrl,
-            userType.name(),
-            null,
-            null,
-            null
-        );
+                nativeId, providerId, login, safeName, safeAvatar, safeWebUrl, userType.name(), null, null, null);
         log.info(
-            "Upserted user for GitLab workspace bootstrap: userLogin={}, nativeId={}, type={}",
-            LoggingUtils.sanitizeForLog(login),
-            nativeId,
-            userType
-        );
+                "Upserted user for GitLab workspace bootstrap: userLogin={}, nativeId={}, type={}",
+                LoggingUtils.sanitizeForLog(login),
+                nativeId,
+                userType);
         // Retrieve the JPA-managed entity to get the auto-generated PK (provider-scoped)
         return userRepository
-            .findByLoginAndProviderId(login, providerId)
-            .map(User::getId)
-            .orElseThrow(() -> new IllegalStateException("User not found after upsert: login=" + login));
+                .findByLoginAndProviderId(login, providerId)
+                .map(User::getId)
+                .orElseThrow(() -> new IllegalStateException("User not found after upsert: login=" + login));
     }
 
     private void ensureDefaultAdminMembershipIfPresent() {
         String defaultSlug = workspaceProperties.defaultProperties().login();
         Workspace target = null;
         if (!isBlank(defaultSlug)) {
-            target = workspaceRepository.findByWorkspaceSlug(Objects.requireNonNull(defaultSlug).trim()).orElse(null);
+            target = workspaceRepository
+                    .findByWorkspaceSlug(Objects.requireNonNull(defaultSlug).trim())
+                    .orElse(null);
         }
         if (target == null) {
             target = workspaceRepository.findAll().stream().findFirst().orElse(null);
@@ -502,30 +453,25 @@ public class WorkspaceProvisioningService {
     }
 
     private void ensureAdminMembership(Workspace workspace) {
-        userRepository
-            .findByLogin("admin")
-            .ifPresent(adminUser -> {
-                boolean alreadyMember = workspaceMembershipRepository
+        userRepository.findByLogin("admin").ifPresent(adminUser -> {
+            boolean alreadyMember = workspaceMembershipRepository
                     .findByWorkspace_IdAndUser_Id(workspace.getId(), adminUser.getId())
                     .isPresent();
-                if (alreadyMember) {
-                    log.debug(
+            if (alreadyMember) {
+                log.debug(
                         "Skipped adding default admin, already member: workspaceSlug={}, workspaceId={}",
                         workspace.getWorkspaceSlug(),
-                        workspace.getId()
-                    );
-                    return;
-                }
-                try {
-                    workspaceMembershipService.createMembership(workspace, adminUser.getId(), WorkspaceRole.ADMIN);
-                    log.info(
-                        "Added default admin to workspace: workspaceSlug={}, role=ADMIN",
-                        workspace.getWorkspaceSlug()
-                    );
-                } catch (IllegalArgumentException ex) {
-                    log.debug("Skipped default admin addition: workspaceSlug={}", workspace.getWorkspaceSlug(), ex);
-                }
-            });
+                        workspace.getId());
+                return;
+            }
+            try {
+                workspaceMembershipService.createMembership(workspace, adminUser.getId(), WorkspaceRole.ADMIN);
+                log.info(
+                        "Added default admin to workspace: workspaceSlug={}, role=ADMIN", workspace.getWorkspaceSlug());
+            } catch (IllegalArgumentException ex) {
+                log.debug("Skipped default admin addition: workspaceSlug={}", workspace.getWorkspaceSlug(), ex);
+            }
+        });
     }
 
     private boolean isBlank(@Nullable String value) {
@@ -534,8 +480,8 @@ public class WorkspaceProvisioningService {
 
     private Long syncGitHubUserForPAT(String patToken, String accountLogin) {
         IdentityProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseThrow(() -> new IllegalStateException("IdentityProvider for GitHub not found"));
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseThrow(() -> new IllegalStateException("IdentityProvider for GitHub not found"));
         Long providerId = Objects.requireNonNull(provider.getId());
 
         Optional<User> existing = userRepository.findByLoginAndProviderId(accountLogin, providerId);
@@ -544,12 +490,12 @@ public class WorkspaceProvisioningService {
         }
 
         GitHubUserResponse userInfo = webClient
-            .get()
-            .uri("/users/{login}", accountLogin)
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + patToken)
-            .retrieve()
-            .bodyToMono(GitHubUserResponse.class)
-            .block();
+                .get()
+                .uri("/users/{login}", accountLogin)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + patToken)
+                .retrieve()
+                .bodyToMono(GitHubUserResponse.class)
+                .block();
 
         if (userInfo == null || userInfo.id() == null) {
             throw new IllegalStateException("Failed to fetch GitHub user info for login '" + accountLogin + "'");
@@ -565,49 +511,45 @@ public class WorkspaceProvisioningService {
         userRepository.acquireLoginLock(login, providerId);
         userRepository.freeLoginConflicts(login, userInfo.id(), providerId);
         userRepository.upsertUser(
-            userInfo.id(),
-            providerId,
-            login,
-            name,
-            avatar,
-            htmlUrl,
-            User.Type.USER.name(),
-            null, // email
-            null, // createdAt
-            null // updatedAt
-        );
+                userInfo.id(),
+                providerId,
+                login,
+                name,
+                avatar,
+                htmlUrl,
+                User.Type.USER.name(),
+                null, // email
+                null, // createdAt
+                null // updatedAt
+                );
         log.info(
-            "Upserted user for PAT workspace bootstrap: userLogin={}, nativeId={}",
-            LoggingUtils.sanitizeForLog(login),
-            userInfo.id()
-        );
+                "Upserted user for PAT workspace bootstrap: userLogin={}, nativeId={}",
+                LoggingUtils.sanitizeForLog(login),
+                userInfo.id());
         // Retrieve the JPA-managed entity to get the auto-generated PK (provider-scoped)
         return userRepository
-            .findByLoginAndProviderId(login, providerId)
-            .map(User::getId)
-            .orElseThrow(() -> new IllegalStateException("User not found after upsert: login=" + login));
+                .findByLoginAndProviderId(login, providerId)
+                .map(User::getId)
+                .orElseThrow(() -> new IllegalStateException("User not found after upsert: login=" + login));
     }
 
     private record GitHubUserResponse(
-        Long id,
-        String login,
-        String name,
-        @JsonProperty("avatar_url") String avatarUrl,
-        @JsonProperty("html_url") String htmlUrl
-    ) {}
+            Long id,
+            String login,
+            String name,
+            @JsonProperty("avatar_url") String avatarUrl,
+            @JsonProperty("html_url") String htmlUrl) {}
 
     private record GitLabTokenUserResponse(
-        Long id,
-        String username,
-        String name,
-        @JsonProperty("avatar_url") String avatarUrl,
-        @JsonProperty("web_url") String webUrl
-    ) {}
+            Long id,
+            String username,
+            String name,
+            @JsonProperty("avatar_url") String avatarUrl,
+            @JsonProperty("web_url") String webUrl) {}
 
     private record GitLabGroupResponse(
-        Long id,
-        String name,
-        @JsonProperty("avatar_url") String avatarUrl,
-        @JsonProperty("web_url") String webUrl
-    ) {}
+            Long id,
+            String name,
+            @JsonProperty("avatar_url") String avatarUrl,
+            @JsonProperty("web_url") String webUrl) {}
 }

@@ -52,10 +52,9 @@ class GitHubIssueDependencySyncServiceIntegrationTest extends BaseIntegrationTes
     void setUp() {
         // Create git provider
         gitProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
 
         // Create test repository
         testRepository = new Repository();
@@ -90,36 +89,34 @@ class GitHubIssueDependencySyncServiceIntegrationTest extends BaseIntegrationTes
     @Test
     void shouldAddBlockingRelationship() {
         issueDependencySyncService.processIssueDependencyEvent(
-            blockedIssue.getId(),
-            blockingIssue.getId(),
-            true // isBlock
-        );
+                blockedIssue.getId(), blockingIssue.getId(), true // isBlock
+                );
 
-        Issue refreshedBlockedIssue = issueRepository.findById(blockedIssue.getId()).orElseThrow();
+        Issue refreshedBlockedIssue =
+                issueRepository.findById(blockedIssue.getId()).orElseThrow();
         assertThat(refreshedBlockedIssue.getBlockedBy()).hasSize(1);
-        assertThat(refreshedBlockedIssue.getBlockedBy()).extracting(Issue::getId).contains(blockingIssue.getId());
+        assertThat(refreshedBlockedIssue.getBlockedBy())
+                .extracting(Issue::getId)
+                .contains(blockingIssue.getId());
     }
 
     @Test
     void shouldRemoveBlockingRelationship() {
         // Given: Add the relationship first
         issueDependencySyncService.processIssueDependencyEvent(
-            blockedIssue.getId(),
-            blockingIssue.getId(),
-            true // isBlock
-        );
+                blockedIssue.getId(), blockingIssue.getId(), true // isBlock
+                );
 
         Issue refreshed = issueRepository.findById(blockedIssue.getId()).orElseThrow();
         assertThat(refreshed.getBlockedBy()).hasSize(1);
 
         // When: Remove the relationship
         issueDependencySyncService.processIssueDependencyEvent(
-            blockedIssue.getId(),
-            blockingIssue.getId(),
-            false // unblock
-        );
+                blockedIssue.getId(), blockingIssue.getId(), false // unblock
+                );
 
-        Issue refreshedAfterRemove = issueRepository.findById(blockedIssue.getId()).orElseThrow();
+        Issue refreshedAfterRemove =
+                issueRepository.findById(blockedIssue.getId()).orElseThrow();
         assertThat(refreshedAfterRemove.getBlockedBy()).isEmpty();
     }
 
@@ -140,13 +137,13 @@ class GitHubIssueDependencySyncServiceIntegrationTest extends BaseIntegrationTes
     void shouldHandleMissingBlockedIssueGracefully() {
         // When: Process event for non-existent blocked issue
         issueDependencySyncService.processIssueDependencyEvent(
-            999999L, // non-existent
-            blockingIssue.getId(),
-            true
-        );
+                999999L, // non-existent
+                blockingIssue.getId(),
+                true);
 
         // Then: No exception, and blocking issue unchanged
-        Issue refreshedBlocking = issueRepository.findById(blockingIssue.getId()).orElseThrow();
+        Issue refreshedBlocking =
+                issueRepository.findById(blockingIssue.getId()).orElseThrow();
         assertThat(refreshedBlocking.getBlocking()).isEmpty();
     }
 
@@ -154,10 +151,9 @@ class GitHubIssueDependencySyncServiceIntegrationTest extends BaseIntegrationTes
     void shouldHandleMissingBlockingIssueGracefully() {
         // When: Process event for non-existent blocking issue
         issueDependencySyncService.processIssueDependencyEvent(
-            blockedIssue.getId(),
-            999999L, // non-existent
-            true
-        );
+                blockedIssue.getId(),
+                999999L, // non-existent
+                true);
 
         // Then: No exception, blocked issue unchanged
         Issue refreshedBlocked = issueRepository.findById(blockedIssue.getId()).orElseThrow();
@@ -176,7 +172,8 @@ class GitHubIssueDependencySyncServiceIntegrationTest extends BaseIntegrationTes
 
         // Then: Check both directions
         Issue refreshedBlocked = issueRepository.findById(blockedIssue.getId()).orElseThrow();
-        Issue refreshedBlocking = issueRepository.findById(blockingIssue.getId()).orElseThrow();
+        Issue refreshedBlocking =
+                issueRepository.findById(blockingIssue.getId()).orElseThrow();
 
         assertThat(refreshedBlocked.getBlockedBy()).extracting(Issue::getId).contains(blockingIssue.getId());
         assertThat(refreshedBlocking.getBlocking()).extracting(Issue::getId).contains(blockedIssue.getId());

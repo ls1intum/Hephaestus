@@ -36,10 +36,9 @@ public class WorkspaceSlugService {
     private final int redirectTtlDays;
 
     public WorkspaceSlugService(
-        WorkspaceRepository workspaceRepository,
-        WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository,
-        @Value("${hephaestus.workspace.slug.redirect.ttl-days:30}") int redirectTtlDays
-    ) {
+            WorkspaceRepository workspaceRepository,
+            WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository,
+            @Value("${hephaestus.workspace.slug.redirect.ttl-days:30}") int redirectTtlDays) {
         this.workspaceRepository = workspaceRepository;
         this.workspaceSlugHistoryRepository = workspaceSlugHistoryRepository;
         this.redirectTtlDays = redirectTtlDays;
@@ -57,10 +56,10 @@ public class WorkspaceSlugService {
         }
         String normalized = slug.trim().toLowerCase();
         normalized = normalized
-            .replace('_', '-')
-            .replaceAll("\\s+", "-")
-            .replaceAll("-{2,}", "-")
-            .replaceAll("^-|-$", "");
+                .replace('_', '-')
+                .replaceAll("\\s+", "-")
+                .replaceAll("-{2,}", "-")
+                .replaceAll("^-|-$", "");
         return normalized;
     }
 
@@ -150,20 +149,19 @@ public class WorkspaceSlugService {
      */
     public @Nullable String resolveRedirect(String oldSlug) {
         return workspaceSlugHistoryRepository
-            .findFirstByOldSlugOrderByChangedAtDesc(oldSlug)
-            .filter(h -> h.getRedirectExpiresAt() == null || h.getRedirectExpiresAt().isAfter(Instant.now()))
-            .map(history -> history.getWorkspace().getWorkspaceSlug())
-            .orElse(null);
+                .findFirstByOldSlugOrderByChangedAtDesc(oldSlug)
+                .filter(h -> h.getRedirectExpiresAt() == null
+                        || h.getRedirectExpiresAt().isAfter(Instant.now()))
+                .map(history -> history.getWorkspace().getWorkspaceSlug())
+                .orElse(null);
     }
 
     // PRIVATE HELPERS
 
     private boolean hasActiveHistory(String slug) {
         Instant now = Instant.now();
-        return (
-            workspaceSlugHistoryRepository.existsByOldSlugAndRedirectExpiresAtIsNull(slug) ||
-            workspaceSlugHistoryRepository.existsByOldSlugAndRedirectExpiresAtAfter(slug, now)
-        );
+        return (workspaceSlugHistoryRepository.existsByOldSlugAndRedirectExpiresAtIsNull(slug)
+                || workspaceSlugHistoryRepository.existsByOldSlugAndRedirectExpiresAtAfter(slug, now));
     }
 
     private @Nullable String buildCandidate(String baseSlug, String suffix) {
@@ -196,9 +194,8 @@ public class WorkspaceSlugService {
     }
 
     private void pruneHistory(Workspace workspace) {
-        List<WorkspaceSlugHistory> history = workspaceSlugHistoryRepository.findByWorkspaceOrderByChangedAtDesc(
-            workspace
-        );
+        List<WorkspaceSlugHistory> history =
+                workspaceSlugHistoryRepository.findByWorkspaceOrderByChangedAtDesc(workspace);
 
         if (history.size() <= SLUG_HISTORY_RETENTION) {
             return;

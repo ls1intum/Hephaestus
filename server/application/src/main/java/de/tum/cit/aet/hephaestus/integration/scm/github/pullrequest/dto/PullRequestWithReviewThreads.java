@@ -22,12 +22,11 @@ import org.jspecify.annotations.Nullable;
  * both with the same type.
  */
 public record PullRequestWithReviewThreads(
-    GitHubPullRequestDTO pullRequest,
-    EmbeddedCommentsDTO embeddedComments,
-    EmbeddedReviewsDTO embeddedReviews,
-    EmbeddedReviewThreadsDTO embeddedReviewThreads,
-    EmbeddedProjectItemsDTO embeddedProjectItems
-) {
+        GitHubPullRequestDTO pullRequest,
+        EmbeddedCommentsDTO embeddedComments,
+        EmbeddedReviewsDTO embeddedReviews,
+        EmbeddedReviewThreadsDTO embeddedReviewThreads,
+        EmbeddedProjectItemsDTO embeddedProjectItems) {
     /**
      * Creates a PullRequestWithReviewThreads from a GraphQL GHPullRequest model.
      *
@@ -48,14 +47,10 @@ public record PullRequestWithReviewThreads(
         }
         EmbeddedCommentsDTO comments = EmbeddedCommentsDTO.fromConnection(ghPullRequest.getComments(), context);
         EmbeddedReviewsDTO reviews = EmbeddedReviewsDTO.fromConnection(ghPullRequest.getReviews(), context);
-        EmbeddedReviewThreadsDTO threads = EmbeddedReviewThreadsDTO.fromConnection(
-            ghPullRequest.getReviewThreads(),
-            context
-        );
-        EmbeddedProjectItemsDTO projectItems = EmbeddedProjectItemsDTO.fromConnection(
-            ghPullRequest.getProjectItems(),
-            context
-        );
+        EmbeddedReviewThreadsDTO threads =
+                EmbeddedReviewThreadsDTO.fromConnection(ghPullRequest.getReviewThreads(), context);
+        EmbeddedProjectItemsDTO projectItems =
+                EmbeddedProjectItemsDTO.fromConnection(ghPullRequest.getProjectItems(), context);
 
         return new PullRequestWithReviewThreads(dto, comments, reviews, threads, projectItems);
     }

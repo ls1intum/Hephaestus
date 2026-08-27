@@ -61,10 +61,9 @@ public class ReviewSweepScheduler {
                 // The failed transaction rolled its own advance back, so without deferAfterFailure the
                 // schedule stays due and would retry itself forever.
                 log.warn(
-                    "Review sweep failed to open, deferring to the next occurrence: scheduleId={}",
-                    schedule.getId(),
-                    e
-                );
+                        "Review sweep failed to open, deferring to the next occurrence: scheduleId={}",
+                        schedule.getId(),
+                        e);
                 try {
                     opener.deferAfterFailure(schedule.getId(), now);
                 } catch (RuntimeException deferFailure) {

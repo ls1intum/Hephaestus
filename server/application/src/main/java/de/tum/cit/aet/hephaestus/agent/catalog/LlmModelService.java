@@ -48,8 +48,8 @@ public class LlmModelService {
     @Transactional(readOnly = true)
     public LlmModel get(Long id) {
         return modelRepository
-            .findByIdWithConnection(id)
-            .orElseThrow(() -> new EntityNotFoundException("LlmModel", id));
+                .findByIdWithConnection(id)
+                .orElseThrow(() -> new EntityNotFoundException("LlmModel", id));
     }
 
     @Transactional(readOnly = true)
@@ -57,10 +57,8 @@ public class LlmModelService {
         if (modelIds.isEmpty()) {
             return Map.of();
         }
-        return priceRepository
-            .findByModelIdInAndEffectiveToIsNull(modelIds)
-            .stream()
-            .collect(Collectors.toMap(price -> price.getModel().getId(), price -> price));
+        return priceRepository.findByModelIdInAndEffectiveToIsNull(modelIds).stream()
+                .collect(Collectors.toMap(price -> price.getModel().getId(), price -> price));
     }
 
     @Transactional(readOnly = true)
@@ -68,24 +66,17 @@ public class LlmModelService {
         if (modelIds.isEmpty()) {
             return Map.of();
         }
-        return grantRepository
-            .findByIdModelIdIn(modelIds)
-            .stream()
-            .collect(
-                Collectors.groupingBy(
-                    grant -> grant.getId().getModelId(),
-                    Collectors.mapping(grant -> grant.getId().getWorkspaceId(), Collectors.toList())
-                )
-            );
+        return grantRepository.findByIdModelIdIn(modelIds).stream()
+                .collect(Collectors.groupingBy(
+                        grant -> grant.getId().getModelId(),
+                        Collectors.mapping(grant -> grant.getId().getWorkspaceId(), Collectors.toList())));
     }
 
     @Transactional(readOnly = true)
     public List<Long> grantedWorkspaceIds(Long modelId) {
-        return grantRepository
-            .findByIdModelId(modelId)
-            .stream()
-            .map(grant -> grant.getId().getWorkspaceId())
-            .toList();
+        return grantRepository.findByIdModelId(modelId).stream()
+                .map(grant -> grant.getId().getWorkspaceId())
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -99,13 +90,11 @@ public class LlmModelService {
             throw new IllegalArgumentException("Create the model disabled, set its price, then activate it.");
         }
         LlmConnection connection = connectionRepository
-            .findById(connectionId)
-            .orElseThrow(() -> new EntityNotFoundException("LlmConnection", connectionId));
+                .findById(connectionId)
+                .orElseThrow(() -> new EntityNotFoundException("LlmConnection", connectionId));
         String slug = modelSlug(connectionId, request.slug(), request.displayName());
-        if (
-            org.springframework.util.StringUtils.hasText(request.slug()) &&
-            modelRepository.findByConnectionIdAndSlug(connectionId, slug).isPresent()
-        ) {
+        if (org.springframework.util.StringUtils.hasText(request.slug())
+                && modelRepository.findByConnectionIdAndSlug(connectionId, slug).isPresent()) {
             throw new LlmModelSlugConflictException(connectionId, slug);
         }
         if (modelRepository.existsByConnectionIdAndUpstreamModelId(connectionId, request.upstreamModelId())) {
@@ -143,25 +132,27 @@ public class LlmModelService {
     }
 
     private String modelSlug(Long connectionId, @Nullable String requested, String displayName) {
-        return CatalogSlug.unique(requested, displayName, slug ->
-            modelRepository.findByConnectionIdAndSlug(connectionId, slug).isPresent()
-        );
+        return CatalogSlug.unique(
+                requested,
+                displayName,
+                slug -> modelRepository
+                        .findByConnectionIdAndSlug(connectionId, slug)
+                        .isPresent());
     }
 
     private void requireActivatable(LlmModel model) {
-        LlmModelPrice price = priceRepository.findByModelIdAndEffectiveToIsNull(model.getId()).orElse(null);
+        LlmModelPrice price =
+                priceRepository.findByModelIdAndEffectiveToIsNull(model.getId()).orElse(null);
         if (!model.getConnection().isEnabled() || price == null || price.getPricingMode() == PricingMode.UNPRICED) {
             throw new IllegalArgumentException(
-                "Activate the connection and configure a price before activating the model."
-            );
+                    "Activate the connection and configure a price before activating the model.");
         }
     }
 
     @Transactional
     public LlmModel update(Long id, UpdateLlmModelRequestDTO request) {
-        LlmModel model = modelRepository
-            .findByIdForUpdate(id)
-            .orElseThrow(() -> new EntityNotFoundException("LlmModel", id));
+        LlmModel model =
+                modelRepository.findByIdForUpdate(id).orElseThrow(() -> new EntityNotFoundException("LlmModel", id));
 
         if (request.displayName() != null) {
             model.setDisplayName(request.displayName());
@@ -204,23 +195,21 @@ public class LlmModelService {
     @Transactional
     public LlmModelPrice updatePrice(Long modelId, UpdateLlmModelPriceRequestDTO request) {
         LlmModel model = modelRepository
-            .findByIdForUpdate(modelId)
-            .orElseThrow(() -> new EntityNotFoundException("LlmModel", modelId));
+                .findByIdForUpdate(modelId)
+                .orElseThrow(() -> new EntityNotFoundException("LlmModel", modelId));
         validatePriceRequest(request);
         if (model.isEnabled() && request.pricingMode() == PricingMode.UNPRICED) {
             throw new IllegalArgumentException("Disable the model before changing its price to UNPRICED.");
         }
 
         Instant now = Instant.now();
-        priceRepository
-            .findByModelIdAndEffectiveToIsNull(modelId)
-            .ifPresent(open -> {
-                open.setEffectiveTo(now);
-                // saveAndFlush, not save: Hibernate orders queued INSERTs ahead of queued UPDATEs, so
-                // without an explicit flush the new open row reaches the database while this one is
-                // still open and ux_llm_model_price_open rejects the reprice.
-                priceRepository.saveAndFlush(open);
-            });
+        priceRepository.findByModelIdAndEffectiveToIsNull(modelId).ifPresent(open -> {
+            open.setEffectiveTo(now);
+            // saveAndFlush, not save: Hibernate orders queued INSERTs ahead of queued UPDATEs, so
+            // without an explicit flush the new open row reaches the database while this one is
+            // still open and ux_llm_model_price_open rejects the reprice.
+            priceRepository.saveAndFlush(open);
+        });
 
         LlmModelPrice price = new LlmModelPrice();
         price.setModel(model);
@@ -239,21 +228,20 @@ public class LlmModelService {
 
     private static void validatePriceRequest(UpdateLlmModelPriceRequestDTO request) {
         LlmPriceValidation.validate(
-            request.pricingMode(),
-            request.per1mInputUsd(),
-            request.per1mOutputUsd(),
-            request.per1mCacheReadUsd(),
-            request.per1mCacheWriteUsd(),
-            request.note()
-        );
+                request.pricingMode(),
+                request.per1mInputUsd(),
+                request.per1mOutputUsd(),
+                request.per1mCacheReadUsd(),
+                request.per1mCacheWriteUsd(),
+                request.note());
     }
 
     /** Replaces the model's grant set with exactly the requested workspaces. */
     @Transactional
     public LlmModel updateSharing(Long modelId, UpdateLlmModelSharingRequestDTO request) {
         LlmModel model = modelRepository
-            .findByIdForUpdate(modelId)
-            .orElseThrow(() -> new EntityNotFoundException("LlmModel", modelId));
+                .findByIdForUpdate(modelId)
+                .orElseThrow(() -> new EntityNotFoundException("LlmModel", modelId));
 
         List<LlmModelWorkspaceGrant> existing = grantRepository.findByIdModelId(modelId);
 
@@ -263,32 +251,29 @@ public class LlmModelService {
             }
         } else {
             Set<Long> requested =
-                request.workspaceIds() != null ? new LinkedHashSet<>(request.workspaceIds()) : Set.of();
+                    request.workspaceIds() != null ? new LinkedHashSet<>(request.workspaceIds()) : Set.of();
             assertWorkspacesExist(requested);
 
-            Set<Long> existingWorkspaceIds = existing
-                .stream()
-                .map(grant -> grant.getId().getWorkspaceId())
-                .collect(Collectors.toSet());
+            Set<Long> existingWorkspaceIds = existing.stream()
+                    .map(grant -> grant.getId().getWorkspaceId())
+                    .collect(Collectors.toSet());
 
-            List<LlmModelWorkspaceGrant> toRemove = existing
-                .stream()
-                .filter(grant -> !requested.contains(grant.getId().getWorkspaceId()))
-                .toList();
+            List<LlmModelWorkspaceGrant> toRemove = existing.stream()
+                    .filter(grant -> !requested.contains(grant.getId().getWorkspaceId()))
+                    .toList();
             if (!toRemove.isEmpty()) {
                 grantRepository.deleteAll(toRemove);
             }
 
             Instant now = Instant.now();
-            List<LlmModelWorkspaceGrant> toAdd = requested
-                .stream()
-                .filter(workspaceId -> !existingWorkspaceIds.contains(workspaceId))
-                .map(workspaceId -> {
-                    LlmModelWorkspaceGrant grant = new LlmModelWorkspaceGrant(modelId, workspaceId);
-                    grant.setGrantedAt(now);
-                    return grant;
-                })
-                .toList();
+            List<LlmModelWorkspaceGrant> toAdd = requested.stream()
+                    .filter(workspaceId -> !existingWorkspaceIds.contains(workspaceId))
+                    .map(workspaceId -> {
+                        LlmModelWorkspaceGrant grant = new LlmModelWorkspaceGrant(modelId, workspaceId);
+                        grant.setGrantedAt(now);
+                        return grant;
+                    })
+                    .toList();
             if (!toAdd.isEmpty()) {
                 grantRepository.saveAll(toAdd);
             }
@@ -296,8 +281,7 @@ public class LlmModelService {
 
         model.setVisibility(request.visibility());
         LlmModel saved = modelRepository.save(model);
-        int workspaceCount =
-            request.visibility() == ModelVisibility.GRANTED && request.workspaceIds() != null
+        int workspaceCount = request.visibility() == ModelVisibility.GRANTED && request.workspaceIds() != null
                 ? new LinkedHashSet<>(request.workspaceIds()).size()
                 : 0;
         llmModelAudit.modelSharingChanged(modelId, saved.getVisibility().name(), workspaceCount);
@@ -308,18 +292,14 @@ public class LlmModelService {
         if (workspaceIds.isEmpty()) {
             return;
         }
-        Set<Long> found = workspaceRepository
-            .findAllById(workspaceIds)
-            .stream()
-            .map(Workspace::getId)
-            .collect(Collectors.toSet());
+        Set<Long> found = workspaceRepository.findAllById(workspaceIds).stream()
+                .map(Workspace::getId)
+                .collect(Collectors.toSet());
         Set<Long> unknown = new LinkedHashSet<>(workspaceIds);
         unknown.removeAll(found);
         if (!unknown.isEmpty()) {
-            throw new IllegalArgumentException(
-                "Cannot share with unknown workspace(s): " +
-                    unknown.stream().map(String::valueOf).collect(Collectors.joining(", "))
-            );
+            throw new IllegalArgumentException("Cannot share with unknown workspace(s): "
+                    + unknown.stream().map(String::valueOf).collect(Collectors.joining(", ")));
         }
     }
 

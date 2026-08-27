@@ -70,8 +70,8 @@ public class UserContentSource implements ContentSource {
         // landing between a separate get-miss and put would otherwise repopulate the cache with
         // stale data for the full TTL. Caffeine's loader is key-locked.
         ObjectNode payload = (cache != null)
-            ? cache.get(key, () -> buildPayload(req.workspaceId(), req.developerId()))
-            : buildPayload(req.workspaceId(), req.developerId());
+                ? cache.get(key, () -> buildPayload(req.workspaceId(), req.developerId()))
+                : buildPayload(req.workspaceId(), req.developerId());
         try {
             files.put(OUTPUT_KEY, objectMapper.writeValueAsBytes(payload));
         } catch (JacksonException e) {
@@ -83,8 +83,8 @@ public class UserContentSource implements ContentSource {
     /** Pure function of (workspaceId, developerId). Callers cache through {@link CacheManager}. */
     public ObjectNode buildPayload(Long workspaceId, Long developerId) {
         User user = userRepository
-            .findById(developerId)
-            .orElseThrow(() -> new EntityNotFoundException("User", developerId.toString()));
+                .findById(developerId)
+                .orElseThrow(() -> new EntityNotFoundException("User", developerId.toString()));
 
         Instant now = Instant.now();
         Instant weekAgo = now.minus(7, ChronoUnit.DAYS);
@@ -121,14 +121,13 @@ public class UserContentSource implements ContentSource {
         lastWeek.put("reviewsGiven", reviewsGivenLastWeek);
 
         ActivityInsights insights = generateInsights(
-            openPRs,
-            mergedThisWeek,
-            mergedLastWeek,
-            reviewsGivenThisWeek,
-            reviewsGivenLastWeek,
-            pendingReviewRequests,
-            unresolvedThreads
-        );
+                openPRs,
+                mergedThisWeek,
+                mergedLastWeek,
+                reviewsGivenThisWeek,
+                reviewsGivenLastWeek,
+                pendingReviewRequests,
+                unresolvedThreads);
         ArrayNode insightsArray = root.putArray("insights");
         insights.insights().forEach(insightsArray::add);
         ArrayNode reflectionArray = root.putArray("suggestedReflectionTopics");
@@ -142,36 +141,30 @@ public class UserContentSource implements ContentSource {
      * here (not in the agent) so the wire payload is identical across deployments.
      */
     static ActivityInsights generateInsights(
-        long openPRs,
-        long mergedThisWeek,
-        long mergedLastWeek,
-        long reviewsGivenThisWeek,
-        long reviewsGivenLastWeek,
-        long pendingReviewRequests,
-        long unresolvedThreads
-    ) {
+            long openPRs,
+            long mergedThisWeek,
+            long mergedLastWeek,
+            long reviewsGivenThisWeek,
+            long reviewsGivenLastWeek,
+            long pendingReviewRequests,
+            long unresolvedThreads) {
         List<String> insights = new ArrayList<>();
         List<String> reflection = new ArrayList<>();
 
         if (mergedThisWeek > mergedLastWeek && mergedLastWeek > 0) {
-            insights.add(
-                "Shipping velocity increased: " +
-                    mergedThisWeek +
-                    " PRs merged this week vs " +
-                    mergedLastWeek +
-                    " last week."
-            );
+            insights.add("Shipping velocity increased: " + mergedThisWeek
+                    + " PRs merged this week vs "
+                    + mergedLastWeek
+                    + " last week.");
         } else if (mergedThisWeek < mergedLastWeek && mergedLastWeek > 0) {
-            insights.add(
-                "Shipping slowed: " + mergedThisWeek + " PRs merged this week vs " + mergedLastWeek + " last week."
-            );
+            insights.add("Shipping slowed: " + mergedThisWeek + " PRs merged this week vs " + mergedLastWeek
+                    + " last week.");
             reflection.add("What affected your shipping pace this week?");
         }
 
         if (openPRs > OPEN_PR_WARNING_THRESHOLD) {
-            insights.add(
-                "You have " + openPRs + " open PRs. Consider focusing on getting these merged before starting new work."
-            );
+            insights.add("You have " + openPRs
+                    + " open PRs. Consider focusing on getting these merged before starting new work.");
             reflection.add("Which open PR is closest to being merge-ready?");
         }
 

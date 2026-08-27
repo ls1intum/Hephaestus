@@ -8,7 +8,6 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
@@ -92,28 +91,22 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         agentJob = agentJobRepository.save(agentJob);
 
         IdentityProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
         recipient = userRepository.save(TestUserFactory.createUser(100L, "recipient", provider));
     }
 
     @Test
     @DisplayName(
-        "insertIfAbsent is idempotent: a second insert on the same (feedback, observation) returns 0 and keeps the original role/ordinal"
-    )
+            "insertIfAbsent is idempotent: a second insert on the same (feedback, observation) returns 0 and keeps the original role/ordinal")
     void insertIfAbsentIsIdempotent() {
         Feedback feedback = saveFeedback(0, FeedbackDeliveryState.DELIVERED, "Delivered advice body");
         Observation observation = saveObservation("obs-1");
 
         int first = feedbackObservationRepository.insertIfAbsent(feedback.getId(), observation.getId(), "PRIMARY", 0);
-        int second = feedbackObservationRepository.insertIfAbsent(
-            feedback.getId(),
-            observation.getId(),
-            "SUPPORTING",
-            7
-        );
+        int second =
+                feedbackObservationRepository.insertIfAbsent(feedback.getId(), observation.getId(), "SUPPORTING", 7);
 
         assertThat(first).isEqualTo(1);
         assertThat(second).isEqualTo(0);
@@ -127,10 +120,8 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName(
-        "findLatestFeedbackBodiesByObservationIds returns DELIVERED and FAILED bodies and excludes PREPARED, " +
-            "SUPPRESSED, and null-body units"
-    )
+    @DisplayName("findLatestFeedbackBodiesByObservationIds returns DELIVERED and FAILED bodies and excludes PREPARED, "
+            + "SUPPRESSED, and null-body units")
     void findAdviceBodiesIncludesFailedExcludesPreparedSuppressed() {
         Observation delivered = saveObservation("obs-delivered");
         Observation failed = saveObservation("obs-failed");
@@ -145,19 +136,17 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         bind(saveFeedback(3, FeedbackDeliveryState.DELIVERED, null), nullBody);
 
         List<ObservationFeedbackBody> bodies = feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(
-            workspace.getId(),
-            List.of(delivered.getId(), failed.getId(), prepared.getId(), suppressed.getId(), nullBody.getId()),
-            IN_CONTEXT_ONLY
-        );
+                workspace.getId(),
+                List.of(delivered.getId(), failed.getId(), prepared.getId(), suppressed.getId(), nullBody.getId()),
+                IN_CONTEXT_ONLY);
 
         assertThat(bodies).hasSize(2);
-        Map<UUID, String> byObservation = bodies
-            .stream()
-            .collect(Collectors.toMap(ObservationFeedbackBody::getObservationId, ObservationFeedbackBody::getBody));
+        Map<UUID, String> byObservation = bodies.stream()
+                .collect(Collectors.toMap(ObservationFeedbackBody::getObservationId, ObservationFeedbackBody::getBody));
         assertThat(byObservation)
-            .containsEntry(delivered.getId(), "The advice the student saw")
-            .containsEntry(failed.getId(), "The advice the direct post could not place")
-            .doesNotContainKeys(prepared.getId(), suppressed.getId(), nullBody.getId());
+                .containsEntry(delivered.getId(), "The advice the student saw")
+                .containsEntry(failed.getId(), "The advice the direct post could not place")
+                .doesNotContainKeys(prepared.getId(), suppressed.getId(), nullBody.getId());
     }
 
     @Test
@@ -170,67 +159,51 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         bind(saveFeedback(higherId, 11, FeedbackDeliveryState.DELIVERED, "Latest identity", createdAt), observation);
 
         List<ObservationFeedbackBody> bodies = feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(
-            workspace.getId(),
-            List.of(observation.getId()),
-            IN_CONTEXT_ONLY
-        );
+                workspace.getId(), List.of(observation.getId()), IN_CONTEXT_ONLY);
 
-        assertThat(bodies).singleElement().extracting(ObservationFeedbackBody::getBody).isEqualTo("Latest identity");
+        assertThat(bodies)
+                .singleElement()
+                .extracting(ObservationFeedbackBody::getBody)
+                .isEqualTo("Latest identity");
     }
 
     @Test
-    @DisplayName(
-        "a newer IN_APP unit bound to the same observation does not become its advice: the per-finding " +
-            "surfaces keep showing what was said about that finding"
-    )
+    @DisplayName("a newer IN_APP unit bound to the same observation does not become its advice: the per-finding "
+            + "surfaces keep showing what was said about that finding")
     void findLatestFeedbackBodiesAnswersOnlyForTheChannelsTheCallerNames() {
         Observation observation = saveObservation("obs-both-lanes");
         bind(
-            saveFeedback(
-                null,
-                20,
-                FeedbackDeliveryState.DELIVERED,
-                "The note posted on the pull request",
-                Instant.parse("2026-01-01T00:00:00Z")
-            ),
-            observation
-        );
+                saveFeedback(
+                        null,
+                        20,
+                        FeedbackDeliveryState.DELIVERED,
+                        "The note posted on the pull request",
+                        Instant.parse("2026-01-01T00:00:00Z")),
+                observation);
         // The in-app unit is newer, DELIVERED and non-null-bodied, so it wins every other clause of
         // the query — the channel predicate is the only thing keeping it off a per-finding surface.
         bind(
-            saveFeedback(
-                null,
-                7000,
-                FeedbackDeliveryState.DELIVERED,
-                "### You keep shipping untested changes\n\nAcross three pull requests…\n\n**Try next:** …",
-                Instant.parse("2026-02-01T00:00:00Z"),
-                FeedbackChannel.IN_APP
-            ),
-            observation
-        );
+                saveFeedback(
+                        null,
+                        7000,
+                        FeedbackDeliveryState.DELIVERED,
+                        "### You keep shipping untested changes\n\nAcross three pull requests…\n\n**Try next:** …",
+                        Instant.parse("2026-02-01T00:00:00Z"),
+                        FeedbackChannel.IN_APP),
+                observation);
 
-        assertThat(
-            feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(
-                workspace.getId(),
-                List.of(observation.getId()),
-                IN_CONTEXT_ONLY
-            )
-        )
-            .singleElement()
-            .extracting(ObservationFeedbackBody::getBody)
-            .isEqualTo("The note posted on the pull request");
+        assertThat(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(
+                        workspace.getId(), List.of(observation.getId()), IN_CONTEXT_ONLY))
+                .singleElement()
+                .extracting(ObservationFeedbackBody::getBody)
+                .isEqualTo("The note posted on the pull request");
 
-        assertThat(
-            feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(
-                workspace.getId(),
-                List.of(observation.getId()),
-                List.of(FeedbackChannel.IN_APP.name())
-            )
-        )
-            .singleElement()
-            .extracting(ObservationFeedbackBody::getBody)
-            .asString()
-            .startsWith("### You keep shipping untested changes");
+        assertThat(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(
+                        workspace.getId(), List.of(observation.getId()), List.of(FeedbackChannel.IN_APP.name())))
+                .singleElement()
+                .extracting(ObservationFeedbackBody::getBody)
+                .asString()
+                .startsWith("### You keep shipping untested changes");
     }
 
     @Test
@@ -257,26 +230,19 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     private Feedback saveFeedback(
-        @Nullable UUID id,
-        int position,
-        FeedbackDeliveryState state,
-        @Nullable String body,
-        Instant createdAt
-    ) {
+            @Nullable UUID id, int position, FeedbackDeliveryState state, @Nullable String body, Instant createdAt) {
         return saveFeedback(id, position, state, body, createdAt, FeedbackChannel.IN_CONTEXT);
     }
 
     private Feedback saveFeedback(
-        @Nullable UUID id,
-        int position,
-        FeedbackDeliveryState state,
-        @Nullable String body,
-        Instant createdAt,
-        FeedbackChannel channel
-    ) {
+            @Nullable UUID id,
+            int position,
+            FeedbackDeliveryState state,
+            @Nullable String body,
+            Instant createdAt,
+            FeedbackChannel channel) {
         boolean anchored = channel == FeedbackChannel.IN_CONTEXT;
-        return feedbackRepository.save(
-            Feedback.builder()
+        return feedbackRepository.save(Feedback.builder()
                 .id(id)
                 .agentJobId(agentJob.getId())
                 .workspaceId(workspace.getId())
@@ -291,31 +257,29 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 .source(FeedbackSource.AGENT)
                 .createdAt(createdAt)
                 .deliveredAt(state == FeedbackDeliveryState.DELIVERED ? Instant.now() : null)
-                .build()
-        );
+                .build());
     }
 
     private Observation saveObservation(String occurrenceKey) {
         UUID id = UUID.randomUUID();
         observationRepository.insertIfAbsent(
-            id,
-            occurrenceKey,
-            agentJob.getId(),
-            practice.getId(),
-            null,
-            "scm.pull_request",
-            42L,
-            recipient.getId(),
-            "Observation title",
-            "ABSENT",
-            "BAD",
-            "MAJOR",
-            null,
-            null,
-            null,
-            Instant.now(),
-            "LIVE"
-        );
+                id,
+                occurrenceKey,
+                agentJob.getId(),
+                practice.getId(),
+                null,
+                "scm.pull_request",
+                42L,
+                recipient.getId(),
+                "Observation title",
+                "ABSENT",
+                "BAD",
+                "MAJOR",
+                null,
+                null,
+                null,
+                Instant.now(),
+                "LIVE");
         return observationRepository.findById(id).orElseThrow();
     }
 }

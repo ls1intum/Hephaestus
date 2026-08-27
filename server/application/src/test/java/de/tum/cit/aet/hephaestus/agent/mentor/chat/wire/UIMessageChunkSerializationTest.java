@@ -39,99 +39,90 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
         UUID messageId = UUID.fromString("11111111-2222-3333-4444-555555555555");
         UUID observationId = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
         UIMessageChunk.MessageMetadata finishMeta = new UIMessageChunk.MessageMetadata(
-            "openai/gpt-oss-120b",
-            new UIMessageChunk.MessageMetadata.Usage(655, 65, null, null, 720),
-            0.0042
-        );
+                "openai/gpt-oss-120b", new UIMessageChunk.MessageMetadata.Usage(655, 65, null, null, 720), 0.0042);
         ObjectNode toolOutput = NODES.objectNode().put("status", "ok").put("count", 7);
         return List.of(
-            new Object[] {
-                new UIMessageChunk.Start(messageId, null),
-                "{\"type\":\"start\",\"messageId\":\"" + messageId + "\"}",
-            },
-            new Object[] { new UIMessageChunk.StartStep(), "{\"type\":\"start-step\"}" },
-            new Object[] { new UIMessageChunk.FinishStep(), "{\"type\":\"finish-step\"}" },
-            new Object[] { new UIMessageChunk.TextStart("t-0"), "{\"type\":\"text-start\",\"id\":\"t-0\"}" },
-            new Object[] {
-                new UIMessageChunk.TextDelta("t-0", "Hello"),
-                "{\"type\":\"text-delta\",\"id\":\"t-0\",\"delta\":\"Hello\"}",
-            },
-            new Object[] { new UIMessageChunk.TextEnd("t-0"), "{\"type\":\"text-end\",\"id\":\"t-0\"}" },
-            new Object[] {
-                new UIMessageChunk.ToolOutputAvailable("call-1", toolOutput),
-                "{\"type\":\"tool-output-available\",\"toolCallId\":\"call-1\",\"output\":{\"status\":\"ok\",\"count\":7}}",
-            },
-            new Object[] {
-                new UIMessageChunk.Finish(null, finishMeta),
-                "{\"type\":\"finish\",\"messageMetadata\":{\"model\":\"openai/gpt-oss-120b\"," +
-                "\"usage\":{\"input\":655,\"output\":65,\"totalTokens\":720},\"costUsd\":0.0042}}",
-            },
-            // MessageMetadata.of(null,null,null) collapses to null → Finish.messageMetadata omitted entirely.
-            new Object[] {
-                new UIMessageChunk.Finish(
-                    UIMessageChunk.FinishReason.STOP,
-                    UIMessageChunk.MessageMetadata.of(null, null, null)
-                ),
-                "{\"type\":\"finish\",\"finishReason\":\"stop\"}",
-            },
-            // All six FinishReason enum values must serialise to their canonical kebab-case wire form.
-            new Object[] {
-                new UIMessageChunk.Finish(UIMessageChunk.FinishReason.CONTENT_FILTER, null),
-                "{\"type\":\"finish\",\"finishReason\":\"content-filter\"}",
-            },
-            new Object[] {
-                new UIMessageChunk.Finish(UIMessageChunk.FinishReason.TOOL_CALLS, null),
-                "{\"type\":\"finish\",\"finishReason\":\"tool-calls\"}",
-            },
-            // Reasoning lifecycle: start / delta / end — block-id propagation pinned.
-            new Object[] { new UIMessageChunk.ReasoningStart("r-0"), "{\"type\":\"reasoning-start\",\"id\":\"r-0\"}" },
-            new Object[] {
-                new UIMessageChunk.ReasoningDelta("r-0", "Let me think…"),
-                "{\"type\":\"reasoning-delta\",\"id\":\"r-0\",\"delta\":\"Let me think…\"}",
-            },
-            new Object[] { new UIMessageChunk.ReasoningEnd("r-0"), "{\"type\":\"reasoning-end\",\"id\":\"r-0\"}" },
-            // Tool input lifecycle — strict zod requires toolCallId + toolName + input on `*-available`.
-            new Object[] {
-                new UIMessageChunk.ToolInputStart("call-1", "fetch_context"),
-                "{\"type\":\"tool-input-start\",\"toolCallId\":\"call-1\",\"toolName\":\"fetch_context\"}",
-            },
-            new Object[] {
-                new UIMessageChunk.ToolInputAvailable(
-                    "call-1",
-                    "fetch_context",
-                    NODES.objectNode().put("path", "inputs/context/workspace.json")
-                ),
-                "{\"type\":\"tool-input-available\",\"toolCallId\":\"call-1\"," +
-                "\"toolName\":\"fetch_context\",\"input\":{\"path\":\"inputs/context/workspace.json\"}}",
-            },
-            // Error tool output — errorText only, no output field on wire.
-            new Object[] {
-                new UIMessageChunk.ToolOutputError("call-1", "fetch_context: path not allowed"),
-                "{\"type\":\"tool-output-error\",\"toolCallId\":\"call-1\"," +
-                "\"errorText\":\"fetch_context: path not allowed\"}",
-            },
-            // NON_NULL: finishReason omitted, but messageMetadata kept.
-            // data-* envelope shape per AI SDK strict-object schema:
-            // {type, id?, data: unknown, transient?: boolean}. status is transient (banner only);
-            // observation is permanent (linked chip in message history).
-            new Object[] {
-                UIMessageChunk.DataMentorStatus.of("warming-up", "container-cold"),
-                "{\"type\":\"data-mentor-status\",\"id\":\"mentor-status\"," +
-                "\"data\":{\"state\":\"warming-up\",\"reason\":\"container-cold\"},\"transient\":true}",
-            },
-            new Object[] {
-                UIMessageChunk.DataObservation.of(observationId),
-                "{\"type\":\"data-observation\",\"id\":\"" +
-                observationId +
-                "\",\"data\":{\"observationId\":\"" +
-                observationId +
-                "\"}}",
-            },
-            new Object[] {
-                new UIMessageChunk.Error("container died mid-turn"),
-                "{\"type\":\"error\",\"errorText\":\"container died mid-turn\"}",
-            }
-        );
+                new Object[] {
+                    new UIMessageChunk.Start(messageId, null),
+                    "{\"type\":\"start\",\"messageId\":\"" + messageId + "\"}",
+                },
+                new Object[] {new UIMessageChunk.StartStep(), "{\"type\":\"start-step\"}"},
+                new Object[] {new UIMessageChunk.FinishStep(), "{\"type\":\"finish-step\"}"},
+                new Object[] {new UIMessageChunk.TextStart("t-0"), "{\"type\":\"text-start\",\"id\":\"t-0\"}"},
+                new Object[] {
+                    new UIMessageChunk.TextDelta("t-0", "Hello"),
+                    "{\"type\":\"text-delta\",\"id\":\"t-0\",\"delta\":\"Hello\"}",
+                },
+                new Object[] {new UIMessageChunk.TextEnd("t-0"), "{\"type\":\"text-end\",\"id\":\"t-0\"}"},
+                new Object[] {
+                    new UIMessageChunk.ToolOutputAvailable("call-1", toolOutput),
+                    "{\"type\":\"tool-output-available\",\"toolCallId\":\"call-1\",\"output\":{\"status\":\"ok\",\"count\":7}}",
+                },
+                new Object[] {
+                    new UIMessageChunk.Finish(null, finishMeta),
+                    "{\"type\":\"finish\",\"messageMetadata\":{\"model\":\"openai/gpt-oss-120b\","
+                            + "\"usage\":{\"input\":655,\"output\":65,\"totalTokens\":720},\"costUsd\":0.0042}}",
+                },
+                // MessageMetadata.of(null,null,null) collapses to null → Finish.messageMetadata omitted entirely.
+                new Object[] {
+                    new UIMessageChunk.Finish(
+                            UIMessageChunk.FinishReason.STOP, UIMessageChunk.MessageMetadata.of(null, null, null)),
+                    "{\"type\":\"finish\",\"finishReason\":\"stop\"}",
+                },
+                // All six FinishReason enum values must serialise to their canonical kebab-case wire form.
+                new Object[] {
+                    new UIMessageChunk.Finish(UIMessageChunk.FinishReason.CONTENT_FILTER, null),
+                    "{\"type\":\"finish\",\"finishReason\":\"content-filter\"}",
+                },
+                new Object[] {
+                    new UIMessageChunk.Finish(UIMessageChunk.FinishReason.TOOL_CALLS, null),
+                    "{\"type\":\"finish\",\"finishReason\":\"tool-calls\"}",
+                },
+                // Reasoning lifecycle: start / delta / end — block-id propagation pinned.
+                new Object[] {new UIMessageChunk.ReasoningStart("r-0"), "{\"type\":\"reasoning-start\",\"id\":\"r-0\"}"
+                },
+                new Object[] {
+                    new UIMessageChunk.ReasoningDelta("r-0", "Let me think…"),
+                    "{\"type\":\"reasoning-delta\",\"id\":\"r-0\",\"delta\":\"Let me think…\"}",
+                },
+                new Object[] {new UIMessageChunk.ReasoningEnd("r-0"), "{\"type\":\"reasoning-end\",\"id\":\"r-0\"}"},
+                // Tool input lifecycle — strict zod requires toolCallId + toolName + input on `*-available`.
+                new Object[] {
+                    new UIMessageChunk.ToolInputStart("call-1", "fetch_context"),
+                    "{\"type\":\"tool-input-start\",\"toolCallId\":\"call-1\",\"toolName\":\"fetch_context\"}",
+                },
+                new Object[] {
+                    new UIMessageChunk.ToolInputAvailable(
+                            "call-1", "fetch_context", NODES.objectNode().put("path", "inputs/context/workspace.json")),
+                    "{\"type\":\"tool-input-available\",\"toolCallId\":\"call-1\","
+                            + "\"toolName\":\"fetch_context\",\"input\":{\"path\":\"inputs/context/workspace.json\"}}",
+                },
+                // Error tool output — errorText only, no output field on wire.
+                new Object[] {
+                    new UIMessageChunk.ToolOutputError("call-1", "fetch_context: path not allowed"),
+                    "{\"type\":\"tool-output-error\",\"toolCallId\":\"call-1\","
+                            + "\"errorText\":\"fetch_context: path not allowed\"}",
+                },
+                // NON_NULL: finishReason omitted, but messageMetadata kept.
+                // data-* envelope shape per AI SDK strict-object schema:
+                // {type, id?, data: unknown, transient?: boolean}. status is transient (banner only);
+                // observation is permanent (linked chip in message history).
+                new Object[] {
+                    UIMessageChunk.DataMentorStatus.of("warming-up", "container-cold"),
+                    "{\"type\":\"data-mentor-status\",\"id\":\"mentor-status\","
+                            + "\"data\":{\"state\":\"warming-up\",\"reason\":\"container-cold\"},\"transient\":true}",
+                },
+                new Object[] {
+                    UIMessageChunk.DataObservation.of(observationId),
+                    "{\"type\":\"data-observation\",\"id\":\"" + observationId
+                            + "\",\"data\":{\"observationId\":\""
+                            + observationId
+                            + "\"}}",
+                },
+                new Object[] {
+                    new UIMessageChunk.Error("container died mid-turn"),
+                    "{\"type\":\"error\",\"errorText\":\"container died mid-turn\"}",
+                });
     }
 
     @ParameterizedTest(name = "{0}")
@@ -173,8 +164,8 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
         // so it won't appear in the permits anyway. If anything is in `missing` here, someone added
         // a chunk record and forgot the `@JsonSubTypes.Type(...)` entry.
         assertThat(missing)
-            .as("Every UIMessageChunk subtype must be listed in @JsonSubTypes (missing: %s)", missing)
-            .isEmpty();
+                .as("Every UIMessageChunk subtype must be listed in @JsonSubTypes (missing: %s)", missing)
+                .isEmpty();
     }
 
     @ParameterizedTest
@@ -191,8 +182,7 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
     void finishReasonRejectsUnknown() {
         // If AI SDK ever ships a `finish` chunk with a new value (e.g. "rate-limit"), we want a
         // fast, loud failure — not a silent null fallback that hides the protocol drift.
-        assertThatThrownBy(() ->
-            MAPPER.readValue("\"rate-limit\"", UIMessageChunk.FinishReason.class)
-        ).hasMessageContaining("rate-limit");
+        assertThatThrownBy(() -> MAPPER.readValue("\"rate-limit\"", UIMessageChunk.FinishReason.class))
+                .hasMessageContaining("rate-limit");
     }
 }

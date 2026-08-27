@@ -15,15 +15,23 @@ import org.jspecify.annotations.Nullable;
  */
 @Schema(description = "An artifact this workspace recorded something about, and how much of it turned into review")
 public record TracedArtifactDTO(
-    @NonNull ArtifactKind artifactKind,
-    @NonNull Long artifactId,
-    @NonNull String title,
-    @Schema(description = "The number the provider shows, for kinds that have one") @Nullable Integer number,
-    @Schema(description = "Repository, collection or channel it sits in") @Nullable String container,
-    @Schema(description = "Where to open it upstream; absent for a deleted or unlinkable artifact")
-    @Nullable
-    String url,
-    @NonNull Instant lastSignalAt,
-    @NonNull @Schema(description = "Occurrences recorded on this artifact") Integer signalCount,
-    @NonNull @Schema(description = "How many of them started a review") Integer reviewedSignalCount
-) {}
+        @NonNull ArtifactKind artifactKind,
+        @NonNull Long artifactId,
+        @NonNull String title,
+
+        @Schema(description = "The number the provider shows, for kinds that have one") @Nullable
+        Integer number,
+
+        @Schema(description = "Repository, collection or channel it sits in") @Nullable
+        String container,
+
+        @Schema(description = "Where to open it upstream; absent for a deleted or unlinkable artifact") @Nullable
+        String url,
+
+        @NonNull Instant lastSignalAt,
+
+        @NonNull @Schema(description = "Occurrences recorded on this artifact")
+        Integer signalCount,
+
+        @NonNull @Schema(description = "How many of them started a review")
+        Integer reviewedSignalCount) {}

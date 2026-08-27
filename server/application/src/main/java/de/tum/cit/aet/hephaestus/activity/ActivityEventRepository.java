@@ -36,8 +36,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
      */
     @Modifying
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO activity_event (
             id, event_key, event_type, occurred_at, actor_id,
             workspace_id, repository_id, target_type, target_id, xp, ingested_at
@@ -47,21 +46,18 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
             :workspaceId, :repositoryId, :targetType, :targetId, :xp, CURRENT_TIMESTAMP
         )
         ON CONFLICT (workspace_id, event_key) DO NOTHING
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int insertIfAbsent(
-        @Param("id") UUID id,
-        @Param("eventKey") String eventKey,
-        @Param("eventType") String eventType,
-        @Param("occurredAt") Instant occurredAt,
-        @Param("actorId") @Nullable Long actorId,
-        @Param("workspaceId") Long workspaceId,
-        @Param("repositoryId") @Nullable Long repositoryId,
-        @Param("targetType") String targetType,
-        @Param("targetId") Long targetId,
-        @Param("xp") double xp
-    );
+            @Param("id") UUID id,
+            @Param("eventKey") String eventKey,
+            @Param("eventType") String eventType,
+            @Param("occurredAt") Instant occurredAt,
+            @Param("actorId") @Nullable Long actorId,
+            @Param("workspaceId") Long workspaceId,
+            @Param("repositoryId") @Nullable Long repositoryId,
+            @Param("targetType") String targetType,
+            @Param("targetId") Long targetId,
+            @Param("xp") double xp);
 
     /**
      * Backfills {@code actor_id} and {@code xp} for COMMIT_CREATED events whose actor
@@ -71,8 +67,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
     @WorkspaceAgnostic("Scoped by repository_id (repository belongs to one workspace)")
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         UPDATE activity_event
         SET actor_id = gc.author_id,
             xp = :xpPerCommit
@@ -83,9 +78,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
           AND activity_event.target_id = gc.id
           AND gc.author_id IS NOT NULL
           AND gc.repository_id = :repositoryId
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int backfillCommitActors(@Param("repositoryId") Long repositoryId, @Param("xpPerCommit") double xpPerCommit);
 
     // Leaderboard Aggregation Queries
@@ -94,8 +87,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
      * Workspace-level XP aggregation. Does NOT apply per-team hidden-repo settings; use
      * {@link #findExperiencePointsByWorkspaceAndTeamsAndTimeframe} for team-filtered results.
      */
-    @Query(
-        """
+    @Query("""
         SELECT e.actor.id as actorId,
                SUM(e.xp) as totalExperiencePoints,
                COUNT(e) as eventCount
@@ -106,21 +98,16 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         AND e.occurredAt >= :since
         AND e.occurredAt < :until
         GROUP BY e.actor.id
-        """
-    )
+        """)
     List<ActivityXpProjection> findExperiencePointsByWorkspaceAndTimeframe(
-        @Param("workspaceId") Long workspaceId,
-        @Param("since") Instant since,
-        @Param("until") Instant until
-    );
+            @Param("workspaceId") Long workspaceId, @Param("since") Instant since, @Param("until") Instant until);
 
     /**
      * Team-filtered XP aggregation. Applies label filtering to review events only:
      * if a team has label filters for a repo, review events are kept only when the PR
      * has at least one matching label. Non-review events are not label-filtered.
      */
-    @Query(
-        """
+    @Query("""
         SELECT e.actor.id as actorId,
                SUM(e.xp) as totalExperiencePoints,
                COUNT(e) as eventCount
@@ -171,18 +158,15 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
             )
         )
         GROUP BY e.actor.id
-        """
-    )
+        """)
     List<ActivityXpProjection> findExperiencePointsByWorkspaceAndTeamsAndTimeframe(
-        @Param("workspaceId") Long workspaceId,
-        @Param("teamIds") Set<Long> teamIds,
-        @Param("since") Instant since,
-        @Param("until") Instant until
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("teamIds") Set<Long> teamIds,
+            @Param("since") Instant since,
+            @Param("until") Instant until);
 
     /** Workspace-level activity breakdown by event type. Does NOT apply per-team hidden-repo settings. */
-    @Query(
-        """
+    @Query("""
         SELECT e.actor.id as actorId,
                e.eventType as eventType,
                COUNT(e) as count,
@@ -202,17 +186,14 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
             )
         )
         GROUP BY e.actor.id, e.eventType
-        """
-    )
+        """)
     List<ActivityBreakdownProjection> findActivityBreakdown(
-        @Param("workspaceId") Long workspaceId,
-        @Param("actorIds") Set<Long> actorIds,
-        @Param("since") Instant since,
-        @Param("until") Instant until
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("actorIds") Set<Long> actorIds,
+            @Param("since") Instant since,
+            @Param("until") Instant until);
 
-    @Query(
-        """
+    @Query("""
         SELECT e.actor.id as actorId, COUNT(e) as count
         FROM ActivityEvent e
         JOIN IssueComment c ON c.id = e.targetId
@@ -226,17 +207,14 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         AND e.occurredAt < :until
         AND c.author.id = pr.author.id
         GROUP BY e.actor.id
-        """
-    )
+        """)
     List<ActorCountProjection> findOwnPullRequestConversationReplyCounts(
-        @Param("workspaceId") Long workspaceId,
-        @Param("actorIds") Set<Long> actorIds,
-        @Param("since") Instant since,
-        @Param("until") Instant until
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("actorIds") Set<Long> actorIds,
+            @Param("since") Instant since,
+            @Param("until") Instant until);
 
-    @Query(
-        """
+    @Query("""
         SELECT e.actor.id as actorId, COUNT(e) as count
         FROM ActivityEvent e
         JOIN PullRequestReviewComment c ON c.id = e.targetId
@@ -250,43 +228,28 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         AND e.occurredAt < :until
         AND c.author.id = pr.author.id
         GROUP BY e.actor.id
-        """
-    )
+        """)
     List<ActorCountProjection> findOwnPullRequestInlineReplyCounts(
-        @Param("workspaceId") Long workspaceId,
-        @Param("actorIds") Set<Long> actorIds,
-        @Param("since") Instant since,
-        @Param("until") Instant until
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("actorIds") Set<Long> actorIds,
+            @Param("since") Instant since,
+            @Param("until") Instant until);
 
     default Map<Long, Long> countOwnPullRequestRepliesByActors(
-        Long workspaceId,
-        Set<Long> actorIds,
-        Instant since,
-        Instant until
-    ) {
+            Long workspaceId, Set<Long> actorIds, Instant since, Instant until) {
         Map<Long, Long> counts = new HashMap<>();
-        for (ActorCountProjection projection : findOwnPullRequestConversationReplyCounts(
-            workspaceId,
-            actorIds,
-            since,
-            until
-        )) {
+        for (ActorCountProjection projection :
+                findOwnPullRequestConversationReplyCounts(workspaceId, actorIds, since, until)) {
             counts.merge(projection.getActorId(), projection.getCount(), Long::sum);
         }
-        for (ActorCountProjection projection : findOwnPullRequestInlineReplyCounts(
-            workspaceId,
-            actorIds,
-            since,
-            until
-        )) {
+        for (ActorCountProjection projection :
+                findOwnPullRequestInlineReplyCounts(workspaceId, actorIds, since, until)) {
             counts.merge(projection.getActorId(), projection.getCount(), Long::sum);
         }
         return counts;
     }
 
-    @Query(
-        """
+    @Query("""
         SELECT e.actor.id as actorId,
                e.eventType as eventType,
                COUNT(e) as count,
@@ -346,18 +309,15 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
             )
         )
         GROUP BY e.actor.id, e.eventType
-        """
-    )
+        """)
     List<ActivityBreakdownProjection> findActivityBreakdownByWorkspaceAndTeams(
-        @Param("workspaceId") Long workspaceId,
-        @Param("teamIds") Set<Long> teamIds,
-        @Param("actorIds") Set<Long> actorIds,
-        @Param("since") Instant since,
-        @Param("until") Instant until
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("teamIds") Set<Long> teamIds,
+            @Param("actorIds") Set<Long> actorIds,
+            @Param("since") Instant since,
+            @Param("until") Instant until);
 
-    @Query(
-        """
+    @Query("""
         SELECT e.actor.id as actorId, COUNT(e) as count
         FROM ActivityEvent e
         JOIN IssueComment c ON c.id = e.targetId
@@ -388,18 +348,15 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
             AND wtrs.hiddenFromContributions = true
         )
         GROUP BY e.actor.id
-        """
-    )
+        """)
     List<ActorCountProjection> findOwnPullRequestConversationReplyCountsByTeams(
-        @Param("workspaceId") Long workspaceId,
-        @Param("teamIds") Set<Long> teamIds,
-        @Param("actorIds") Set<Long> actorIds,
-        @Param("since") Instant since,
-        @Param("until") Instant until
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("teamIds") Set<Long> teamIds,
+            @Param("actorIds") Set<Long> actorIds,
+            @Param("since") Instant since,
+            @Param("until") Instant until);
 
-    @Query(
-        """
+    @Query("""
         SELECT e.actor.id as actorId, COUNT(e) as count
         FROM ActivityEvent e
         JOIN PullRequestReviewComment c ON c.id = e.targetId
@@ -430,40 +387,23 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
             AND wtrs.hiddenFromContributions = true
         )
         GROUP BY e.actor.id
-        """
-    )
+        """)
     List<ActorCountProjection> findOwnPullRequestInlineReplyCountsByTeams(
-        @Param("workspaceId") Long workspaceId,
-        @Param("teamIds") Set<Long> teamIds,
-        @Param("actorIds") Set<Long> actorIds,
-        @Param("since") Instant since,
-        @Param("until") Instant until
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("teamIds") Set<Long> teamIds,
+            @Param("actorIds") Set<Long> actorIds,
+            @Param("since") Instant since,
+            @Param("until") Instant until);
 
     default Map<Long, Long> countOwnPullRequestRepliesByActorsAndTeams(
-        Long workspaceId,
-        Set<Long> teamIds,
-        Set<Long> actorIds,
-        Instant since,
-        Instant until
-    ) {
+            Long workspaceId, Set<Long> teamIds, Set<Long> actorIds, Instant since, Instant until) {
         Map<Long, Long> counts = new HashMap<>();
-        for (ActorCountProjection projection : findOwnPullRequestConversationReplyCountsByTeams(
-            workspaceId,
-            teamIds,
-            actorIds,
-            since,
-            until
-        )) {
+        for (ActorCountProjection projection :
+                findOwnPullRequestConversationReplyCountsByTeams(workspaceId, teamIds, actorIds, since, until)) {
             counts.merge(projection.getActorId(), projection.getCount(), Long::sum);
         }
-        for (ActorCountProjection projection : findOwnPullRequestInlineReplyCountsByTeams(
-            workspaceId,
-            teamIds,
-            actorIds,
-            since,
-            until
-        )) {
+        for (ActorCountProjection projection :
+                findOwnPullRequestInlineReplyCountsByTeams(workspaceId, teamIds, actorIds, since, until)) {
             counts.merge(projection.getActorId(), projection.getCount(), Long::sum);
         }
         return counts;
@@ -473,8 +413,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
      * Count DISTINCT PRs reviewed per actor (workspace-level).
      * Self-reviews (reviewer == PR author) are excluded.
      */
-    @Query(
-        """
+    @Query("""
         SELECT e.actor.id as actorId, COUNT(DISTINCT r.pullRequest.id) as prCount
         FROM ActivityEvent e
         JOIN PullRequestReview r ON r.id = e.targetId
@@ -492,28 +431,21 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         AND e.occurredAt < :until
         AND (r.pullRequest.author IS NULL OR r.pullRequest.author.id <> e.actor.id)
         GROUP BY e.actor.id
-        """
-    )
+        """)
     List<DistinctPrCountProjection> findDistinctReviewedPullRequestCountsByActors(
-        @Param("workspaceId") Long workspaceId,
-        @Param("actorIds") Set<Long> actorIds,
-        @Param("since") Instant since,
-        @Param("until") Instant until
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("actorIds") Set<Long> actorIds,
+            @Param("since") Instant since,
+            @Param("until") Instant until);
 
     default Map<Long, Long> countDistinctReviewedPullRequestsByActors(
-        Long workspaceId,
-        Set<Long> actorIds,
-        Instant since,
-        Instant until
-    ) {
-        return findDistinctReviewedPullRequestCountsByActors(workspaceId, actorIds, since, until)
-            .stream()
-            .collect(Collectors.toMap(DistinctPrCountProjection::getActorId, DistinctPrCountProjection::getPrCount));
+            Long workspaceId, Set<Long> actorIds, Instant since, Instant until) {
+        return findDistinctReviewedPullRequestCountsByActors(workspaceId, actorIds, since, until).stream()
+                .collect(
+                        Collectors.toMap(DistinctPrCountProjection::getActorId, DistinctPrCountProjection::getPrCount));
     }
 
-    @Query(
-        """
+    @Query("""
         SELECT e.actor.id as actorId, COUNT(DISTINCT r.pullRequest.id) as prCount
         FROM ActivityEvent e
         JOIN PullRequestReview r ON r.id = e.targetId
@@ -565,26 +497,20 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
             )
         )
         GROUP BY e.actor.id
-        """
-    )
+        """)
     List<DistinctPrCountProjection> findDistinctReviewedPullRequestCountsByActorsAndTeams(
-        @Param("workspaceId") Long workspaceId,
-        @Param("teamIds") Set<Long> teamIds,
-        @Param("actorIds") Set<Long> actorIds,
-        @Param("since") Instant since,
-        @Param("until") Instant until
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("teamIds") Set<Long> teamIds,
+            @Param("actorIds") Set<Long> actorIds,
+            @Param("since") Instant since,
+            @Param("until") Instant until);
 
     default Map<Long, Long> countDistinctReviewedPullRequestsByActorsAndTeams(
-        Long workspaceId,
-        Set<Long> teamIds,
-        Set<Long> actorIds,
-        Instant since,
-        Instant until
-    ) {
+            Long workspaceId, Set<Long> teamIds, Set<Long> actorIds, Instant since, Instant until) {
         return findDistinctReviewedPullRequestCountsByActorsAndTeams(workspaceId, teamIds, actorIds, since, until)
-            .stream()
-            .collect(Collectors.toMap(DistinctPrCountProjection::getActorId, DistinctPrCountProjection::getPrCount));
+                .stream()
+                .collect(
+                        Collectors.toMap(DistinctPrCountProjection::getActorId, DistinctPrCountProjection::getPrCount));
     }
 
     /**
@@ -592,8 +518,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
      * Unlike leaderboard queries, does NOT apply hidden-repo settings (profile shows all
      * of the user's work). Self-reviews are still excluded.
      */
-    @Query(
-        """
+    @Query("""
         SELECT DISTINCT r.pullRequest.id
         FROM ActivityEvent e
         JOIN PullRequestReview r ON r.id = e.targetId
@@ -610,30 +535,29 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         AND e.occurredAt >= :since
         AND e.occurredAt < :until
         AND (r.pullRequest.author IS NULL OR r.pullRequest.author.id <> e.actor.id)
-        """
-    )
+        """)
     List<Long> findDistinctReviewedPullRequestIdsByActor(
-        @Param("workspaceId") Long workspaceId,
-        @Param("actorId") Long actorId,
-        @Param("since") Instant since,
-        @Param("until") Instant until
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("actorId") Long actorId,
+            @Param("since") Instant since,
+            @Param("until") Instant until);
 
     interface DistinctPrCountProjection {
         Long getActorId();
+
         Long getPrCount();
     }
 
     interface ActorCountProjection {
         Long getActorId();
+
         Long getCount();
     }
 
     // Profile XP Lookups
 
     /** Total lifetime XP for an actor in a workspace. Returns 0 if no events exist. */
-    @Query(
-        """
+    @Query("""
         SELECT COALESCE(SUM(e.xp), 0)
         FROM ActivityEvent e
         WHERE e.workspace.id = :workspaceId
@@ -641,36 +565,31 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         AND e.actor.type = de.tum.cit.aet.hephaestus.integration.scm.domain.user.User$Type.USER
         AND e.actor.id = :actorId
         AND e.xp > 0
-        """
-    )
+        """)
     long findTotalXpByWorkspaceAndActor(@Param("workspaceId") Long workspaceId, @Param("actorId") Long actorId);
 
-    @Query(
-        """
+    @Query("""
         SELECT e.targetId as targetId, e.xp as xp
         FROM ActivityEvent e
         WHERE e.workspace.id = :workspaceId
         AND e.targetId IN :targetIds
         AND e.targetType IN :targetTypes
-        """
-    )
+        """)
     List<TargetXpProjection> findXpByTargetIdsAndTypesInternal(
-        @Param("workspaceId") Long workspaceId,
-        @Param("targetIds") Set<Long> targetIds,
-        @Param("targetTypes") Set<String> targetTypes
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("targetIds") Set<Long> targetIds,
+            @Param("targetTypes") Set<String> targetTypes);
 
     default List<TargetXpProjection> findXpByTargetIdsAndTypes(
-        Long workspaceId,
-        Set<Long> targetIds,
-        Set<ActivityTargetType> targetTypes
-    ) {
-        Set<String> typeValues = targetTypes.stream().map(ActivityTargetType::getValue).collect(Collectors.toSet());
+            Long workspaceId, Set<Long> targetIds, Set<ActivityTargetType> targetTypes) {
+        Set<String> typeValues =
+                targetTypes.stream().map(ActivityTargetType::getValue).collect(Collectors.toSet());
         return findXpByTargetIdsAndTypesInternal(workspaceId, targetIds, typeValues);
     }
 
     interface TargetXpProjection {
         Long getTargetId();
+
         Double getXp();
     }
 
@@ -689,8 +608,7 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
      * Does NOT apply hidden-repo settings: "hidden from contributions" only affects team
      * leaderboard ranking, not personal profile visibility.
      */
-    @Query(
-        """
+    @Query("""
         SELECT e
         FROM ActivityEvent e
         LEFT JOIN FETCH e.actor
@@ -709,27 +627,22 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
             de.tum.cit.aet.hephaestus.activity.ActivityEventType.COMMENT_CREATED
         )
         ORDER BY e.occurredAt DESC
-        """
-    )
+        """)
     List<ActivityEvent> findProfileActivityByActorInTimeframe(
-        @Param("workspaceId") Long workspaceId,
-        @Param("actorId") Long actorId,
-        @Param("since") Instant since,
-        @Param("until") Instant until
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("actorId") Long actorId,
+            @Param("since") Instant since,
+            @Param("until") Instant until);
 
     // Achievement Progress Queries
 
     @WorkspaceAgnostic("Achievements are per-user lifetime accomplishments across all workspaces")
-    @Query(
-        value = """
+    @Query(value = """
         SELECT COUNT(*)
         FROM activity_event e
         WHERE e.actor_id = :actorId
         AND e.event_type IN :eventTypes
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     long countByActorIdAndEventTypes(@Param("actorId") Long actorId, @Param("eventTypes") Set<String> eventTypes);
 
     /**
@@ -737,69 +650,56 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
      * Uses Slice (not Stream) to avoid open-cursor issues when interleaving nested queries.
      */
     @WorkspaceAgnostic("Achievement recalculation replays all user events across workspaces")
-    @Query(
-        """
+    @Query("""
         SELECT e
         FROM ActivityEvent e
         WHERE e.actor.id = :actorId
         ORDER BY e.occurredAt ASC
-        """
-    )
+        """)
     Slice<ActivityEvent> findSliceByActorIdOrderByOccurredAtAsc(@Param("actorId") Long actorId, Pageable pageable);
 
     /** Count events of a type for an actor in [start, end). Used by BruteForce / NightOwl. */
     @WorkspaceAgnostic("Achievements are per-user lifetime accomplishments across all workspaces")
-    @Query(
-        value = """
+    @Query(value = """
         SELECT COUNT(*)
         FROM activity_event e
         WHERE e.actor_id = :actorId
         AND e.event_type = :eventType
         AND e.occurred_at >= :start
         AND e.occurred_at < :end
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     long countByActorIdAndEventTypeInWindow(
-        @Param("actorId") Long actorId,
-        @Param("eventType") String eventType,
-        @Param("start") Instant start,
-        @Param("end") Instant end
-    );
+            @Param("actorId") Long actorId,
+            @Param("eventType") String eventType,
+            @Param("start") Instant start,
+            @Param("end") Instant end);
 
     /**
      * Count events for an actor in [start, end] (inclusive end). Lets achievement evaluators
      * pass {@code event.occurredAt()} as {@code end} without adding artificial padding.
      */
     @WorkspaceAgnostic("Achievements are per-user lifetime accomplishments across all workspaces")
-    @Query(
-        value = """
+    @Query(value = """
         SELECT COUNT(*)
         FROM activity_event e
         WHERE e.actor_id = :actorId
         AND e.event_type = :eventType
         AND e.occurred_at >= :start
         AND e.occurred_at <= :end
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     long countByActorIdAndEventTypeInWindowInclusiveEnd(
-        @Param("actorId") Long actorId,
-        @Param("eventType") String eventType,
-        @Param("start") Instant start,
-        @Param("end") Instant end
-    );
+            @Param("actorId") Long actorId,
+            @Param("eventType") String eventType,
+            @Param("start") Instant start,
+            @Param("end") Instant end);
 
     /** Most recent event timestamp for an actor before {@code before}. Used by LongTimeReturn. */
     @WorkspaceAgnostic("Achievements are per-user lifetime accomplishments across all workspaces")
-    @Query(
-        value = """
+    @Query(value = """
         SELECT MAX(e.occurred_at)
         FROM activity_event e
         WHERE e.actor_id = :actorId
         AND e.occurred_at < :before
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     Optional<Instant> findMaxOccurredAtByActorIdBefore(@Param("actorId") Long actorId, @Param("before") Instant before);
 }

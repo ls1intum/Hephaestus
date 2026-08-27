@@ -52,8 +52,10 @@ class ConversationThreadContentSourceTest extends BaseUnitTest {
 
     @Test
     void supportsOnlyConversationReviewRequests() {
-        assertThat(source.supports(new ContextRequest.ConversationReviewRequest(conversationJob()))).isTrue();
-        assertThat(source.supports(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID()))).isFalse();
+        assertThat(source.supports(new ContextRequest.ConversationReviewRequest(conversationJob())))
+                .isTrue();
+        assertThat(source.supports(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID())))
+                .isFalse();
     }
 
     @Test
@@ -83,9 +85,8 @@ class ConversationThreadContentSourceTest extends BaseUnitTest {
         when(projection.buildThreadPayload(7L, "C0ABC", "1700000000.100000")).thenReturn(payload);
         SourceKind kind = new SourceKind("slack.conversation.thread");
 
-        when(projection.threadReadability(7L, "C0ABC", "1700000000.100000")).thenReturn(
-            ConversationThreadProjection.ThreadReadability.READABLE
-        );
+        when(projection.threadReadability(7L, "C0ABC", "1700000000.100000"))
+                .thenReturn(ConversationThreadProjection.ThreadReadability.READABLE);
 
         var contribution = source.capture(new ContextRequest.ConversationReviewRequest(job), Set.of(kind));
 
@@ -101,19 +102,16 @@ class ConversationThreadContentSourceTest extends BaseUnitTest {
         payload.put("messageCount", 0);
         payload.put("truncated", false);
         when(projection.buildThreadPayload(7L, "C0ABC", "1700000000.100000")).thenReturn(payload);
-        when(projection.threadReadability(7L, "C0ABC", "1700000000.100000")).thenReturn(
-            ConversationThreadProjection.ThreadReadability.CONSENT_NOT_ACTIVE
-        );
+        when(projection.threadReadability(7L, "C0ABC", "1700000000.100000"))
+                .thenReturn(ConversationThreadProjection.ThreadReadability.CONSENT_NOT_ACTIVE);
         SourceKind kind = new SourceKind("slack.conversation.thread");
 
         var contribution = source.capture(new ContextRequest.ConversationReviewRequest(job), Set.of(kind));
 
         // Reporting this as an empty conversation would have the model judge a developer's
         // communication on a thread it was never permitted to read.
-        assertThat(contribution.stateOverrides()).containsEntry(
-            kind,
-            new SourceCaptureState.Redacted(SourceAbsenceReason.CONSENT_NOT_ACTIVE)
-        );
+        assertThat(contribution.stateOverrides())
+                .containsEntry(kind, new SourceCaptureState.Redacted(SourceAbsenceReason.CONSENT_NOT_ACTIVE));
     }
 
     @Test
@@ -123,16 +121,13 @@ class ConversationThreadContentSourceTest extends BaseUnitTest {
         payload.put("messageCount", 0);
         payload.put("truncated", false);
         when(projection.buildThreadPayload(7L, "C0ABC", "1700000000.100000")).thenReturn(payload);
-        when(projection.threadReadability(7L, "C0ABC", "1700000000.100000")).thenReturn(
-            ConversationThreadProjection.ThreadReadability.NOT_FOUND
-        );
+        when(projection.threadReadability(7L, "C0ABC", "1700000000.100000"))
+                .thenReturn(ConversationThreadProjection.ThreadReadability.NOT_FOUND);
         SourceKind kind = new SourceKind("slack.conversation.thread");
 
         var contribution = source.capture(new ContextRequest.ConversationReviewRequest(job), Set.of(kind));
 
-        assertThat(contribution.stateOverrides()).containsEntry(
-            kind,
-            new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND)
-        );
+        assertThat(contribution.stateOverrides())
+                .containsEntry(kind, new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND));
     }
 }

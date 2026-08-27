@@ -38,10 +38,10 @@ public class ContributorService {
 
     public ContributorService(WebClient.Builder webClientBuilder, ContributorProperties contributorProperties) {
         this.webClient = webClientBuilder
-            .baseUrl(GITHUB_API_BASE)
-            .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
-            .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
-            .build();
+                .baseUrl(GITHUB_API_BASE)
+                .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
+                .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
+                .build();
         this.githubAuthToken = contributorProperties.authToken();
     }
 
@@ -77,13 +77,13 @@ public class ContributorService {
     private void collectContributorsForRepository(String owner, String repo, Map<Long, ContributorDTO> accumulator) {
         try {
             List<ContributorDTO.GitHubContributorResponse> contributors = webClient
-                .get()
-                .uri("/repos/{owner}/{repo}/contributors?per_page=100", owner, repo)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + githubAuthToken)
-                .retrieve()
-                .bodyToFlux(ContributorDTO.GitHubContributorResponse.class)
-                .collectList()
-                .block();
+                    .get()
+                    .uri("/repos/{owner}/{repo}/contributors?per_page=100", owner, repo)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + githubAuthToken)
+                    .retrieve()
+                    .bodyToFlux(ContributorDTO.GitHubContributorResponse.class)
+                    .collectList()
+                    .block();
 
             if (contributors != null) {
                 for (var contributor : contributors) {
@@ -92,27 +92,20 @@ public class ContributorService {
             }
         } catch (WebClientResponseException e) {
             log.warn(
-                "HTTP error fetching contributors for repository {}/{}: {} - {}",
-                owner,
-                repo,
-                e.getStatusCode(),
-                e.getMessage(),
-                e
-            );
+                    "HTTP error fetching contributors for repository {}/{}: {} - {}",
+                    owner,
+                    repo,
+                    e.getStatusCode(),
+                    e.getMessage(),
+                    e);
         }
     }
 
-    private static final Set<String> EXCLUDED_LOGINS = Set.of(
-        "semantic-release-bot",
-        "dependabot[bot]",
-        "github-actions[bot]",
-        "renovate[bot]"
-    );
+    private static final Set<String> EXCLUDED_LOGINS =
+            Set.of("semantic-release-bot", "dependabot[bot]", "github-actions[bot]", "renovate[bot]");
 
     private void safelyAddContributor(
-        ContributorDTO.GitHubContributorResponse contributor,
-        Map<Long, ContributorDTO> accumulator
-    ) {
+            ContributorDTO.GitHubContributorResponse contributor, Map<Long, ContributorDTO> accumulator) {
         try {
             String login = contributor.login();
             if (login != null && EXCLUDED_LOGINS.contains(login.toLowerCase())) {
@@ -135,12 +128,12 @@ public class ContributorService {
         }
         try {
             GitHubUserResponse user = webClient
-                .get()
-                .uri("/users/{login}", login)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + githubAuthToken)
-                .retrieve()
-                .bodyToMono(GitHubUserResponse.class)
-                .block();
+                    .get()
+                    .uri("/users/{login}", login)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + githubAuthToken)
+                    .retrieve()
+                    .bodyToMono(GitHubUserResponse.class)
+                    .block();
             return user != null ? user.name() : null;
         } catch (WebClientResponseException e) {
             log.debug("HTTP error fetching full name for user {}: {} - {}", login, e.getStatusCode(), e.getMessage());
@@ -150,19 +143,16 @@ public class ContributorService {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record GitHubUserResponse(
-        @JsonProperty("login") @Nullable String login,
-        @JsonProperty("name") @Nullable String name
-    ) {}
+            @JsonProperty("login") @Nullable String login,
+            @JsonProperty("name") @Nullable String name) {}
 
     private List<ContributorDTO> sortContributors(Map<Long, ContributorDTO> uniqueContributors) {
         if (uniqueContributors.isEmpty()) {
             return List.of();
         }
 
-        return uniqueContributors
-            .values()
-            .stream()
-            .sorted(Comparator.comparingInt(ContributorDTO::contributions).reversed())
-            .toList();
+        return uniqueContributors.values().stream()
+                .sorted(Comparator.comparingInt(ContributorDTO::contributions).reversed())
+                .toList();
     }
 }

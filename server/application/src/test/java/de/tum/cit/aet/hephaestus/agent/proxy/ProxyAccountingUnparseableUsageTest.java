@@ -30,58 +30,47 @@ class ProxyAccountingUnparseableUsageTest extends BaseUnitTest {
     private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
 
     private final ProxyAccounting accounting = new ProxyAccounting(
-        budgetGate,
-        usageAccumulator,
-        mentorTurnUsageAccumulator,
-        meterRegistry,
-        new ObjectMapper()
-    );
+            budgetGate, usageAccumulator, mentorTurnUsageAccumulator, meterRegistry, new ObjectMapper());
 
     @Test
     @DisplayName("an unreadable 2xx body is counted, not silently dropped")
     void shouldCountUnparseableUpstreamBody() {
-        ProxyRouting.BilledAttempt attempt = new ProxyRouting.BilledAttempt(
-            LlmUsageSourceType.AGENT_JOB,
-            UUID.randomUUID(),
-            1,
-            BigDecimal.ZERO
-        );
+        ProxyRouting.BilledAttempt attempt =
+                new ProxyRouting.BilledAttempt(LlmUsageSourceType.AGENT_JOB, UUID.randomUUID(), 1, BigDecimal.ZERO);
         byte[] notJson = "<html>502 upstream</html>".getBytes(StandardCharsets.UTF_8);
 
         assertThatCode(() -> accounting.recordUsage(attempt, notJson, false))
-            .as("accounting must never turn a call the provider already charged us for into an error")
-            .doesNotThrowAnyException();
+                .as("accounting must never turn a call the provider already charged us for into an error")
+                .doesNotThrowAnyException();
 
-        assertThat(meterRegistry.counter("llm.proxy.usage.unparseable", "sourceType", "AGENT_JOB").count())
-            .as("a non-zero rate is the only signal that the ledger is under-billing")
-            .isEqualTo(1.0);
+        assertThat(meterRegistry
+                        .counter("llm.proxy.usage.unparseable", "sourceType", "AGENT_JOB")
+                        .count())
+                .as("a non-zero rate is the only signal that the ledger is under-billing")
+                .isEqualTo(1.0);
         verify(usageAccumulator, never()).accumulate(any(), any());
     }
 
     @Test
     @DisplayName("a readable body still bills and leaves the counter alone")
     void shouldNotCountAParseableBody() {
-        ProxyRouting.BilledAttempt attempt = new ProxyRouting.BilledAttempt(
-            LlmUsageSourceType.AGENT_JOB,
-            UUID.randomUUID(),
-            1,
-            BigDecimal.ZERO
-        );
+        ProxyRouting.BilledAttempt attempt =
+                new ProxyRouting.BilledAttempt(LlmUsageSourceType.AGENT_JOB, UUID.randomUUID(), 1, BigDecimal.ZERO);
         // Every bucket distinct and non-zero: with cache-read and reasoning left at 0 the assertion
         // below cannot tell the correct mapping from any permutation of it.
-        byte[] body = (
-            """
+        byte[] body = ("""
             {"usage":{"prompt_tokens":10,"completion_tokens":5,\
             "prompt_tokens_details":{"cached_tokens":4},\
             "completion_tokens_details":{"reasoning_tokens":2}}}\
-            """
-        ).getBytes(StandardCharsets.UTF_8);
+            """).getBytes(StandardCharsets.UTF_8);
 
         accounting.recordUsage(attempt, body, false);
 
-        assertThat(meterRegistry.counter("llm.proxy.usage.unparseable", "sourceType", "AGENT_JOB").count())
-            .as("the counter must mean 'unbilled', not 'a call happened'")
-            .isZero();
+        assertThat(meterRegistry
+                        .counter("llm.proxy.usage.unparseable", "sourceType", "AGENT_JOB")
+                        .count())
+                .as("the counter must mean 'unbilled', not 'a call happened'")
+                .isZero();
         // Component order is (billableInput, output, reasoning, cacheRead), and the input bucket is the
         // NON-cached remainder: 10 prompt tokens of which 4 were cache reads bills 6 at the input rate,
         // not 10 — the intuitive (in, out, cacheRead, reasoning) reading mis-asserts and still passes.

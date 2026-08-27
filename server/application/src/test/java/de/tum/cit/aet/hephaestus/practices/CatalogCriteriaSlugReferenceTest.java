@@ -48,10 +48,9 @@ class CatalogCriteriaSlugReferenceTest extends BaseUnitTest {
         }
 
         assertThat(offenders)
-            .as(
-                "every slug-shaped criteria reference must name a real practice slug; these are truncations of a real slug"
-            )
-            .isEmpty();
+                .as(
+                        "every slug-shaped criteria reference must name a real practice slug; these are truncations of a real slug")
+                .isEmpty();
 
         // Belt-and-braces: these known phantom slugs must never appear, even though they are not prefixes
         // of any real slug (so the truncation check above would miss them).
@@ -61,8 +60,8 @@ class CatalogCriteriaSlugReferenceTest extends BaseUnitTest {
         for (String phantom : Set.of("keeps-secrets-out", "avoids-unsafe-panics", "exposed-credential-material")) {
             Pattern asWholeSlug = Pattern.compile(Pattern.quote(phantom) + "(?![a-z-])");
             assertThat(asWholeSlug.matcher(rawCatalogue).find())
-                .as("the phantom slug '%s' must not be named in any criteria", phantom)
-                .isFalse();
+                    .as("the phantom slug '%s' must not be named in any criteria", phantom)
+                    .isFalse();
         }
     }
 
@@ -91,12 +90,12 @@ class CatalogCriteriaSlugReferenceTest extends BaseUnitTest {
     }
 
     private static String readCatalogue() throws IOException {
-        try (
-            InputStream in = CatalogCriteriaSlugReferenceTest.class.getClassLoader().getResourceAsStream(
-                "practices/default-catalog.json"
-            )
-        ) {
-            assertThat(in).as("practices/default-catalog.json must be on the classpath").isNotNull();
+        try (InputStream in = CatalogCriteriaSlugReferenceTest.class
+                .getClassLoader()
+                .getResourceAsStream("practices/default-catalog.json")) {
+            assertThat(in)
+                    .as("practices/default-catalog.json must be on the classpath")
+                    .isNotNull();
             return new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
         }
     }

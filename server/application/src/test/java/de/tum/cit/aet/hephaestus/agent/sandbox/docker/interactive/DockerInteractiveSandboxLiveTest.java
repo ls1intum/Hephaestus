@@ -35,7 +35,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -73,10 +72,9 @@ class DockerInteractiveSandboxLiveTest {
 
     /** The image under test. A release-channel tag would test some other release's image (ADR 0031);
      * point this at a locally built agent image, or export the reference a deployment would use. */
-    private static final String AGENT_PI_IMAGE = System.getenv().getOrDefault(
-        "HEPHAESTUS_AGENT_IMAGE_REFERENCE",
-        "ghcr.io/ls1intum/hephaestus/agent-pi:dev"
-    );
+    private static final String AGENT_PI_IMAGE = System.getenv()
+            .getOrDefault("HEPHAESTUS_AGENT_IMAGE_REFERENCE", "ghcr.io/ls1intum/hephaestus/agent-pi:dev");
+
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private DockerClient dockerClient;
@@ -102,38 +100,26 @@ class DockerInteractiveSandboxLiveTest {
     @BeforeEach
     void setUp() throws Exception {
         SandboxProperties sandboxProperties = new SandboxProperties(
-            "unix:///var/run/docker.sock",
-            false,
-            null,
-            5,
-            10,
-            60,
-            null,
-            8080,
-            null,
-            209_715_200L,
-            500_000,
-            null
-        );
+                "unix:///var/run/docker.sock", false, null, 5, 10, 60, null, 8080, null, 209_715_200L, 500_000, null);
         // Tight TTL so idle eviction tests don't have to wait minutes.
         InteractiveSandboxProperties interactiveProperties = new InteractiveSandboxProperties(
-            /* idleTtlSeconds */ 2,
-            /* graceTimeoutSeconds */ 2,
-            /* reapIntervalSeconds */ 1,
-            /* ringBufferFrames */ 16,
-            /* stdinWriteTimeoutMs */ 5_000,
-            /* sendQueueCapacity */ 64,
-            /* subscriberQueueCapacity */ 64,
-            /* attachFirstFrameTimeoutSeconds */ 15,
-            /* maxSessionsPerUser */ 3,
-            /* maxSessionsTotal */ 50,
-            /* maxFrameChars */ 64 * 1024
-        );
+                /* idleTtlSeconds */ 2,
+                /* graceTimeoutSeconds */ 2,
+                /* reapIntervalSeconds */ 1,
+                /* ringBufferFrames */ 16,
+                /* stdinWriteTimeoutMs */ 5_000,
+                /* sendQueueCapacity */ 64,
+                /* subscriberQueueCapacity */ 64,
+                /* attachFirstFrameTimeoutSeconds */ 15,
+                /* maxSessionsPerUser */ 3,
+                /* maxSessionsTotal */ 50,
+                /* maxFrameChars */ 64 * 1024);
 
         dockerClient = DockerClientImpl.getInstance(
-            DefaultDockerClientConfig.createDefaultConfigBuilder().build(),
-            new ApacheDockerHttpClient.Builder().dockerHost(URI.create("unix:///var/run/docker.sock")).build()
-        );
+                DefaultDockerClientConfig.createDefaultConfigBuilder().build(),
+                new ApacheDockerHttpClient.Builder()
+                        .dockerHost(URI.create("unix:///var/run/docker.sock"))
+                        .build());
 
         dockerOps = new DockerClientOperations(dockerClient, dockerClient);
         dockerWaitExecutor = Executors.newCachedThreadPool();
@@ -145,28 +131,22 @@ class DockerInteractiveSandboxLiveTest {
         metrics = new InteractiveSandboxMetrics(meterRegistry);
         watchdog = new StdinWriteWatchdog();
         registry = new InteractiveSandboxRegistry(
-            interactiveProperties,
-            containerManager,
-            metrics,
-            watchdog,
-            meterRegistry
-        );
+                interactiveProperties, containerManager, metrics, watchdog, meterRegistry);
         proxyCredentialRegistry = new MentorProxyCredentialRegistry();
         adapter = new DockerInteractiveSandboxAdapter(
-            interactiveProperties,
-            sandboxProperties,
-            networkManager,
-            workspaceManager,
-            containerManager,
-            securityPolicy,
-            registry,
-            metrics,
-            MAPPER,
-            dockerWaitExecutor,
-            "docker",
-            8080,
-            proxyCredentialRegistry
-        );
+                interactiveProperties,
+                sandboxProperties,
+                networkManager,
+                workspaceManager,
+                containerManager,
+                securityPolicy,
+                registry,
+                metrics,
+                MAPPER,
+                dockerWaitExecutor,
+                "docker",
+                8080,
+                proxyCredentialRegistry);
 
         runnerBytes = Files.readAllBytes(Path.of("src/main/resources/agent/pi-mentor-runner.ts"));
     }
@@ -178,23 +158,23 @@ class DockerInteractiveSandboxLiveTest {
         }
         // Belt-and-braces: clean up anything a failing test left behind.
         try {
-            containerManager
-                .listManagedContainers()
-                .forEach(c -> {
-                    try {
-                        containerManager.forceRemove(c.id());
-                    } catch (Exception ignored) {}
-                });
-        } catch (Exception ignored) {}
+            containerManager.listManagedContainers().forEach(c -> {
+                try {
+                    containerManager.forceRemove(c.id());
+                } catch (Exception ignored) {
+                }
+            });
+        } catch (Exception ignored) {
+        }
         try {
-            networkManager
-                .listOrphanedNetworks()
-                .forEach(n -> {
-                    try {
-                        networkManager.removeNetwork(n.id());
-                    } catch (Exception ignored) {}
-                });
-        } catch (Exception ignored) {}
+            networkManager.listOrphanedNetworks().forEach(n -> {
+                try {
+                    networkManager.removeNetwork(n.id());
+                } catch (Exception ignored) {
+                }
+            });
+        } catch (Exception ignored) {
+        }
         if (dockerWaitExecutor != null) {
             dockerWaitExecutor.shutdownNow();
         }
@@ -207,63 +187,55 @@ class DockerInteractiveSandboxLiveTest {
         UUID sessionId = UUID.randomUUID();
         SecurityProfile sec = new SecurityProfile(null, "private", List.of("ALL"), Map.of());
         return new InteractiveSandboxSpec(
-            sessionId,
-            userId,
-            workspaceId,
-            AGENT_PI_IMAGE,
-            List.of("bun", "/workspace/.runner/pi-mentor-runner.ts"),
-            Map.of(),
-            new NetworkPolicy(true, null, null),
-            new ResourceLimits(512 * 1024 * 1024, 1.0, 256, Duration.ofMinutes(5)),
-            sec,
-            Map.of(".runner/pi-mentor-runner.ts", runnerBytes),
-            Map.of()
-        );
+                sessionId,
+                userId,
+                workspaceId,
+                AGENT_PI_IMAGE,
+                List.of("bun", "/workspace/.runner/pi-mentor-runner.ts"),
+                Map.of(),
+                new NetworkPolicy(true, null, null),
+                new ResourceLimits(512 * 1024 * 1024, 1.0, 256, Duration.ofMinutes(5)),
+                sec,
+                Map.of(".runner/pi-mentor-runner.ts", runnerBytes),
+                Map.of());
     }
 
     private InteractiveSandboxSpec buildSpecWithProxyRoute(
-        String userId,
-        String workspaceId,
-        String baseUrl,
-        AtomicReference<String> token
-    ) {
+            String userId, String workspaceId, String baseUrl, AtomicReference<String> token) {
         InteractiveSandboxSpec base = buildMentorSpec(userId, workspaceId);
         String minted = proxyCredentialRegistry.mint(
-            base.sessionId(),
-            new MentorProxyCredentialRegistry.Route("openai-completions", baseUrl, null, null, null, null)
-        );
+                base.sessionId(),
+                new MentorProxyCredentialRegistry.Route("openai-completions", baseUrl, null, null, null, null));
         token.set(minted);
         return new InteractiveSandboxSpec(
-            base.sessionId(),
-            base.userId(),
-            base.workspaceId(),
-            base.image(),
-            base.command(),
-            base.environment(),
-            new NetworkPolicy(true, null, minted),
-            base.resourceLimits(),
-            base.securityProfile(),
-            base.inputFiles(),
-            base.volumeMounts()
-        );
+                base.sessionId(),
+                base.userId(),
+                base.workspaceId(),
+                base.image(),
+                base.command(),
+                base.environment(),
+                new NetworkPolicy(true, null, minted),
+                base.resourceLimits(),
+                base.securityProfile(),
+                base.inputFiles(),
+                base.volumeMounts());
     }
 
     private static InteractiveSandboxSpec withContextSnapshot(InteractiveSandboxSpec base, String snapshot) {
         Map<String, byte[]> inputs = new HashMap<>(base.inputFiles());
         inputs.put("inputs/context/current_thread_history.json", snapshot.getBytes(StandardCharsets.UTF_8));
         return new InteractiveSandboxSpec(
-            base.sessionId(),
-            base.userId(),
-            base.workspaceId(),
-            base.image(),
-            base.command(),
-            base.environment(),
-            base.networkPolicy(),
-            base.resourceLimits(),
-            base.securityProfile(),
-            inputs,
-            base.volumeMounts()
-        );
+                base.sessionId(),
+                base.userId(),
+                base.workspaceId(),
+                base.image(),
+                base.command(),
+                base.environment(),
+                base.networkPolicy(),
+                base.resourceLimits(),
+                base.securityProfile(),
+                inputs,
+                base.volumeMounts());
     }
 
     private static JsonNode ping() {
@@ -288,11 +260,10 @@ class DockerInteractiveSandboxLiveTest {
             sb.subscribe(frames::add);
             sb.send(ping());
 
-            await()
-                .atMost(Duration.ofSeconds(15))
-                .untilAsserted(() ->
-                    assertThat(frames.stream().anyMatch(n -> "pong".equals(n.path("type").asString()))).isTrue()
-                );
+            await().atMost(Duration.ofSeconds(15))
+                    .untilAsserted(() -> assertThat(frames.stream()
+                                    .anyMatch(n -> "pong".equals(n.path("type").asString())))
+                            .isTrue());
             sb.close(Duration.ofSeconds(2));
         }
     }
@@ -313,17 +284,14 @@ class DockerInteractiveSandboxLiveTest {
             String payload = "a" + LINE_SEP + "b" + PARA_SEP + "c\nd\re";
             sb.send(echo(payload));
 
-            await()
-                .atMost(Duration.ofSeconds(15))
-                .untilAsserted(() -> {
-                    JsonNode echoBack = frames
-                        .stream()
+            await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> {
+                JsonNode echoBack = frames.stream()
                         .filter(n -> "echo_back".equals(n.path("type").asString()))
                         .findFirst()
                         .orElse(null);
-                    assertThat(echoBack).isNotNull();
-                    assertThat(echoBack.path("payload").asString()).isEqualTo(payload);
-                });
+                assertThat(echoBack).isNotNull();
+                assertThat(echoBack.path("payload").asString()).isEqualTo(payload);
+            });
             // 3-byte UTF-8 sequences; catches encoding regressions.
             assertThat(LINE_SEP.getBytes(StandardCharsets.UTF_8)).hasSize(3);
             assertThat(PARA_SEP.getBytes(StandardCharsets.UTF_8)).hasSize(3);
@@ -345,36 +313,26 @@ class DockerInteractiveSandboxLiveTest {
             // 1 startup "ready" + burst ticks - ring capacity = drops.
             int expectedDrops = (1 + burst) - ringCapacity;
 
-            await()
-                .atMost(Duration.ofSeconds(15))
-                .untilAsserted(() ->
-                    assertThat(metrics.ringBufferDropped.count() - before).isEqualTo((double) expectedDrops)
-                );
+            await().atMost(Duration.ofSeconds(15))
+                    .untilAsserted(() -> assertThat(metrics.ringBufferDropped.count() - before)
+                            .isEqualTo((double) expectedDrops));
 
             CopyOnWriteArrayList<JsonNode> snapshot = new CopyOnWriteArrayList<>();
             sb.subscribe(snapshot::add);
-            await()
-                .atMost(Duration.ofSeconds(5))
-                .untilAsserted(() ->
-                    assertThat(
-                        snapshot
-                            .stream()
-                            .filter(n -> "tick".equals(n.path("type").asString()))
-                            .count()
-                    ).isEqualTo(ringCapacity)
-                );
+            await().atMost(Duration.ofSeconds(5))
+                    .untilAsserted(() -> assertThat(snapshot.stream()
+                                    .filter(n -> "tick".equals(n.path("type").asString()))
+                                    .count())
+                            .isEqualTo(ringCapacity));
             int oldestRetainedN = burst - ringCapacity;
             int newestN = burst - 1;
-            assertThat(
-                snapshot
-                    .stream()
-                    .filter(n -> "tick".equals(n.path("type").asString()))
-                    .map(n -> n.path("n").asInt())
-            )
-                .as("subscriber must observe ticks (%d..%d)", oldestRetainedN, newestN)
-                .contains(oldestRetainedN)
-                .contains(newestN)
-                .doesNotContain(oldestRetainedN - 1);
+            assertThat(snapshot.stream()
+                            .filter(n -> "tick".equals(n.path("type").asString()))
+                            .map(n -> n.path("n").asInt()))
+                    .as("subscriber must observe ticks (%d..%d)", oldestRetainedN, newestN)
+                    .contains(oldestRetainedN)
+                    .contains(newestN)
+                    .doesNotContain(oldestRetainedN - 1);
 
             sb.close(Duration.ofSeconds(2));
         }
@@ -390,14 +348,14 @@ class DockerInteractiveSandboxLiveTest {
             assertThat(((DockerAttachedSandboxAdapter) sb).state()).isEqualTo(AttachedSandboxState.ATTACHED);
 
             // Poll reap() rather than sleep so the test exits as soon as TTL elapses.
-            await()
-                .atMost(Duration.ofSeconds(20))
-                .pollInterval(Duration.ofMillis(200))
-                .untilAsserted(() -> {
-                    registry.reap();
-                    assertThat(((DockerAttachedSandboxAdapter) sb).state()).isEqualTo(AttachedSandboxState.CLOSED);
-                });
-            assertThat(metrics.evictionsBy(EvictionReason.IDLE).count() - before).isEqualTo(1.0);
+            await().atMost(Duration.ofSeconds(20))
+                    .pollInterval(Duration.ofMillis(200))
+                    .untilAsserted(() -> {
+                        registry.reap();
+                        assertThat(((DockerAttachedSandboxAdapter) sb).state()).isEqualTo(AttachedSandboxState.CLOSED);
+                    });
+            assertThat(metrics.evictionsBy(EvictionReason.IDLE).count() - before)
+                    .isEqualTo(1.0);
         }
     }
 
@@ -417,19 +375,13 @@ class DockerInteractiveSandboxLiveTest {
         void compatibleReuseRevokesTheUnusedFreshProxyToken() {
             AtomicReference<String> firstToken = new AtomicReference<>();
             AtomicReference<String> unusedToken = new AtomicReference<>();
-            AttachedSandbox first = adapter.attach(
-                withContextSnapshot(
+            AttachedSandbox first = adapter.attach(withContextSnapshot(
                     buildSpecWithProxyRoute("u_reuse", "w_reuse", "https://gateway.example/v1", firstToken),
-                    "first turn"
-                )
-            );
+                    "first turn"));
 
-            AttachedSandbox reused = adapter.attach(
-                withContextSnapshot(
+            AttachedSandbox reused = adapter.attach(withContextSnapshot(
                     buildSpecWithProxyRoute("u_reuse", "w_reuse", "https://gateway.example/v1", unusedToken),
-                    "second turn"
-                )
-            );
+                    "second turn"));
 
             assertThat(reused).isSameAs(first);
             assertThat(proxyCredentialRegistry.validate(captured(firstToken))).isPresent();
@@ -441,21 +393,19 @@ class DockerInteractiveSandboxLiveTest {
         void changedProxyRouteReplacesTheWarmSandbox() {
             AtomicReference<String> oldToken = new AtomicReference<>();
             AtomicReference<String> newToken = new AtomicReference<>();
-            AttachedSandbox oldSandbox = adapter.attach(
-                buildSpecWithProxyRoute("u_route", "w_route", "https://old.example/v1", oldToken)
-            );
+            AttachedSandbox oldSandbox =
+                    adapter.attach(buildSpecWithProxyRoute("u_route", "w_route", "https://old.example/v1", oldToken));
 
-            AttachedSandbox replacement = adapter.attach(
-                buildSpecWithProxyRoute("u_route", "w_route", "https://new.example/v1", newToken)
-            );
+            AttachedSandbox replacement =
+                    adapter.attach(buildSpecWithProxyRoute("u_route", "w_route", "https://new.example/v1", newToken));
 
             assertThat(replacement).isNotSameAs(oldSandbox);
             assertThat(((DockerAttachedSandboxAdapter) oldSandbox).state()).isEqualTo(AttachedSandboxState.CLOSED);
             assertThat(proxyCredentialRegistry.validate(captured(oldToken))).isEmpty();
             assertThat(proxyCredentialRegistry.validate(captured(newToken)))
-                .get()
-                .extracting(route -> route.baseUrl())
-                .isEqualTo("https://new.example/v1");
+                    .get()
+                    .extracting(route -> route.baseUrl())
+                    .isEqualTo("https://new.example/v1");
             replacement.close(Duration.ofSeconds(2));
         }
 
@@ -491,19 +441,18 @@ class DockerInteractiveSandboxLiveTest {
             assertThat(captured(r1)).isSameAs(r2.get());
 
             // Reclaim of loser is fire-and-forget; wait for the close future then assert one container.
-            await()
-                .atMost(Duration.ofSeconds(15))
-                .untilAsserted(() -> assertThat(managedInteractiveCount() - containersBefore).isEqualTo(1));
+            await().atMost(Duration.ofSeconds(15))
+                    .untilAsserted(() -> assertThat(managedInteractiveCount() - containersBefore)
+                            .isEqualTo(1));
 
             captured(r1).close(Duration.ofSeconds(2));
         }
 
         private int managedInteractiveCount() {
-            return (int) containerManager
-                .listManagedContainers()
-                .stream()
-                .filter(c -> SandboxLabels.KIND_INTERACTIVE.equals(c.labels().get(SandboxLabels.KIND)))
-                .count();
+            return (int) containerManager.listManagedContainers().stream()
+                    .filter(c ->
+                            SandboxLabels.KIND_INTERACTIVE.equals(c.labels().get(SandboxLabels.KIND)))
+                    .count();
         }
     }
 
@@ -515,11 +464,9 @@ class DockerInteractiveSandboxLiveTest {
         void labelsPresent() {
             AttachedSandbox sb = adapter.attach(buildSpec("u6", "w6"));
             String sessionId = sb.identity().sessionId().toString();
-            var match = containerManager
-                .listManagedContainers()
-                .stream()
-                .filter(c -> sessionId.equals(c.labels().get(SandboxLabels.SESSION_ID)))
-                .findFirst();
+            var match = containerManager.listManagedContainers().stream()
+                    .filter(c -> sessionId.equals(c.labels().get(SandboxLabels.SESSION_ID)))
+                    .findFirst();
             assertThat(match).as("Container with our SESSION_ID label exists").isPresent();
             assertThat(match.get().labels().get(SandboxLabels.KIND)).isEqualTo(SandboxLabels.KIND_INTERACTIVE);
             assertThat(match.get().labels().get(SandboxLabels.MANAGED)).isEqualTo("true");
@@ -536,19 +483,17 @@ class DockerInteractiveSandboxLiveTest {
             AttachedSandbox sb = adapter.attach(buildSpec("u7", "w7"));
             String containerId = ((DockerAttachedSandboxAdapter) sb).containerId();
             ProcessBuilder pb = new ProcessBuilder(
-                "docker",
-                "exec",
-                "-u",
-                "1000:1000",
-                containerId,
-                "sh",
-                "-c",
-                "set -e; " +
-                    "touch /workspace/scratch/probe && rm /workspace/scratch/probe && echo scratch:rw; " +
-                    "touch /workspace/context/user/probe && rm /workspace/context/user/probe && echo user:rw; " +
-                    "if touch /workspace/context/target/probe 2>/dev/null; then echo target:RW_UNEXPECTED; else echo target:ro; fi; " +
-                    "if touch /workspace/context/probe 2>/dev/null; then echo context:RW_UNEXPECTED; else echo context:ro; fi"
-            );
+                    "docker",
+                    "exec",
+                    "-u",
+                    "1000:1000",
+                    containerId,
+                    "sh",
+                    "-c",
+                    "set -e; " + "touch /workspace/scratch/probe && rm /workspace/scratch/probe && echo scratch:rw; "
+                            + "touch /workspace/context/user/probe && rm /workspace/context/user/probe && echo user:rw; "
+                            + "if touch /workspace/context/target/probe 2>/dev/null; then echo target:RW_UNEXPECTED; else echo target:ro; fi; "
+                            + "if touch /workspace/context/probe 2>/dev/null; then echo context:RW_UNEXPECTED; else echo context:ro; fi");
             pb.redirectErrorStream(true);
             try {
                 Process p = pb.start();
@@ -571,26 +516,23 @@ class DockerInteractiveSandboxLiveTest {
             // agent-pi pre-creates /workspace owned by 1000:1000, so mkdir as root under --cap-drop=ALL
             // (no CAP_DAC_OVERRIDE) fails without the CONTAINER_USER fix.
             assumeTrue(
-                dockerOps.imageIsPresent(AGENT_PI_IMAGE),
-                "agent-pi image not in local daemon — build with: docker build -t " +
-                    AGENT_PI_IMAGE +
-                    " docker/agents/pi/"
-            );
+                    dockerOps.imageIsPresent(AGENT_PI_IMAGE),
+                    "agent-pi image not in local daemon — build with: docker build -t " + AGENT_PI_IMAGE
+                            + " docker/agents/pi/");
             UUID sessionId = UUID.randomUUID();
             SecurityProfile sec = new SecurityProfile(null, "private", List.of("ALL"), Map.of());
             InteractiveSandboxSpec piSpec = new InteractiveSandboxSpec(
-                sessionId,
-                "u_pi_perm",
-                "w_pi_perm",
-                AGENT_PI_IMAGE,
-                List.of("bun", "/workspace/.runner/pi-mentor-runner.ts"),
-                Map.of(),
-                new NetworkPolicy(true, null, null),
-                new ResourceLimits(512 * 1024 * 1024, 1.0, 256, Duration.ofMinutes(5)),
-                sec,
-                Map.of(".runner/pi-mentor-runner.ts", runnerBytes),
-                Map.of()
-            );
+                    sessionId,
+                    "u_pi_perm",
+                    "w_pi_perm",
+                    AGENT_PI_IMAGE,
+                    List.of("bun", "/workspace/.runner/pi-mentor-runner.ts"),
+                    Map.of(),
+                    new NetworkPolicy(true, null, null),
+                    new ResourceLimits(512 * 1024 * 1024, 1.0, 256, Duration.ofMinutes(5)),
+                    sec,
+                    Map.of(".runner/pi-mentor-runner.ts", runnerBytes),
+                    Map.of());
             AttachedSandbox sb = adapter.attach(piSpec);
             assertThat(((DockerAttachedSandboxAdapter) sb).state()).isEqualTo(AttachedSandboxState.ATTACHED);
             sb.close(Duration.ofSeconds(2));
@@ -607,24 +549,24 @@ class DockerInteractiveSandboxLiveTest {
             // sh -c 'exit 1' instead of the JSONL runner: pump sees EOF before any frame.
             InteractiveSandboxSpec base = buildSpec("u_crash", "w_crash");
             InteractiveSandboxSpec brokenSpec = new InteractiveSandboxSpec(
-                base.sessionId(),
-                base.userId(),
-                base.workspaceId(),
-                base.image(),
-                List.of("sh", "-c", "exit 1"),
-                base.environment(),
-                base.networkPolicy(),
-                base.resourceLimits(),
-                base.securityProfile(),
-                base.inputFiles(),
-                base.volumeMounts()
-            );
-            Assertions.assertThatThrownBy(() -> adapter.attach(brokenSpec)).isInstanceOf(
-                InteractiveSandboxException.class
-            );
+                    base.sessionId(),
+                    base.userId(),
+                    base.workspaceId(),
+                    base.image(),
+                    List.of("sh", "-c", "exit 1"),
+                    base.environment(),
+                    base.networkPolicy(),
+                    base.resourceLimits(),
+                    base.securityProfile(),
+                    base.inputFiles(),
+                    base.volumeMounts());
+            Assertions.assertThatThrownBy(() -> adapter.attach(brokenSpec))
+                    .isInstanceOf(InteractiveSandboxException.class);
             // Must distinguish runner-crash from flow-control timeout for dashboards.
-            assertThat(metrics.attachFailureFirstFrameFailed.count() - failedBefore).isEqualTo(1.0);
-            assertThat(metrics.attachFailureFirstFrameTimeout.count() - timeoutBefore).isZero();
+            assertThat(metrics.attachFailureFirstFrameFailed.count() - failedBefore)
+                    .isEqualTo(1.0);
+            assertThat(metrics.attachFailureFirstFrameTimeout.count() - timeoutBefore)
+                    .isZero();
         }
     }
 
@@ -640,18 +582,17 @@ class DockerInteractiveSandboxLiveTest {
     private InteractiveSandboxSpec buildMentorSpec(String userId, String workspaceId) {
         PiRuntimeFactory factory = new PiRuntimeFactory(MAPPER);
         PiPlanSpec planSpec = new PiPlanSpec(
-            "openai-completions",
-            "stub-model",
-            null,
-            null,
-            false,
-            "stub-proxy-token",
-            true,
-            120,
-            new MentorRunnerProfile(),
-            Map.of(),
-            ""
-        );
+                "openai-completions",
+                "stub-model",
+                null,
+                null,
+                false,
+                "stub-proxy-token",
+                true,
+                120,
+                new MentorRunnerProfile(),
+                Map.of(),
+                "");
         PiRuntimeFactory.PiPlan plan = factory.build(planSpec);
 
         Map<String, String> env = new HashMap<>(plan.environment());
@@ -659,18 +600,17 @@ class DockerInteractiveSandboxLiveTest {
         env.put("MENTOR_RUNNER_PROTOCOL_ONLY", "1");
 
         return new InteractiveSandboxSpec(
-            UUID.randomUUID(),
-            userId,
-            workspaceId,
-            AGENT_PI_IMAGE,
-            plan.command(),
-            Map.copyOf(env),
-            plan.networkPolicy(),
-            ResourceLimits.DEFAULT,
-            SecurityProfile.DEFAULT,
-            plan.inputFiles(),
-            Map.of()
-        );
+                UUID.randomUUID(),
+                userId,
+                workspaceId,
+                AGENT_PI_IMAGE,
+                plan.command(),
+                Map.copyOf(env),
+                plan.networkPolicy(),
+                ResourceLimits.DEFAULT,
+                SecurityProfile.DEFAULT,
+                plan.inputFiles(),
+                Map.of());
     }
 
     @Nested
@@ -681,26 +621,21 @@ class DockerInteractiveSandboxLiveTest {
         @Test
         void productionBootstrapSucceeds() {
             assumeTrue(
-                dockerOps.imageIsPresent(AGENT_PI_IMAGE),
-                "agent-pi image not in local daemon — build with: docker build -t " +
-                    AGENT_PI_IMAGE +
-                    " docker/agents/pi/"
-            );
+                    dockerOps.imageIsPresent(AGENT_PI_IMAGE),
+                    "agent-pi image not in local daemon — build with: docker build -t " + AGENT_PI_IMAGE
+                            + " docker/agents/pi/");
             // A failed bootstrap step means the pump sees EOF with a non-zero exit and attach() throws.
             AttachedSandbox sb = adapter.attach(buildMentorSpec("u_boot", "w_boot"));
             CopyOnWriteArrayList<JsonNode> frames = new CopyOnWriteArrayList<>();
             sb.subscribe(frames::add);
-            await()
-                .atMost(RPC_TIMEOUT)
-                .untilAsserted(() ->
-                    assertThat(
-                        frames
-                            .stream()
-                            .anyMatch(f ->
-                                "runner_ready".equals(f.path("params").path("event").path("type").asString())
-                            )
-                    ).isTrue()
-                );
+            await().atMost(RPC_TIMEOUT)
+                    .untilAsserted(() -> assertThat(frames.stream()
+                                    .anyMatch(f -> "runner_ready"
+                                            .equals(f.path("params")
+                                                    .path("event")
+                                                    .path("type")
+                                                    .asString())))
+                            .isTrue());
             sb.close(Duration.ofSeconds(2));
         }
 
@@ -712,38 +647,32 @@ class DockerInteractiveSandboxLiveTest {
             CopyOnWriteArrayList<JsonNode> frames = new CopyOnWriteArrayList<>();
             sb.subscribe(frames::add);
 
-            await()
-                .atMost(RPC_TIMEOUT)
-                .untilAsserted(() ->
-                    assertThat(
-                        frames
-                            .stream()
-                            .anyMatch(f ->
-                                "runner_ready".equals(f.path("params").path("event").path("type").asString())
-                            )
-                    ).isTrue()
-                );
+            await().atMost(RPC_TIMEOUT)
+                    .untilAsserted(() -> assertThat(frames.stream()
+                                    .anyMatch(f -> "runner_ready"
+                                            .equals(f.path("params")
+                                                    .path("event")
+                                                    .path("type")
+                                                    .asString())))
+                            .isTrue());
 
             String helloId = UUID.randomUUID().toString();
-            sb.send(
-                MAPPER.createObjectNode()
+            sb.send(MAPPER.createObjectNode()
                     .<ObjectNode>put("jsonrpc", "2.0")
                     .<ObjectNode>put("id", helloId)
                     .<ObjectNode>put("method", "hello")
-                    .set("params", MAPPER.createObjectNode())
-            );
+                    .set("params", MAPPER.createObjectNode()));
 
-            await()
-                .atMost(RPC_TIMEOUT)
-                .untilAsserted(() -> {
-                    JsonNode resp = frames
-                        .stream()
+            await().atMost(RPC_TIMEOUT).untilAsserted(() -> {
+                JsonNode resp = frames.stream()
                         .filter(f -> helloId.equals(f.path("id").asString()))
                         .findFirst()
                         .orElse(null);
-                    assertThat(resp).as("hello response").isNotNull();
-                    assertThat(resp.path("result").path("protocolVersion").asInt()).as("protocolVersion").isEqualTo(1);
-                });
+                assertThat(resp).as("hello response").isNotNull();
+                assertThat(resp.path("result").path("protocolVersion").asInt())
+                        .as("protocolVersion")
+                        .isEqualTo(1);
+            });
             sb.close(Duration.ofSeconds(2));
         }
 
@@ -754,96 +683,83 @@ class DockerInteractiveSandboxLiveTest {
             CopyOnWriteArrayList<JsonNode> frames = new CopyOnWriteArrayList<>();
             sb.subscribe(frames::add);
 
-            await()
-                .atMost(RPC_TIMEOUT)
-                .untilAsserted(() ->
-                    assertThat(
-                        frames
-                            .stream()
-                            .anyMatch(f ->
-                                "runner_ready".equals(f.path("params").path("event").path("type").asString())
-                            )
-                    ).isTrue()
-                );
+            await().atMost(RPC_TIMEOUT)
+                    .untilAsserted(() -> assertThat(frames.stream()
+                                    .anyMatch(f -> "runner_ready"
+                                            .equals(f.path("params")
+                                                    .path("event")
+                                                    .path("type")
+                                                    .asString())))
+                            .isTrue());
 
             String helloId = UUID.randomUUID().toString();
-            sb.send(
-                MAPPER.createObjectNode()
+            sb.send(MAPPER.createObjectNode()
                     .<ObjectNode>put("jsonrpc", "2.0")
                     .<ObjectNode>put("id", helloId)
                     .<ObjectNode>put("method", "hello")
-                    .set("params", MAPPER.createObjectNode())
-            );
-            await()
-                .atMost(RPC_TIMEOUT)
-                .untilAsserted(() ->
-                    assertThat(frames.stream().anyMatch(f -> helloId.equals(f.path("id").asString()))).isTrue()
-                );
+                    .set("params", MAPPER.createObjectNode()));
+            await().atMost(RPC_TIMEOUT)
+                    .untilAsserted(() -> assertThat(frames.stream()
+                                    .anyMatch(f -> helloId.equals(f.path("id").asString())))
+                            .isTrue());
 
             String threadId = UUID.randomUUID().toString();
             String openId = UUID.randomUUID().toString();
-            sb.send(
-                MAPPER.createObjectNode()
+            sb.send(MAPPER.createObjectNode()
                     .<ObjectNode>put("jsonrpc", "2.0")
                     .<ObjectNode>put("id", openId)
                     .<ObjectNode>put("method", "open_thread")
-                    .set("params", MAPPER.createObjectNode().put("threadId", threadId))
-            );
-            await()
-                .atMost(RPC_TIMEOUT)
-                .untilAsserted(() -> {
-                    JsonNode openResp = frames
-                        .stream()
+                    .set("params", MAPPER.createObjectNode().put("threadId", threadId)));
+            await().atMost(RPC_TIMEOUT).untilAsserted(() -> {
+                JsonNode openResp = frames.stream()
                         .filter(f -> openId.equals(f.path("id").asString()))
                         .findFirst()
                         .orElse(null);
-                    assertThat(openResp).as("open_thread response").isNotNull();
-                    assertThat(openResp.path("result").path("threadId").asString()).isEqualTo(threadId);
-                });
+                assertThat(openResp).as("open_thread response").isNotNull();
+                assertThat(openResp.path("result").path("threadId").asString()).isEqualTo(threadId);
+            });
 
             String promptId = UUID.randomUUID().toString();
-            sb.send(
-                MAPPER.createObjectNode()
+            sb.send(MAPPER.createObjectNode()
                     .<ObjectNode>put("jsonrpc", "2.0")
                     .<ObjectNode>put("id", promptId)
                     .<ObjectNode>put("method", "prompt")
-                    .set("params", MAPPER.createObjectNode().put("threadId", threadId).put("text", "Hello, stub!"))
-            );
-            await()
-                .atMost(RPC_TIMEOUT)
-                .untilAsserted(() -> {
-                    JsonNode promptResp = frames
-                        .stream()
+                    .set(
+                            "params",
+                            MAPPER.createObjectNode().put("threadId", threadId).put("text", "Hello, stub!")));
+            await().atMost(RPC_TIMEOUT).untilAsserted(() -> {
+                JsonNode promptResp = frames.stream()
                         .filter(f -> promptId.equals(f.path("id").asString()))
                         .findFirst()
                         .orElse(null);
-                    assertThat(promptResp).as("prompt response").isNotNull();
-                    assertThat(promptResp.path("result").path("accepted").asBoolean()).isTrue();
-                });
+                assertThat(promptResp).as("prompt response").isNotNull();
+                assertThat(promptResp.path("result").path("accepted").asBoolean())
+                        .isTrue();
+            });
 
             // The stub emits agent_start → message_update → agent_end scoped to threadId.
-            await()
-                .atMost(RPC_TIMEOUT)
-                .untilAsserted(() -> {
-                    List<JsonNode> events = frames
-                        .stream()
-                        .filter(
-                            f ->
-                                "event".equals(f.path("method").asString()) &&
-                                threadId.equals(f.path("params").path("threadId").asString())
-                        )
+            await().atMost(RPC_TIMEOUT).untilAsserted(() -> {
+                List<JsonNode> events = frames.stream()
+                        .filter(f -> "event".equals(f.path("method").asString())
+                                && threadId.equals(
+                                        f.path("params").path("threadId").asString()))
                         .map(f -> f.path("params").path("event"))
                         .collect(Collectors.toList());
-                    assertThat(events.stream().anyMatch(e -> "agent_start".equals(e.path("type").asString())))
+                assertThat(events.stream()
+                                .anyMatch(
+                                        e -> "agent_start".equals(e.path("type").asString())))
                         .as("agent_start")
                         .isTrue();
-                    assertThat(events.stream().anyMatch(e -> "message_update".equals(e.path("type").asString())))
+                assertThat(events.stream()
+                                .anyMatch(e ->
+                                        "message_update".equals(e.path("type").asString())))
                         .as("message_update / text_delta")
                         .isTrue();
-                    assertThat(events.stream().anyMatch(e -> "agent_end".equals(e.path("type").asString())))
+                assertThat(events.stream()
+                                .anyMatch(e -> "agent_end".equals(e.path("type").asString())))
                         .as("agent_end")
                         .isTrue();
-                });
+            });
             sb.close(Duration.ofSeconds(2));
         }
     }
@@ -857,13 +773,10 @@ class DockerInteractiveSandboxLiveTest {
             String containerId = ((DockerAttachedSandboxAdapter) sb).containerId();
             sb.close(Duration.ofSeconds(2));
             assertThat(((DockerAttachedSandboxAdapter) sb).state()).isEqualTo(AttachedSandboxState.CLOSED);
-            assertThat(
-                containerManager
-                    .listManagedContainers()
-                    .stream()
-                    .filter(c -> containerId.equals(c.id()))
-                    .toList()
-            ).isEmpty();
+            assertThat(containerManager.listManagedContainers().stream()
+                            .filter(c -> containerId.equals(c.id()))
+                            .toList())
+                    .isEmpty();
         }
 
         @Test

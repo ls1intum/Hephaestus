@@ -45,11 +45,10 @@ import org.springframework.transaction.support.TransactionTemplate;
 @ConditionalOnServerRole
 @Component
 @WorkspaceAgnostic(
-    "Cross-workspace conversation-thread sweep on a schedule; the candidate scan / counts / watermark advance " +
-        "delegate to the Slack-implemented ConversationCandidateSource SPI (workspace-pinned there) and the " +
-        "enqueue delegates to AgentJobService#submit, which scopes its own writes (same inherently cross-workspace " +
-        "pattern as SlackRetentionSweeper)"
-)
+        "Cross-workspace conversation-thread sweep on a schedule; the candidate scan / counts / watermark advance "
+                + "delegate to the Slack-implemented ConversationCandidateSource SPI (workspace-pinned there) and the "
+                + "enqueue delegates to AgentJobService#submit, which scopes its own writes (same inherently cross-workspace "
+                + "pattern as SlackRetentionSweeper)")
 public class ConversationThreadTriggerScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(ConversationThreadTriggerScheduler.class);
@@ -72,12 +71,12 @@ public class ConversationThreadTriggerScheduler {
     private final boolean conversationIngestEnabled;
 
     public ConversationThreadTriggerScheduler(
-        ConversationCandidateSource candidateSource,
-        ConversationReviewSubmitter submitter,
-        SignalRecorder signalRecorder,
-        TransactionTemplate transactionTemplate,
-        @Value("${hephaestus.integration.slack.conversation-ingest.enabled:true}") boolean conversationIngestEnabled
-    ) {
+            ConversationCandidateSource candidateSource,
+            ConversationReviewSubmitter submitter,
+            SignalRecorder signalRecorder,
+            TransactionTemplate transactionTemplate,
+            @Value("${hephaestus.integration.slack.conversation-ingest.enabled:true}")
+                    boolean conversationIngestEnabled) {
         this.candidateSource = candidateSource;
         this.submitter = submitter;
         this.signalRecorder = signalRecorder;
@@ -107,23 +106,14 @@ public class ConversationThreadTriggerScheduler {
         for (ConversationThreadCandidate c : candidates) {
             long totalTurns = candidateSource.liveTurnCount(c.workspaceId(), c.channelId(), c.threadTs());
             long growth = candidateSource.liveTurnCountSince(
-                c.workspaceId(),
-                c.channelId(),
-                c.threadTs(),
-                c.lastReviewedTs()
-            );
+                    c.workspaceId(), c.channelId(), c.threadTs(), c.lastReviewedTs());
             if (!passesGates(now, c.lastTs(), totalTurns, growth, QUIESCENCE_MINUTES, MIN_HUMAN_TURNS, MIN_GROWTH)) {
                 continue;
             }
             // The occurrence goes into the ledger BEFORE anything is submitted, and the ledger's own
             // uniqueness decides whether this sweep is the one that acts on it.
-            SignalKey key = ChatSignals.threadSettledKey(
-                c.workspaceId(),
-                c.threadId(),
-                c.threadTs(),
-                c.lastTs(),
-                totalTurns
-            );
+            SignalKey key =
+                    ChatSignals.threadSettledKey(c.workspaceId(), c.threadId(), c.threadTs(), c.lastTs(), totalTurns);
             boolean ours = transactionTemplate.execute(status -> signalRecorder.record(key, now, DiscoveredVia.SYNC));
             if (!Boolean.TRUE.equals(ours)) {
                 // Another sweep already decided this exact occurrence — the gates run on counts read a
@@ -140,24 +130,22 @@ public class ConversationThreadTriggerScheduler {
         }
         if (enqueued > 0) {
             log.info(
-                "conversation.detect: enqueued {} review job(s) across {} candidate thread(s)",
-                enqueued,
-                candidates.size()
-            );
+                    "conversation.detect: enqueued {} review job(s) across {} candidate thread(s)",
+                    enqueued,
+                    candidates.size());
         }
         return enqueued;
     }
 
     /** Pure gate predicate, unit-tested directly. */
     static boolean passesGates(
-        Instant now,
-        @Nullable String lastTs,
-        long totalTurns,
-        long growthSinceWatermark,
-        int quiescenceMinutes,
-        int minHumanTurns,
-        int minGrowth
-    ) {
+            Instant now,
+            @Nullable String lastTs,
+            long totalTurns,
+            long growthSinceWatermark,
+            int quiescenceMinutes,
+            int minHumanTurns,
+            int minGrowth) {
         if (totalTurns < minHumanTurns) {
             return false;
         }

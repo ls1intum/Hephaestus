@@ -50,10 +50,9 @@ public class GitHubLabelProcessor {
     private final ApplicationEventPublisher eventPublisher;
 
     public GitHubLabelProcessor(
-        LabelRepository labelRepository,
-        IdentityProviderRepository gitProviderRepository,
-        ApplicationEventPublisher eventPublisher
-    ) {
+            LabelRepository labelRepository,
+            IdentityProviderRepository gitProviderRepository,
+            ApplicationEventPublisher eventPublisher) {
         this.labelRepository = labelRepository;
         this.gitProviderRepository = gitProviderRepository;
         this.eventPublisher = eventPublisher;
@@ -76,9 +75,8 @@ public class GitHubLabelProcessor {
     public @Nullable Label process(@Nullable GitHubLabelDTO dto, Repository repository, ProcessingContext context) {
         if (dto == null || dto.name() == null) {
             log.warn(
-                "Skipped label processing: reason=nullOrMissingName, repoId={}",
-                repository != null ? repository.getId() : null
-            );
+                    "Skipped label processing: reason=nullOrMissingName, repoId={}",
+                    repository != null ? repository.getId() : null);
             return null;
         }
 
@@ -89,10 +87,8 @@ public class GitHubLabelProcessor {
 
         // Fall back to nativeId lookup if name lookup didn't find it (handles label renames)
         if (existingOpt.isEmpty() && dto.id() != null) {
-            existingOpt = labelRepository.findByNativeIdAndProviderId(
-                dto.id(),
-                Objects.requireNonNull(context.providerId())
-            );
+            existingOpt =
+                    labelRepository.findByNativeIdAndProviderId(dto.id(), Objects.requireNonNull(context.providerId()));
         }
         boolean isNew = existingOpt.isEmpty();
 
@@ -181,8 +177,8 @@ public class GitHubLabelProcessor {
         }
 
         labelRepository
-            .findByNativeIdAndProviderId(nativeId, Objects.requireNonNull(context.providerId()))
-            .ifPresent(label -> deleteLabel(label, context));
+                .findByNativeIdAndProviderId(nativeId, Objects.requireNonNull(context.providerId()))
+                .ifPresent(label -> deleteLabel(label, context));
     }
 
     private void deleteLabel(Label label, ProcessingContext context) {
@@ -192,8 +188,7 @@ public class GitHubLabelProcessor {
 
         labelRepository.delete(label);
         eventPublisher.publishEvent(
-            new ScmDomainEvent.LabelDeleted(label.getId(), label.getName(), EventContext.from(context))
-        );
+                new ScmDomainEvent.LabelDeleted(label.getId(), label.getName(), EventContext.from(context)));
         log.info("Deleted label: labelId={}, labelName={}", label.getId(), label.getName());
     }
 }

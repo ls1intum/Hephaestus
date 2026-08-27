@@ -49,13 +49,14 @@ public class ContainerSecurityPolicy {
      * these paths always have {@code noexec,nosuid,nodev} enforced.
      */
     private static final Map<String, String> MANDATORY_TMPFS = Map.of(
-        "/tmp",
-        "rw,noexec,nosuid,nodev,size=1073741824",
-        "/run",
-        "rw,noexec,nosuid,nodev,size=67108864",
-        "/home/agent/.local",
-        "rw,exec,nosuid,nodev,size=1073741824" // exec allowed: Pi's Node.js runtime extracts native addons here at runtime
-    );
+            "/tmp",
+            "rw,noexec,nosuid,nodev,size=1073741824",
+            "/run",
+            "rw,noexec,nosuid,nodev,size=67108864",
+            "/home/agent/.local",
+            "rw,exec,nosuid,nodev,size=1073741824" // exec allowed: Pi's Node.js runtime extracts native addons here at
+            // runtime
+            );
 
     private final SandboxProperties properties;
     private final @Nullable String seccompProfileJson;
@@ -78,10 +79,7 @@ public class ContainerSecurityPolicy {
      * @return the host config spec for container creation
      */
     public DockerOperations.HostConfigSpec buildHostConfig(
-        SecurityProfile security,
-        ResourceLimits resources,
-        @Nullable NetworkPolicy networkPolicy
-    ) {
+            SecurityProfile security, ResourceLimits resources, @Nullable NetworkPolicy networkPolicy) {
         // Enforcement floors: these security invariants are always applied regardless
         // of the caller-supplied SecurityProfile. A compromised or misconfigured caller
         // cannot weaken the sandbox below these minimums.
@@ -104,11 +102,10 @@ public class ContainerSecurityPolicy {
         // RLIMIT_NPROC is host-UID scoped and can prevent a non-root container from starting on a
         // shared host. The cgroup pids limit already constrains all tasks inside the container.
         Map<String, DockerOperations.UlimitSpec> ulimits = Map.of(
-            "nofile",
-            new DockerOperations.UlimitSpec(NOFILE_LIMIT, NOFILE_LIMIT),
-            "core",
-            new DockerOperations.UlimitSpec(0, 0)
-        );
+                "nofile",
+                new DockerOperations.UlimitSpec(NOFILE_LIMIT, NOFILE_LIMIT),
+                "core",
+                new DockerOperations.UlimitSpec(0, 0));
 
         // Resolve runtime: global config is the enforcement floor — callers cannot downgrade.
         // If global says "runsc", caller cannot set "runc" to bypass gVisor.
@@ -148,21 +145,20 @@ public class ContainerSecurityPolicy {
         }
 
         return new DockerOperations.HostConfigSpec(
-            resources.memoryBytes(),
-            resources.memoryBytes(), // memory-swap = memory (no swap)
-            (long) (resources.cpus() * NANO_CPUS_PER_CPU), // nanoCPUs
-            resources.pidsLimit(),
-            false, // read-only rootfs disabled: docker cp injects files before start (before tmpfs mounts exist)
-            false, // never privileged
-            dropCaps,
-            securityOpts,
-            tmpfs,
-            dns,
-            "private", // cgroup namespace always private
-            ipcMode,
-            runtime,
-            ulimits
-        );
+                resources.memoryBytes(),
+                resources.memoryBytes(), // memory-swap = memory (no swap)
+                (long) (resources.cpus() * NANO_CPUS_PER_CPU), // nanoCPUs
+                resources.pidsLimit(),
+                false, // read-only rootfs disabled: docker cp injects files before start (before tmpfs mounts exist)
+                false, // never privileged
+                dropCaps,
+                securityOpts,
+                tmpfs,
+                dns,
+                "private", // cgroup namespace always private
+                ipcMode,
+                runtime,
+                ulimits);
     }
 
     /** Build container labels for lifecycle management and reconciliation. */

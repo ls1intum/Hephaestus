@@ -8,7 +8,6 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmAuthMode;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditAction;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditActorKind;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
@@ -77,21 +76,19 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         Workspace workspace = setupWorkspace("audit-features");
 
         webTestClient
-            .patch()
-            .uri("/workspaces/{slug}/features", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("mentorEnabled", true))
-            .exchange()
-            .expectStatus()
-            .isOk();
+                .patch()
+                .uri("/workspaces/{slug}/features", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("mentorEnabled", true))
+                .exchange()
+                .expectStatus()
+                .isOk();
 
-        ConfigAuditEvent row = configAuditEventRepository
-            .findAll()
-            .stream()
-            .filter(e -> e.getEntityType() == ConfigAuditEntityType.WORKSPACE_FEATURES)
-            .findFirst()
-            .orElseThrow();
+        ConfigAuditEvent row = configAuditEventRepository.findAll().stream()
+                .filter(e -> e.getEntityType() == ConfigAuditEntityType.WORKSPACE_FEATURES)
+                .findFirst()
+                .orElseThrow();
         assertThat(row.getWorkspaceId()).isEqualTo(workspace.getId());
         assertThat(row.changedKeyList()).contains("mentorEnabled");
         assertThat(row.getNewValue()).contains("\"mentorEnabled\":true");
@@ -103,83 +100,71 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         Workspace workspace = setupWorkspace("audit-practice");
 
         PracticeDTO practice = webTestClient
-            .post()
-            .uri("/workspaces/{slug}/practices", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(
-                Map.of(
-                    "slug",
-                    "focused-reviews",
-                    "name",
-                    "Focused reviews",
-                    "bindings",
-                    PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
-                    "criteria",
-                    "Initial private criteria",
-                    "precomputeScript",
-                    "return { hints: [] };"
-                )
-            )
-            .exchange()
-            .expectStatus()
-            .isCreated()
-            .expectBody(PracticeDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .post()
+                .uri("/workspaces/{slug}/practices", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of(
+                        "slug",
+                        "focused-reviews",
+                        "name",
+                        "Focused reviews",
+                        "bindings",
+                        PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
+                        "criteria",
+                        "Initial private criteria",
+                        "precomputeScript",
+                        "return { hints: [] };"))
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody(PracticeDTO.class)
+                .returnResult()
+                .getResponseBody();
         assertThat(practice).isNotNull();
 
         webTestClient
-            .patch()
-            .uri("/workspaces/{slug}/practices/{practiceSlug}", workspace.getWorkspaceSlug(), practice.slug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(
-                Map.of(
-                    "name",
-                    "Focused code reviews",
-                    "criteria",
-                    "Updated private criteria",
-                    "precomputeScript",
-                    "return { hints: ['updated'] };"
-                )
-            )
-            .exchange()
-            .expectStatus()
-            .isOk();
+                .patch()
+                .uri("/workspaces/{slug}/practices/{practiceSlug}", workspace.getWorkspaceSlug(), practice.slug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of(
+                        "name",
+                        "Focused code reviews",
+                        "criteria",
+                        "Updated private criteria",
+                        "precomputeScript",
+                        "return { hints: ['updated'] };"))
+                .exchange()
+                .expectStatus()
+                .isOk();
 
         webTestClient
-            .delete()
-            .uri("/workspaces/{slug}/practices/{practiceSlug}", workspace.getWorkspaceSlug(), practice.slug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isNoContent();
+                .delete()
+                .uri("/workspaces/{slug}/practices/{practiceSlug}", workspace.getWorkspaceSlug(), practice.slug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNoContent();
 
-        List<ConfigAuditEvent> rows = configAuditEventRepository
-            .findAll()
-            .stream()
-            .filter(row -> java.util.Objects.equals(row.getWorkspaceId(), workspace.getId()))
-            .filter(row -> row.getEntityType() == ConfigAuditEntityType.PRACTICE_DEFINITION)
-            .filter(row -> row.getEntityId().equals(String.valueOf(practice.id())))
-            .sorted(java.util.Comparator.comparing(ConfigAuditEvent::getId))
-            .toList();
+        List<ConfigAuditEvent> rows = configAuditEventRepository.findAll().stream()
+                .filter(row -> java.util.Objects.equals(row.getWorkspaceId(), workspace.getId()))
+                .filter(row -> row.getEntityType() == ConfigAuditEntityType.PRACTICE_DEFINITION)
+                .filter(row -> row.getEntityId().equals(String.valueOf(practice.id())))
+                .sorted(java.util.Comparator.comparing(ConfigAuditEvent::getId))
+                .toList();
 
         assertThat(rows)
-            .extracting(ConfigAuditEvent::getAction)
-            .containsExactly(ConfigAuditAction.CREATED, ConfigAuditAction.UPDATED, ConfigAuditAction.DELETED);
+                .extracting(ConfigAuditEvent::getAction)
+                .containsExactly(ConfigAuditAction.CREATED, ConfigAuditAction.UPDATED, ConfigAuditAction.DELETED);
         assertThat(rows.get(0).getNewValue())
-            .contains("\"criteriaRevision\":1", "\"criteriaSha256\"", "\"precomputeScriptSha256\"")
-            .doesNotContain("Initial private criteria", "return { hints");
-        assertThat(rows.get(1).changedKeyList()).containsExactlyInAnyOrder(
-            "name",
-            "criteriaRevision",
-            "criteriaSha256",
-            "precomputeScriptSha256"
-        );
+                .contains("\"criteriaRevision\":1", "\"criteriaSha256\"", "\"precomputeScriptSha256\"")
+                .doesNotContain("Initial private criteria", "return { hints");
+        assertThat(rows.get(1).changedKeyList())
+                .containsExactlyInAnyOrder("name", "criteriaRevision", "criteriaSha256", "precomputeScriptSha256");
         assertThat(rows.get(1).getNewValue())
-            .contains("\"criteriaRevision\":2", "\"name\":\"Focused code reviews\"")
-            .doesNotContain("Updated private criteria", "return { hints");
+                .contains("\"criteriaRevision\":2", "\"name\":\"Focused code reviews\"")
+                .doesNotContain("Updated private criteria", "return { hints");
         assertThat(rows.get(2).getNewValue()).isNull();
         assertThat(rows.get(2).getOldValue()).contains("\"criteriaRevision\":2");
     }
@@ -205,11 +190,9 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         patchPracticeReview(workspace, Map.of("reset", List.of("COOLDOWN_MINUTES")));
 
-        List<ConfigAuditEvent> rows = configAuditEventRepository
-            .findAll()
-            .stream()
-            .sorted(java.util.Comparator.comparing(ConfigAuditEvent::getId))
-            .toList();
+        List<ConfigAuditEvent> rows = configAuditEventRepository.findAll().stream()
+                .sorted(java.util.Comparator.comparing(ConfigAuditEvent::getId))
+                .toList();
         assertThat(rows).hasSize(2);
         assertThat(rows.get(1).changedKeyList()).containsExactly("cooldownMinutes");
         assertThat(rows.get(1).getNewValue()).contains("\"cooldownMinutes\":null");
@@ -224,17 +207,17 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         patchPracticeReview(theirs, Map.of("cooldownMinutes", 15));
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/config-audit", mine.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.content.length()")
-            .isEqualTo(1)
-            .jsonPath("$.content[0].workspaceId")
-            .isEqualTo(mine.getId());
+                .get()
+                .uri("/workspaces/{slug}/config-audit", mine.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.content.length()")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].workspaceId")
+                .isEqualTo(mine.getId());
     }
 
     @Test
@@ -245,22 +228,19 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         patchPracticeReview(workspace, Map.of("deliverToMerged", true));
 
         webTestClient
-            .get()
-            .uri(uri ->
-                uri
-                    .path("/workspaces/{slug}/config-audit")
-                    .queryParam("changedKey", "deliverToMerged")
-                    .build(workspace.getWorkspaceSlug())
-            )
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.content.length()")
-            .isEqualTo(1)
-            .jsonPath("$.content[0].changedKeys[0]")
-            .isEqualTo("deliverToMerged");
+                .get()
+                .uri(uri -> uri.path("/workspaces/{slug}/config-audit")
+                        .queryParam("changedKey", "deliverToMerged")
+                        .build(workspace.getWorkspaceSlug()))
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.content.length()")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].changedKeys[0]")
+                .isEqualTo("deliverToMerged");
     }
 
     @Test
@@ -274,28 +254,30 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         patchPracticeReview(b, Map.of("cooldownMinutes", 15));
 
         webTestClient
-            .get()
-            .uri("/admin/config-audit")
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.content.length()")
-            .isEqualTo(2);
+                .get()
+                .uri("/admin/config-audit")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.content.length()")
+                .isEqualTo(2);
 
         webTestClient
-            .get()
-            .uri(uri -> uri.path("/admin/config-audit").queryParam("workspaceId", b.getId()).build())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.content.length()")
-            .isEqualTo(1)
-            .jsonPath("$.content[0].workspaceId")
-            .isEqualTo(b.getId());
+                .get()
+                .uri(uri -> uri.path("/admin/config-audit")
+                        .queryParam("workspaceId", b.getId())
+                        .build())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.content.length()")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].workspaceId")
+                .isEqualTo(b.getId());
     }
 
     @Test
@@ -305,34 +287,33 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         // reads any workspace by design. The sibling test also administers both workspaces, so it
         // survives removing the gate. Only a caller who administers neither proves the gate binds.
         Workspace theirs = createWorkspace(
-            "audit-gate-theirs",
-            "Other Workspace",
-            "audit-gate-theirs-org",
-            AccountType.ORG,
-            persistUser("audit-gate-theirs-owner")
-        );
+                "audit-gate-theirs",
+                "Other Workspace",
+                "audit-gate-theirs-org",
+                AccountType.ORG,
+                persistUser("audit-gate-theirs-owner"));
 
         // 401, not 403: a non-member resolves no workspace context at all, so the request is refused
         // before the admin gate is consulted. Either way the trail is not served.
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/config-audit", theirs.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isUnauthorized();
+                .get()
+                .uri("/workspaces/{slug}/config-audit", theirs.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isUnauthorized();
     }
 
     @Test
     @WithMentorUser
     void aNonInstanceAdminIsRefusedTheCrossWorkspaceView() {
         webTestClient
-            .get()
-            .uri("/admin/config-audit")
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .get()
+                .uri("/admin/config-audit")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isForbidden();
     }
 
     /**
@@ -344,26 +325,17 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         String future = Instant.now().plusSeconds(60).toString();
         String past = Instant.now().minusSeconds(60).toString();
         return java.util.stream.Stream.of(
-            org.junit.jupiter.params.provider.Arguments.of(
-                "entityType matches",
-                "entityType",
-                "WORKSPACE_LLM_CONNECTION",
-                1
-            ),
-            org.junit.jupiter.params.provider.Arguments.of(
-                "entityType matches the other kind",
-                "entityType",
-                "PRACTICE_REVIEW_SETTINGS",
-                1
-            ),
-            org.junit.jupiter.params.provider.Arguments.of("action matches", "action", "CREATED", 1),
-            org.junit.jupiter.params.provider.Arguments.of("action excludes", "action", "DELETED", 0),
-            org.junit.jupiter.params.provider.Arguments.of("actorId excludes", "actorId", "999999", 0),
-            org.junit.jupiter.params.provider.Arguments.of("from excludes the past", "from", future, 0),
-            org.junit.jupiter.params.provider.Arguments.of("from includes the past", "from", past, 2),
-            org.junit.jupiter.params.provider.Arguments.of("to excludes the present", "to", past, 0),
-            org.junit.jupiter.params.provider.Arguments.of("to includes the present", "to", future, 2)
-        );
+                org.junit.jupiter.params.provider.Arguments.of(
+                        "entityType matches", "entityType", "WORKSPACE_LLM_CONNECTION", 1),
+                org.junit.jupiter.params.provider.Arguments.of(
+                        "entityType matches the other kind", "entityType", "PRACTICE_REVIEW_SETTINGS", 1),
+                org.junit.jupiter.params.provider.Arguments.of("action matches", "action", "CREATED", 1),
+                org.junit.jupiter.params.provider.Arguments.of("action excludes", "action", "DELETED", 0),
+                org.junit.jupiter.params.provider.Arguments.of("actorId excludes", "actorId", "999999", 0),
+                org.junit.jupiter.params.provider.Arguments.of("from excludes the past", "from", future, 0),
+                org.junit.jupiter.params.provider.Arguments.of("from includes the past", "from", past, 2),
+                org.junit.jupiter.params.provider.Arguments.of("to excludes the present", "to", past, 0),
+                org.junit.jupiter.params.provider.Arguments.of("to includes the present", "to", future, 2));
     }
 
     @org.junit.jupiter.params.ParameterizedTest(name = "{0}")
@@ -386,18 +358,14 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         patchPracticeReview(workspace, Map.of("cooldownMinutes", 45));
 
         assertFilterYields(
-            workspace,
-            uri ->
-                uri
-                    .queryParam("entityType", "PRACTICE_REVIEW_SETTINGS")
-                    .queryParam("entityId", String.valueOf(workspace.getId())),
-            1
-        );
+                workspace,
+                uri -> uri.queryParam("entityType", "PRACTICE_REVIEW_SETTINGS")
+                        .queryParam("entityId", String.valueOf(workspace.getId())),
+                1);
         assertFilterYields(
-            workspace,
-            uri -> uri.queryParam("entityType", "PRACTICE_REVIEW_SETTINGS").queryParam("entityId", "999999"),
-            0
-        );
+                workspace,
+                uri -> uri.queryParam("entityType", "PRACTICE_REVIEW_SETTINGS").queryParam("entityId", "999999"),
+                0);
     }
 
     @Test
@@ -411,13 +379,10 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         createConnection(workspace, "primary");
 
         assertFilterYields(
-            workspace,
-            uri ->
-                uri
-                    .queryParam("entityType", "WORKSPACE_LLM_CONNECTION")
-                    .queryParam("entityType", "PRACTICE_REVIEW_SETTINGS"),
-            2
-        );
+                workspace,
+                uri -> uri.queryParam("entityType", "WORKSPACE_LLM_CONNECTION")
+                        .queryParam("entityType", "PRACTICE_REVIEW_SETTINGS"),
+                2);
         assertFilterYields(workspace, uri -> uri.queryParam("action", "CREATED").queryParam("action", "DELETED"), 1);
     }
 
@@ -431,23 +396,22 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         patchPracticeReview(workspace, Map.of("cooldownMinutes", 45));
         patchPracticeReview(workspace, Map.of("cooldownMinutes", 46));
         jdbcTemplate.update(
-            "UPDATE config_audit_event SET occurred_at = ? WHERE workspace_id = ?",
-            java.sql.Timestamp.from(java.time.Instant.parse("2026-07-01T00:00:00Z")),
-            workspace.getId()
-        );
+                "UPDATE config_audit_event SET occurred_at = ? WHERE workspace_id = ?",
+                java.sql.Timestamp.from(java.time.Instant.parse("2026-07-01T00:00:00Z")),
+                workspace.getId());
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/config-audit", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.content[0].newValue")
-            .value(org.hamcrest.Matchers.containsString("46"))
-            .jsonPath("$.content[1].newValue")
-            .value(org.hamcrest.Matchers.containsString("45"));
+                .get()
+                .uri("/workspaces/{slug}/config-audit", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.content[0].newValue")
+                .value(org.hamcrest.Matchers.containsString("46"))
+                .jsonPath("$.content[1].newValue")
+                .value(org.hamcrest.Matchers.containsString("45"));
     }
 
     @Test
@@ -457,17 +421,14 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         Workspace workspace = setupWorkspace("audit-badfilter");
 
         webTestClient
-            .get()
-            .uri(uri ->
-                uri
-                    .path("/workspaces/{slug}/config-audit")
-                    .queryParam("entityId", "1")
-                    .build(workspace.getWorkspaceSlug())
-            )
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+                .get()
+                .uri(uri -> uri.path("/workspaces/{slug}/config-audit")
+                        .queryParam("entityId", "1")
+                        .build(workspace.getWorkspaceSlug()))
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isBadRequest();
     }
 
     @Test
@@ -476,28 +437,28 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     void anUnscopedReadOfTheAuditTableIsCaughtByTenancyEnforcement() {
         // Pins that the table is registered workspace-scoped; isolation itself is carried by the gate
         // and by findForWorkspace.
-        assertThatThrownBy(() ->
-            entityManager.createNativeQuery("SELECT * FROM config_audit_event", ConfigAuditEvent.class).getResultList()
-        )
-            .isInstanceOf(de.tum.cit.aet.hephaestus.core.tenancy.TenancyViolationException.class)
-            .hasMessageContaining("config_audit_event");
+        assertThatThrownBy(() -> entityManager
+                        .createNativeQuery("SELECT * FROM config_audit_event", ConfigAuditEvent.class)
+                        .getResultList())
+                .isInstanceOf(de.tum.cit.aet.hephaestus.core.tenancy.TenancyViolationException.class)
+                .hasMessageContaining("config_audit_event");
     }
 
     private void assertFilterYields(
-        Workspace workspace,
-        java.util.function.UnaryOperator<org.springframework.web.util.UriBuilder> query,
-        int expected
-    ) {
+            Workspace workspace,
+            java.util.function.UnaryOperator<org.springframework.web.util.UriBuilder> query,
+            int expected) {
         webTestClient
-            .get()
-            .uri(uri -> query.apply(uri.path("/workspaces/{slug}/config-audit")).build(workspace.getWorkspaceSlug()))
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.content.length()")
-            .isEqualTo(expected);
+                .get()
+                .uri(uri ->
+                        query.apply(uri.path("/workspaces/{slug}/config-audit")).build(workspace.getWorkspaceSlug()))
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.content.length()")
+                .isEqualTo(expected);
     }
 
     private Workspace setupWorkspace(String slug) {
@@ -509,36 +470,33 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private void patchPracticeReview(Workspace workspace, Map<String, Object> body) {
         webTestClient
-            .patch()
-            .uri("/workspaces/{slug}/practices/review-settings", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(body)
-            .exchange()
-            .expectStatus()
-            .isOk();
+                .patch()
+                .uri("/workspaces/{slug}/practices/review-settings", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(body)
+                .exchange()
+                .expectStatus()
+                .isOk();
     }
 
     /** A second producer, of a different entity type and action, so the filter matrix proves each predicate narrows. */
     private void createConnection(Workspace workspace, String slug) {
         webTestClient
-            .post()
-            .uri("/workspaces/{slug}/llm/connections", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(
-                new CreateWorkspaceLlmConnectionRequestDTO(
-                    slug,
-                    "My Provider",
-                    "https://api.openai.com",
-                    "openai-completions",
-                    LlmAuthMode.BEARER,
-                    "sk-workspace-secret-9999",
-                    true
-                )
-            )
-            .exchange()
-            .expectStatus()
-            .isCreated();
+                .post()
+                .uri("/workspaces/{slug}/llm/connections", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new CreateWorkspaceLlmConnectionRequestDTO(
+                        slug,
+                        "My Provider",
+                        "https://api.openai.com",
+                        "openai-completions",
+                        LlmAuthMode.BEARER,
+                        "sk-workspace-secret-9999",
+                        true))
+                .exchange()
+                .expectStatus()
+                .isCreated();
     }
 }

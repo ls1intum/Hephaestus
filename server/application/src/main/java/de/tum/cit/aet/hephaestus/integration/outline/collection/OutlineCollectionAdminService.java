@@ -70,14 +70,13 @@ public class OutlineCollectionAdminService {
     private final ApplicationEventPublisher eventPublisher;
 
     public OutlineCollectionAdminService(
-        ConnectionService connectionService,
-        OutlineCollectionRepository collectionRepository,
-        OutlineDocumentRepository documentRepository,
-        OutlineContentClient outlineApiClient,
-        OutlineDocumentSyncScheduler syncScheduler,
-        @Qualifier("applicationTaskExecutor") AsyncTaskExecutor taskExecutor,
-        ApplicationEventPublisher eventPublisher
-    ) {
+            ConnectionService connectionService,
+            OutlineCollectionRepository collectionRepository,
+            OutlineDocumentRepository documentRepository,
+            OutlineContentClient outlineApiClient,
+            OutlineDocumentSyncScheduler syncScheduler,
+            @Qualifier("applicationTaskExecutor") AsyncTaskExecutor taskExecutor,
+            ApplicationEventPublisher eventPublisher) {
         this.connectionService = connectionService;
         this.collectionRepository = collectionRepository;
         this.documentRepository = documentRepository;
@@ -100,10 +99,9 @@ public class OutlineCollectionAdminService {
     public List<OutlineCollectionDTO> listCollections(long workspaceId) {
         OutlineInstall install = requireInstall(workspaceId);
         Map<String, Long> liveCounts = liveCountsByCollection(install);
-        return registeredRows(install)
-            .stream()
-            .map(row -> OutlineCollectionDTO.from(row, liveCounts.getOrDefault(row.getCollectionId(), 0L)))
-            .toList();
+        return registeredRows(install).stream()
+                .map(row -> OutlineCollectionDTO.from(row, liveCounts.getOrDefault(row.getCollectionId(), 0L)))
+                .toList();
     }
 
     /** One mirrored collection by its Outline id, or {@link EntityNotFoundException} (404) when not registered. */
@@ -118,32 +116,24 @@ public class OutlineCollectionAdminService {
      */
     public List<OutlineCollectionCandidateDTO> listCandidates(long workspaceId) {
         OutlineInstall install = requireInstall(workspaceId);
-        Set<String> mirrored = registeredRows(install)
-            .stream()
-            .map(OutlineCollection::getCollectionId)
-            .collect(Collectors.toSet());
+        Set<String> mirrored = registeredRows(install).stream()
+                .map(OutlineCollection::getCollectionId)
+                .collect(Collectors.toSet());
         return outlineApiClient
-            .listCollections(install.serverUrl(), requireToken(workspaceId), CANDIDATES_MAX_PAGES)
-            .stream()
-            .filter(c -> c.getId() != null && !c.getId().isBlank())
-            .map(c ->
-                new OutlineCollectionCandidateDTO(
-                    c.getId(),
-                    c.getName(),
-                    c.getUrlId(),
-                    c.getColor(),
-                    c.getIcon(),
-                    c.getDescription(),
-                    mirrored.contains(c.getId())
-                )
-            )
-            .sorted(
-                Comparator.comparing(
-                    OutlineCollectionCandidateDTO::name,
-                    Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)
-                )
-            )
-            .toList();
+                .listCollections(install.serverUrl(), requireToken(workspaceId), CANDIDATES_MAX_PAGES)
+                .stream()
+                .filter(c -> c.getId() != null && !c.getId().isBlank())
+                .map(c -> new OutlineCollectionCandidateDTO(
+                        c.getId(),
+                        c.getName(),
+                        c.getUrlId(),
+                        c.getColor(),
+                        c.getIcon(),
+                        c.getDescription(),
+                        mirrored.contains(c.getId())))
+                .sorted(Comparator.comparing(
+                        OutlineCollectionCandidateDTO::name, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
+                .toList();
     }
 
     /**
@@ -156,20 +146,16 @@ public class OutlineCollectionAdminService {
     public RegistrationOutcome register(long workspaceId, String collectionId) {
         OutlineInstall install = requireInstall(workspaceId);
         Optional<OutlineCollection> existing = collectionRepository.findByWorkspaceIdAndConnectionIdAndCollectionId(
-            workspaceId,
-            install.connectionId(),
-            collectionId
-        );
+                workspaceId, install.connectionId(), collectionId);
         if (existing.isPresent()) {
             return new RegistrationOutcome(false, toDto(install, existing.get()));
         }
 
-        OutlineCollectionModel live = outlineApiClient
-            .listCollections(install.serverUrl(), requireToken(workspaceId))
-            .stream()
-            .filter(c -> collectionId.equals(c.getId()))
-            .findFirst()
-            .orElseThrow(() -> new UnknownOutlineCollectionException(collectionId));
+        OutlineCollectionModel live =
+                outlineApiClient.listCollections(install.serverUrl(), requireToken(workspaceId)).stream()
+                        .filter(c -> collectionId.equals(c.getId()))
+                        .findFirst()
+                        .orElseThrow(() -> new UnknownOutlineCollectionException(collectionId));
 
         OutlineCollection row = new OutlineCollection();
         row.setWorkspaceId(workspaceId);
@@ -233,53 +219,39 @@ public class OutlineCollectionAdminService {
         OutlineInstall install = requireInstall(workspaceId);
         OutlineCollection row = requireRegistered(install, collectionId);
         long erased = documentRepository.deleteByWorkspaceIdAndConnectionIdAndCollectionId(
-            workspaceId,
-            install.connectionId(),
-            collectionId
-        );
+                workspaceId, install.connectionId(), collectionId);
         collectionRepository.delete(row);
         log.info(
-            "outline.audit: collection erase — actor={} removed collectionId={} from the mirror for workspaceId={} ({} mirrored document(s) erased)",
-            LoggingUtils.sanitizeForLog(SecurityUtils.getCurrentUserLogin().orElse("system")),
-            LoggingUtils.sanitizeForLog(collectionId),
-            workspaceId,
-            erased
-        );
+                "outline.audit: collection erase — actor={} removed collectionId={} from the mirror for workspaceId={} ({} mirrored document(s) erased)",
+                LoggingUtils.sanitizeForLog(SecurityUtils.getCurrentUserLogin().orElse("system")),
+                LoggingUtils.sanitizeForLog(collectionId),
+                workspaceId,
+                erased);
     }
 
     private List<OutlineCollection> registeredRows(OutlineInstall install) {
-        return collectionRepository
-            .findByWorkspaceIdOrderByCreatedAtAsc(install.workspaceId())
-            .stream()
-            .filter(row -> row.getConnectionId() == install.connectionId())
-            .toList();
+        return collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(install.workspaceId()).stream()
+                .filter(row -> row.getConnectionId() == install.connectionId())
+                .toList();
     }
 
     private OutlineCollection requireRegistered(OutlineInstall install, String collectionId) {
         return collectionRepository
-            .findByWorkspaceIdAndConnectionIdAndCollectionId(
-                install.workspaceId(),
-                install.connectionId(),
-                collectionId
-            )
-            .orElseThrow(() -> new EntityNotFoundException("Outline collection", collectionId));
+                .findByWorkspaceIdAndConnectionIdAndCollectionId(
+                        install.workspaceId(), install.connectionId(), collectionId)
+                .orElseThrow(() -> new EntityNotFoundException("Outline collection", collectionId));
     }
 
     private OutlineCollectionDTO toDto(OutlineInstall install, OutlineCollection row) {
         long liveCount = documentRepository.countByWorkspaceIdAndConnectionIdAndCollectionIdAndDeletedAtIsNull(
-            install.workspaceId(),
-            install.connectionId(),
-            row.getCollectionId()
-        );
+                install.workspaceId(), install.connectionId(), row.getCollectionId());
         return OutlineCollectionDTO.from(row, liveCount);
     }
 
     private Map<String, Long> liveCountsByCollection(OutlineInstall install) {
         Map<String, Long> counts = new HashMap<>();
-        for (Object[] rowCount : documentRepository.countLiveByCollection(
-            install.workspaceId(),
-            install.connectionId()
-        )) {
+        for (Object[] rowCount :
+                documentRepository.countLiveByCollection(install.workspaceId(), install.connectionId())) {
             counts.put((String) rowCount[0], (Long) rowCount[1]);
         }
         return counts;
@@ -300,17 +272,15 @@ public class OutlineCollectionAdminService {
      */
     private void kickCollectionSync(long workspaceId, String collectionId) {
         OutlineSyncDispatch.fireAndForget(
-            taskExecutor,
-            () -> syncScheduler.syncCollectionNow(workspaceId, collectionId),
-            e ->
-                // The registration/resume already succeeded; the catch-up tick retries a failed kick.
-                log.warn(
-                    "outline.admin: targeted sync kick failed for workspaceId={}, collectionId={}: {}",
-                    workspaceId,
-                    collectionId,
-                    e.toString()
-                )
-        );
+                taskExecutor,
+                () -> syncScheduler.syncCollectionNow(workspaceId, collectionId),
+                e ->
+                        // The registration/resume already succeeded; the catch-up tick retries a failed kick.
+                        log.warn(
+                                "outline.admin: targeted sync kick failed for workspaceId={}, collectionId={}: {}",
+                                workspaceId,
+                                collectionId,
+                                e.toString()));
     }
 
     /** The workspace's ACTIVE Outline install, or a 404 when not connected — see {@link OutlineConnectionResolver}. */
@@ -318,18 +288,17 @@ public class OutlineCollectionAdminService {
         Connection connection = OutlineConnectionResolver.requireActiveConnection(connectionService, workspaceId);
         ConnectionConfig.OutlineConfig config = (ConnectionConfig.OutlineConfig) connection.getConfig();
         return new OutlineInstall(
-            workspaceId,
-            connection.getId(),
-            Objects.requireNonNull(config.serverUrl(), "Outline connection must have a server URL")
-        );
+                workspaceId,
+                connection.getId(),
+                Objects.requireNonNull(config.serverUrl(), "Outline connection must have a server URL"));
     }
 
     /** The install's stored API token; missing credentials read as "not usably connected" (404). */
     private String requireToken(long workspaceId) {
         return connectionService
-            .findActiveBearerToken(workspaceId, IntegrationKind.OUTLINE)
-            .map(BearerToken::token)
-            .orElseThrow(() -> new EntityNotFoundException("Outline connection", Long.toString(workspaceId)));
+                .findActiveBearerToken(workspaceId, IntegrationKind.OUTLINE)
+                .map(BearerToken::token)
+                .orElseThrow(() -> new EntityNotFoundException("Outline connection", Long.toString(workspaceId)));
     }
 
     private static @Nullable String truncateDescription(@Nullable String description) {
@@ -337,7 +306,7 @@ public class OutlineCollectionAdminService {
             return null;
         }
         return description.length() <= MAX_DESCRIPTION_LENGTH
-            ? description
-            : description.substring(0, MAX_DESCRIPTION_LENGTH);
+                ? description
+                : description.substring(0, MAX_DESCRIPTION_LENGTH);
     }
 }

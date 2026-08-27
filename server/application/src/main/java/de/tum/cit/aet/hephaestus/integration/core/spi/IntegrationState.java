@@ -30,15 +30,14 @@ public enum IntegrationState {
     UNINSTALLED;
 
     private static final Map<IntegrationState, Set<IntegrationState>> LEGAL = Map.of(
-        PENDING,
-        Set.of(ACTIVE, UNINSTALLED),
-        ACTIVE,
-        Set.of(SUSPENDED, UNINSTALLED),
-        SUSPENDED,
-        Set.of(ACTIVE, UNINSTALLED),
-        UNINSTALLED,
-        Set.of()
-    );
+            PENDING,
+            Set.of(ACTIVE, UNINSTALLED),
+            ACTIVE,
+            Set.of(SUSPENDED, UNINSTALLED),
+            SUSPENDED,
+            Set.of(ACTIVE, UNINSTALLED),
+            UNINSTALLED,
+            Set.of());
 
     public boolean canTransitionTo(IntegrationState next) {
         return Objects.requireNonNull(LEGAL.get(this)).contains(next);

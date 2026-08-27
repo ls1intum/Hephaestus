@@ -46,10 +46,9 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
     private final ObjectMapper objectMapper;
 
     JobTokenAuthenticationFilter(
-        AgentJobRepository agentJobRepository,
-        MentorProxyCredentialRegistry mentorRegistry,
-        ObjectMapper objectMapper
-    ) {
+            AgentJobRepository agentJobRepository,
+            MentorProxyCredentialRegistry mentorRegistry,
+            ObjectMapper objectMapper) {
         this.agentJobRepository = agentJobRepository;
         this.mentorRegistry = mentorRegistry;
         this.objectMapper = objectMapper;
@@ -57,7 +56,7 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-        throws ServletException, IOException {
+            throws ServletException, IOException {
         if (!isPrivateIp(request.getRemoteAddr())) {
             log.warn("LLM proxy request from non-private IP: {}", request.getRemoteAddr());
             response.sendError(HttpServletResponse.SC_FORBIDDEN, "Forbidden");
@@ -116,8 +115,7 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
             log.warn("Failed to parse config snapshot for job {}: {}", job.getId(), e.getMessage());
             return Optional.empty();
         }
-        return Optional.of(
-            new ProxyRouting(
+        return Optional.of(new ProxyRouting(
                 "job:" + job.getId(),
                 snapshot.apiProtocol(),
                 snapshot.baseUrl(),
@@ -126,13 +124,7 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
                 snapshot.modelId(),
                 job.getWorkspace().getId(),
                 new ProxyRouting.BilledAttempt(
-                    LlmUsageSourceType.AGENT_JOB,
-                    job.getId(),
-                    job.getRetryCount(),
-                    spentSoFarUsd(job, snapshot)
-                )
-            )
-        );
+                        LlmUsageSourceType.AGENT_JOB, job.getId(), job.getRetryCount(), spentSoFarUsd(job, snapshot))));
     }
 
     /**
@@ -145,14 +137,12 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
         if (price == null) {
             return BigDecimal.ZERO;
         }
-        BigDecimal cost = price
-            .calculateCost(
-                zeroIfNull(job.getLlmTotalInputTokens()),
-                zeroIfNull(job.getLlmTotalOutputTokens()),
-                zeroIfNull(job.getLlmCacheReadTokens()),
-                zeroIfNull(job.getLlmCacheWriteTokens())
-            )
-            .usd();
+        BigDecimal cost = price.calculateCost(
+                        zeroIfNull(job.getLlmTotalInputTokens()),
+                        zeroIfNull(job.getLlmTotalOutputTokens()),
+                        zeroIfNull(job.getLlmCacheReadTokens()),
+                        zeroIfNull(job.getLlmCacheWriteTokens()))
+                .usd();
         return cost != null ? cost : BigDecimal.ZERO;
     }
 

@@ -29,19 +29,17 @@ import org.springframework.stereotype.Component;
 public class AllRarityEvaluator implements AchievementEvaluator {
 
     private static final Map<String, Set<String>> PREREQUISITES = Map.of(
-        "milestone.all_rare",
-        Set.of("pr.merged.rare", "commit.rare", "review.rare", "issue.open.rare", "issue.close.rare"),
-        "milestone.all_epic",
-        Set.of("pr.merged.epic", "commit.epic", "review.epic", "issue.open.epic", "issue.close.epic"),
-        "milestone.all_legendary",
-        Set.of(
-            "pr.merged.legendary",
-            "commit.legendary",
-            "review.legendary",
-            "issue.open.legendary",
-            "issue.close.legendary"
-        )
-    );
+            "milestone.all_rare",
+            Set.of("pr.merged.rare", "commit.rare", "review.rare", "issue.open.rare", "issue.close.rare"),
+            "milestone.all_epic",
+            Set.of("pr.merged.epic", "commit.epic", "review.epic", "issue.open.epic", "issue.close.epic"),
+            "milestone.all_legendary",
+            Set.of(
+                    "pr.merged.legendary",
+                    "commit.legendary",
+                    "review.legendary",
+                    "issue.open.legendary",
+                    "issue.close.legendary"));
 
     private final UserAchievementRepository userAchievementRepository;
     private final AchievementRegistry achievementRegistry;
@@ -54,13 +52,11 @@ public class AllRarityEvaluator implements AchievementEvaluator {
                     achievementRegistry.getById(prereqId);
                 } catch (IllegalArgumentException e) {
                     throw new IllegalStateException(
-                        "AllRarityEvaluator prerequisite '" +
-                            prereqId +
-                            "' for '" +
-                            entry.getKey() +
-                            "' not found in registry. Did achievements.yml change?",
-                        e
-                    );
+                            "AllRarityEvaluator prerequisite '" + prereqId
+                                    + "' for '"
+                                    + entry.getKey()
+                                    + "' not found in registry. Did achievements.yml change?",
+                            e);
                 }
             }
         }
@@ -81,10 +77,8 @@ public class AllRarityEvaluator implements AchievementEvaluator {
         Long userId = userAchievement.getUser().getId();
         var existing = userAchievementRepository.findByUserIdAndAchievementIdIn(userId, required);
 
-        long unlockedCount = existing
-            .stream()
-            .filter(ua -> ua.getUnlockedAt() != null)
-            .count();
+        long unlockedCount =
+                existing.stream().filter(ua -> ua.getUnlockedAt() != null).count();
 
         if (unlockedCount == required.size()) {
             userAchievement.setProgressData(new BinaryAchievementProgress(true));

@@ -8,21 +8,19 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 public record FeedbackApprovalDTO(
-    UUID feedbackId,
-    FeedbackApprovalDecision decision,
-    FeedbackRejectionReason rejectionReason,
-    @Nullable String rejectionNote,
-    Long actorAccountId,
-    Instant decidedAt
-) {
+        UUID feedbackId,
+        FeedbackApprovalDecision decision,
+        FeedbackRejectionReason rejectionReason,
+        @Nullable String rejectionNote,
+        Long actorAccountId,
+        Instant decidedAt) {
     public static FeedbackApprovalDTO from(FeedbackApproval approval) {
         return new FeedbackApprovalDTO(
-            approval.getFeedbackId(),
-            approval.getDecision(),
-            approval.getRejectionReason(),
-            approval.getRejectionNote(),
-            approval.getActorAccountId(),
-            approval.getDecidedAt()
-        );
+                approval.getFeedbackId(),
+                approval.getDecision(),
+                approval.getRejectionReason(),
+                approval.getRejectionNote(),
+                approval.getActorAccountId(),
+                approval.getDecidedAt());
     }
 }

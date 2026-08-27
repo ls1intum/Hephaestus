@@ -34,10 +34,7 @@ public class AtomicChangesEvaluator implements AchievementEvaluator {
 
         Long authorId = userAchievement.getUser().getId();
         List<Commit> recentCommits = commitRepository.findTopNByAuthorIdOrderByAuthoredAtDesc(
-            authorId,
-            event.occurredAt(),
-            PageRequest.of(0, REQUIRED_CONSECUTIVE)
-        );
+                authorId, event.occurredAt(), PageRequest.of(0, REQUIRED_CONSECUTIVE));
 
         if (recentCommits.size() < REQUIRED_CONSECUTIVE) {
             return false;

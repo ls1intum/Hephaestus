@@ -6,7 +6,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -40,7 +39,6 @@ import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -81,12 +79,11 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
     private OrganizationMembershipListener organizationMembershipListener;
 
     private final GitLabProperties gitLabProperties = new GitLabProperties(
-        "https://gitlab.com",
-        Duration.ofSeconds(30),
-        Duration.ofSeconds(60),
-        Duration.ofMillis(10), // fast throttle for tests
-        Duration.ofMinutes(5)
-    );
+            "https://gitlab.com",
+            Duration.ofSeconds(30),
+            Duration.ofSeconds(60),
+            Duration.ofMillis(10), // fast throttle for tests
+            Duration.ofMinutes(5));
 
     private GitLabGroupMemberSyncService service;
     private Organization testOrg;
@@ -95,8 +92,8 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
     void setUp() {
         IdentityProvider gitLabProvider = TestEntities.gitProvider(TEST_PROVIDER_ID, IdentityProviderType.GITLAB);
         lenient()
-            .when(gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.com"))
-            .thenReturn(Optional.of(gitLabProvider));
+                .when(gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.com"))
+                .thenReturn(Optional.of(gitLabProvider));
 
         // TransactionTemplate that executes callbacks directly (no real transactions needed)
         PlatformTransactionManager mockTxManager = mock(PlatformTransactionManager.class);
@@ -104,23 +101,24 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
         TransactionTemplate txTemplate = new TransactionTemplate(mockTxManager);
 
         // Default: advisory lock always succeeds
-        lenient().when(userRepository.tryAcquireLoginLock(anyString(), anyLong())).thenReturn(true);
+        lenient()
+                .when(userRepository.tryAcquireLoginLock(anyString(), anyLong()))
+                .thenReturn(true);
 
         // Default: responseHandler.handle() returns CONTINUE (valid response)
         lenient()
-            .when(responseHandler.handle(any(), anyString(), any()))
-            .thenReturn(new HandleResult(HandleResult.Action.CONTINUE, null));
+                .when(responseHandler.handle(any(), anyString(), any()))
+                .thenReturn(new HandleResult(HandleResult.Action.CONTINUE, null));
 
         service = new GitLabGroupMemberSyncService(
-            graphQlClientProvider,
-            responseHandler,
-            organizationMembershipRepository,
-            userRepository,
-            gitProviderRepository,
-            gitLabProperties,
-            organizationMembershipListener,
-            txTemplate
-        );
+                graphQlClientProvider,
+                responseHandler,
+                organizationMembershipRepository,
+                userRepository,
+                gitProviderRepository,
+                gitLabProperties,
+                organizationMembershipListener,
+                txTemplate);
 
         testOrg = new Organization();
         testOrg.setId(42L);
@@ -136,7 +134,8 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
         user.setId(userId);
         user.setNativeId(nativeId);
         user.setType(User.Type.USER);
-        when(userRepository.findByNativeIdAndProviderId(nativeId, TEST_PROVIDER_ID)).thenReturn(Optional.of(user));
+        when(userRepository.findByNativeIdAndProviderId(nativeId, TEST_PROVIDER_ID))
+                .thenReturn(Optional.of(user));
     }
 
     @Nested
@@ -169,13 +168,12 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
 
         @Test
         void providerNotFound_throwsIllegalState() {
-            when(
-                gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.com")
-            ).thenReturn(Optional.empty());
+            when(gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.com"))
+                    .thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.syncGroupMemberships(SCOPE_ID, GROUP_PATH, testOrg))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("IdentityProvider not found");
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("IdentityProvider not found");
         }
     }
 
@@ -194,7 +192,8 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
 
             stubUserLookup(10L, 1010L);
             stubUserLookup(20L, 1020L);
-            when(organizationMembershipRepository.findUserIdsByOrganizationId(42L)).thenReturn(List.of());
+            when(organizationMembershipRepository.findUserIdsByOrganizationId(42L))
+                    .thenReturn(List.of());
 
             int result = service.syncGroupMemberships(SCOPE_ID, GROUP_PATH, testOrg);
 
@@ -205,18 +204,18 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
             verify(organizationMembershipRepository).upsertMembership(42L, 1020L, OrganizationMemberRole.ADMIN);
 
             // Verify native SQL upsert was used (not JPA save)
-            verify(userRepository, times(2)).upsertUser(
-                anyLong(),
-                eq(TEST_PROVIDER_ID),
-                anyString(),
-                any(),
-                anyString(),
-                anyString(),
-                eq("USER"),
-                any(),
-                any(),
-                any()
-            );
+            verify(userRepository, times(2))
+                    .upsertUser(
+                            anyLong(),
+                            eq(TEST_PROVIDER_ID),
+                            anyString(),
+                            any(),
+                            anyString(),
+                            anyString(),
+                            eq("USER"),
+                            any(),
+                            any(),
+                            any());
             verify(userRepository, never()).save(any(User.class));
 
             // Verify login conflict resolution
@@ -231,9 +230,8 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
             verify(graphQlClientProvider).recordSuccess();
 
             // Verify listener event
-            ArgumentCaptor<OrganizationSyncedEvent> eventCaptor = ArgumentCaptor.forClass(
-                OrganizationSyncedEvent.class
-            );
+            ArgumentCaptor<OrganizationSyncedEvent> eventCaptor =
+                    ArgumentCaptor.forClass(OrganizationSyncedEvent.class);
             verify(organizationMembershipListener).onOrganizationMembershipsSynced(eventCaptor.capture());
             assertThat(eventCaptor.getValue().organizationId()).isEqualTo(42L);
             assertThat(eventCaptor.getValue().organizationLogin()).isEqualTo("my-org");
@@ -250,7 +248,8 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
             when(graphQlClientProvider.getRateLimitRemaining(SCOPE_ID)).thenReturn(100);
 
             stubUserLookup(10L, 1010L);
-            when(organizationMembershipRepository.findUserIdsByOrganizationId(42L)).thenReturn(List.of());
+            when(organizationMembershipRepository.findUserIdsByOrganizationId(42L))
+                    .thenReturn(List.of());
 
             int result = service.syncGroupMemberships(SCOPE_ID, GROUP_PATH, testOrg);
 
@@ -276,7 +275,8 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
 
             stubUserLookup(10L, 1010L);
             stubUserLookup(20L, 1020L);
-            when(organizationMembershipRepository.findUserIdsByOrganizationId(42L)).thenReturn(List.of());
+            when(organizationMembershipRepository.findUserIdsByOrganizationId(42L))
+                    .thenReturn(List.of());
 
             int result = service.syncGroupMemberships(SCOPE_ID, GROUP_PATH, testOrg);
 
@@ -323,7 +323,8 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
             stubUserLookup(10L, 1010L);
 
             // Existing memberships include a stale user (id=9999)
-            when(organizationMembershipRepository.findUserIdsByOrganizationId(42L)).thenReturn(List.of(1010L, 9999L));
+            when(organizationMembershipRepository.findUserIdsByOrganizationId(42L))
+                    .thenReturn(List.of(1010L, 9999L));
 
             int result = service.syncGroupMemberships(SCOPE_ID, GROUP_PATH, testOrg);
 
@@ -343,9 +344,8 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
             lenient().when(invalidResp.getErrors()).thenReturn(List.of());
 
             // Invalid response → handler returns ABORT
-            when(responseHandler.handle(eq(invalidResp), anyString(), any())).thenReturn(
-                new HandleResult(HandleResult.Action.ABORT, null)
-            );
+            when(responseHandler.handle(eq(invalidResp), anyString(), any()))
+                    .thenReturn(new HandleResult(HandleResult.Action.ABORT, null));
 
             HttpGraphQlClient.RequestSpec requestSpec = mock(HttpGraphQlClient.RequestSpec.class);
             when(client.documentName(anyString())).thenReturn(requestSpec);
@@ -378,7 +378,8 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
             when(graphQlClientProvider.getRateLimitRemaining(SCOPE_ID)).thenReturn(100);
 
             stubUserLookup(10L, 1010L);
-            when(organizationMembershipRepository.findUserIdsByOrganizationId(42L)).thenReturn(List.of());
+            when(organizationMembershipRepository.findUserIdsByOrganizationId(42L))
+                    .thenReturn(List.of());
 
             int result = service.syncGroupMemberships(SCOPE_ID, GROUP_PATH, testOrg);
 
@@ -396,24 +397,25 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
             when(graphQlClientProvider.getRateLimitRemaining(SCOPE_ID)).thenReturn(100);
 
             stubUserLookup(10L, 1010L);
-            when(organizationMembershipRepository.findUserIdsByOrganizationId(42L)).thenReturn(List.of());
+            when(organizationMembershipRepository.findUserIdsByOrganizationId(42L))
+                    .thenReturn(List.of());
 
             int result = service.syncGroupMemberships(SCOPE_ID, GROUP_PATH, testOrg);
 
             assertThat(result).isEqualTo(1);
             // upsertUser called only for the valid member
-            verify(userRepository, times(1)).upsertUser(
-                eq(10L),
-                eq(TEST_PROVIDER_ID),
-                eq("alice"),
-                any(),
-                anyString(),
-                anyString(),
-                eq("USER"),
-                any(),
-                any(),
-                any()
-            );
+            verify(userRepository, times(1))
+                    .upsertUser(
+                            eq(10L),
+                            eq(TEST_PROVIDER_ID),
+                            eq("alice"),
+                            any(),
+                            anyString(),
+                            anyString(),
+                            eq("USER"),
+                            any(),
+                            any(),
+                            any());
         }
 
         @Test
@@ -445,8 +447,8 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
         @Test
         void interruptedDuringRateLimitWait_breaksLoop() throws InterruptedException {
             doThrow(new InterruptedException("rate limit wait interrupted"))
-                .when(graphQlClientProvider)
-                .waitIfRateLimitLow(SCOPE_ID);
+                    .when(graphQlClientProvider)
+                    .waitIfRateLimitLow(SCOPE_ID);
 
             int result = service.syncGroupMemberships(SCOPE_ID, GROUP_PATH, testOrg);
 
@@ -480,7 +482,8 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
             when(graphQlClientProvider.getRateLimitRemaining(SCOPE_ID)).thenReturn(100);
 
             // Existing memberships
-            when(organizationMembershipRepository.findUserIdsByOrganizationId(42L)).thenReturn(List.of(1010L, 1020L));
+            when(organizationMembershipRepository.findUserIdsByOrganizationId(42L))
+                    .thenReturn(List.of(1010L, 1020L));
 
             int result = service.syncGroupMemberships(SCOPE_ID, GROUP_PATH, testOrg);
 
@@ -507,15 +510,14 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
             TransactionTemplate txTemplate = new TransactionTemplate(mockTxManager);
 
             var serviceNoListener = new GitLabGroupMemberSyncService(
-                graphQlClientProvider,
-                responseHandler,
-                organizationMembershipRepository,
-                userRepository,
-                gitProviderRepository,
-                gitLabProperties,
-                null,
-                txTemplate
-            );
+                    graphQlClientProvider,
+                    responseHandler,
+                    organizationMembershipRepository,
+                    userRepository,
+                    gitProviderRepository,
+                    gitLabProperties,
+                    null,
+                    txTemplate);
 
             var member = createMember("gid://gitlab/User/10", "alice", "Alice", 30);
             ClientGraphQlResponse response = mockMembersPage(List.of(member), null);
@@ -524,7 +526,8 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
             when(graphQlClientProvider.getRateLimitRemaining(SCOPE_ID)).thenReturn(100);
 
             stubUserLookup(10L, 1010L);
-            when(organizationMembershipRepository.findUserIdsByOrganizationId(42L)).thenReturn(List.of());
+            when(organizationMembershipRepository.findUserIdsByOrganizationId(42L))
+                    .thenReturn(List.of());
 
             int result = serviceNoListener.syncGroupMemberships(SCOPE_ID, GROUP_PATH, testOrg);
 
@@ -540,12 +543,11 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
             stubUserLookup(42L, 1042L);
 
             var memberUser = new GitLabMemberUser(
-                "gid://gitlab/User/42",
-                "alice",
-                "Alice A.",
-                "https://gitlab.com/avatar.png",
-                "https://gitlab.com/alice"
-            );
+                    "gid://gitlab/User/42",
+                    "alice",
+                    "Alice A.",
+                    "https://gitlab.com/avatar.png",
+                    "https://gitlab.com/alice");
 
             Long userId = service.upsertUser(memberUser, TEST_PROVIDER_ID);
 
@@ -558,18 +560,18 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
             verify(userRepository).freeLoginConflicts("alice", 42L, TEST_PROVIDER_ID);
 
             // Verify native SQL upsert (not JPA save)
-            verify(userRepository).upsertUser(
-                42L,
-                TEST_PROVIDER_ID,
-                "alice",
-                "Alice A.",
-                "https://gitlab.com/avatar.png",
-                "https://gitlab.com/alice",
-                "USER",
-                null,
-                null,
-                null
-            );
+            verify(userRepository)
+                    .upsertUser(
+                            42L,
+                            TEST_PROVIDER_ID,
+                            "alice",
+                            "Alice A.",
+                            "https://gitlab.com/avatar.png",
+                            "https://gitlab.com/alice",
+                            "USER",
+                            null,
+                            null,
+                            null);
             verify(userRepository, never()).save(any(User.class));
         }
 
@@ -578,116 +580,97 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
             when(userRepository.tryAcquireLoginLock("alice", TEST_PROVIDER_ID)).thenReturn(false);
             stubUserLookup(42L, 1042L);
 
-            var memberUser = new GitLabMemberUser(
-                "gid://gitlab/User/42",
-                "alice",
-                "Alice",
-                null,
-                "https://gitlab.com/alice"
-            );
+            var memberUser =
+                    new GitLabMemberUser("gid://gitlab/User/42", "alice", "Alice", null, "https://gitlab.com/alice");
 
             Long userId = service.upsertUser(memberUser, TEST_PROVIDER_ID);
 
             assertThat(userId).isEqualTo(1042L);
             verify(userRepository, never()).freeLoginConflicts(anyString(), anyLong(), anyLong());
-            verify(userRepository).upsertUser(
-                eq(42L),
-                eq(TEST_PROVIDER_ID),
-                eq("alice"),
-                eq("Alice"),
-                eq(""),
-                eq("https://gitlab.com/alice"),
-                eq("USER"),
-                any(),
-                any(),
-                any()
-            );
+            verify(userRepository)
+                    .upsertUser(
+                            eq(42L),
+                            eq(TEST_PROVIDER_ID),
+                            eq("alice"),
+                            eq("Alice"),
+                            eq(""),
+                            eq("https://gitlab.com/alice"),
+                            eq("USER"),
+                            any(),
+                            any(),
+                            any());
         }
 
         @Test
         void nullAvatarUrl_defaultsToEmpty() {
             stubUserLookup(42L, 1042L);
 
-            var memberUser = new GitLabMemberUser(
-                "gid://gitlab/User/42",
-                "alice",
-                null,
-                null,
-                "https://gitlab.com/alice"
-            );
+            var memberUser =
+                    new GitLabMemberUser("gid://gitlab/User/42", "alice", null, null, "https://gitlab.com/alice");
 
             Long userId = service.upsertUser(memberUser, TEST_PROVIDER_ID);
 
             assertThat(userId).isEqualTo(1042L);
-            verify(userRepository).upsertUser(
-                eq(42L),
-                eq(TEST_PROVIDER_ID),
-                eq("alice"),
-                any(),
-                eq(""),
-                eq("https://gitlab.com/alice"),
-                eq("USER"),
-                any(),
-                any(),
-                any()
-            );
+            verify(userRepository)
+                    .upsertUser(
+                            eq(42L),
+                            eq(TEST_PROVIDER_ID),
+                            eq("alice"),
+                            any(),
+                            eq(""),
+                            eq("https://gitlab.com/alice"),
+                            eq("USER"),
+                            any(),
+                            any(),
+                            any());
         }
 
         @Test
         void invalidGid_returnsNull() {
-            var memberUser = new GitLabMemberUser(
-                "not-a-valid-gid",
-                "alice",
-                "Alice",
-                null,
-                "https://gitlab.com/alice"
-            );
+            var memberUser =
+                    new GitLabMemberUser("not-a-valid-gid", "alice", "Alice", null, "https://gitlab.com/alice");
 
             Long userId = service.upsertUser(memberUser, TEST_PROVIDER_ID);
 
             assertThat(userId).isNull();
-            verify(userRepository, never()).upsertUser(
-                anyLong(),
-                anyLong(),
-                anyString(),
-                any(),
-                anyString(),
-                anyString(),
-                anyString(),
-                any(),
-                any(),
-                any()
-            );
+            verify(userRepository, never())
+                    .upsertUser(
+                            anyLong(),
+                            anyLong(),
+                            anyString(),
+                            any(),
+                            anyString(),
+                            anyString(),
+                            anyString(),
+                            any(),
+                            any(),
+                            any());
         }
 
         @Test
         void userNotFoundAfterUpsert_returnsNull() {
-            when(userRepository.findByNativeIdAndProviderId(42L, TEST_PROVIDER_ID)).thenReturn(Optional.empty());
+            when(userRepository.findByNativeIdAndProviderId(42L, TEST_PROVIDER_ID))
+                    .thenReturn(Optional.empty());
 
-            var memberUser = new GitLabMemberUser(
-                "gid://gitlab/User/42",
-                "alice",
-                "Alice",
-                null,
-                "https://gitlab.com/alice"
-            );
+            var memberUser =
+                    new GitLabMemberUser("gid://gitlab/User/42", "alice", "Alice", null, "https://gitlab.com/alice");
 
             Long userId = service.upsertUser(memberUser, TEST_PROVIDER_ID);
 
             assertThat(userId).isNull();
             // Upsert was still attempted
-            verify(userRepository).upsertUser(
-                eq(42L),
-                eq(TEST_PROVIDER_ID),
-                anyString(),
-                any(),
-                anyString(),
-                anyString(),
-                eq("USER"),
-                any(),
-                any(),
-                any()
-            );
+            verify(userRepository)
+                    .upsertUser(
+                            eq(42L),
+                            eq(TEST_PROVIDER_ID),
+                            anyString(),
+                            any(),
+                            anyString(),
+                            anyString(),
+                            eq("USER"),
+                            any(),
+                            any(),
+                            any());
         }
     }
 
@@ -696,51 +679,44 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
 
         @Test
         void owner_mapsToAdmin() {
-            assertThat(GitLabGroupMemberSyncService.mapAccessLevel(new GitLabAccessLevel("OWNER", 50))).isEqualTo(
-                OrganizationMemberRole.ADMIN
-            );
+            assertThat(GitLabGroupMemberSyncService.mapAccessLevel(new GitLabAccessLevel("OWNER", 50)))
+                    .isEqualTo(OrganizationMemberRole.ADMIN);
         }
 
         @Test
         void maintainer_mapsToAdmin() {
-            assertThat(GitLabGroupMemberSyncService.mapAccessLevel(new GitLabAccessLevel("MAINTAINER", 40))).isEqualTo(
-                OrganizationMemberRole.ADMIN
-            );
+            assertThat(GitLabGroupMemberSyncService.mapAccessLevel(new GitLabAccessLevel("MAINTAINER", 40)))
+                    .isEqualTo(OrganizationMemberRole.ADMIN);
         }
 
         @Test
         void developer_mapsToMember() {
-            assertThat(GitLabGroupMemberSyncService.mapAccessLevel(new GitLabAccessLevel("DEVELOPER", 30))).isEqualTo(
-                OrganizationMemberRole.MEMBER
-            );
+            assertThat(GitLabGroupMemberSyncService.mapAccessLevel(new GitLabAccessLevel("DEVELOPER", 30)))
+                    .isEqualTo(OrganizationMemberRole.MEMBER);
         }
 
         @Test
         void reporter_mapsToMember() {
-            assertThat(GitLabGroupMemberSyncService.mapAccessLevel(new GitLabAccessLevel("REPORTER", 20))).isEqualTo(
-                OrganizationMemberRole.MEMBER
-            );
+            assertThat(GitLabGroupMemberSyncService.mapAccessLevel(new GitLabAccessLevel("REPORTER", 20)))
+                    .isEqualTo(OrganizationMemberRole.MEMBER);
         }
 
         @Test
         void planner_mapsToMember() {
-            assertThat(GitLabGroupMemberSyncService.mapAccessLevel(new GitLabAccessLevel("PLANNER", 15))).isEqualTo(
-                OrganizationMemberRole.MEMBER
-            );
+            assertThat(GitLabGroupMemberSyncService.mapAccessLevel(new GitLabAccessLevel("PLANNER", 15)))
+                    .isEqualTo(OrganizationMemberRole.MEMBER);
         }
 
         @Test
         void guest_mapsToMember() {
-            assertThat(GitLabGroupMemberSyncService.mapAccessLevel(new GitLabAccessLevel("GUEST", 10))).isEqualTo(
-                OrganizationMemberRole.MEMBER
-            );
+            assertThat(GitLabGroupMemberSyncService.mapAccessLevel(new GitLabAccessLevel("GUEST", 10)))
+                    .isEqualTo(OrganizationMemberRole.MEMBER);
         }
 
         @Test
         void minimalAccess_mapsToMember() {
-            assertThat(
-                GitLabGroupMemberSyncService.mapAccessLevel(new GitLabAccessLevel("MINIMAL_ACCESS", 5))
-            ).isEqualTo(OrganizationMemberRole.MEMBER);
+            assertThat(GitLabGroupMemberSyncService.mapAccessLevel(new GitLabAccessLevel("MINIMAL_ACCESS", 5)))
+                    .isEqualTo(OrganizationMemberRole.MEMBER);
         }
 
         @Test
@@ -750,9 +726,8 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
 
         @Test
         void nullIntegerValue_mapsToMember() {
-            assertThat(GitLabGroupMemberSyncService.mapAccessLevel(new GitLabAccessLevel("UNKNOWN", null))).isEqualTo(
-                OrganizationMemberRole.MEMBER
-            );
+            assertThat(GitLabGroupMemberSyncService.mapAccessLevel(new GitLabAccessLevel("UNKNOWN", null)))
+                    .isEqualTo(OrganizationMemberRole.MEMBER);
         }
     }
 
@@ -760,9 +735,8 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
 
     private GitLabGroupMemberResponse createMember(String gid, String username, String name, int accessLevel) {
         return new GitLabGroupMemberResponse(
-            new GitLabMemberUser(gid, username, name, null, "https://gitlab.com/" + username),
-            new GitLabAccessLevel(accessLevelName(accessLevel), accessLevel)
-        );
+                new GitLabMemberUser(gid, username, name, null, "https://gitlab.com/" + username),
+                new GitLabAccessLevel(accessLevelName(accessLevel), accessLevel));
     }
 
     private static String accessLevelName(int level) {
@@ -786,14 +760,13 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
 
     @SuppressWarnings("unchecked")
     private ClientGraphQlResponse mockMembersPage(
-        List<GitLabGroupMemberResponse> members,
-        @Nullable GitLabPageInfo pageInfo
-    ) {
+            List<GitLabGroupMemberResponse> members, @Nullable GitLabPageInfo pageInfo) {
         ClientGraphQlResponse resp = mock(ClientGraphQlResponse.class);
         lenient().when(resp.isValid()).thenReturn(true);
 
         ClientResponseField nodesField = mock(ClientResponseField.class);
-        when(nodesField.<GitLabGroupMemberResponse>toEntityList(any(Class.class))).thenReturn(members);
+        when(nodesField.<GitLabGroupMemberResponse>toEntityList(any(Class.class)))
+                .thenReturn(members);
         when(resp.field("group.groupMembers.nodes")).thenReturn(nodesField);
 
         ClientResponseField pageInfoField = mock(ClientResponseField.class);
@@ -805,10 +778,7 @@ class GitLabGroupMemberSyncServiceTest extends BaseUnitTest {
 
     @SafeVarargs
     private void mockSequentialExecute(
-        HttpGraphQlClient client,
-        ClientGraphQlResponse first,
-        ClientGraphQlResponse... rest
-    ) {
+            HttpGraphQlClient client, ClientGraphQlResponse first, ClientGraphQlResponse... rest) {
         HttpGraphQlClient.RequestSpec requestSpec = mock(HttpGraphQlClient.RequestSpec.class);
         when(client.documentName(anyString())).thenReturn(requestSpec);
         when(requestSpec.variable(anyString(), any())).thenReturn(requestSpec);

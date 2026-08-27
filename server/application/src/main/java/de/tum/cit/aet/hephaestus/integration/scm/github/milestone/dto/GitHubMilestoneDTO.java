@@ -17,19 +17,18 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubMilestoneDTO(
-    @JsonProperty("id") @Nullable Long id,
-    @JsonProperty("number") int number,
-    @JsonProperty("title") String title,
-    @JsonProperty("description") @Nullable String description,
-    @JsonProperty("state") @Nullable String state,
-    @JsonProperty("due_on") @Nullable Instant dueOn,
-    @JsonProperty("html_url") @Nullable String htmlUrl,
-    @JsonProperty("open_issues") Integer openIssuesCount,
-    @JsonProperty("closed_issues") Integer closedIssuesCount,
-    @JsonProperty("created_at") @Nullable Instant createdAt,
-    @JsonProperty("updated_at") @Nullable Instant updatedAt,
-    @JsonProperty("closed_at") @Nullable Instant closedAt
-) {
+        @JsonProperty("id") @Nullable Long id,
+        @JsonProperty("number") int number,
+        @JsonProperty("title") String title,
+        @JsonProperty("description") @Nullable String description,
+        @JsonProperty("state") @Nullable String state,
+        @JsonProperty("due_on") @Nullable Instant dueOn,
+        @JsonProperty("html_url") @Nullable String htmlUrl,
+        @JsonProperty("open_issues") Integer openIssuesCount,
+        @JsonProperty("closed_issues") Integer closedIssuesCount,
+        @JsonProperty("created_at") @Nullable Instant createdAt,
+        @JsonProperty("updated_at") @Nullable Instant updatedAt,
+        @JsonProperty("closed_at") @Nullable Instant closedAt) {
     // STATIC FACTORY METHODS FOR GRAPHQL RESPONSES
 
     /**
@@ -41,19 +40,18 @@ public record GitHubMilestoneDTO(
             return null;
         }
         return new GitHubMilestoneDTO(
-            null,
-            milestone.getNumber(),
-            milestone.getTitle(),
-            milestone.getDescription(),
-            convertState(milestone.getState()),
-            toInstant(milestone.getDueOn()),
-            uriToString(milestone.getUrl()),
-            milestone.getOpenIssueCount(),
-            milestone.getClosedIssueCount(),
-            toInstant(milestone.getCreatedAt()),
-            toInstant(milestone.getUpdatedAt()),
-            toInstant(milestone.getClosedAt())
-        );
+                null,
+                milestone.getNumber(),
+                milestone.getTitle(),
+                milestone.getDescription(),
+                convertState(milestone.getState()),
+                toInstant(milestone.getDueOn()),
+                uriToString(milestone.getUrl()),
+                milestone.getOpenIssueCount(),
+                milestone.getClosedIssueCount(),
+                toInstant(milestone.getCreatedAt()),
+                toInstant(milestone.getUpdatedAt()),
+                toInstant(milestone.getClosedAt()));
     }
 
     @Nullable

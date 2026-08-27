@@ -41,14 +41,11 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
      * signal, and counting orphans of a deleted PR would leave this row permanently inflated. The
      * predicate rides the {@code r.pullRequest} join the grouping already needs.
      */
-    @Query(
-        "SELECT r.pullRequest.repository.id AS repositoryId, COUNT(r) AS itemCount FROM PullRequestReview r " +
-            "WHERE r.pullRequest.repository.id IN :repositoryIds AND r.pullRequest.deletedAt IS NULL " +
-            "GROUP BY r.pullRequest.repository.id"
-    )
+    @Query("SELECT r.pullRequest.repository.id AS repositoryId, COUNT(r) AS itemCount FROM PullRequestReview r "
+            + "WHERE r.pullRequest.repository.id IN :repositoryIds AND r.pullRequest.deletedAt IS NULL "
+            + "GROUP BY r.pullRequest.repository.id")
     List<RepositoryItemCountProjection> countGroupedByRepositoryIds(
-        @Param("repositoryIds") Collection<Long> repositoryIds
-    );
+            @Param("repositoryIds") Collection<Long> repositoryIds);
 
     /**
      * All review DECISIONS for a pull request, with the review author eagerly fetched.
@@ -63,27 +60,22 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
      * superseding final APPROVE must not be dropped, which would manufacture a false "merged past
      * unresolved request-changes" finding. {@code id} breaks ties on equal/null timestamps.
      */
-    @Query(
-        """
+    @Query("""
         SELECT prr
         FROM PullRequestReview prr
         LEFT JOIN FETCH prr.author
         WHERE prr.pullRequest.id = :pullRequestId
         ORDER BY prr.submittedAt DESC, prr.id DESC
-        """
-    )
+        """)
     List<PullRequestReview> findAllByPullRequestIdWithAuthor(@Param("pullRequestId") Long pullRequestId);
 
-    @Query(
-        "SELECT prr FROM PullRequestReview prr LEFT JOIN FETCH prr.author " +
-            "WHERE prr.pullRequest.id = :pullRequestId AND prr.state NOT IN :excludedStates " +
-            "ORDER BY prr.submittedAt DESC, prr.id DESC"
-    )
+    @Query("SELECT prr FROM PullRequestReview prr LEFT JOIN FETCH prr.author "
+            + "WHERE prr.pullRequest.id = :pullRequestId AND prr.state NOT IN :excludedStates "
+            + "ORDER BY prr.submittedAt DESC, prr.id DESC")
     List<PullRequestReview> findRecentByPullRequestIdWithAuthor(
-        @Param("pullRequestId") Long pullRequestId,
-        @Param("excludedStates") Collection<PullRequestReview.State> excludedStates,
-        Pageable pageable
-    );
+            @Param("pullRequestId") Long pullRequestId,
+            @Param("excludedStates") Collection<PullRequestReview.State> excludedStates,
+            Pageable pageable);
 
     /**
      * Batch fetch reviews by IDs with all related entities eagerly loaded.
@@ -94,8 +86,7 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
      * @param ids the review IDs to fetch
      * @return reviews with related entities eagerly loaded
      */
-    @Query(
-        """
+    @Query("""
         SELECT prr
         FROM PullRequestReview prr
         LEFT JOIN FETCH prr.author
@@ -103,8 +94,7 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
         LEFT JOIN FETCH pr.repository
         LEFT JOIN FETCH prr.comments
         WHERE prr.id IN :ids
-        """
-    )
+        """)
     List<PullRequestReview> findAllByIdWithRelations(@Param("ids") Collection<Long> ids);
 
     /**
@@ -115,15 +105,13 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
      * @param id the review ID
      * @return review with pullRequest and pullRequest.author eagerly loaded
      */
-    @Query(
-        """
+    @Query("""
         SELECT prr
         FROM PullRequestReview prr
         LEFT JOIN FETCH prr.pullRequest pr
         LEFT JOIN FETCH pr.author
         WHERE prr.id = :id
-        """
-    )
+        """)
     Optional<PullRequestReview> findByIdWithPullRequestAuthor(@Param("id") Long id);
 
     /**
@@ -138,8 +126,7 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
      * @param workspaceId the workspace to scope the query to
      * @return reviews with related entities eagerly loaded, ordered by submittedAt descending
      */
-    @Query(
-        """
+    @Query("""
         SELECT prr
         FROM PullRequestReview prr
         LEFT JOIN FETCH prr.author
@@ -153,12 +140,10 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
             AND prr.author.type = 'USER'
             AND rtm.workspace.id = :workspaceId
         ORDER BY prr.submittedAt DESC
-        """
-    )
+        """)
     List<PullRequestReview> findAllByAuthorLoginInTimeframe(
-        @Param("authorLogin") String authorLogin,
-        @Param("after") Instant after,
-        @Param("before") Instant before,
-        @Param("workspaceId") Long workspaceId
-    );
+            @Param("authorLogin") String authorLogin,
+            @Param("after") Instant after,
+            @Param("before") Instant before,
+            @Param("workspaceId") Long workspaceId);
 }

@@ -38,12 +38,11 @@ import org.jspecify.annotations.Nullable;
  */
 @Entity
 @Table(
-    name = "workspace_agent_binding",
-    uniqueConstraints = @UniqueConstraint(
-        name = "uk_workspace_agent_binding_purpose",
-        columnNames = { "workspace_id", "purpose" }
-    )
-)
+        name = "workspace_agent_binding",
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uk_workspace_agent_binding_purpose",
+                        columnNames = {"workspace_id", "purpose"}))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -58,10 +57,9 @@ public class WorkspaceAgentBinding implements ModelBindingSource {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
-        name = "workspace_id",
-        nullable = false,
-        foreignKey = @ForeignKey(name = "fk_workspace_agent_binding_workspace")
-    )
+            name = "workspace_id",
+            nullable = false,
+            foreignKey = @ForeignKey(name = "fk_workspace_agent_binding_workspace"))
     @ToString.Exclude
     private Workspace workspace;
 
@@ -87,17 +85,15 @@ public class WorkspaceAgentBinding implements ModelBindingSource {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(
-        name = "instance_model_id",
-        foreignKey = @ForeignKey(name = "fk_workspace_agent_binding_instance_model")
-    )
+            name = "instance_model_id",
+            foreignKey = @ForeignKey(name = "fk_workspace_agent_binding_instance_model"))
     @ToString.Exclude
     private @Nullable LlmModel instanceModel;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(
-        name = "workspace_model_id",
-        foreignKey = @ForeignKey(name = "fk_workspace_agent_binding_workspace_model")
-    )
+            name = "workspace_model_id",
+            foreignKey = @ForeignKey(name = "fk_workspace_agent_binding_workspace_model"))
     @ToString.Exclude
     private @Nullable WorkspaceLlmModel workspaceModel;
 

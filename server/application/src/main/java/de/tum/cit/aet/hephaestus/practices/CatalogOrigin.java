@@ -17,38 +17,37 @@ public final class CatalogOrigin {
         if (practice.getSourceCuratedSlug() == null || practice.getCurrentRevision() == null) {
             return null;
         }
-        CatalogEntry<PracticeDefinition> entry = catalog.practice(practice.getSourceCuratedSlug()).orElse(null);
+        CatalogEntry<PracticeDefinition> entry =
+                catalog.practice(practice.getSourceCuratedSlug()).orElse(null);
         boolean sourceOffered = entry != null && catalog.isEffectivelyOffered(entry);
         return describe(
-            practice.getSourceCuratedSlug(),
-            practice.getCurrentRevision().getReviewRuleFingerprint(),
-            practice.getSourceCuratedFingerprint(),
-            entry == null ? null : entry.effective().provenanceFingerprint(entry.slug()),
-            sourceOffered
-        );
+                practice.getSourceCuratedSlug(),
+                practice.getCurrentRevision().getReviewRuleFingerprint(),
+                practice.getSourceCuratedFingerprint(),
+                entry == null ? null : entry.effective().provenanceFingerprint(entry.slug()),
+                sourceOffered);
     }
 
     public static @Nullable CatalogOriginDTO of(PracticeGroup group, EffectiveCatalog catalog) {
         if (group.getSourceCuratedSlug() == null) {
             return null;
         }
-        CatalogEntry<GroupDefinition> entry = catalog.group(group.getSourceCuratedSlug()).orElse(null);
+        CatalogEntry<GroupDefinition> entry =
+                catalog.group(group.getSourceCuratedSlug()).orElse(null);
         return describe(
-            group.getSourceCuratedSlug(),
-            GroupDefinition.from(group).provenanceFingerprint(group.getSlug()),
-            group.getSourceCuratedFingerprint(),
-            entry == null ? null : entry.effective().provenanceFingerprint(entry.slug()),
-            entry != null && entry.offered()
-        );
+                group.getSourceCuratedSlug(),
+                GroupDefinition.from(group).provenanceFingerprint(group.getSlug()),
+                group.getSourceCuratedFingerprint(),
+                entry == null ? null : entry.effective().provenanceFingerprint(entry.slug()),
+                entry != null && entry.offered());
     }
 
     private static CatalogOriginDTO describe(
-        String slug,
-        @Nullable String runningHere,
-        @Nullable String copiedFrom,
-        @Nullable String offeredNow,
-        boolean sourceOffered
-    ) {
+            String slug,
+            @Nullable String runningHere,
+            @Nullable String copiedFrom,
+            @Nullable String offeredNow,
+            boolean sourceOffered) {
         boolean matchesCatalog = runningHere != null && runningHere.equals(offeredNow);
         boolean matchesSource = runningHere != null && runningHere.equals(copiedFrom);
         CatalogLink link;

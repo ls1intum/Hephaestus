@@ -76,7 +76,8 @@ class ProcessingContextFactoryTest {
             String repoFullName = "ls1intum/Hephaestus";
             GitHubWebhookEvent event = createEventWithRepo(repoFullName);
             when(repositoryScopeFilter.isRepositoryAllowed(repoFullName)).thenReturn(true);
-            when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName)).thenReturn(Optional.empty());
+            when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName))
+                    .thenReturn(Optional.empty());
 
             Optional<ProcessingContext> result = factory.forWebhookEvent(event);
 
@@ -91,9 +92,8 @@ class ProcessingContextFactoryTest {
             repository.setOrganization(null);
 
             when(repositoryScopeFilter.isRepositoryAllowed(repoFullName)).thenReturn(true);
-            when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName)).thenReturn(
-                Optional.of(repository)
-            );
+            when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName))
+                    .thenReturn(Optional.of(repository));
             when(scopeIdResolver.findScopeIdByRepositoryName(repoFullName)).thenReturn(Optional.of(42L));
 
             Optional<ProcessingContext> result = factory.forWebhookEvent(event);
@@ -118,15 +118,8 @@ class ProcessingContextFactoryTest {
 
         private GitHubWebhookEvent createEventWithRepo(String fullName) {
             GitHubWebhookEvent event = mock(GitHubWebhookEvent.class);
-            GitHubRepositoryRefDTO repoInfo = new GitHubRepositoryRefDTO(
-                1L,
-                "node_id",
-                "repo",
-                fullName,
-                false,
-                "url",
-                null
-            );
+            GitHubRepositoryRefDTO repoInfo =
+                    new GitHubRepositoryRefDTO(1L, "node_id", "repo", fullName, false, "url", null);
             when(event.repository()).thenReturn(repoInfo);
             when(event.action()).thenReturn("opened");
             return event;
@@ -147,9 +140,8 @@ class ProcessingContextFactoryTest {
             repository.setOrganization(TestEntities.organization(1L, orgLogin));
 
             when(repositoryScopeFilter.isRepositoryAllowed(repoFullName)).thenReturn(true);
-            when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName)).thenReturn(
-                Optional.of(repository)
-            );
+            when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName))
+                    .thenReturn(Optional.of(repository));
             when(scopeIdResolver.findScopeIdByOrgLogin(orgLogin)).thenReturn(Optional.of(expectedScopeId));
 
             Optional<ProcessingContext> result = factory.forWebhookEvent(event);
@@ -170,9 +162,8 @@ class ProcessingContextFactoryTest {
             repository.setOrganization(null); // Personal repo - no org!
 
             when(repositoryScopeFilter.isRepositoryAllowed(repoFullName)).thenReturn(true);
-            when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName)).thenReturn(
-                Optional.of(repository)
-            );
+            when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName))
+                    .thenReturn(Optional.of(repository));
             when(scopeIdResolver.findScopeIdByRepositoryName(repoFullName)).thenReturn(Optional.of(expectedScopeId));
 
             Optional<ProcessingContext> result = factory.forWebhookEvent(event);
@@ -196,9 +187,8 @@ class ProcessingContextFactoryTest {
             repository.setOrganization(TestEntities.organization(1L, orgLogin));
 
             when(repositoryScopeFilter.isRepositoryAllowed(repoFullName)).thenReturn(true);
-            when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName)).thenReturn(
-                Optional.of(repository)
-            );
+            when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName))
+                    .thenReturn(Optional.of(repository));
             // Org lookup fails
             when(scopeIdResolver.findScopeIdByOrgLogin(orgLogin)).thenReturn(Optional.empty());
             // Fallback to repo lookup succeeds
@@ -223,9 +213,8 @@ class ProcessingContextFactoryTest {
             repository.setOrganization(null);
 
             when(repositoryScopeFilter.isRepositoryAllowed(repoFullName)).thenReturn(true);
-            when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName)).thenReturn(
-                Optional.of(repository)
-            );
+            when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName))
+                    .thenReturn(Optional.of(repository));
             when(scopeIdResolver.findScopeIdByRepositoryName(repoFullName)).thenReturn(Optional.empty());
 
             Optional<ProcessingContext> result = factory.forWebhookEvent(event);
@@ -236,15 +225,8 @@ class ProcessingContextFactoryTest {
 
         private GitHubWebhookEvent createEventWithRepo(String fullName) {
             GitHubWebhookEvent event = mock(GitHubWebhookEvent.class);
-            GitHubRepositoryRefDTO repoInfo = new GitHubRepositoryRefDTO(
-                1L,
-                "node_id",
-                "repo",
-                fullName,
-                false,
-                "url",
-                null
-            );
+            GitHubRepositoryRefDTO repoInfo =
+                    new GitHubRepositoryRefDTO(1L, "node_id", "repo", fullName, false, "url", null);
             when(event.repository()).thenReturn(repoInfo);
             when(event.action()).thenReturn("opened");
             return event;

@@ -87,7 +87,7 @@ public class OutlineSubjectKeyDeriver implements SubjectKeyDeriver {
         return value.replace('.', '~');
     }
 
-    private @Nullable JsonNode tryParse(byte@Nullable [] body) {
+    private @Nullable JsonNode tryParse(byte @Nullable [] body) {
         if (body == null || body.length == 0) {
             return null;
         }

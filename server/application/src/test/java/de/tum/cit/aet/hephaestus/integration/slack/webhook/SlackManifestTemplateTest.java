@@ -32,18 +32,18 @@ class SlackManifestTemplateTest extends BaseUnitTest {
         String manifest = Files.readString(MANIFEST, StandardCharsets.UTF_8);
 
         assertThat(manifest)
-            .contains("agent_view:")
-            .contains("agent_description:")
-            .contains("- app_home_opened")
-            .contains("- app_context_changed")
-            .contains("- message.im")
-            .doesNotContain("- message.app_home")
-            .doesNotContain("assistant_view:")
-            .doesNotContain("assistant_thread_started")
-            .doesNotContain("assistant_thread_context_changed")
-            .doesNotContain("latest pull request")
-            .doesNotContain("most recent pull request")
-            .contains("What needs attention?"); // suggested-prompts anchor
+                .contains("agent_view:")
+                .contains("agent_description:")
+                .contains("- app_home_opened")
+                .contains("- app_context_changed")
+                .contains("- message.im")
+                .doesNotContain("- message.app_home")
+                .doesNotContain("assistant_view:")
+                .doesNotContain("assistant_thread_started")
+                .doesNotContain("assistant_thread_context_changed")
+                .doesNotContain("latest pull request")
+                .doesNotContain("most recent pull request")
+                .contains("What needs attention?"); // suggested-prompts anchor
     }
 
     /**
@@ -77,33 +77,23 @@ class SlackManifestTemplateTest extends BaseUnitTest {
         SlackChannelLifecycleService lifecycle = mock(SlackChannelLifecycleService.class);
         SlackUninstallService uninstall = mock(SlackUninstallService.class);
         List<IntegrationMessageHandler> handlers = List.of(
-            new SlackChannelMessageHandler(
-                mock(SlackIngestService.class),
-                deserializer,
-                mock(TransactionTemplate.class)
-            ),
-            new SlackMentorDmMessageHandler(mock(SlackMentorService.class), deserializer),
-            new SlackAppHomeOpenedMessageHandler(
-                mock(SlackAppHomeService.class),
-                mock(SlackAssistantEventHandler.class),
-                deserializer
-            ),
-            new SlackMemberJoinedChannelMessageHandler(mock(SlackChannelJoinNoticeHandler.class), deserializer),
-            new SlackAppContextChangedMessageHandler(deserializer),
-            new SlackAppUninstalledMessageHandler(uninstall, deserializer),
-            new SlackTokensRevokedMessageHandler(uninstall, deserializer),
-            new SlackChannelLeftMessageHandler(lifecycle, deserializer),
-            new SlackGroupLeftMessageHandler(lifecycle, deserializer),
-            new SlackChannelArchiveMessageHandler(lifecycle, deserializer),
-            new SlackGroupArchiveMessageHandler(lifecycle, deserializer),
-            new SlackChannelDeletedMessageHandler(lifecycle, deserializer),
-            new SlackChannelRenameMessageHandler(lifecycle, deserializer),
-            new SlackGroupRenameMessageHandler(lifecycle, deserializer)
-        );
-        return handlers
-            .stream()
-            .map(h -> h.key().eventType())
-            .collect(Collectors.toCollection(LinkedHashSet::new));
+                new SlackChannelMessageHandler(
+                        mock(SlackIngestService.class), deserializer, mock(TransactionTemplate.class)),
+                new SlackMentorDmMessageHandler(mock(SlackMentorService.class), deserializer),
+                new SlackAppHomeOpenedMessageHandler(
+                        mock(SlackAppHomeService.class), mock(SlackAssistantEventHandler.class), deserializer),
+                new SlackMemberJoinedChannelMessageHandler(mock(SlackChannelJoinNoticeHandler.class), deserializer),
+                new SlackAppContextChangedMessageHandler(deserializer),
+                new SlackAppUninstalledMessageHandler(uninstall, deserializer),
+                new SlackTokensRevokedMessageHandler(uninstall, deserializer),
+                new SlackChannelLeftMessageHandler(lifecycle, deserializer),
+                new SlackGroupLeftMessageHandler(lifecycle, deserializer),
+                new SlackChannelArchiveMessageHandler(lifecycle, deserializer),
+                new SlackGroupArchiveMessageHandler(lifecycle, deserializer),
+                new SlackChannelDeletedMessageHandler(lifecycle, deserializer),
+                new SlackChannelRenameMessageHandler(lifecycle, deserializer),
+                new SlackGroupRenameMessageHandler(lifecycle, deserializer));
+        return handlers.stream().map(h -> h.key().eventType()).collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     /** String-anchored parse of the {@code bot_events:} block (indented {@code - <event>} lines until dedent). */
@@ -111,12 +101,11 @@ class SlackManifestTemplateTest extends BaseUnitTest {
         String manifest = Files.readString(MANIFEST, StandardCharsets.UTF_8);
         int start = manifest.indexOf("bot_events:");
         assertThat(start).as("manifest declares a bot_events block").isPositive();
-        return manifest
-            .substring(start + "bot_events:".length())
-            .lines()
-            .dropWhile(String::isBlank) // the remainder of the "bot_events:" line itself
-            .takeWhile(line -> line.stripLeading().startsWith("- "))
-            .map(line -> line.strip().substring(2).strip())
-            .toList();
+        return manifest.substring(start + "bot_events:".length())
+                .lines()
+                .dropWhile(String::isBlank) // the remainder of the "bot_events:" line itself
+                .takeWhile(line -> line.stripLeading().startsWith("- "))
+                .map(line -> line.strip().substring(2).strip())
+                .toList();
     }
 }

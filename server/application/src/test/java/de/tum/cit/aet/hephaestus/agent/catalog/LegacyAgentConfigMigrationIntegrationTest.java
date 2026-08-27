@@ -69,15 +69,14 @@ class LegacyAgentConfigMigrationIntegrationTest {
      */
     private static final String PRE_RELEASE_TAG = "before-1368";
 
-    private static final TestDatabase DATABASE = PostgreSQLTestContainer.createDatabase(
-        "hephaestus_legacy_agent_config_migration"
-    );
+    private static final TestDatabase DATABASE =
+            PostgreSQLTestContainer.createDatabase("hephaestus_legacy_agent_config_migration");
 
     @BeforeAll
     static void migrateAcrossSeededLegacyData() throws Exception {
         assertThat(updateUpToTheReleaseChangelog())
-            .as("the release changelog must still contribute changesets for this test to mean anything")
-            .isPositive();
+                .as("the release changelog must still contribute changesets for this test to mean anything")
+                .isPositive();
         try (Liquibase liquibase = liquibase()) {
             liquibase.tag(PRE_RELEASE_TAG);
         }
@@ -95,116 +94,101 @@ class LegacyAgentConfigMigrationIntegrationTest {
     @Order(2)
     void theSeederShapeSurvivesEvenThoughNoPointerNamesIt() throws SQLException {
         assertThat(connectionOf("legacy-seeded"))
-            .as("an enabled config with no pointer was serving both features; its endpoint and key must survive")
-            .containsExactly("https://gpu.example.invalid/v1", "encrypted-seeded-key", "gpt-4o");
+                .as("an enabled config with no pointer was serving both features; its endpoint and key must survive")
+                .containsExactly("https://gpu.example.invalid/v1", "encrypted-seeded-key", "gpt-4o");
 
         assertThat(bindingsOf("legacy-seeded"))
-            .as("the mentor fell back to it and detection fanned out to it, so it keeps both purposes")
-            .containsExactly(
-                new String[] { "MENTOR", "900", "5", "true" },
-                new String[] { "PRACTICE_DETECTION", "900", "5", "true" }
-            );
+                .as("the mentor fell back to it and detection fanned out to it, so it keeps both purposes")
+                .containsExactly(
+                        new String[] {"MENTOR", "900", "5", "true"},
+                        new String[] {"PRACTICE_DETECTION", "900", "5", "true"});
     }
 
     @Test
     @Order(3)
     void everyConfiguredWorkspaceKeepsItsEndpointModelAndApiKey() throws SQLException {
-        assertThat(
-            carriedConnectionRows()
-                .stream()
-                .map(row -> row[0] + '/' + row[1])
-                .toList()
-        )
-            .as("one connection per config that was reachable — enabled, or named by a pointer")
-            .containsExactly(
-                "legacy-anthropic/legacy-9504",
-                "legacy-bound/legacy-9502",
-                "legacy-fanout/legacy-9506",
-                "legacy-fanout/legacy-9507",
-                "legacy-nomodel/legacy-9505",
-                "legacy-paused/legacy-9508",
-                "legacy-paused/legacy-9509",
-                "legacy-seeded/legacy-9501"
-            );
+        assertThat(carriedConnectionRows().stream()
+                        .map(row -> row[0] + '/' + row[1])
+                        .toList())
+                .as("one connection per config that was reachable — enabled, or named by a pointer")
+                .containsExactly(
+                        "legacy-anthropic/legacy-9504",
+                        "legacy-bound/legacy-9502",
+                        "legacy-fanout/legacy-9506",
+                        "legacy-fanout/legacy-9507",
+                        "legacy-nomodel/legacy-9505",
+                        "legacy-paused/legacy-9508",
+                        "legacy-paused/legacy-9509",
+                        "legacy-seeded/legacy-9501");
 
         assertThat(connectionOf("legacy-bound"))
-            .as("an endpoint, an encrypted key and a model name are all irreplaceable once the table is dropped")
-            .containsExactly("https://bound.example.invalid/v1", "encrypted-bound-key", "gpt-4.1");
+                .as("an endpoint, an encrypted key and a model name are all irreplaceable once the table is dropped")
+                .containsExactly("https://bound.example.invalid/v1", "encrypted-bound-key", "gpt-4.1");
     }
 
     @Test
     @Order(4)
     void aConfigSharedByBothPurposesBecomesTwoBindingsOnOneModel() throws SQLException {
-        assertThat(bindingsOf("legacy-bound")).containsExactly(
-            new String[] { "MENTOR", "600", "3", "false" },
-            new String[] { "PRACTICE_DETECTION", "600", "3", "false" }
-        );
-        assertThat(
-            scalar(
-                """
+        assertThat(bindingsOf("legacy-bound"))
+                .containsExactly(
+                        new String[] {"MENTOR", "600", "3", "false"},
+                        new String[] {"PRACTICE_DETECTION", "600", "3", "false"});
+        assertThat(scalar("""
                 SELECT count(DISTINCT b.workspace_model_id)::text
                 FROM workspace_agent_binding b
                 JOIN workspace w ON w.id = b.workspace_id
                 WHERE w.slug = 'legacy-bound'
-                """
-            )
-        )
-            .as("both purposes point at the one model the single legacy config described")
-            .isEqualTo("1");
+                """))
+                .as("both purposes point at the one model the single legacy config described")
+                .isEqualTo("1");
     }
 
     @Test
     @Order(5)
     void aProviderWithNoRecordedEndpointGetsItsDocumentedPublicOne() throws SQLException {
         assertThat(connectionOf("legacy-anthropic")[0])
-            .as("Anthropic's documented public endpoint, not the not-migrated placeholder")
-            .isEqualTo("https://api.anthropic.com/v1");
+                .as("Anthropic's documented public endpoint, not the not-migrated placeholder")
+                .isEqualTo("https://api.anthropic.com/v1");
         assertThat(connectionOf("legacy-anthropic")[1]).isEqualTo("encrypted-anthropic-key");
 
         assertThat(connectionsOf("legacy-fanout").get(0)[0])
-            .as("OpenAI's documented public endpoint")
-            .isEqualTo("https://api.openai.com/v1");
+                .as("OpenAI's documented public endpoint")
+                .isEqualTo("https://api.openai.com/v1");
     }
 
     @Test
     @Order(6)
     void aProviderWhoseEndpointWasNeverRecordedAnywhereGetsAnUnresolvablePlaceholder() throws SQLException {
         assertThat(connectionOf("legacy-nomodel")[0])
-            .as(
-                "the reserved .invalid TLD can never resolve, so a re-enabled row fails loudly instead of leaking the key"
-            )
-            .isEqualTo("https://endpoint-not-migrated.invalid/v1");
+                .as(
+                        "the reserved .invalid TLD can never resolve, so a re-enabled row fails loudly instead of leaking the key")
+                .isEqualTo("https://endpoint-not-migrated.invalid/v1");
     }
 
     @Test
     @Order(7)
     void everyCarriedConnectionSpeaksTheOneProtocolTheNewSchemaAdmits() throws SQLException {
-        assertThat(
-            query(
-                """
+        assertThat(query("""
                 SELECT DISTINCT api_protocol, auth_mode
                 FROM workspace_llm_connection
                 WHERE slug LIKE 'legacy-%'
-                """
-            )
-        )
-            .as("the legacy runtime spoke OpenAI chat completions with a bearer token; nothing else is admitted")
-            .containsExactly(new String[] { "openai-completions", "BEARER" });
+                """))
+                .as("the legacy runtime spoke OpenAI chat completions with a bearer token; nothing else is admitted")
+                .containsExactly(new String[] {"openai-completions", "BEARER"});
     }
 
     @Test
     @Order(8)
     void aConfigThatNeverNamedAModelStillKeepsItsExecutionLimits() throws SQLException {
         assertThat(connectionOf("legacy-nomodel")[2])
-            .as("upstream_model_id is NOT NULL, so an unmistakable placeholder stands in for the missing name")
-            .isEqualTo("model-not-migrated");
+                .as("upstream_model_id is NOT NULL, so an unmistakable placeholder stands in for the missing name")
+                .isEqualTo("model-not-migrated");
 
         assertThat(bindingsOf("legacy-nomodel"))
-            .as("the limits are what the binding exists to carry; skipping the model would have dropped them")
-            .containsExactly(
-                new String[] { "MENTOR", "1200", "7", "true" },
-                new String[] { "PRACTICE_DETECTION", "1200", "7", "true" }
-            );
+                .as("the limits are what the binding exists to carry; skipping the model would have dropped them")
+                .containsExactly(
+                        new String[] {"MENTOR", "1200", "7", "true"},
+                        new String[] {"PRACTICE_DETECTION", "1200", "7", "true"});
     }
 
     /**
@@ -216,15 +200,14 @@ class LegacyAgentConfigMigrationIntegrationTest {
     @Order(9)
     void aFannedOutWorkspaceKeepsEveryKeyAndBindsTheOldestConfig() throws SQLException {
         assertThat(connectionsOf("legacy-fanout"))
-            .as("both enabled configs were live; neither key may be dropped")
-            .containsExactly(
-                new String[] { "https://api.openai.com/v1", "encrypted-fanout-older-key", "gpt-4o-mini" },
-                new String[] { "https://second.example.invalid/v1", "encrypted-fanout-newer-key", "o3" }
-            );
+                .as("both enabled configs were live; neither key may be dropped")
+                .containsExactly(
+                        new String[] {"https://api.openai.com/v1", "encrypted-fanout-older-key", "gpt-4o-mini"},
+                        new String[] {"https://second.example.invalid/v1", "encrypted-fanout-newer-key", "o3"});
 
         assertThat(modelSlugsBoundIn("legacy-fanout"))
-            .as("the oldest enabled config is the deterministic pick, and the mentor already resolved that way")
-            .containsExactly("legacy-9506", "legacy-9506");
+                .as("the oldest enabled config is the deterministic pick, and the mentor already resolved that way")
+                .containsExactly("legacy-9506", "legacy-9506");
     }
 
     /**
@@ -235,38 +218,32 @@ class LegacyAgentConfigMigrationIntegrationTest {
     @Test
     @Order(10)
     void aPointerAtADisabledConfigPausesDetectionButNotTheMentor() throws SQLException {
-        assertThat(purposeToModelSlug("legacy-paused")).containsExactly(
-            Map.entry("MENTOR", "legacy-9509"),
-            Map.entry("PRACTICE_DETECTION", "legacy-9508")
-        );
+        assertThat(purposeToModelSlug("legacy-paused"))
+                .containsExactly(Map.entry("MENTOR", "legacy-9509"), Map.entry("PRACTICE_DETECTION", "legacy-9508"));
     }
 
     @Test
     @Order(11)
     void nothingCarriedOverIsEnabledUntilAnAdminHasLookedAtIt() throws SQLException {
-        assertThat(
-            scalar(
-                """
+        assertThat(scalar("""
                 SELECT (
                     (SELECT count(*) FROM workspace_llm_connection WHERE enabled)
                   + (SELECT count(*) FROM workspace_llm_model WHERE enabled)
                   + (SELECT count(*) FROM workspace_agent_binding WHERE enabled))::text
-                """
-            )
-        )
-            .as("the endpoint a PROXY-mode config really used lived in an env var, so re-enabling is a human decision")
-            .isEqualTo("0");
+                """))
+                .as(
+                        "the endpoint a PROXY-mode config really used lived in an env var, so re-enabling is a human decision")
+                .isEqualTo("0");
     }
 
     @Test
     @Order(12)
     void aDisabledConfigNothingCouldReachIsNotCarriedOver() throws SQLException {
         assertThat(scalar("SELECT count(*)::text FROM workspace_llm_connection WHERE display_name = 'Orphan'"))
-            .as("an unreachable draft configured nothing and must not resurface as a connection")
-            .isEqualTo("0");
-        assertThat(
-            scalar("SELECT count(*)::text FROM workspace_llm_connection WHERE api_key = 'encrypted-orphan-key'")
-        ).isEqualTo("0");
+                .as("an unreachable draft configured nothing and must not resurface as a connection")
+                .isEqualTo("0");
+        assertThat(scalar("SELECT count(*)::text FROM workspace_llm_connection WHERE api_key = 'encrypted-orphan-key'"))
+                .isEqualTo("0");
     }
 
     /**
@@ -277,8 +254,8 @@ class LegacyAgentConfigMigrationIntegrationTest {
     @Order(13)
     void deletingAnAgentJobIsRefusedWhileItsFeedbackExists() throws SQLException {
         assertThatThrownBy(() -> execute("DELETE FROM agent_job WHERE id = '9a000000-0000-0000-0000-000000000001'"))
-            .as("the FK is RESTRICT, so the delete is refused instead of cascading")
-            .hasMessageContaining("sfk_feedback_agent_job");
+                .as("the FK is RESTRICT, so the delete is refused instead of cascading")
+                .hasMessageContaining("sfk_feedback_agent_job");
 
         assertThat(scalar("SELECT count(*)::text FROM feedback")).isEqualTo("1");
     }
@@ -290,17 +267,13 @@ class LegacyAgentConfigMigrationIntegrationTest {
     @Test
     @Order(14)
     void backfilledSpendIsAttributedToTheInstancePurse() throws SQLException {
-        assertThat(
-            query(
-                """
+        assertThat(query("""
                 SELECT source_type, funding_source, pricing_state, cost_usd::text
                 FROM llm_usage_event ORDER BY source_type
-                """
-            )
-        ).containsExactly(
-            new String[] { "AGENT_JOB", "INSTANCE", "PRICED", "0.250000" },
-            new String[] { "MENTOR_TURN", "INSTANCE", "PRICED", "0.125000" }
-        );
+                """))
+                .containsExactly(
+                        new String[] {"AGENT_JOB", "INSTANCE", "PRICED", "0.250000"},
+                        new String[] {"MENTOR_TURN", "INSTANCE", "PRICED", "0.125000"});
     }
 
     /**
@@ -314,17 +287,15 @@ class LegacyAgentConfigMigrationIntegrationTest {
         String deployLog = PostgreSQLTestContainer.getLogs();
 
         assertThat(deployLog)
-            .as("a placeholder endpoint, a placeholder model id and a non-OpenAI protocol all need a human")
-            .contains(
-                "carried over with a placeholder endpoint, model id or non-OpenAI protocol in these " +
-                    "workspaces: legacy-anthropic, legacy-fanout, legacy-nomodel"
-            );
+                .as("a placeholder endpoint, a placeholder model id and a non-OpenAI protocol all need a human")
+                .contains("carried over with a placeholder endpoint, model id or non-OpenAI protocol in these "
+                        + "workspaces: legacy-anthropic, legacy-fanout, legacy-nomodel");
         assertThat(deployLog)
-            .as("only legacy-fanout ran detection on more than one config; legacy-paused had an explicit pointer")
-            .contains("ran on SEVERAL configurations at once in these workspaces: legacy-fanout");
+                .as("only legacy-fanout ran detection on more than one config; legacy-paused had an explicit pointer")
+                .contains("ran on SEVERAL configurations at once in these workspaces: legacy-fanout");
         assertThat(deployLog)
-            .as("a dropped config may hold a key worth revoking, so it is named before the table goes")
-            .contains("are dropped with the old table: legacy-orphan/Orphan");
+                .as("a dropped config may hold a key worth revoking, so it is named before the table goes")
+                .contains("are dropped with the old table: legacy-orphan/Orphan");
     }
 
     @Test
@@ -336,14 +307,14 @@ class LegacyAgentConfigMigrationIntegrationTest {
 
         execute("DELETE FROM databasechangelog WHERE filename LIKE '%" + RELEASE_CHANGELOG + "'");
         assertThatCode(LegacyAgentConfigMigrationIntegrationTest::runTheReleaseChangeSets)
-            .as("every changeSet must guard itself; a second pass over an upgraded database must not throw")
-            .doesNotThrowAnyException();
+                .as("every changeSet must guard itself; a second pass over an upgraded database must not throw")
+                .doesNotThrowAnyException();
 
         assertThat(carriedConnectionRows()).containsExactlyElementsOf(connectionsBefore);
         assertThat(scalar("SELECT count(*)::text FROM workspace_agent_binding")).isEqualTo(bindingsBefore);
         assertThat(scalar("SELECT count(*)::text FROM llm_usage_event"))
-            .as("the ledger backfills are NOT EXISTS-guarded, so a second pass must not double-bill")
-            .isEqualTo(ledgerBefore);
+                .as("the ledger backfills are NOT EXISTS-guarded, so a second pass must not double-bill")
+                .isEqualTo(ledgerBefore);
     }
 
     /** Destructive, so it runs last — the rollback takes the catalog with it. */
@@ -354,12 +325,14 @@ class LegacyAgentConfigMigrationIntegrationTest {
             liquibase.rollback(PRE_RELEASE_TAG, contexts(), new LabelExpression());
         }
 
-        assertThat(scalar("SELECT to_regclass('workspace_agent_binding')::text")).isNull();
-        assertThat(scalar("SELECT to_regclass('workspace_llm_connection')::text")).isNull();
+        assertThat(scalar("SELECT to_regclass('workspace_agent_binding')::text"))
+                .isNull();
+        assertThat(scalar("SELECT to_regclass('workspace_llm_connection')::text"))
+                .isNull();
         assertThat(scalar("SELECT to_regclass('workspace_llm_model')::text")).isNull();
         assertThat(scalar("SELECT count(*)::text FROM workspace WHERE slug LIKE 'legacy-%'"))
-            .as("a rollback of the AI catalog must not take the workspaces with it")
-            .isEqualTo("7");
+                .as("a rollback of the AI catalog must not take the workspaces with it")
+                .isEqualTo("7");
     }
 
     /** @return how many changesets the release changelog contributes, i.e. how many were NOT applied. */
@@ -386,7 +359,9 @@ class LegacyAgentConfigMigrationIntegrationTest {
     private static void runTheReleaseChangeSets() throws Exception {
         try (Liquibase liquibase = liquibase()) {
             List<Integer> releaseIndexes = pendingReleaseIndexes(liquibase);
-            assertThat(releaseIndexes).as("the release changelog has nothing left to apply").isNotEmpty();
+            assertThat(releaseIndexes)
+                    .as("the release changelog has nothing left to apply")
+                    .isNotEmpty();
             liquibase.update(releaseIndexes.getLast() + 1, contexts(), new LabelExpression());
         }
     }
@@ -405,9 +380,8 @@ class LegacyAgentConfigMigrationIntegrationTest {
 
     /** Each caller gets its own connection: closing a {@link Liquibase} closes the one it was given. */
     private static Liquibase liquibase() throws Exception {
-        Database database = DatabaseFactory.getInstance().findCorrectDatabaseImplementation(
-            new JdbcConnection(connect())
-        );
+        Database database =
+                DatabaseFactory.getInstance().findCorrectDatabaseImplementation(new JdbcConnection(connect()));
         return new Liquibase(MASTER, new ClassLoaderResourceAccessor(), database);
     }
 
@@ -418,7 +392,7 @@ class LegacyAgentConfigMigrationIntegrationTest {
 
     private static void seedLegacyConfiguration() throws SQLException {
         execute(
-            """
+                """
             INSERT INTO workspace (id, account_login, account_type, display_name, slug, status, is_publicly_viewable)
             VALUES (9401, 'legacy-seeded',    'ORG', 'Seeded',    'legacy-seeded',    'ACTIVE', false),
                    (9402, 'legacy-bound',     'ORG', 'Bound',     'legacy-bound',     'ACTIVE', false),
@@ -428,9 +402,9 @@ class LegacyAgentConfigMigrationIntegrationTest {
                    (9406, 'legacy-fanout',    'ORG', 'Fan-out',   'legacy-fanout',    'ACTIVE', false),
                    (9407, 'legacy-paused',    'ORG', 'Paused',    'legacy-paused',    'ACTIVE', false)
             """,
-            // 9501 is the startup seeder's shape: enabled, both pointers left NULL — a default install,
-            // not a config an admin ever pointed at.
-            """
+                // 9501 is the startup seeder's shape: enabled, both pointers left NULL — a default install,
+                // not a config an admin ever pointed at.
+                """
             INSERT INTO agent_config (id, workspace_id, name, enabled, model_name, llm_api_key, llm_base_url,
                                       llm_provider, credential_mode, timeout_seconds, max_concurrent_jobs,
                                       allow_internet, created_at)
@@ -453,55 +427,54 @@ class LegacyAgentConfigMigrationIntegrationTest {
                    (9509, 9407, 'Live mentor', true, 'gpt-4o', 'encrypted-mentor-key',
                     'https://mentor.example.invalid/v1', 'OPENAI', 'PROXY', 720, 9, true, now())
             """,
-            "UPDATE workspace SET practice_config_id = 9502, mentor_config_id = 9502 WHERE id = 9402",
-            "UPDATE workspace SET practice_config_id = 9508 WHERE id = 9407",
-            // A completed job with recorded spend, and a suppressed finding hanging off it so the FK
-            // this release hardens to RESTRICT has a row to refuse a cascade on.
-            "INSERT INTO \"user\" (id, native_id, provider_id) VALUES (9601, 9601, 1)",
-            """
+                "UPDATE workspace SET practice_config_id = 9502, mentor_config_id = 9502 WHERE id = 9402",
+                "UPDATE workspace SET practice_config_id = 9508 WHERE id = 9407",
+                // A completed job with recorded spend, and a suppressed finding hanging off it so the FK
+                // this release hardens to RESTRICT has a row to refuse a cascade on.
+                "INSERT INTO \"user\" (id, native_id, provider_id) VALUES (9601, 9601, 1)",
+                """
             INSERT INTO agent_job (id, workspace_id, config_id, job_type, status, config_snapshot, job_token,
                                    retry_count, created_at, completed_at, llm_model, llm_total_calls,
                                    llm_total_input_tokens, llm_total_output_tokens, llm_cost_usd)
             VALUES ('9a000000-0000-0000-0000-000000000001', 9401, 9501, 'PRACTICE_DETECTION', 'COMPLETED',
                     '{}'::jsonb, 'token', 0, now(), now(), 'gpt-4o', 3, 1000, 500, 0.25)
             """,
-            """
+                """
             INSERT INTO feedback (id, agent_job_id, workspace_id, recipient_user_id, about_user_id, channel,
                                   position, delivery_state, suppression_reason, source, created_at)
             VALUES ('9b000000-0000-0000-0000-000000000001', '9a000000-0000-0000-0000-000000000001', 9401,
                     9601, 9601, 'IN_CONTEXT', 1, 'SUPPRESSED', 'VOLUME_CAPPED', 'AGENT', now())
             """,
-            // One mentor turn with recorded spend, so the chat_message backfill has something to classify.
-            """
+                // One mentor turn with recorded spend, so the chat_message backfill has something to classify.
+                """
             INSERT INTO chat_thread (id, workspace_id, user_id, created_at, surface)
             VALUES ('9c000000-0000-0000-0000-000000000001', 9401, 9601, now(), 'WEB')
             """,
-            """
+                """
             INSERT INTO chat_message (id, thread_id, role, status, parts, version, created_at, metadata)
             VALUES ('9d000000-0000-0000-0000-000000000001', '9c000000-0000-0000-0000-000000000001',
                     'ASSISTANT', 'completed', '[]'::jsonb, 0, now(),
                     '{"model":"gpt-4o","usage":{"input":10,"output":20},"costUsd":"0.125"}'::jsonb)
-            """
-        );
+            """);
     }
 
     /** Every carried-over connection: (workspace slug, connection slug, endpoint, key, model id). */
     private static List<String[]> carriedConnectionRows() throws SQLException {
-        return query(
-            """
+        return query("""
             SELECT w.slug, c.slug, c.base_url, c.api_key, m.upstream_model_id
             FROM workspace_llm_connection c
             JOIN workspace w ON w.id = c.workspace_id
             LEFT JOIN workspace_llm_model m ON m.connection_id = c.id
             ORDER BY w.slug, c.slug
-            """
-        );
+            """);
     }
 
     /** The single connection of a workspace that has exactly one: (endpoint, key, model id). */
     private static String[] connectionOf(String workspaceSlug) throws SQLException {
         List<String[]> connections = connectionsOf(workspaceSlug);
-        assertThat(connections).as("%s is expected to have exactly one connection", workspaceSlug).hasSize(1);
+        assertThat(connections)
+                .as("%s is expected to have exactly one connection", workspaceSlug)
+                .hasSize(1);
         return connections.get(0);
     }
 
@@ -509,7 +482,7 @@ class LegacyAgentConfigMigrationIntegrationTest {
         List<String[]> rows = new ArrayList<>();
         for (String[] row : carriedConnectionRows()) {
             if (row[0].equals(workspaceSlug)) {
-                rows.add(new String[] { row[2], row[3], row[4] });
+                rows.add(new String[] {row[2], row[3], row[4]});
             }
         }
         return rows;
@@ -517,33 +490,31 @@ class LegacyAgentConfigMigrationIntegrationTest {
 
     /** A workspace's bindings as (purpose, timeout, concurrency, internet), ordered by purpose. */
     private static List<String[]> bindingsOf(String workspaceSlug) throws SQLException {
-        return query(
-            """
+        return query("""
             SELECT b.purpose, b.timeout_seconds::text, b.max_concurrent_jobs::text, b.allow_internet::text
             FROM workspace_agent_binding b
             JOIN workspace w ON w.id = b.workspace_id
             WHERE w.slug = '%s'
             ORDER BY b.purpose
-            """.formatted(workspaceSlug)
-        );
+            """.formatted(workspaceSlug));
     }
 
     private static List<String> modelSlugsBoundIn(String workspaceSlug) throws SQLException {
-        return purposeToModelSlug(workspaceSlug).stream().map(Map.Entry::getValue).toList();
+        return purposeToModelSlug(workspaceSlug).stream()
+                .map(Map.Entry::getValue)
+                .toList();
     }
 
     private static List<Map.Entry<String, String>> purposeToModelSlug(String workspaceSlug) throws SQLException {
         List<Map.Entry<String, String>> bound = new ArrayList<>();
-        for (String[] row : query(
-            """
+        for (String[] row : query("""
             SELECT b.purpose, m.slug
             FROM workspace_agent_binding b
             JOIN workspace w ON w.id = b.workspace_id
             JOIN workspace_llm_model m ON m.id = b.workspace_model_id
             WHERE w.slug = '%s'
             ORDER BY b.purpose
-            """.formatted(workspaceSlug)
-        )) {
+            """.formatted(workspaceSlug))) {
             bound.add(Map.entry(row[0], row[1]));
         }
         return bound;
@@ -554,7 +525,8 @@ class LegacyAgentConfigMigrationIntegrationTest {
     }
 
     private static void execute(String... statements) throws SQLException {
-        try (Connection connection = connect(); Statement statement = connection.createStatement()) {
+        try (Connection connection = connect();
+                Statement statement = connection.createStatement()) {
             for (String sql : statements) {
                 statement.execute(sql);
             }
@@ -567,7 +539,8 @@ class LegacyAgentConfigMigrationIntegrationTest {
     }
 
     private static List<String[]> query(String sql) throws SQLException {
-        try (Connection connection = connect(); Statement statement = connection.createStatement()) {
+        try (Connection connection = connect();
+                Statement statement = connection.createStatement()) {
             try (ResultSet rs = statement.executeQuery(sql)) {
                 int columns = rs.getMetaData().getColumnCount();
                 List<String[]> rows = new ArrayList<>();

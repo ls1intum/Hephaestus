@@ -96,12 +96,8 @@ public class FeedbackSupersession {
     public Outcome supersede(long workspaceId, long recipientUserId, FeedbackChannel channel, String threadKey) {
         UUID lastRefused = null;
         for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-            Optional<UUID> target = feedbackRepository.findLatestOnThread(
-                workspaceId,
-                recipientUserId,
-                channel.name(),
-                threadKey
-            );
+            Optional<UUID> target =
+                    feedbackRepository.findLatestOnThread(workspaceId, recipientUserId, channel.name(), threadKey);
             if (target.isEmpty()) {
                 return Outcome.standalone();
             }
@@ -119,10 +115,9 @@ public class FeedbackSupersession {
             // over time rather than two unrelated messages that happen to share a key.
             if (feedbackRepository.isDelivered(workspaceId, targetId)) {
                 log.info(
-                    "Supersession target was read first; continuing the thread instead: channel={}, target={}",
-                    channel,
-                    targetId
-                );
+                        "Supersession target was read first; continuing the thread instead: channel={}, target={}",
+                        channel,
+                        targetId);
                 return new Outcome(Disposition.CONTINUED, targetId);
             }
             lastRefused = targetId;

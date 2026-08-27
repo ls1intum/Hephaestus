@@ -69,27 +69,23 @@ public class GitLabManifest implements IntegrationManifest {
     @Override
     public ReviewContribution reviewContribution() {
         return new ReviewContribution(
-            Set.of(ScmSignals.PULL_REQUEST, ScmSignals.ISSUE),
-            Map.of(
-                ScmSignals.PULL_REQUEST,
-                Set.of(
-                    ScmSignals.PULL_REQUEST_OPENED,
-                    ScmSignals.PULL_REQUEST_READY,
-                    ScmSignals.PULL_REQUEST_REVIEWED,
-                    ScmSignals.PULL_REQUEST_MERGED,
-                    ScmSignals.PULL_REQUEST_CLOSED
-                ),
-                ScmSignals.ISSUE,
-                Set.of(ScmSignals.ISSUE_OPENED, ScmSignals.ISSUE_LABELED, ScmSignals.ISSUE_CLOSED)
-            ),
-            gitlabStackEnabled
-                ? Map.of(
-                      ScmSignals.PULL_REQUEST,
-                      Set.of(FeedbackLane.IN_CONTEXT_SUMMARY, FeedbackLane.IN_CONTEXT_INLINE),
-                      ScmSignals.ISSUE,
-                      Set.of(FeedbackLane.IN_CONTEXT_SUMMARY)
-                  )
-                : Map.of()
-        );
+                Set.of(ScmSignals.PULL_REQUEST, ScmSignals.ISSUE),
+                Map.of(
+                        ScmSignals.PULL_REQUEST,
+                        Set.of(
+                                ScmSignals.PULL_REQUEST_OPENED,
+                                ScmSignals.PULL_REQUEST_READY,
+                                ScmSignals.PULL_REQUEST_REVIEWED,
+                                ScmSignals.PULL_REQUEST_MERGED,
+                                ScmSignals.PULL_REQUEST_CLOSED),
+                        ScmSignals.ISSUE,
+                        Set.of(ScmSignals.ISSUE_OPENED, ScmSignals.ISSUE_LABELED, ScmSignals.ISSUE_CLOSED)),
+                gitlabStackEnabled
+                        ? Map.of(
+                                ScmSignals.PULL_REQUEST,
+                                Set.of(FeedbackLane.IN_CONTEXT_SUMMARY, FeedbackLane.IN_CONTEXT_INLINE),
+                                ScmSignals.ISSUE,
+                                Set.of(FeedbackLane.IN_CONTEXT_SUMMARY))
+                        : Map.of());
     }
 }

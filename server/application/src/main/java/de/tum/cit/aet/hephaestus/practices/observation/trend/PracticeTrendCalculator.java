@@ -20,70 +20,50 @@ final class PracticeTrendCalculator {
     private PracticeTrendCalculator() {}
 
     static PracticeTrend calculatePractice(
-        String practiceSlug,
-        List<Observation> observations,
-        Instant cutoff,
-        TrendProperties properties
-    ) {
-        OpportunityBundler.Bundles bundles = OpportunityBundler.bundle(
-            observations,
-            cutoff,
-            properties.getBundleSize()
-        );
+            String practiceSlug, List<Observation> observations, Instant cutoff, TrendProperties properties) {
+        OpportunityBundler.Bundles bundles =
+                OpportunityBundler.bundle(observations, cutoff, properties.getBundleSize());
         int missing = bundles.opportunitiesUntilComparable(properties.getMinBundleSize());
         List<EvidenceOpportunity> trail = OpportunityBundler.cappedTrail(bundles.trail(), properties.getBundleSize());
         TrendSupport support = TrendSupportFactory.forPractice(
-            properties,
-            bundles.current().size(),
-            bundles.previous().size(),
-            missing,
-            trail
-        );
+                properties, bundles.current().size(), bundles.previous().size(), missing, trail);
         if (missing > 0) {
             return new PracticeTrend(
-                practiceSlug,
-                TrendScope.PRACTICE,
-                TrendDirection.INSUFFICIENT_EVIDENCE,
-                support,
-                null,
-                null,
-                trail,
-                null
-            );
+                    practiceSlug,
+                    TrendScope.PRACTICE,
+                    TrendDirection.INSUFFICIENT_EVIDENCE,
+                    support,
+                    null,
+                    null,
+                    trail,
+                    null);
         }
 
-        BetaPosterior.Difference difference = posterior(bundles.current()).differenceFrom(
-            posterior(bundles.previous())
-        );
+        BetaPosterior.Difference difference =
+                posterior(bundles.current()).differenceFrom(posterior(bundles.previous()));
         TrendDirection direction = TrendDirectionRule.classify(
-            difference,
-            properties.getRopeHalfWidth(),
-            properties.getCredibilityThreshold()
-        );
+                difference, properties.getRopeHalfWidth(), properties.getCredibilityThreshold());
         return new PracticeTrend(
-            practiceSlug,
-            TrendScope.PRACTICE,
-            direction,
-            support,
-            outcomes(bundles.current()),
-            outcomes(bundles.previous()),
-            trail,
-            difference
-        );
+                practiceSlug,
+                TrendScope.PRACTICE,
+                direction,
+                support,
+                outcomes(bundles.current()),
+                outcomes(bundles.previous()),
+                trail,
+                difference);
     }
 
     private static BetaPosterior posterior(List<EvidenceOpportunity> opportunities) {
-        double sum = opportunities
-            .stream()
-            .mapToDouble(opportunity -> opportunity.outcomes().positiveShare())
-            .sum();
+        double sum = opportunities.stream()
+                .mapToDouble(opportunity -> opportunity.outcomes().positiveShare())
+                .sum();
         return BetaPosterior.from(opportunities.size(), sum);
     }
 
     private static OutcomeVector outcomes(List<EvidenceOpportunity> opportunities) {
-        return opportunities
-            .stream()
-            .map(EvidenceOpportunity::outcomes)
-            .reduce(OutcomeVector.EMPTY, OutcomeVector::plus);
+        return opportunities.stream()
+                .map(EvidenceOpportunity::outcomes)
+                .reduce(OutcomeVector.EMPTY, OutcomeVector::plus);
     }
 }

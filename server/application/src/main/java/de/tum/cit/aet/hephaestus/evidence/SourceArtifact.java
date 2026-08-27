@@ -7,12 +7,10 @@ public record SourceArtifact(String path, String mediaType, String sha256, long 
     public SourceArtifact {
         path = requireText(path, "path");
         Path artifactPath = Path.of(path);
-        if (
-            artifactPath.isAbsolute() ||
-            path.contains("\\") ||
-            artifactPath.normalize().toString().isEmpty() ||
-            !artifactPath.equals(artifactPath.normalize())
-        ) {
+        if (artifactPath.isAbsolute()
+                || path.contains("\\")
+                || artifactPath.normalize().toString().isEmpty()
+                || !artifactPath.equals(artifactPath.normalize())) {
             throw new IllegalArgumentException("Artifact path must be safe and workspace-relative: " + path);
         }
         mediaType = requireText(mediaType, "mediaType");

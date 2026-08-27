@@ -36,17 +36,17 @@ class MentorChatMetricsTest extends BaseUnitTest {
             metrics.recordCompleted(o);
         }
         for (MentorChatMetrics.Outcome o : MentorChatMetrics.Outcome.values()) {
-            assertThat(registry.get("mentor.turn.completed").tag("outcome", o.tag()).counter().count())
-                .as("counter for %s should be 1", o)
-                .isEqualTo(1d);
+            assertThat(registry.get("mentor.turn.completed")
+                            .tag("outcome", o.tag())
+                            .counter()
+                            .count())
+                    .as("counter for %s should be 1", o)
+                    .isEqualTo(1d);
         }
         // Total = N outcomes × 1 increment.
-        long total = registry
-            .find("mentor.turn.completed")
-            .meters()
-            .stream()
-            .mapToLong(m -> Math.round(((io.micrometer.core.instrument.Counter) m).count()))
-            .sum();
+        long total = registry.find("mentor.turn.completed").meters().stream()
+                .mapToLong(m -> Math.round(((io.micrometer.core.instrument.Counter) m).count()))
+                .sum();
         assertThat(total).isEqualTo(MentorChatMetrics.Outcome.values().length);
     }
 

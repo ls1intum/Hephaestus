@@ -49,11 +49,10 @@ class WorkerProfileOverlayTest extends BaseUnitTest {
 
     private static @Nullable Object baseValueOf(String key) throws IOException {
         return new YamlPropertySourceLoader()
-            .load("application.yml", new ClassPathResource("application.yml"))
-            .stream()
-            .map(source -> source.getProperty(key))
-            .filter(Objects::nonNull)
-            .findFirst()
-            .orElse(null);
+                .load("application.yml", new ClassPathResource("application.yml")).stream()
+                        .map(source -> source.getProperty(key))
+                        .filter(Objects::nonNull)
+                        .findFirst()
+                        .orElse(null);
     }
 }

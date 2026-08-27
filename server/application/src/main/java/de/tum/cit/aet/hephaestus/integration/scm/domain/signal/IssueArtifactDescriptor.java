@@ -26,13 +26,12 @@ import org.springframework.stereotype.Component;
 public class IssueArtifactDescriptor implements ArtifactDescriptor {
 
     private static final List<Signal> SIGNALS = List.of(
-        declareRecommended(ScmSignals.ISSUE_OPENED, "Opened", Set.of(GITHUB_ISSUES, GITLAB_ISSUE)),
-        // GitLab has no native "labeled" action; its issue processor derives one per newly added
-        // label off the update event, so the provenance is real.
-        declareRecommended(ScmSignals.ISSUE_LABELED, "Labeled", Set.of(GITHUB_ISSUES, GITLAB_ISSUE)),
-        declare(ScmSignals.ISSUE_CLOSED, "Closed", Set.of(GITHUB_ISSUES, GITLAB_ISSUE)),
-        declareManualRequest(ScmSignals.ISSUE_MANUAL_REVIEW, "Review requested by hand")
-    );
+            declareRecommended(ScmSignals.ISSUE_OPENED, "Opened", Set.of(GITHUB_ISSUES, GITLAB_ISSUE)),
+            // GitLab has no native "labeled" action; its issue processor derives one per newly added
+            // label off the update event, so the provenance is real.
+            declareRecommended(ScmSignals.ISSUE_LABELED, "Labeled", Set.of(GITHUB_ISSUES, GITLAB_ISSUE)),
+            declare(ScmSignals.ISSUE_CLOSED, "Closed", Set.of(GITHUB_ISSUES, GITLAB_ISSUE)),
+            declareManualRequest(ScmSignals.ISSUE_MANUAL_REVIEW, "Review requested by hand"));
 
     @Override
     public ArtifactKind kind() {
@@ -61,12 +60,9 @@ public class IssueArtifactDescriptor implements ArtifactDescriptor {
 
     @Override
     public List<ReviewLimitation> reviewLimitations() {
-        return List.of(
-            new ReviewLimitation(
+        return List.of(new ReviewLimitation(
                 "IMPLEMENTATION_NOT_OBSERVED",
-                "Issue evidence does not establish whether the described work was implemented correctly."
-            )
-        );
+                "Issue evidence does not establish whether the described work was implemented correctly."));
     }
 
     @Override

@@ -34,8 +34,7 @@ public class OutlineSubjectParser implements SubjectParser {
         String[] parts = fullSubject.split("\\.", -1);
         if (parts.length < 3) {
             throw new IllegalArgumentException(
-                "Outline subject must have at least 3 components (outline.<sub>.<event>), got: " + fullSubject
-            );
+                    "Outline subject must have at least 3 components (outline.<sub>.<event>), got: " + fullSubject);
         }
         if (!"outline".equals(parts[0])) {
             throw new IllegalArgumentException("subject must start with 'outline.', got: " + fullSubject);
@@ -43,7 +42,7 @@ public class OutlineSubjectParser implements SubjectParser {
         // A well-formed subject has exactly 3 components; the deriver sanitizes dots in the event
         // to '~'. Defensively rejoin any trailing parts so a legacy/unsanitized event still parses.
         String event =
-            parts.length == 3 ? parts[2] : String.join(".", java.util.Arrays.copyOfRange(parts, 2, parts.length));
+                parts.length == 3 ? parts[2] : String.join(".", java.util.Arrays.copyOfRange(parts, 2, parts.length));
         if (event.isBlank()) {
             throw new IllegalArgumentException("Outline subject event component is blank: " + fullSubject);
         }

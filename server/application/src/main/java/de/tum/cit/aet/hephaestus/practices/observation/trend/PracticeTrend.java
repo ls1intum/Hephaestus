@@ -25,15 +25,14 @@ public final class PracticeTrend {
     private final BetaPosterior.@Nullable Difference difference;
 
     PracticeTrend(
-        String slug,
-        TrendScope scope,
-        TrendDirection direction,
-        TrendSupport support,
-        @Nullable OutcomeVector currentOutcomes,
-        @Nullable OutcomeVector previousOutcomes,
-        List<EvidenceOpportunity> opportunities,
-        BetaPosterior.@Nullable Difference difference
-    ) {
+            String slug,
+            TrendScope scope,
+            TrendDirection direction,
+            TrendSupport support,
+            @Nullable OutcomeVector currentOutcomes,
+            @Nullable OutcomeVector previousOutcomes,
+            List<EvidenceOpportunity> opportunities,
+            BetaPosterior.@Nullable Difference difference) {
         this.slug = slug;
         this.scope = scope;
         this.direction = direction;
@@ -79,14 +78,13 @@ public final class PracticeTrend {
      * @param decay per-opportunity weight factor in {@code (0,1]}; 1.0 is an unweighted mean
      */
     public OptionalDouble recentPositiveShare(int window, double decay) {
-        List<EvidenceOpportunity> applicable = opportunities.stream().filter(EvidenceOpportunity::applicable).toList();
+        List<EvidenceOpportunity> applicable =
+                opportunities.stream().filter(EvidenceOpportunity::applicable).toList();
         if (applicable.isEmpty()) {
             return OptionalDouble.empty();
         }
-        List<EvidenceOpportunity> recent = applicable.subList(
-            Math.max(0, applicable.size() - window),
-            applicable.size()
-        );
+        List<EvidenceOpportunity> recent =
+                applicable.subList(Math.max(0, applicable.size() - window), applicable.size());
         double weighted = 0.0;
         double totalWeight = 0.0;
         for (int index = recent.size() - 1, age = 0; index >= 0; index--, age++) {
@@ -121,31 +119,28 @@ public final class PracticeTrend {
 
     public PracticeTrendDTO toDto() {
         return new PracticeTrendDTO(
-            slug,
-            scope,
-            direction,
-            TrendSupportDTO.from(support),
-            OutcomeVectorDTO.from(currentOutcomes),
-            OutcomeVectorDTO.from(previousOutcomes),
-            java.util.stream.IntStream.range(0, opportunities.size())
-                .mapToObj(index -> {
-                    EvidenceOpportunity opportunity = opportunities.get(index);
-                    return new TrendOpportunityDTO(
-                        index,
-                        opportunity.occurredAt(),
-                        opportunity.artifactKind(),
-                        opportunity.artifactId(),
-                        new OutcomeVectorDTO(
-                            opportunity.outcomes().demonstratedStrengths(),
-                            opportunity.outcomes().safeAvoidances(),
-                            opportunity.outcomes().commissionProblems(),
-                            opportunity.outcomes().omissionGaps(),
-                            opportunity.outcomes().notApplicable()
-                        ),
-                        opportunity.bundle()
-                    );
-                })
-                .toList()
-        );
+                slug,
+                scope,
+                direction,
+                TrendSupportDTO.from(support),
+                OutcomeVectorDTO.from(currentOutcomes),
+                OutcomeVectorDTO.from(previousOutcomes),
+                java.util.stream.IntStream.range(0, opportunities.size())
+                        .mapToObj(index -> {
+                            EvidenceOpportunity opportunity = opportunities.get(index);
+                            return new TrendOpportunityDTO(
+                                    index,
+                                    opportunity.occurredAt(),
+                                    opportunity.artifactKind(),
+                                    opportunity.artifactId(),
+                                    new OutcomeVectorDTO(
+                                            opportunity.outcomes().demonstratedStrengths(),
+                                            opportunity.outcomes().safeAvoidances(),
+                                            opportunity.outcomes().commissionProblems(),
+                                            opportunity.outcomes().omissionGaps(),
+                                            opportunity.outcomes().notApplicable()),
+                                    opportunity.bundle());
+                        })
+                        .toList());
     }
 }

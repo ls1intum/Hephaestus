@@ -42,8 +42,7 @@ public record SignalRevision(String value) {
         }
         if (!GRAMMAR.matcher(value).matches()) {
             throw new IllegalArgumentException(
-                "signal revision must contain only [A-Za-z0-9_.~-] — no colon, no whitespace — got: " + value
-            );
+                    "signal revision must contain only [A-Za-z0-9_.~-] — no colon, no whitespace — got: " + value);
         }
     }
 

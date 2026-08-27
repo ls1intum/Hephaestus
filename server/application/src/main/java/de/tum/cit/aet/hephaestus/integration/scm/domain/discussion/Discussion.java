@@ -40,12 +40,15 @@ import org.jspecify.annotations.Nullable;
  */
 @Entity
 @Table(
-    name = "discussion",
-    uniqueConstraints = {
-        @UniqueConstraint(name = "uq_discussion_repo_number", columnNames = { "repository_id", "number" }),
-        @UniqueConstraint(name = "uq_discussion_provider_native_id", columnNames = { "provider_id", "native_id" }),
-    }
-)
+        name = "discussion",
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "uq_discussion_repo_number",
+                    columnNames = {"repository_id", "number"}),
+            @UniqueConstraint(
+                    name = "uq_discussion_provider_native_id",
+                    columnNames = {"provider_id", "native_id"}),
+        })
 @Getter
 @Setter
 @NoArgsConstructor
@@ -148,10 +151,9 @@ public class Discussion extends BaseGitServiceEntity {
 
     @ManyToMany
     @JoinTable(
-        name = "discussion_label",
-        joinColumns = @JoinColumn(name = "discussion_id"),
-        inverseJoinColumns = @JoinColumn(name = "label_id")
-    )
+            name = "discussion_label",
+            joinColumns = @JoinColumn(name = "discussion_id"),
+            inverseJoinColumns = @JoinColumn(name = "label_id"))
     @ToString.Exclude
     private Set<Label> labels = new HashSet<>();
 

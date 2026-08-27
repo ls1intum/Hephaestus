@@ -41,8 +41,8 @@ class ReviewSweepScheduleTest extends BaseUnitTest {
         Instant tomorrow = NOW.plus(Duration.ofDays(1));
 
         assertThat(schedule.windowStart(tomorrow))
-            .as("tomorrow's window still reaches back over today's")
-            .isBefore(NOW);
+                .as("tomorrow's window still reaches back over today's")
+                .isBefore(NOW);
     }
 
     /**

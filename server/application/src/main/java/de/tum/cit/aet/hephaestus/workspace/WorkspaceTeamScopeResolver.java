@@ -27,7 +27,7 @@ public class WorkspaceTeamScopeResolver {
             return Optional.empty();
         }
         return workspaceRepository
-            .findOrganizationProviderIdByWorkspaceId(workspace.getId())
-            .map(providerId -> new WorkspaceTeamScope(workspace.getAccountLogin(), providerId));
+                .findOrganizationProviderIdByWorkspaceId(workspace.getId())
+                .map(providerId -> new WorkspaceTeamScope(workspace.getAccountLogin(), providerId));
     }
 }

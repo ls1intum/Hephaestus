@@ -21,8 +21,8 @@ public final class TestUserFactory {
         Long providerId = provider.getId();
         assertNotNull(providerId);
         return repository
-            .findByLoginAndProviderId(login, providerId)
-            .orElseGet(() -> repository.save(createUser(fallbackId, login, provider)));
+                .findByLoginAndProviderId(login, providerId)
+                .orElseGet(() -> repository.save(createUser(fallbackId, login, provider)));
     }
 
     public static User createUser(long id, String login) {

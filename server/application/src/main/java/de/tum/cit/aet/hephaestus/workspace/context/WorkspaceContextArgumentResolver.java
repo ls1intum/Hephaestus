@@ -43,17 +43,15 @@ public class WorkspaceContextArgumentResolver implements HandlerMethodArgumentRe
      */
     @Override
     public Object resolveArgument(
-        @NonNull MethodParameter parameter,
-        @Nullable ModelAndViewContainer mavContainer,
-        @NonNull NativeWebRequest webRequest,
-        @Nullable WebDataBinderFactory binderFactory
-    ) {
+            @NonNull MethodParameter parameter,
+            @Nullable ModelAndViewContainer mavContainer,
+            @NonNull NativeWebRequest webRequest,
+            @Nullable WebDataBinderFactory binderFactory) {
         WorkspaceContext context = WorkspaceContextHolder.getContext();
         if (context == null) {
             throw new IllegalStateException(
-                "WorkspaceContext is not set. Ensure the endpoint is within a workspace-scoped controller " +
-                    "or the WorkspaceContextFilter is properly configured."
-            );
+                    "WorkspaceContext is not set. Ensure the endpoint is within a workspace-scoped controller "
+                            + "or the WorkspaceContextFilter is properly configured.");
         }
         return context;
     }

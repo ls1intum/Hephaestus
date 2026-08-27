@@ -17,7 +17,8 @@ class IntegrationMessageHandlerRegistryTest extends BaseUnitTest {
         IntegrationMessageHandlerRegistry registry = new IntegrationMessageHandlerRegistry(List.of());
 
         assertThat(registry.handlerCount()).isZero();
-        assertThat(registry.resolve(new EventTypeKey(IntegrationKind.GITHUB, "repository.push"))).isEmpty();
+        assertThat(registry.resolve(new EventTypeKey(IntegrationKind.GITHUB, "repository.push")))
+                .isEmpty();
     }
 
     @Test
@@ -33,16 +34,17 @@ class IntegrationMessageHandlerRegistryTest extends BaseUnitTest {
     void twoHandlersWithDistinctKeysCoexist() {
         StubHandler githubPush = new StubHandler(new EventTypeKey(IntegrationKind.GITHUB, "repository.push"));
         StubHandler gitlabMr = new StubHandler(new EventTypeKey(IntegrationKind.GITLAB, "merge_request"));
-        IntegrationMessageHandlerRegistry registry = new IntegrationMessageHandlerRegistry(
-            List.of(githubPush, gitlabMr)
-        );
+        IntegrationMessageHandlerRegistry registry =
+                new IntegrationMessageHandlerRegistry(List.of(githubPush, gitlabMr));
 
         assertThat(registry.handlerCount()).isEqualTo(2);
         assertThat(registry.resolve(githubPush.key())).contains(githubPush);
         assertThat(registry.resolve(gitlabMr.key())).contains(gitlabMr);
         // Mismatched (kind, eventType) keys never confuse the lookup:
-        assertThat(registry.resolve(new EventTypeKey(IntegrationKind.GITHUB, "merge_request"))).isEmpty();
-        assertThat(registry.resolve(new EventTypeKey(IntegrationKind.GITLAB, "repository.push"))).isEmpty();
+        assertThat(registry.resolve(new EventTypeKey(IntegrationKind.GITHUB, "merge_request")))
+                .isEmpty();
+        assertThat(registry.resolve(new EventTypeKey(IntegrationKind.GITLAB, "repository.push")))
+                .isEmpty();
     }
 
     @Test
@@ -52,10 +54,10 @@ class IntegrationMessageHandlerRegistryTest extends BaseUnitTest {
         SecondStubHandler second = new SecondStubHandler(shared);
 
         assertThatThrownBy(() -> new IntegrationMessageHandlerRegistry(List.of(first, second)))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining(shared.toString())
-            .hasMessageContaining(StubHandler.class.getName())
-            .hasMessageContaining(SecondStubHandler.class.getName());
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(shared.toString())
+                .hasMessageContaining(StubHandler.class.getName())
+                .hasMessageContaining(SecondStubHandler.class.getName());
     }
 
     @Test

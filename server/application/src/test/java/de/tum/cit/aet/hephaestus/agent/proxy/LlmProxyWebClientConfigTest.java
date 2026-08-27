@@ -27,24 +27,22 @@ class LlmProxyWebClientConfigTest extends BaseUnitTest {
         LoopResources loop = config.llmProxyLoopResources();
         try {
             WebClient client = config.llmProxyWebClient(
-                provider,
-                loop,
-                new LlmProperties(
-                    "",
-                    new LlmProperties.Egress(false),
-                    new LlmProperties.Fx(LlmProperties.ECB_DAILY_URL)
-                )
-            );
+                    provider,
+                    loop,
+                    new LlmProperties(
+                            "", new LlmProperties.Egress(false), new LlmProperties.Fx(LlmProperties.ECB_DAILY_URL)));
 
-            Throwable thrown = catchThrowable(() ->
-                client.get().uri(LOOPBACK_URL).retrieve().bodyToMono(String.class).block(BLOCK)
-            );
+            Throwable thrown = catchThrowable(() -> client.get()
+                    .uri(LOOPBACK_URL)
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block(BLOCK));
 
             Throwable root = rootCause(thrown);
             assertThat(root)
-                .as("guard must reject at DNS resolution, not surface a plain connect failure")
-                .isInstanceOf(UnknownHostException.class)
-                .isNotInstanceOf(ConnectException.class);
+                    .as("guard must reject at DNS resolution, not surface a plain connect failure")
+                    .isInstanceOf(UnknownHostException.class)
+                    .isNotInstanceOf(ConnectException.class);
             assertThat(root.getMessage()).contains("SSRF guard");
         } finally {
             provider.dispose();

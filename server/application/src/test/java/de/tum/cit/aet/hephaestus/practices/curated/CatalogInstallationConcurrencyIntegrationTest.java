@@ -45,30 +45,25 @@ class CatalogInstallationConcurrencyIntegrationTest extends AbstractWorkspaceInt
         CatalogEntry<PracticeDefinition> current = catalogService.practice(PRACTICE);
         PracticeDefinition definition = current.effective();
         PracticeDefinition updated = new PracticeDefinition(
-            definition.name(),
-            definition.bindings(),
-            "Committed catalog criteria",
-            definition.precomputeScript(),
-            definition.automatedReviewPolicy(),
-            definition.whyItMatters(),
-            definition.whatGoodLooksLike(),
-            definition.groupSlug()
-        );
+                definition.name(),
+                definition.bindings(),
+                "Committed catalog criteria",
+                definition.precomputeScript(),
+                definition.automatedReviewPolicy(),
+                definition.whyItMatters(),
+                definition.whatGoodLooksLike(),
+                definition.groupSlug());
         CountDownLatch writeReady = new CountDownLatch(1);
         CountDownLatch allowCommit = new CountDownLatch(1);
         CountDownLatch installerStarted = new CountDownLatch(1);
 
-        CompletableFuture<Void> writer = CompletableFuture.runAsync(() ->
-            transactionOperations.executeWithoutResult(ignored -> {
-                catalogService.writePractice(
-                    PRACTICE,
-                    EntityTagPrecondition.parse('"' + current.etag() + '"'),
-                    updated
-                );
-                writeReady.countDown();
-                await(allowCommit);
-            })
-        );
+        CompletableFuture<Void> writer =
+                CompletableFuture.runAsync(() -> transactionOperations.executeWithoutResult(ignored -> {
+                    catalogService.writePractice(
+                            PRACTICE, EntityTagPrecondition.parse('"' + current.etag() + '"'), updated);
+                    writeReady.countDown();
+                    await(allowCommit);
+                }));
         assertThat(writeReady.await(10, TimeUnit.SECONDS)).isTrue();
 
         CompletableFuture<Void> installer = CompletableFuture.runAsync(() -> {
@@ -84,21 +79,17 @@ class CatalogInstallationConcurrencyIntegrationTest extends AbstractWorkspaceInt
         writer.get(10, TimeUnit.SECONDS);
         installer.get(10, TimeUnit.SECONDS);
 
-        assertThat(
-            jdbcTemplate.queryForObject(
-                "SELECT criteria FROM practice WHERE workspace_id = ? AND slug = ?",
-                String.class,
-                workspace.getId(),
-                PRACTICE
-            )
-        ).isEqualTo("Committed catalog criteria");
-        assertThat(
-            jdbcTemplate.queryForObject(
-                "SELECT count(*) FROM practice_catalog_installation WHERE workspace_id = ?",
-                Long.class,
-                workspace.getId()
-            )
-        ).isOne();
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT criteria FROM practice WHERE workspace_id = ? AND slug = ?",
+                        String.class,
+                        workspace.getId(),
+                        PRACTICE))
+                .isEqualTo("Committed catalog criteria");
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT count(*) FROM practice_catalog_installation WHERE workspace_id = ?",
+                        Long.class,
+                        workspace.getId()))
+                .isOne();
     }
 
     private static void await(CountDownLatch latch) {

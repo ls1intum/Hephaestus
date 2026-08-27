@@ -25,12 +25,11 @@ import org.jspecify.annotations.Nullable;
  */
 @Schema(name = "AchievementDefinition", description = "Static definition metadata for an achievement")
 public record AchievementDefinition(
-    @NonNull String id,
-    @NonNull AchievementCategory category,
-    @NonNull AchievementRarity rarity,
-    @NonNull AchievementProgress requirements,
-    @Nullable String parent,
-    boolean isHidden,
-    @Nullable Set<ActivityEventType> triggerEvents,
-    @NonNull String evaluatorClass
-) {}
+        @NonNull String id,
+        @NonNull AchievementCategory category,
+        @NonNull AchievementRarity rarity,
+        @NonNull AchievementProgress requirements,
+        @Nullable String parent,
+        boolean isHidden,
+        @Nullable Set<ActivityEventType> triggerEvents,
+        @NonNull String evaluatorClass) {}

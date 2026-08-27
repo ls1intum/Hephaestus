@@ -17,7 +17,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,20 +30,14 @@ class JsonlStdinWriterTest extends BaseUnitTest {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private record TestCounters(
-        Counter queueFull,
-        Counter writeTimeout,
-        Counter brokenPipe,
-        Counter closed,
-        Counter sendBytes
-    ) {
+            Counter queueFull, Counter writeTimeout, Counter brokenPipe, Counter closed, Counter sendBytes) {
         static TestCounters of(SimpleMeterRegistry reg) {
             return new TestCounters(
-                reg.counter("test.queue.full"),
-                reg.counter("test.write.timeout"),
-                reg.counter("test.broken.pipe"),
-                reg.counter("test.closed"),
-                reg.counter("test.send.bytes")
-            );
+                    reg.counter("test.queue.full"),
+                    reg.counter("test.write.timeout"),
+                    reg.counter("test.broken.pipe"),
+                    reg.counter("test.closed"),
+                    reg.counter("test.send.bytes"));
         }
     }
 
@@ -57,29 +50,27 @@ class JsonlStdinWriterTest extends BaseUnitTest {
         AtomicInteger terminalFires = new AtomicInteger();
 
         JsonlStdinWriter writer = new JsonlStdinWriter(
-            UUID.randomUUID(),
-            sink,
-            MAPPER,
-            16,
-            2_000L,
-            c.queueFull(),
-            c.writeTimeout(),
-            c.brokenPipe(),
-            c.closed(),
-            c.sendBytes(),
-            terminalFires::incrementAndGet,
-            Map.of()
-        );
+                UUID.randomUUID(),
+                sink,
+                MAPPER,
+                16,
+                2_000L,
+                c.queueFull(),
+                c.writeTimeout(),
+                c.brokenPipe(),
+                c.closed(),
+                c.sendBytes(),
+                terminalFires::incrementAndGet,
+                Map.of());
         writer.start();
 
         writer.send(StringNode.valueOf("hello"));
         writer.send(IntNode.valueOf(42));
 
-        await()
-            .atMost(Duration.ofSeconds(2))
-            .untilAsserted(() ->
-                assertThat(sink.toString(StandardCharsets.UTF_8)).contains("\"hello\"\n").contains("42\n")
-            );
+        await().atMost(Duration.ofSeconds(2))
+                .untilAsserted(() -> assertThat(sink.toString(StandardCharsets.UTF_8))
+                        .contains("\"hello\"\n")
+                        .contains("42\n"));
         assertThat(c.sendBytes().count()).isGreaterThan(0);
         assertThat(terminalFires).hasValue(0);
 
@@ -113,56 +104,56 @@ class JsonlStdinWriterTest extends BaseUnitTest {
 
         AtomicInteger terminalFires = new AtomicInteger();
         JsonlStdinWriter writer = new JsonlStdinWriter(
-            UUID.randomUUID(),
-            blocking,
-            MAPPER,
-            2,
-            500L,
-            c.queueFull(),
-            c.writeTimeout(),
-            c.brokenPipe(),
-            c.closed(),
-            c.sendBytes(),
-            terminalFires::incrementAndGet,
-            Map.of()
-        );
+                UUID.randomUUID(),
+                blocking,
+                MAPPER,
+                2,
+                500L,
+                c.queueFull(),
+                c.writeTimeout(),
+                c.brokenPipe(),
+                c.closed(),
+                c.sendBytes(),
+                terminalFires::incrementAndGet,
+                Map.of());
         writer.start();
 
         Thread firstSender = new Thread(() -> {
             try {
                 writer.send(StringNode.valueOf("first"));
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
         });
         firstSender.start();
         assertThat(writerEnteredWrite.await(2, TimeUnit.SECONDS))
-            .as("writer thread must enter the blocking write before we test queue-full")
-            .isTrue();
+                .as("writer thread must enter the blocking write before we test queue-full")
+                .isTrue();
 
         // Queue capacity = 2. Two more queued sends; the fourth must reject — queue_full or timeout.
         Thread secondSender = new Thread(() -> {
             try {
                 writer.send(StringNode.valueOf("second"));
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
         });
         Thread thirdSender = new Thread(() -> {
             try {
                 writer.send(StringNode.valueOf("third"));
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
         });
         secondSender.start();
         thirdSender.start();
 
-        await()
-            .atMost(Duration.ofSeconds(5))
-            .untilAsserted(() -> {
-                try {
-                    writer.send(StringNode.valueOf("fourth"));
-                } catch (InteractiveSandboxException expected) {
-                    assertThat(c.queueFull().count() + c.writeTimeout().count()).isGreaterThan(0.0);
-                    return;
-                }
-                throw new AssertionError("Expected InteractiveSandboxException on overflow / timeout");
-            });
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
+            try {
+                writer.send(StringNode.valueOf("fourth"));
+            } catch (InteractiveSandboxException expected) {
+                assertThat(c.queueFull().count() + c.writeTimeout().count()).isGreaterThan(0.0);
+                return;
+            }
+            throw new AssertionError("Expected InteractiveSandboxException on overflow / timeout");
+        });
 
         release.countDown();
         writer.close();
@@ -178,24 +169,23 @@ class JsonlStdinWriterTest extends BaseUnitTest {
         TestCounters c = TestCounters.of(reg);
         AtomicInteger terminalFires = new AtomicInteger();
         JsonlStdinWriter writer = new JsonlStdinWriter(
-            UUID.randomUUID(),
-            new ByteArrayOutputStream(),
-            MAPPER,
-            8,
-            500L,
-            c.queueFull(),
-            c.writeTimeout(),
-            c.brokenPipe(),
-            c.closed(),
-            c.sendBytes(),
-            terminalFires::incrementAndGet,
-            Map.of()
-        );
+                UUID.randomUUID(),
+                new ByteArrayOutputStream(),
+                MAPPER,
+                8,
+                500L,
+                c.queueFull(),
+                c.writeTimeout(),
+                c.brokenPipe(),
+                c.closed(),
+                c.sendBytes(),
+                terminalFires::incrementAndGet,
+                Map.of());
         writer.start();
         writer.close();
         assertThatThrownBy(() -> writer.send(StringNode.valueOf("x")))
-            .isInstanceOf(InteractiveSandboxException.class)
-            .hasMessageContaining("Session is closed");
+                .isInstanceOf(InteractiveSandboxException.class)
+                .hasMessageContaining("Session is closed");
         assertThat(c.closed().count()).isEqualTo(1.0);
     }
 
@@ -222,24 +212,24 @@ class JsonlStdinWriterTest extends BaseUnitTest {
         };
         AtomicInteger terminalFires = new AtomicInteger();
         JsonlStdinWriter writer = new JsonlStdinWriter(
-            UUID.randomUUID(),
-            blocking,
-            MAPPER,
-            8,
-            50L,
-            c.queueFull(),
-            c.writeTimeout(),
-            c.brokenPipe(),
-            c.closed(),
-            c.sendBytes(),
-            terminalFires::incrementAndGet,
-            Map.of()
-        );
+                UUID.randomUUID(),
+                blocking,
+                MAPPER,
+                8,
+                50L,
+                c.queueFull(),
+                c.writeTimeout(),
+                c.brokenPipe(),
+                c.closed(),
+                c.sendBytes(),
+                terminalFires::incrementAndGet,
+                Map.of());
         writer.start();
         Thread t = new Thread(() -> {
             try {
                 writer.send(StringNode.valueOf("stalled"));
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
         });
         t.start();
         TimeUnit.MILLISECONDS.sleep(150);
@@ -258,35 +248,29 @@ class JsonlStdinWriterTest extends BaseUnitTest {
         TestCounters c = TestCounters.of(reg);
         ByteArrayOutputStream sink = new ByteArrayOutputStream();
         JsonlStdinWriter writer = new JsonlStdinWriter(
-            UUID.randomUUID(),
-            sink,
-            MAPPER,
-            8,
-            2_000L,
-            c.queueFull(),
-            c.writeTimeout(),
-            c.brokenPipe(),
-            c.closed(),
-            c.sendBytes(),
-            () -> {},
-            Map.of()
-        );
+                UUID.randomUUID(),
+                sink,
+                MAPPER,
+                8,
+                2_000L,
+                c.queueFull(),
+                c.writeTimeout(),
+                c.brokenPipe(),
+                c.closed(),
+                c.sendBytes(),
+                () -> {},
+                Map.of());
         writer.start();
         // Real LF in the value must be escaped, not emitted raw; only the trailing \n is real.
         JsonNode node = MAPPER.createObjectNode().put("payload", "a\nb");
         writer.send(node);
-        await()
-            .atMost(Duration.ofSeconds(2))
-            .untilAsserted(() -> {
-                String actual = sink.toString(StandardCharsets.UTF_8);
-                assertThat(actual).contains("\"payload\":\"a\\nb\"}");
-                assertThat(actual).endsWith("\n");
-            });
+        await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
+            String actual = sink.toString(StandardCharsets.UTF_8);
+            assertThat(actual).contains("\"payload\":\"a\\nb\"}");
+            assertThat(actual).endsWith("\n");
+        });
         String result = sink.toString(StandardCharsets.UTF_8);
-        long newlineCount = result
-            .chars()
-            .filter(ch -> ch == '\n')
-            .count();
+        long newlineCount = result.chars().filter(ch -> ch == '\n').count();
         assertThat(newlineCount).isEqualTo(1L);
         writer.close();
     }

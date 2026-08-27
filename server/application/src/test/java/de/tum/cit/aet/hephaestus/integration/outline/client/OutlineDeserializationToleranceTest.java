@@ -30,9 +30,8 @@ import tools.jackson.databind.json.JsonMapper;
 @Tag("unit")
 @JsonTest
 @ContextConfiguration(
-    classes = JacksonAutoConfiguration.class,
-    initializers = ConfigDataApplicationContextInitializer.class
-)
+        classes = JacksonAutoConfiguration.class,
+        initializers = ConfigDataApplicationContextInitializer.class)
 class OutlineDeserializationToleranceTest {
 
     @Autowired
@@ -60,21 +59,19 @@ class OutlineDeserializationToleranceTest {
             """;
 
         WebClient stubbed = new OutlineClientConfig(new OutlineRateLimitTracker(new SimpleMeterRegistry()))
-            .outlineWebClient(baseObjectMapper)
-            .mutate()
-            .exchangeFunction(request ->
-                Mono.just(
-                    ClientResponse.create(HttpStatus.OK).header("Content-Type", "application/json").body(body).build()
-                )
-            )
-            .build();
+                .outlineWebClient(baseObjectMapper)
+                .mutate()
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK)
+                        .header("Content-Type", "application/json")
+                        .body(body)
+                        .build()))
+                .build();
 
-        OutlineEnvelope<OutlineDocumentModel> envelope = stubbed
-            .post()
-            .uri("https://wiki.example.com/api/documents.info")
-            .retrieve()
-            .bodyToMono(new ParameterizedTypeReference<OutlineEnvelope<OutlineDocumentModel>>() {})
-            .block();
+        OutlineEnvelope<OutlineDocumentModel> envelope = stubbed.post()
+                .uri("https://wiki.example.com/api/documents.info")
+                .retrieve()
+                .bodyToMono(new ParameterizedTypeReference<OutlineEnvelope<OutlineDocumentModel>>() {})
+                .block();
 
         assertThat(envelope).isNotNull();
         assertThat(envelope.data()).isNotNull();
@@ -97,21 +94,19 @@ class OutlineDeserializationToleranceTest {
             """;
 
         WebClient stubbed = new OutlineClientConfig(new OutlineRateLimitTracker(new SimpleMeterRegistry()))
-            .outlineWebClient(baseObjectMapper)
-            .mutate()
-            .exchangeFunction(request ->
-                Mono.just(
-                    ClientResponse.create(HttpStatus.OK).header("Content-Type", "application/json").body(body).build()
-                )
-            )
-            .build();
+                .outlineWebClient(baseObjectMapper)
+                .mutate()
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK)
+                        .header("Content-Type", "application/json")
+                        .body(body)
+                        .build()))
+                .build();
 
-        OutlineEnvelope<List<OutlineDocumentModel>> envelope = stubbed
-            .post()
-            .uri("https://wiki.example.com/api/documents.list")
-            .retrieve()
-            .bodyToMono(new ParameterizedTypeReference<OutlineEnvelope<List<OutlineDocumentModel>>>() {})
-            .block();
+        OutlineEnvelope<List<OutlineDocumentModel>> envelope = stubbed.post()
+                .uri("https://wiki.example.com/api/documents.list")
+                .retrieve()
+                .bodyToMono(new ParameterizedTypeReference<OutlineEnvelope<List<OutlineDocumentModel>>>() {})
+                .block();
 
         assertThat(envelope).isNotNull();
         assertThat(envelope.data()).hasSize(2);
@@ -153,22 +148,20 @@ class OutlineDeserializationToleranceTest {
             """;
 
         WebClient stubbed = new OutlineClientConfig(new OutlineRateLimitTracker(new SimpleMeterRegistry()))
-            .outlineWebClient(baseObjectMapper)
-            .mutate()
-            .exchangeFunction(request ->
-                Mono.just(
-                    ClientResponse.create(HttpStatus.OK).header("Content-Type", "application/json").body(body).build()
-                )
-            )
-            .build();
+                .outlineWebClient(baseObjectMapper)
+                .mutate()
+                .exchangeFunction(request -> Mono.just(ClientResponse.create(HttpStatus.OK)
+                        .header("Content-Type", "application/json")
+                        .body(body)
+                        .build()))
+                .build();
 
         // The production decode path: retrieve().bodyToMono(...), the reactive Jackson codec — NOT readValue.
-        OutlineEnvelope<List<OutlineCollectionModel>> envelope = stubbed
-            .post()
-            .uri("https://wiki.example.com/api/collections.list")
-            .retrieve()
-            .bodyToMono(new ParameterizedTypeReference<OutlineEnvelope<List<OutlineCollectionModel>>>() {})
-            .block();
+        OutlineEnvelope<List<OutlineCollectionModel>> envelope = stubbed.post()
+                .uri("https://wiki.example.com/api/collections.list")
+                .retrieve()
+                .bodyToMono(new ParameterizedTypeReference<OutlineEnvelope<List<OutlineCollectionModel>>>() {})
+                .block();
 
         assertThat(envelope).isNotNull();
         assertThat(envelope.data()).hasSize(1);

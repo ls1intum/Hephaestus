@@ -28,18 +28,16 @@ public class GitHubIssueMessageHandler extends AbstractIntegrationMessageHandler
     private final GitHubIssueProcessor issueProcessor;
 
     public GitHubIssueMessageHandler(
-        ProcessingContextFactory contextFactory,
-        GitHubIssueProcessor issueProcessor,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            ProcessingContextFactory contextFactory,
+            GitHubIssueProcessor issueProcessor,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITHUB,
-            "repository." + GitHubEventType.ISSUES.getValue(),
-            GitHubIssueEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITHUB,
+                "repository." + GitHubEventType.ISSUES.getValue(),
+                GitHubIssueEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.contextFactory = contextFactory;
         this.issueProcessor = issueProcessor;
     }
@@ -54,11 +52,10 @@ public class GitHubIssueMessageHandler extends AbstractIntegrationMessageHandler
         }
 
         log.debug(
-            "Received issue event: action={}, issueNumber={}, repoName={}",
-            event.action(),
-            issueDto.number(),
-            event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
-        );
+                "Received issue event: action={}, issueNumber={}, repoName={}",
+                event.action(),
+                issueDto.number(),
+                event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown");
 
         ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);
         if (context == null) {
@@ -70,17 +67,16 @@ public class GitHubIssueMessageHandler extends AbstractIntegrationMessageHandler
 
     private void routeToProcessor(GitHubIssueEventDTO event, GitHubIssueDTO issueDto, ProcessingContext context) {
         switch (event.actionType()) {
-            case
-                GitHubEventAction.Issue.OPENED,
-                GitHubEventAction.Issue.EDITED,
-                GitHubEventAction.Issue.ASSIGNED,
-                GitHubEventAction.Issue.UNASSIGNED,
-                GitHubEventAction.Issue.MILESTONED,
-                GitHubEventAction.Issue.DEMILESTONED,
-                GitHubEventAction.Issue.PINNED,
-                GitHubEventAction.Issue.UNPINNED,
-                GitHubEventAction.Issue.LOCKED,
-                GitHubEventAction.Issue.UNLOCKED -> issueProcessor.process(issueDto, context);
+            case GitHubEventAction.Issue.OPENED,
+                    GitHubEventAction.Issue.EDITED,
+                    GitHubEventAction.Issue.ASSIGNED,
+                    GitHubEventAction.Issue.UNASSIGNED,
+                    GitHubEventAction.Issue.MILESTONED,
+                    GitHubEventAction.Issue.DEMILESTONED,
+                    GitHubEventAction.Issue.PINNED,
+                    GitHubEventAction.Issue.UNPINNED,
+                    GitHubEventAction.Issue.LOCKED,
+                    GitHubEventAction.Issue.UNLOCKED -> issueProcessor.process(issueDto, context);
             // A transfer moves the issue OUT of this repository. Upserting it here would recreate
             // the phantom the deletion sweep exists to retire.
             case GitHubEventAction.Issue.TRANSFERRED -> issueProcessor.processTransferred(issueDto, context);
@@ -102,7 +98,8 @@ public class GitHubIssueMessageHandler extends AbstractIntegrationMessageHandler
                 }
             }
             case GitHubEventAction.Issue.TYPED -> {
-                String orgLogin = event.organization() != null ? event.organization().login() : null;
+                String orgLogin =
+                        event.organization() != null ? event.organization().login() : null;
                 issueProcessor.processTyped(issueDto, event.issueType(), orgLogin, context);
             }
             case GitHubEventAction.Issue.UNTYPED -> issueProcessor.processUntyped(issueDto, context);

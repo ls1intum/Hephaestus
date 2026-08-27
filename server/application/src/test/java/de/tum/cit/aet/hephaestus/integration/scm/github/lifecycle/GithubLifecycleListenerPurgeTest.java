@@ -51,20 +51,19 @@ class GithubLifecycleListenerPurgeTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         listener = new GithubLifecycleListener(
-            mock(),
-            workspaceRepository,
-            mock(),
-            mock(),
-            mock(),
-            mock(),
-            mock(),
-            mock(),
-            mock(),
-            gitHubAppTokenService,
-            mock(),
-            connectionService,
-            workspaceLifecycleService
-        );
+                mock(),
+                workspaceRepository,
+                mock(),
+                mock(),
+                mock(),
+                mock(),
+                mock(),
+                mock(),
+                mock(),
+                gitHubAppTokenService,
+                mock(),
+                connectionService,
+                workspaceLifecycleService);
     }
 
     @Test
@@ -107,8 +106,8 @@ class GithubLifecycleListenerPurgeTest extends BaseUnitTest {
     @DisplayName("updateWorkspaceStatus refuses PURGED outright")
     void updateWorkspaceStatus_rejectsPurgedSoItCannotBypassThePurgeChain() {
         assertThatThrownBy(() -> listener.updateWorkspaceStatus(INSTALLATION_ID, Workspace.WorkspaceStatus.PURGED))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("purgeWorkspaceForInstallation");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("purgeWorkspaceForInstallation");
 
         verifyNoInteractions(workspaceRepository, workspaceLifecycleService);
     }
@@ -120,13 +119,7 @@ class GithubLifecycleListenerPurgeTest extends BaseUnitTest {
         when(workspaceRepository.findByInstallationIdForUpdate(INSTALLATION_ID)).thenReturn(Optional.of(workspace));
 
         Workspace result = listener.createOrUpdateFromInstallation(
-            INSTALLATION_ID,
-            99L,
-            "acme",
-            AccountKind.ORGANIZATION,
-            null,
-            RepositorySelection.ALL
-        );
+                INSTALLATION_ID, 99L, "acme", AccountKind.ORGANIZATION, null, RepositorySelection.ALL);
 
         assertThat(result).isNull();
         assertThat(workspace.getStatus()).isEqualTo(Workspace.WorkspaceStatus.PURGED);
@@ -142,13 +135,7 @@ class GithubLifecycleListenerPurgeTest extends BaseUnitTest {
         when(workspaceRepository.findByAccountLoginIgnoreCaseForUpdate("acme")).thenReturn(Optional.of(workspace));
 
         Workspace result = listener.createOrUpdateFromInstallation(
-            INSTALLATION_ID,
-            99L,
-            "acme",
-            AccountKind.ORGANIZATION,
-            null,
-            RepositorySelection.ALL
-        );
+                INSTALLATION_ID, 99L, "acme", AccountKind.ORGANIZATION, null, RepositorySelection.ALL);
 
         assertThat(result).isNull();
         verify(workspaceRepository, never()).save(workspace);
@@ -160,9 +147,8 @@ class GithubLifecycleListenerPurgeTest extends BaseUnitTest {
         workspace.setStatus(Workspace.WorkspaceStatus.PURGED);
         when(workspaceRepository.findByInstallationIdForUpdate(INSTALLATION_ID)).thenReturn(Optional.of(workspace));
 
-        assertThat(listener.updateWorkspaceStatus(INSTALLATION_ID, Workspace.WorkspaceStatus.ACTIVE)).contains(
-            workspace
-        );
+        assertThat(listener.updateWorkspaceStatus(INSTALLATION_ID, Workspace.WorkspaceStatus.ACTIVE))
+                .contains(workspace);
 
         assertThat(workspace.getStatus()).isEqualTo(Workspace.WorkspaceStatus.PURGED);
         verify(workspaceRepository, never()).save(workspace);
@@ -175,7 +161,8 @@ class GithubLifecycleListenerPurgeTest extends BaseUnitTest {
         workspace.setRepositorySelection(RepositorySelection.SELECTED);
         when(workspaceRepository.findByInstallationIdForUpdate(INSTALLATION_ID)).thenReturn(Optional.of(workspace));
 
-        assertThat(listener.updateRepositorySelection(INSTALLATION_ID, RepositorySelection.ALL)).isEmpty();
+        assertThat(listener.updateRepositorySelection(INSTALLATION_ID, RepositorySelection.ALL))
+                .isEmpty();
 
         assertThat(workspace.getRepositorySelection()).isEqualTo(RepositorySelection.SELECTED);
         verify(workspaceRepository, never()).save(workspace);
@@ -201,9 +188,8 @@ class GithubLifecycleListenerPurgeTest extends BaseUnitTest {
         when(workspaceRepository.findByInstallationIdForUpdate(INSTALLATION_ID)).thenReturn(Optional.of(workspace));
         when(workspaceRepository.save(workspace)).thenReturn(workspace);
 
-        assertThat(listener.updateWorkspaceStatus(INSTALLATION_ID, Workspace.WorkspaceStatus.ACTIVE)).contains(
-            workspace
-        );
+        assertThat(listener.updateWorkspaceStatus(INSTALLATION_ID, Workspace.WorkspaceStatus.ACTIVE))
+                .contains(workspace);
 
         assertThat(workspace.getStatus()).isEqualTo(Workspace.WorkspaceStatus.ACTIVE);
         verify(workspaceRepository).findByInstallationIdForUpdate(INSTALLATION_ID);

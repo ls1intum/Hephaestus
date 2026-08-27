@@ -65,28 +65,26 @@ class ScmWorkspaceContentEraserTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         eraser = new ScmWorkspaceContentEraser(
-            workspaceRepository,
-            repositoryToMonitorRepository,
-            repositoryMonitorService,
-            teamRepository,
-            organizationMembershipRepository,
-            new NatsConnectionProperties(false, null, null, null),
-            natsConsumerService,
-            eventPublisher
-        );
+                workspaceRepository,
+                repositoryToMonitorRepository,
+                repositoryMonitorService,
+                teamRepository,
+                organizationMembershipRepository,
+                new NatsConnectionProperties(false, null, null, null),
+                natsConsumerService,
+                eventPublisher);
     }
 
     private Workspace workspaceWithMonitors(String... namesWithOwner) {
         Workspace workspace = newWorkspace();
-        List<RepositoryToMonitor> monitors = List.of(namesWithOwner)
-            .stream()
-            .map(name -> {
-                RepositoryToMonitor monitor = new RepositoryToMonitor();
-                monitor.setNameWithOwner(name);
-                monitor.setWorkspace(workspace);
-                return monitor;
-            })
-            .toList();
+        List<RepositoryToMonitor> monitors = List.of(namesWithOwner).stream()
+                .map(name -> {
+                    RepositoryToMonitor monitor = new RepositoryToMonitor();
+                    monitor.setNameWithOwner(name);
+                    monitor.setWorkspace(workspace);
+                    return monitor;
+                })
+                .toList();
         workspace.getRepositoriesToMonitor().addAll(monitors);
         when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(workspace));
         when(repositoryToMonitorRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(monitors);
@@ -160,7 +158,8 @@ class ScmWorkspaceContentEraserTest extends BaseUnitTest {
     void erase_keepsOrgTierMirrorWhenAnotherNonPurgedWorkspaceIsStillBoundToTheOrganization() {
         Workspace workspace = workspaceWithMonitors("acme/alpha");
         workspace.setOrganization(organization(7L, "acme"));
-        when(workspaceRepository.countOtherActiveWorkspacesForOrganization(7L, WORKSPACE_ID)).thenReturn(1L);
+        when(workspaceRepository.countOtherActiveWorkspacesForOrganization(7L, WORKSPACE_ID))
+                .thenReturn(1L);
 
         eraser.eraseWorkspaceScmMirror(WORKSPACE_ID);
 
@@ -171,9 +170,11 @@ class ScmWorkspaceContentEraserTest extends BaseUnitTest {
     void erase_dropsOrgTierMirrorOnlyWhenThisIsTheLastWorkspaceForTheOrganization() {
         Workspace workspace = workspaceWithMonitors("acme/alpha");
         workspace.setOrganization(organization(7L, "acme"));
-        when(workspaceRepository.countOtherActiveWorkspacesForOrganization(7L, WORKSPACE_ID)).thenReturn(0L);
+        when(workspaceRepository.countOtherActiveWorkspacesForOrganization(7L, WORKSPACE_ID))
+                .thenReturn(0L);
         Team team = new Team();
-        when(teamRepository.findByOrganizationIgnoreCaseAndProviderId("acme", 3L)).thenReturn(List.of(team));
+        when(teamRepository.findByOrganizationIgnoreCaseAndProviderId("acme", 3L))
+                .thenReturn(List.of(team));
 
         eraser.eraseWorkspaceScmMirror(WORKSPACE_ID);
 
@@ -185,7 +186,8 @@ class ScmWorkspaceContentEraserTest extends BaseUnitTest {
     void erase_releasesTheOrganizationLinkAndFlushesItBeforeTheLastTenantGuardCounts() {
         Workspace workspace = workspaceWithMonitors("acme/alpha");
         workspace.setOrganization(organization(7L, "acme"));
-        when(workspaceRepository.countOtherActiveWorkspacesForOrganization(7L, WORKSPACE_ID)).thenReturn(0L);
+        when(workspaceRepository.countOtherActiveWorkspacesForOrganization(7L, WORKSPACE_ID))
+                .thenReturn(0L);
 
         eraser.eraseWorkspaceScmMirror(WORKSPACE_ID);
 

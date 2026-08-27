@@ -35,10 +35,9 @@ public class WorkspaceTeamMembershipAdapter implements TeamMembershipListener {
     private final TeamMembershipRepository teamMembershipRepository;
 
     public WorkspaceTeamMembershipAdapter(
-        WorkspaceRepository workspaceRepository,
-        WorkspaceMembershipService workspaceMembershipService,
-        TeamMembershipRepository teamMembershipRepository
-    ) {
+            WorkspaceRepository workspaceRepository,
+            WorkspaceMembershipService workspaceMembershipService,
+            TeamMembershipRepository teamMembershipRepository) {
         this.workspaceRepository = workspaceRepository;
         this.workspaceMembershipService = workspaceMembershipService;
         this.teamMembershipRepository = teamMembershipRepository;
@@ -55,44 +54,39 @@ public class WorkspaceTeamMembershipAdapter implements TeamMembershipListener {
         Optional<Workspace> workspaceOpt = workspaceRepository.findById(event.scopeId());
         if (workspaceOpt.isEmpty()) {
             log.debug(
-                "Skipped team membership reconciliation: reason=workspaceNotFound, scopeId={}, rootGroupFullPath={}",
-                event.scopeId(),
-                event.rootGroupFullPath()
-            );
+                    "Skipped team membership reconciliation: reason=workspaceNotFound, scopeId={}, rootGroupFullPath={}",
+                    event.scopeId(),
+                    event.rootGroupFullPath());
             return;
         }
 
         Workspace workspace = workspaceOpt.get();
 
         try {
-            Set<Long> userIds = teamMembershipRepository.findDistinctUserIdsByTeamOrganizationIgnoreCase(
-                event.rootGroupFullPath()
-            );
+            Set<Long> userIds =
+                    teamMembershipRepository.findDistinctUserIdsByTeamOrganizationIgnoreCase(event.rootGroupFullPath());
 
             if (userIds.isEmpty()) {
                 log.debug(
-                    "Skipped team membership reconciliation: reason=noTeamMembers, workspaceId={}, rootGroupFullPath={}",
-                    workspace.getId(),
-                    event.rootGroupFullPath()
-                );
+                        "Skipped team membership reconciliation: reason=noTeamMembers, workspaceId={}, rootGroupFullPath={}",
+                        workspace.getId(),
+                        event.rootGroupFullPath());
                 return;
             }
 
             int created = workspaceMembershipService.ensureMemberships(workspace, userIds);
             log.info(
-                "Reconciled workspace memberships from team graph: workspaceId={}, rootGroupFullPath={}, considered={}, created={}",
-                workspace.getId(),
-                event.rootGroupFullPath(),
-                userIds.size(),
-                created
-            );
+                    "Reconciled workspace memberships from team graph: workspaceId={}, rootGroupFullPath={}, considered={}, created={}",
+                    workspace.getId(),
+                    event.rootGroupFullPath(),
+                    userIds.size(),
+                    created);
         } catch (Exception e) {
             log.error(
-                "Failed to reconcile workspace memberships from team graph: workspaceId={}, rootGroupFullPath={}",
-                workspace.getId(),
-                event.rootGroupFullPath(),
-                e
-            );
+                    "Failed to reconcile workspace memberships from team graph: workspaceId={}, rootGroupFullPath={}",
+                    workspace.getId(),
+                    event.rootGroupFullPath(),
+                    e);
             // Don't rethrow — team sync succeeded, workspace reconciliation is secondary.
         }
     }

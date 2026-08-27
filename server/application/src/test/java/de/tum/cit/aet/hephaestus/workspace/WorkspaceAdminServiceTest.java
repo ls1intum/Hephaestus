@@ -42,16 +42,13 @@ class WorkspaceAdminServiceTest extends BaseUnitTest {
         owner.setLogin("octocat");
 
         when(workspaceRepository.findAll()).thenReturn(List.of(workspace));
-        when(membershipRepository.findUsersByWorkspaceIdAndRole(12L, WorkspaceRole.OWNER)).thenReturn(List.of(owner));
+        when(membershipRepository.findUsersByWorkspaceIdAndRole(12L, WorkspaceRole.OWNER))
+                .thenReturn(List.of(owner));
         when(accountIdentityQuery.resolveAccountIdForActor(34L)).thenReturn(Optional.of(56L));
         when(membershipRepository.countByWorkspace_Id(12L)).thenReturn(3L);
 
         WorkspaceAdminService service = new WorkspaceAdminService(
-            workspaceRepository,
-            membershipRepository,
-            connectionService,
-            accountIdentityQuery
-        );
+                workspaceRepository, membershipRepository, connectionService, accountIdentityQuery);
 
         AdminWorkspaceViewDTO view = service.listAll().getFirst();
 

@@ -49,19 +49,20 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.sandbox")
 public record SandboxProperties(
-    @DefaultValue("unix:///var/run/docker.sock") @NotBlank String dockerHost,
-    @DefaultValue("false") boolean tlsVerify,
-    @Nullable String certPath,
-    @DefaultValue("5") @Min(1) int maxConcurrentContainers,
-    @DefaultValue("10") @Min(1) int containerStopTimeoutSeconds,
-    @DefaultValue("60") @Min(10) int reconciliationIntervalSeconds,
-    @Nullable String containerRuntime,
-    @Nullable Integer llmProxyPort,
-    @Nullable String appServerContainerId,
-    @DefaultValue("1073741824") @Min(1) long maxDirectoryBytes, // 1 GB
-    @DefaultValue("500000") @Min(1) int maxDirectoryEntries,
-    @Nullable @Valid DefaultResourceLimits defaultResourceLimits
-) {
+        @DefaultValue("unix:///var/run/docker.sock") @NotBlank
+        String dockerHost,
+
+        @DefaultValue("false") boolean tlsVerify,
+        @Nullable String certPath,
+        @DefaultValue("5") @Min(1) int maxConcurrentContainers,
+        @DefaultValue("10") @Min(1) int containerStopTimeoutSeconds,
+        @DefaultValue("60") @Min(10) int reconciliationIntervalSeconds,
+        @Nullable String containerRuntime,
+        @Nullable Integer llmProxyPort,
+        @Nullable String appServerContainerId,
+        @DefaultValue("1073741824") @Min(1) long maxDirectoryBytes, // 1 GB
+        @DefaultValue("500000") @Min(1) int maxDirectoryEntries,
+        @Nullable @Valid DefaultResourceLimits defaultResourceLimits) {
     public SandboxProperties {
         if (defaultResourceLimits == null) {
             defaultResourceLimits = new DefaultResourceLimits(4L * 1024 * 1024 * 1024, 2.0, 256);
@@ -98,8 +99,7 @@ public record SandboxProperties(
      * @param pidsLimit maximum process count
      */
     public record DefaultResourceLimits(
-        @DefaultValue("4294967296") @Min(1) long memoryBytes,
-        @DefaultValue("2.0") @DecimalMin("0.01") double cpus,
-        @DefaultValue("512") @Min(1) int pidsLimit
-    ) {}
+            @DefaultValue("4294967296") @Min(1) long memoryBytes,
+            @DefaultValue("2.0") @DecimalMin("0.01") double cpus,
+            @DefaultValue("512") @Min(1) int pidsLimit) {}
 }

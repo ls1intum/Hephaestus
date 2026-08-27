@@ -58,26 +58,24 @@ public class GitLabMilestoneProcessor extends BaseGitLabProcessor {
     private final ApplicationEventPublisher eventPublisher;
 
     public GitLabMilestoneProcessor(
-        GitLabUserService gitLabUserService,
-        UserRepository userRepository,
-        LabelRepository labelRepository,
-        RepositoryRepository repositoryRepository,
-        ScopeIdResolver scopeIdResolver,
-        RepositoryScopeFilter repositoryScopeFilter,
-        GitLabProperties gitLabProperties,
-        MilestoneRepository milestoneRepository,
-        IssueRepository issueRepository,
-        ApplicationEventPublisher eventPublisher
-    ) {
+            GitLabUserService gitLabUserService,
+            UserRepository userRepository,
+            LabelRepository labelRepository,
+            RepositoryRepository repositoryRepository,
+            ScopeIdResolver scopeIdResolver,
+            RepositoryScopeFilter repositoryScopeFilter,
+            GitLabProperties gitLabProperties,
+            MilestoneRepository milestoneRepository,
+            IssueRepository issueRepository,
+            ApplicationEventPublisher eventPublisher) {
         super(
-            gitLabUserService,
-            userRepository,
-            labelRepository,
-            repositoryRepository,
-            scopeIdResolver,
-            repositoryScopeFilter,
-            gitLabProperties
-        );
+                gitLabUserService,
+                userRepository,
+                labelRepository,
+                repositoryRepository,
+                scopeIdResolver,
+                repositoryScopeFilter,
+                gitLabProperties);
         this.milestoneRepository = milestoneRepository;
         this.issueRepository = issueRepository;
         this.eventPublisher = eventPublisher;
@@ -98,9 +96,8 @@ public class GitLabMilestoneProcessor extends BaseGitLabProcessor {
     public Milestone process(@Nullable GitLabMilestoneDTO dto, Repository repository, ProcessingContext context) {
         if (dto == null) {
             log.warn(
-                "Skipped milestone processing: reason=nullDto, repoId={}",
-                repository != null ? repository.getId() : null
-            );
+                    "Skipped milestone processing: reason=nullDto, repoId={}",
+                    repository != null ? repository.getId() : null);
             return null;
         }
 
@@ -109,10 +106,8 @@ public class GitLabMilestoneProcessor extends BaseGitLabProcessor {
             return null;
         }
 
-        Optional<Milestone> existingOpt = milestoneRepository.findByNumberAndRepositoryId(
-            dto.iid(),
-            repository.getId()
-        );
+        Optional<Milestone> existingOpt =
+                milestoneRepository.findByNumberAndRepositoryId(dto.iid(), repository.getId());
         boolean isNew = existingOpt.isEmpty();
 
         Milestone milestone = existingOpt.orElseGet(Milestone::new);
@@ -215,20 +210,17 @@ public class GitLabMilestoneProcessor extends BaseGitLabProcessor {
             return;
         }
 
-        milestoneRepository
-            .findById(milestoneId)
-            .ifPresent(milestone -> {
-                int clearedCount = issueRepository.clearMilestoneReferences(milestoneId);
-                if (clearedCount > 0) {
-                    log.debug("Cleared milestone references from {} issues before deletion", clearedCount);
-                }
+        milestoneRepository.findById(milestoneId).ifPresent(milestone -> {
+            int clearedCount = issueRepository.clearMilestoneReferences(milestoneId);
+            if (clearedCount > 0) {
+                log.debug("Cleared milestone references from {} issues before deletion", clearedCount);
+            }
 
-                milestoneRepository.delete(milestone);
-                eventPublisher.publishEvent(
-                    new ScmDomainEvent.MilestoneDeleted(milestoneId, milestone.getTitle(), EventContext.from(context))
-                );
-                log.info("Deleted milestone: milestoneId={}, milestoneNumber={}", milestoneId, milestone.getNumber());
-            });
+            milestoneRepository.delete(milestone);
+            eventPublisher.publishEvent(
+                    new ScmDomainEvent.MilestoneDeleted(milestoneId, milestone.getTitle(), EventContext.from(context)));
+            log.info("Deleted milestone: milestoneId={}, milestoneNumber={}", milestoneId, milestone.getNumber());
+        });
     }
 
     /**
@@ -274,9 +266,8 @@ public class GitLabMilestoneProcessor extends BaseGitLabProcessor {
         }
         // Fallback: construct from repository nameWithOwner
         if (repository.getNameWithOwner() != null) {
-            return (
-                gitLabProperties.defaultServerUrl() + "/" + repository.getNameWithOwner() + "/-/milestones/" + dto.iid()
-            );
+            return (gitLabProperties.defaultServerUrl() + "/" + repository.getNameWithOwner() + "/-/milestones/"
+                    + dto.iid());
         }
         return null;
     }

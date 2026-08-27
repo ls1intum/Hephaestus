@@ -29,7 +29,9 @@ public class WorkerControlChannelHealthIndicator implements HealthIndicator {
         }
         boolean connected = client.isConnected();
         Instant lastInbound = client.lastInboundAt();
-        long ageMs = lastInbound.equals(Instant.EPOCH) ? -1L : Duration.between(lastInbound, Instant.now()).toMillis();
+        long ageMs = lastInbound.equals(Instant.EPOCH)
+                ? -1L
+                : Duration.between(lastInbound, Instant.now()).toMillis();
         boolean inboundStale = lastInbound.equals(Instant.EPOCH) || ageMs > silenceThreshold.toMillis();
         Health.Builder builder = (connected && !inboundStale) ? Health.up() : Health.down();
         builder.withDetail("connected", connected);

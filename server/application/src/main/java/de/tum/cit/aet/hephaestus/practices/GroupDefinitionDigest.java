@@ -6,11 +6,11 @@ final class GroupDefinitionDigest {
 
     static String digest(String slug, GroupDefinition definition) {
         return new CanonicalDigest()
-            .add(slug)
-            .add(definition.name())
-            .addNullable(definition.description())
-            .addNullable(definition.icon())
-            .addNullable(definition.color())
-            .hex();
+                .add(slug)
+                .add(definition.name())
+                .addNullable(definition.description())
+                .addNullable(definition.icon())
+                .addNullable(definition.color())
+                .hex();
     }
 }

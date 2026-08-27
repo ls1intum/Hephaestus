@@ -47,16 +47,13 @@ public class WorkspaceAgnosticAspect {
 
     @Around("@annotation(de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic)")
     public Object aroundAnnotatedMethod(ProceedingJoinPoint pjp) throws Throwable {
-        WorkspaceAgnostic annotation = ((MethodSignature) pjp.getSignature()).getMethod().getAnnotation(
-            WorkspaceAgnostic.class
-        );
+        WorkspaceAgnostic annotation =
+                ((MethodSignature) pjp.getSignature()).getMethod().getAnnotation(WorkspaceAgnostic.class);
         return proceedWithBypass(pjp, annotation);
     }
 
-    @Around(
-        "@within(de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic) " +
-            "&& !@annotation(de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic)"
-    )
+    @Around("@within(de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic) "
+            + "&& !@annotation(de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic)")
     public Object aroundAnnotatedType(ProceedingJoinPoint pjp) throws Throwable {
         Class<?> declaringType = pjp.getSignature().getDeclaringType();
         WorkspaceAgnostic annotation = declaringType.getAnnotation(WorkspaceAgnostic.class);
@@ -75,11 +72,9 @@ public class WorkspaceAgnosticAspect {
      * honest (an inherited method whose declaring type is also annotated would otherwise
      * open the bypass twice).
      */
-    @Around(
-        "execution(* org.springframework.data.repository.Repository+.*(..)) " +
-            "&& !@annotation(de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic) " +
-            "&& !@within(de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic)"
-    )
+    @Around("execution(* org.springframework.data.repository.Repository+.*(..)) "
+            + "&& !@annotation(de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic) "
+            + "&& !@within(de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic)")
     public Object aroundInheritedRepositoryMethod(ProceedingJoinPoint pjp) throws Throwable {
         Object target = pjp.getTarget();
         if (target == null) {

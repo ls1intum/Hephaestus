@@ -46,7 +46,7 @@ public class GitLabScmTokenSource implements ScmTokenSource {
     @Override
     public Optional<String> reviewHeadRef(long pullRequestNumber) {
         return pullRequestNumber > 0
-            ? Optional.of("refs/merge-requests/" + pullRequestNumber + "/head")
-            : Optional.empty();
+                ? Optional.of("refs/merge-requests/" + pullRequestNumber + "/head")
+                : Optional.empty();
     }
 }

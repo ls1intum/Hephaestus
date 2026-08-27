@@ -55,16 +55,16 @@ class ReviewBackfillServiceTest extends BaseUnitTest {
     @Mock
     private ConfigAuditPort configAudit;
 
-    private final ReviewBackfillProperties properties = new ReviewBackfillProperties(
-        25,
-        Duration.ofDays(400),
-        5000,
-        Duration.ofDays(90)
-    );
+    private final ReviewBackfillProperties properties =
+            new ReviewBackfillProperties(25, Duration.ofDays(400), 5000, Duration.ofDays(90));
 
     @BeforeEach
     void authenticate() {
-        Jwt jwt = Jwt.withTokenValue("t").header("alg", "none").subject("77").claim("scope", "read").build();
+        Jwt jwt = Jwt.withTokenValue("t")
+                .header("alg", "none")
+                .subject("77")
+                .claim("scope", "read")
+                .build();
         SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
     }
 
@@ -75,13 +75,7 @@ class ReviewBackfillServiceTest extends BaseUnitTest {
 
     private ReviewBackfillService service() {
         return new ReviewBackfillService(
-            runRepository,
-            scopeRepository,
-            costEstimator,
-            workspaceRepository,
-            properties,
-            configAudit
-        );
+                runRepository, scopeRepository, costEstimator, workspaceRepository, properties, configAudit);
     }
 
     @Test
@@ -115,11 +109,11 @@ class ReviewBackfillServiceTest extends BaseUnitTest {
 
     @Test
     void anInvertedWindowIsRefused() {
-        assertThatThrownBy(() ->
-            service().preflight(context(), new CreateReviewBackfillRunRequestDTO(ArtifactKinds.PULL_REQUEST, TO, FROM))
-        )
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("must start before it ends");
+        assertThatThrownBy(() -> service()
+                        .preflight(
+                                context(), new CreateReviewBackfillRunRequestDTO(ArtifactKinds.PULL_REQUEST, TO, FROM)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must start before it ends");
         verify(runRepository, never()).save(any());
     }
 
@@ -129,20 +123,20 @@ class ReviewBackfillServiceTest extends BaseUnitTest {
         stubScope(9001);
 
         assertThatThrownBy(() -> service().preflight(context(), request()))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("9001")
-            .hasMessageContaining("5000");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("9001")
+                .hasMessageContaining("5000");
         verify(runRepository, never()).save(any());
     }
 
     @Test
     void aWindowLongerThanTheLimitIsRefused() {
-        assertThatThrownBy(() ->
-            service().preflight(
-                context(),
-                new CreateReviewBackfillRunRequestDTO(ArtifactKinds.PULL_REQUEST, TO.minus(Duration.ofDays(500)), TO)
-            )
-        ).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service()
+                        .preflight(
+                                context(),
+                                new CreateReviewBackfillRunRequestDTO(
+                                        ArtifactKinds.PULL_REQUEST, TO.minus(Duration.ofDays(500)), TO)))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     /**
@@ -153,9 +147,8 @@ class ReviewBackfillServiceTest extends BaseUnitTest {
     void aSecondCampaignIsRefusedWhileOneIsUnderWay() {
         when(runRepository.existsByWorkspaceIdAndStatusIn(anyLong(), any())).thenReturn(true);
 
-        assertThatThrownBy(() -> service().preflight(context(), request())).isInstanceOf(
-            ReviewBackfillConflictException.class
-        );
+        assertThatThrownBy(() -> service().preflight(context(), request()))
+                .isInstanceOf(ReviewBackfillConflictException.class);
     }
 
     /** An estimate nobody acted on is a draft; a corrected one supersedes it rather than being blocked. */
@@ -163,7 +156,8 @@ class ReviewBackfillServiceTest extends BaseUnitTest {
     void aNewEstimateSupersedesAnUnconfirmedOne() {
         ReviewBackfillRun stale = new ReviewBackfillRun();
         stale.setStatus(ReviewBackfillStatus.AWAITING_CONFIRMATION);
-        when(runRepository.findByWorkspaceIdOrderByCreatedAtDesc(anyLong(), any())).thenReturn(List.of(stale));
+        when(runRepository.findByWorkspaceIdOrderByCreatedAtDesc(anyLong(), any()))
+                .thenReturn(List.of(stale));
         stubScope(10);
         when(runRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
@@ -175,8 +169,8 @@ class ReviewBackfillServiceTest extends BaseUnitTest {
     @Test
     void aConversationThreadCannotBeBackfilled() {
         assertThatThrownBy(() -> ReviewBackfillService.jobTypeFor(ArtifactKinds.CONVERSATION_THREAD))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("chat.conversation_thread");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("chat.conversation_thread");
     }
 
     private void stubScope(long count) {

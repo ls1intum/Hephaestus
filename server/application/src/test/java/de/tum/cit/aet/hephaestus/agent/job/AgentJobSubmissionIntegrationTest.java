@@ -100,9 +100,8 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
         practiceRepository.save(practice);
 
         LlmConnection connection = llmConnectionRepository.save(LlmCatalogTestFixtures.connection("submit-test"));
-        LlmModel model = llmModelRepository.save(
-            LlmCatalogTestFixtures.model(connection, "submit-model", "gpt-submit-test")
-        );
+        LlmModel model =
+                llmModelRepository.save(LlmCatalogTestFixtures.model(connection, "submit-model", "gpt-submit-test"));
 
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
         binding.setWorkspace(workspace);
@@ -114,10 +113,9 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
 
         // Seed git entities needed for the submission request
         IdentityProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
 
         User author = TestUserFactory.createUser(300L, "pr-author", provider);
         author = userRepository.save(author);
@@ -135,41 +133,44 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
         Long providerId = provider.getId();
         org.junit.jupiter.api.Assertions.assertNotNull(providerId);
         pullRequestRepository.upsertCore(
-            6001L,
-            providerId,
-            10,
-            "Submit Test PR",
-            "Body",
-            "OPEN",
-            null,
-            "https://github.com/org/submit-repo/pull/10",
-            false,
-            null,
-            0,
-            now,
-            now,
-            now,
-            author.getId(),
-            repo.getId(),
-            null,
-            null,
-            false,
-            false,
-            1,
-            5,
-            3,
-            2,
-            null,
-            null,
-            null,
-            "feature/submit",
-            "main",
-            "sha1abc",
-            "sha1base",
-            null,
-            null // mergeCommitSha
-        );
-        prId = pullRequestRepository.findByRepositoryIdAndNumber(repo.getId(), 10).orElseThrow().getId();
+                6001L,
+                providerId,
+                10,
+                "Submit Test PR",
+                "Body",
+                "OPEN",
+                null,
+                "https://github.com/org/submit-repo/pull/10",
+                false,
+                null,
+                0,
+                now,
+                now,
+                now,
+                author.getId(),
+                repo.getId(),
+                null,
+                null,
+                false,
+                false,
+                1,
+                5,
+                3,
+                2,
+                null,
+                null,
+                null,
+                "feature/submit",
+                "main",
+                "sha1abc",
+                "sha1base",
+                null,
+                null // mergeCommitSha
+                );
+        prId = pullRequestRepository
+                .findByRepositoryIdAndNumber(repo.getId(), 10)
+                .orElseThrow()
+                .getId();
     }
 
     private PullRequestReviewSubmissionRequest createRequest(String commitSha) {
@@ -177,25 +178,24 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
         org.junit.jupiter.api.Assertions.assertNotNull(defaultBranch);
         RepositoryRef repoRef = new RepositoryRef(repo.getId(), repo.getNameWithOwner(), defaultBranch);
         ScmEventPayload.PullRequestData prData = new ScmEventPayload.PullRequestData(
-            prId,
-            10,
-            "Submit Test PR",
-            "Body",
-            PullRequest.State.OPEN,
-            false,
-            false,
-            5,
-            3,
-            2,
-            repo.getHtmlUrl() + "/pull/10",
-            repoRef,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null
-        );
+                prId,
+                10,
+                "Submit Test PR",
+                "Body",
+                PullRequest.State.OPEN,
+                false,
+                false,
+                5,
+                3,
+                2,
+                repo.getHtmlUrl() + "/pull/10",
+                repoRef,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
         return new PullRequestReviewSubmissionRequest(prData, "feature/submit", commitSha, defaultBranch);
     }
 
@@ -206,12 +206,8 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
         void submitsJobWithCorrectState() {
             var request = createRequest("abc123");
 
-            Optional<AgentJob> result = agentJobService.submit(
-                workspace.getId(),
-                AgentJobType.PULL_REQUEST_REVIEW,
-                request,
-                null
-            );
+            Optional<AgentJob> result =
+                    agentJobService.submit(workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, request, null);
 
             assertThat(result).isPresent();
             AgentJob job = result.get();
@@ -238,18 +234,10 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
         void deduplicatesSameCommitSha() {
             var request = createRequest("dedup123");
 
-            Optional<AgentJob> first = agentJobService.submit(
-                workspace.getId(),
-                AgentJobType.PULL_REQUEST_REVIEW,
-                request,
-                null
-            );
-            Optional<AgentJob> second = agentJobService.submit(
-                workspace.getId(),
-                AgentJobType.PULL_REQUEST_REVIEW,
-                request,
-                null
-            );
+            Optional<AgentJob> first =
+                    agentJobService.submit(workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, request, null);
+            Optional<AgentJob> second =
+                    agentJobService.submit(workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, request, null);
 
             assertThat(first).isPresent();
             assertThat(second).isPresent();
@@ -263,18 +251,10 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             var request1 = createRequest("sha_v1");
             var request2 = createRequest("sha_v2");
 
-            Optional<AgentJob> first = agentJobService.submit(
-                workspace.getId(),
-                AgentJobType.PULL_REQUEST_REVIEW,
-                request1,
-                null
-            );
-            Optional<AgentJob> second = agentJobService.submit(
-                workspace.getId(),
-                AgentJobType.PULL_REQUEST_REVIEW,
-                request2,
-                null
-            );
+            Optional<AgentJob> first =
+                    agentJobService.submit(workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, request1, null);
+            Optional<AgentJob> second =
+                    agentJobService.submit(workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, request2, null);
 
             assertThat(first).isPresent();
             assertThat(second).isPresent();
@@ -292,20 +272,15 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             existing.setPurpose(AgentPurpose.PRACTICE_REVIEW);
             existing.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
             existing.setIdempotencyKey(
-                // per-phase key: must carry the "manual" phase to dedup against a manual submission
-                "pr_review:" + repo.getNameWithOwner() + ":10:manual:race123:detection"
-            );
+                    // per-phase key: must carry the "manual" phase to dedup against a manual submission
+                    "pr_review:" + repo.getNameWithOwner() + ":10:manual:race123:detection");
             existing.setMetadata(OBJECT_MAPPER.createObjectNode());
             existing.setConfigSnapshot(OBJECT_MAPPER.createObjectNode());
             agentJobRepository.saveAndFlush(existing);
 
             var request = createRequest("race123");
-            Optional<AgentJob> result = agentJobService.submit(
-                workspace.getId(),
-                AgentJobType.PULL_REQUEST_REVIEW,
-                request,
-                null
-            );
+            Optional<AgentJob> result =
+                    agentJobService.submit(workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, request, null);
 
             assertThat(result).isPresent();
             assertThat(result.get().getId()).isEqualTo(existing.getId());
@@ -320,12 +295,8 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             agentBindingRepository.deleteAll();
 
             var request = createRequest("noconfig123");
-            Optional<AgentJob> result = agentJobService.submit(
-                workspace.getId(),
-                AgentJobType.PULL_REQUEST_REVIEW,
-                request,
-                null
-            );
+            Optional<AgentJob> result =
+                    agentJobService.submit(workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, request, null);
 
             assertThat(result).isEmpty();
         }
@@ -336,12 +307,8 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             agentBindingRepository.save(agentBinding);
 
             var request = createRequest("disabled123");
-            Optional<AgentJob> result = agentJobService.submit(
-                workspace.getId(),
-                AgentJobType.PULL_REQUEST_REVIEW,
-                request,
-                null
-            );
+            Optional<AgentJob> result =
+                    agentJobService.submit(workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, request, null);
 
             assertThat(result).isEmpty();
         }
@@ -354,12 +321,8 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
         void capturesSnapshotAtSubmitTime() {
             var request = createRequest("snapshot123");
 
-            Optional<AgentJob> result = agentJobService.submit(
-                workspace.getId(),
-                AgentJobType.PULL_REQUEST_REVIEW,
-                request,
-                null
-            );
+            Optional<AgentJob> result =
+                    agentJobService.submit(workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, request, null);
 
             assertThat(result).isPresent();
             var snapshot = result.get().getConfigSnapshot();

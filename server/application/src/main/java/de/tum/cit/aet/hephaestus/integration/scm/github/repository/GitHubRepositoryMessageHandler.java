@@ -56,25 +56,23 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
     private final SyncTargetProvider syncTargetProvider;
 
     GitHubRepositoryMessageHandler(
-        ProvisioningListener provisioningListener,
-        RepositoryRepository repositoryRepository,
-        ProjectIntegrityService projectIntegrityService,
-        IdentityProviderRepository gitProviderRepository,
-        SyncTargetProvider syncTargetProvider,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            ProvisioningListener provisioningListener,
+            RepositoryRepository repositoryRepository,
+            ProjectIntegrityService projectIntegrityService,
+            IdentityProviderRepository gitProviderRepository,
+            SyncTargetProvider syncTargetProvider,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITHUB,
-            // Org tier, not repository tier — see the class javadoc. Must stay in lockstep with
-            // GithubSubjectKeyDeriver's org-scoping of the `repository` event: registering this on
-            // `repository.` again makes every repository lifecycle event resolve no handler and be
-            // ACK-dropped silently (WebhookFixtureHandlerResolutionTest guards exactly that).
-            "organization." + GitHubEventType.REPOSITORY.getValue(),
-            GitHubRepositoryEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITHUB,
+                // Org tier, not repository tier — see the class javadoc. Must stay in lockstep with
+                // GithubSubjectKeyDeriver's org-scoping of the `repository` event: registering this on
+                // `repository.` again makes every repository lifecycle event resolve no handler and be
+                // ACK-dropped silently (WebhookFixtureHandlerResolutionTest guards exactly that).
+                "organization." + GitHubEventType.REPOSITORY.getValue(),
+                GitHubRepositoryEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.provisioningListener = provisioningListener;
         this.repositoryRepository = repositoryRepository;
         this.projectIntegrityService = projectIntegrityService;
@@ -101,11 +99,10 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
         GitHubEventAction.Repository action = event.actionType();
 
         log.debug(
-            "Received repository event: action={}, repoName={}, repoId={}",
-            event.action(),
-            safeFullName,
-            repositoryId
-        );
+                "Received repository event: action={}, repoName={}, repoId={}",
+                event.action(),
+                safeFullName,
+                repositoryId);
 
         switch (action) {
             case DELETED -> handleRepositoryDeleted(event, fullName, safeFullName);
@@ -116,11 +113,11 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
             case RENAMED, TRANSFERRED -> handleRepositoryMoved(event, safeFullName);
             case PRIVATIZED -> handleVisibilityChanged(fullName, safeFullName, true);
             case PUBLICIZED -> handleVisibilityChanged(fullName, safeFullName, false);
-            default -> log.debug(
-                "Skipped repository event: reason=unhandledAction, action={}, repoName={}",
-                event.action(),
-                safeFullName
-            );
+            default ->
+                log.debug(
+                        "Skipped repository event: reason=unhandledAction, action={}, repoName={}",
+                        event.action(),
+                        safeFullName);
         }
     }
 
@@ -154,42 +151,39 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
      * polymorphic project ownership model.
      */
     private void deleteRepositoryByName(String fullName, String safeFullName) {
-        repositoryRepository
-            .findByNameWithOwner(fullName)
-            .ifPresent(repository -> {
-                Long repoId = repository.getId();
+        repositoryRepository.findByNameWithOwner(fullName).ifPresent(repository -> {
+            Long repoId = repository.getId();
 
-                int deletedProjects = projectIntegrityService.cascadeDeleteProjectsForRepository(repoId);
-                if (deletedProjects > 0) {
-                    log.info(
+            int deletedProjects = projectIntegrityService.cascadeDeleteProjectsForRepository(repoId);
+            if (deletedProjects > 0) {
+                log.info(
                         "Cascade deleted projects for repository: repoId={}, repoName={}, projectCount={}",
                         repoId,
                         safeFullName,
-                        deletedProjects
-                    );
-                }
+                        deletedProjects);
+            }
 
-                repositoryRepository.delete(repository);
-                log.info("Deleted repository directly: repoName={}", safeFullName);
-            });
+            repositoryRepository.delete(repository);
+            log.info("Deleted repository directly: repoName={}", safeFullName);
+        });
     }
 
     private void handleRepositoryArchived(String fullName, String safeFullName, boolean archived) {
         repositoryRepository
-            .findByNameWithOwner(fullName)
-            .ifPresentOrElse(
-                repository -> {
-                    repository.setArchived(archived);
-                    repositoryRepository.save(repository);
-                    log.info("Updated repository archived status: repoName={}, archived={}", safeFullName, archived);
-                },
-                () ->
-                    log.debug(
-                        "Repository not found locally for archive update: repoName={}, archived={}",
-                        safeFullName,
-                        archived
-                    )
-            );
+                .findByNameWithOwner(fullName)
+                .ifPresentOrElse(
+                        repository -> {
+                            repository.setArchived(archived);
+                            repositoryRepository.save(repository);
+                            log.info(
+                                    "Updated repository archived status: repoName={}, archived={}",
+                                    safeFullName,
+                                    archived);
+                        },
+                        () -> log.debug(
+                                "Repository not found locally for archive update: repoName={}, archived={}",
+                                safeFullName,
+                                archived));
     }
 
     /**
@@ -223,36 +217,32 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
 
         if (nativeId == null && previousNameWithOwner == null) {
             log.warn(
-                "Cannot process repository {} - payload carries neither a repository id nor a previous name: newRepoName={}",
-                event.action(),
-                safeNewFullName
-            );
+                    "Cannot process repository {} - payload carries neither a repository id nor a previous name: newRepoName={}",
+                    event.action(),
+                    safeNewFullName);
             return;
         }
 
-        resolveMovedRepository(nativeId, previousNameWithOwner).ifPresentOrElse(
-            repository -> {
-                repository.setName(newName);
-                repository.setNameWithOwner(newFullName);
-                repository.setHtmlUrl(GITHUB_SERVER_URL + "/" + newFullName);
-                repositoryRepository.save(repository);
-                log.info(
-                    "Renamed repository: action={}, oldName={}, newName={}, nativeId={}",
-                    event.action(),
-                    safeOldFullName,
-                    safeNewFullName,
-                    nativeId
-                );
-            },
-            () ->
-                log.debug(
-                    "Repository not found locally for {}: oldName={}, newName={}, nativeId={}",
-                    event.action(),
-                    safeOldFullName,
-                    safeNewFullName,
-                    nativeId
-                )
-        );
+        resolveMovedRepository(nativeId, previousNameWithOwner)
+                .ifPresentOrElse(
+                        repository -> {
+                            repository.setName(newName);
+                            repository.setNameWithOwner(newFullName);
+                            repository.setHtmlUrl(GITHUB_SERVER_URL + "/" + newFullName);
+                            repositoryRepository.save(repository);
+                            log.info(
+                                    "Renamed repository: action={}, oldName={}, newName={}, nativeId={}",
+                                    event.action(),
+                                    safeOldFullName,
+                                    safeNewFullName,
+                                    nativeId);
+                        },
+                        () -> log.debug(
+                                "Repository not found locally for {}: oldName={}, newName={}, nativeId={}",
+                                event.action(),
+                                safeOldFullName,
+                                safeNewFullName,
+                                nativeId));
 
         // Always attempt the monitor re-key, even when no domain row is mirrored yet: the monitor is
         // what the NATS filter is built from, so leaving it stale is the actual data-loss path.
@@ -265,48 +255,41 @@ public class GitHubRepositoryMessageHandler extends AbstractIntegrationMessageHa
      * the previous {@code owner/name} for legacy rows whose {@code native_id} was never captured.
      */
     private Optional<Repository> resolveMovedRepository(
-        @Nullable Long nativeId,
-        @Nullable String previousNameWithOwner
-    ) {
+            @Nullable Long nativeId, @Nullable String previousNameWithOwner) {
         if (nativeId != null) {
             Long providerId = gitProviderRepository
-                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
-                .map(IdentityProvider::getId)
-                .orElse(null);
+                    .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
+                    .map(IdentityProvider::getId)
+                    .orElse(null);
             if (providerId != null) {
-                Optional<Repository> byNativeId = repositoryRepository.findByNativeIdAndProviderId(
-                    nativeId,
-                    providerId
-                );
+                Optional<Repository> byNativeId =
+                        repositoryRepository.findByNativeIdAndProviderId(nativeId, providerId);
                 if (byNativeId.isPresent()) {
                     return byNativeId;
                 }
             }
         }
         return previousNameWithOwner == null
-            ? Optional.empty()
-            : repositoryRepository.findByNameWithOwner(previousNameWithOwner);
+                ? Optional.empty()
+                : repositoryRepository.findByNameWithOwner(previousNameWithOwner);
     }
 
     private void handleVisibilityChanged(String fullName, String safeFullName, boolean isPrivate) {
         repositoryRepository
-            .findByNameWithOwner(fullName)
-            .ifPresentOrElse(
-                repository -> {
-                    repository.setVisibility(isPrivate ? Repository.Visibility.PRIVATE : Repository.Visibility.PUBLIC);
-                    repositoryRepository.save(repository);
-                    log.info(
-                        "Updated repository visibility: repoName={}, visibility={}",
-                        safeFullName,
-                        isPrivate ? "PRIVATE" : "PUBLIC"
-                    );
-                },
-                () ->
-                    log.debug(
-                        "Repository not found locally for visibility update: repoName={}, private={}",
-                        safeFullName,
-                        isPrivate
-                    )
-            );
+                .findByNameWithOwner(fullName)
+                .ifPresentOrElse(
+                        repository -> {
+                            repository.setVisibility(
+                                    isPrivate ? Repository.Visibility.PRIVATE : Repository.Visibility.PUBLIC);
+                            repositoryRepository.save(repository);
+                            log.info(
+                                    "Updated repository visibility: repoName={}, visibility={}",
+                                    safeFullName,
+                                    isPrivate ? "PRIVATE" : "PUBLIC");
+                        },
+                        () -> log.debug(
+                                "Repository not found locally for visibility update: repoName={}, private={}",
+                                safeFullName,
+                                isPrivate));
     }
 }

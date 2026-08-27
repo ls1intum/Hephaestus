@@ -19,9 +19,7 @@ public class SlackMemberJoinedChannelMessageHandler extends AbstractSlackEnvelop
     private final Clock clock;
 
     public SlackMemberJoinedChannelMessageHandler(
-        SlackChannelJoinNoticeHandler joinNoticeHandler,
-        NatsMessageDeserializer deserializer
-    ) {
+            SlackChannelJoinNoticeHandler joinNoticeHandler, NatsMessageDeserializer deserializer) {
         super("member_joined_channel", deserializer);
         this.joinNoticeHandler = joinNoticeHandler;
         this.clock = Clock.systemUTC();

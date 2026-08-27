@@ -53,13 +53,13 @@ public abstract class BaseGitLabProcessor {
      * while {@link OffsetDateTime#parse} handles the ISO-8601 format.
      */
     private static final DateTimeFormatter GITLAB_WEBHOOK_TIMESTAMP = new DateTimeFormatterBuilder()
-        .appendPattern("yyyy-MM-dd HH:mm:ss")
-        .optionalStart()
-        .appendPattern(" ")
-        .appendOffset("+HHmm", "+0000")
-        .optionalEnd()
-        .parseDefaulting(ChronoField.OFFSET_SECONDS, 0)
-        .toFormatter();
+            .appendPattern("yyyy-MM-dd HH:mm:ss")
+            .optionalStart()
+            .appendPattern(" ")
+            .appendOffset("+HHmm", "+0000")
+            .optionalEnd()
+            .parseDefaulting(ChronoField.OFFSET_SECONDS, 0)
+            .toFormatter();
 
     protected final GitLabUserService gitLabUserService;
     protected final UserRepository userRepository;
@@ -70,14 +70,13 @@ public abstract class BaseGitLabProcessor {
     protected final GitLabProperties gitLabProperties;
 
     protected BaseGitLabProcessor(
-        GitLabUserService gitLabUserService,
-        UserRepository userRepository,
-        LabelRepository labelRepository,
-        RepositoryRepository repositoryRepository,
-        ScopeIdResolver scopeIdResolver,
-        RepositoryScopeFilter repositoryScopeFilter,
-        GitLabProperties gitLabProperties
-    ) {
+            GitLabUserService gitLabUserService,
+            UserRepository userRepository,
+            LabelRepository labelRepository,
+            RepositoryRepository repositoryRepository,
+            ScopeIdResolver scopeIdResolver,
+            RepositoryScopeFilter repositoryScopeFilter,
+            GitLabProperties gitLabProperties) {
         this.gitLabUserService = gitLabUserService;
         this.userRepository = userRepository;
         this.labelRepository = labelRepository;
@@ -127,20 +126,16 @@ public abstract class BaseGitLabProcessor {
             return existing.get();
         }
 
-        long nativeId =
-            dto.id() != null
+        long nativeId = dto.id() != null
                 ? GitLabSyncConstants.toEntityId(dto.id())
                 : generateDeterministicLabelId(repository.getId(), dto.title());
         Long providerId = Objects.requireNonNull(repository.getProvider().getId());
 
         labelRepository.insertIfAbsent(
-            nativeId,
-            Objects.requireNonNull(providerId),
-            dto.title(),
-            dto.color(),
-            repository.getId()
-        );
-        return labelRepository.findByRepositoryIdAndName(repository.getId(), dto.title()).orElse(null);
+                nativeId, Objects.requireNonNull(providerId), dto.title(), dto.color(), repository.getId());
+        return labelRepository
+                .findByRepositoryIdAndName(repository.getId(), dto.title())
+                .orElse(null);
     }
 
     /**
@@ -168,7 +163,9 @@ public abstract class BaseGitLabProcessor {
         Long providerId = Objects.requireNonNull(repository.getProvider().getId());
 
         labelRepository.insertIfAbsent(nativeId, Objects.requireNonNull(providerId), title, color, repository.getId());
-        return labelRepository.findByRepositoryIdAndName(repository.getId(), title).orElse(null);
+        return labelRepository
+                .findByRepositoryIdAndName(repository.getId(), title)
+                .orElse(null);
     }
 
     /** Produces a negative deterministic ID from (repositoryId, labelName) to avoid collisions with real label IDs. */
@@ -182,10 +179,7 @@ public abstract class BaseGitLabProcessor {
      * Updates assignees collection from webhook user list.
      */
     protected boolean updateAssignees(
-        @Nullable List<GitLabWebhookUser> assigneeDtos,
-        Set<User> currentAssignees,
-        Long providerId
-    ) {
+            @Nullable List<GitLabWebhookUser> assigneeDtos, Set<User> currentAssignees, Long providerId) {
         if (assigneeDtos == null) {
             return false;
         }
@@ -210,10 +204,7 @@ public abstract class BaseGitLabProcessor {
      * Updates labels collection from webhook label list.
      */
     protected boolean updateLabels(
-        @Nullable List<GitLabWebhookLabel> labelDtos,
-        Collection<Label> currentLabels,
-        Repository repository
-    ) {
+            @Nullable List<GitLabWebhookLabel> labelDtos, Collection<Label> currentLabels, Repository repository) {
         if (labelDtos == null) {
             return false;
         }
@@ -278,8 +269,8 @@ public abstract class BaseGitLabProcessor {
         }
 
         Repository repository = repositoryRepository
-            .findByNameWithOwnerWithOrganization(pathWithNamespace)
-            .orElse(null);
+                .findByNameWithOwnerWithOrganization(pathWithNamespace)
+                .orElse(null);
         if (repository == null) {
             log.debug("Skipped event: reason=repositoryNotFound, repoName={}", pathWithNamespace);
             return null;
@@ -297,7 +288,9 @@ public abstract class BaseGitLabProcessor {
                 return scopeId;
             }
         }
-        return scopeIdResolver.findScopeIdByRepositoryName(repository.getNameWithOwner()).orElse(null);
+        return scopeIdResolver
+                .findScopeIdByRepositoryName(repository.getNameWithOwner())
+                .orElse(null);
     }
 
     // Sanitization

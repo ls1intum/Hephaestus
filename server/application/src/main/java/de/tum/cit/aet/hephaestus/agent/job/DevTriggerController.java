@@ -60,12 +60,11 @@ public class DevTriggerController {
     private final SignalRecorder signalRecorder;
 
     public DevTriggerController(
-        AgentJobService agentJobService,
-        ReviewableArtifactLoader artifactLoader,
-        PracticeReviewDetectionGate detectionGate,
-        TransactionTemplate transactionTemplate,
-        SignalRecorder signalRecorder
-    ) {
+            AgentJobService agentJobService,
+            ReviewableArtifactLoader artifactLoader,
+            PracticeReviewDetectionGate detectionGate,
+            TransactionTemplate transactionTemplate,
+            SignalRecorder signalRecorder) {
         this.agentJobService = agentJobService;
         this.artifactLoader = artifactLoader;
         this.detectionGate = detectionGate;
@@ -79,11 +78,10 @@ public class DevTriggerController {
      * @param signalKey the ledger identity this run is recorded under; present only in bypass mode
      */
     private record Prepared(
-        @Nullable AgentJobType jobType,
-        @Nullable Object request,
-        @Nullable String message,
-        @Nullable SignalKey signalKey
-    ) {
+            @Nullable AgentJobType jobType,
+            @Nullable Object request,
+            @Nullable String message,
+            @Nullable SignalKey signalKey) {
         static Prepared review(@Nullable PullRequestReviewSubmissionRequest request, @Nullable SignalKey key) {
             return new Prepared(AgentJobType.PULL_REQUEST_REVIEW, request, null, key);
         }
@@ -99,40 +97,36 @@ public class DevTriggerController {
 
     @PostMapping("/api/dev/trigger-review")
     @AuditExempt(
-        reason = "submits a review job; changes no configuration or access, and the run and its spend are " +
-            "already recorded on agent_job and the LLM usage ledger"
-    )
+            reason = "submits a review job; changes no configuration or access, and the run and its spend are "
+                    + "already recorded on agent_job and the LLM usage ledger")
     public String triggerReview(
-        @RequestParam @Nullable Long prId,
-        @RequestParam @Nullable Long issueId,
-        @RequestParam @Nullable Long workspaceId,
-        @RequestParam @Nullable String signal
-    ) {
+            @RequestParam @Nullable Long prId,
+            @RequestParam @Nullable Long issueId,
+            @RequestParam @Nullable Long workspaceId,
+            @RequestParam @Nullable String signal) {
         if (workspaceId == null || (prId == null && issueId == null)) {
             return "Error: workspaceId and one of prId / issueId are required";
         }
 
-        Prepared prepared = transactionTemplate.execute(status ->
-            issueId != null
+        Prepared prepared = transactionTemplate.execute(status -> issueId != null
                 ? prepareIssue(workspaceId, issueId, signal)
-                : preparePullRequest(workspaceId, Objects.requireNonNull(prId), signal)
-        );
+                : preparePullRequest(workspaceId, Objects.requireNonNull(prId), signal));
 
         if (prepared == null || prepared.request() == null) {
             return prepared == null
-                ? "No submission prepared"
-                : Objects.requireNonNullElse(prepared.message(), "No submission prepared");
+                    ? "No submission prepared"
+                    : Objects.requireNonNullElse(prepared.message(), "No submission prepared");
         }
         return agentJobService.submitPrepared(
-            workspaceId,
-            Objects.requireNonNull(prepared.jobType()),
-            (JobSubmissionRequest) prepared.request(),
-            prepared.signalKey()
-        );
+                workspaceId,
+                Objects.requireNonNull(prepared.jobType()),
+                (JobSubmissionRequest) prepared.request(),
+                prepared.signalKey());
     }
 
     private Prepared preparePullRequest(Long workspaceId, Long prId, @Nullable String signal) {
-        PullRequest pr = artifactLoader.findPullRequestForGate(workspaceId, prId).orElse(null);
+        PullRequest pr =
+                artifactLoader.findPullRequestForGate(workspaceId, prId).orElse(null);
         if (pr == null) {
             return Prepared.done("PR not found in workspace " + workspaceId + ": " + prId);
         }
@@ -141,28 +135,26 @@ public class DevTriggerController {
             GateDecision decision = detectionGate.evaluate(pr, triggerSignal, TriggerMode.AUTO);
             if (decision instanceof GateDecision.Skip skip) {
                 recordRefusal(
-                    ScmSignals.pullRequestKey(
-                        workspaceId,
-                        pr.getId(),
-                        triggerSignal,
-                        pr.getHeadRefOid(),
-                        pr.getTitle(),
-                        pr.getBody()
-                    ).orElse(null),
-                    skip
-                );
+                        ScmSignals.pullRequestKey(
+                                        workspaceId,
+                                        pr.getId(),
+                                        triggerSignal,
+                                        pr.getHeadRefOid(),
+                                        pr.getTitle(),
+                                        pr.getBody())
+                                .orElse(null),
+                        skip);
                 return Prepared.done("Gate skipped (" + triggerSignal + "): " + skip.reason());
             }
         }
         PullRequestReviewSubmissionRequest request = agentJobService.buildReviewRequest(pr, triggerSignal);
         return request == null
-            ? Prepared.done("PR missing branch info: prId=" + pr.getId())
-            : Prepared.review(
-                  request,
-                  triggerSignal == null
-                      ? recordManualRequest(workspaceId, pr.getId(), ScmSignals.PULL_REQUEST_MANUAL_REVIEW)
-                      : null
-              );
+                ? Prepared.done("PR missing branch info: prId=" + pr.getId())
+                : Prepared.review(
+                        request,
+                        triggerSignal == null
+                                ? recordManualRequest(workspaceId, pr.getId(), ScmSignals.PULL_REQUEST_MANUAL_REVIEW)
+                                : null);
     }
 
     private Prepared prepareIssue(Long workspaceId, Long issueId, @Nullable String signal) {
@@ -175,28 +167,26 @@ public class DevTriggerController {
             GateDecision decision = detectionGate.evaluateIssue(issue, triggerSignal, TriggerMode.AUTO);
             if (decision instanceof GateDecision.Skip skip) {
                 recordRefusal(
-                    ScmSignals.issueKey(
-                        workspaceId,
-                        issue.getId(),
-                        triggerSignal,
-                        issue.getTitle(),
-                        issue.getBody(),
-                        null
-                    ).orElse(null),
-                    skip
-                );
+                        ScmSignals.issueKey(
+                                        workspaceId,
+                                        issue.getId(),
+                                        triggerSignal,
+                                        issue.getTitle(),
+                                        issue.getBody(),
+                                        null)
+                                .orElse(null),
+                        skip);
                 return Prepared.done("Gate skipped (" + triggerSignal + "): " + skip.reason());
             }
         }
         IssueReviewSubmissionRequest request = agentJobService.buildIssueRequest(issue, triggerSignal);
         return request == null
-            ? Prepared.done("Issue missing repository: issueId=" + issue.getId())
-            : Prepared.issue(
-                  request,
-                  triggerSignal == null
-                      ? recordManualRequest(workspaceId, issue.getId(), ScmSignals.ISSUE_MANUAL_REVIEW)
-                      : null
-              );
+                ? Prepared.done("Issue missing repository: issueId=" + issue.getId())
+                : Prepared.issue(
+                        request,
+                        triggerSignal == null
+                                ? recordManualRequest(workspaceId, issue.getId(), ScmSignals.ISSUE_MANUAL_REVIEW)
+                                : null);
     }
 
     /**

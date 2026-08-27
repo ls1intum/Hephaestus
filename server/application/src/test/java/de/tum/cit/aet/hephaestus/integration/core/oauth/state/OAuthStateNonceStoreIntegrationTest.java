@@ -37,13 +37,16 @@ class OAuthStateNonceStoreIntegrationTest extends BaseIntegrationTest {
         store.issue(nonce, 1L, IntegrationKind.GITHUB, Instant.now());
 
         assertThat(store.tryConsume(nonce)).as("first consume wins").isTrue();
-        assertThat(store.tryConsume(nonce)).as("a replay of the same nonce is rejected").isFalse();
+        assertThat(store.tryConsume(nonce))
+                .as("a replay of the same nonce is rejected")
+                .isFalse();
     }
 
     @Test
     void consumingAnUnknownNonceFailsClosed() {
         // No backing row (e.g. a forged state whose HMAC somehow validated) → reject, never accept.
-        assertThat(store.tryConsume("absent-" + Long.toHexString(System.nanoTime()))).isFalse();
+        assertThat(store.tryConsume("absent-" + Long.toHexString(System.nanoTime())))
+                .isFalse();
     }
 
     @Test
@@ -66,8 +69,8 @@ class OAuthStateNonceStoreIntegrationTest extends BaseIntegrationTest {
             boolean r1 = first.get(15, TimeUnit.SECONDS);
             boolean r2 = second.get(15, TimeUnit.SECONDS);
             assertThat(List.of(r1, r2))
-                .as("exactly one concurrent consume wins")
-                .containsExactlyInAnyOrder(true, false);
+                    .as("exactly one concurrent consume wins")
+                    .containsExactlyInAnyOrder(true, false);
         } finally {
             pool.shutdownNow();
         }

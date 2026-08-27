@@ -23,25 +23,22 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Component
 public class GitHubInstallationRepositoriesMessageHandler
-    extends AbstractIntegrationMessageHandler<GitHubInstallationRepositoriesEventDTO>
-{
+        extends AbstractIntegrationMessageHandler<GitHubInstallationRepositoriesEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubInstallationRepositoriesMessageHandler.class);
 
     private final ProvisioningListener provisioningListener;
 
     GitHubInstallationRepositoriesMessageHandler(
-        NatsMessageDeserializer deserializer,
-        ProvisioningListener provisioningListener,
-        TransactionTemplate transactionTemplate
-    ) {
+            NatsMessageDeserializer deserializer,
+            ProvisioningListener provisioningListener,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITHUB,
-            "installation." + GitHubEventType.INSTALLATION_REPOSITORIES.getValue(),
-            GitHubInstallationRepositoriesEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITHUB,
+                "installation." + GitHubEventType.INSTALLATION_REPOSITORIES.getValue(),
+                GitHubInstallationRepositoriesEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.provisioningListener = provisioningListener;
     }
 
@@ -56,48 +53,39 @@ public class GitHubInstallationRepositoriesMessageHandler
 
         List<GitHubRepositoryRefDTO> added = event.repositoriesAdded() != null ? event.repositoriesAdded() : List.of();
         List<GitHubRepositoryRefDTO> removed =
-            event.repositoriesRemoved() != null ? event.repositoriesRemoved() : List.of();
+                event.repositoriesRemoved() != null ? event.repositoriesRemoved() : List.of();
 
         log.debug(
-            "Received installation_repositories event: action={}, installationId={}, addedCount={}, removedCount={}",
-            event.action(),
-            installation.id(),
-            added.size(),
-            removed.size()
-        );
+                "Received installation_repositories event: action={}, installationId={}, addedCount={}, removedCount={}",
+                event.action(),
+                installation.id(),
+                added.size(),
+                removed.size());
 
         long installationId = installation.id();
 
         // Notify consuming module via SPI for added repositories
         if (!added.isEmpty()) {
-            List<RepositorySnapshot> addedSnapshots = added
-                .stream()
-                .map(ref ->
-                    new RepositorySnapshot(
-                        Objects.requireNonNull(ref.id()),
-                        ref.fullName(),
-                        ref.name(),
-                        ref.isPrivate()
-                    )
-                )
-                .toList();
+            List<RepositorySnapshot> addedSnapshots = added.stream()
+                    .map(ref -> new RepositorySnapshot(
+                            Objects.requireNonNull(ref.id()), ref.fullName(), ref.name(), ref.isPrivate()))
+                    .toList();
             provisioningListener.onRepositoriesAdded(installationId, addedSnapshots);
             log.info(
-                "Added repositories to installation: installationId={}, repoCount={}",
-                installationId,
-                addedSnapshots.size()
-            );
+                    "Added repositories to installation: installationId={}, repoCount={}",
+                    installationId,
+                    addedSnapshots.size());
         }
 
         // Notify consuming module via SPI for removed repositories
         if (!removed.isEmpty()) {
-            List<String> removedNames = removed.stream().map(GitHubRepositoryRefDTO::fullName).toList();
+            List<String> removedNames =
+                    removed.stream().map(GitHubRepositoryRefDTO::fullName).toList();
             provisioningListener.onRepositoriesRemoved(installationId, removedNames);
             log.info(
-                "Removed repositories from installation: installationId={}, repoCount={}",
-                installationId,
-                removedNames.size()
-            );
+                    "Removed repositories from installation: installationId={}, repoCount={}",
+                    installationId,
+                    removedNames.size());
         }
     }
 }

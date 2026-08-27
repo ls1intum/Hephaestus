@@ -55,22 +55,12 @@ class ReviewSweepCampaignOpenerTest extends BaseUnitTest {
     @Mock
     private ConfigAuditPort configAudit;
 
-    private final ReviewBackfillProperties properties = new ReviewBackfillProperties(
-        25,
-        Duration.ofDays(400),
-        5000,
-        Duration.ofDays(90)
-    );
+    private final ReviewBackfillProperties properties =
+            new ReviewBackfillProperties(25, Duration.ofDays(400), 5000, Duration.ofDays(90));
 
     private ReviewSweepCampaignOpener opener() {
         return new ReviewSweepCampaignOpener(
-            scheduleRepository,
-            runRepository,
-            scopeRepository,
-            costEstimator,
-            properties,
-            configAudit
-        );
+                scheduleRepository, runRepository, scopeRepository, costEstimator, properties, configAudit);
     }
 
     /** Directly RUNNING, not queued for confirmation: creating the schedule already was the confirmation. */
@@ -133,7 +123,8 @@ class ReviewSweepCampaignOpenerTest extends BaseUnitTest {
     @Test
     void aWorkspaceStillWorkingThroughACampaignDoesNotGetASecond() {
         givenSchedule(schedule());
-        when(runRepository.existsByWorkspaceIdAndStatusIn(eq(WORKSPACE_ID), any())).thenReturn(true);
+        when(runRepository.existsByWorkspaceIdAndStatusIn(eq(WORKSPACE_ID), any()))
+                .thenReturn(true);
 
         assertThat(opener().openDueRun(SCHEDULE_ID, NOW)).isEqualTo(ReviewSweepOutcome.SKIPPED_CAMPAIGN_UNDER_WAY);
 

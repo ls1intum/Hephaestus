@@ -37,24 +37,18 @@ public class OAuthStateNonceCleanupJob {
     /** Spring-wired constructor; retention binds via {@link OAuthStateProperties}. */
     @Autowired
     public OAuthStateNonceCleanupJob(
-        OAuthStateNonceRepository repository,
-        OAuthStateProperties properties,
-        MeterRegistry meterRegistry
-    ) {
+            OAuthStateNonceRepository repository, OAuthStateProperties properties, MeterRegistry meterRegistry) {
         this(repository, properties.nonceRetention(), meterRegistry);
     }
 
     /** Canonical constructor (also the unit-test seam): retention passed directly. */
     public OAuthStateNonceCleanupJob(
-        OAuthStateNonceRepository repository,
-        @Nullable Duration retention,
-        MeterRegistry meterRegistry
-    ) {
+            OAuthStateNonceRepository repository, @Nullable Duration retention, MeterRegistry meterRegistry) {
         this.repository = repository;
         this.retention = retention == null ? Duration.ofDays(7) : retention;
         this.prunedCounter = Counter.builder("oauth.state.nonce.pruned")
-            .description("Number of OAuth state nonces pruned by the daily sweep")
-            .register(meterRegistry);
+                .description("Number of OAuth state nonces pruned by the daily sweep")
+                .register(meterRegistry);
     }
 
     @Scheduled(cron = "0 0 4 * * *")
@@ -67,10 +61,6 @@ public class OAuthStateNonceCleanupJob {
             prunedCounter.increment(deleted);
         }
         log.info(
-            "OAuthStateNonceCleanupJob: pruned {} nonces older than {} (retention={})",
-            deleted,
-            cutoff,
-            retention
-        );
+                "OAuthStateNonceCleanupJob: pruned {} nonces older than {} (retention={})", deleted, cutoff, retention);
     }
 }

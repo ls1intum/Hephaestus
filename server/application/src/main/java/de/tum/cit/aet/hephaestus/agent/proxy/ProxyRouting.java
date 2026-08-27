@@ -14,15 +14,14 @@ import org.jspecify.annotations.Nullable;
  * @param attempt {@code null} only for a mentor session between turns
  */
 public record ProxyRouting(
-    String principalDescription,
-    String apiProtocol,
-    String baseUrl,
-    @Nullable FundingSource connectionScope,
-    @Nullable Long connectionId,
-    @Nullable Long modelId,
-    @Nullable Long workspaceId,
-    @Nullable BilledAttempt attempt
-) {
+        String principalDescription,
+        String apiProtocol,
+        String baseUrl,
+        @Nullable FundingSource connectionScope,
+        @Nullable Long connectionId,
+        @Nullable Long modelId,
+        @Nullable Long workspaceId,
+        @Nullable BilledAttempt attempt) {
     /**
      * The one execution this credential bills to, with identity and spend read in the same instant so
      * a caller cannot pair one execution's identity with another's spend.

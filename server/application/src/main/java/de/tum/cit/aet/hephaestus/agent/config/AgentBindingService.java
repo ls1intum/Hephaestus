@@ -54,18 +54,15 @@ public class AgentBindingService {
      */
     @Transactional
     public WorkspaceAgentBinding upsertBinding(
-        WorkspaceContext workspaceContext,
-        AgentPurpose purpose,
-        AgentBindingRequestDTO request
-    ) {
+            WorkspaceContext workspaceContext, AgentPurpose purpose, AgentBindingRequestDTO request) {
         Long workspaceId = workspaceContext.id();
         Workspace workspace = workspaceRepository
-            .findByIdForUpdate(workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceContext.slug()));
+                .findByIdForUpdate(workspaceId)
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceContext.slug()));
 
         WorkspaceAgentBinding binding = bindingRepository
-            .findByWorkspaceIdAndPurpose(workspaceId, purpose)
-            .orElseGet(() -> newBinding(workspace, purpose));
+                .findByWorkspaceIdAndPurpose(workspaceId, purpose)
+                .orElseGet(() -> newBinding(workspace, purpose));
         BindingSnapshot before = BindingSnapshot.of(binding);
 
         applyModel(binding, workspaceId, request.instanceModelId(), request.workspaceModelId());
@@ -93,40 +90,35 @@ public class AgentBindingService {
         Long workspaceId = workspaceContext.id();
         // Taken for the row lock and the 404 only; nothing below writes the workspace row.
         workspaceRepository
-            .findByIdForUpdate(workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceContext.slug()));
-        bindingRepository
-            .findByWorkspaceIdAndPurpose(workspaceId, purpose)
-            .ifPresent(binding -> {
-                BindingSnapshot before = BindingSnapshot.of(binding);
-                bindingRepository.delete(binding);
-                configAudit.record(
-                    ConfigAuditEntry.deleted(ConfigAuditEntityType.AGENT_BINDING, purpose.name(), workspaceId, before)
-                );
-            });
+                .findByIdForUpdate(workspaceId)
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceContext.slug()));
+        bindingRepository.findByWorkspaceIdAndPurpose(workspaceId, purpose).ifPresent(binding -> {
+            BindingSnapshot before = BindingSnapshot.of(binding);
+            bindingRepository.delete(binding);
+            configAudit.record(
+                    ConfigAuditEntry.deleted(ConfigAuditEntityType.AGENT_BINDING, purpose.name(), workspaceId, before));
+        });
     }
 
     private void applyModel(
-        WorkspaceAgentBinding binding,
-        Long workspaceId,
-        @Nullable Long instanceModelId,
-        @Nullable Long workspaceModelId
-    ) {
+            WorkspaceAgentBinding binding,
+            Long workspaceId,
+            @Nullable Long instanceModelId,
+            @Nullable Long workspaceModelId) {
         if ((instanceModelId == null) == (workspaceModelId == null)) {
             throw new IllegalArgumentException(
-                "A binding must reference exactly one model — a shared model or your own provider's model."
-            );
+                    "A binding must reference exactly one model — a shared model or your own provider's model.");
         }
         if (instanceModelId != null) {
             LlmModel model = llmModelRepository
-                .findById(instanceModelId)
-                .orElseThrow(() -> new EntityNotFoundException("LlmModel", instanceModelId));
+                    .findById(instanceModelId)
+                    .orElseThrow(() -> new EntityNotFoundException("LlmModel", instanceModelId));
             binding.setInstanceModel(model);
             binding.setWorkspaceModel(null);
         } else {
             WorkspaceLlmModel model = workspaceLlmModelRepository
-                .findByIdAndWorkspaceId(workspaceModelId, workspaceId)
-                .orElseThrow(() -> new EntityNotFoundException("WorkspaceLlmModel", workspaceModelId));
+                    .findByIdAndWorkspaceId(workspaceModelId, workspaceId)
+                    .orElseThrow(() -> new EntityNotFoundException("WorkspaceLlmModel", workspaceModelId));
             binding.setWorkspaceModel(model);
             binding.setInstanceModel(null);
         }
@@ -140,9 +132,8 @@ public class AgentBindingService {
     }
 
     private void audit(AgentPurpose purpose, Long workspaceId, BindingSnapshot before, BindingSnapshot after) {
-        configAudit.record(
-            ConfigAuditEntry.updated(ConfigAuditEntityType.AGENT_BINDING, purpose.name(), workspaceId, before, after)
-        );
+        configAudit.record(ConfigAuditEntry.updated(
+                ConfigAuditEntityType.AGENT_BINDING, purpose.name(), workspaceId, before, after));
     }
 
     private static WorkspaceAgentBinding newBinding(Workspace workspace, AgentPurpose purpose) {
@@ -154,16 +145,14 @@ public class AgentBindingService {
 
     /** Audit projection of a binding's effective model + enabled state. */
     private record BindingSnapshot(
-        @Nullable Long instanceModelId,
-        @Nullable Long workspaceModelId,
-        @Nullable Boolean enabled
-    ) implements ConfigAuditSnapshot {
+            @Nullable Long instanceModelId,
+            @Nullable Long workspaceModelId,
+            @Nullable Boolean enabled) implements ConfigAuditSnapshot {
         static BindingSnapshot of(WorkspaceAgentBinding b) {
             return new BindingSnapshot(
-                b.getInstanceModel() == null ? null : b.getInstanceModel().getId(),
-                b.getWorkspaceModel() == null ? null : b.getWorkspaceModel().getId(),
-                b.isEnabled()
-            );
+                    b.getInstanceModel() == null ? null : b.getInstanceModel().getId(),
+                    b.getWorkspaceModel() == null ? null : b.getWorkspaceModel().getId(),
+                    b.isEnabled());
         }
     }
 }

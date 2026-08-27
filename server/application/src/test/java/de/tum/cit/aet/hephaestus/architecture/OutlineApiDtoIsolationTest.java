@@ -20,27 +20,25 @@ class OutlineApiDtoIsolationTest extends HephaestusArchitectureTest {
     @Test
     void outlineWireModelsStayOnTheExtractSeam() {
         ArchRule rule = classes()
-            .that()
-            .resideInAPackage("..integration.outline.client.model..")
-            .should()
-            .onlyBeAccessed()
-            .byClassesThat()
-            .resideInAnyPackage(
-                "..integration.outline.client..",
-                "..integration.outline.sync..",
-                "..integration.outline.collection..",
-                "..integration.outline.lifecycle..",
-                "..integration.outline.webhook.."
-            )
-            .because(
-                "Outline wire models are an implementation detail of the client and its sync, collection-admin, " +
-                    "lifecycle-registrar, and webhook consumers on the extract seam; they must not leak into the " +
-                    "agent read path or any other module"
-            )
-            // Never allow this guard to pass vacuously: the generated models MUST be present in the
-            // imported set (they are — the base importer no longer excludes them), so an empty subject
-            // set here means the package moved/renamed and the boundary is no longer being checked.
-            .allowEmptyShould(false);
+                .that()
+                .resideInAPackage("..integration.outline.client.model..")
+                .should()
+                .onlyBeAccessed()
+                .byClassesThat()
+                .resideInAnyPackage(
+                        "..integration.outline.client..",
+                        "..integration.outline.sync..",
+                        "..integration.outline.collection..",
+                        "..integration.outline.lifecycle..",
+                        "..integration.outline.webhook..")
+                .because(
+                        "Outline wire models are an implementation detail of the client and its sync, collection-admin, "
+                                + "lifecycle-registrar, and webhook consumers on the extract seam; they must not leak into the "
+                                + "agent read path or any other module")
+                // Never allow this guard to pass vacuously: the generated models MUST be present in the
+                // imported set (they are — the base importer no longer excludes them), so an empty subject
+                // set here means the package moved/renamed and the boundary is no longer being checked.
+                .allowEmptyShould(false);
         rule.check(classes);
     }
 }

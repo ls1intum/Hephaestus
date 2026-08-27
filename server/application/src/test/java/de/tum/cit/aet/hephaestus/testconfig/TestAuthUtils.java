@@ -94,6 +94,7 @@ public class TestAuthUtils {
 
     /** The double-submit CSRF cookie/header pair the SPA echoes (see SpaCsrfTokenRequestHandler). */
     private static final String XSRF_COOKIE = "__Host-XSRF-TOKEN";
+
     private static final String XSRF_HEADER = "X-XSRF-TOKEN";
 
     /**
@@ -104,7 +105,12 @@ public class TestAuthUtils {
      * canonical way to assert a protected endpoint returns 401, not the CSRF filter's 403.
      */
     public static String fetchCsrfToken(WebTestClient client) {
-        var result = client.get().uri("/identity-providers").exchange().expectStatus().isOk().returnResult(Void.class);
+        var result = client.get()
+                .uri("/identity-providers")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .returnResult(Void.class);
         List<ResponseCookie> cookies = result.getResponseCookies().get(XSRF_COOKIE);
         if (cookies == null || cookies.isEmpty()) {
             throw new IllegalStateException("XSRF-TOKEN cookie was not issued on the safe request");

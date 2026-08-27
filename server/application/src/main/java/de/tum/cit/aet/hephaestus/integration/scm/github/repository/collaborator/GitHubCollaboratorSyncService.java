@@ -66,14 +66,13 @@ public class GitHubCollaboratorSyncService {
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
     public GitHubCollaboratorSyncService(
-        RepositoryRepository repositoryRepository,
-        RepositoryCollaboratorRepository collaboratorRepository,
-        GitHubGraphQlClientProvider graphQlClientProvider,
-        GitHubUserProcessor userProcessor,
-        GitHubSyncProperties syncProperties,
-        GitHubExceptionClassifier exceptionClassifier,
-        GitHubGraphQlSyncCoordinator graphQlSyncHelper
-    ) {
+            RepositoryRepository repositoryRepository,
+            RepositoryCollaboratorRepository collaboratorRepository,
+            GitHubGraphQlClientProvider graphQlClientProvider,
+            GitHubUserProcessor userProcessor,
+            GitHubSyncProperties syncProperties,
+            GitHubExceptionClassifier exceptionClassifier,
+            GitHubGraphQlSyncCoordinator graphQlSyncHelper) {
         this.repositoryRepository = repositoryRepository;
         this.collaboratorRepository = collaboratorRepository;
         this.graphQlClientProvider = graphQlClientProvider;
@@ -123,71 +122,56 @@ public class GitHubCollaboratorSyncService {
                 pageCount++;
                 if (pageCount >= MAX_PAGINATION_PAGES) {
                     log.warn(
-                        "Reached maximum pagination limit for collaborators: repoName={}, limit={}",
-                        safeNameWithOwner,
-                        MAX_PAGINATION_PAGES
-                    );
+                            "Reached maximum pagination limit for collaborators: repoName={}, limit={}",
+                            safeNameWithOwner,
+                            MAX_PAGINATION_PAGES);
                     break;
                 }
 
                 final String currentCursor = cursor;
                 final int currentPage = pageCount;
 
-                ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
-                    client
-                        .documentName(GET_COLLABORATORS_DOCUMENT)
-                        .variable("owner", owner)
-                        .variable("name", name)
-                        .variable(
-                            "first",
-                            adaptPageSize(LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
-                        )
-                        .variable("after", currentCursor)
-                        .execute()
-                )
-                    .retryWhen(
-                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                            .jitter(JITTER_FACTOR)
-                            .filter(ScmTransportErrors::isTransportError)
-                            .doBeforeRetry(signal ->
-                                log.warn(
-                                    "Retrying after transport error: context=collaboratorSync, repoName={}, page={}, attempt={}, error={}",
-                                    safeNameWithOwner,
-                                    currentPage,
-                                    signal.totalRetries() + 1,
-                                    signal.failure().getMessage()
-                                )
-                            )
-                    )
-                    .block(syncProperties.graphqlTimeout());
+                ClientGraphQlResponse graphQlResponse = Mono.defer(() -> client.documentName(GET_COLLABORATORS_DOCUMENT)
+                                .variable("owner", owner)
+                                .variable("name", name)
+                                .variable(
+                                        "first",
+                                        adaptPageSize(
+                                                LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId)))
+                                .variable("after", currentCursor)
+                                .execute())
+                        .retryWhen(Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                                .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                                .jitter(JITTER_FACTOR)
+                                .filter(ScmTransportErrors::isTransportError)
+                                .doBeforeRetry(signal -> log.warn(
+                                        "Retrying after transport error: context=collaboratorSync, repoName={}, page={}, attempt={}, error={}",
+                                        safeNameWithOwner,
+                                        currentPage,
+                                        signal.totalRetries() + 1,
+                                        signal.failure().getMessage())))
+                        .block(syncProperties.graphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
                     ClassificationResult classification = graphQlSyncHelper.classifyGraphQlErrors(graphQlResponse);
                     if (classification != null) {
-                        if (
-                            graphQlSyncHelper.handleGraphQlClassification(
-                                new GraphQlClassificationContext(
-                                    classification,
-                                    retryAttempt,
-                                    MAX_RETRY_ATTEMPTS,
-                                    "collaborator sync",
-                                    "repoName",
-                                    safeNameWithOwner,
-                                    log
-                                )
-                            )
-                        ) {
+                        if (graphQlSyncHelper.handleGraphQlClassification(new GraphQlClassificationContext(
+                                classification,
+                                retryAttempt,
+                                MAX_RETRY_ATTEMPTS,
+                                "collaborator sync",
+                                "repoName",
+                                safeNameWithOwner,
+                                log))) {
                             retryAttempt++;
                             continue;
                         }
                         break;
                     }
                     log.warn(
-                        "Received invalid GraphQL response: repoName={}, errors={}",
-                        safeNameWithOwner,
-                        graphQlResponse != null ? graphQlResponse.getErrors() : "null"
-                    );
+                            "Received invalid GraphQL response: repoName={}, errors={}",
+                            safeNameWithOwner,
+                            graphQlResponse != null ? graphQlResponse.getErrors() : "null");
                     break;
                 }
 
@@ -196,22 +180,15 @@ public class GitHubCollaboratorSyncService {
 
                 // Check if we should pause due to rate limiting
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    if (
-                        !graphQlSyncHelper.waitForRateLimitIfNeeded(
-                            scopeId,
-                            "collaborator sync",
-                            "repoName",
-                            safeNameWithOwner,
-                            log
-                        )
-                    ) {
+                    if (!graphQlSyncHelper.waitForRateLimitIfNeeded(
+                            scopeId, "collaborator sync", "repoName", safeNameWithOwner, log)) {
                         break;
                     }
                 }
 
                 GHRepositoryCollaboratorConnection response = graphQlResponse
-                    .field("repository.collaborators")
-                    .toEntity(GHRepositoryCollaboratorConnection.class);
+                        .field("repository.collaborators")
+                        .toEntity(GHRepositoryCollaboratorConnection.class);
 
                 if (response == null || response.getEdges() == null) {
                     break;
@@ -234,9 +211,8 @@ public class GitHubCollaboratorSyncService {
                         continue;
                     }
                     User user = userProcessor.findOrCreate(
-                        userDTO,
-                        Objects.requireNonNull(repository.getProvider().getId())
-                    );
+                            userDTO,
+                            Objects.requireNonNull(repository.getProvider().getId()));
                     if (user == null) {
                         continue;
                     }
@@ -262,12 +238,11 @@ public class GitHubCollaboratorSyncService {
             // Raw edges received vs collaborators.totalCount (totalSynced is post-filter).
             if (reportedTotalCount >= 0) {
                 GraphQlConnectionOverflowDetector.checkPaginated(
-                    "collaborators",
-                    collaboratorsReceived,
-                    reportedTotalCount,
-                    !syncCompletedNormally,
-                    safeNameWithOwner
-                );
+                        "collaborators",
+                        collaboratorsReceived,
+                        reportedTotalCount,
+                        !syncCompletedNormally,
+                        safeNameWithOwner);
             }
 
             // CRITICAL: Only remove stale collaborators if sync completed fully.
@@ -278,38 +253,25 @@ public class GitHubCollaboratorSyncService {
                 removedCount = removeStaleCollaborators(repositoryId, syncedUserIds);
             } else {
                 log.warn(
-                    "Skipped stale collaborator removal: reason=incompleteSync, repoName={}, pagesProcessed={}",
-                    safeNameWithOwner,
-                    pageCount
-                );
+                        "Skipped stale collaborator removal: reason=incompleteSync, repoName={}, pagesProcessed={}",
+                        safeNameWithOwner,
+                        pageCount);
             }
 
             log.info(
-                "Completed collaborator sync: repoName={}, collaboratorCount={}, removedCount={}, complete={}",
-                safeNameWithOwner,
-                totalSynced,
-                removedCount,
-                syncCompletedNormally
-            );
+                    "Completed collaborator sync: repoName={}, collaboratorCount={}, removedCount={}, complete={}",
+                    safeNameWithOwner,
+                    totalSynced,
+                    removedCount,
+                    syncCompletedNormally);
             return totalSynced;
         } catch (InstallationNotFoundException e) {
             // Re-throw to abort the entire sync operation
             throw e;
         } catch (Exception e) {
             ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
-            if (
-                !graphQlSyncHelper.handleGraphQlClassification(
-                    new GraphQlClassificationContext(
-                        classification,
-                        0,
-                        MAX_RETRY_ATTEMPTS,
-                        "collaborator sync",
-                        "repoName",
-                        safeNameWithOwner,
-                        log
-                    )
-                )
-            ) {
+            if (!graphQlSyncHelper.handleGraphQlClassification(new GraphQlClassificationContext(
+                    classification, 0, MAX_RETRY_ATTEMPTS, "collaborator sync", "repoName", safeNameWithOwner, log))) {
                 return 0;
             }
             return 0;
@@ -324,10 +286,8 @@ public class GitHubCollaboratorSyncService {
      * @param permission the permission level
      */
     private void upsertCollaborator(Repository repository, User user, RepositoryCollaborator.Permission permission) {
-        Optional<RepositoryCollaborator> existing = collaboratorRepository.findByRepositoryIdAndUserId(
-            repository.getId(),
-            user.getId()
-        );
+        Optional<RepositoryCollaborator> existing =
+                collaboratorRepository.findByRepositoryIdAndUserId(repository.getId(), user.getId());
 
         if (existing.isPresent()) {
             // Update permission if changed
@@ -371,11 +331,10 @@ public class GitHubCollaboratorSyncService {
                 collaboratorRepository.delete(existing);
                 removedCount++;
                 log.debug(
-                    "Removed stale collaborator: repoId={}, userId={}, userLogin={}",
-                    repositoryId,
-                    existing.getUser().getId(),
-                    sanitizeForLog(existing.getUser().getLogin())
-                );
+                        "Removed stale collaborator: repoId={}, userId={}, userLogin={}",
+                        repositoryId,
+                        existing.getUser().getId(),
+                        sanitizeForLog(existing.getUser().getLogin()));
             }
         }
 

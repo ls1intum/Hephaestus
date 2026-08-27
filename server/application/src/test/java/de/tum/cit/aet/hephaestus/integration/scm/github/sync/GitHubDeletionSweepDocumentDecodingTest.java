@@ -57,12 +57,10 @@ class GitHubDeletionSweepDocumentDecodingTest extends BaseUnitTest {
         return switch (fieldName) {
             case "__typename" -> graphQlTypeName;
             case "number" -> 42;
-            default -> throw new IllegalStateException(
-                "Document selects field '" +
-                    fieldName +
-                    "' that this test has no sample value for. Add one so the new selection is proven " +
-                    "to decode, or drop the field from the document."
-            );
+            default ->
+                throw new IllegalStateException("Document selects field '" + fieldName
+                        + "' that this test has no sample value for. Add one so the new selection is proven "
+                        + "to decode, or drop the field from the document.");
         };
     }
 
@@ -72,9 +70,9 @@ class GitHubDeletionSweepDocumentDecodingTest extends BaseUnitTest {
      */
     private static JsonMapper productionMapper() {
         JsonMapper base = JsonMapper.builder()
-            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-            .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
-            .build();
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+                .build();
         return GitHubGraphQlConfig.gitHubGraphQlObjectMapper(base);
     }
 
@@ -116,8 +114,8 @@ class GitHubDeletionSweepDocumentDecodingTest extends BaseUnitTest {
     private static String responseJsonForDocument(String documentName, String graphQlTypeName) {
         Set<String> selectedFields = nodeSelectionOf(readDocument(documentName));
         assertThat(selectedFields)
-            .as("document %s selects no node fields — the parser or the document changed shape", documentName)
-            .isNotEmpty();
+                .as("document %s selects no node fields — the parser or the document changed shape", documentName)
+                .isNotEmpty();
 
         Map<String, Object> node = new LinkedHashMap<>();
         for (String field : selectedFields) {
@@ -148,10 +146,7 @@ class GitHubDeletionSweepDocumentDecodingTest extends BaseUnitTest {
 
     /** Comment lines may mention node selections or field names in prose; they are not selections. */
     private static String stripComments(String document) {
-        return document
-            .lines()
-            .filter(line -> !line.strip().startsWith("#"))
-            .reduce("", (a, b) -> a + "\n" + b);
+        return document.lines().filter(line -> !line.strip().startsWith("#")).reduce("", (a, b) -> a + "\n" + b);
     }
 
     private static String readDocument(String documentName) {

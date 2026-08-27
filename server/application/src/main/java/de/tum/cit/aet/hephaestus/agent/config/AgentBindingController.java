@@ -40,33 +40,28 @@ public class AgentBindingController {
     @ApiResponse(responseCode = "200", description = "Bindings returned")
     @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<List<AgentBindingDTO>> listAgents(WorkspaceContext workspaceContext) {
-        List<AgentBindingDTO> bindings = agentBindingService
-            .getBindings(workspaceContext)
-            .stream()
-            .map(binding -> AgentBindingDTO.from(binding, agentBindingService.isReady(binding)))
-            .toList();
+        List<AgentBindingDTO> bindings = agentBindingService.getBindings(workspaceContext).stream()
+                .map(binding -> AgentBindingDTO.from(binding, agentBindingService.isReady(binding)))
+                .toList();
         return ResponseEntity.ok(bindings);
     }
 
     @PutMapping("/{purpose}")
     @Operation(summary = "Configure the agent for one purpose")
     @ApiResponse(
-        responseCode = "200",
-        description = "Binding saved",
-        content = @Content(schema = @Schema(implementation = AgentBindingDTO.class))
-    )
+            responseCode = "200",
+            description = "Binding saved",
+            content = @Content(schema = @Schema(implementation = AgentBindingDTO.class)))
     @ApiResponse(
-        responseCode = "404",
-        description = "Model not found",
-        content = @Content(schema = @Schema(hidden = true))
-    )
+            responseCode = "404",
+            description = "Model not found",
+            content = @Content(schema = @Schema(hidden = true)))
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "AGENT_BINDING")
     public ResponseEntity<AgentBindingDTO> configureAgent(
-        WorkspaceContext workspaceContext,
-        @PathVariable AgentPurpose purpose,
-        @Valid @RequestBody AgentBindingRequestDTO request
-    ) {
+            WorkspaceContext workspaceContext,
+            @PathVariable AgentPurpose purpose,
+            @Valid @RequestBody AgentBindingRequestDTO request) {
         WorkspaceAgentBinding binding = agentBindingService.upsertBinding(workspaceContext, purpose, request);
         return ResponseEntity.ok(AgentBindingDTO.from(binding, agentBindingService.isReady(binding)));
     }

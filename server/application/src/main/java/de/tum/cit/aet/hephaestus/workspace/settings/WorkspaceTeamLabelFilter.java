@@ -63,10 +63,9 @@ public class WorkspaceTeamLabelFilter {
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("workspaceId")
     @JoinColumn(
-        name = "workspace_id",
-        nullable = false,
-        foreignKey = @ForeignKey(name = "fk_workspace_team_label_filter_workspace")
-    )
+            name = "workspace_id",
+            nullable = false,
+            foreignKey = @ForeignKey(name = "fk_workspace_team_label_filter_workspace"))
     @ToString.Exclude
     private Workspace workspace;
 
@@ -74,10 +73,9 @@ public class WorkspaceTeamLabelFilter {
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("teamId")
     @JoinColumn(
-        name = "team_id",
-        nullable = false,
-        foreignKey = @ForeignKey(name = "fk_workspace_team_label_filter_team")
-    )
+            name = "team_id",
+            nullable = false,
+            foreignKey = @ForeignKey(name = "fk_workspace_team_label_filter_team"))
     @ToString.Exclude
     private Team team;
 
@@ -85,10 +83,9 @@ public class WorkspaceTeamLabelFilter {
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("labelId")
     @JoinColumn(
-        name = "label_id",
-        nullable = false,
-        foreignKey = @ForeignKey(name = "fk_workspace_team_label_filter_label")
-    )
+            name = "label_id",
+            nullable = false,
+            foreignKey = @ForeignKey(name = "fk_workspace_team_label_filter_label"))
     @ToString.Exclude
     private Label label;
 

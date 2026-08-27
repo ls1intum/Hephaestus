@@ -51,12 +51,12 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
     void setup() {
         databaseTestUtils.cleanDatabase();
         repositoryEnumerator.reset();
-        // Ensure GitHub IdentityProvider exists - required by WorkspaceRepositoryMonitorService.ensureRepositoryFromSnapshot
+        // Ensure GitHub IdentityProvider exists - required by
+        // WorkspaceRepositoryMonitorService.ensureRepositoryFromSnapshot
         gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
         // Clear any suspended installation state from previous tests
         // This prevents test pollution when async syncs mark installations as suspended
         gitHubAppTokenService.markInstallationActive(INSTALLATION_ID);
@@ -67,12 +67,9 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
         Workspace workspace = persistWorkspace(RepositorySelection.ALL);
         repositoryToMonitorRepository.save(buildMonitor(workspace, "HephaestusTest/Orphaned"));
 
-        repositoryEnumerator.returns(
-            List.of(
+        repositoryEnumerator.returns(List.of(
                 snapshot(1L, "HephaestusTest/demo-repository", "demo-repository", true),
-                snapshot(2L, "HephaestusTest/payload-fixture-repo-renamed", "payload-fixture-repo-renamed", false)
-            )
-        );
+                snapshot(2L, "HephaestusTest/payload-fixture-repo-renamed", "payload-fixture-repo-renamed", false)));
 
         // Use deferSync=true to prevent async syncs from running during test
         // Async syncs can mark installations as suspended on 403 errors, affecting subsequent calls
@@ -80,11 +77,15 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
 
         List<RepositoryToMonitor> monitors = repositoryToMonitorRepository.findByWorkspaceId(workspace.getId());
         assertThat(monitors)
-            .extracting(RepositoryToMonitor::getNameWithOwner)
-            .containsExactlyInAnyOrder("HephaestusTest/demo-repository", "HephaestusTest/payload-fixture-repo-renamed");
-        assertThat(repositoryRepository.findByNameWithOwner("HephaestusTest/demo-repository")).isPresent();
-        assertThat(repositoryRepository.findByNameWithOwner("HephaestusTest/payload-fixture-repo-renamed")).isPresent();
-        assertThat(repositoryRepository.findByNameWithOwner("HephaestusTest/Orphaned")).isEmpty();
+                .extracting(RepositoryToMonitor::getNameWithOwner)
+                .containsExactlyInAnyOrder(
+                        "HephaestusTest/demo-repository", "HephaestusTest/payload-fixture-repo-renamed");
+        assertThat(repositoryRepository.findByNameWithOwner("HephaestusTest/demo-repository"))
+                .isPresent();
+        assertThat(repositoryRepository.findByNameWithOwner("HephaestusTest/payload-fixture-repo-renamed"))
+                .isPresent();
+        assertThat(repositoryRepository.findByNameWithOwner("HephaestusTest/Orphaned"))
+                .isEmpty();
     }
 
     @Test
@@ -98,8 +99,8 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
 
         List<RepositoryToMonitor> monitors = repositoryToMonitorRepository.findByWorkspaceId(workspace.getId());
         assertThat(monitors)
-            .extracting(RepositoryToMonitor::getNameWithOwner)
-            .containsExactly("HephaestusTest/HelloWorld");
+                .extracting(RepositoryToMonitor::getNameWithOwner)
+                .containsExactly("HephaestusTest/HelloWorld");
     }
 
     @Test
@@ -109,12 +110,13 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
         workspaceRepository.saveAndFlush(workspace);
 
         workspaceRepositoryMonitorService.ensureRepositoryAndMonitorFromSnapshot(
-            INSTALLATION_ID,
-            new ProvisioningListener.RepositorySnapshot(4L, "HephaestusTest/replayed", "replayed", true)
-        );
+                INSTALLATION_ID,
+                new ProvisioningListener.RepositorySnapshot(4L, "HephaestusTest/replayed", "replayed", true));
 
-        assertThat(repositoryToMonitorRepository.findByWorkspaceId(workspace.getId())).isEmpty();
-        assertThat(repositoryRepository.findByNameWithOwner("HephaestusTest/replayed")).isEmpty();
+        assertThat(repositoryToMonitorRepository.findByWorkspaceId(workspace.getId()))
+                .isEmpty();
+        assertThat(repositoryRepository.findByNameWithOwner("HephaestusTest/replayed"))
+                .isEmpty();
     }
 
     @Test
@@ -125,29 +127,24 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
         workspaceRepository.saveAndFlush(workspace);
 
         workspaceRepositoryMonitorService.removeRepositoryMonitorForInstallation(
-            INSTALLATION_ID,
-            "HephaestusTest/retained"
-        );
+                INSTALLATION_ID, "HephaestusTest/retained");
 
         assertThat(repositoryToMonitorRepository.findByWorkspaceId(workspace.getId()))
-            .extracting(RepositoryToMonitor::getNameWithOwner)
-            .containsExactly("HephaestusTest/retained");
+                .extracting(RepositoryToMonitor::getNameWithOwner)
+                .containsExactly("HephaestusTest/retained");
     }
 
     private Workspace persistWorkspace(RepositorySelection selection) {
         var builder = WorkspaceTestFixtures.installationWorkspace(INSTALLATION_ID, "HephaestusTest")
-            .withRepositorySelection(selection)
-            .withSlug("ws-install-" + INSTALLATION_ID + "-" + selection.name().toLowerCase(Locale.ENGLISH));
+                .withRepositorySelection(selection)
+                .withSlug(
+                        "ws-install-" + INSTALLATION_ID + "-" + selection.name().toLowerCase(Locale.ENGLISH));
         // the provider classification used by
         // WorkspaceRepositoryMonitorService.isGitHubAppWorkspace pulls from the
         // Connection registry, so the fixture must persist the GitHub App connection
         // alongside the Workspace.
         return WorkspaceTestFixtures.persistInstallationWorkspace(
-            workspaceRepository,
-            connectionRepository,
-            builder,
-            INSTALLATION_ID
-        );
+                workspaceRepository, connectionRepository, builder, INSTALLATION_ID);
     }
 
     private RepositoryToMonitor buildMonitor(Workspace workspace, String nameWithOwner) {
@@ -155,11 +152,7 @@ class WorkspaceRepositoryCoverageIntegrationTest extends BaseIntegrationTest {
     }
 
     private InstallationRepositoryEnumerator.InstallationRepository snapshot(
-        long id,
-        String nameWithOwner,
-        String name,
-        boolean isPrivate
-    ) {
+            long id, String nameWithOwner, String name, boolean isPrivate) {
         return new InstallationRepositoryEnumerator.InstallationRepository(id, nameWithOwner, name, isPrivate);
     }
 }

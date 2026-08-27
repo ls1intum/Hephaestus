@@ -30,17 +30,22 @@ class ObservationFingerprintTest extends BaseUnitTest {
     @DisplayName("the file PATH is part of identity; a different file is a different finding")
     void pathParticipates() {
         String foo = ObservationFingerprint.compute(SLUG, TYPE, 42L, 7L, "Foo.swift");
-        assertThat(ObservationFingerprint.compute(SLUG, TYPE, 42L, 7L, "Bar.swift")).isNotEqualTo(foo);
+        assertThat(ObservationFingerprint.compute(SLUG, TYPE, 42L, 7L, "Bar.swift"))
+                .isNotEqualTo(foo);
     }
 
     @Test
     @DisplayName("a different practice / target / subject is a different finding")
     void discriminators() {
         String base = ObservationFingerprint.compute(SLUG, TYPE, 42L, 7L, "F.swift");
-        assertThat(ObservationFingerprint.compute("other-practice", TYPE, 42L, 7L, "F.swift")).isNotEqualTo(base);
-        assertThat(ObservationFingerprint.compute(SLUG, "scm.issue", 42L, 7L, "F.swift")).isNotEqualTo(base);
-        assertThat(ObservationFingerprint.compute(SLUG, TYPE, 99L, 7L, "F.swift")).isNotEqualTo(base);
-        assertThat(ObservationFingerprint.compute(SLUG, TYPE, 42L, 8L, "F.swift")).isNotEqualTo(base);
+        assertThat(ObservationFingerprint.compute("other-practice", TYPE, 42L, 7L, "F.swift"))
+                .isNotEqualTo(base);
+        assertThat(ObservationFingerprint.compute(SLUG, "scm.issue", 42L, 7L, "F.swift"))
+                .isNotEqualTo(base);
+        assertThat(ObservationFingerprint.compute(SLUG, TYPE, 99L, 7L, "F.swift"))
+                .isNotEqualTo(base);
+        assertThat(ObservationFingerprint.compute(SLUG, TYPE, 42L, 8L, "F.swift"))
+                .isNotEqualTo(base);
     }
 
     @Test
@@ -59,14 +64,14 @@ class ObservationFingerprintTest extends BaseUnitTest {
         // casing/spacing differences across runs must NOT produce a different recurrence key.
         String canonical = ObservationFingerprint.compute(SLUG, TYPE, 42L, 7L, "src/foo.swift");
         assertThat(ObservationFingerprint.compute(SLUG, TYPE, 42L, 7L, "  SRC/Foo.swift  "))
-            .as("leading/trailing whitespace + upper-case folds to the same key")
-            .isEqualTo(canonical);
+                .as("leading/trailing whitespace + upper-case folds to the same key")
+                .isEqualTo(canonical);
         assertThat(ObservationFingerprint.compute(SLUG, TYPE, 42L, 7L, "src/foo.swift\t"))
-            .as("trailing whitespace folds to the same key")
-            .isEqualTo(canonical);
+                .as("trailing whitespace folds to the same key")
+                .isEqualTo(canonical);
         assertThat(ObservationFingerprint.compute(SLUG, TYPE, 42L, 7L, "src/  foo.swift"))
-            .as("internal whitespace collapses (the replaceAll(\\s+,' ') branch) to the same key")
-            .isEqualTo(ObservationFingerprint.compute(SLUG, TYPE, 42L, 7L, "src/ foo.swift"));
+                .as("internal whitespace collapses (the replaceAll(\\s+,' ') branch) to the same key")
+                .isEqualTo(ObservationFingerprint.compute(SLUG, TYPE, 42L, 7L, "src/ foo.swift"));
     }
 
     @Test
@@ -76,11 +81,11 @@ class ObservationFingerprintTest extends BaseUnitTest {
         // Were it dropped, these pairs (which differ ONLY in where the boundary falls) would collide and
         // silently re-identify distinct findings. Lock that the separator keeps them apart.
         assertThat(ObservationFingerprint.compute("a-b", "PR", 1L, 1L, "F"))
-            .as("slug 'a-b' + type 'PR' must not collide with slug 'a' + type 'b-PR'")
-            .isNotEqualTo(ObservationFingerprint.compute("a", "b-PR", 1L, 1L, "F"));
+                .as("slug 'a-b' + type 'PR' must not collide with slug 'a' + type 'b-PR'")
+                .isNotEqualTo(ObservationFingerprint.compute("a", "b-PR", 1L, 1L, "F"));
         assertThat(ObservationFingerprint.compute(SLUG, TYPE, 1L, 23L, "F"))
-            .as("artifactId 1 + aboutUserId 23 must not collide with artifactId 12 + aboutUserId 3")
-            .isNotEqualTo(ObservationFingerprint.compute(SLUG, TYPE, 12L, 3L, "F"));
+                .as("artifactId 1 + aboutUserId 23 must not collide with artifactId 12 + aboutUserId 3")
+                .isNotEqualTo(ObservationFingerprint.compute(SLUG, TYPE, 12L, 3L, "F"));
     }
 
     @Test
@@ -91,19 +96,19 @@ class ObservationFingerprintTest extends BaseUnitTest {
         // must canonicalize to one locus rather than two distinct recurrence keys.
         String canonical = ObservationFingerprint.compute(SLUG, TYPE, 42L, 7L, "src/foo.swift");
         assertThat(ObservationFingerprint.compute(SLUG, TYPE, 42L, 7L, "src/foo.swift"))
-            .as("an embedded unit-separator byte is stripped, not preserved")
-            .isEqualTo(canonical);
+                .as("an embedded unit-separator byte is stripped, not preserved")
+                .isEqualTo(canonical);
     }
 
     @Test
     @DisplayName("required args fail fast at the guard, not deep in the digest builder")
     void requiredArgsFailFast() {
         assertThatThrownBy(() -> ObservationFingerprint.compute(null, TYPE, 1L, 1L, null))
-            .isInstanceOf(NullPointerException.class)
-            .hasMessage("practiceSlug");
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("practiceSlug");
         assertThatThrownBy(() -> ObservationFingerprint.compute(SLUG, null, 1L, 1L, null))
-            .isInstanceOf(NullPointerException.class)
-            .hasMessage("artifactKind");
+                .isInstanceOf(NullPointerException.class)
+                .hasMessage("artifactKind");
     }
 
     @Test
@@ -114,8 +119,7 @@ class ObservationFingerprintTest extends BaseUnitTest {
         // such a change must be a deliberate, reviewed edit to this expectation. The cost of making it
         // is that observations recorded under the old key stop correlating with new ones — at most one
         // re-posted piece of feedback per open artifact.
-        assertThat(ObservationFingerprint.compute(SLUG, TYPE, 42L, 7L, "Foo.swift")).isEqualTo(
-            "a8b20bf6e20b28b3315420a241577853676ceed52e7be2976f94d3978cfa830d"
-        );
+        assertThat(ObservationFingerprint.compute(SLUG, TYPE, 42L, 7L, "Foo.swift"))
+                .isEqualTo("a8b20bf6e20b28b3315420a241577853676ceed52e7be2976f94d3978cfa830d");
     }
 }

@@ -35,11 +35,10 @@ public class UserPreferences {
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(
-        name = "user_id",
-        nullable = false,
-        unique = true,
-        foreignKey = @ForeignKey(name = "fk_user_preferences_user")
-    )
+            name = "user_id",
+            nullable = false,
+            unique = true,
+            foreignKey = @ForeignKey(name = "fk_user_preferences_user"))
     @ToString.Exclude
     private User user;
 

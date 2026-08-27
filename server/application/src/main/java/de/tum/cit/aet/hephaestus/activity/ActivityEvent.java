@@ -46,24 +46,24 @@ import org.jspecify.annotations.Nullable;
 @Entity
 @Immutable
 @Table(
-    name = "activity_event",
-    uniqueConstraints = {
-        @UniqueConstraint(name = "uk_activity_event_workspace_key", columnNames = { "workspace_id", "event_key" }),
-    },
-    indexes = {
-        // Leaderboard queries: workspace aggregations with time range
-        @Index(name = "idx_activity_event_workspace_occurred", columnList = "workspace_id, occurred_at DESC"),
-        // User activity queries: mentor context with time range
-        @Index(name = "idx_activity_event_actor_occurred", columnList = "actor_id, occurred_at DESC"),
-        // Combined workspace + user queries: activity breakdown
-        @Index(
-            name = "idx_activity_event_workspace_actor_occurred",
-            columnList = "workspace_id, actor_id, occurred_at DESC"
-        ),
-        // XP lookup for profile hydration: batch load XP by target
-        @Index(name = "idx_activity_event_xp_lookup", columnList = "workspace_id, target_type, target_id"),
-    }
-)
+        name = "activity_event",
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "uk_activity_event_workspace_key",
+                    columnNames = {"workspace_id", "event_key"}),
+        },
+        indexes = {
+            // Leaderboard queries: workspace aggregations with time range
+            @Index(name = "idx_activity_event_workspace_occurred", columnList = "workspace_id, occurred_at DESC"),
+            // User activity queries: mentor context with time range
+            @Index(name = "idx_activity_event_actor_occurred", columnList = "actor_id, occurred_at DESC"),
+            // Combined workspace + user queries: activity breakdown
+            @Index(
+                    name = "idx_activity_event_workspace_actor_occurred",
+                    columnList = "workspace_id, actor_id, occurred_at DESC"),
+            // XP lookup for profile hydration: batch load XP by target
+            @Index(name = "idx_activity_event_xp_lookup", columnList = "workspace_id, target_type, target_id"),
+        })
 @Getter
 @Builder
 @NoArgsConstructor

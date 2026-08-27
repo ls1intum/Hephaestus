@@ -44,13 +44,10 @@ public interface LlmModelRepository extends JpaRepository<LlmModel, Long> {
      * Both {@code llm_model} and {@code llm_model_workspace_grant} are global tables, so
      * {@code :workspaceId} is a plain filter here, not a tenancy predicate.
      */
-    @Query(
-        "SELECT m FROM LlmModel m JOIN FETCH m.connection c " +
-            "WHERE m.enabled = true AND c.enabled = true " +
-            "AND (m.visibility = de.tum.cit.aet.hephaestus.agent.catalog.ModelVisibility.PUBLIC " +
-            "OR EXISTS (SELECT 1 FROM LlmModelWorkspaceGrant g " +
-            "WHERE g.id.modelId = m.id AND g.id.workspaceId = :workspaceId)) " +
-            "ORDER BY m.id"
-    )
+    @Query("SELECT m FROM LlmModel m JOIN FETCH m.connection c " + "WHERE m.enabled = true AND c.enabled = true "
+            + "AND (m.visibility = de.tum.cit.aet.hephaestus.agent.catalog.ModelVisibility.PUBLIC "
+            + "OR EXISTS (SELECT 1 FROM LlmModelWorkspaceGrant g "
+            + "WHERE g.id.modelId = m.id AND g.id.workspaceId = :workspaceId)) "
+            + "ORDER BY m.id")
     List<LlmModel> findVisibleEnabledModels(@Param("workspaceId") Long workspaceId);
 }

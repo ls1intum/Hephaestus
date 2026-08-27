@@ -26,13 +26,11 @@ public final class OutlineConnectionResolver {
     /** The workspace's ACTIVE, usably-configured Outline connection, or {@link EntityNotFoundException} (404). */
     public static Connection requireActiveConnection(ConnectionService connectionService, long workspaceId) {
         Connection connection = connectionService
-            .findActive(workspaceId, IntegrationKind.OUTLINE)
-            .orElseThrow(() -> new EntityNotFoundException("Outline connection", Long.toString(workspaceId)));
-        if (
-            !(connection.getConfig() instanceof ConnectionConfig.OutlineConfig config) ||
-            config.serverUrl() == null ||
-            config.serverUrl().isBlank()
-        ) {
+                .findActive(workspaceId, IntegrationKind.OUTLINE)
+                .orElseThrow(() -> new EntityNotFoundException("Outline connection", Long.toString(workspaceId)));
+        if (!(connection.getConfig() instanceof ConnectionConfig.OutlineConfig config)
+                || config.serverUrl() == null
+                || config.serverUrl().isBlank()) {
             throw new EntityNotFoundException("Outline connection", Long.toString(workspaceId));
         }
         return connection;

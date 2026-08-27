@@ -36,10 +36,9 @@ class SlackInteractivityControllerTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         controller = new SlackInteractivityController(
-            new SlackSignatureVerifier(SIGNING_SECRET),
-            handler,
-            JsonMapper.builder().build()
-        );
+                new SlackSignatureVerifier(SIGNING_SECRET),
+                handler,
+                JsonMapper.builder().build());
     }
 
     private static String formBody(String payloadJson) {

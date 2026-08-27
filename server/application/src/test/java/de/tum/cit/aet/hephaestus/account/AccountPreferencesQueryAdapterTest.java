@@ -18,7 +18,7 @@ class AccountPreferencesQueryAdapterTest extends BaseUnitTest {
         when(userPreferencesRepository.findByUserId(7L)).thenThrow(new IllegalStateException("db down"));
 
         assertThatThrownBy(() -> adapter.preferencesForUserId(7L))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessage("db down");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("db down");
     }
 }

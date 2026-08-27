@@ -41,11 +41,10 @@ public abstract class BaseGitHubProcessor {
     private final GitHubUserProcessor gitHubUserProcessor;
 
     protected BaseGitHubProcessor(
-        UserRepository userRepository,
-        @Nullable LabelRepository labelRepository,
-        @Nullable MilestoneRepository milestoneRepository,
-        GitHubUserProcessor gitHubUserProcessor
-    ) {
+            UserRepository userRepository,
+            @Nullable LabelRepository labelRepository,
+            @Nullable MilestoneRepository milestoneRepository,
+            GitHubUserProcessor gitHubUserProcessor) {
         this.userRepository = userRepository;
         this.labelRepository = labelRepository;
         this.milestoneRepository = milestoneRepository;
@@ -104,7 +103,7 @@ public abstract class BaseGitHubProcessor {
         // Use atomic insert to prevent race conditions.
         // If another thread inserted first, this returns 0 and we fetch the winner.
         long nativeId =
-            dto.id() != null ? dto.id() : LabelIdUtils.generateDeterministicId(repository.getId(), dto.name());
+                dto.id() != null ? dto.id() : LabelIdUtils.generateDeterministicId(repository.getId(), dto.name());
         Long providerId = Objects.requireNonNull(repository.getProvider().getId());
         labels.insertIfAbsent(nativeId, providerId, dto.name(), dto.color(), repository.getId());
 
@@ -151,41 +150,45 @@ public abstract class BaseGitHubProcessor {
         // Use atomic insert to prevent race conditions.
         // If another thread inserted first, this returns 0 and we fetch the winner.
         Long milestoneId =
-            dto.id() != null ? dto.id() : generateDeterministicMilestoneId(repository.getId(), dto.number());
+                dto.id() != null ? dto.id() : generateDeterministicMilestoneId(repository.getId(), dto.number());
 
         String title = dto.title() != null ? dto.title() : "Milestone " + dto.number();
         String htmlUrl = dto.htmlUrl() != null ? dto.htmlUrl() : "";
-        String state = parseMilestoneState(dto.state() == null ? "open" : dto.state()).name();
+        String state =
+                parseMilestoneState(dto.state() == null ? "open" : dto.state()).name();
         int openIssuesCount = dto.openIssuesCount() != null ? dto.openIssuesCount() : 0;
         int closedIssuesCount = dto.closedIssuesCount() != null ? dto.closedIssuesCount() : 0;
 
         Long providerId = Objects.requireNonNull(repository.getProvider().getId());
         int inserted = milestones.insertIfAbsent(
-            milestoneId,
-            providerId,
-            dto.number(),
-            title,
-            dto.description(),
-            state,
-            htmlUrl,
-            dto.dueOn(),
-            openIssuesCount,
-            closedIssuesCount,
-            repository.getId(),
-            dto.createdAt(),
-            dto.updatedAt()
-        );
+                milestoneId,
+                providerId,
+                dto.number(),
+                title,
+                dto.description(),
+                state,
+                htmlUrl,
+                dto.dueOn(),
+                openIssuesCount,
+                closedIssuesCount,
+                repository.getId(),
+                dto.createdAt(),
+                dto.updatedAt());
 
         if (inserted == 0) {
             // Another thread inserted first - fetch the winner
-            return milestones.findByNumberAndRepositoryId(dto.number(), repository.getId()).orElse(null);
+            return milestones
+                    .findByNumberAndRepositoryId(dto.number(), repository.getId())
+                    .orElse(null);
         }
 
         // We inserted - fetch the entity to return a managed instance.
         // Must look up by natural key (number + repository), not by milestoneId,
         // because the table uses auto-generated synthetic PKs (the milestoneId here
         // is the native provider ID stored in native_id, not the synthetic PK).
-        return milestones.findByNumberAndRepositoryId(dto.number(), repository.getId()).orElse(null);
+        return milestones
+                .findByNumberAndRepositoryId(dto.number(), repository.getId())
+                .orElse(null);
     }
 
     /**
@@ -205,10 +208,8 @@ public abstract class BaseGitHubProcessor {
      */
     private Milestone.State parseMilestoneState(String state) {
         if (state == null) {
-            log.warn(
-                "Milestone state is null, defaulting to OPEN. " +
-                    "This may indicate missing data in webhook or GraphQL response."
-            );
+            log.warn("Milestone state is null, defaulting to OPEN. "
+                    + "This may indicate missing data in webhook or GraphQL response.");
             return Milestone.State.OPEN;
         }
         return switch (state.toUpperCase()) {
@@ -241,10 +242,7 @@ public abstract class BaseGitHubProcessor {
      * @return true if assignments changed, false otherwise
      */
     protected boolean updateAssignees(
-        @Nullable List<GitHubUserDTO> assigneeDtos,
-        Set<User> currentAssignees,
-        Long providerId
-    ) {
+            @Nullable List<GitHubUserDTO> assigneeDtos, Set<User> currentAssignees, Long providerId) {
         if (assigneeDtos == null) {
             return false;
         }
@@ -275,10 +273,7 @@ public abstract class BaseGitHubProcessor {
      * @return true if labels changed, false otherwise
      */
     protected boolean updateLabels(
-        @Nullable List<GitHubLabelDTO> labelDtos,
-        Collection<Label> currentLabels,
-        Repository repository
-    ) {
+            @Nullable List<GitHubLabelDTO> labelDtos, Collection<Label> currentLabels, Repository repository) {
         if (labelDtos == null) {
             return false;
         }
@@ -308,10 +303,7 @@ public abstract class BaseGitHubProcessor {
      * @return true if reviewers changed, false otherwise
      */
     protected boolean updateRequestedReviewers(
-        @Nullable List<GitHubUserDTO> reviewerDtos,
-        Set<User> currentReviewers,
-        Long providerId
-    ) {
+            @Nullable List<GitHubUserDTO> reviewerDtos, Set<User> currentReviewers, Long providerId) {
         if (reviewerDtos == null) {
             return false;
         }

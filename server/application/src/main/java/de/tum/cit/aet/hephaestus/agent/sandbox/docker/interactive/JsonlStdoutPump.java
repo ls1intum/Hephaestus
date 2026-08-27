@@ -36,16 +36,15 @@ final class JsonlStdoutPump {
     private final Map<String, String> mdcSnapshot;
 
     JsonlStdoutPump(
-        UUID sessionId,
-        Reader source,
-        ObjectMapper mapper,
-        FrameSink sink,
-        IntConsumer onEof,
-        IntSupplier exitCodeSupplier,
-        Counter parseErrorCounter,
-        int maxLineChars,
-        Map<String, String> mdcSnapshot
-    ) {
+            UUID sessionId,
+            Reader source,
+            ObjectMapper mapper,
+            FrameSink sink,
+            IntConsumer onEof,
+            IntSupplier exitCodeSupplier,
+            Counter parseErrorCounter,
+            int maxLineChars,
+            Map<String, String> mdcSnapshot) {
         this.sessionId = sessionId;
         // 1 read() per byte against a raw stream is 1 syscall per byte; wrap unless already buffered.
         this.source = source instanceof BufferedReader br ? br : new BufferedReader(source);
@@ -60,9 +59,9 @@ final class JsonlStdoutPump {
 
     void start() {
         Thread.ofVirtual()
-            .name("mentor-pump-" + sessionId)
-            .uncaughtExceptionHandler((t, ex) -> log.warn("Pump thread died unexpectedly: {}", sessionId, ex))
-            .start(this::pumpLoop);
+                .name("mentor-pump-" + sessionId)
+                .uncaughtExceptionHandler((t, ex) -> log.warn("Pump thread died unexpectedly: {}", sessionId, ex))
+                .start(this::pumpLoop);
     }
 
     private void pumpLoop() {

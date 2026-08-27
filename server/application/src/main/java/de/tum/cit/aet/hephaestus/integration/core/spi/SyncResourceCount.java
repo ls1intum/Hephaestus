@@ -28,11 +28,10 @@ import org.jspecify.annotations.Nullable;
  *                     watermark; {@code null} means "not tracked", never "never synced"
  */
 public record SyncResourceCount(
-    @NonNull String key,
-    @NonNull String label,
-    long count,
-    @Nullable Instant lastSyncedAt
-) {
+        @NonNull String key,
+        @NonNull String label,
+        long count,
+        @Nullable Instant lastSyncedAt) {
     public static final String KEY_ISSUES = "issues";
     public static final String KEY_PULL_REQUESTS = "pullRequests";
     public static final String KEY_ISSUE_COMMENTS = "issueComments";

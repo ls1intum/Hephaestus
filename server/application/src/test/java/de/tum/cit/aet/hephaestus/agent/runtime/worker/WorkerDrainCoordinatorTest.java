@@ -39,13 +39,7 @@ class WorkerDrainCoordinatorTest extends BaseUnitTest {
         ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
 
         WorkerDrainCoordinator coordinator = new WorkerDrainCoordinator(
-            client,
-            state,
-            props,
-            Optional.of(executor),
-            events,
-            new SimpleMeterRegistry()
-        );
+                client, state, props, Optional.of(executor), events, new SimpleMeterRegistry());
         coordinator.start();
         coordinator.stop();
 
@@ -55,8 +49,8 @@ class WorkerDrainCoordinatorTest extends BaseUnitTest {
         ArgumentCaptor<WorkerControlFrame> sent = ArgumentCaptor.forClass(WorkerControlFrame.class);
         verify(client, times(2)).send(sent.capture());
         assertThat(sent.getAllValues())
-            .extracting(WorkerControlFrame::getClass)
-            .containsExactly(Heartbeat.class, CapacityReport.class);
+                .extracting(WorkerControlFrame::getClass)
+                .containsExactly(Heartbeat.class, CapacityReport.class);
         assertThat(((Heartbeat) sent.getAllValues().get(0)).draining()).isTrue();
         assertThat(((CapacityReport) sent.getAllValues().get(1)).spareReview()).isZero();
         assertThat(coordinator.isDraining()).isTrue();
@@ -70,13 +64,12 @@ class WorkerDrainCoordinatorTest extends BaseUnitTest {
         when(executor.awaitInFlight(any(Duration.class))).thenReturn(false);
 
         WorkerDrainCoordinator coordinator = new WorkerDrainCoordinator(
-            mock(WorkerControlClient.class),
-            new WorkerCapacityState(props),
-            props,
-            Optional.of(executor),
-            mock(ApplicationEventPublisher.class),
-            new SimpleMeterRegistry()
-        );
+                mock(WorkerControlClient.class),
+                new WorkerCapacityState(props),
+                props,
+                Optional.of(executor),
+                mock(ApplicationEventPublisher.class),
+                new SimpleMeterRegistry());
         coordinator.start();
         coordinator.stop();
 
@@ -89,13 +82,12 @@ class WorkerDrainCoordinatorTest extends BaseUnitTest {
         AgentJobExecutor executor = mock(AgentJobExecutor.class);
 
         WorkerDrainCoordinator coordinator = new WorkerDrainCoordinator(
-            mock(WorkerControlClient.class),
-            new WorkerCapacityState(props),
-            props,
-            Optional.of(executor),
-            mock(ApplicationEventPublisher.class),
-            new SimpleMeterRegistry()
-        );
+                mock(WorkerControlClient.class),
+                new WorkerCapacityState(props),
+                props,
+                Optional.of(executor),
+                mock(ApplicationEventPublisher.class),
+                new SimpleMeterRegistry());
         coordinator.start();
         coordinator.stop();
 
@@ -111,13 +103,12 @@ class WorkerDrainCoordinatorTest extends BaseUnitTest {
         when(executor.awaitInFlight(any(Duration.class))).thenReturn(true);
 
         WorkerDrainCoordinator coordinator = new WorkerDrainCoordinator(
-            mock(WorkerControlClient.class),
-            new WorkerCapacityState(props),
-            props,
-            Optional.of(executor),
-            mock(ApplicationEventPublisher.class),
-            new SimpleMeterRegistry()
-        );
+                mock(WorkerControlClient.class),
+                new WorkerCapacityState(props),
+                props,
+                Optional.of(executor),
+                mock(ApplicationEventPublisher.class),
+                new SimpleMeterRegistry());
         coordinator.start();
         coordinator.stop();
         coordinator.stop(); // re-entrancy
@@ -134,13 +125,12 @@ class WorkerDrainCoordinatorTest extends BaseUnitTest {
         ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
 
         WorkerDrainCoordinator coordinator = new WorkerDrainCoordinator(
-            throwing,
-            new WorkerCapacityState(props),
-            props,
-            Optional.of(executor),
-            events,
-            new SimpleMeterRegistry()
-        );
+                throwing,
+                new WorkerCapacityState(props),
+                props,
+                Optional.of(executor),
+                events,
+                new SimpleMeterRegistry());
         coordinator.start();
         coordinator.stop();
 
@@ -157,12 +147,11 @@ class WorkerDrainCoordinatorTest extends BaseUnitTest {
     private static void verifyReadinessStateRefusingTrafficWasPublished(ApplicationEventPublisher events) {
         ArgumentCaptor<ApplicationEvent> captor = ArgumentCaptor.forClass(ApplicationEvent.class);
         verify(events, atLeastOnce()).publishEvent(captor.capture());
-        boolean found = captor
-            .getAllValues()
-            .stream()
-            .anyMatch(
-                e -> e instanceof AvailabilityChangeEvent<?> a && a.getState() == ReadinessState.REFUSING_TRAFFIC
-            );
-        assertThat(found).as("expected an AvailabilityChangeEvent(REFUSING_TRAFFIC) to be published").isTrue();
+        boolean found = captor.getAllValues().stream()
+                .anyMatch(e ->
+                        e instanceof AvailabilityChangeEvent<?> a && a.getState() == ReadinessState.REFUSING_TRAFFIC);
+        assertThat(found)
+                .as("expected an AvailabilityChangeEvent(REFUSING_TRAFFIC) to be published")
+                .isTrue();
     }
 }

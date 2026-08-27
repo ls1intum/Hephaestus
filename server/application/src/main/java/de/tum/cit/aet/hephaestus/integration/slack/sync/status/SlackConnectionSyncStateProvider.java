@@ -34,11 +34,10 @@ public class SlackConnectionSyncStateProvider implements ConnectionSyncStateProv
     private final SlackRateLimitTracker rateLimitTracker;
 
     public SlackConnectionSyncStateProvider(
-        SlackMonitoredChannelRepository monitoredChannelRepository,
-        SlackMessageRepository messageRepository,
-        SlackSyncProperties properties,
-        SlackRateLimitTracker rateLimitTracker
-    ) {
+            SlackMonitoredChannelRepository monitoredChannelRepository,
+            SlackMessageRepository messageRepository,
+            SlackSyncProperties properties,
+            SlackRateLimitTracker rateLimitTracker) {
         this.monitoredChannelRepository = monitoredChannelRepository;
         this.messageRepository = messageRepository;
         this.properties = properties;
@@ -70,33 +69,27 @@ public class SlackConnectionSyncStateProvider implements ConnectionSyncStateProv
         RateLimitSnapshot rateLimit = rateLimitTracker.snapshot(ref.workspaceId());
 
         return new ConnectionSyncDetails(
-            webhookRegistered,
-            CronSchedules.nextRun(properties.cron()),
-            CronSchedules.interval(properties.cron()),
-            rateLimit,
-            null,
-            false
-        );
+                webhookRegistered,
+                CronSchedules.nextRun(properties.cron()),
+                CronSchedules.interval(properties.cron()),
+                rateLimit,
+                null,
+                false);
     }
 
     @Override
     public List<SyncResourceState> resources(IntegrationRef ref, long connectionId) {
         long workspaceId = ref.workspaceId();
-        Map<String, Long> itemCountByChannelId = messageRepository
-            .countGroupedByChannelId(workspaceId)
-            .stream()
-            .collect(
-                Collectors.toMap(
-                    SlackMessageRepository.ChannelItemCount::getSlackChannelId,
-                    SlackMessageRepository.ChannelItemCount::getItemCount
-                )
-            );
+        Map<String, Long> itemCountByChannelId = messageRepository.countGroupedByChannelId(workspaceId).stream()
+                .collect(Collectors.toMap(
+                        SlackMessageRepository.ChannelItemCount::getSlackChannelId,
+                        SlackMessageRepository.ChannelItemCount::getItemCount));
 
         return monitoredChannelRepository
-            .findByWorkspaceIdAndConsentStateNot(workspaceId, ConsentState.REVOKED)
-            .stream()
-            .map(channel -> toResourceState(channel, itemCountByChannelId))
-            .toList();
+                .findByWorkspaceIdAndConsentStateNot(workspaceId, ConsentState.REVOKED)
+                .stream()
+                .map(channel -> toResourceState(channel, itemCountByChannelId))
+                .toList();
     }
 
     private SyncResourceState toResourceState(SlackMonitoredChannel channel, Map<String, Long> itemCountByChannelId) {
@@ -104,21 +97,20 @@ public class SlackConnectionSyncStateProvider implements ConnectionSyncStateProv
         String name = channel.getChannelName() != null ? channel.getChannelName() : channel.getSlackChannelId();
         Instant lastSyncedAt = toInstant(channel.getLastHistorySyncedTs());
         return new SyncResourceState(
-            channel.getId(),
-            channel.getSlackChannelId(),
-            name,
-            SyncResourceState.Type.CHANNEL,
-            channel.getConsentState().name(),
-            lastSyncedAt,
-            itemCount,
-            // A channel maps to exactly one entity class, so the breakdown is a single row rendered inline
-            // (no expander); its watermark is the channel's own, not a stand-in for a missing per-class one.
-            List.of(new SyncResourceCount(SyncResourceCount.KEY_MESSAGES, "Messages", itemCount, lastSyncedAt)),
-            null,
-            null,
-            null,
-            null
-        );
+                channel.getId(),
+                channel.getSlackChannelId(),
+                name,
+                SyncResourceState.Type.CHANNEL,
+                channel.getConsentState().name(),
+                lastSyncedAt,
+                itemCount,
+                // A channel maps to exactly one entity class, so the breakdown is a single row rendered inline
+                // (no expander); its watermark is the channel's own, not a stand-in for a missing per-class one.
+                List.of(new SyncResourceCount(SyncResourceCount.KEY_MESSAGES, "Messages", itemCount, lastSyncedAt)),
+                null,
+                null,
+                null,
+                null);
     }
 
     private static @Nullable Instant toInstant(@Nullable String slackTs) {

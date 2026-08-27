@@ -64,36 +64,34 @@ public class ResilienceConfig {
     public CircuitBreakerRegistry circuitBreakerRegistry() {
         // Default configuration for GitHub API circuit breakers
         CircuitBreakerConfig defaultConfig = CircuitBreakerConfig.custom()
-            // Use count-based sliding window
-            .slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED)
-            .slidingWindowSize(10)
-            // Open circuit when 50% of calls fail
-            .failureRateThreshold(50)
-            // Also consider slow calls as failures
-            .slowCallRateThreshold(80)
-            .slowCallDurationThreshold(Duration.ofSeconds(10))
-            // Wait 30 seconds before transitioning from OPEN to HALF_OPEN
-            .waitDurationInOpenState(Duration.ofSeconds(30))
-            // Allow 3 calls in HALF_OPEN state to test if service recovered
-            .permittedNumberOfCallsInHalfOpenState(3)
-            // Minimum calls required before calculating failure rate
-            .minimumNumberOfCalls(5)
-            // Automatically transition from OPEN to HALF_OPEN after wait duration
-            .automaticTransitionFromOpenToHalfOpenEnabled(true)
-            // Record these exceptions as failures
-            .recordExceptions(
-                IOException.class,
-                TimeoutException.class,
-                WebClientRequestException.class,
-                WebClientResponseException.class
-            )
-            // Don't record these as failures (they're client errors, not service failures)
-            .ignoreExceptions(
-                IllegalArgumentException.class,
-                IllegalStateException.class,
-                InstallationSuspendedException.class
-            )
-            .build();
+                // Use count-based sliding window
+                .slidingWindowType(CircuitBreakerConfig.SlidingWindowType.COUNT_BASED)
+                .slidingWindowSize(10)
+                // Open circuit when 50% of calls fail
+                .failureRateThreshold(50)
+                // Also consider slow calls as failures
+                .slowCallRateThreshold(80)
+                .slowCallDurationThreshold(Duration.ofSeconds(10))
+                // Wait 30 seconds before transitioning from OPEN to HALF_OPEN
+                .waitDurationInOpenState(Duration.ofSeconds(30))
+                // Allow 3 calls in HALF_OPEN state to test if service recovered
+                .permittedNumberOfCallsInHalfOpenState(3)
+                // Minimum calls required before calculating failure rate
+                .minimumNumberOfCalls(5)
+                // Automatically transition from OPEN to HALF_OPEN after wait duration
+                .automaticTransitionFromOpenToHalfOpenEnabled(true)
+                // Record these exceptions as failures
+                .recordExceptions(
+                        IOException.class,
+                        TimeoutException.class,
+                        WebClientRequestException.class,
+                        WebClientResponseException.class)
+                // Don't record these as failures (they're client errors, not service failures)
+                .ignoreExceptions(
+                        IllegalArgumentException.class,
+                        IllegalStateException.class,
+                        InstallationSuspendedException.class)
+                .build();
 
         CircuitBreakerRegistry registry = CircuitBreakerRegistry.of(defaultConfig);
 
@@ -114,36 +112,24 @@ public class ResilienceConfig {
 
     private void registerEventListeners(CircuitBreaker circuitBreaker) {
         circuitBreaker
-            .getEventPublisher()
-            .onStateTransition(event ->
-                log.warn(
-                    "Circuit breaker state transition: breakerName={}, fromState={}, toState={}",
-                    event.getCircuitBreakerName(),
-                    event.getStateTransition().getFromState(),
-                    event.getStateTransition().getToState()
-                )
-            )
-            .onError(event ->
-                log.debug(
-                    "Circuit breaker recorded error: breakerName={}, exceptionType={}, message={}",
-                    event.getCircuitBreakerName(),
-                    event.getThrowable().getClass().getSimpleName(),
-                    event.getThrowable().getMessage()
-                )
-            )
-            .onSuccess(event ->
-                log.trace(
-                    "Circuit breaker recorded success: breakerName={}, durationMs={}",
-                    event.getCircuitBreakerName(),
-                    event.getElapsedDuration().toMillis()
-                )
-            )
-            .onCallNotPermitted(event ->
-                log.warn(
-                    "Circuit breaker rejected call: breakerName={}, reason=circuit_open",
-                    event.getCircuitBreakerName()
-                )
-            );
+                .getEventPublisher()
+                .onStateTransition(event -> log.warn(
+                        "Circuit breaker state transition: breakerName={}, fromState={}, toState={}",
+                        event.getCircuitBreakerName(),
+                        event.getStateTransition().getFromState(),
+                        event.getStateTransition().getToState()))
+                .onError(event -> log.debug(
+                        "Circuit breaker recorded error: breakerName={}, exceptionType={}, message={}",
+                        event.getCircuitBreakerName(),
+                        event.getThrowable().getClass().getSimpleName(),
+                        event.getThrowable().getMessage()))
+                .onSuccess(event -> log.trace(
+                        "Circuit breaker recorded success: breakerName={}, durationMs={}",
+                        event.getCircuitBreakerName(),
+                        event.getElapsedDuration().toMillis()))
+                .onCallNotPermitted(event -> log.warn(
+                        "Circuit breaker rejected call: breakerName={}, reason=circuit_open",
+                        event.getCircuitBreakerName()));
     }
 
     /**

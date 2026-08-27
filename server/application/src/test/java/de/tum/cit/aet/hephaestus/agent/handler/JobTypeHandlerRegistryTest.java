@@ -5,13 +5,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
-import de.tum.cit.aet.hephaestus.config.ApplicationProperties;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
@@ -50,85 +48,80 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
         var parser = new PracticeDetectionResultParser(objectMapper);
         var envelopeWriter = new TaskEnvelopeWriter(objectMapper);
         return new PullRequestReviewHandler(
-            objectMapper,
-            cas,
-            new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults()),
-            workspaceContextBuilder,
-            envelopeWriter,
-            parser,
-            new de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser(),
-            deliveryService,
-            feedbackService,
-            new SecretDiffScanner(),
-            org.mockito.Mockito.mock(FeedbackResponseSuppressionFilter.class),
-            new InContextDeliveryGate(
-                practiceRepository,
-                org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
-                org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
-                workspaceDefaults()
-            ),
-            org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class)
-        );
+                objectMapper,
+                cas,
+                new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults()),
+                workspaceContextBuilder,
+                envelopeWriter,
+                parser,
+                new de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser(),
+                deliveryService,
+                feedbackService,
+                new SecretDiffScanner(),
+                org.mockito.Mockito.mock(FeedbackResponseSuppressionFilter.class),
+                new InContextDeliveryGate(
+                        practiceRepository,
+                        org.mockito.Mockito.mock(
+                                de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
+                        org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
+                        workspaceDefaults()),
+                org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class));
     }
 
     private JobTypeHandler issueReviewHandler() {
         var parser = new PracticeDetectionResultParser(objectMapper);
         var envelopeWriter = new TaskEnvelopeWriter(objectMapper);
         return new IssueReviewHandler(
-            objectMapper,
-            workspaceContextBuilder,
-            envelopeWriter,
-            new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults()),
-            parser,
-            new de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser(),
-            deliveryService,
-            new InContextDeliveryGate(
-                practiceRepository,
-                org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
+                objectMapper,
+                workspaceContextBuilder,
+                envelopeWriter,
+                new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults()),
+                parser,
+                new de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser(),
+                deliveryService,
+                new InContextDeliveryGate(
+                        practiceRepository,
+                        org.mockito.Mockito.mock(
+                                de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
+                        org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
+                        workspaceDefaults()),
+                org.mockito.Mockito.mock(PullRequestCommentPoster.class),
                 org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
-                workspaceDefaults()
-            ),
-            org.mockito.Mockito.mock(PullRequestCommentPoster.class),
-            org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
-            org.mockito.Mockito.mock(PracticeFeedbackDeliveryPolicy.class),
-            org.mockito.Mockito.mock(PracticeFeedbackCommentFormatter.class),
-            org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class)
-        );
+                org.mockito.Mockito.mock(PracticeFeedbackDeliveryPolicy.class),
+                org.mockito.Mockito.mock(PracticeFeedbackCommentFormatter.class),
+                org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class));
     }
 
     private JobTypeHandler conversationReviewHandler() {
         var parser = new PracticeDetectionResultParser(objectMapper);
         var envelopeWriter = new TaskEnvelopeWriter(objectMapper);
         return new ConversationReviewHandler(
-            objectMapper,
-            workspaceContextBuilder,
-            envelopeWriter,
-            new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults()),
-            parser,
-            deliveryService,
-            org.mockito.Mockito.mock(ApplicationEventPublisher.class),
-            org.mockito.Mockito.mock(org.springframework.transaction.support.TransactionTemplate.class)
-        );
+                objectMapper,
+                workspaceContextBuilder,
+                envelopeWriter,
+                new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults()),
+                parser,
+                deliveryService,
+                org.mockito.Mockito.mock(ApplicationEventPublisher.class),
+                org.mockito.Mockito.mock(org.springframework.transaction.support.TransactionTemplate.class));
     }
 
     private JobTypeHandler documentReviewHandler() {
         var parser = new PracticeDetectionResultParser(objectMapper);
         var envelopeWriter = new TaskEnvelopeWriter(objectMapper);
         return new DocumentReviewHandler(
-            objectMapper,
-            workspaceContextBuilder,
-            envelopeWriter,
-            new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults()),
-            parser,
-            deliveryService
-        );
+                objectMapper,
+                workspaceContextBuilder,
+                envelopeWriter,
+                new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults()),
+                parser,
+                deliveryService);
     }
 
     /** A registry with the full handler set (every {@link AgentJobType} mapped). */
     private JobTypeHandlerRegistry fullRegistry() {
         return new JobTypeHandlerRegistry(
-            List.of(prReviewHandler(), issueReviewHandler(), conversationReviewHandler(), documentReviewHandler())
-        );
+                List.of(prReviewHandler(), issueReviewHandler(), conversationReviewHandler(), documentReviewHandler()));
     }
 
     @Nested
@@ -158,17 +151,17 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             var handler2 = prReviewHandler();
 
             assertThatThrownBy(() -> new JobTypeHandlerRegistry(List.of(handler1, handler2)))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Duplicate")
-                .hasMessageContaining("PULL_REQUEST_REVIEW");
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Duplicate")
+                    .hasMessageContaining("PULL_REQUEST_REVIEW");
         }
 
         @Test
         void shouldThrowOnMissingHandler() {
             assertThatThrownBy(() -> new JobTypeHandlerRegistry(List.of()))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("No JobTypeHandler registered for")
-                .hasMessageContaining("PULL_REQUEST_REVIEW");
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("No JobTypeHandler registered for")
+                    .hasMessageContaining("PULL_REQUEST_REVIEW");
         }
     }
 

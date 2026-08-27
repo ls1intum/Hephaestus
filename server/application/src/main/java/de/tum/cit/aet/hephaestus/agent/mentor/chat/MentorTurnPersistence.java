@@ -59,13 +59,12 @@ public class MentorTurnPersistence {
     private final TransactionTemplate requiresNewTx;
 
     public MentorTurnPersistence(
-        ChatThreadRepository chatThreadRepository,
-        ChatMessageRepository chatMessageRepository,
-        WorkspaceRepository workspaceRepository,
-        ConversationalDeliveryReconciler conversationalDeliveryReconciler,
-        LlmUsageRecorder usageRecorder,
-        PlatformTransactionManager transactionManager
-    ) {
+            ChatThreadRepository chatThreadRepository,
+            ChatMessageRepository chatMessageRepository,
+            WorkspaceRepository workspaceRepository,
+            ConversationalDeliveryReconciler conversationalDeliveryReconciler,
+            LlmUsageRecorder usageRecorder,
+            PlatformTransactionManager transactionManager) {
         this.chatThreadRepository = chatThreadRepository;
         this.chatMessageRepository = chatMessageRepository;
         this.workspaceRepository = workspaceRepository;
@@ -79,20 +78,21 @@ public class MentorTurnPersistence {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public ChatThread ensureThread(long workspaceId, UUID threadId, User user, String firstPrompt) {
         return chatThreadRepository
-            .findByIdAndWorkspaceId(threadId, workspaceId)
-            .map(existing -> {
-                if (existing.getUser() == null || !existing.getUser().getId().equals(user.getId())) {
-                    throw new EntityNotFoundException("ChatThread", threadId.toString());
-                }
-                return existing;
-            })
-            .orElseGet(() -> createThread(workspaceId, threadId, user, firstPrompt));
+                .findByIdAndWorkspaceId(threadId, workspaceId)
+                .map(existing -> {
+                    if (existing.getUser() == null
+                            || !existing.getUser().getId().equals(user.getId())) {
+                        throw new EntityNotFoundException("ChatThread", threadId.toString());
+                    }
+                    return existing;
+                })
+                .orElseGet(() -> createThread(workspaceId, threadId, user, firstPrompt));
     }
 
     private ChatThread createThread(long workspaceId, UUID threadId, User user, String firstPrompt) {
         Workspace workspace = workspaceRepository
-            .findById(workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", String.valueOf(workspaceId)));
+                .findById(workspaceId)
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", String.valueOf(workspaceId)));
         ChatThread thread = new ChatThread();
         thread.setId(threadId);
         thread.setUser(user);
@@ -122,18 +122,15 @@ public class MentorTurnPersistence {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public TurnPersistenceCookie persistInFlight(
-        ChatThread thread,
-        String userText,
-        UUID assistantMessageId,
-        @Nullable UUID userMessageId,
-        MentorLlmConfig llmConfig
-    ) {
+            ChatThread thread,
+            String userText,
+            UUID assistantMessageId,
+            @Nullable UUID userMessageId,
+            MentorLlmConfig llmConfig) {
         try {
             if (userMessageId != null && chatMessageRepository.existsById(userMessageId)) {
                 throw new TurnAlreadyInFlightException(
-                    thread.getId(),
-                    new DataIntegrityViolationException("duplicate client user message id")
-                );
+                        thread.getId(), new DataIntegrityViolationException("duplicate client user message id"));
             }
             ChatMessage userMessage = new ChatMessage();
             userMessage.setId(userMessageId != null ? userMessageId : UUID.randomUUID());
@@ -157,13 +154,12 @@ public class MentorTurnPersistence {
                 throw new IllegalStateException("Mentor turn has no admitted LLM price snapshot");
             }
             return new TurnPersistenceCookie(
-                thread.getId(),
-                savedUser.getId(),
-                assistantMessageId,
-                Instant.now(),
-                llmConfig.upstreamModelId(),
-                llmConfig.priceSnapshot()
-            );
+                    thread.getId(),
+                    savedUser.getId(),
+                    assistantMessageId,
+                    Instant.now(),
+                    llmConfig.upstreamModelId(),
+                    llmConfig.priceSnapshot());
         } catch (DataIntegrityViolationException ex) {
             // Spring maps every integrity violation to this one class, so narrow by constraint name:
             // an unrelated CHECK regression must not masquerade as a 409.
@@ -217,45 +213,41 @@ public class MentorTurnPersistence {
         if (price == null || isEmpty(breakdown)) {
             return null;
         }
-        var cost = price
-            .calculateCost(
-                breakdown.inputTokens(),
-                breakdown.outputTokens(),
-                breakdown.cacheReadTokens(),
-                breakdown.cacheWriteTokens()
-            )
-            .usd();
+        var cost = price.calculateCost(
+                        breakdown.inputTokens(),
+                        breakdown.outputTokens(),
+                        breakdown.cacheReadTokens(),
+                        breakdown.cacheWriteTokens())
+                .usd();
         return cost != null ? cost.doubleValue() : null;
     }
 
     /** Uses {@link TransactionTemplate} so the message and ledger write share an explicit new transaction. */
     public void finalise(
-        TurnPersistenceCookie cookie,
-        TranslatorState state,
-        UIMessageChunk.Finish finish,
-        MentorChannel.DeliveryOutcome deliveryOutcome
-    ) {
+            TurnPersistenceCookie cookie,
+            TranslatorState state,
+            UIMessageChunk.Finish finish,
+            MentorChannel.DeliveryOutcome deliveryOutcome) {
         try {
             requiresNewTx.executeWithoutResult(tx -> doFinalise(cookie, state, finish, deliveryOutcome));
         } catch (OptimisticLockingFailureException stale) {
             // A concurrent writer (typically the in-flight reaper) already recorded a terminal state
             // for this row; theirs wins.
             log.info(
-                "finalise lost optimistic-lock race for assistantMessageId={} — leaving prior observation in place",
-                cookie.assistantMessageId()
-            );
+                    "finalise lost optimistic-lock race for assistantMessageId={} — leaving prior observation in place",
+                    cookie.assistantMessageId());
         }
     }
 
     private void doFinalise(
-        TurnPersistenceCookie cookie,
-        TranslatorState state,
-        UIMessageChunk.Finish finish,
-        MentorChannel.DeliveryOutcome deliveryOutcome
-    ) {
+            TurnPersistenceCookie cookie,
+            TranslatorState state,
+            UIMessageChunk.Finish finish,
+            MentorChannel.DeliveryOutcome deliveryOutcome) {
         ChatMessage assistant = chatMessageRepository
-            .findById(cookie.assistantMessageId())
-            .orElseThrow(() -> new EntityNotFoundException("ChatMessage", cookie.assistantMessageId().toString()));
+                .findById(cookie.assistantMessageId())
+                .orElseThrow(() -> new EntityNotFoundException(
+                        "ChatMessage", cookie.assistantMessageId().toString()));
         assistant.setParts(state.partsSnapshot());
         assistant.setStatus(ChatMessage.Status.completed);
         ObjectNode meta = newOrCopyMeta(assistant);
@@ -268,8 +260,7 @@ public class MentorTurnPersistence {
         if (usage.model() != null) {
             meta.put("model", usage.model());
         }
-        ObjectNode usageNode =
-            meta.has("usage") && meta.get("usage").isObject()
+        ObjectNode usageNode = meta.has("usage") && meta.get("usage").isObject()
                 ? (ObjectNode) meta.get("usage")
                 : meta.putObject("usage");
         usageNode.put("input", usage.inputTokens());
@@ -284,11 +275,14 @@ public class MentorTurnPersistence {
         }
         // Reuse the figure already on the wire Finish rather than re-deriving it, so the row holds
         // exactly what the client saw.
-        Double wireCostUsd = finish.messageMetadata() != null ? finish.messageMetadata().costUsd() : null;
+        Double wireCostUsd =
+                finish.messageMetadata() != null ? finish.messageMetadata().costUsd() : null;
         if (wireCostUsd != null) {
             meta.put("costUsd", wireCostUsd);
         }
-        meta.put("durationMs", Duration.between(cookie.startedAt(), Instant.now()).toMillis());
+        meta.put(
+                "durationMs",
+                Duration.between(cookie.startedAt(), Instant.now()).toMillis());
         assistant.setMetadata(meta);
         // saveAndFlush, not save: forces the optimistic-lock check inside finalise's try/catch instead of
         // at the REQUIRES_NEW commit boundary, where it would escape uncaught.
@@ -318,64 +312,56 @@ public class MentorTurnPersistence {
         long reasoning = 0;
         UsageProvenance provenance = UsageProvenance.RUNNER;
         if (isEmpty(usage)) {
-            MentorTurnLlmUsage viaProxy = chatMessageRepository
-                .findLlmUsageById(assistant.getId())
-                .orElse(MentorTurnLlmUsage.NONE);
+            MentorTurnLlmUsage viaProxy =
+                    chatMessageRepository.findLlmUsageById(assistant.getId()).orElse(MentorTurnLlmUsage.NONE);
             if (viaProxy.hasBillableUsage()) {
                 log.info(
-                    "Mentor turn {} reported no usage of its own; billing the {} call(s) the proxy recorded",
-                    assistant.getId(),
-                    viaProxy.totalCalls()
-                );
+                        "Mentor turn {} reported no usage of its own; billing the {} call(s) the proxy recorded",
+                        assistant.getId(),
+                        viaProxy.totalCalls());
                 usage = new UsageBreakdown(
-                    usage.model(),
-                    viaProxy.inputTokens(),
-                    viaProxy.outputTokens(),
-                    viaProxy.cacheReadTokens(),
-                    /* cacheWrite — no OpenAI-compatible usage block reports one per call */ 0
-                );
+                        usage.model(),
+                        viaProxy.inputTokens(),
+                        viaProxy.outputTokens(),
+                        viaProxy.cacheReadTokens(),
+                        /* cacheWrite — no OpenAI-compatible usage block reports one per call */ 0);
                 calls = viaProxy.totalCalls();
                 reasoning = viaProxy.reasoningTokens();
                 provenance = UsageProvenance.PROXY;
             }
         }
         LlmUsageSample sample = new LlmUsageSample(
-            LlmUsageJobType.MENTOR_TURN,
-            LlmUsageSourceType.MENTOR_TURN,
-            assistant.getId(),
-            0,
-            cookie.upstreamModelId(),
-            usage.inputTokens(),
-            usage.outputTokens(),
-            usage.cacheReadTokens(),
-            usage.cacheWriteTokens(),
-            reasoning,
-            Math.max(1, calls),
-            cookie.priceSnapshot(),
-            // Neither record had tokens, so the row names no source rather than crediting one that saw
-            // nothing — the same distinction the UNVERIFIABLE append below makes about the amount.
-            isEmpty(usage) ? UsageProvenance.NONE : provenance,
-            Instant.now()
-        );
-        if (isEmpty(usage)) usageRecorder.recordUnverifiable(thread.getWorkspace().getId(), sample);
+                LlmUsageJobType.MENTOR_TURN,
+                LlmUsageSourceType.MENTOR_TURN,
+                assistant.getId(),
+                0,
+                cookie.upstreamModelId(),
+                usage.inputTokens(),
+                usage.outputTokens(),
+                usage.cacheReadTokens(),
+                usage.cacheWriteTokens(),
+                reasoning,
+                Math.max(1, calls),
+                cookie.priceSnapshot(),
+                // Neither record had tokens, so the row names no source rather than crediting one that saw
+                // nothing — the same distinction the UNVERIFIABLE append below makes about the amount.
+                isEmpty(usage) ? UsageProvenance.NONE : provenance,
+                Instant.now());
+        if (isEmpty(usage))
+            usageRecorder.recordUnverifiable(thread.getWorkspace().getId(), sample);
         else usageRecorder.record(thread.getWorkspace().getId(), sample);
     }
 
     private static boolean isEmpty(UsageBreakdown usage) {
-        return (
-            usage.inputTokens() <= 0 &&
-            usage.outputTokens() <= 0 &&
-            usage.cacheReadTokens() <= 0 &&
-            usage.cacheWriteTokens() <= 0
-        );
+        return (usage.inputTokens() <= 0
+                && usage.outputTokens() <= 0
+                && usage.cacheReadTokens() <= 0
+                && usage.cacheWriteTokens() <= 0);
     }
 
     /** Reconcile linked observations in the same transaction as the completed assistant message. */
     private void reconcileConversationalDelivery(
-        ChatMessage assistant,
-        TranslatorState state,
-        MentorChannel.DeliveryOutcome deliveryOutcome
-    ) {
+            ChatMessage assistant, TranslatorState state, MentorChannel.DeliveryOutcome deliveryOutcome) {
         List<UUID> linkedObservationIds = state.linkedObservationIds();
         if (linkedObservationIds.isEmpty()) {
             return;
@@ -385,19 +371,16 @@ public class MentorTurnPersistence {
             return;
         }
         switch (deliveryOutcome) {
-            case INSTANCE_SILENCED -> conversationalDeliveryReconciler.suppressForSilentMode(
-                thread.getWorkspace().getId(),
-                thread.getUser().getId(),
-                linkedObservationIds
-            );
-            case DELIVERED -> conversationalDeliveryReconciler.reconcile(
-                thread.getWorkspace().getId(),
-                thread.getUser().getId(),
-                assistant.getId(),
-                linkedObservationIds
-            );
-            case NOT_DELIVERED -> {
-            }
+            case INSTANCE_SILENCED ->
+                conversationalDeliveryReconciler.suppressForSilentMode(
+                        thread.getWorkspace().getId(), thread.getUser().getId(), linkedObservationIds);
+            case DELIVERED ->
+                conversationalDeliveryReconciler.reconcile(
+                        thread.getWorkspace().getId(),
+                        thread.getUser().getId(),
+                        assistant.getId(),
+                        linkedObservationIds);
+            case NOT_DELIVERED -> {}
         }
     }
 
@@ -408,26 +391,29 @@ public class MentorTurnPersistence {
         } catch (OptimisticLockingFailureException stale) {
             // Theirs wins: never downgrade a row another writer already completed.
             log.info(
-                "interrupt lost optimistic-lock race for assistantMessageId={} — leaving prior observation in place",
-                cookie.assistantMessageId()
-            );
+                    "interrupt lost optimistic-lock race for assistantMessageId={} — leaving prior observation in place",
+                    cookie.assistantMessageId());
         }
     }
 
     private void doInterrupt(TurnPersistenceCookie cookie, TranslatorState state, Throwable cause) {
-        chatMessageRepository
-            .findById(cookie.assistantMessageId())
-            .ifPresent(assistant -> {
-                assistant.setParts(state.partsSnapshot());
-                assistant.setStatus(ChatMessage.Status.interrupted);
-                ObjectNode meta = newOrCopyMeta(assistant);
-                meta.put("error", cause.getMessage() != null ? cause.getMessage() : cause.getClass().getSimpleName());
-                meta.put("durationMs", Duration.between(cookie.startedAt(), Instant.now()).toMillis());
-                assistant.setMetadata(meta);
-                // saveAndFlush, not save — see doFinalise.
-                chatMessageRepository.saveAndFlush(assistant);
-                billTurn(assistant, state, cookie);
-            });
+        chatMessageRepository.findById(cookie.assistantMessageId()).ifPresent(assistant -> {
+            assistant.setParts(state.partsSnapshot());
+            assistant.setStatus(ChatMessage.Status.interrupted);
+            ObjectNode meta = newOrCopyMeta(assistant);
+            meta.put(
+                    "error",
+                    cause.getMessage() != null
+                            ? cause.getMessage()
+                            : cause.getClass().getSimpleName());
+            meta.put(
+                    "durationMs",
+                    Duration.between(cookie.startedAt(), Instant.now()).toMillis());
+            assistant.setMetadata(meta);
+            // saveAndFlush, not save — see doFinalise.
+            chatMessageRepository.saveAndFlush(assistant);
+            billTurn(assistant, state, cookie);
+        });
 
         // Session bytes the runner shipped before the interrupt still buy prompt-cache continuity.
         byte[] sessionBytes = state.observedSessionJsonl();
@@ -466,12 +452,11 @@ public class MentorTurnPersistence {
         JsonNode usage = state.observedUsage();
         if (usage == null) return new UsageBreakdown(model, 0, 0, 0, 0);
         return new UsageBreakdown(
-            model,
-            readLong(usage, "input"),
-            readLong(usage, "output"),
-            readLong(usage, "cacheRead"),
-            readLong(usage, "cacheWrite")
-        );
+                model,
+                readLong(usage, "input"),
+                readLong(usage, "output"),
+                readLong(usage, "cacheRead"),
+                readLong(usage, "cacheWrite"));
     }
 
     private static long readLong(JsonNode node, String field) {
@@ -481,19 +466,13 @@ public class MentorTurnPersistence {
 
     /** Tracking record carried through the turn pipeline. */
     public record TurnPersistenceCookie(
-        UUID threadId,
-        UUID userMessageId,
-        UUID assistantMessageId,
-        Instant startedAt,
-        String upstreamModelId,
-        LlmPriceSnapshot priceSnapshot
-    ) {}
+            UUID threadId,
+            UUID userMessageId,
+            UUID assistantMessageId,
+            Instant startedAt,
+            String upstreamModelId,
+            LlmPriceSnapshot priceSnapshot) {}
 
     private record UsageBreakdown(
-        @Nullable String model,
-        long inputTokens,
-        long outputTokens,
-        long cacheReadTokens,
-        long cacheWriteTokens
-    ) {}
+            @Nullable String model, long inputTokens, long outputTokens, long cacheReadTokens, long cacheWriteTokens) {}
 }

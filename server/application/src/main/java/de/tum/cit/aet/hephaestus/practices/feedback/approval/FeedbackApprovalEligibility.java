@@ -18,12 +18,10 @@ public class FeedbackApprovalEligibility {
     public boolean isEligible(Long workspaceId, UUID feedbackId) {
         var practices = practiceRepository.findContributingPractices(workspaceId, feedbackId);
         if (practices.isEmpty()) return false;
-        PracticeAutonomy workspaceDefault = defaultsProvider.forWorkspace(workspaceId).defaultAutonomy();
-        return practices
-            .stream()
-            .allMatch(
-                practice ->
-                    AutonomyResolver.effectiveAutonomyOf(practice, workspaceDefault) == PracticeAutonomy.HUMAN_APPROVAL
-            );
+        PracticeAutonomy workspaceDefault =
+                defaultsProvider.forWorkspace(workspaceId).defaultAutonomy();
+        return practices.stream()
+                .allMatch(practice -> AutonomyResolver.effectiveAutonomyOf(practice, workspaceDefault)
+                        == PracticeAutonomy.HUMAN_APPROVAL);
     }
 }

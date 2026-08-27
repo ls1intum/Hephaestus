@@ -24,8 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 @WorkspaceAgnostic("Queried by explicit workspace ID - settings queries always workspace-scoped")
 public interface WorkspaceTeamLabelFilterRepository
-    extends JpaRepository<WorkspaceTeamLabelFilter, WorkspaceTeamLabelFilter.Id>
-{
+        extends JpaRepository<WorkspaceTeamLabelFilter, WorkspaceTeamLabelFilter.Id> {
     /**
      * Finds all label filters for a given workspace.
      *
@@ -50,15 +49,13 @@ public interface WorkspaceTeamLabelFilterRepository
      * @param teamId the team ID
      * @return set of labels configured as filters for the team in the workspace
      */
-    @Query(
-        """
+    @Query("""
         SELECT wtlf.label
         FROM WorkspaceTeamLabelFilter wtlf
         JOIN FETCH wtlf.label.repository
         WHERE wtlf.workspace.id = :workspaceId
           AND wtlf.team.id = :teamId
-        """
-    )
+        """)
     Set<Label> findLabelsByWorkspaceAndTeam(@Param("workspaceId") Long workspaceId, @Param("teamId") Long teamId);
 
     /**
@@ -67,13 +64,11 @@ public interface WorkspaceTeamLabelFilterRepository
      * @param workspaceId the workspace ID
      * @return set of team IDs with label filters
      */
-    @Query(
-        """
+    @Query("""
         SELECT DISTINCT wtlf.team.id
         FROM WorkspaceTeamLabelFilter wtlf
         WHERE wtlf.workspace.id = :workspaceId
-        """
-    )
+        """)
     Set<Long> findTeamIdsWithLabelFilters(@Param("workspaceId") Long workspaceId);
 
     /**
@@ -86,20 +81,16 @@ public interface WorkspaceTeamLabelFilterRepository
      * @param teamIds the set of team IDs to fetch label filters for
      * @return list of label filters for the specified teams in the workspace
      */
-    @Query(
-        """
+    @Query("""
         SELECT wtlf
         FROM WorkspaceTeamLabelFilter wtlf
         JOIN FETCH wtlf.label l
         JOIN FETCH l.repository
         WHERE wtlf.workspace.id = :workspaceId
           AND wtlf.team.id IN :teamIds
-        """
-    )
+        """)
     List<WorkspaceTeamLabelFilter> findByWorkspaceIdAndTeamIds(
-        @Param("workspaceId") Long workspaceId,
-        @Param("teamIds") Set<Long> teamIds
-    );
+            @Param("workspaceId") Long workspaceId, @Param("teamIds") Set<Long> teamIds);
 
     /**
      * Deletes a specific label filter by its composite key components.
@@ -110,19 +101,14 @@ public interface WorkspaceTeamLabelFilterRepository
      */
     @Modifying
     @Transactional
-    @Query(
-        """
+    @Query("""
         DELETE FROM WorkspaceTeamLabelFilter wtlf
         WHERE wtlf.workspace.id = :workspaceId
           AND wtlf.team.id = :teamId
           AND wtlf.label.id = :labelId
-        """
-    )
+        """)
     void deleteByWorkspaceIdAndTeamIdAndLabelId(
-        @Param("workspaceId") Long workspaceId,
-        @Param("teamId") Long teamId,
-        @Param("labelId") Long labelId
-    );
+            @Param("workspaceId") Long workspaceId, @Param("teamId") Long teamId, @Param("labelId") Long labelId);
 
     /**
      * Deletes all label filters for a specific team in a workspace.
@@ -132,13 +118,11 @@ public interface WorkspaceTeamLabelFilterRepository
      */
     @Modifying
     @Transactional
-    @Query(
-        """
+    @Query("""
         DELETE FROM WorkspaceTeamLabelFilter wtlf
         WHERE wtlf.workspace.id = :workspaceId
           AND wtlf.team.id = :teamId
-        """
-    )
+        """)
     void deleteAllByWorkspaceIdAndTeamId(@Param("workspaceId") Long workspaceId, @Param("teamId") Long teamId);
 
     /**

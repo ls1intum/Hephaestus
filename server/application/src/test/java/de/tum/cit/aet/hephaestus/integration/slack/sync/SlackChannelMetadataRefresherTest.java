@@ -62,9 +62,8 @@ class SlackChannelMetadataRefresherTest extends BaseUnitTest {
     }
 
     private void stub(SlackMonitoredChannel channel, ConversationLookup lookup) {
-        when(monitoredChannelRepository.findByWorkspaceIdAndConsentStateNot(WS, ConsentState.REVOKED)).thenReturn(
-            List.of(channel)
-        );
+        when(monitoredChannelRepository.findByWorkspaceIdAndConsentStateNot(WS, ConsentState.REVOKED))
+                .thenReturn(List.of(channel));
         when(slackMessageService.lookupConversationDetailed(WS, CHANNEL)).thenReturn(lookup);
     }
 
@@ -135,9 +134,8 @@ class SlackChannelMetadataRefresherTest extends BaseUnitTest {
      */
     @Test
     void cancellationRequestedUpFront_callsSlackForNoChannelAtAll() {
-        when(monitoredChannelRepository.findByWorkspaceIdAndConsentStateNot(WS, ConsentState.REVOKED)).thenReturn(
-            List.of(namedChannel("C1"), namedChannel("C2"), namedChannel("C3"))
-        );
+        when(monitoredChannelRepository.findByWorkspaceIdAndConsentStateNot(WS, ConsentState.REVOKED))
+                .thenReturn(List.of(namedChannel("C1"), namedChannel("C2"), namedChannel("C3")));
 
         int checked = refresher.refreshWorkspace(WS, () -> true);
 
@@ -148,12 +146,10 @@ class SlackChannelMetadataRefresherTest extends BaseUnitTest {
     /** Mid-pass cancellation stops at the next channel boundary rather than draining the workspace. */
     @Test
     void cancellationRequestedAfterTheFirstChannel_stopsAtTheNextBoundary() {
-        when(monitoredChannelRepository.findByWorkspaceIdAndConsentStateNot(WS, ConsentState.REVOKED)).thenReturn(
-            List.of(namedChannel("C1"), namedChannel("C2"), namedChannel("C3"))
-        );
-        when(slackMessageService.lookupConversationDetailed(eq(WS), anyString())).thenReturn(
-            new ConversationLookup.Unavailable("transport_failure")
-        );
+        when(monitoredChannelRepository.findByWorkspaceIdAndConsentStateNot(WS, ConsentState.REVOKED))
+                .thenReturn(List.of(namedChannel("C1"), namedChannel("C2"), namedChannel("C3")));
+        when(slackMessageService.lookupConversationDetailed(eq(WS), anyString()))
+                .thenReturn(new ConversationLookup.Unavailable("transport_failure"));
         AtomicInteger polls = new AtomicInteger();
 
         int checked = refresher.refreshWorkspace(WS, () -> polls.getAndIncrement() > 0);
@@ -165,12 +161,10 @@ class SlackChannelMetadataRefresherTest extends BaseUnitTest {
     /** The uninterruptible overload the nightly cron uses still visits every channel. */
     @Test
     void withoutACancelSignal_everyChannelIsChecked() {
-        when(monitoredChannelRepository.findByWorkspaceIdAndConsentStateNot(WS, ConsentState.REVOKED)).thenReturn(
-            List.of(namedChannel("C1"), namedChannel("C2"))
-        );
-        when(slackMessageService.lookupConversationDetailed(eq(WS), anyString())).thenReturn(
-            new ConversationLookup.Unavailable("transport_failure")
-        );
+        when(monitoredChannelRepository.findByWorkspaceIdAndConsentStateNot(WS, ConsentState.REVOKED))
+                .thenReturn(List.of(namedChannel("C1"), namedChannel("C2")));
+        when(slackMessageService.lookupConversationDetailed(eq(WS), anyString()))
+                .thenReturn(new ConversationLookup.Unavailable("transport_failure"));
 
         assertThat(refresher.refreshWorkspace(WS)).isEqualTo(2);
         verify(slackMessageService, times(2)).lookupConversationDetailed(anyLong(), any());

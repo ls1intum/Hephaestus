@@ -44,21 +44,20 @@ public class GitLabSyncServiceHolder {
     private final @Nullable GitLabIssueDependencySyncService issueDependencySyncService;
 
     public GitLabSyncServiceHolder(
-        @Nullable GitLabGroupSyncService groupSyncService,
-        @Nullable GitLabGroupMemberSyncService groupMemberSyncService,
-        @Nullable GitLabLabelSyncService labelSyncService,
-        @Nullable GitLabMilestoneSyncService milestoneSyncService,
-        @Nullable GitLabIssueSyncService issueSyncService,
-        @Nullable GitLabMergeRequestSyncService mergeRequestSyncService,
-        @Nullable GitLabTeamSyncService teamSyncService,
-        @Nullable GitLabCollaboratorSyncService collaboratorSyncService,
-        @Nullable GitLabIssueTypeSyncService issueTypeSyncService,
-        @Nullable GitLabCommitSyncService commitSyncService,
-        @Nullable GitLabCommitBackfillService commitBackfillService,
-        @Nullable GitLabCommitMergeRequestLinker commitMergeRequestLinker,
-        @Nullable GitLabSubIssueSyncService subIssueSyncService,
-        @Nullable GitLabIssueDependencySyncService issueDependencySyncService
-    ) {
+            @Nullable GitLabGroupSyncService groupSyncService,
+            @Nullable GitLabGroupMemberSyncService groupMemberSyncService,
+            @Nullable GitLabLabelSyncService labelSyncService,
+            @Nullable GitLabMilestoneSyncService milestoneSyncService,
+            @Nullable GitLabIssueSyncService issueSyncService,
+            @Nullable GitLabMergeRequestSyncService mergeRequestSyncService,
+            @Nullable GitLabTeamSyncService teamSyncService,
+            @Nullable GitLabCollaboratorSyncService collaboratorSyncService,
+            @Nullable GitLabIssueTypeSyncService issueTypeSyncService,
+            @Nullable GitLabCommitSyncService commitSyncService,
+            @Nullable GitLabCommitBackfillService commitBackfillService,
+            @Nullable GitLabCommitMergeRequestLinker commitMergeRequestLinker,
+            @Nullable GitLabSubIssueSyncService subIssueSyncService,
+            @Nullable GitLabIssueDependencySyncService issueDependencySyncService) {
         this.groupSyncService = groupSyncService;
         this.groupMemberSyncService = groupMemberSyncService;
         this.labelSyncService = labelSyncService;

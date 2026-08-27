@@ -32,10 +32,8 @@ public class ScmArtifactIdentityConfiguration {
      * longer opens.
      */
     private record ScmIdentityResolver(
-        ArtifactKind kind,
-        String fallbackTitle,
-        Function<Collection<Long>, List<ScmArtifactLabel>> lookup
-    ) implements ArtifactIdentityResolver {
+            ArtifactKind kind, String fallbackTitle, Function<Collection<Long>, List<ScmArtifactLabel>> lookup)
+            implements ArtifactIdentityResolver {
         @Override
         public Map<Long, ArtifactIdentity> resolve(long workspaceId, Collection<Long> artifactIds) {
             if (artifactIds.isEmpty()) {
@@ -44,18 +42,16 @@ public class ScmArtifactIdentityConfiguration {
             Map<Long, ArtifactIdentity> resolved = new HashMap<>();
             for (ScmArtifactLabel label : lookup.apply(artifactIds)) {
                 String title =
-                    label.getTitle() == null || label.getTitle().isBlank() ? fallbackTitle : label.getTitle();
+                        label.getTitle() == null || label.getTitle().isBlank() ? fallbackTitle : label.getTitle();
                 resolved.put(
-                    label.getId(),
-                    new ArtifactIdentity(
-                        kind,
                         label.getId(),
-                        label.getNumber(),
-                        title,
-                        label.getContainer(),
-                        label.getDeletedAt() == null ? label.getUrl() : null
-                    )
-                );
+                        new ArtifactIdentity(
+                                kind,
+                                label.getId(),
+                                label.getNumber(),
+                                title,
+                                label.getContainer(),
+                                label.getDeletedAt() == null ? label.getUrl() : null));
             }
             return Map.copyOf(resolved);
         }

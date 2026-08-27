@@ -36,8 +36,7 @@ class DiffNotePosterTest extends BaseUnitTest {
 
     private final PullRequestCommentPoster commentPoster = mock(PullRequestCommentPoster.class);
     private final PracticeFeedbackCommentFormatter commentFormatter = new PracticeFeedbackCommentFormatter(
-        new ApplicationProperties(null, new ApplicationProperties.Webapp("https://hephaestus.example"))
-    );
+            new ApplicationProperties(null, new ApplicationProperties.Webapp("https://hephaestus.example")));
 
     private AgentJob gitlabJob() {
         AgentJob job = TestEntities.agentJob();
@@ -83,7 +82,8 @@ class DiffNotePosterTest extends BaseUnitTest {
     }
 
     private DiffNotePoster poster(RecordingChannel channel) {
-        when(commentPoster.buildTarget(any(), eq(IntegrationKind.GITLAB), eq(1L))).thenReturn(target());
+        when(commentPoster.buildTarget(any(), eq(IntegrationKind.GITLAB), eq(1L)))
+                .thenReturn(target());
         return new DiffNotePoster(commentPoster, commentFormatter, List.of(channel));
     }
 
@@ -101,8 +101,8 @@ class DiffNotePosterTest extends BaseUnitTest {
         assertThat(anchor.filePath()).isEqualTo("src/A.java");
         assertThat(anchor.newLineNumber()).isEqualTo(14);
         assertThat(f.body())
-            .contains("<sub>AI-generated &middot; React with 👍 or 👎, or reply, to give feedback.</sub>")
-            .doesNotContain("Why you're seeing this");
+                .contains("<sub>AI-generated &middot; React with 👍 or 👎, or reply, to give feedback.</sub>")
+                .doesNotContain("Why you're seeing this");
         assertThat(anchor.startLine()).isEqualTo(10);
         assertThat(f.recurrenceKey()).isEqualTo("ck-multi");
     }
@@ -115,7 +115,8 @@ class DiffNotePosterTest extends BaseUnitTest {
 
         poster.reconcileInlineNotes(gitlabJob(), List.of(single));
 
-        FeedbackAnchor.DiffAnchor anchor = (FeedbackAnchor.DiffAnchor) posted(channel).get(0).anchor();
+        FeedbackAnchor.DiffAnchor anchor =
+                (FeedbackAnchor.DiffAnchor) posted(channel).get(0).anchor();
         assertThat(anchor.newLineNumber()).isEqualTo(10);
         assertThat(anchor.startLine()).isNull();
     }
@@ -139,7 +140,8 @@ class DiffNotePosterTest extends BaseUnitTest {
         channel.clearThrows = new RuntimeException("gitlab down");
         DiffNotePoster poster = poster(channel);
 
-        assertThatCode(() -> poster.reconcileInlineNotes(gitlabJob(), List.of())).doesNotThrowAnyException();
+        assertThatCode(() -> poster.reconcileInlineNotes(gitlabJob(), List.of()))
+                .doesNotThrowAnyException();
         assertThat(channel.cleared).isTrue();
     }
 
@@ -151,8 +153,8 @@ class DiffNotePosterTest extends BaseUnitTest {
         when(b.kind()).thenReturn(IntegrationKind.GITLAB);
 
         assertThatThrownBy(() -> new DiffNotePoster(commentPoster, commentFormatter, List.of(a, b)))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("Duplicate InlineFeedbackChannel for kind");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Duplicate InlineFeedbackChannel for kind");
     }
 
     @Test
@@ -163,7 +165,8 @@ class DiffNotePosterTest extends BaseUnitTest {
 
         poster.reconcileInlineNotes(gitlabJob(), List.of(note));
 
-        FeedbackAnchor.DiffAnchor anchor = (FeedbackAnchor.DiffAnchor) posted(channel).get(0).anchor();
+        FeedbackAnchor.DiffAnchor anchor =
+                (FeedbackAnchor.DiffAnchor) posted(channel).get(0).anchor();
         assertThat(anchor.filePath()).isEqualTo("src/components/Button.tsx");
     }
 
@@ -174,9 +177,7 @@ class DiffNotePosterTest extends BaseUnitTest {
         var captor = ArgumentCaptor.forClass(IntegrationKind.class);
 
         DiffNotePoster.DiffNoteResult result = poster.reconcileInlineNotes(
-            gitlabJob(),
-            List.of(new DiffNote("src/A.java", 10, null, "real body", "ck-1"))
-        );
+                gitlabJob(), List.of(new DiffNote("src/A.java", 10, null, "real body", "ck-1")));
 
         assertThat(result.posted()).isEqualTo(1);
         assertThat(result.failed()).isZero();

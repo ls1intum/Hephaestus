@@ -38,8 +38,8 @@ class AuthSecurityConfigTest extends BaseUnitTest {
     @Test
     void blankKeyInProdFailsClosed() {
         assertThatThrownBy(() -> AuthSecurityConfig.resolveStateCookieKey(propsWithKey(""), true))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("required in production");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("required in production");
     }
 
     @Test
@@ -59,8 +59,8 @@ class AuthSecurityConfigTest extends BaseUnitTest {
     @Test
     void configuredKeyOfWrongLengthIsRejected() {
         assertThatThrownBy(() -> AuthSecurityConfig.resolveStateCookieKey(propsWithKey(base64Key(16)), false))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("32 bytes");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("32 bytes");
     }
 
     @Test
@@ -70,20 +70,19 @@ class AuthSecurityConfigTest extends BaseUnitTest {
         // confidential (CLIENT_SECRET_BASIC), so PKCE is supplied solely by withPkce() in pkceResolver().
         // This asserts it is actually emitted — deleting that one line must fail this test.
         ClientRegistration github = ClientRegistration.withRegistrationId("github")
-            .clientId("client-id")
-            .clientSecret("client-secret")
-            .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
-            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-            .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
-            .scope("read:user", "user:email")
-            .authorizationUri("https://github.com/login/oauth/authorize")
-            .tokenUri("https://github.com/login/oauth/access_token")
-            .userInfoUri("https://api.github.com/user")
-            .userNameAttributeName("id")
-            .build();
-        OAuth2AuthorizationRequestResolver resolver = AuthSecurityConfig.pkceResolver(
-            new InMemoryClientRegistrationRepository(github)
-        );
+                .clientId("client-id")
+                .clientSecret("client-secret")
+                .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
+                .scope("read:user", "user:email")
+                .authorizationUri("https://github.com/login/oauth/authorize")
+                .tokenUri("https://github.com/login/oauth/access_token")
+                .userInfoUri("https://api.github.com/user")
+                .userNameAttributeName("id")
+                .build();
+        OAuth2AuthorizationRequestResolver resolver =
+                AuthSecurityConfig.pkceResolver(new InMemoryClientRegistrationRepository(github));
 
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/oauth2/authorization/github");
         request.setServletPath("/oauth2/authorization/github");
@@ -91,7 +90,7 @@ class AuthSecurityConfigTest extends BaseUnitTest {
 
         assertThat(authorizationRequest).isNotNull();
         assertThat(authorizationRequest.getAdditionalParameters())
-            .containsKey("code_challenge")
-            .containsEntry("code_challenge_method", "S256");
+                .containsKey("code_challenge")
+                .containsEntry("code_challenge_method", "S256");
     }
 }

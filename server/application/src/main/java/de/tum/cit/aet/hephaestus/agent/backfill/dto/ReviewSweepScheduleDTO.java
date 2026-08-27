@@ -20,29 +20,29 @@ import org.jspecify.annotations.Nullable;
  * @param lastRunAt not "when it last came due" — a tick that found nothing to review does not move it.
  */
 public record ReviewSweepScheduleDTO(
-    @NonNull UUID id,
-    @NonNull ArtifactKind artifactKind,
-    @NonNull ReviewSweepCadence cadence,
-    @NonNull Integer lookbackDays,
-    @NonNull Boolean enabled,
-    @NonNull Instant nextRunAt,
-    @Schema(description = "When a campaign was last opened from this schedule; absent until the first one")
-    @Nullable
-    Instant lastRunAt,
-    @NonNull Long createdByAccountId,
-    @NonNull Instant createdAt
-) {
+        @NonNull UUID id,
+        @NonNull ArtifactKind artifactKind,
+        @NonNull ReviewSweepCadence cadence,
+        @NonNull Integer lookbackDays,
+        @NonNull Boolean enabled,
+        @NonNull Instant nextRunAt,
+
+        @Schema(description = "When a campaign was last opened from this schedule; absent until the first one")
+        @Nullable
+        Instant lastRunAt,
+
+        @NonNull Long createdByAccountId,
+        @NonNull Instant createdAt) {
     public static ReviewSweepScheduleDTO from(ReviewSweepSchedule schedule) {
         return new ReviewSweepScheduleDTO(
-            schedule.getId(),
-            schedule.kind(),
-            schedule.getCadence(),
-            schedule.getLookbackDays(),
-            schedule.getEnabled(),
-            schedule.getNextRunAt(),
-            schedule.getLastRunAt(),
-            schedule.getCreatedByAccountId(),
-            schedule.getCreatedAt()
-        );
+                schedule.getId(),
+                schedule.kind(),
+                schedule.getCadence(),
+                schedule.getLookbackDays(),
+                schedule.getEnabled(),
+                schedule.getNextRunAt(),
+                schedule.getLastRunAt(),
+                schedule.getCreatedByAccountId(),
+                schedule.getCreatedAt());
     }
 }

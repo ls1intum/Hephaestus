@@ -42,8 +42,7 @@ class EcbFxRateClientTest extends BaseUnitTest {
 
     private static EcbFxRateClient clientForUrl(String dailyUrl) {
         return new EcbFxRateClient(
-            new LlmProperties("", new LlmProperties.Egress(false), new LlmProperties.Fx(dailyUrl))
-        );
+                new LlmProperties("", new LlmProperties.Egress(false), new LlmProperties.Fx(dailyUrl)));
     }
 
     private static String fixture() throws IOException {
@@ -54,9 +53,11 @@ class EcbFxRateClientTest extends BaseUnitTest {
     }
 
     private void enqueueXml(String body) {
-        ecb.enqueue(
-            new MockResponse.Builder().code(200).addHeader("Content-Type", "text/xml;charset=UTF-8").body(body).build()
-        );
+        ecb.enqueue(new MockResponse.Builder()
+                .code(200)
+                .addHeader("Content-Type", "text/xml;charset=UTF-8")
+                .body(body)
+                .build());
     }
 
     @Test
@@ -75,29 +76,21 @@ class EcbFxRateClientTest extends BaseUnitTest {
 
     static Stream<Arguments> unusableDocuments() {
         return Stream.of(
-            Arguments.of(
-                """
+                Arguments.of("""
                 <gesmes:Envelope xmlns:gesmes="http://www.gesmes.org/xml/2002-08-01"
                                  xmlns="http://www.ecb.int/vocabulary/2002-08-01/eurofxref">
                   <Cube><Cube time='2026-07-24'><Cube currency='GBP' rate='0.86545'/></Cube></Cube>
                 </gesmes:Envelope>
-                """,
-                "a well-formed document that quotes every currency except USD"
-            ),
-            Arguments.of("<html><body>503 Service Unavailable", "an error page served where XML was expected"),
-            Arguments.of(
-                """
+                """, "a well-formed document that quotes every currency except USD"),
+                Arguments.of("<html><body>503 Service Unavailable", "an error page served where XML was expected"),
+                Arguments.of("""
                 <?xml version="1.0"?>
                 <!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
                 <Cube><Cube time='2026-07-24'><Cube currency='USD' rate='1.1377'/></Cube></Cube>
-                """,
-                "a DOCTYPE, refused outright so no external entity can be expanded"
-            ),
-            Arguments.of(
-                "<Cube><Cube time='2026-07-24'><Cube currency='USD' rate='0'/></Cube></Cube>",
-                "a zero quote, which the read-time inversion would divide by"
-            )
-        );
+                """, "a DOCTYPE, refused outright so no external entity can be expanded"),
+                Arguments.of(
+                        "<Cube><Cube time='2026-07-24'><Cube currency='USD' rate='0'/></Cube></Cube>",
+                        "a zero quote, which the read-time inversion would divide by"));
     }
 
     @ParameterizedTest(name = "{1}")
@@ -111,9 +104,11 @@ class EcbFxRateClientTest extends BaseUnitTest {
     void shouldReturnRateWhenEcbAnswers() throws Exception {
         enqueueXml(fixture());
 
-        Optional<EcbDailyRate> fetched = clientFor("/stats/eurofxref/eurofxref-daily.xml").fetchLatestUsdRate();
+        Optional<EcbDailyRate> fetched =
+                clientFor("/stats/eurofxref/eurofxref-daily.xml").fetchLatestUsdRate();
 
-        assertThat(fetched).hasValueSatisfying(rate -> assertThat(rate.usdPerEur()).isEqualByComparingTo("1.1377"));
+        assertThat(fetched)
+                .hasValueSatisfying(rate -> assertThat(rate.usdPerEur()).isEqualByComparingTo("1.1377"));
         assertThat(ecb.takeRequest().getTarget()).isEqualTo("/stats/eurofxref/eurofxref-daily.xml");
     }
 

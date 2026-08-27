@@ -14,11 +14,11 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubOrganizationEventDTO(
-    @JsonProperty("action") String action,
-    @JsonProperty("organization") GitHubOrganizationDTO organization,
-    @JsonProperty("membership") GitHubMembershipDTO membership,
-    @JsonProperty("sender") GitHubUserDTO sender
-) implements GitHubWebhookEvent {
+        @JsonProperty("action") String action,
+        @JsonProperty("organization") GitHubOrganizationDTO organization,
+        @JsonProperty("membership") GitHubMembershipDTO membership,
+        @JsonProperty("sender") GitHubUserDTO sender)
+        implements GitHubWebhookEvent {
     @Override
     public GitHubEventAction.Organization actionType() {
         return GitHubEventAction.Organization.fromString(action);
@@ -34,23 +34,21 @@ public record GitHubOrganizationEventDTO(
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record GitHubOrganizationDTO(
-        @JsonProperty("id") @Nullable Long id,
-        @JsonProperty("node_id") String nodeId,
-        @JsonProperty("login") String login,
-        @JsonProperty("description") String description,
-        @JsonProperty("avatar_url") @Nullable String avatarUrl,
-        @JsonProperty("html_url") @Nullable String htmlUrl,
-        @JsonProperty("created_at") @Nullable Instant createdAt,
-        @JsonProperty("updated_at") @Nullable Instant updatedAt
-    ) {}
+            @JsonProperty("id") @Nullable Long id,
+            @JsonProperty("node_id") String nodeId,
+            @JsonProperty("login") String login,
+            @JsonProperty("description") String description,
+            @JsonProperty("avatar_url") @Nullable String avatarUrl,
+            @JsonProperty("html_url") @Nullable String htmlUrl,
+            @JsonProperty("created_at") @Nullable Instant createdAt,
+            @JsonProperty("updated_at") @Nullable Instant updatedAt) {}
 
     /**
      * DTO for membership info (for member_added/removed events).
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record GitHubMembershipDTO(
-        @JsonProperty("user") GitHubUserDTO user,
-        @JsonProperty("role") String role,
-        @JsonProperty("state") String state
-    ) {}
+            @JsonProperty("user") GitHubUserDTO user,
+            @JsonProperty("role") String role,
+            @JsonProperty("state") String state) {}
 }

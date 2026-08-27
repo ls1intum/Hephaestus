@@ -41,9 +41,8 @@ class AuthBeginControllerLinkTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         loginProviderService = mock(LoginProviderService.class);
-        when(loginProviderService.findEnabled(any())).thenReturn(
-            Optional.of(providerRow("github", LoginProvider.ProviderType.GITHUB))
-        );
+        when(loginProviderService.findEnabled(any()))
+                .thenReturn(Optional.of(providerRow("github", LoginProvider.ProviderType.GITHUB)));
         bearerTokenResolver = mock(CookieBearerTokenResolver.class);
         jwtDecoder = mock(RevocationAwareJwtDecoder.class);
         byte[] key = new byte[32];
@@ -54,12 +53,11 @@ class AuthBeginControllerLinkTest extends BaseUnitTest {
 
     private AuthBeginController buildController(String apiBasePath) {
         return new AuthBeginController(
-            loginProviderService,
-            authIntentCookie,
-            bearerTokenResolver,
-            jwtDecoder,
-            AuthPropertiesFixture.withApiBasePath(apiBasePath)
-        );
+                loginProviderService,
+                authIntentCookie,
+                bearerTokenResolver,
+                jwtDecoder,
+                AuthPropertiesFixture.withApiBasePath(apiBasePath));
     }
 
     private static LoginProvider providerRow(String registrationId, LoginProvider.ProviderType type) {
@@ -72,7 +70,11 @@ class AuthBeginControllerLinkTest extends BaseUnitTest {
     }
 
     private static Jwt jwtForAccount(String sub) {
-        return Jwt.withTokenValue("t").header("alg", "ES256").subject(sub).claim("scope", "x").build();
+        return Jwt.withTokenValue("t")
+                .header("alg", "ES256")
+                .subject(sub)
+                .claim("scope", "x")
+                .build();
     }
 
     private AuthIntentCookie.@Nullable Intent readIntent(MockHttpServletResponse res) {
@@ -137,9 +139,8 @@ class AuthBeginControllerLinkTest extends BaseUnitTest {
     @Test
     void slackLoginMode_rejectedBecauseSlackIsLinkOnly() {
         // Link-only is classified by the login_provider row's TYPE, not by URL sniffing.
-        when(loginProviderService.findEnabled("slack")).thenReturn(
-            Optional.of(providerRow("slack", LoginProvider.ProviderType.SLACK))
-        );
+        when(loginProviderService.findEnabled("slack"))
+                .thenReturn(Optional.of(providerRow("slack", LoginProvider.ProviderType.SLACK)));
         MockHttpServletResponse res = new MockHttpServletResponse();
 
         RedirectView view = controller.begin("slack", null, "/settings", "login", new MockHttpServletRequest(), res);
@@ -153,9 +154,8 @@ class AuthBeginControllerLinkTest extends BaseUnitTest {
     void outlineLoginMode_rejectedBecauseOutlineIsLinkOnly() {
         // A self-hosted Outline's authorization URL is indistinguishable from a GitLab's by shape —
         // only the row's TYPE can classify it. LOGIN mode must be rejected before any redirect.
-        when(loginProviderService.findEnabled("outline")).thenReturn(
-            Optional.of(providerRow("outline", LoginProvider.ProviderType.OUTLINE))
-        );
+        when(loginProviderService.findEnabled("outline"))
+                .thenReturn(Optional.of(providerRow("outline", LoginProvider.ProviderType.OUTLINE)));
         MockHttpServletResponse res = new MockHttpServletResponse();
 
         RedirectView view = controller.begin("outline", null, "/settings", "login", new MockHttpServletRequest(), res);
@@ -167,9 +167,8 @@ class AuthBeginControllerLinkTest extends BaseUnitTest {
 
     @Test
     void outlineLinkMode_withValidSession_proceedsToInit() {
-        when(loginProviderService.findEnabled("outline")).thenReturn(
-            Optional.of(providerRow("outline", LoginProvider.ProviderType.OUTLINE))
-        );
+        when(loginProviderService.findEnabled("outline"))
+                .thenReturn(Optional.of(providerRow("outline", LoginProvider.ProviderType.OUTLINE)));
         when(bearerTokenResolver.resolve(any())).thenReturn("token");
         when(jwtDecoder.decode("token")).thenReturn(jwtForAccount("42"));
         MockHttpServletResponse res = new MockHttpServletResponse();
@@ -198,14 +197,8 @@ class AuthBeginControllerLinkTest extends BaseUnitTest {
 
     @Test
     void initRedirect_carriesApiBasePath_soItLandsOnTheProxiedEndpointNotTheSpa() {
-        RedirectView view = buildController("/api").begin(
-            "github",
-            "ws",
-            "/",
-            "login",
-            new MockHttpServletRequest(),
-            new MockHttpServletResponse()
-        );
+        RedirectView view = buildController("/api")
+                .begin("github", "ws", "/", "login", new MockHttpServletRequest(), new MockHttpServletResponse());
 
         assertThat(view.getUrl()).isEqualTo("/api/oauth2/authorization/github");
     }

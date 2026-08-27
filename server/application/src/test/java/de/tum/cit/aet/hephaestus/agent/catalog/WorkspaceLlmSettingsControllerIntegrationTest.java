@@ -42,15 +42,15 @@ class WorkspaceLlmSettingsControllerIntegrationTest extends AbstractWorkspaceInt
         instanceLlmSettingsRepository.save(settings);
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/settings", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.ownProviderAllowed")
-            .isEqualTo(false);
+                .get()
+                .uri("/workspaces/{slug}/llm/settings", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.ownProviderAllowed")
+                .isEqualTo(false);
     }
 
     @Test
@@ -63,12 +63,12 @@ class WorkspaceLlmSettingsControllerIntegrationTest extends AbstractWorkspaceInt
         ensureWorkspaceMembership(workspace, member, WorkspaceRole.MEMBER);
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/settings", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .get()
+                .uri("/workspaces/{slug}/llm/settings", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isForbidden();
     }
 
     @Test
@@ -81,27 +81,26 @@ class WorkspaceLlmSettingsControllerIntegrationTest extends AbstractWorkspaceInt
         ensureWorkspaceMembership(own, admin, WorkspaceRole.ADMIN);
 
         Workspace other = createWorkspace(
-            "llmsettings-other-ws",
-            "Other",
-            "llmsettings-other-org",
-            AccountType.ORG,
-            persistUser("llmsettings-other-owner")
-        );
+                "llmsettings-other-ws",
+                "Other",
+                "llmsettings-other-org",
+                AccountType.ORG,
+                persistUser("llmsettings-other-owner"));
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/settings", other.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .get()
+                .uri("/workspaces/{slug}/llm/settings", other.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isForbidden();
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/settings", own.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk();
+                .get()
+                .uri("/workspaces/{slug}/llm/settings", own.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk();
     }
 }

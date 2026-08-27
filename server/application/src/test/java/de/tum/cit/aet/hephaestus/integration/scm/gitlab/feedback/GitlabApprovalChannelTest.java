@@ -53,12 +53,7 @@ class GitlabApprovalChannelTest extends BaseUnitTest {
         gitlab = new MockWebServer();
         gitlab.start();
         channel = new GitlabApprovalChannel(
-            gitLabProvider,
-            tokenService,
-            feedbackChannel,
-            WebClient.builder(),
-            egressGuard
-        );
+                gitLabProvider, tokenService, feedbackChannel, WebClient.builder(), egressGuard);
     }
 
     @AfterEach
@@ -99,12 +94,15 @@ class GitlabApprovalChannelTest extends BaseUnitTest {
     @Test
     void approveSurfacesTheReasonOnUnauthorized() {
         stubScope();
-        gitlab.enqueue(new MockResponse.Builder().code(401).body("{\"message\":\"401 Unauthorized\"}").build());
+        gitlab.enqueue(new MockResponse.Builder()
+                .code(401)
+                .body("{\"message\":\"401 Unauthorized\"}")
+                .build());
 
         assertThatThrownBy(() -> channel.approve(gitlabTarget(), null))
-            .isInstanceOf(FeedbackDeliveryException.class)
-            .hasMessageContaining("group/project!42")
-            .hasMessageContaining("may not approve");
+                .isInstanceOf(FeedbackDeliveryException.class)
+                .hasMessageContaining("group/project!42")
+                .hasMessageContaining("may not approve");
     }
 
     @Test
@@ -120,9 +118,8 @@ class GitlabApprovalChannelTest extends BaseUnitTest {
         stubScope();
         gitlab.enqueue(new MockResponse.Builder().code(401).build());
 
-        assertThatThrownBy(() -> channel.approve(gitlabTarget(), "looks good")).isInstanceOf(
-            FeedbackDeliveryException.class
-        );
+        assertThatThrownBy(() -> channel.approve(gitlabTarget(), "looks good"))
+                .isInstanceOf(FeedbackDeliveryException.class);
 
         verify(feedbackChannel, never()).postSummary(any(), any());
     }
@@ -145,19 +142,18 @@ class GitlabApprovalChannelTest extends BaseUnitTest {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(true);
 
         assertThatThrownBy(() -> channel.approve(gitlabTarget(), null))
-            .isInstanceOf(FeedbackDeliveryException.class)
-            .hasMessageContaining("rate limit critical");
+                .isInstanceOf(FeedbackDeliveryException.class)
+                .hasMessageContaining("rate limit critical");
     }
 
     @Test
     void shouldBlockBeforeTokenOrHttpCallsWhenSilentModeIsEngaged() {
         doThrow(new OutboundEgressSuppressedException("test"))
-            .when(egressGuard)
-            .requireDeliveryAllowed("gitlab.approve");
+                .when(egressGuard)
+                .requireDeliveryAllowed("gitlab.approve");
 
-        assertThatThrownBy(() -> channel.approve(gitlabTarget(), null)).isInstanceOf(
-            OutboundEgressSuppressedException.class
-        );
+        assertThatThrownBy(() -> channel.approve(gitlabTarget(), null))
+                .isInstanceOf(OutboundEgressSuppressedException.class);
         verifyNoInteractions(tokenService, feedbackChannel);
         assertThat(gitlab.getRequestCount()).isZero();
     }

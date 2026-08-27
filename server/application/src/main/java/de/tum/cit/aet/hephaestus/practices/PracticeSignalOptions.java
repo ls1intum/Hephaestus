@@ -30,13 +30,11 @@ public class PracticeSignalOptions {
 
     /** The kinds an author may write a practice against: the reviewable ones, in a stable order. */
     public List<ArtifactKind> authorableKinds() {
-        return artifacts
-            .all()
-            .stream()
-            .filter(ArtifactDescriptor::reviewable)
-            .map(ArtifactDescriptor::kind)
-            .sorted(Comparator.comparing(ArtifactKind::value))
-            .toList();
+        return artifacts.all().stream()
+                .filter(ArtifactDescriptor::reviewable)
+                .map(ArtifactDescriptor::kind)
+                .sorted(Comparator.comparing(ArtifactKind::value))
+                .toList();
     }
 
     /**
@@ -48,14 +46,17 @@ public class PracticeSignalOptions {
      */
     public List<SignalOption> bindableOptionsFor(ArtifactKind kind) {
         return declaredOptions(kind)
-            .filter(signal -> !signal.requestedByHand())
-            .map(SignalOption::of)
-            .toList();
+                .filter(signal -> !signal.requestedByHand())
+                .map(SignalOption::of)
+                .toList();
     }
 
     /** The occasion a person raises by asking for a review of this kind, if the kind admits one. */
     public Optional<SignalOption> manualRequestOptionFor(ArtifactKind kind) {
-        return declaredOptions(kind).filter(Signal::requestedByHand).map(SignalOption::of).findFirst();
+        return declaredOptions(kind)
+                .filter(Signal::requestedByHand)
+                .map(SignalOption::of)
+                .findFirst();
     }
 
     /** The signal a person's explicit "review this now" raises for this kind, if the kind admits one. */
@@ -69,7 +70,9 @@ public class PracticeSignalOptions {
      * injector both rely on this agreeing with theirs.
      */
     public boolean isManualRequest(SignalName signal) {
-        return manualRequestSignalFor(signal.artifactKind()).filter(signal::equals).isPresent();
+        return manualRequestSignalFor(signal.artifactKind())
+                .filter(signal::equals)
+                .isPresent();
     }
 
     public Set<SignalName> eligibleFor(ArtifactKind kind) {
@@ -92,10 +95,10 @@ public class PracticeSignalOptions {
      */
     public boolean producedByIngestion(SignalName signal) {
         return artifacts
-            .descriptorFor(signal.artifactKind())
-            .flatMap(descriptor -> descriptor.signal(signal))
-            .filter(declared -> !declared.producedBy().isEmpty())
-            .isPresent();
+                .descriptorFor(signal.artifactKind())
+                .flatMap(descriptor -> descriptor.signal(signal))
+                .filter(declared -> !declared.producedBy().isEmpty())
+                .isPresent();
     }
 
     private Stream<Signal> declaredOptions(ArtifactKind kind) {

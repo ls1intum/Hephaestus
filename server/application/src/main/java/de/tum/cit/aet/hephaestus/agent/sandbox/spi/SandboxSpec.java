@@ -26,60 +26,56 @@ import org.jspecify.annotations.Nullable;
  * @param volumeMounts host bind mounts (host path → container path); mounted read-only
  */
 public record SandboxSpec(
-    UUID jobId,
-    String image,
-    List<String> command,
-    Map<String, String> environment,
-    @Nullable NetworkPolicy networkPolicy,
-    ResourceLimits resourceLimits,
-    @Nullable SecurityProfile securityProfile,
-    Map<String, byte[]> inputFiles,
-    /** Inputs staged by host path and streamed into the container, never read into this process. */
-    Map<String, java.nio.file.Path> inputFilesOnDisk,
-    String outputPath,
-    Map<String, String> volumeMounts
-) {
-    /** For runs whose inputs are all held in memory. */
-    public SandboxSpec(
         UUID jobId,
         String image,
-        @Nullable List<String> command,
-        @Nullable Map<String, String> environment,
+        List<String> command,
+        Map<String, String> environment,
         @Nullable NetworkPolicy networkPolicy,
         ResourceLimits resourceLimits,
         @Nullable SecurityProfile securityProfile,
-        @Nullable Map<String, byte[]> inputFiles,
+        Map<String, byte[]> inputFiles,
+        /** Inputs staged by host path and streamed into the container, never read into this process. */
+        Map<String, java.nio.file.Path> inputFilesOnDisk,
         String outputPath,
-        @Nullable Map<String, String> volumeMounts
-    ) {
+        Map<String, String> volumeMounts) {
+    /** For runs whose inputs are all held in memory. */
+    public SandboxSpec(
+            UUID jobId,
+            String image,
+            @Nullable List<String> command,
+            @Nullable Map<String, String> environment,
+            @Nullable NetworkPolicy networkPolicy,
+            ResourceLimits resourceLimits,
+            @Nullable SecurityProfile securityProfile,
+            @Nullable Map<String, byte[]> inputFiles,
+            String outputPath,
+            @Nullable Map<String, String> volumeMounts) {
         this(
-            jobId,
-            image,
-            command,
-            environment,
-            networkPolicy,
-            resourceLimits,
-            securityProfile,
-            inputFiles,
-            Map.of(),
-            outputPath,
-            volumeMounts
-        );
+                jobId,
+                image,
+                command,
+                environment,
+                networkPolicy,
+                resourceLimits,
+                securityProfile,
+                inputFiles,
+                Map.of(),
+                outputPath,
+                volumeMounts);
     }
 
     public SandboxSpec(
-        UUID jobId,
-        String image,
-        @Nullable List<String> command,
-        @Nullable Map<String, String> environment,
-        @Nullable NetworkPolicy networkPolicy,
-        ResourceLimits resourceLimits,
-        @Nullable SecurityProfile securityProfile,
-        @Nullable Map<String, byte[]> inputFiles,
-        @Nullable Map<String, java.nio.file.Path> inputFilesOnDisk,
-        String outputPath,
-        @Nullable Map<String, String> volumeMounts
-    ) {
+            UUID jobId,
+            String image,
+            @Nullable List<String> command,
+            @Nullable Map<String, String> environment,
+            @Nullable NetworkPolicy networkPolicy,
+            ResourceLimits resourceLimits,
+            @Nullable SecurityProfile securityProfile,
+            @Nullable Map<String, byte[]> inputFiles,
+            @Nullable Map<String, java.nio.file.Path> inputFilesOnDisk,
+            String outputPath,
+            @Nullable Map<String, String> volumeMounts) {
         this.jobId = Objects.requireNonNull(jobId, "jobId must not be null");
         this.image = Objects.requireNonNull(image, "image must not be null");
         this.resourceLimits = Objects.requireNonNull(resourceLimits, "resourceLimits must not be null");
@@ -97,6 +93,6 @@ public record SandboxSpec(
         this.inputFiles = inputFiles != null ? Map.copyOf(inputFiles) : Map.of();
         this.inputFilesOnDisk = inputFilesOnDisk != null ? Map.copyOf(inputFilesOnDisk) : Map.of();
         this.volumeMounts =
-            volumeMounts != null ? Collections.unmodifiableMap(new LinkedHashMap<>(volumeMounts)) : Map.of();
+                volumeMounts != null ? Collections.unmodifiableMap(new LinkedHashMap<>(volumeMounts)) : Map.of();
     }
 }

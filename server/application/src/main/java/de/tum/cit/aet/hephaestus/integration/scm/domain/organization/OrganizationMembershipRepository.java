@@ -10,11 +10,9 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
 @WorkspaceAgnostic(
-    "Memberships scoped through organization_id; organization is global, membership filtered by workspace context"
-)
+        "Memberships scoped through organization_id; organization is global, membership filtered by workspace context")
 public interface OrganizationMembershipRepository
-    extends JpaRepository<OrganizationMembership, OrganizationMembershipId>
-{
+        extends JpaRepository<OrganizationMembership, OrganizationMembershipId> {
     @Query("SELECT m.userId FROM OrganizationMembership m WHERE m.organizationId = :orgId")
     List<Long> findUserIdsByOrganizationId(@Param("orgId") Long organizationId);
 
@@ -22,20 +20,16 @@ public interface OrganizationMembershipRepository
 
     @Modifying
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO organization_membership (organization_id, user_id, role)
         VALUES (:orgId, :userId, :#{#role.name()})
         ON CONFLICT (organization_id, user_id)
         DO UPDATE SET role = EXCLUDED.role
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     void upsertMembership(
-        @Param("orgId") Long organizationId,
-        @Param("userId") Long userId,
-        @Param("role") OrganizationMemberRole role
-    );
+            @Param("orgId") Long organizationId,
+            @Param("userId") Long userId,
+            @Param("role") OrganizationMemberRole role);
 
     /**
      * Drop the whole membership mirror for one organization — the org-tier half of
@@ -53,7 +47,5 @@ public interface OrganizationMembershipRepository
     @Transactional
     @Query("DELETE FROM OrganizationMembership m WHERE m.organizationId = :orgId AND m.userId IN :userIds")
     void deleteByOrganizationIdAndUserIdIn(
-        @Param("orgId") Long organizationId,
-        @Param("userIds") Collection<Long> userIds
-    );
+            @Param("orgId") Long organizationId, @Param("userIds") Collection<Long> userIds);
 }

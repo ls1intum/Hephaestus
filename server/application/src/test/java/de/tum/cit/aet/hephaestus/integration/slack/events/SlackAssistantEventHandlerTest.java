@@ -42,37 +42,35 @@ class SlackAssistantEventHandlerTest extends BaseUnitTest {
         when(mentorReadinessQuery.isReady(42L)).thenReturn(true);
 
         handler.onMessagesOpened(
-            "T1",
-            JsonMapper.builder().build().readTree("{\"tab\":\"messages\",\"channel\":\"D1\"}")
-        );
+                "T1", JsonMapper.builder().build().readTree("{\"tab\":\"messages\",\"channel\":\"D1\"}"));
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<SuggestedPrompt>> prompts = ArgumentCaptor.forClass(List.class);
-        verify(messageService).setSuggestedPrompts(
-            ArgumentMatchers.eq(42L),
-            ArgumentMatchers.eq("D1"),
-            ArgumentMatchers.eq("Practice mentor"),
-            prompts.capture()
-        );
+        verify(messageService)
+                .setSuggestedPrompts(
+                        ArgumentMatchers.eq(42L),
+                        ArgumentMatchers.eq("D1"),
+                        ArgumentMatchers.eq("Practice mentor"),
+                        prompts.capture());
         assertThat(prompts.getValue()).hasSize(4);
         assertThat(prompts.getValue())
-            .extracting(SuggestedPrompt::getTitle)
-            .containsExactly("What needs attention?", "Review my recent work", "Check my reviews", "Follow up");
+                .extracting(SuggestedPrompt::getTitle)
+                .containsExactly("What needs attention?", "Review my recent work", "Check my reviews", "Follow up");
         assertThat(prompts.getValue())
-            .extracting(SuggestedPrompt::getMessage)
-            .allSatisfy(message -> assertThat(message).doesNotContain("latest", "most recent"));
+                .extracting(SuggestedPrompt::getMessage)
+                .allSatisfy(message -> assertThat(message).doesNotContain("latest", "most recent"));
     }
 
     @Test
     void missingChannelDoesNotSetPrompts() throws Exception {
         handler.onMessagesOpened("T1", JsonMapper.builder().build().readTree("{\"tab\":\"messages\"}"));
 
-        verify(messageService, never()).setSuggestedPrompts(
-            ArgumentMatchers.anyLong(),
-            ArgumentMatchers.anyString(),
-            ArgumentMatchers.anyString(),
-            ArgumentMatchers.anyList()
-        );
+        verify(messageService, never())
+                .setSuggestedPrompts(
+                        ArgumentMatchers.anyLong(),
+                        ArgumentMatchers.anyString(),
+                        ArgumentMatchers.anyString(),
+                        ArgumentMatchers.anyList());
     }
 
     @Test
@@ -81,15 +79,13 @@ class SlackAssistantEventHandlerTest extends BaseUnitTest {
         when(mentorReadinessQuery.isReady(42L)).thenReturn(false);
 
         handler.onMessagesOpened(
-            "T1",
-            JsonMapper.builder().build().readTree("{\"tab\":\"messages\",\"channel\":\"D1\"}")
-        );
+                "T1", JsonMapper.builder().build().readTree("{\"tab\":\"messages\",\"channel\":\"D1\"}"));
 
-        verify(messageService, never()).setSuggestedPrompts(
-            ArgumentMatchers.anyLong(),
-            ArgumentMatchers.anyString(),
-            ArgumentMatchers.anyString(),
-            ArgumentMatchers.anyList()
-        );
+        verify(messageService, never())
+                .setSuggestedPrompts(
+                        ArgumentMatchers.anyLong(),
+                        ArgumentMatchers.anyString(),
+                        ArgumentMatchers.anyString(),
+                        ArgumentMatchers.anyList());
     }
 }

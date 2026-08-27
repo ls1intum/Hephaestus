@@ -12,7 +12,6 @@ public final class MentorVisibleTextSanitizer {
         }
         String normalized = text.stripLeading().toLowerCase(Locale.ROOT);
         return normalized.matches(
-            "^(user (wants|asks|is asking|asked|said)|we need to|need to|i need to|allowed paths:|use function fetch_context|according to (the )?(instructions|guidelines)).*"
-        );
+                "^(user (wants|asks|is asking|asked|said)|we need to|need to|i need to|allowed paths:|use function fetch_context|according to (the )?(instructions|guidelines)).*");
     }
 }

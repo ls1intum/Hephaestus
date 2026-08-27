@@ -40,19 +40,17 @@ public class GitLabSubgroupMessageHandler extends AbstractIntegrationMessageHand
     private final GitLabProperties gitLabProperties;
 
     GitLabSubgroupMessageHandler(
-        GitLabTeamProcessor teamProcessor,
-        IdentityProviderRepository gitProviderRepository,
-        GitLabProperties gitLabProperties,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            GitLabTeamProcessor teamProcessor,
+            IdentityProviderRepository gitProviderRepository,
+            GitLabProperties gitLabProperties,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITLAB,
-            GitLabEventType.SUBGROUP.getValue(),
-            GitLabSubgroupEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITLAB,
+                GitLabEventType.SUBGROUP.getValue(),
+                GitLabSubgroupEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.teamProcessor = teamProcessor;
         this.gitProviderRepository = gitProviderRepository;
         this.gitLabProperties = gitLabProperties;
@@ -62,16 +60,15 @@ public class GitLabSubgroupMessageHandler extends AbstractIntegrationMessageHand
     protected void handleEvent(GitLabSubgroupEventDTO event) {
         String safeFullPath = sanitizeForLog(event.fullPath());
         log.debug(
-            "Received subgroup event: eventName={}, fullPath={}, groupId={}, parentGroupId={}",
-            event.eventName(),
-            safeFullPath,
-            event.groupId(),
-            event.parentGroupId()
-        );
+                "Received subgroup event: eventName={}, fullPath={}, groupId={}, parentGroupId={}",
+                event.eventName(),
+                safeFullPath,
+                event.groupId(),
+                event.parentGroupId());
 
         IdentityProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
-            .orElse(null);
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
+                .orElse(null);
 
         if (provider == null) {
             log.warn("IdentityProvider not found for GITLAB, skipping subgroup event");
@@ -98,34 +95,29 @@ public class GitLabSubgroupMessageHandler extends AbstractIntegrationMessageHand
         // Build a GitLabDescendantGroupResponse from the webhook DTO
         // to reuse the existing processor logic.
         GitLabDescendantGroupResponse groupResponse = new GitLabDescendantGroupResponse(
-            "gid://gitlab/Group/" + event.groupId(),
-            event.fullPath(),
-            event.name(),
-            null, // description not in webhook payload
-            null, // webUrl not in webhook payload
-            null, // visibility not in webhook payload
-            event.parentFullPath() != null
-                ? new GitLabDescendantGroupResponse.ParentRef(
-                      "gid://gitlab/Group/" + event.parentGroupId(),
-                      event.parentFullPath()
-                  )
-                : null
-        );
+                "gid://gitlab/Group/" + event.groupId(),
+                event.fullPath(),
+                event.name(),
+                null, // description not in webhook payload
+                null, // webUrl not in webhook payload
+                null, // visibility not in webhook payload
+                event.parentFullPath() != null
+                        ? new GitLabDescendantGroupResponse.ParentRef(
+                                "gid://gitlab/Group/" + event.parentGroupId(), event.parentFullPath())
+                        : null);
 
         teamProcessor.process(groupResponse, rootFullPath, provider);
         log.info(
-            "Created/updated team from subgroup event: fullPath={}, groupId={}",
-            sanitizeForLog(event.fullPath()),
-            event.groupId()
-        );
+                "Created/updated team from subgroup event: fullPath={}, groupId={}",
+                sanitizeForLog(event.fullPath()),
+                event.groupId());
     }
 
     private void handleSubgroupDestroy(GitLabSubgroupEventDTO event, IdentityProvider provider) {
         teamProcessor.delete(event.groupId(), Objects.requireNonNull(provider.getId()));
         log.info(
-            "Deleted team from subgroup event: fullPath={}, groupId={}",
-            sanitizeForLog(event.fullPath()),
-            event.groupId()
-        );
+                "Deleted team from subgroup event: fullPath={}, groupId={}",
+                sanitizeForLog(event.fullPath()),
+                event.groupId());
     }
 }

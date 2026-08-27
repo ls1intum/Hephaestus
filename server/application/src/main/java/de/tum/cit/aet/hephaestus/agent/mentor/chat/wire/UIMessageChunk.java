@@ -17,27 +17,25 @@ import tools.jackson.databind.JsonNode;
  * Round-trip serialisation is locked down by {@code UIMessageChunkSerializationTest}.
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type")
-@JsonSubTypes(
-    {
-        @JsonSubTypes.Type(value = UIMessageChunk.Start.class, name = "start"),
-        @JsonSubTypes.Type(value = UIMessageChunk.StartStep.class, name = "start-step"),
-        @JsonSubTypes.Type(value = UIMessageChunk.FinishStep.class, name = "finish-step"),
-        @JsonSubTypes.Type(value = UIMessageChunk.Finish.class, name = "finish"),
-        @JsonSubTypes.Type(value = UIMessageChunk.TextStart.class, name = "text-start"),
-        @JsonSubTypes.Type(value = UIMessageChunk.TextDelta.class, name = "text-delta"),
-        @JsonSubTypes.Type(value = UIMessageChunk.TextEnd.class, name = "text-end"),
-        @JsonSubTypes.Type(value = UIMessageChunk.ReasoningStart.class, name = "reasoning-start"),
-        @JsonSubTypes.Type(value = UIMessageChunk.ReasoningDelta.class, name = "reasoning-delta"),
-        @JsonSubTypes.Type(value = UIMessageChunk.ReasoningEnd.class, name = "reasoning-end"),
-        @JsonSubTypes.Type(value = UIMessageChunk.ToolInputStart.class, name = "tool-input-start"),
-        @JsonSubTypes.Type(value = UIMessageChunk.ToolInputAvailable.class, name = "tool-input-available"),
-        @JsonSubTypes.Type(value = UIMessageChunk.ToolOutputAvailable.class, name = "tool-output-available"),
-        @JsonSubTypes.Type(value = UIMessageChunk.ToolOutputError.class, name = "tool-output-error"),
-        @JsonSubTypes.Type(value = UIMessageChunk.Error.class, name = "error"),
-        @JsonSubTypes.Type(value = UIMessageChunk.DataMentorStatus.class, name = "data-mentor-status"),
-        @JsonSubTypes.Type(value = UIMessageChunk.DataObservation.class, name = "data-observation"),
-    }
-)
+@JsonSubTypes({
+    @JsonSubTypes.Type(value = UIMessageChunk.Start.class, name = "start"),
+    @JsonSubTypes.Type(value = UIMessageChunk.StartStep.class, name = "start-step"),
+    @JsonSubTypes.Type(value = UIMessageChunk.FinishStep.class, name = "finish-step"),
+    @JsonSubTypes.Type(value = UIMessageChunk.Finish.class, name = "finish"),
+    @JsonSubTypes.Type(value = UIMessageChunk.TextStart.class, name = "text-start"),
+    @JsonSubTypes.Type(value = UIMessageChunk.TextDelta.class, name = "text-delta"),
+    @JsonSubTypes.Type(value = UIMessageChunk.TextEnd.class, name = "text-end"),
+    @JsonSubTypes.Type(value = UIMessageChunk.ReasoningStart.class, name = "reasoning-start"),
+    @JsonSubTypes.Type(value = UIMessageChunk.ReasoningDelta.class, name = "reasoning-delta"),
+    @JsonSubTypes.Type(value = UIMessageChunk.ReasoningEnd.class, name = "reasoning-end"),
+    @JsonSubTypes.Type(value = UIMessageChunk.ToolInputStart.class, name = "tool-input-start"),
+    @JsonSubTypes.Type(value = UIMessageChunk.ToolInputAvailable.class, name = "tool-input-available"),
+    @JsonSubTypes.Type(value = UIMessageChunk.ToolOutputAvailable.class, name = "tool-output-available"),
+    @JsonSubTypes.Type(value = UIMessageChunk.ToolOutputError.class, name = "tool-output-error"),
+    @JsonSubTypes.Type(value = UIMessageChunk.Error.class, name = "error"),
+    @JsonSubTypes.Type(value = UIMessageChunk.DataMentorStatus.class, name = "data-mentor-status"),
+    @JsonSubTypes.Type(value = UIMessageChunk.DataObservation.class, name = "data-observation"),
+})
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public sealed interface UIMessageChunk {
     /**
@@ -68,9 +66,7 @@ public sealed interface UIMessageChunk {
      * (and downstream observability) can surface them.
      */
     record Finish(
-        @Nullable FinishReason finishReason,
-        @Nullable MessageMetadata messageMetadata
-    ) implements UIMessageChunk {}
+            @Nullable FinishReason finishReason, @Nullable MessageMetadata messageMetadata) implements UIMessageChunk {}
 
     /**
      * AI SDK strict-zod enum for the {@code finish} chunk's {@code finishReason}
@@ -113,12 +109,12 @@ public sealed interface UIMessageChunk {
      * the wire so the AI SDK strict-zod {@code messageMetadata} validator accepts the payload.
      */
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    record MessageMetadata(@Nullable String model, @Nullable Usage usage, @Nullable Double costUsd) {
-        public static @Nullable MessageMetadata of(
+    record MessageMetadata(
             @Nullable String model,
             @Nullable Usage usage,
-            @Nullable Double costUsd
-        ) {
+            @Nullable Double costUsd) {
+        public static @Nullable MessageMetadata of(
+                @Nullable String model, @Nullable Usage usage, @Nullable Double costUsd) {
             // Cheap "nothing observed" gate so we don't ship `{}` to clients (which the strict
             // validator still accepts but bloats every Finish chunk).
             if (model == null && usage == null && costUsd == null) return null;
@@ -128,12 +124,11 @@ public sealed interface UIMessageChunk {
         /** Pi's {@code Usage} shape (pi-ai/src/types.ts) projected onto the AI SDK wire. */
         @JsonInclude(JsonInclude.Include.NON_NULL)
         public record Usage(
-            @Nullable Integer input,
-            @Nullable Integer output,
-            @Nullable Integer cacheRead,
-            @Nullable Integer cacheWrite,
-            @Nullable Integer totalTokens
-        ) {
+                @Nullable Integer input,
+                @Nullable Integer output,
+                @Nullable Integer cacheRead,
+                @Nullable Integer cacheWrite,
+                @Nullable Integer totalTokens) {
             /** Build from a Pi JSONNode {@code usage} block; null-tolerant on every field. */
             public static @Nullable Usage fromJsonNode(@Nullable JsonNode node) {
                 if (node == null || !node.isObject() || node.isEmpty()) return null;
@@ -198,14 +193,15 @@ public sealed interface UIMessageChunk {
      * it from the persisted UIMessage parts array on the client.
      */
     record DataMentorStatus(
-        @JsonProperty("id") String id,
-        @JsonProperty("data") DataMentorStatusPayload data,
-        @JsonProperty("transient") @Nullable Boolean transientFlag
-    ) implements UIMessageChunk {
+            @JsonProperty("id") String id,
+            @JsonProperty("data") DataMentorStatusPayload data,
+            @JsonProperty("transient") @Nullable Boolean transientFlag)
+            implements UIMessageChunk {
         /** Stable id so subsequent status emits dedupe client-side instead of accumulating. */
         public static final String STATUS_PART_ID = "mentor-status";
 
-        public record DataMentorStatusPayload(String state, @Nullable String reason) {}
+        public record DataMentorStatusPayload(
+                String state, @Nullable String reason) {}
 
         public static DataMentorStatus of(String state, @Nullable String reason) {
             return new DataMentorStatus(STATUS_PART_ID, new DataMentorStatusPayload(state, reason), Boolean.TRUE);
@@ -219,9 +215,8 @@ public sealed interface UIMessageChunk {
      * inside the {@code data} envelope.
      */
     record DataObservation(
-        @JsonProperty("id") UUID id,
-        @JsonProperty("data") DataObservationPayload data
-    ) implements UIMessageChunk {
+            @JsonProperty("id") UUID id,
+            @JsonProperty("data") DataObservationPayload data) implements UIMessageChunk {
         public DataObservation {
             Objects.requireNonNull(id, "id");
             Objects.requireNonNull(data, "data");

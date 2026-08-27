@@ -81,15 +81,14 @@ public record ObservationDelta(List<LocusChange> loci) {
      * @param observedAt when it was measured; orders the runs within an artifact
      */
     public record Locus(
-        @Nullable String recurrenceKey,
-        String practiceSlug,
-        @Nullable ArtifactKind artifactKind,
-        @Nullable Long artifactId,
-        @Nullable UUID runId,
-        @Nullable Instant observedAt,
-        @Nullable Assessment assessment,
-        @Nullable Severity severity
-    ) {}
+            @Nullable String recurrenceKey,
+            String practiceSlug,
+            @Nullable ArtifactKind artifactKind,
+            @Nullable Long artifactId,
+            @Nullable UUID runId,
+            @Nullable Instant observedAt,
+            @Nullable Assessment assessment,
+            @Nullable Severity severity) {}
 
     /**
      * One locus's verdict.
@@ -99,15 +98,14 @@ public record ObservationDelta(List<LocusChange> loci) {
      *     that is the last run it was still a problem in, because it is absent from the newest one
      */
     public record LocusChange(
-        String recurrenceKey,
-        String practiceSlug,
-        Status status,
-        int runsSeen,
-        @Nullable Instant firstSeenAt,
-        @Nullable Instant lastSeenAt,
-        @Nullable Assessment latestAssessment,
-        @Nullable Severity latestSeverity
-    ) {}
+            String recurrenceKey,
+            String practiceSlug,
+            Status status,
+            int runsSeen,
+            @Nullable Instant firstSeenAt,
+            @Nullable Instant lastSeenAt,
+            @Nullable Assessment latestAssessment,
+            @Nullable Severity latestSeverity) {}
 
     /**
      * Classify every locus in one window.
@@ -124,18 +122,19 @@ public record ObservationDelta(List<LocusChange> loci) {
     public static ObservationDelta classify(Collection<Locus> window) {
         Map<ArtifactRef, List<Locus>> byArtifact = new LinkedHashMap<>();
         for (Locus locus : window) {
-            if (locus == null || locus.recurrenceKey() == null || locus.recurrenceKey().isBlank()) {
+            if (locus == null
+                    || locus.recurrenceKey() == null
+                    || locus.recurrenceKey().isBlank()) {
                 continue;
             }
-            byArtifact.computeIfAbsent(ArtifactRef.of(locus), ref -> new ArrayList<>()).add(locus);
+            byArtifact
+                    .computeIfAbsent(ArtifactRef.of(locus), ref -> new ArrayList<>())
+                    .add(locus);
         }
         List<LocusChange> changes = new ArrayList<>();
         byArtifact.values().forEach(loci -> changes.addAll(classifyArtifact(loci)));
-        changes.sort(
-            Comparator.comparingInt((LocusChange change) -> statusOrder(change.status())).thenComparing(
-                LocusChange::recurrenceKey
-            )
-        );
+        changes.sort(Comparator.comparingInt((LocusChange change) -> statusOrder(change.status()))
+                .thenComparing(LocusChange::recurrenceKey));
         return new ObservationDelta(changes);
     }
 
@@ -143,7 +142,8 @@ public record ObservationDelta(List<LocusChange> loci) {
         UUID newestRun = newestRunOf(loci);
         Map<String, List<Locus>> byKey = new LinkedHashMap<>();
         for (Locus locus : loci) {
-            byKey.computeIfAbsent(locus.recurrenceKey(), key -> new ArrayList<>()).add(locus);
+            byKey.computeIfAbsent(locus.recurrenceKey(), key -> new ArrayList<>())
+                    .add(locus);
         }
         List<LocusChange> changes = new ArrayList<>();
         byKey.forEach((key, occurrences) -> {
@@ -161,36 +161,35 @@ public record ObservationDelta(List<LocusChange> loci) {
      * according to whatever order the query happened to return.
      */
     private static @Nullable UUID newestRunOf(List<Locus> loci) {
-        return loci
-            .stream()
-            .filter(locus -> locus.runId() != null)
-            .max(
-                Comparator.comparing((Locus locus) ->
-                    locus.observedAt() == null ? Instant.MIN : locus.observedAt()
-                ).thenComparing(locus -> Objects.requireNonNull(locus.runId()).toString())
-            )
-            .map(Locus::runId)
-            .orElse(null);
+        return loci.stream()
+                .filter(locus -> locus.runId() != null)
+                .max(Comparator.comparing(
+                                (Locus locus) -> locus.observedAt() == null ? Instant.MIN : locus.observedAt())
+                        .thenComparing(
+                                locus -> Objects.requireNonNull(locus.runId()).toString()))
+                .map(Locus::runId)
+                .orElse(null);
     }
 
     private static @Nullable LocusChange classifyLocus(String key, List<Locus> occurrences, @Nullable UUID newestRun) {
-        List<Locus> inNewestRun = occurrences
-            .stream()
-            .filter(locus -> newestRun != null && newestRun.equals(locus.runId()))
-            .toList();
-        long runsSeen = occurrences.stream().map(Locus::runId).filter(Objects::nonNull).distinct().count();
-        Instant firstSeen = occurrences
-            .stream()
-            .map(Locus::observedAt)
-            .filter(Objects::nonNull)
-            .min(Comparator.naturalOrder())
-            .orElse(null);
-        Instant lastSeen = occurrences
-            .stream()
-            .map(Locus::observedAt)
-            .filter(Objects::nonNull)
-            .max(Comparator.naturalOrder())
-            .orElse(null);
+        List<Locus> inNewestRun = occurrences.stream()
+                .filter(locus -> newestRun != null && newestRun.equals(locus.runId()))
+                .toList();
+        long runsSeen = occurrences.stream()
+                .map(Locus::runId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .count();
+        Instant firstSeen = occurrences.stream()
+                .map(Locus::observedAt)
+                .filter(Objects::nonNull)
+                .min(Comparator.naturalOrder())
+                .orElse(null);
+        Instant lastSeen = occurrences.stream()
+                .map(Locus::observedAt)
+                .filter(Objects::nonNull)
+                .max(Comparator.naturalOrder())
+                .orElse(null);
 
         if (newestRun == null) {
             // No run identifies itself, so no measurement can be said to be the current one. Absence from
@@ -198,15 +197,14 @@ public record ObservationDelta(List<LocusChange> loci) {
             // must not be reachable by default.
             Locus any = worstOf(occurrences);
             return new LocusChange(
-                key,
-                any.practiceSlug(),
-                Status.NEW,
-                (int) runsSeen,
-                firstSeen,
-                lastSeen,
-                any.assessment(),
-                any.severity()
-            );
+                    key,
+                    any.practiceSlug(),
+                    Status.NEW,
+                    (int) runsSeen,
+                    firstSeen,
+                    lastSeen,
+                    any.assessment(),
+                    any.severity());
         }
         if (inNewestRun.isEmpty()) {
             Locus worst = worstOf(occurrences);
@@ -216,45 +214,41 @@ public record ObservationDelta(List<LocusChange> loci) {
                 return null;
             }
             return new LocusChange(
-                key,
-                worst.practiceSlug(),
-                Status.RESOLVED,
-                (int) runsSeen,
-                firstSeen,
-                lastSeen,
-                worst.assessment(),
-                worst.severity()
-            );
+                    key,
+                    worst.practiceSlug(),
+                    Status.RESOLVED,
+                    (int) runsSeen,
+                    firstSeen,
+                    lastSeen,
+                    worst.assessment(),
+                    worst.severity());
         }
         Locus current = worstOf(inNewestRun);
         if (runsSeen <= 1) {
             return new LocusChange(
+                    key,
+                    current.practiceSlug(),
+                    Status.NEW,
+                    (int) runsSeen,
+                    firstSeen,
+                    lastSeen,
+                    current.assessment(),
+                    current.severity());
+        }
+        List<Locus> earlier = occurrences.stream()
+                .filter(locus -> !inNewestRun.contains(locus))
+                .toList();
+        Locus prior = worstOf(earlier);
+        boolean moved = prior.assessment() != current.assessment() || prior.severity() != current.severity();
+        return new LocusChange(
                 key,
                 current.practiceSlug(),
-                Status.NEW,
+                moved ? Status.RECURRING : Status.UNCHANGED,
                 (int) runsSeen,
                 firstSeen,
                 lastSeen,
                 current.assessment(),
-                current.severity()
-            );
-        }
-        List<Locus> earlier = occurrences
-            .stream()
-            .filter(locus -> !inNewestRun.contains(locus))
-            .toList();
-        Locus prior = worstOf(earlier);
-        boolean moved = prior.assessment() != current.assessment() || prior.severity() != current.severity();
-        return new LocusChange(
-            key,
-            current.practiceSlug(),
-            moved ? Status.RECURRING : Status.UNCHANGED,
-            (int) runsSeen,
-            firstSeen,
-            lastSeen,
-            current.assessment(),
-            current.severity()
-        );
+                current.severity());
     }
 
     /**
@@ -263,10 +257,9 @@ public record ObservationDelta(List<LocusChange> loci) {
      * one: worst severity, then highest confidence is unavailable here, so the first wins.
      */
     private static Locus worstOf(List<Locus> occurrences) {
-        return occurrences
-            .stream()
-            .min(Comparator.comparingInt(ObservationDelta::severityOrder))
-            .orElseThrow(() -> new IllegalArgumentException("worstOf requires at least one occurrence"));
+        return occurrences.stream()
+                .min(Comparator.comparingInt(ObservationDelta::severityOrder))
+                .orElseThrow(() -> new IllegalArgumentException("worstOf requires at least one occurrence"));
     }
 
     private static int severityOrder(Locus locus) {
@@ -284,7 +277,8 @@ public record ObservationDelta(List<LocusChange> loci) {
     }
 
     /** The artifact a locus belongs to; the grain the "newest run" question is asked at. */
-    private record ArtifactRef(@Nullable ArtifactKind kind, @Nullable Long id) {
+    private record ArtifactRef(
+            @Nullable ArtifactKind kind, @Nullable Long id) {
         static ArtifactRef of(Locus locus) {
             return new ArtifactRef(locus.artifactKind(), locus.artifactId());
         }

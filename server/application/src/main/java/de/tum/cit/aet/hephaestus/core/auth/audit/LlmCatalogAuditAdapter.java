@@ -66,25 +66,23 @@ public class LlmCatalogAuditAdapter implements LlmConnectionAudit, LlmModelAudit
     @Override
     public void modelSharingChanged(Long modelId, String visibility, int workspaceCount) {
         record(
-            AuthEvent.EventType.LLM_MODEL_SHARING_CHANGED,
-            details("modelId", modelId, "visibility", visibility, "workspaceCount", workspaceCount)
-        );
+                AuthEvent.EventType.LLM_MODEL_SHARING_CHANGED,
+                details("modelId", modelId, "visibility", visibility, "workspaceCount", workspaceCount));
     }
 
     @Override
     public void settingsChanged(boolean allowWorkspaceConnections) {
         record(
-            AuthEvent.EventType.LLM_SETTINGS_CHANGED,
-            details("allowWorkspaceConnections", allowWorkspaceConnections)
-        );
+                AuthEvent.EventType.LLM_SETTINGS_CHANGED,
+                details("allowWorkspaceConnections", allowWorkspaceConnections));
     }
 
     private void record(AuthEvent.EventType type, Map<String, Object> details) {
         authEventLogger
-            .event(type, AuthEvent.Result.SUCCESS)
-            .actingAccount(SecurityUtils.getCurrentAccountId().orElse(null))
-            .details(JSON.writeValueAsString(details))
-            .record();
+                .event(type, AuthEvent.Result.SUCCESS)
+                .actingAccount(SecurityUtils.getCurrentAccountId().orElse(null))
+                .details(JSON.writeValueAsString(details))
+                .record();
     }
 
     private static Map<String, Object> connectionDetails(Long connectionId, String slug) {

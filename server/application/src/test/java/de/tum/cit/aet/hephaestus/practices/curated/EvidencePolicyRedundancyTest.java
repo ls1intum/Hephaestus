@@ -27,16 +27,13 @@ import tools.jackson.databind.json.JsonMapper;
 class EvidencePolicyRedundancyTest extends BaseUnitTest {
 
     private final JsonMapper objectMapper = JsonMapper.builder().build();
-    private final ClasspathArtifactSourceCatalogRegistry registry = new ClasspathArtifactSourceCatalogRegistry(
-        objectMapper,
-        Clock.systemUTC()
-    );
+    private final ClasspathArtifactSourceCatalogRegistry registry =
+            new ClasspathArtifactSourceCatalogRegistry(objectMapper, Clock.systemUTC());
     private final PracticeSignalOptions signalOptions = PracticeSignalOptionsFixture.real();
     private final BundledPracticeCatalogLoader loader = new BundledPracticeCatalogLoader(
-        objectMapper,
-        new PracticeDefinitionValidator(registry, signalOptions),
-        new PracticeEvidenceDefaults(registry, PracticeSignalOptionsFixture.catalog())
-    );
+            objectMapper,
+            new PracticeDefinitionValidator(registry, signalOptions),
+            new PracticeEvidenceDefaults(registry, PracticeSignalOptionsFixture.catalog()));
 
     /**
      * Every kind a practice can be authored against has at least one source that declares it applies —
@@ -46,12 +43,11 @@ class EvidencePolicyRedundancyTest extends BaseUnitTest {
     void everyAuthorableArtifactKindHasEvidenceThatAppliesToIt() {
         for (ArtifactKind kind : signalOptions.authorableKinds()) {
             assertThat(registry.current().sourcesFor(kind.value()))
-                .as(
-                    "artifact kind '%s' can be authored against but no source declares it applies; a practice " +
-                        "written on it would refuse every review it triggered",
-                    kind
-                )
-                .isNotEmpty();
+                    .as(
+                            "artifact kind '%s' can be authored against but no source declares it applies; a practice "
+                                    + "written on it would refuse every review it triggered",
+                            kind)
+                    .isNotEmpty();
         }
     }
 
@@ -80,55 +76,41 @@ class EvidencePolicyRedundancyTest extends BaseUnitTest {
     @Test
     void onlyThePracticesThatAssertAnAbsenceDemandAWholeCapture() {
         Map<String, Set<SourceKind>> exhaustive = new LinkedHashMap<>();
-        loader
-            .catalog()
-            .practices()
-            .forEach(practice ->
-                practice
-                    .definition()
-                    .bindings()
-                    .forEach(binding ->
-                        binding
-                            .needs()
-                            .stream()
-                            .filter(need -> need.stance() == EvidenceStance.EXHAUSTIVE)
-                            .forEach(need ->
-                                exhaustive
-                                    .computeIfAbsent(practice.slug(), slug -> new LinkedHashSet<>())
-                                    .add(need.sourceKind())
-                            )
-                    )
-            );
+        loader.catalog()
+                .practices()
+                .forEach(practice -> practice.definition()
+                        .bindings()
+                        .forEach(binding -> binding.needs().stream()
+                                .filter(need -> need.stance() == EvidenceStance.EXHAUSTIVE)
+                                .forEach(need -> exhaustive
+                                        .computeIfAbsent(practice.slug(), slug -> new LinkedHashSet<>())
+                                        .add(need.sourceKind()))));
 
-        assertThat(exhaustive).containsOnlyKeys(
-            // Gap-shaped absences over a paginated corpus.
-            "merged-past-unresolved-review-threads",
-            "engaging-with-inline-review-comments",
-            "issue-closed-with-unmet-outcome",
-            "ready-and-traceable-handoff",
-            // Clean-shaped absences over the diff: the eight defect detectors.
-            "removes-duplication-instead-of-copy-pasting",
-            "keeps-functions-small-and-single-purpose",
-            "leaves-the-code-clean-with-intent-revealing-comments",
-            "handles-errors-instead-of-swallowing-them",
-            "validates-inputs-and-edge-cases-at-the-boundary",
-            "avoids-unsafe-panics-and-chosen-crashes",
-            "validates-and-escapes-untrusted-input",
-            "avoids-insecure-defaults-and-over-broad-permissions"
-        );
-        assertThat(exhaustive.get("merged-past-unresolved-review-threads")).containsExactly(
-            new SourceKind("scm.review-threads")
-        );
-        assertThat(exhaustive.get("issue-closed-with-unmet-outcome")).containsExactly(
-            new SourceKind("scm.issue.comments")
-        );
+        assertThat(exhaustive)
+                .containsOnlyKeys(
+                        // Gap-shaped absences over a paginated corpus.
+                        "merged-past-unresolved-review-threads",
+                        "engaging-with-inline-review-comments",
+                        "issue-closed-with-unmet-outcome",
+                        "ready-and-traceable-handoff",
+                        // Clean-shaped absences over the diff: the eight defect detectors.
+                        "removes-duplication-instead-of-copy-pasting",
+                        "keeps-functions-small-and-single-purpose",
+                        "leaves-the-code-clean-with-intent-revealing-comments",
+                        "handles-errors-instead-of-swallowing-them",
+                        "validates-inputs-and-edge-cases-at-the-boundary",
+                        "avoids-unsafe-panics-and-chosen-crashes",
+                        "validates-and-escapes-untrusted-input",
+                        "avoids-insecure-defaults-and-over-broad-permissions");
+        assertThat(exhaustive.get("merged-past-unresolved-review-threads"))
+                .containsExactly(new SourceKind("scm.review-threads"));
+        assertThat(exhaustive.get("issue-closed-with-unmet-outcome"))
+                .containsExactly(new SourceKind("scm.issue.comments"));
         // A defect detector bounds the diff and nothing else: its clean verdict must not silently start
         // ranging over the repository tree, which no capture can ever cover whole.
-        assertThat(exhaustive.get("handles-errors-instead-of-swallowing-them")).containsExactly(
-            new SourceKind("scm.pull-request.diff")
-        );
-        assertThat(exhaustive.get("validates-and-escapes-untrusted-input")).containsExactly(
-            new SourceKind("scm.pull-request.diff")
-        );
+        assertThat(exhaustive.get("handles-errors-instead-of-swallowing-them"))
+                .containsExactly(new SourceKind("scm.pull-request.diff"));
+        assertThat(exhaustive.get("validates-and-escapes-untrusted-input"))
+                .containsExactly(new SourceKind("scm.pull-request.diff"));
     }
 }

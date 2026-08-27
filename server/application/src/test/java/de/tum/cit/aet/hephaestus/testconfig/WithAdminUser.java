@@ -21,7 +21,7 @@ public @interface WithAdminUser {
      * {@code JwtPrincipalFactory}), which is what {@code SecurityUtils.isSuperAdmin} reads to grant
      * cross-workspace elevation.
      */
-    String[] authorities() default { "app_admin" };
+    String[] authorities() default {"app_admin"};
 
     /**
      * The user ID for the mock admin user.

@@ -33,13 +33,13 @@ public class OrganizationService {
         IdentityProvider provider = gitProviderRepository.getReferenceById(providerId);
 
         Organization organization = organizations
-            .findByNativeIdAndProviderId(nativeId, providerId)
-            .orElseGet(() -> {
-                Organization o = new Organization();
-                o.setNativeId(nativeId);
-                o.setProvider(provider);
-                return o;
-            });
+                .findByNativeIdAndProviderId(nativeId, providerId)
+                .orElseGet(() -> {
+                    Organization o = new Organization();
+                    o.setNativeId(nativeId);
+                    o.setProvider(provider);
+                    return o;
+                });
 
         if (!login.equals(organization.getLogin())) {
             organization.setLogin(login);
@@ -50,7 +50,9 @@ public class OrganizationService {
             return organizations.saveAndFlush(organization);
         } catch (DataIntegrityViolationException ex) {
             // Another thread saved the same org in parallel; reuse the persisted row
-            return organizations.findByNativeIdAndProviderId(nativeId, providerId).orElseThrow(() -> ex);
+            return organizations
+                    .findByNativeIdAndProviderId(nativeId, providerId)
+                    .orElseThrow(() -> ex);
         }
     }
 }

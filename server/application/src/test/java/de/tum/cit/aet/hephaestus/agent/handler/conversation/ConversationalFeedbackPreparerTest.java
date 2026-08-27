@@ -57,9 +57,8 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
     private static final String SELF_CHECK = "They name a check they could run before pushing.";
 
     private final FeedbackRepository feedbackRepository = mock(FeedbackRepository.class);
-    private final FeedbackObservationRepository feedbackObservationRepository = mock(
-        FeedbackObservationRepository.class
-    );
+    private final FeedbackObservationRepository feedbackObservationRepository =
+            mock(FeedbackObservationRepository.class);
     private final ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
     private final OutboundEgressGuard egressGuard = mock(OutboundEgressGuard.class);
 
@@ -67,44 +66,39 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
     private final FeedbackSupersession supersession = mock(FeedbackSupersession.class);
 
     private final ConversationalFeedbackPreparer preparer = new ConversationalFeedbackPreparer(
-        feedbackRepository,
-        feedbackObservationRepository,
-        observationRepository,
-        supersession,
-        eventPublisher,
-        egressGuard
-    );
+            feedbackRepository,
+            feedbackObservationRepository,
+            observationRepository,
+            supersession,
+            eventPublisher,
+            egressGuard);
     private final Map<UUID, String> practiceSlugByObservation = new HashMap<>();
 
     @BeforeEach
     void deliveryIsAllowedAndNothingIsPreparedYet() {
         lenient().when(egressGuard.deliveryAllowed(any())).thenReturn(true);
         lenient()
-            .when(supersession.supersede(anyLong(), anyLong(), any(), any()))
-            .thenReturn(FeedbackSupersession.Outcome.standalone());
-        lenient().when(feedbackRepository.existsByAgentJobIdAndPosition(any(), anyInt())).thenReturn(false);
+                .when(supersession.supersede(anyLong(), anyLong(), any(), any()))
+                .thenReturn(FeedbackSupersession.Outcome.standalone());
         lenient()
-            .when(feedbackRepository.save(any()))
-            .thenAnswer(invocation -> invocation.getArgument(0));
-        lenient()
-            .when(observationRepository.practiceSlugsFor(any()))
-            .thenAnswer(invocation -> {
-                Collection<UUID> ids = invocation.getArgument(0);
-                List<ObservationRepository.ObservationPracticeSlug> rows = new ArrayList<>();
-                for (UUID id : ids) {
-                    String slug = practiceSlugByObservation.get(id);
-                    if (slug != null) {
-                        rows.add(new StubPracticeSlug(id, slug));
-                    }
+                .when(feedbackRepository.existsByAgentJobIdAndPosition(any(), anyInt()))
+                .thenReturn(false);
+        lenient().when(feedbackRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(observationRepository.practiceSlugsFor(any())).thenAnswer(invocation -> {
+            Collection<UUID> ids = invocation.getArgument(0);
+            List<ObservationRepository.ObservationPracticeSlug> rows = new ArrayList<>();
+            for (UUID id : ids) {
+                String slug = practiceSlugByObservation.get(id);
+                if (slug != null) {
+                    rows.add(new StubPracticeSlug(id, slug));
                 }
-                return rows;
-            });
+            }
+            return rows;
+        });
     }
 
-    private record StubPracticeSlug(
-        UUID observationId,
-        String practiceSlug
-    ) implements ObservationRepository.ObservationPracticeSlug {
+    private record StubPracticeSlug(UUID observationId, String practiceSlug)
+            implements ObservationRepository.ObservationPracticeSlug {
         @Override
         public UUID getObservationId() {
             return observationId;
@@ -143,21 +137,18 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
         int prepared = preparer.prepare(UUID.randomUUID(), WS, List.of(loud, quiet), List.of(move(TESTS)));
 
         assertThat(prepared).isEqualTo(1);
-        assertThat(saved())
-            .singleElement()
-            .satisfies(unit -> {
-                assertThat(unit.getDeliveryState()).isEqualTo(FeedbackDeliveryState.PREPARED);
-                assertThat(ConversationBriefBody.parse(unit.getBody())).isNotNull();
-            });
+        assertThat(saved()).singleElement().satisfies(unit -> {
+            assertThat(unit.getDeliveryState()).isEqualTo(FeedbackDeliveryState.PREPARED);
+            assertThat(ConversationBriefBody.parse(unit.getBody())).isNotNull();
+        });
     }
 
     @Test
     void collapsesLociOfOnePractice() {
         List<Observation> admitted = List.of(
-            problem(ALICE, TESTS, Severity.MAJOR),
-            problem(ALICE, TESTS, Severity.MAJOR),
-            problem(BOB, TESTS, Severity.MAJOR)
-        );
+                problem(ALICE, TESTS, Severity.MAJOR),
+                problem(ALICE, TESTS, Severity.MAJOR),
+                problem(BOB, TESTS, Severity.MAJOR));
 
         int prepared = preparer.prepare(UUID.randomUUID(), WS, admitted, List.of(move(TESTS)));
 
@@ -168,11 +159,7 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
     @Test
     void dropsAMoveWithNoEvidence() {
         int prepared = preparer.prepare(
-            UUID.randomUUID(),
-            WS,
-            List.of(problem(ALICE, SIZE, Severity.MAJOR)),
-            List.of(move(TESTS))
-        );
+                UUID.randomUUID(), WS, List.of(problem(ALICE, SIZE, Severity.MAJOR)), List.of(move(TESTS)));
 
         assertThat(prepared).isZero();
         verify(feedbackRepository, never()).save(any());
@@ -181,61 +168,52 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
     @Test
     void capsAtThreePerRecipient() {
         List<Observation> admitted = List.of(
-            problem(ALICE, "p-one", Severity.CRITICAL),
-            problem(ALICE, "p-two", Severity.MAJOR),
-            problem(ALICE, "p-three", Severity.MAJOR),
-            problem(ALICE, "p-four", Severity.MINOR)
-        );
+                problem(ALICE, "p-one", Severity.CRITICAL),
+                problem(ALICE, "p-two", Severity.MAJOR),
+                problem(ALICE, "p-three", Severity.MAJOR),
+                problem(ALICE, "p-four", Severity.MINOR));
         List<ComposedFeedbackUnit> composed = List.of(move("p-one"), move("p-two"), move("p-three"), move("p-four"));
 
         int prepared = preparer.prepare(UUID.randomUUID(), WS, admitted, composed);
 
         assertThat(prepared).isEqualTo(ConversationalFeedbackPreparer.TOP_N_PER_RECIPIENT);
         assertThat(saved())
-            .filteredOn(unit -> unit.getDeliveryState() == FeedbackDeliveryState.SUPPRESSED)
-            .singleElement()
-            .satisfies(unit -> {
-                assertThat(unit.getSuppressionReason()).isEqualTo(FeedbackSuppressionReason.VOLUME_CAPPED);
-                assertThat(unit.getBody()).isNull();
-            });
+                .filteredOn(unit -> unit.getDeliveryState() == FeedbackDeliveryState.SUPPRESSED)
+                .singleElement()
+                .satisfies(unit -> {
+                    assertThat(unit.getSuppressionReason()).isEqualTo(FeedbackSuppressionReason.VOLUME_CAPPED);
+                    assertThat(unit.getBody()).isNull();
+                });
     }
 
     @Test
     void raisedRowsCarryTheHabitThread() {
         List<Observation> admitted = List.of(
-            problem(ALICE, "p-one", Severity.CRITICAL),
-            problem(ALICE, "p-two", Severity.MAJOR),
-            problem(ALICE, "p-three", Severity.MAJOR),
-            problem(ALICE, "p-four", Severity.MINOR)
-        );
+                problem(ALICE, "p-one", Severity.CRITICAL),
+                problem(ALICE, "p-two", Severity.MAJOR),
+                problem(ALICE, "p-three", Severity.MAJOR),
+                problem(ALICE, "p-four", Severity.MINOR));
         List<ComposedFeedbackUnit> composed = List.of(move("p-one"), move("p-two"), move("p-three"), move("p-four"));
 
         preparer.prepare(UUID.randomUUID(), WS, admitted, composed);
 
         assertThat(saved())
-            .filteredOn(unit -> unit.getDeliveryState() == FeedbackDeliveryState.PREPARED)
-            .allSatisfy(unit -> assertThat(unit.getThreadKey()).isNotBlank())
-            .extracting(Feedback::getThreadKey)
-            .containsExactlyInAnyOrder(
-                threadKeyFor("p-one", ALICE),
-                threadKeyFor("p-two", ALICE),
-                threadKeyFor("p-three", ALICE)
-            );
+                .filteredOn(unit -> unit.getDeliveryState() == FeedbackDeliveryState.PREPARED)
+                .allSatisfy(unit -> assertThat(unit.getThreadKey()).isNotBlank())
+                .extracting(Feedback::getThreadKey)
+                .containsExactlyInAnyOrder(
+                        threadKeyFor("p-one", ALICE), threadKeyFor("p-two", ALICE), threadKeyFor("p-three", ALICE));
         assertThat(saved())
-            .filteredOn(unit -> unit.getDeliveryState() == FeedbackDeliveryState.SUPPRESSED)
-            .singleElement()
-            .extracting(Feedback::getThreadKey)
-            .isNull();
+                .filteredOn(unit -> unit.getDeliveryState() == FeedbackDeliveryState.SUPPRESSED)
+                .singleElement()
+                .extracting(Feedback::getThreadKey)
+                .isNull();
     }
 
     @Test
     void missingCompositionCreatesNoQueueEntry() {
-        int prepared = preparer.prepare(
-            UUID.randomUUID(),
-            WS,
-            List.of(problem(ALICE, TESTS, Severity.MAJOR)),
-            List.of()
-        );
+        int prepared =
+                preparer.prepare(UUID.randomUUID(), WS, List.of(problem(ALICE, TESTS, Severity.MAJOR)), List.of());
 
         assertThat(prepared).isZero();
         verify(feedbackRepository, never()).save(any());
@@ -245,49 +223,42 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
     void supersedeRetiresTheQueuedMove() {
         UUID retired = UUID.randomUUID();
         String threadKey = threadKeyFor(TESTS, ALICE);
-        when(supersession.supersede(WS, ALICE, FeedbackChannel.IN_CHAT, threadKey)).thenReturn(
-            new FeedbackSupersession.Outcome(FeedbackSupersession.Disposition.SUPERSEDED, retired)
-        );
+        when(supersession.supersede(WS, ALICE, FeedbackChannel.IN_CHAT, threadKey))
+                .thenReturn(new FeedbackSupersession.Outcome(FeedbackSupersession.Disposition.SUPERSEDED, retired));
 
         int prepared = preparer.prepare(
-            UUID.randomUUID(),
-            WS,
-            List.of(problem(ALICE, TESTS, Severity.MAJOR)),
-            List.of(supersede(TESTS, threadKey))
-        );
+                UUID.randomUUID(),
+                WS,
+                List.of(problem(ALICE, TESTS, Severity.MAJOR)),
+                List.of(supersede(TESTS, threadKey)));
 
         assertThat(prepared).isEqualTo(1);
-        assertThat(saved())
-            .singleElement()
-            .satisfies(unit -> {
-                assertThat(unit.getThreadKey()).isEqualTo(threadKey);
-                assertThat(unit.getReplacesId()).isEqualTo(retired);
-                assertThat(unit.getDeliveryState()).isEqualTo(FeedbackDeliveryState.PREPARED);
-            });
+        assertThat(saved()).singleElement().satisfies(unit -> {
+            assertThat(unit.getThreadKey()).isEqualTo(threadKey);
+            assertThat(unit.getReplacesId()).isEqualTo(retired);
+            assertThat(unit.getDeliveryState()).isEqualTo(FeedbackDeliveryState.PREPARED);
+        });
     }
 
     @Test
     void supersedeLosingToADeliveredMoveStillWrites() {
         UUID alreadyRaised = UUID.randomUUID();
         String threadKey = threadKeyFor(TESTS, ALICE);
-        when(supersession.supersede(WS, ALICE, FeedbackChannel.IN_CHAT, threadKey)).thenReturn(
-            new FeedbackSupersession.Outcome(FeedbackSupersession.Disposition.CONTINUED, alreadyRaised)
-        );
+        when(supersession.supersede(WS, ALICE, FeedbackChannel.IN_CHAT, threadKey))
+                .thenReturn(
+                        new FeedbackSupersession.Outcome(FeedbackSupersession.Disposition.CONTINUED, alreadyRaised));
 
         int prepared = preparer.prepare(
-            UUID.randomUUID(),
-            WS,
-            List.of(problem(ALICE, TESTS, Severity.MAJOR)),
-            List.of(supersede(TESTS, threadKey))
-        );
+                UUID.randomUUID(),
+                WS,
+                List.of(problem(ALICE, TESTS, Severity.MAJOR)),
+                List.of(supersede(TESTS, threadKey)));
 
         assertThat(prepared).isEqualTo(1);
-        assertThat(saved())
-            .singleElement()
-            .satisfies(unit -> {
-                assertThat(unit.getDeliveryState()).isEqualTo(FeedbackDeliveryState.PREPARED);
-                assertThat(unit.getReplacesId()).isEqualTo(alreadyRaised);
-            });
+        assertThat(saved()).singleElement().satisfies(unit -> {
+            assertThat(unit.getDeliveryState()).isEqualTo(FeedbackDeliveryState.PREPARED);
+            assertThat(unit.getReplacesId()).isEqualTo(alreadyRaised);
+        });
     }
 
     @Test
@@ -295,20 +266,17 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
         String someoneElsesHabit = threadKeyFor(SIZE, ALICE);
 
         int prepared = preparer.prepare(
-            UUID.randomUUID(),
-            WS,
-            List.of(problem(ALICE, TESTS, Severity.MAJOR)),
-            List.of(supersede(TESTS, someoneElsesHabit))
-        );
+                UUID.randomUUID(),
+                WS,
+                List.of(problem(ALICE, TESTS, Severity.MAJOR)),
+                List.of(supersede(TESTS, someoneElsesHabit)));
 
         assertThat(prepared).isEqualTo(1);
         verify(supersession, never()).supersede(anyLong(), anyLong(), any(), any());
-        assertThat(saved())
-            .singleElement()
-            .satisfies(unit -> {
-                assertThat(unit.getThreadKey()).isEqualTo(threadKeyFor(TESTS, ALICE));
-                assertThat(unit.getReplacesId()).isNull();
-            });
+        assertThat(saved()).singleElement().satisfies(unit -> {
+            assertThat(unit.getThreadKey()).isEqualTo(threadKeyFor(TESTS, ALICE));
+            assertThat(unit.getReplacesId()).isNull();
+        });
     }
 
     @Test
@@ -324,11 +292,10 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
         when(feedbackRepository.existsByAgentJobIdAndPosition(any(), anyInt())).thenReturn(true);
 
         preparer.prepare(
-            UUID.randomUUID(),
-            WS,
-            List.of(problem(ALICE, TESTS, Severity.MAJOR)),
-            List.of(supersede(TESTS, threadKeyFor(TESTS, ALICE)))
-        );
+                UUID.randomUUID(),
+                WS,
+                List.of(problem(ALICE, TESTS, Severity.MAJOR)),
+                List.of(supersede(TESTS, threadKeyFor(TESTS, ALICE))));
 
         verify(supersession, never()).supersede(anyLong(), anyLong(), any(), any());
     }
@@ -336,10 +303,8 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
     @Test
     void reRunIsIdempotent() {
         when(feedbackRepository.existsByAgentJobIdAndPosition(any(), anyInt())).thenReturn(true);
-        List<Observation> admitted = List.of(
-            problem(ALICE, TESTS, Severity.MAJOR),
-            problem(ALICE, SIZE, Severity.MINOR)
-        );
+        List<Observation> admitted =
+                List.of(problem(ALICE, TESTS, Severity.MAJOR), problem(ALICE, SIZE, Severity.MINOR));
 
         int prepared = preparer.prepare(UUID.randomUUID(), WS, admitted, List.of(move(TESTS), move(SIZE)));
 
@@ -350,27 +315,21 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
 
     @Test
     void ordinalsIgnoreComposition() {
-        List<Observation> admitted = List.of(
-            problem(ALICE, SIZE, Severity.CRITICAL),
-            problem(ALICE, TESTS, Severity.MINOR)
-        );
+        List<Observation> admitted =
+                List.of(problem(ALICE, SIZE, Severity.CRITICAL), problem(ALICE, TESTS, Severity.MINOR));
 
         preparer.prepare(UUID.randomUUID(), WS, admitted, List.of(move(TESTS)));
 
         assertThat(saved())
-            .singleElement()
-            .extracting(Feedback::getPosition)
-            .isEqualTo(FeedbackLedgerRecorder.IN_CHAT_UNIT_ORDINAL_BASE + 1);
+                .singleElement()
+                .extracting(Feedback::getPosition)
+                .isEqualTo(FeedbackLedgerRecorder.IN_CHAT_UNIT_ORDINAL_BASE + 1);
     }
 
     @Test
     void withholdWritesNothing() {
         int prepared = preparer.prepare(
-            UUID.randomUUID(),
-            WS,
-            List.of(problem(ALICE, TESTS, Severity.MAJOR)),
-            List.of(withhold(TESTS))
-        );
+                UUID.randomUUID(), WS, List.of(problem(ALICE, TESTS, Severity.MAJOR)), List.of(withhold(TESTS)));
 
         assertThat(prepared).isZero();
         verify(feedbackRepository, never()).save(any());
@@ -379,10 +338,8 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
 
     @Test
     void withholdIsNotSilence() {
-        List<Observation> admitted = List.of(
-            problem(ALICE, TESTS, Severity.MAJOR),
-            problem(ALICE, SIZE, Severity.CRITICAL)
-        );
+        List<Observation> admitted =
+                List.of(problem(ALICE, TESTS, Severity.MAJOR), problem(ALICE, SIZE, Severity.CRITICAL));
 
         int prepared = preparer.prepare(UUID.randomUUID(), WS, admitted, List.of(withhold(TESTS)));
 
@@ -392,10 +349,8 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
 
     @Test
     void doesNotFallBackToTheRanking() {
-        List<Observation> admitted = List.of(
-            problem(ALICE, TESTS, Severity.MINOR),
-            problem(ALICE, SIZE, Severity.CRITICAL)
-        );
+        List<Observation> admitted =
+                List.of(problem(ALICE, TESTS, Severity.MINOR), problem(ALICE, SIZE, Severity.CRITICAL));
 
         int prepared = preparer.prepare(UUID.randomUUID(), WS, admitted, List.of());
 
@@ -406,12 +361,8 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
 
     @Test
     void unresolvedPracticeWithoutCompositionCreatesNothing() {
-        int prepared = preparer.prepare(
-            UUID.randomUUID(),
-            WS,
-            List.of(problem(ALICE, null, Severity.MAJOR)),
-            List.of()
-        );
+        int prepared =
+                preparer.prepare(UUID.randomUUID(), WS, List.of(problem(ALICE, null, Severity.MAJOR)), List.of());
 
         assertThat(prepared).isZero();
         verify(feedbackRepository, never()).save(any());
@@ -422,11 +373,7 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
         when(egressGuard.deliveryAllowed(any())).thenReturn(false);
 
         int prepared = preparer.prepare(
-            UUID.randomUUID(),
-            WS,
-            List.of(problem(ALICE, TESTS, Severity.MAJOR)),
-            List.of(move(TESTS))
-        );
+                UUID.randomUUID(), WS, List.of(problem(ALICE, TESTS, Severity.MAJOR)), List.of(move(TESTS)));
 
         assertThat(prepared).isZero();
         verify(feedbackRepository, never()).save(any());
@@ -451,39 +398,34 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
     }
 
     private static ComposedFeedbackUnit move(
-        String practiceSlug,
-        ComposedFeedbackUnit.Action action,
-        @Nullable String supersedesThreadKey
-    ) {
+            String practiceSlug, ComposedFeedbackUnit.Action action, @Nullable String supersedesThreadKey) {
         return new ComposedFeedbackUnit(
-            FeedbackChannel.IN_CHAT,
-            practiceSlug,
-            List.of("obs-0"),
-            action,
-            supersedesThreadKey,
-            null,
-            "The test arrives after the review, not with the change",
-            null,
-            null,
-            new ComposedFeedbackUnit.ConversationBrief(OBSERVED, REALISATION, EVIDENCE, SELF_CHECK, null),
-            null
-        );
+                FeedbackChannel.IN_CHAT,
+                practiceSlug,
+                List.of("obs-0"),
+                action,
+                supersedesThreadKey,
+                null,
+                "The test arrives after the review, not with the change",
+                null,
+                null,
+                new ComposedFeedbackUnit.ConversationBrief(OBSERVED, REALISATION, EVIDENCE, SELF_CHECK, null),
+                null);
     }
 
     private static ComposedFeedbackUnit withhold(String practiceSlug) {
         return new ComposedFeedbackUnit(
-            FeedbackChannel.IN_CHAT,
-            practiceSlug,
-            List.of("obs-0"),
-            ComposedFeedbackUnit.Action.WITHHOLD,
-            null,
-            ComposedFeedbackUnit.WithholdReason.ALREADY_SAID,
-            null,
-            null,
-            null,
-            null,
-            null
-        );
+                FeedbackChannel.IN_CHAT,
+                practiceSlug,
+                List.of("obs-0"),
+                ComposedFeedbackUnit.Action.WITHHOLD,
+                null,
+                ComposedFeedbackUnit.WithholdReason.ALREADY_SAID,
+                null,
+                null,
+                null,
+                null,
+                null);
     }
 
     private Observation problem(long about, @Nullable String practiceSlug, Severity severity) {

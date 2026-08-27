@@ -36,17 +36,13 @@ class SlackOAuthClientTest extends BaseUnitTest {
 
     @Test
     void exchangeCode_happyPath_returnsBoundAccessRecord() throws Exception {
-        slackMock.enqueue(
-            new MockResponse.Builder()
+        slackMock.enqueue(new MockResponse.Builder()
                 .code(200)
                 .addHeader("Content-Type", "application/json")
-                .body(
-                    "{\"ok\":true,\"access_token\":\"xoxb-abc\",\"app_id\":\"A1\",\"bot_user_id\":\"U1\"," +
-                        "\"team\":{\"id\":\"T1\",\"name\":\"Acme\"}," +
-                        "\"scope\":\"chat:write,users:read\"}"
-                )
-                .build()
-        );
+                .body("{\"ok\":true,\"access_token\":\"xoxb-abc\",\"app_id\":\"A1\",\"bot_user_id\":\"U1\","
+                        + "\"team\":{\"id\":\"T1\",\"name\":\"Acme\"},"
+                        + "\"scope\":\"chat:write,users:read\"}")
+                .build());
 
         OAuthV2Access r = client.exchangeCode("code-123", "https://example.test/cb");
 
@@ -60,31 +56,25 @@ class SlackOAuthClientTest extends BaseUnitTest {
 
     @Test
     void exchangeCode_slackOkFalse_throwsWithSlackErrorCode() {
-        slackMock.enqueue(
-            new MockResponse.Builder()
+        slackMock.enqueue(new MockResponse.Builder()
                 .code(200)
                 .addHeader("Content-Type", "application/json")
                 .body("{\"ok\":false,\"error\":\"invalid_code\"}")
-                .build()
-        );
+                .build());
 
         assertThatThrownBy(() -> client.exchangeCode("bad", null))
-            .isInstanceOf(SlackOAuthException.class)
-            .hasMessageContaining("invalid_code");
+                .isInstanceOf(SlackOAuthException.class)
+                .hasMessageContaining("invalid_code");
     }
 
     @Test
     void exchangeCode_returnsRotationFields_passesThroughForStrategyToReject() {
-        slackMock.enqueue(
-            new MockResponse.Builder()
+        slackMock.enqueue(new MockResponse.Builder()
                 .code(200)
                 .addHeader("Content-Type", "application/json")
-                .body(
-                    "{\"ok\":true,\"access_token\":\"xoxe-abc\",\"team\":{\"id\":\"T1\",\"name\":\"Acme\"}," +
-                        "\"expires_in\":43200,\"refresh_token\":\"xoxe-1-refresh\"}"
-                )
-                .build()
-        );
+                .body("{\"ok\":true,\"access_token\":\"xoxe-abc\",\"team\":{\"id\":\"T1\",\"name\":\"Acme\"},"
+                        + "\"expires_in\":43200,\"refresh_token\":\"xoxe-1-refresh\"}")
+                .build());
 
         OAuthV2Access r = client.exchangeCode("code", null);
 
@@ -97,43 +87,36 @@ class SlackOAuthClientTest extends BaseUnitTest {
 
     @Test
     void exchangeCode_blankClientCredentials_throwsBeforeHttp() throws IOException {
-        SlackOAuthClient unconfigured = new SlackOAuthClient(
-            "",
-            "",
-            slackMock.url("/").toString().replaceAll("/$", "")
-        );
+        SlackOAuthClient unconfigured =
+                new SlackOAuthClient("", "", slackMock.url("/").toString().replaceAll("/$", ""));
         assertThatThrownBy(() -> unconfigured.exchangeCode("code", null))
-            .isInstanceOf(SlackOAuthException.class)
-            .hasMessageContaining("slack oauth client not configured");
+                .isInstanceOf(SlackOAuthException.class)
+                .hasMessageContaining("slack oauth client not configured");
         assertThat(slackMock.getRequestCount()).isEqualTo(0);
     }
 
     @Test
     void revokeStrict_treatsAnAlreadyRevokedTokenAsSuccess() {
-        slackMock.enqueue(
-            new MockResponse.Builder()
+        slackMock.enqueue(new MockResponse.Builder()
                 .code(200)
                 .addHeader("Content-Type", "application/json")
                 .body("{\"ok\":false,\"error\":\"token_revoked\"}")
-                .build()
-        );
+                .build());
 
         assertThatCode(() -> client.revokeStrict("xoxb-revoked")).doesNotThrowAnyException();
     }
 
     @Test
     void revokeStrict_propagatesProviderFailure() {
-        slackMock.enqueue(
-            new MockResponse.Builder()
+        slackMock.enqueue(new MockResponse.Builder()
                 .code(200)
                 .addHeader("Content-Type", "application/json")
                 .body("{\"ok\":false,\"error\":\"invalid_auth\"}")
-                .build()
-        );
+                .build());
 
         assertThatThrownBy(() -> client.revokeStrict("xoxb-invalid"))
-            .isInstanceOf(SlackOAuthException.class)
-            .hasMessageContaining("invalid_auth");
+                .isInstanceOf(SlackOAuthException.class)
+                .hasMessageContaining("invalid_auth");
     }
 
     private static <T> T required(@Nullable T value) {

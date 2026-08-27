@@ -30,14 +30,13 @@ import org.hibernate.annotations.UpdateTimestamp;
  */
 @Entity
 @Table(
-    name = "login_provider",
-    // One login OAuth app per instance: a (type, baseUrl) pair identifies a single SCM instance, so two
-    // rows for e.g. https://gitlab.lrz.de would mean two login buttons → split identities for one user.
-    uniqueConstraints = @UniqueConstraint(
-        name = "uq_login_provider_type_base_url",
-        columnNames = { "type", "base_url" }
-    )
-)
+        name = "login_provider",
+        // One login OAuth app per instance: a (type, baseUrl) pair identifies a single SCM instance, so two
+        // rows for e.g. https://gitlab.lrz.de would mean two login buttons → split identities for one user.
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uq_login_provider_type_base_url",
+                        columnNames = {"type", "base_url"}))
 @Getter
 @Setter
 @NoArgsConstructor

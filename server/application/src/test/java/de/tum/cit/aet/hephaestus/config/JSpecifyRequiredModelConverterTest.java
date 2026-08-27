@@ -61,14 +61,13 @@ class JSpecifyRequiredModelConverterTest {
     // --- fixtures -----------------------------------------------------------------------------
 
     record Sample(
-        @NonNull String nonNull,
-        @Nullable String nullable,
-        String bare,
-        @NonNull int annotatedPrimitive,
-        int barePrimitive,
-        @NonNull List<String> items,
-        @NonNull Nested nested
-    ) {}
+            @NonNull String nonNull,
+            @Nullable String nullable,
+            String bare,
+            @NonNull int annotatedPrimitive,
+            int barePrimitive,
+            @NonNull List<String> items,
+            @NonNull Nested nested) {}
 
     record Nested(@NonNull String x, @Nullable String y) {}
 

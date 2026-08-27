@@ -23,12 +23,10 @@ class OutlineSubjectParserTest extends BaseUnitTest {
 
     @Test
     void parse_collapsesEveryDocumentEventToTheHandlerKey() {
-        assertThat(parser.parse("outline.sub-1.documents~update")).isEqualTo(
-            new EventTypeKey(IntegrationKind.OUTLINE, OutlineWebhookMessageHandler.EVENT_TYPE)
-        );
-        assertThat(parser.parse("outline.sub-1.documents~delete")).isEqualTo(
-            new EventTypeKey(IntegrationKind.OUTLINE, OutlineWebhookMessageHandler.EVENT_TYPE)
-        );
+        assertThat(parser.parse("outline.sub-1.documents~update"))
+                .isEqualTo(new EventTypeKey(IntegrationKind.OUTLINE, OutlineWebhookMessageHandler.EVENT_TYPE));
+        assertThat(parser.parse("outline.sub-1.documents~delete"))
+                .isEqualTo(new EventTypeKey(IntegrationKind.OUTLINE, OutlineWebhookMessageHandler.EVENT_TYPE));
     }
 
     @Test
@@ -41,19 +39,20 @@ class OutlineSubjectParserTest extends BaseUnitTest {
     @Test
     void deriverAndParserAgree_roundTrip() {
         String subscriptionId = "sub-abc";
-        OutlineSubjectKeyDeriver deriver = new OutlineSubjectKeyDeriver(JsonMapper.builder().build());
+        OutlineSubjectKeyDeriver deriver =
+                new OutlineSubjectKeyDeriver(JsonMapper.builder().build());
         var payload = JsonMapper.builder()
-            .build()
-            .readTree("{\"webhookSubscriptionId\":\"" + subscriptionId + "\",\"event\":\"documents.update\"}");
+                .build()
+                .readTree("{\"webhookSubscriptionId\":\"" + subscriptionId + "\",\"event\":\"documents.update\"}");
 
         String subject = deriver.deriveSubject(payload, Map.of());
 
         // Consumer subscribes to outline.<sub>.> — the deriver's subject must fall under it.
-        String filterPrefix = ConsumerSubjectMath.subscriptionFilter("outline", subscriptionId).replace(".>", ".");
+        String filterPrefix = ConsumerSubjectMath.subscriptionFilter("outline", subscriptionId)
+                .replace(".>", ".");
         assertThat(subject).startsWith(filterPrefix);
         // And that subject parses back to the single handler key.
-        assertThat(parser.parse(subject)).isEqualTo(
-            new EventTypeKey(IntegrationKind.OUTLINE, OutlineWebhookMessageHandler.EVENT_TYPE)
-        );
+        assertThat(parser.parse(subject))
+                .isEqualTo(new EventTypeKey(IntegrationKind.OUTLINE, OutlineWebhookMessageHandler.EVENT_TYPE));
     }
 }

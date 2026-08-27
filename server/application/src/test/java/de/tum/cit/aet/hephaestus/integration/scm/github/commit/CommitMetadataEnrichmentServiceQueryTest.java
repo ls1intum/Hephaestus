@@ -39,38 +39,37 @@ class CommitMetadataEnrichmentServiceQueryTest extends BaseUnitTest {
     private static final GraphQLSchema SCHEMA = loadSchema();
 
     @ParameterizedTest(name = "{0} commits in one batch")
-    @ValueSource(ints = { 1, 2, 50 })
+    @ValueSource(ints = {1, 2, 50})
     void assembledBatchQueryIsValidAgainstTheCheckedInGitHubSchema(int commits) {
         List<String> shas = java.util.stream.IntStream.range(0, commits)
-            .mapToObj(i -> String.format("%040x", i))
-            .toList();
+                .mapToObj(i -> String.format("%040x", i))
+                .toList();
 
         String query = CommitMetadataEnrichmentService.buildBatchQuery("ls1intum", "Hephaestus", shas);
 
         ParseAndValidateResult result = ParseAndValidate.parseAndValidate(
-            SCHEMA,
-            ExecutionInput.newExecutionInput(query).build()
-        );
+                SCHEMA, ExecutionInput.newExecutionInput(query).build());
 
-        assertThat(result.getSyntaxException()).as("assembled query failed to parse:%n%s", query).isNull();
-        assertThat(result.getValidationErrors().stream().map(GraphQLError::getMessage).toList())
-            .as("assembled query is invalid against the checked-in schema:%n%s", query)
-            .isEmpty();
+        assertThat(result.getSyntaxException())
+                .as("assembled query failed to parse:%n%s", query)
+                .isNull();
+        assertThat(result.getValidationErrors().stream()
+                        .map(GraphQLError::getMessage)
+                        .toList())
+                .as("assembled query is invalid against the checked-in schema:%n%s", query)
+                .isEmpty();
     }
 
     @Test
     void everyBatchedCommitGetsItsOwnAliasAndTheFragmentIsSentExactlyOnce() {
-        String query = CommitMetadataEnrichmentService.buildBatchQuery(
-            "o",
-            "r",
-            List.of("a".repeat(40), "b".repeat(40))
-        );
+        String query =
+                CommitMetadataEnrichmentService.buildBatchQuery("o", "r", List.of("a".repeat(40), "b".repeat(40)));
 
         assertThat(query).contains("commit0: object(oid: \"" + "a".repeat(40) + "\")");
         assertThat(query).contains("commit1: object(oid: \"" + "b".repeat(40) + "\")");
         assertThat(query.split("fragment CommitEnrichmentFields on Commit", -1).length - 1)
-            .as("GraphQL rejects a duplicate fragment definition, so it must be appended once per request")
-            .isEqualTo(1);
+                .as("GraphQL rejects a duplicate fragment definition, so it must be appended once per request")
+                .isEqualTo(1);
     }
 
     /**
@@ -82,15 +81,14 @@ class CommitMetadataEnrichmentServiceQueryTest extends BaseUnitTest {
         String fragment = CommitMetadataEnrichmentService.commitEnrichmentFragment();
 
         assertThat(fragment).contains("authors(first: " + CommitMetadataEnrichmentService.AUTHORS_PAGE_SIZE + ")");
-        assertThat(fragment).contains(
-            "associatedPullRequests(first: " + CommitMetadataEnrichmentService.ASSOCIATED_PRS_PAGE_SIZE + ")"
-        );
+        assertThat(fragment)
+                .contains("associatedPullRequests(first: " + CommitMetadataEnrichmentService.ASSOCIATED_PRS_PAGE_SIZE
+                        + ")");
     }
 
     private static GraphQLSchema loadSchema() {
-        TypeDefinitionRegistry registry = new SchemaParser().parse(
-            read(new ClassPathResource("graphql/github/schema.github.graphql"))
-        );
+        TypeDefinitionRegistry registry =
+                new SchemaParser().parse(read(new ClassPathResource("graphql/github/schema.github.graphql")));
         return UnExecutableSchemaGenerator.makeUnExecutableSchema(registry);
     }
 

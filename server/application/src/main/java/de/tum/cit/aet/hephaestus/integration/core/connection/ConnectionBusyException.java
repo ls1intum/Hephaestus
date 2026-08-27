@@ -18,13 +18,10 @@ public class ConnectionBusyException extends RuntimeException {
     private final long jobId;
 
     public ConnectionBusyException(long connectionId, long jobId) {
-        super(
-            "Connection " +
-                connectionId +
-                " has active sync job " +
-                jobId +
-                "; its cancellation has been requested — retry the disconnect once it stops"
-        );
+        super("Connection " + connectionId
+                + " has active sync job "
+                + jobId
+                + "; its cancellation has been requested — retry the disconnect once it stops");
         this.connectionId = connectionId;
         this.jobId = jobId;
     }

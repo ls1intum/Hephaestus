@@ -50,23 +50,20 @@ class SlackIdentityLinkIntegrationTest extends RealAuthIntegrationTest {
         seedProvider("slack-link", LoginProvider.ProviderType.SLACK);
 
         // A developer signs in with GitHub → their base account.
-        Account github = service
-            .resolveOrProvision(
-                "github-slacklink",
-                "gh-1",
-                githubPrincipal("gh-1", "dev@example.com", "octocat"),
-                AuthIntentCookie.Intent.login(null, null)
-            )
-            .account();
+        Account github = service.resolveOrProvision(
+                        "github-slacklink",
+                        "gh-1",
+                        githubPrincipal("gh-1", "dev@example.com", "octocat"),
+                        AuthIntentCookie.Intent.login(null, null))
+                .account();
         long accountsAfterLogin = accountRepository.count();
 
         // While authenticated, they link "Sign in with Slack" (simulated id_token: sub=U1, team_id=T1).
         AccountProvisioningService.ProvisionResult linked = service.resolveOrProvision(
-            "slack-link",
-            "U1",
-            slackPrincipal("U1", "T1", "dev@example.com"),
-            AuthIntentCookie.Intent.link(persistedId(github.getId()), "/settings")
-        );
+                "slack-link",
+                "U1",
+                slackPrincipal("U1", "T1", "dev@example.com"),
+                AuthIntentCookie.Intent.link(persistedId(github.getId()), "/settings"));
 
         assertThat(linked.identityLinked()).isTrue();
         assertThat(linked.account().getId()).isEqualTo(persistedId(github.getId()));
@@ -76,11 +73,10 @@ class SlackIdentityLinkIntegrationTest extends RealAuthIntegrationTest {
         // Exactly one SLACK identity link (subject U1, team T1, MANUAL_LINK) now hangs off the SAME account.
         List<IdentityLink> links = identityLinkRepository.findActiveByAccountId(persistedId(github.getId()));
         assertThat(links).extracting(IdentityLink::getSubject).containsExactlyInAnyOrder("gh-1", "U1");
-        IdentityLink slack = links
-            .stream()
-            .filter(l -> l.getSubject().equals("U1"))
-            .findFirst()
-            .orElseThrow();
+        IdentityLink slack = links.stream()
+                .filter(l -> l.getSubject().equals("U1"))
+                .findFirst()
+                .orElseThrow();
         assertThat(slack.getTeamId()).isEqualTo("T1");
         assertThat(slack.getLinkedVia()).isEqualTo(IdentityLink.LinkedVia.MANUAL_LINK);
     }
@@ -91,14 +87,12 @@ class SlackIdentityLinkIntegrationTest extends RealAuthIntegrationTest {
         long before = accountRepository.count();
 
         // A LINK-mode Slack callback with no authenticated account binding must fail closed — never an orphan.
-        assertThatThrownBy(() ->
-            service.resolveOrProvision(
-                "slack-noauth",
-                "U1",
-                slackPrincipal("U1", "T1", "dev@example.com"),
-                AuthIntentCookie.Intent.link(null, "/settings")
-            )
-        ).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> service.resolveOrProvision(
+                        "slack-noauth",
+                        "U1",
+                        slackPrincipal("U1", "T1", "dev@example.com"),
+                        AuthIntentCookie.Intent.link(null, "/settings")))
+                .isInstanceOf(IllegalStateException.class);
 
         assertThat(accountRepository.count()).isEqualTo(before);
     }
@@ -119,29 +113,26 @@ class SlackIdentityLinkIntegrationTest extends RealAuthIntegrationTest {
 
     private static OAuth2User githubPrincipal(String subject, String email, String login) {
         return new DefaultOAuth2User(
-            List.of(new SimpleGrantedAuthority("ROLE_USER")),
-            Map.of("id", subject, "login", login, "email", email, "email_verified", true),
-            "id"
-        );
+                List.of(new SimpleGrantedAuthority("ROLE_USER")),
+                Map.of("id", subject, "login", login, "email", email, "email_verified", true),
+                "id");
     }
 
     private static OAuth2User slackPrincipal(String subject, String teamId, String email) {
         return new DefaultOAuth2User(
-            List.of(new SimpleGrantedAuthority("ROLE_USER")),
-            Map.of(
-                "sub",
-                subject,
-                "https://slack.com/team_id",
-                teamId,
-                "name",
-                "Slack Dev",
-                "email",
-                email,
-                "email_verified",
-                true
-            ),
-            "sub"
-        );
+                List.of(new SimpleGrantedAuthority("ROLE_USER")),
+                Map.of(
+                        "sub",
+                        subject,
+                        "https://slack.com/team_id",
+                        teamId,
+                        "name",
+                        "Slack Dev",
+                        "email",
+                        email,
+                        "email_verified",
+                        true),
+                "sub");
     }
 
     private static long persistedId(@Nullable Long id) {

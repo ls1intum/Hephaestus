@@ -40,12 +40,11 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
     private final ObservationVisibilityPolicy visibilityPolicy;
 
     public PreparedConversationFeedbackContentSource(
-        FeedbackObservationRepository feedbackObservationRepository,
-        ConversationConsentGate consentGate,
-        ObjectMapper objectMapper,
-        ObservationRepository observationRepository,
-        ObservationVisibilityPolicy visibilityPolicy
-    ) {
+            FeedbackObservationRepository feedbackObservationRepository,
+            ConversationConsentGate consentGate,
+            ObjectMapper objectMapper,
+            ObservationRepository observationRepository,
+            ObservationVisibilityPolicy visibilityPolicy) {
         this.feedbackObservationRepository = feedbackObservationRepository;
         this.consentGate = consentGate;
         this.objectMapper = objectMapper;
@@ -69,20 +68,14 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
         MentorChatRequest req = (MentorChatRequest) request;
         long workspaceId = req.workspaceId();
         List<PreparedConversationFact> prepared =
-            feedbackObservationRepository.findPreparedConversationFactsForRecipient(
-                workspaceId,
-                req.developerId(),
-                PageRequest.of(0, MAX_PREPARED)
-            );
+                feedbackObservationRepository.findPreparedConversationFactsForRecipient(
+                        workspaceId, req.developerId(), PageRequest.of(0, MAX_PREPARED));
 
         Set<Long> activeThreadIds = consentGate.activeThreadIds(workspaceId, conversationThreadIds(prepared));
         // Load and authorize the bound observations before exposing their evidence to the mentor.
         Map<UUID, Observation> observations = observationsById(workspaceId, prepared);
         Set<UUID> visible = visibilityPolicy.permitsAll(
-            workspaceId,
-            observations.values(),
-            SourceUsePurpose.CONVERSATIONAL_MENTORING
-        );
+                workspaceId, observations.values(), SourceUsePurpose.CONVERSATIONAL_MENTORING);
 
         ObjectNode root = objectMapper.createObjectNode();
 
@@ -93,10 +86,8 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
             if (!visible.contains(fact.getObservationId())) {
                 continue;
             }
-            if (
-                ArtifactKinds.CONVERSATION_THREAD.equals(fact.getArtifactKind()) &&
-                (fact.getArtifactId() == null || !activeThreadIds.contains(fact.getArtifactId()))
-            ) {
+            if (ArtifactKinds.CONVERSATION_THREAD.equals(fact.getArtifactKind())
+                    && (fact.getArtifactId() == null || !activeThreadIds.contains(fact.getArtifactId()))) {
                 continue;
             }
             ObjectNode node = arr.addObject();

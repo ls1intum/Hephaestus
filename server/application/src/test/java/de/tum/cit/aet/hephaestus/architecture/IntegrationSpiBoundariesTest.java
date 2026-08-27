@@ -40,52 +40,44 @@ class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
 
     private static final String INTEGRATION_KIND_FQN = "de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind";
     private static final String GIT_PROVIDER_TYPE_FQN =
-        "de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType";
+            "de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType";
 
     @Test
     void spiHasNoVendorSdkDependencies() {
         ArchRule rule = noClasses()
-            .that()
-            .resideInAPackage("..integration.core.spi..")
-            .should()
-            .dependOnClassesThat()
-            .resideInAnyPackage("org.kohsuke..", "com.slack..", "org.gitlab4j..", "com.linecorp.bot..")
-            .because(
-                "The unified SPI must remain vendor-neutral. Vendor SDK types belong in " +
-                    "integration/<kind>/internal/, never on a cross-vendor port."
-            );
+                .that()
+                .resideInAPackage("..integration.core.spi..")
+                .should()
+                .dependOnClassesThat()
+                .resideInAnyPackage("org.kohsuke..", "com.slack..", "org.gitlab4j..", "com.linecorp.bot..")
+                .because("The unified SPI must remain vendor-neutral. Vendor SDK types belong in "
+                        + "integration/<kind>/internal/, never on a cross-vendor port.");
         rule.check(classes);
     }
 
     @Test
     void kindModulesDoNotImportEachOther() {
-        check(
-            noClasses()
+        check(noClasses()
                 .that()
                 .resideInAPackage("..integration.scm.github..")
                 .should()
                 .dependOnClassesThat()
                 .resideInAnyPackage("..integration.scm.gitlab..", "..integration.slack..")
-                .because("Cross-kind coupling defeats the SPI. Use the shared integration/spi surface.")
-        );
-        check(
-            noClasses()
+                .because("Cross-kind coupling defeats the SPI. Use the shared integration/spi surface."));
+        check(noClasses()
                 .that()
                 .resideInAPackage("..integration.scm.gitlab..")
                 .should()
                 .dependOnClassesThat()
                 .resideInAnyPackage("..integration.scm.github..", "..integration.slack..")
-                .because("Cross-kind coupling defeats the SPI.")
-        );
-        check(
-            noClasses()
+                .because("Cross-kind coupling defeats the SPI."));
+        check(noClasses()
                 .that()
                 .resideInAPackage("..integration.slack..")
                 .should()
                 .dependOnClassesThat()
                 .resideInAnyPackage("..integration.scm.github..", "..integration.scm.gitlab..")
-                .because("Cross-kind coupling defeats the SPI.")
-        );
+                .because("Cross-kind coupling defeats the SPI."));
     }
 
     /**
@@ -109,27 +101,23 @@ class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
     @Test
     void agentDoesNotReadProviderEnumConstants() {
         ArchRule rule = classes()
-            .that()
-            .resideInAPackage("..agent..")
-            // Bites for both enums: no constant reads of IntegrationKind, and no dependency at all
-            // on the legacy IdentityProviderType (whose only legitimate agent-side use would itself be a
-            // branch-on-provider). Reading a IdentityProviderType constant is caught by the same
-            // constant-read condition; depending on the type in any other way is caught explicitly.
-            .should(
-                notReadEnumConstantsOf(INTEGRATION_KIND_FQN)
-                    .and(notReadEnumConstantsOf(GIT_PROVIDER_TYPE_FQN))
-                    .and(notDependOnClass(GIT_PROVIDER_TYPE_FQN))
-            )
-            // Strict: if no agent/** classes are loaded the rule must fail rather than pass
-            // vacuously — the population is the whole agent module and is never legitimately empty.
-            .allowEmptyShould(false)
-            .because(
-                "agent/** dispatches on the provider via the SPI registry " +
-                    "(Map<IntegrationKind, …Channel> keyed by channel.kind()). Reading a concrete " +
-                    "IntegrationKind constant (GITHUB/GITLAB/SLACK) — or touching the legacy " +
-                    "IdentityProviderType enum at all — is the branch-on-provider smell; push the " +
-                    "behaviour into the per-kind SPI adapter instead."
-            );
+                .that()
+                .resideInAPackage("..agent..")
+                // Bites for both enums: no constant reads of IntegrationKind, and no dependency at all
+                // on the legacy IdentityProviderType (whose only legitimate agent-side use would itself be a
+                // branch-on-provider). Reading a IdentityProviderType constant is caught by the same
+                // constant-read condition; depending on the type in any other way is caught explicitly.
+                .should(notReadEnumConstantsOf(INTEGRATION_KIND_FQN)
+                        .and(notReadEnumConstantsOf(GIT_PROVIDER_TYPE_FQN))
+                        .and(notDependOnClass(GIT_PROVIDER_TYPE_FQN)))
+                // Strict: if no agent/** classes are loaded the rule must fail rather than pass
+                // vacuously — the population is the whole agent module and is never legitimately empty.
+                .allowEmptyShould(false)
+                .because("agent/** dispatches on the provider via the SPI registry "
+                        + "(Map<IntegrationKind, …Channel> keyed by channel.kind()). Reading a concrete "
+                        + "IntegrationKind constant (GITHUB/GITLAB/SLACK) — or touching the legacy "
+                        + "IdentityProviderType enum at all — is the branch-on-provider smell; push the "
+                        + "behaviour into the per-kind SPI adapter instead.");
         rule.check(classes);
     }
 
@@ -146,29 +134,22 @@ class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
                 for (JavaFieldAccess access : javaClass.getFieldAccessesFromSelf()) {
                     var target = access.getTarget();
                     boolean ownedByEnum = target.getOwner().getFullName().equals(enumFqn);
-                    boolean isEnumConstant = target
-                        .resolveMember()
-                        .map(
-                            field ->
-                                field.getModifiers().contains(JavaModifier.STATIC) &&
-                                field.getRawType().getFullName().equals(enumFqn)
-                        )
-                        // Unresolved member but owned by the enum and same-typed: treat as a constant.
-                        .orElse(ownedByEnum && target.getRawType().getFullName().equals(enumFqn));
+                    boolean isEnumConstant = target.resolveMember()
+                            .map(field -> field.getModifiers().contains(JavaModifier.STATIC)
+                                    && field.getRawType().getFullName().equals(enumFqn))
+                            // Unresolved member but owned by the enum and same-typed: treat as a constant.
+                            .orElse(ownedByEnum
+                                    && target.getRawType().getFullName().equals(enumFqn));
                     if (ownedByEnum && isEnumConstant) {
-                        events.add(
-                            SimpleConditionEvent.violated(
+                        events.add(SimpleConditionEvent.violated(
                                 javaClass,
                                 String.format(
-                                    "%s reads enum constant %s.%s at %s — branch-on-provider smell; " +
-                                        "dispatch via the SPI registry (Map keyed by channel.kind()) instead",
-                                    javaClass.getSimpleName(),
-                                    target.getOwner().getSimpleName(),
-                                    target.getName(),
-                                    access.getSourceCodeLocation()
-                                )
-                            )
-                        );
+                                        "%s reads enum constant %s.%s at %s — branch-on-provider smell; "
+                                                + "dispatch via the SPI registry (Map keyed by channel.kind()) instead",
+                                        javaClass.getSimpleName(),
+                                        target.getOwner().getSimpleName(),
+                                        target.getName(),
+                                        access.getSourceCodeLocation())));
                     }
                 }
             }
@@ -186,18 +167,12 @@ class IntegrationSpiBoundariesTest extends HephaestusArchitectureTest {
             public void check(JavaClass javaClass, ConditionEvents events) {
                 for (Dependency dependency : javaClass.getDirectDependenciesFromSelf()) {
                     if (dependency.getTargetClass().getFullName().equals(fqn)) {
-                        events.add(
-                            SimpleConditionEvent.violated(
+                        events.add(SimpleConditionEvent.violated(
                                 javaClass,
                                 String.format(
-                                    "%s depends on %s at %s — agent/** must dispatch by IntegrationKind " +
-                                        "via the SPI registry, never the legacy IdentityProviderType",
-                                    javaClass.getSimpleName(),
-                                    fqn,
-                                    dependency.getSourceCodeLocation()
-                                )
-                            )
-                        );
+                                        "%s depends on %s at %s — agent/** must dispatch by IntegrationKind "
+                                                + "via the SPI registry, never the legacy IdentityProviderType",
+                                        javaClass.getSimpleName(), fqn, dependency.getSourceCodeLocation())));
                     }
                 }
             }

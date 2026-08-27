@@ -16,13 +16,11 @@ public interface JwtSigningKeyRepository extends JpaRepository<JwtSigningKey, St
      * active key, two rows sharing a {@code created_at} (same-millisecond insert / cross-pod clock skew)
      * must still pick the SAME signer cluster-wide, not an arbitrary one.
      */
-    @Query(
-        """
+    @Query("""
         SELECT k FROM JwtSigningKey k
         WHERE k.active = true
         ORDER BY k.createdAt DESC, k.kid DESC
-        """
-    )
+        """)
     List<JwtSigningKey> findActive();
 
     /** Count active keys so {@code ensureActiveKey()} knows whether to bootstrap the first one. */

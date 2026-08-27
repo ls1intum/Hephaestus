@@ -23,15 +23,15 @@ public class AccountPreferencesQueryAdapter implements AccountPreferencesQuery {
             return Optional.empty();
         }
         return userPreferencesRepository
-            .findByUserLogin(login)
-            .map(p -> new PreferencesView(p.isParticipateInResearch(), p.isPracticeFeedbackDeliveryEnabled()));
+                .findByUserLogin(login)
+                .map(p -> new PreferencesView(p.isParticipateInResearch(), p.isPracticeFeedbackDeliveryEnabled()));
     }
 
     @Override
     @Transactional(readOnly = true)
     public Optional<PreferencesView> preferencesForUserId(long userId) {
         return userPreferencesRepository
-            .findByUserId(userId)
-            .map(p -> new PreferencesView(p.isParticipateInResearch(), p.isPracticeFeedbackDeliveryEnabled()));
+                .findByUserId(userId)
+                .map(p -> new PreferencesView(p.isParticipateInResearch(), p.isPracticeFeedbackDeliveryEnabled()));
     }
 }

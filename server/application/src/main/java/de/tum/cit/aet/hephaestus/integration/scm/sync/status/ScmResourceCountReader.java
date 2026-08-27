@@ -40,12 +40,11 @@ public class ScmResourceCountReader {
     private final CommitRepository commitRepository;
 
     public ScmResourceCountReader(
-        IssueRepository issueRepository,
-        IssueCommentRepository issueCommentRepository,
-        PullRequestReviewRepository reviewRepository,
-        PullRequestReviewCommentRepository reviewCommentRepository,
-        CommitRepository commitRepository
-    ) {
+            IssueRepository issueRepository,
+            IssueCommentRepository issueCommentRepository,
+            PullRequestReviewRepository reviewRepository,
+            PullRequestReviewCommentRepository reviewCommentRepository,
+            CommitRepository commitRepository) {
         this.issueRepository = issueRepository;
         this.issueCommentRepository = issueCommentRepository;
         this.reviewRepository = reviewRepository;
@@ -72,32 +71,24 @@ public class ScmResourceCountReader {
         Map<Long, Long> reviewComments = toMap(reviewCommentRepository.countGroupedByRepositoryIds(ids));
         Map<Long, Long> commits = toMap(commitRepository.countGroupedByRepositoryIds(ids));
 
-        return ids
-            .stream()
-            .collect(
-                Collectors.toMap(Function.identity(), id ->
-                    new ScmResourceCounts(
-                        issues.getOrDefault(id, 0L),
-                        pullRequests.getOrDefault(id, 0L),
-                        issueComments.getOrDefault(id, 0L),
-                        reviews.getOrDefault(id, 0L),
-                        reviewComments.getOrDefault(id, 0L),
-                        commits.getOrDefault(id, 0L)
-                    )
-                )
-            );
+        return ids.stream()
+                .collect(Collectors.toMap(
+                        Function.identity(),
+                        id -> new ScmResourceCounts(
+                                issues.getOrDefault(id, 0L),
+                                pullRequests.getOrDefault(id, 0L),
+                                issueComments.getOrDefault(id, 0L),
+                                reviews.getOrDefault(id, 0L),
+                                reviewComments.getOrDefault(id, 0L),
+                                commits.getOrDefault(id, 0L))));
     }
 
     private static Map<Long, Long> toMap(List<RepositoryItemCountProjection> rows) {
-        return rows
-            .stream()
-            .collect(
-                Collectors.toMap(
-                    RepositoryItemCountProjection::getRepositoryId,
-                    RepositoryItemCountProjection::getItemCount,
-                    (a, b) -> a
-                )
-            );
+        return rows.stream()
+                .collect(Collectors.toMap(
+                        RepositoryItemCountProjection::getRepositoryId,
+                        RepositoryItemCountProjection::getItemCount,
+                        (a, b) -> a));
     }
 
     /**
@@ -111,13 +102,7 @@ public class ScmResourceCountReader {
      * @param commits        commits
      */
     public record ScmResourceCounts(
-        long issues,
-        long pullRequests,
-        long issueComments,
-        long reviews,
-        long reviewComments,
-        long commits
-    ) {
+            long issues, long pullRequests, long issueComments, long reviews, long reviewComments, long commits) {
         private static final ScmResourceCounts EMPTY = new ScmResourceCounts(0, 0, 0, 0, 0, 0);
 
         public static ScmResourceCounts empty() {
@@ -139,26 +124,17 @@ public class ScmResourceCountReader {
          * sibling's timestamp would claim exactly the freshness this breakdown exists to disprove.
          */
         public List<SyncResourceCount> toSyncResourceCounts(
-            @Nullable Instant issuesSyncedAt,
-            @Nullable Instant pullRequestsSyncedAt
-        ) {
+                @Nullable Instant issuesSyncedAt, @Nullable Instant pullRequestsSyncedAt) {
             List<SyncResourceCount> counts = new ArrayList<>(6);
             counts.add(new SyncResourceCount(SyncResourceCount.KEY_ISSUES, "Issues", issues, issuesSyncedAt));
-            counts.add(
-                new SyncResourceCount(
-                    SyncResourceCount.KEY_PULL_REQUESTS,
-                    "Pull requests",
-                    pullRequests,
-                    pullRequestsSyncedAt
-                )
-            );
+            counts.add(new SyncResourceCount(
+                    SyncResourceCount.KEY_PULL_REQUESTS, "Pull requests", pullRequests, pullRequestsSyncedAt));
             // Comments, reviews and review comments are fetched nested inside the issue and PR pages —
             // no independent watermark column exists for them, so they report none.
             counts.add(new SyncResourceCount(SyncResourceCount.KEY_ISSUE_COMMENTS, "Comments", issueComments, null));
             counts.add(new SyncResourceCount(SyncResourceCount.KEY_REVIEWS, "Reviews", reviews, null));
-            counts.add(
-                new SyncResourceCount(SyncResourceCount.KEY_REVIEW_COMMENTS, "Review comments", reviewComments, null)
-            );
+            counts.add(new SyncResourceCount(
+                    SyncResourceCount.KEY_REVIEW_COMMENTS, "Review comments", reviewComments, null));
             counts.add(new SyncResourceCount(SyncResourceCount.KEY_COMMITS, "Commits", commits, null));
             return List.copyOf(counts);
         }

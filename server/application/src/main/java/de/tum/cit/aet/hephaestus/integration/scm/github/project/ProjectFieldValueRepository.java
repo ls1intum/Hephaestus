@@ -33,14 +33,12 @@ public interface ProjectFieldValueRepository extends JpaRepository<ProjectFieldV
      * @param itemId the item's ID
      * @return list of field values for the item
      */
-    @Query(
-        """
+    @Query("""
         SELECT fv
         FROM ProjectFieldValue fv
         JOIN FETCH fv.field
         WHERE fv.item.id = :itemId
-        """
-    )
+        """)
     List<ProjectFieldValue> findAllByItemIdWithField(@Param("itemId") Long itemId);
 
     /**
@@ -83,8 +81,7 @@ public interface ProjectFieldValueRepository extends JpaRepository<ProjectFieldV
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO project_field_value (
             item_id, field_id, text_value, number_value, date_value,
             single_select_option_id, iteration_id, updated_at
@@ -100,17 +97,14 @@ public interface ProjectFieldValueRepository extends JpaRepository<ProjectFieldV
             single_select_option_id = EXCLUDED.single_select_option_id,
             iteration_id = EXCLUDED.iteration_id,
             updated_at = EXCLUDED.updated_at
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int upsertCore(
-        @Param("itemId") Long itemId,
-        @Param("fieldId") String fieldId,
-        @Param("textValue") @Nullable String textValue,
-        @Param("numberValue") @Nullable Double numberValue,
-        @Param("dateValue") @Nullable LocalDate dateValue,
-        @Param("singleSelectOptionId") @Nullable String singleSelectOptionId,
-        @Param("iterationId") @Nullable String iterationId,
-        @Param("updatedAt") Instant updatedAt
-    );
+            @Param("itemId") Long itemId,
+            @Param("fieldId") String fieldId,
+            @Param("textValue") @Nullable String textValue,
+            @Param("numberValue") @Nullable Double numberValue,
+            @Param("dateValue") @Nullable LocalDate dateValue,
+            @Param("singleSelectOptionId") @Nullable String singleSelectOptionId,
+            @Param("iterationId") @Nullable String iterationId,
+            @Param("updatedAt") Instant updatedAt);
 }

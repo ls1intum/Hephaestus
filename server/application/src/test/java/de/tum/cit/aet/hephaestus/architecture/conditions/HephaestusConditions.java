@@ -53,25 +53,17 @@ public final class HephaestusConditions {
         return new ArchCondition<>("have at most " + maxParams + " constructor parameters") {
             @Override
             public void check(JavaClass javaClass, ConditionEvents events) {
-                long maxFound = javaClass
-                    .getConstructors()
-                    .stream()
-                    .mapToLong(c -> c.getRawParameterTypes().size())
-                    .max()
-                    .orElse(0);
+                long maxFound = javaClass.getConstructors().stream()
+                        .mapToLong(c -> c.getRawParameterTypes().size())
+                        .max()
+                        .orElse(0);
 
                 if (maxFound > maxParams) {
-                    events.add(
-                        SimpleConditionEvent.violated(
+                    events.add(SimpleConditionEvent.violated(
                             javaClass,
                             String.format(
-                                "%s has %d constructor params (max %d) - consider splitting responsibilities",
-                                javaClass.getSimpleName(),
-                                maxFound,
-                                maxParams
-                            )
-                        )
-                    );
+                                    "%s has %d constructor params (max %d) - consider splitting responsibilities",
+                                    javaClass.getSimpleName(), maxFound, maxParams)));
                 }
             }
         };
@@ -93,25 +85,17 @@ public final class HephaestusConditions {
                     return;
                 }
 
-                long maxFound = javaClass
-                    .getConstructors()
-                    .stream()
-                    .mapToLong(c -> c.getRawParameterTypes().size())
-                    .max()
-                    .orElse(0);
+                long maxFound = javaClass.getConstructors().stream()
+                        .mapToLong(c -> c.getRawParameterTypes().size())
+                        .max()
+                        .orElse(0);
 
                 if (maxFound > maxParams) {
-                    events.add(
-                        SimpleConditionEvent.violated(
+                    events.add(SimpleConditionEvent.violated(
                             javaClass,
                             String.format(
-                                "%s has %d constructor params (max %d) - consider splitting responsibilities",
-                                javaClass.getSimpleName(),
-                                maxFound,
-                                maxParams
-                            )
-                        )
-                    );
+                                    "%s has %d constructor params (max %d) - consider splitting responsibilities",
+                                    javaClass.getSimpleName(), maxFound, maxParams)));
                 }
             }
         };
@@ -130,34 +114,26 @@ public final class HephaestusConditions {
         return new ArchCondition<>("have at most " + maxMethods + " business methods") {
             @Override
             public void check(JavaClass javaClass, ConditionEvents events) {
-                long methodCount = javaClass
-                    .getMethods()
-                    .stream()
-                    .filter(m -> m.getOwner().equals(javaClass))
-                    .filter(m -> !m.getName().startsWith("$"))
-                    .filter(m -> !m.getName().startsWith("lambda$"))
-                    .filter(m -> !m.getName().equals("equals"))
-                    .filter(m -> !m.getName().equals("hashCode"))
-                    .filter(m -> !m.getName().equals("toString"))
-                    .filter(m -> !m.getName().startsWith("get"))
-                    .filter(m -> !m.getName().startsWith("set"))
-                    .filter(m -> !m.getName().startsWith("is"))
-                    .filter(m -> !m.getName().equals("<init>"))
-                    .filter(m -> !m.getName().equals("<clinit>"))
-                    .count();
+                long methodCount = javaClass.getMethods().stream()
+                        .filter(m -> m.getOwner().equals(javaClass))
+                        .filter(m -> !m.getName().startsWith("$"))
+                        .filter(m -> !m.getName().startsWith("lambda$"))
+                        .filter(m -> !m.getName().equals("equals"))
+                        .filter(m -> !m.getName().equals("hashCode"))
+                        .filter(m -> !m.getName().equals("toString"))
+                        .filter(m -> !m.getName().startsWith("get"))
+                        .filter(m -> !m.getName().startsWith("set"))
+                        .filter(m -> !m.getName().startsWith("is"))
+                        .filter(m -> !m.getName().equals("<init>"))
+                        .filter(m -> !m.getName().equals("<clinit>"))
+                        .count();
 
                 if (methodCount > maxMethods) {
-                    events.add(
-                        SimpleConditionEvent.violated(
+                    events.add(SimpleConditionEvent.violated(
                             javaClass,
                             String.format(
-                                "%s has %d business methods (max %d) - consider splitting",
-                                javaClass.getSimpleName(),
-                                methodCount,
-                                maxMethods
-                            )
-                        )
-                    );
+                                    "%s has %d business methods (max %d) - consider splitting",
+                                    javaClass.getSimpleName(), methodCount, maxMethods)));
                 }
             }
         };
@@ -174,18 +150,14 @@ public final class HephaestusConditions {
             @Override
             public void check(JavaClass javaClass, ConditionEvents events) {
                 boolean isFinal = javaClass.getModifiers().contains(JavaModifier.FINAL);
-                boolean hasOnlyPrivateCtors = javaClass
-                    .getConstructors()
-                    .stream()
-                    .allMatch(c -> c.getModifiers().contains(JavaModifier.PRIVATE));
+                boolean hasOnlyPrivateCtors = javaClass.getConstructors().stream()
+                        .allMatch(c -> c.getModifiers().contains(JavaModifier.PRIVATE));
 
                 if (!isFinal && !hasOnlyPrivateCtors) {
-                    events.add(
-                        SimpleConditionEvent.violated(
+                    events.add(SimpleConditionEvent.violated(
                             javaClass,
-                            String.format("%s should be final or have private constructor", javaClass.getSimpleName())
-                        )
-                    );
+                            String.format(
+                                    "%s should be final or have private constructor", javaClass.getSimpleName())));
                 }
             }
         };
@@ -205,22 +177,15 @@ public final class HephaestusConditions {
                     return;
                 }
 
-                boolean hasNonFinalField = javaClass
-                    .getFields()
-                    .stream()
-                    .filter(f -> !f.getModifiers().contains(JavaModifier.STATIC))
-                    .anyMatch(f -> !f.getModifiers().contains(JavaModifier.FINAL));
+                boolean hasNonFinalField = javaClass.getFields().stream()
+                        .filter(f -> !f.getModifiers().contains(JavaModifier.STATIC))
+                        .anyMatch(f -> !f.getModifiers().contains(JavaModifier.FINAL));
 
                 if (hasNonFinalField) {
-                    events.add(
-                        SimpleConditionEvent.violated(
+                    events.add(SimpleConditionEvent.violated(
                             javaClass,
                             String.format(
-                                "%s has mutable fields - use record or final fields",
-                                javaClass.getSimpleName()
-                            )
-                        )
-                    );
+                                    "%s has mutable fields - use record or final fields", javaClass.getSimpleName())));
                 }
             }
         };
@@ -238,34 +203,24 @@ public final class HephaestusConditions {
             @Override
             public void check(JavaClass javaClass, ConditionEvents events) {
                 // Count @Autowired fields
-                long fieldInjections = javaClass
-                    .getFields()
-                    .stream()
-                    .filter(f -> f.isAnnotatedWith(Autowired.class))
-                    .count();
+                long fieldInjections = javaClass.getFields().stream()
+                        .filter(f -> f.isAnnotatedWith(Autowired.class))
+                        .count();
 
                 // Count constructor parameters
-                long constructorParams = javaClass
-                    .getConstructors()
-                    .stream()
-                    .mapToLong(c -> c.getRawParameterTypes().size())
-                    .max()
-                    .orElse(0);
+                long constructorParams = javaClass.getConstructors().stream()
+                        .mapToLong(c -> c.getRawParameterTypes().size())
+                        .max()
+                        .orElse(0);
 
                 long totalDeps = Math.max(fieldInjections, constructorParams);
 
                 if (totalDeps > maxDependencies) {
-                    events.add(
-                        SimpleConditionEvent.violated(
+                    events.add(SimpleConditionEvent.violated(
                             javaClass,
                             String.format(
-                                "%s has %d dependencies (max %d) - SRP violation",
-                                javaClass.getSimpleName(),
-                                totalDeps,
-                                maxDependencies
-                            )
-                        )
-                    );
+                                    "%s has %d dependencies (max %d) - SRP violation",
+                                    javaClass.getSimpleName(), totalDeps, maxDependencies)));
                 }
             }
         };
@@ -284,25 +239,17 @@ public final class HephaestusConditions {
         return new ArchCondition<>("have at most " + maxMethods + " abstract methods") {
             @Override
             public void check(JavaClass javaClass, ConditionEvents events) {
-                int methodCount = (int) javaClass
-                    .getMethods()
-                    .stream()
-                    .filter(m -> !m.getModifiers().contains(JavaModifier.STATIC))
-                    .filter(m -> m.getModifiers().contains(JavaModifier.ABSTRACT))
-                    .count();
+                int methodCount = (int) javaClass.getMethods().stream()
+                        .filter(m -> !m.getModifiers().contains(JavaModifier.STATIC))
+                        .filter(m -> m.getModifiers().contains(JavaModifier.ABSTRACT))
+                        .count();
 
                 if (methodCount > maxMethods) {
-                    events.add(
-                        SimpleConditionEvent.violated(
+                    events.add(SimpleConditionEvent.violated(
                             javaClass,
                             String.format(
-                                "%s has %d abstract methods (max %d) - ISP violation",
-                                javaClass.getSimpleName(),
-                                methodCount,
-                                maxMethods
-                            )
-                        )
-                    );
+                                    "%s has %d abstract methods (max %d) - ISP violation",
+                                    javaClass.getSimpleName(), methodCount, maxMethods)));
                 }
             }
         };
@@ -322,18 +269,11 @@ public final class HephaestusConditions {
             public void check(JavaMethod method, ConditionEvents events) {
                 int paramCount = method.getRawParameterTypes().size();
                 if (paramCount > maxParams) {
-                    events.add(
-                        SimpleConditionEvent.violated(
+                    events.add(SimpleConditionEvent.violated(
                             method,
                             String.format(
-                                "%s.%s has %d parameters (max %d) - consider parameter object",
-                                method.getOwner().getSimpleName(),
-                                method.getName(),
-                                paramCount,
-                                maxParams
-                            )
-                        )
-                    );
+                                    "%s.%s has %d parameters (max %d) - consider parameter object",
+                                    method.getOwner().getSimpleName(), method.getName(), paramCount, maxParams)));
                 }
             }
         };
@@ -354,38 +294,22 @@ public final class HephaestusConditions {
         return new ArchCondition<>("have security annotation") {
             @Override
             public void check(JavaMethod method, ConditionEvents events) {
-                boolean hasSecurityAnnotation =
-                    method.isAnnotatedWith("org.springframework.security.access.prepost.PreAuthorize") ||
-                    method.getOwner().isAnnotatedWith("org.springframework.security.access.prepost.PreAuthorize") ||
-                    method
-                        .getAnnotations()
-                        .stream()
-                        .anyMatch(
-                            a ->
-                                a.getRawType().getName().contains("Require") ||
-                                a.getRawType().getName().contains("Ensure")
-                        ) ||
-                    method
-                        .getOwner()
-                        .getAnnotations()
-                        .stream()
-                        .anyMatch(
-                            a ->
-                                a.getRawType().getName().contains("Require") ||
-                                a.getRawType().getName().contains("Ensure")
-                        );
+                boolean hasSecurityAnnotation = method.isAnnotatedWith(
+                                "org.springframework.security.access.prepost.PreAuthorize")
+                        || method.getOwner().isAnnotatedWith("org.springframework.security.access.prepost.PreAuthorize")
+                        || method.getAnnotations().stream()
+                                .anyMatch(a -> a.getRawType().getName().contains("Require")
+                                        || a.getRawType().getName().contains("Ensure"))
+                        || method.getOwner().getAnnotations().stream()
+                                .anyMatch(a -> a.getRawType().getName().contains("Require")
+                                        || a.getRawType().getName().contains("Ensure"));
 
                 if (!hasSecurityAnnotation) {
-                    events.add(
-                        SimpleConditionEvent.violated(
+                    events.add(SimpleConditionEvent.violated(
                             method,
                             String.format(
-                                "%s.%s has no security annotation",
-                                method.getOwner().getSimpleName(),
-                                method.getName()
-                            )
-                        )
-                    );
+                                    "%s.%s has no security annotation",
+                                    method.getOwner().getSimpleName(), method.getName())));
                 }
             }
         };
@@ -406,38 +330,22 @@ public final class HephaestusConditions {
                     return;
                 }
 
-                boolean hasSecurityAnnotation =
-                    method.isAnnotatedWith("org.springframework.security.access.prepost.PreAuthorize") ||
-                    method.getOwner().isAnnotatedWith("org.springframework.security.access.prepost.PreAuthorize") ||
-                    method
-                        .getAnnotations()
-                        .stream()
-                        .anyMatch(
-                            a ->
-                                a.getRawType().getName().contains("Require") ||
-                                a.getRawType().getName().contains("Ensure")
-                        ) ||
-                    method
-                        .getOwner()
-                        .getAnnotations()
-                        .stream()
-                        .anyMatch(
-                            a ->
-                                a.getRawType().getName().contains("Require") ||
-                                a.getRawType().getName().contains("Ensure")
-                        );
+                boolean hasSecurityAnnotation = method.isAnnotatedWith(
+                                "org.springframework.security.access.prepost.PreAuthorize")
+                        || method.getOwner().isAnnotatedWith("org.springframework.security.access.prepost.PreAuthorize")
+                        || method.getAnnotations().stream()
+                                .anyMatch(a -> a.getRawType().getName().contains("Require")
+                                        || a.getRawType().getName().contains("Ensure"))
+                        || method.getOwner().getAnnotations().stream()
+                                .anyMatch(a -> a.getRawType().getName().contains("Require")
+                                        || a.getRawType().getName().contains("Ensure"));
 
                 if (!hasSecurityAnnotation) {
-                    events.add(
-                        SimpleConditionEvent.violated(
+                    events.add(SimpleConditionEvent.violated(
                             method,
                             String.format(
-                                "%s.%s is an endpoint with no security annotation",
-                                method.getOwner().getSimpleName(),
-                                method.getName()
-                            )
-                        )
-                    );
+                                    "%s.%s is an endpoint with no security annotation",
+                                    method.getOwner().getSimpleName(), method.getName())));
                 }
             }
         };
@@ -456,24 +364,17 @@ public final class HephaestusConditions {
         return new ArchCondition<>("have at most " + maxBooleans + " boolean parameters") {
             @Override
             public void check(JavaMethod method, ConditionEvents events) {
-                long booleanCount = method
-                    .getRawParameterTypes()
-                    .stream()
-                    .filter(p -> p.getName().equals("boolean") || p.getName().equals("java.lang.Boolean"))
-                    .count();
+                long booleanCount = method.getRawParameterTypes().stream()
+                        .filter(p ->
+                                p.getName().equals("boolean") || p.getName().equals("java.lang.Boolean"))
+                        .count();
 
                 if (booleanCount > maxBooleans) {
-                    events.add(
-                        SimpleConditionEvent.violated(
+                    events.add(SimpleConditionEvent.violated(
                             method,
                             String.format(
-                                "%s.%s has %d boolean params - consider using enum or builder",
-                                method.getOwner().getSimpleName(),
-                                method.getName(),
-                                booleanCount
-                            )
-                        )
-                    );
+                                    "%s.%s has %d boolean params - consider using enum or builder",
+                                    method.getOwner().getSimpleName(), method.getName(), booleanCount)));
                 }
             }
         };
@@ -490,22 +391,15 @@ public final class HephaestusConditions {
         return new ArchCondition<>("not declare generic Exception") {
             @Override
             public void check(JavaMethod method, ConditionEvents events) {
-                boolean declaresGenericException = method
-                    .getThrowsClause()
-                    .stream()
-                    .anyMatch(t -> t.getRawType().getName().equals("java.lang.Exception"));
+                boolean declaresGenericException = method.getThrowsClause().stream()
+                        .anyMatch(t -> t.getRawType().getName().equals("java.lang.Exception"));
 
                 if (declaresGenericException) {
-                    events.add(
-                        SimpleConditionEvent.violated(
+                    events.add(SimpleConditionEvent.violated(
                             method,
                             String.format(
-                                "LSP: %s.%s declares generic Exception - use specific exceptions",
-                                method.getOwner().getSimpleName(),
-                                method.getName()
-                            )
-                        )
-                    );
+                                    "LSP: %s.%s declares generic Exception - use specific exceptions",
+                                    method.getOwner().getSimpleName(), method.getName())));
                 }
             }
         };
@@ -524,17 +418,11 @@ public final class HephaestusConditions {
             @Override
             public void check(JavaField field, ConditionEvents events) {
                 if (!field.getOwner().isAnnotatedWith(annotationName)) {
-                    events.add(
-                        SimpleConditionEvent.violated(
+                    events.add(SimpleConditionEvent.violated(
                             field,
                             String.format(
-                                "%s.%s is not in class with %s",
-                                field.getOwner().getSimpleName(),
-                                field.getName(),
-                                annotationName
-                            )
-                        )
-                    );
+                                    "%s.%s is not in class with %s",
+                                    field.getOwner().getSimpleName(), field.getName(), annotationName)));
                 }
             }
         };
@@ -553,51 +441,41 @@ public final class HephaestusConditions {
                     return;
                 }
 
-                boolean hasNotNullAnnotation =
-                    field.isAnnotatedWith(jakarta.validation.constraints.NotNull.class) ||
-                    field.isAnnotatedWith("org.jetbrains.annotations.NotNull");
+                boolean hasNotNullAnnotation = field.isAnnotatedWith(jakarta.validation.constraints.NotNull.class)
+                        || field.isAnnotatedWith("org.jetbrains.annotations.NotNull");
 
-                boolean hasNonNullableJoinColumn = field
-                    .getAnnotations()
-                    .stream()
-                    .filter(a -> a.getRawType().getSimpleName().equals("JoinColumn"))
-                    .findFirst()
-                    .map(a -> {
-                        try {
-                            Object nullable = a.getExplicitlyDeclaredProperty("nullable");
-                            return Boolean.FALSE.equals(nullable);
-                        } catch (Exception e) {
-                            return false;
-                        }
-                    })
-                    .orElse(false);
+                boolean hasNonNullableJoinColumn = field.getAnnotations().stream()
+                        .filter(a -> a.getRawType().getSimpleName().equals("JoinColumn"))
+                        .findFirst()
+                        .map(a -> {
+                            try {
+                                Object nullable = a.getExplicitlyDeclaredProperty("nullable");
+                                return Boolean.FALSE.equals(nullable);
+                            } catch (Exception e) {
+                                return false;
+                            }
+                        })
+                        .orElse(false);
 
-                boolean hasRequiredManyToOne = field
-                    .getAnnotations()
-                    .stream()
-                    .filter(a -> a.getRawType().getSimpleName().equals("ManyToOne"))
-                    .findFirst()
-                    .map(a -> {
-                        try {
-                            Object optional = a.getExplicitlyDeclaredProperty("optional");
-                            return Boolean.FALSE.equals(optional);
-                        } catch (Exception e) {
-                            return false;
-                        }
-                    })
-                    .orElse(false);
+                boolean hasRequiredManyToOne = field.getAnnotations().stream()
+                        .filter(a -> a.getRawType().getSimpleName().equals("ManyToOne"))
+                        .findFirst()
+                        .map(a -> {
+                            try {
+                                Object optional = a.getExplicitlyDeclaredProperty("optional");
+                                return Boolean.FALSE.equals(optional);
+                            } catch (Exception e) {
+                                return false;
+                            }
+                        })
+                        .orElse(false);
 
                 if (!hasNotNullAnnotation && !hasNonNullableJoinColumn && !hasRequiredManyToOne) {
-                    events.add(
-                        SimpleConditionEvent.violated(
+                    events.add(SimpleConditionEvent.violated(
                             field,
                             String.format(
-                                "NULLABLE WORKSPACE: %s.%s should have @NotNull or @JoinColumn(nullable=false)",
-                                field.getOwner().getSimpleName(),
-                                field.getName()
-                            )
-                        )
-                    );
+                                    "NULLABLE WORKSPACE: %s.%s should have @NotNull or @JoinColumn(nullable=false)",
+                                    field.getOwner().getSimpleName(), field.getName())));
                 }
             }
         };
@@ -612,14 +490,12 @@ public final class HephaestusConditions {
      * @return true if the method has an HTTP mapping annotation
      */
     public static boolean isHttpEndpoint(JavaMethod method) {
-        return (
-            method.isAnnotatedWith("org.springframework.web.bind.annotation.GetMapping") ||
-            method.isAnnotatedWith("org.springframework.web.bind.annotation.PostMapping") ||
-            method.isAnnotatedWith("org.springframework.web.bind.annotation.PutMapping") ||
-            method.isAnnotatedWith("org.springframework.web.bind.annotation.DeleteMapping") ||
-            method.isAnnotatedWith("org.springframework.web.bind.annotation.PatchMapping") ||
-            method.isAnnotatedWith("org.springframework.web.bind.annotation.RequestMapping")
-        );
+        return (method.isAnnotatedWith("org.springframework.web.bind.annotation.GetMapping")
+                || method.isAnnotatedWith("org.springframework.web.bind.annotation.PostMapping")
+                || method.isAnnotatedWith("org.springframework.web.bind.annotation.PutMapping")
+                || method.isAnnotatedWith("org.springframework.web.bind.annotation.DeleteMapping")
+                || method.isAnnotatedWith("org.springframework.web.bind.annotation.PatchMapping")
+                || method.isAnnotatedWith("org.springframework.web.bind.annotation.RequestMapping"));
     }
 
     /**
@@ -641,14 +517,12 @@ public final class HephaestusConditions {
      */
     public static boolean isBoilerplateMethod(JavaMethod method) {
         String name = method.getName();
-        return (
-            name.equals("equals") ||
-            name.equals("hashCode") ||
-            name.equals("toString") ||
-            name.startsWith("get") ||
-            name.startsWith("set") ||
-            name.startsWith("is")
-        );
+        return (name.equals("equals")
+                || name.equals("hashCode")
+                || name.equals("toString")
+                || name.startsWith("get")
+                || name.startsWith("set")
+                || name.startsWith("is"));
     }
 
     /**
@@ -675,29 +549,22 @@ public final class HephaestusConditions {
         return new ArchCondition<>("have workspace-aware dependencies") {
             @Override
             public void check(JavaClass javaClass, ConditionEvents events) {
-                Set<String> dependencies = javaClass
-                    .getFields()
-                    .stream()
-                    .map(f -> f.getRawType().getSimpleName())
-                    .collect(Collectors.toSet());
+                Set<String> dependencies = javaClass.getFields().stream()
+                        .map(f -> f.getRawType().getSimpleName())
+                        .collect(Collectors.toSet());
 
                 javaClass
-                    .getConstructors()
-                    .forEach(c -> c.getRawParameterTypes().forEach(p -> dependencies.add(p.getSimpleName())));
+                        .getConstructors()
+                        .forEach(c -> c.getRawParameterTypes().forEach(p -> dependencies.add(p.getSimpleName())));
 
                 boolean hasWorkspaceAwareDep = dependencies.stream().anyMatch(workspaceDependencyNames::contains);
 
                 if (!hasWorkspaceAwareDep) {
-                    events.add(
-                        SimpleConditionEvent.violated(
+                    events.add(SimpleConditionEvent.violated(
                             javaClass,
                             String.format(
-                                "%s has no workspace-aware dependencies (%s)",
-                                javaClass.getSimpleName(),
-                                workspaceDependencyNames
-                            )
-                        )
-                    );
+                                    "%s has no workspace-aware dependencies (%s)",
+                                    javaClass.getSimpleName(), workspaceDependencyNames)));
                 }
             }
         };
@@ -712,42 +579,23 @@ public final class HephaestusConditions {
         return new ArchCondition<>("have WorkspaceContext parameter") {
             @Override
             public void check(JavaMethod method, ConditionEvents events) {
-                boolean hasWorkspaceContext = method
-                    .getRawParameterTypes()
-                    .stream()
-                    .anyMatch(p -> p.getSimpleName().equals("WorkspaceContext"));
+                boolean hasWorkspaceContext = method.getRawParameterTypes().stream()
+                        .anyMatch(p -> p.getSimpleName().equals("WorkspaceContext"));
 
-                boolean hasWorkspaceSecurityAnnotation =
-                    method
-                        .getAnnotations()
-                        .stream()
-                        .anyMatch(
-                            a ->
-                                a.getRawType().getSimpleName().contains("Workspace") ||
-                                a.getRawType().getSimpleName().contains("Ensure") ||
-                                a.getRawType().getSimpleName().contains("Require")
-                        ) ||
-                    method
-                        .getOwner()
-                        .getAnnotations()
-                        .stream()
-                        .anyMatch(
-                            a ->
-                                a.getRawType().getSimpleName().contains("Workspace") ||
-                                a.getRawType().getSimpleName().contains("Ensure")
-                        );
+                boolean hasWorkspaceSecurityAnnotation = method.getAnnotations().stream()
+                                .anyMatch(a -> a.getRawType().getSimpleName().contains("Workspace")
+                                        || a.getRawType().getSimpleName().contains("Ensure")
+                                        || a.getRawType().getSimpleName().contains("Require"))
+                        || method.getOwner().getAnnotations().stream()
+                                .anyMatch(a -> a.getRawType().getSimpleName().contains("Workspace")
+                                        || a.getRawType().getSimpleName().contains("Ensure"));
 
                 if (!hasWorkspaceContext && !hasWorkspaceSecurityAnnotation) {
-                    events.add(
-                        SimpleConditionEvent.violated(
+                    events.add(SimpleConditionEvent.violated(
                             method,
                             String.format(
-                                "%s.%s has no WorkspaceContext or workspace security annotation",
-                                method.getOwner().getSimpleName(),
-                                method.getName()
-                            )
-                        )
-                    );
+                                    "%s.%s has no WorkspaceContext or workspace security annotation",
+                                    method.getOwner().getSimpleName(), method.getName())));
                 }
             }
         };

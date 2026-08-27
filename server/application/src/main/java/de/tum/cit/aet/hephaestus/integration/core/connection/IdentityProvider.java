@@ -30,11 +30,12 @@ import org.jspecify.annotations.Nullable;
  */
 @Entity
 @Table(
-    name = "identity_provider",
-    uniqueConstraints = {
-        @UniqueConstraint(name = "uq_identity_provider_type_server_url", columnNames = { "type", "server_url" }),
-    }
-)
+        name = "identity_provider",
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "uq_identity_provider_type_server_url",
+                    columnNames = {"type", "server_url"}),
+        })
 @Getter
 @Setter
 @NoArgsConstructor

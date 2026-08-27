@@ -39,12 +39,12 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void contributorsDoesNotDependOnLeaderboardInternals() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..contributors..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage("..leaderboard..service..", "..leaderboard..repository..")
-                .because("Contributors module is independent of leaderboard scoring");
+                    .that()
+                    .resideInAPackage("..contributors..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAnyPackage("..leaderboard..service..", "..leaderboard..repository..")
+                    .because("Contributors module is independent of leaderboard scoring");
             rule.check(classes);
         }
 
@@ -54,12 +54,12 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void contributorsDoesNotDependOnActivityInternals() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..contributors..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage("..activity..service..", "..activity..repository..", "..practices..")
-                .because("Contributors module should not depend on activity internals");
+                    .that()
+                    .resideInAPackage("..contributors..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAnyPackage("..activity..service..", "..activity..repository..", "..practices..")
+                    .because("Contributors module should not depend on activity internals");
             rule.check(classes);
         }
 
@@ -69,12 +69,12 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void contributorsDoesNotDependOnMentor() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..contributors..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("..mentor..")
-                .because("Contributors and mentor are independent modules");
+                    .that()
+                    .resideInAPackage("..contributors..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAPackage("..mentor..")
+                    .because("Contributors and mentor are independent modules");
             rule.check(classes);
         }
     }
@@ -93,19 +93,18 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void accountDoesNotDependOnFeatureModules() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..account..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage(
-                    "..leaderboard..",
-                    "..activity..",
-                    "..mentor..",
-                    "..notification..",
-                    "..profile..",
-                    "..contributors.."
-                )
-                .because("Account is a foundational module - feature modules depend on it");
+                    .that()
+                    .resideInAPackage("..account..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAnyPackage(
+                            "..leaderboard..",
+                            "..activity..",
+                            "..mentor..",
+                            "..notification..",
+                            "..profile..",
+                            "..contributors..")
+                    .because("Account is a foundational module - feature modules depend on it");
             rule.check(classes);
         }
 
@@ -117,12 +116,12 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void accountDoesNotDependOnGitproviderSync() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..account..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("..integration.scm.sync..")
-                .because("Account handles user management, not data sync");
+                    .that()
+                    .resideInAPackage("..account..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAPackage("..integration.scm.sync..")
+                    .because("Account handles user management, not data sync");
             rule.check(classes);
         }
     }
@@ -143,20 +142,19 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
             // NOTE: `..core..` would also match `integration.core.*` after the integration restructure,
             // which is undesired — we want the framework-foundation `core` only. Anchor to the FQN root.
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("de.tum.cit.aet.hephaestus.core..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage(
-                    "..leaderboard..",
-                    "..activity..",
-                    "..mentor..",
-                    "..notification..",
-                    "..profile..",
-                    "..contributors..",
-                    "..workspace.."
-                )
-                .because("Core is a foundation layer - should not depend on feature modules");
+                    .that()
+                    .resideInAPackage("de.tum.cit.aet.hephaestus.core..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAnyPackage(
+                            "..leaderboard..",
+                            "..activity..",
+                            "..mentor..",
+                            "..notification..",
+                            "..profile..",
+                            "..contributors..",
+                            "..workspace..")
+                    .because("Core is a foundation layer - should not depend on feature modules");
             rule.check(classes);
         }
 
@@ -170,12 +168,12 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
             // Anchor to the FQN root to exclude `integration.core.*` (which is the integration core
             // and is allowed to know the scm aggregate during the migration).
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("de.tum.cit.aet.hephaestus.core..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("..integration.scm..")
-                .because("Core should be infrastructure-agnostic");
+                    .that()
+                    .resideInAPackage("de.tum.cit.aet.hephaestus.core..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAPackage("..integration.scm..")
+                    .because("Core should be infrastructure-agnostic");
             rule.check(classes);
         }
 
@@ -187,20 +185,19 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void sharedHasMinimalDependencies() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..shared..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage(
-                    "..leaderboard..",
-                    "..activity..",
-                    "..mentor..",
-                    "..notification..",
-                    "..profile..",
-                    "..contributors..",
-                    "..integration.scm.."
-                )
-                .because("Shared code should not depend on feature modules");
+                    .that()
+                    .resideInAPackage("..shared..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAnyPackage(
+                            "..leaderboard..",
+                            "..activity..",
+                            "..mentor..",
+                            "..notification..",
+                            "..profile..",
+                            "..contributors..",
+                            "..integration.scm..")
+                    .because("Shared code should not depend on feature modules");
             rule.check(classes);
         }
     }
@@ -219,17 +216,16 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void analyticsDoesNotDependOnFeatureInternals() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..analytics..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage(
-                    "..leaderboard..service..",
-                    "..activity..service..",
-                    "..mentor..service..",
-                    "..profile..service.."
-                )
-                .because("Analytics adapters are consumed by features, not vice versa");
+                    .that()
+                    .resideInAPackage("..analytics..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAnyPackage(
+                            "..leaderboard..service..",
+                            "..activity..service..",
+                            "..mentor..service..",
+                            "..profile..service..")
+                    .because("Analytics adapters are consumed by features, not vice versa");
             rule.check(classes);
         }
     }
@@ -247,14 +243,15 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void configDoesNotDependOnFeatureServiceImplementations() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..config..")
-                .and()
-                .haveSimpleNameEndingWith("Config")
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage("..leaderboard..repository..", "..activity..repository..", "..mentor..repository..")
-                .because("Config should wire up services, not access repositories directly");
+                    .that()
+                    .resideInAPackage("..config..")
+                    .and()
+                    .haveSimpleNameEndingWith("Config")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAnyPackage(
+                            "..leaderboard..repository..", "..activity..repository..", "..mentor..repository..")
+                    .because("Config should wire up services, not access repositories directly");
             rule.check(classes);
         }
     }
@@ -277,12 +274,12 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void workspaceAdaptersAreInternal() {
             ArchRule rule = noClasses()
-                .that()
-                .resideOutsideOfPackage("..workspace..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("..workspace.adapter..")
-                .because("Workspace adapters are internal - use workspace public API");
+                    .that()
+                    .resideOutsideOfPackage("..workspace..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAPackage("..workspace.adapter..")
+                    .because("Workspace adapters are internal - use workspace public API");
             rule.check(classes);
         }
 
@@ -295,12 +292,12 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void workspaceValidationHasMinimalDependencies() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..workspace.validation..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage("..leaderboard..", "..activity..", "..mentor..", "..integration.scm.sync..")
-                .because("Validation should be pure logic without external service dependencies");
+                    .that()
+                    .resideInAPackage("..workspace.validation..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAnyPackage("..leaderboard..", "..activity..", "..mentor..", "..integration.scm.sync..")
+                    .because("Validation should be pure logic without external service dependencies");
             rule.check(classes);
         }
 
@@ -313,15 +310,15 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void workspaceContextInternalsAreProtected() {
             ArchRule rule = classes()
-                .that()
-                .resideInAPackage("..workspace.context..")
-                .and()
-                .areNotMemberClasses()
-                .should()
-                .bePublic()
-                .orShould()
-                .bePackagePrivate()
-                .because("Workspace context classes should have proper visibility (inner classes excluded)");
+                    .that()
+                    .resideInAPackage("..workspace.context..")
+                    .and()
+                    .areNotMemberClasses()
+                    .should()
+                    .bePublic()
+                    .orShould()
+                    .bePackagePrivate()
+                    .because("Workspace context classes should have proper visibility (inner classes excluded)");
             rule.check(classes);
         }
     }

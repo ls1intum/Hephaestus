@@ -6,13 +6,12 @@ import java.util.List;
 import java.util.Objects;
 
 public record SourceReadinessCheck(
-    SourceKind sourceKind,
-    SourceContractVersion sourceContractVersion,
-    Instant checkedAt,
-    Instant temporalAnchor,
-    boolean meetsRequirements,
-    List<SourceReadinessReason> reasonCodes
-) {
+        SourceKind sourceKind,
+        SourceContractVersion sourceContractVersion,
+        Instant checkedAt,
+        Instant temporalAnchor,
+        boolean meetsRequirements,
+        List<SourceReadinessReason> reasonCodes) {
     public SourceReadinessCheck {
         Objects.requireNonNull(sourceKind, "sourceKind");
         Objects.requireNonNull(sourceContractVersion, "sourceContractVersion");

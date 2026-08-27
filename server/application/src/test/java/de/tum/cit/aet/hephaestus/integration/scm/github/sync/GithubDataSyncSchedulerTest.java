@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.sync;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -48,7 +47,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -106,68 +104,62 @@ class GithubDataSyncSchedulerTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         SyncSchedulerProperties properties = new SyncSchedulerProperties(
-            true,
-            7,
-            "0 0 3 * * *",
-            15,
-            new BackfillProperties(false, 50, 100, 60),
-            new FilterProperties(Set.of(), Set.of(), Set.of()),
-            new DiscussionsProperties(false),
-            new ProjectsProperties(false)
-        );
+                true,
+                7,
+                "0 0 3 * * *",
+                15,
+                new BackfillProperties(false, 50, 100, 60),
+                new FilterProperties(Set.of(), Set.of(), Set.of()),
+                new DiscussionsProperties(false),
+                new ProjectsProperties(false));
 
         scheduler = new GithubDataSyncScheduler(
-            syncTargetProvider,
-            syncContextProvider,
-            dataSyncService,
-            deletionSweepService,
-            subIssueSyncService,
-            issueTypeSyncService,
-            issueDependencySyncService,
-            projectSyncService,
-            organizationSyncService,
-            teamSyncService,
-            organizationRepository,
-            properties,
-            rateLimitTracker,
-            Runnable::run, // synchronous executor — deterministic assertions, no timing flakiness
-            connectionRepository,
-            syncJobService
-        );
+                syncTargetProvider,
+                syncContextProvider,
+                dataSyncService,
+                deletionSweepService,
+                subIssueSyncService,
+                issueTypeSyncService,
+                issueDependencySyncService,
+                projectSyncService,
+                organizationSyncService,
+                teamSyncService,
+                organizationRepository,
+                properties,
+                rateLimitTracker,
+                Runnable::run, // synchronous executor — deterministic assertions, no timing flakiness
+                connectionRepository,
+                syncJobService);
 
         lenient().when(syncTargetProvider.getSyncStatistics()).thenReturn(new SyncStatistics(1, 0, 0, 1, false));
         // Skip the sub-issue/dependency gate — irrelevant to job-recording behavior, avoids stubbing
         // subIssueSyncService/issueDependencySyncService for every test.
         lenient().when(rateLimitTracker.isCritical(WORKSPACE_ID)).thenReturn(true);
-        lenient()
-            .when(syncContextProvider.wrapWithContext(any()))
-            .thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(syncContextProvider.wrapWithContext(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     private static SyncSession session() {
         // Blank accountLogin -> the scheduler's syncTeams short-circuits without needing
         // teamSyncService/organizationRepository stubs.
         return new SyncSession(
-            WORKSPACE_ID,
-            "acme-workspace",
-            "Acme",
-            "",
-            100L,
-            null,
-            List.of(),
-            new SyncContext(WORKSPACE_ID, "acme-workspace", "Acme", 100L)
-        );
+                WORKSPACE_ID,
+                "acme-workspace",
+                "Acme",
+                "",
+                100L,
+                null,
+                List.of(),
+                new SyncContext(WORKSPACE_ID, "acme-workspace", "Acme", 100L));
     }
 
     private static Connection activeGithubConnection() {
         Workspace workspace = new Workspace();
         workspace.setId(WORKSPACE_ID);
         Connection connection = new Connection(
-            workspace,
-            IntegrationKind.GITHUB,
-            "100",
-            new ConnectionConfig.GitHubAppConfig(100L, "acme", null, Set.of())
-        );
+                workspace,
+                IntegrationKind.GITHUB,
+                "100",
+                new ConnectionConfig.GitHubAppConfig(100L, "acme", null, Set.of()));
         connection.setState(IntegrationState.ACTIVE);
         org.springframework.test.util.ReflectionTestUtils.setField(connection, "id", CONNECTION_ID);
         return connection;
@@ -178,35 +170,28 @@ class GithubDataSyncSchedulerTest extends BaseUnitTest {
 
         @Test
         void activeConnectionPresent_recordsReconciliationScheduledJobAndRunsBody() {
-            when(
-                connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                    WORKSPACE_ID,
-                    IntegrationKind.GITHUB,
-                    IntegrationState.ACTIVE
-                )
-            ).thenReturn(Optional.of(activeGithubConnection()));
+            when(connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                            WORKSPACE_ID, IntegrationKind.GITHUB, IntegrationState.ACTIVE))
+                    .thenReturn(Optional.of(activeGithubConnection()));
             when(syncTargetProvider.getSyncSessions(IntegrationKind.GITHUB)).thenReturn(List.of(session()));
             doAnswer(invocation -> {
-                Consumer<Object> body = invocation.getArgument(1);
-                body.accept(null); // no assertions in the runner body need a real SyncJobHandle
-                return null;
-            })
-                .when(syncJobService)
-                .run(any(), any());
+                        Consumer<Object> body = invocation.getArgument(1);
+                        body.accept(null); // no assertions in the runner body need a real SyncJobHandle
+                        return null;
+                    })
+                    .when(syncJobService)
+                    .run(any(), any());
 
             scheduler.syncDataCron();
 
-            verify(syncJobService).run(
-                argThat(
-                    (SyncJobRequest req) ->
-                        req.workspaceId() == WORKSPACE_ID &&
-                        req.connectionId() == CONNECTION_ID &&
-                        req.kind() == IntegrationKind.GITHUB &&
-                        req.type() == SyncJobType.RECONCILIATION &&
-                        req.trigger() == SyncJobTrigger.SCHEDULED
-                ),
-                any()
-            );
+            verify(syncJobService)
+                    .run(
+                            argThat((SyncJobRequest req) -> req.workspaceId() == WORKSPACE_ID
+                                    && req.connectionId() == CONNECTION_ID
+                                    && req.kind() == IntegrationKind.GITHUB
+                                    && req.type() == SyncJobType.RECONCILIATION
+                                    && req.trigger() == SyncJobTrigger.SCHEDULED),
+                            any());
             verify(issueTypeSyncService).syncIssueTypesForScope(WORKSPACE_ID);
         }
     }
@@ -216,25 +201,22 @@ class GithubDataSyncSchedulerTest extends BaseUnitTest {
 
         @Test
         void activeSyncJobAlreadyRunning_skipsScopeWithoutRunningBodyOrThrowing() {
-            when(
-                connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                    WORKSPACE_ID,
-                    IntegrationKind.GITHUB,
-                    IntegrationState.ACTIVE
-                )
-            ).thenReturn(Optional.of(activeGithubConnection()));
+            when(connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                            WORKSPACE_ID, IntegrationKind.GITHUB, IntegrationState.ACTIVE))
+                    .thenReturn(Optional.of(activeGithubConnection()));
             when(syncTargetProvider.getSyncSessions(IntegrationKind.GITHUB)).thenReturn(List.of(session()));
 
             SyncJob activeJob = new SyncJob(
-                new Workspace(),
-                activeGithubConnection(),
-                IntegrationKind.GITHUB,
-                SyncJobType.RECONCILIATION,
-                SyncJobTrigger.MANUAL,
-                null
-            );
+                    new Workspace(),
+                    activeGithubConnection(),
+                    IntegrationKind.GITHUB,
+                    SyncJobType.RECONCILIATION,
+                    SyncJobTrigger.MANUAL,
+                    null);
             activeJob.setId(77L);
-            doThrow(new SyncJobConflictException(activeJob)).when(syncJobService).run(any(), any());
+            doThrow(new SyncJobConflictException(activeJob))
+                    .when(syncJobService)
+                    .run(any(), any());
 
             assertThatCode(() -> scheduler.syncDataCron()).doesNotThrowAnyException();
 
@@ -247,13 +229,9 @@ class GithubDataSyncSchedulerTest extends BaseUnitTest {
 
         @Test
         void noActiveGithubConnection_runsUnrecordedFallback() {
-            when(
-                connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                    WORKSPACE_ID,
-                    IntegrationKind.GITHUB,
-                    IntegrationState.ACTIVE
-                )
-            ).thenReturn(Optional.empty());
+            when(connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                            WORKSPACE_ID, IntegrationKind.GITHUB, IntegrationState.ACTIVE))
+                    .thenReturn(Optional.empty());
             when(syncTargetProvider.getSyncSessions(IntegrationKind.GITHUB)).thenReturn(List.of(session()));
 
             scheduler.syncDataCron();
@@ -283,9 +261,8 @@ class GithubDataSyncSchedulerTest extends BaseUnitTest {
 
         @Test
         void shouldSweepForDeletionsWhenReconciliation() {
-            when(deletionSweepService.sweepScope(WORKSPACE_ID, handle)).thenReturn(
-                new GitHubDeletionSweepService.SweepOutcome(2, 1, false)
-            );
+            when(deletionSweepService.sweepScope(WORKSPACE_ID, handle))
+                    .thenReturn(new GitHubDeletionSweepService.SweepOutcome(2, 1, false));
 
             scheduler.syncWorkspaceNow(WORKSPACE_ID, handle, SyncJobType.RECONCILIATION);
 
@@ -305,9 +282,8 @@ class GithubDataSyncSchedulerTest extends BaseUnitTest {
 
         @Test
         void shouldReportWarningsWhenSweepCouldNotVerifyEveryRepository() {
-            when(deletionSweepService.sweepScope(WORKSPACE_ID, handle)).thenReturn(
-                new GitHubDeletionSweepService.SweepOutcome(0, 0, true)
-            );
+            when(deletionSweepService.sweepScope(WORKSPACE_ID, handle))
+                    .thenReturn(new GitHubDeletionSweepService.SweepOutcome(0, 0, true));
 
             scheduler.syncWorkspaceNow(WORKSPACE_ID, handle, SyncJobType.RECONCILIATION);
 

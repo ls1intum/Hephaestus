@@ -43,11 +43,10 @@ public class ConversationReviewSubmitter implements PendingSignalResubmitter {
     private final TransactionTemplate transactionTemplate;
 
     public ConversationReviewSubmitter(
-        ConversationCandidateSource candidateSource,
-        AgentJobService agentJobService,
-        SignalRecorder signalRecorder,
-        TransactionTemplate transactionTemplate
-    ) {
+            ConversationCandidateSource candidateSource,
+            AgentJobService agentJobService,
+            SignalRecorder signalRecorder,
+            TransactionTemplate transactionTemplate) {
         this.candidateSource = candidateSource;
         this.agentJobService = agentJobService;
         this.signalRecorder = signalRecorder;
@@ -67,14 +66,13 @@ public class ConversationReviewSubmitter implements PendingSignalResubmitter {
     public void resubmit(ArtifactSignal signal) {
         long workspaceId = signal.getWorkspace().getId();
         ConversationThreadCandidate candidate = candidateSource
-            .candidateById(workspaceId, signal.getArtifactId())
-            .orElse(null);
+                .candidateById(workspaceId, signal.getArtifactId())
+                .orElse(null);
         if (candidate == null) {
             log.debug(
-                "Conversation signal has no consented thread left to review: workspaceId={}, threadId={}",
-                workspaceId,
-                signal.getArtifactId()
-            );
+                    "Conversation signal has no consented thread left to review: workspaceId={}, threadId={}",
+                    workspaceId,
+                    signal.getArtifactId());
             settleRefused(signal.key(), SignalStateReason.ARTIFACT_GONE);
             return;
         }
@@ -98,12 +96,11 @@ public class ConversationReviewSubmitter implements PendingSignalResubmitter {
             }
             try {
                 SubmissionOutcome outcome = agentJobService.submitWithOutcome(
-                    candidate.workspaceId(),
-                    AgentJobType.CONVERSATION_REVIEW,
-                    requestFor(candidate, participant),
-                    // Null: the ledger row belongs to the occurrence, not to any one recipient.
-                    null
-                );
+                        candidate.workspaceId(),
+                        AgentJobType.CONVERSATION_REVIEW,
+                        requestFor(candidate, participant),
+                        // Null: the ledger row belongs to the occurrence, not to any one recipient.
+                        null);
                 if (outcome.job() != null) {
                     started++;
                     if (firstJobId == null) {
@@ -114,11 +111,10 @@ public class ConversationReviewSubmitter implements PendingSignalResubmitter {
                 }
             } catch (RuntimeException e) {
                 log.warn(
-                    "conversation.detect: enqueue failed for threadId={}, participant={}: {}",
-                    candidate.threadId(),
-                    participant,
-                    e.toString()
-                );
+                        "conversation.detect: enqueue failed for threadId={}, participant={}: {}",
+                        candidate.threadId(),
+                        participant,
+                        e.toString());
             }
         }
 
@@ -134,13 +130,12 @@ public class ConversationReviewSubmitter implements PendingSignalResubmitter {
 
     private ConversationReviewSubmissionRequest requestFor(ConversationThreadCandidate candidate, long participant) {
         return new ConversationReviewSubmissionRequest(
-            candidate.threadId(),
-            candidate.channelId(),
-            candidate.channelName(),
-            candidate.threadTs(),
-            participant,
-            candidate.lastTs()
-        );
+                candidate.threadId(),
+                candidate.channelId(),
+                candidate.channelName(),
+                candidate.threadTs(),
+                participant,
+                candidate.lastTs());
     }
 
     private void settleTriggered(SignalKey key, UUID jobId) {

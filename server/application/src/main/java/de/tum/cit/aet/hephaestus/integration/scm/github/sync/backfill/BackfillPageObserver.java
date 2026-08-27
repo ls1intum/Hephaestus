@@ -34,12 +34,7 @@ public interface BackfillPageObserver {
      * @param itemsSyncedInBatch items persisted so far in this batch, for the narrative only
      */
     void onPageComplete(
-        Long syncTargetId,
-        String repositoryName,
-        SyncPhase phase,
-        int lowestNumberSeen,
-        int itemsSyncedInBatch
-    );
+            Long syncTargetId, String repositoryName, SyncPhase phase, int lowestNumberSeen, int itemsSyncedInBatch);
 
     /** No-op observer for the scheduled cycle, which has no job handle to report to. */
     BackfillPageObserver NOOP = (syncTargetId, repositoryName, phase, lowestNumberSeen, itemsSyncedInBatch) -> {};

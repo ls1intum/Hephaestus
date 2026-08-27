@@ -40,34 +40,24 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHProjectV
  * @see <a href="https://docs.github.com/en/graphql/reference/unions#projectv2itemfieldvalue">GitHub GraphQL API - ProjectV2ItemFieldValue</a>
  */
 @JsonTypeInfo(
-    use = JsonTypeInfo.Id.NAME,
-    include = JsonTypeInfo.As.PROPERTY,
-    property = "__typename",
-    visible = true,
-    defaultImpl = GHProjectV2ItemFieldTextValue.class
-)
-@JsonSubTypes(
-    {
-        @JsonSubTypes.Type(value = GHProjectV2ItemFieldTextValue.class, name = "ProjectV2ItemFieldTextValue"),
-        @JsonSubTypes.Type(value = GHProjectV2ItemFieldNumberValue.class, name = "ProjectV2ItemFieldNumberValue"),
-        @JsonSubTypes.Type(value = GHProjectV2ItemFieldDateValue.class, name = "ProjectV2ItemFieldDateValue"),
-        @JsonSubTypes.Type(
+        use = JsonTypeInfo.Id.NAME,
+        include = JsonTypeInfo.As.PROPERTY,
+        property = "__typename",
+        visible = true,
+        defaultImpl = GHProjectV2ItemFieldTextValue.class)
+@JsonSubTypes({
+    @JsonSubTypes.Type(value = GHProjectV2ItemFieldTextValue.class, name = "ProjectV2ItemFieldTextValue"),
+    @JsonSubTypes.Type(value = GHProjectV2ItemFieldNumberValue.class, name = "ProjectV2ItemFieldNumberValue"),
+    @JsonSubTypes.Type(value = GHProjectV2ItemFieldDateValue.class, name = "ProjectV2ItemFieldDateValue"),
+    @JsonSubTypes.Type(
             value = GHProjectV2ItemFieldSingleSelectValue.class,
-            name = "ProjectV2ItemFieldSingleSelectValue"
-        ),
-        @JsonSubTypes.Type(value = GHProjectV2ItemFieldIterationValue.class, name = "ProjectV2ItemFieldIterationValue"),
-        @JsonSubTypes.Type(value = GHProjectV2ItemFieldLabelValue.class, name = "ProjectV2ItemFieldLabelValue"),
-        @JsonSubTypes.Type(value = GHProjectV2ItemFieldMilestoneValue.class, name = "ProjectV2ItemFieldMilestoneValue"),
-        @JsonSubTypes.Type(
-            value = GHProjectV2ItemFieldPullRequestValue.class,
-            name = "ProjectV2ItemFieldPullRequestValue"
-        ),
-        @JsonSubTypes.Type(
-            value = GHProjectV2ItemFieldRepositoryValue.class,
-            name = "ProjectV2ItemFieldRepositoryValue"
-        ),
-        @JsonSubTypes.Type(value = GHProjectV2ItemFieldReviewerValue.class, name = "ProjectV2ItemFieldReviewerValue"),
-        @JsonSubTypes.Type(value = GHProjectV2ItemFieldUserValue.class, name = "ProjectV2ItemFieldUserValue"),
-    }
-)
+            name = "ProjectV2ItemFieldSingleSelectValue"),
+    @JsonSubTypes.Type(value = GHProjectV2ItemFieldIterationValue.class, name = "ProjectV2ItemFieldIterationValue"),
+    @JsonSubTypes.Type(value = GHProjectV2ItemFieldLabelValue.class, name = "ProjectV2ItemFieldLabelValue"),
+    @JsonSubTypes.Type(value = GHProjectV2ItemFieldMilestoneValue.class, name = "ProjectV2ItemFieldMilestoneValue"),
+    @JsonSubTypes.Type(value = GHProjectV2ItemFieldPullRequestValue.class, name = "ProjectV2ItemFieldPullRequestValue"),
+    @JsonSubTypes.Type(value = GHProjectV2ItemFieldRepositoryValue.class, name = "ProjectV2ItemFieldRepositoryValue"),
+    @JsonSubTypes.Type(value = GHProjectV2ItemFieldReviewerValue.class, name = "ProjectV2ItemFieldReviewerValue"),
+    @JsonSubTypes.Type(value = GHProjectV2ItemFieldUserValue.class, name = "ProjectV2ItemFieldUserValue"),
+})
 public abstract class GitHubProjectV2ItemFieldValueMixin {}

@@ -46,16 +46,11 @@ public class OutlineMirrorWriter {
      *         race twice (skipped; the next reconcile converges)
      */
     public @Nullable OutlineDocumentSnapshot upsertDocument(
-        long workspaceId,
-        long connectionId,
-        String documentId,
-        Consumer<OutlineDocument> mutator
-    ) {
+            long workspaceId, long connectionId, String documentId, Consumer<OutlineDocument> mutator) {
         return retryOnce(
-            () -> transactions.upsertDocument(workspaceId, connectionId, documentId, mutator),
-            "document",
-            documentId
-        );
+                () -> transactions.upsertDocument(workspaceId, connectionId, documentId, mutator),
+                "document",
+                documentId);
     }
 
     /**
@@ -66,33 +61,23 @@ public class OutlineMirrorWriter {
      *         lost the optimistic-lock race twice
      */
     public @Nullable OutlineDocumentSnapshot updateDocument(
-        long workspaceId,
-        long connectionId,
-        String documentId,
-        Consumer<OutlineDocument> mutator
-    ) {
+            long workspaceId, long connectionId, String documentId, Consumer<OutlineDocument> mutator) {
         return retryOnce(
-            () -> transactions.updateDocument(workspaceId, connectionId, documentId, mutator),
-            "document",
-            documentId
-        );
+                () -> transactions.updateDocument(workspaceId, connectionId, documentId, mutator),
+                "document",
+                documentId);
     }
 
     /** Update a registered collection's bookkeeping. See {@link OutlineMirrorTransactions#updateCollection}. */
     public void updateCollection(
-        long workspaceId,
-        long connectionId,
-        String collectionId,
-        Consumer<OutlineCollection> mutator
-    ) {
+            long workspaceId, long connectionId, String collectionId, Consumer<OutlineCollection> mutator) {
         retryOnce(
-            () -> {
-                transactions.updateCollection(workspaceId, connectionId, collectionId, mutator);
-                return null;
-            },
-            "collection",
-            collectionId
-        );
+                () -> {
+                    transactions.updateCollection(workspaceId, connectionId, collectionId, mutator);
+                    return null;
+                },
+                "collection",
+                collectionId);
     }
 
     /** The staleness drop. See {@link OutlineMirrorTransactions#dropStaleTombstones}. */
@@ -115,10 +100,9 @@ public class OutlineMirrorWriter {
             return write.get();
         } catch (ObjectOptimisticLockingFailureException stillContended) {
             log.warn(
-                "outline.sync: {} {} lost the optimistic-lock retry too — skipping, the next reconcile fixes it",
-                kind,
-                identifier
-            );
+                    "outline.sync: {} {} lost the optimistic-lock retry too — skipping, the next reconcile fixes it",
+                    kind,
+                    identifier);
             return null;
         }
     }

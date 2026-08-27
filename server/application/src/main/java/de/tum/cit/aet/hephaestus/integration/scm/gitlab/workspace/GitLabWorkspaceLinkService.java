@@ -18,49 +18,41 @@ public class GitLabWorkspaceLinkService {
     private final OrganizationRepository organizationRepository;
 
     public GitLabWorkspaceLinkService(
-        WorkspaceRepository workspaceRepository,
-        OrganizationRepository organizationRepository
-    ) {
+            WorkspaceRepository workspaceRepository, OrganizationRepository organizationRepository) {
         this.workspaceRepository = workspaceRepository;
         this.organizationRepository = organizationRepository;
     }
 
     @Transactional
     public void link(Workspace workspace) {
-        if (
-            workspace.getOrganization() != null ||
-            workspace.getAccountLogin() == null ||
-            workspace.getAccountLogin().isBlank()
-        ) {
+        if (workspace.getOrganization() != null
+                || workspace.getAccountLogin() == null
+                || workspace.getAccountLogin().isBlank()) {
             return;
         }
         organizationRepository
-            .findByLoginIgnoreCaseAndProvider_Type(workspace.getAccountLogin(), IdentityProviderType.GITLAB)
-            .ifPresent(org -> {
-                if (
-                    workspaceRepository.existsByOrganizationId(org.getId()) &&
-                    !workspaceRepository.existsByIdAndOrganizationId(workspace.getId(), org.getId())
-                ) {
-                    log.warn(
-                        "Organization already linked to another workspace: orgId={}, workspaceId={}",
-                        org.getId(),
-                        workspace.getId()
-                    );
-                    return;
-                }
-                workspaceRepository
-                    .findById(workspace.getId())
-                    .filter(current -> current.getOrganization() == null)
-                    .ifPresent(current -> {
-                        current.setOrganization(org);
-                        workspaceRepository.save(current);
-                        workspace.setOrganization(org);
-                        log.info(
-                            "Linked organization to workspace: orgId={}, workspaceId={}",
-                            org.getId(),
-                            current.getId()
-                        );
-                    });
-            });
+                .findByLoginIgnoreCaseAndProvider_Type(workspace.getAccountLogin(), IdentityProviderType.GITLAB)
+                .ifPresent(org -> {
+                    if (workspaceRepository.existsByOrganizationId(org.getId())
+                            && !workspaceRepository.existsByIdAndOrganizationId(workspace.getId(), org.getId())) {
+                        log.warn(
+                                "Organization already linked to another workspace: orgId={}, workspaceId={}",
+                                org.getId(),
+                                workspace.getId());
+                        return;
+                    }
+                    workspaceRepository
+                            .findById(workspace.getId())
+                            .filter(current -> current.getOrganization() == null)
+                            .ifPresent(current -> {
+                                current.setOrganization(org);
+                                workspaceRepository.save(current);
+                                workspace.setOrganization(org);
+                                log.info(
+                                        "Linked organization to workspace: orgId={}, workspaceId={}",
+                                        org.getId(),
+                                        current.getId());
+                            });
+                });
     }
 }

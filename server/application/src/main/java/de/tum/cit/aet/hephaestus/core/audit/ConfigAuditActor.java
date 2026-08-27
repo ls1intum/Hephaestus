@@ -8,7 +8,10 @@ import org.jspecify.annotations.Nullable;
  * Who caused a configuration change, resolved from the security context rather than passed in by the
  * producer — so a producer can neither forget it nor spoof it.
  */
-record ConfigAuditActor(ConfigAuditActorKind kind, @Nullable Long accountId, @Nullable Long actingAccountId) {
+record ConfigAuditActor(
+        ConfigAuditActorKind kind,
+        @Nullable Long accountId,
+        @Nullable Long actingAccountId) {
     /**
      * The kind is decided by whether anyone is <em>authenticated</em>, not by whether their id parses.
      * Those are different questions, and conflating them is how an audit trail starts lying: derive the

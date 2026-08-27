@@ -25,18 +25,14 @@ public interface MilestoneRepository extends JpaRepository<Milestone, Long> {
 
     List<Milestone> findAllByRepository_Id(Long repositoryId);
 
-    @Query(
-        """
+    @Query("""
         SELECT m
         FROM Milestone m
         WHERE m.number = :number
         AND m.repository.id = :repositoryId
-        """
-    )
+        """)
     Optional<Milestone> findByNumberAndRepositoryId(
-        @Param("number") Integer number,
-        @Param("repositoryId") Long repositoryId
-    );
+            @Param("number") Integer number, @Param("repositoryId") Long repositoryId);
 
     /**
      * Atomically inserts a milestone if absent (race-condition safe).
@@ -49,8 +45,7 @@ public interface MilestoneRepository extends JpaRepository<Milestone, Long> {
      */
     @Modifying
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO milestone (
             native_id, provider_id, number, title, description, state, html_url, due_on,
             open_issues_count, closed_issues_count, repository_id, created_at, updated_at
@@ -60,22 +55,19 @@ public interface MilestoneRepository extends JpaRepository<Milestone, Long> {
             :openIssuesCount, :closedIssuesCount, :repositoryId, :createdAt, :updatedAt
         )
         ON CONFLICT (number, repository_id) DO NOTHING
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int insertIfAbsent(
-        @Param("nativeId") Long nativeId,
-        @Param("providerId") Long providerId,
-        @Param("number") int number,
-        @Param("title") String title,
-        @Param("description") @Nullable String description,
-        @Param("state") String state,
-        @Param("htmlUrl") String htmlUrl,
-        @Param("dueOn") @Nullable Instant dueOn,
-        @Param("openIssuesCount") int openIssuesCount,
-        @Param("closedIssuesCount") int closedIssuesCount,
-        @Param("repositoryId") Long repositoryId,
-        @Param("createdAt") @Nullable Instant createdAt,
-        @Param("updatedAt") @Nullable Instant updatedAt
-    );
+            @Param("nativeId") Long nativeId,
+            @Param("providerId") Long providerId,
+            @Param("number") int number,
+            @Param("title") String title,
+            @Param("description") @Nullable String description,
+            @Param("state") String state,
+            @Param("htmlUrl") String htmlUrl,
+            @Param("dueOn") @Nullable Instant dueOn,
+            @Param("openIssuesCount") int openIssuesCount,
+            @Param("closedIssuesCount") int closedIssuesCount,
+            @Param("repositoryId") Long repositoryId,
+            @Param("createdAt") @Nullable Instant createdAt,
+            @Param("updatedAt") @Nullable Instant updatedAt);
 }

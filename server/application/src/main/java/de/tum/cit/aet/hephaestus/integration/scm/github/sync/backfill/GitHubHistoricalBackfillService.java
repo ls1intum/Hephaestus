@@ -155,21 +155,20 @@ public class GitHubHistoricalBackfillService {
     private final Executor monitoringExecutor;
 
     public GitHubHistoricalBackfillService(
-        SyncTargetProvider syncTargetProvider,
-        BackfillStateProvider backfillStateProvider,
-        SyncSchedulerProperties syncSchedulerProperties,
-        GitHubSyncProperties syncProperties,
-        GitHubGraphQlClientProvider graphQlClientProvider,
-        GitHubIssueProcessor issueProcessor,
-        GitHubIssueCommentProcessor issueCommentProcessor,
-        GitHubPullRequestProcessor prProcessor,
-        GitHubPullRequestReviewProcessor reviewProcessor,
-        GitHubPullRequestReviewSyncService reviewSyncService,
-        GitHubPullRequestReviewCommentSyncService reviewCommentSyncService,
-        RepositoryRepository repositoryRepository,
-        TransactionTemplate transactionTemplate,
-        @Qualifier("monitoringExecutor") Executor monitoringExecutor
-    ) {
+            SyncTargetProvider syncTargetProvider,
+            BackfillStateProvider backfillStateProvider,
+            SyncSchedulerProperties syncSchedulerProperties,
+            GitHubSyncProperties syncProperties,
+            GitHubGraphQlClientProvider graphQlClientProvider,
+            GitHubIssueProcessor issueProcessor,
+            GitHubIssueCommentProcessor issueCommentProcessor,
+            GitHubPullRequestProcessor prProcessor,
+            GitHubPullRequestReviewProcessor reviewProcessor,
+            GitHubPullRequestReviewSyncService reviewSyncService,
+            GitHubPullRequestReviewCommentSyncService reviewCommentSyncService,
+            RepositoryRepository repositoryRepository,
+            TransactionTemplate transactionTemplate,
+            @Qualifier("monitoringExecutor") Executor monitoringExecutor) {
         this.syncTargetProvider = syncTargetProvider;
         this.backfillStateProvider = backfillStateProvider;
         this.syncSchedulerProperties = syncSchedulerProperties;
@@ -238,24 +237,21 @@ public class GitHubHistoricalBackfillService {
         AtomicInteger repositoriesProcessed = new AtomicInteger(0);
         AtomicInteger pendingRepositories = new AtomicInteger(0);
 
-        CompletableFuture<?>[] futures = sessions
-            .stream()
-            .map(session ->
-                CompletableFuture.runAsync(
-                    () -> backfillSession(session, backfillProps, repositoriesProcessed, pendingRepositories),
-                    monitoringExecutor
-                ).whenComplete((result, error) -> {
-                    if (error != null) {
-                        log.error(
-                            "Backfill session failed: scopeId={}, scopeSlug={}, error={}",
-                            session.scopeId(),
-                            session.slug(),
-                            error.getMessage()
-                        );
-                    }
-                })
-            )
-            .toArray(CompletableFuture[]::new);
+        CompletableFuture<?>[] futures = sessions.stream()
+                .map(session -> CompletableFuture.runAsync(
+                                () -> backfillSession(
+                                        session, backfillProps, repositoriesProcessed, pendingRepositories),
+                                monitoringExecutor)
+                        .whenComplete((result, error) -> {
+                            if (error != null) {
+                                log.error(
+                                        "Backfill session failed: scopeId={}, scopeSlug={}, error={}",
+                                        session.scopeId(),
+                                        session.slug(),
+                                        error.getMessage());
+                            }
+                        }))
+                .toArray(CompletableFuture[]::new);
 
         // Wait for all workspace backfills to complete
         // Use get() instead of join() because get() throws InterruptedException,
@@ -265,10 +261,9 @@ public class GitHubHistoricalBackfillService {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.warn(
-                "Backfill cycle interrupted (shutdown requested): processed={}, pending={}",
-                repositoriesProcessed.get(),
-                pendingRepositories.get()
-            );
+                    "Backfill cycle interrupted (shutdown requested): processed={}, pending={}",
+                    repositoriesProcessed.get(),
+                    pendingRepositories.get());
             return new BackfillCycleResult(repositoriesProcessed.get(), pendingRepositories.get(), "interrupted");
         } catch (ExecutionException e) {
             // Should not happen since each future handles its own exceptions via whenComplete()
@@ -291,7 +286,10 @@ public class GitHubHistoricalBackfillService {
      * @param pendingRepositories   number of repositories that need backfill but were skipped
      * @param skipReason            why pending repositories were skipped (null if none pending)
      */
-    public record BackfillCycleResult(int repositoriesProcessed, int pendingRepositories, @Nullable String skipReason) {
+    public record BackfillCycleResult(
+            int repositoriesProcessed,
+            int pendingRepositories,
+            @Nullable String skipReason) {
         /** Creates a result indicating no backfill work is needed. */
         public static BackfillCycleResult nothingToDo() {
             return new BackfillCycleResult(0, 0, null);
@@ -308,42 +306,38 @@ public class GitHubHistoricalBackfillService {
      * @param pendingRepositories   atomic counter for pending repositories
      */
     private void backfillSession(
-        SyncSession session,
-        SyncSchedulerProperties.BackfillProperties backfillProps,
-        AtomicInteger repositoriesProcessed,
-        AtomicInteger pendingRepositories
-    ) {
+            SyncSession session,
+            SyncSchedulerProperties.BackfillProperties backfillProps,
+            AtomicInteger repositoriesProcessed,
+            AtomicInteger pendingRepositories) {
         Long scopeId = session.scopeId();
         List<SyncTarget> targets = session.syncTargets();
 
         // Log incremental sync progress for visibility. Repos that haven't completed
         // their own incremental sync are skipped individually (per-repo gate below).
-        long pendingIncrementalSync = targets
-            .stream()
-            .filter(t -> t.lastIssuesSyncedAt() == null || t.lastPullRequestsSyncedAt() == null)
-            .count();
+        long pendingIncrementalSync = targets.stream()
+                .filter(t -> t.lastIssuesSyncedAt() == null || t.lastPullRequestsSyncedAt() == null)
+                .count();
 
         if (pendingIncrementalSync > 0) {
             long completed = targets.size() - pendingIncrementalSync;
             log.debug(
-                "Some repos pending incremental sync (backfill proceeds for completed repos): " +
-                    "scopeId={}, scopeSlug={}, incrementalComplete={}, incrementalPending={}",
-                scopeId,
-                session.slug(),
-                completed,
-                pendingIncrementalSync
-            );
+                    "Some repos pending incremental sync (backfill proceeds for completed repos): "
+                            + "scopeId={}, scopeSlug={}, incrementalComplete={}, incrementalPending={}",
+                    scopeId,
+                    session.slug(),
+                    completed,
+                    pendingIncrementalSync);
         }
 
         int remainingPoints = graphQlClientProvider.getRateLimitRemaining(scopeId);
         if (remainingPoints < backfillProps.rateLimitThreshold()) {
             log.debug(
-                "Skipping backfill for scope: reason=rateLimitLow, scopeId={}, remaining={}, threshold={}, resetsAt={}",
-                scopeId,
-                remainingPoints,
-                backfillProps.rateLimitThreshold(),
-                graphQlClientProvider.getRateLimitResetAt(scopeId)
-            );
+                    "Skipping backfill for scope: reason=rateLimitLow, scopeId={}, remaining={}, threshold={}, resetsAt={}",
+                    scopeId,
+                    remainingPoints,
+                    backfillProps.rateLimitThreshold(),
+                    graphQlClientProvider.getRateLimitResetAt(scopeId));
             for (SyncTarget target : targets) {
                 if (!target.isBackfillComplete()) {
                     pendingRepositories.incrementAndGet();
@@ -361,19 +355,17 @@ public class GitHubHistoricalBackfillService {
             // Backfill should only run for repos that have their baseline data.
             if (target.lastIssuesSyncedAt() == null || target.lastPullRequestsSyncedAt() == null) {
                 log.trace(
-                    "Skipping backfill: reason=incrementalSyncPending, repo={}",
-                    sanitizeForLog(target.repositoryNameWithOwner())
-                );
+                        "Skipping backfill: reason=incrementalSyncPending, repo={}",
+                        sanitizeForLog(target.repositoryNameWithOwner()));
                 pendingRepositories.incrementAndGet();
                 continue;
             }
 
             if (isInCooldown(target.id())) {
                 log.trace(
-                    "Skipping backfill: reason=inCooldown, repo={}, cooldownExpiresAt={}",
-                    sanitizeForLog(target.repositoryNameWithOwner()),
-                    repositoryCooldowns.get(target.id())
-                );
+                        "Skipping backfill: reason=inCooldown, repo={}, cooldownExpiresAt={}",
+                        sanitizeForLog(target.repositoryNameWithOwner()),
+                        repositoryCooldowns.get(target.id()));
                 pendingRepositories.incrementAndGet();
                 continue;
             }
@@ -381,11 +373,10 @@ public class GitHubHistoricalBackfillService {
             remainingPoints = graphQlClientProvider.getRateLimitRemaining(scopeId);
             if (remainingPoints < backfillProps.rateLimitThreshold()) {
                 log.info(
-                    "Stopping backfill for scope: reason=rateLimitLow, scopeId={}, remaining={}, processed={}",
-                    scopeId,
-                    remainingPoints,
-                    repositoriesProcessed.get()
-                );
+                        "Stopping backfill for scope: reason=rateLimitLow, scopeId={}, remaining={}, processed={}",
+                        scopeId,
+                        remainingPoints,
+                        repositoriesProcessed.get());
                 pendingRepositories.incrementAndGet();
                 break;
             }
@@ -419,9 +410,8 @@ public class GitHubHistoricalBackfillService {
         Long syncTargetId = target.id();
         Long scopeId = target.scopeId();
 
-        Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(
-            target.repositoryNameWithOwner()
-        );
+        Optional<RepositoryOwnerAndName> parsedName =
+                GitHubRepositoryNameParser.parse(target.repositoryNameWithOwner());
         if (parsedName.isEmpty()) {
             log.warn("Skipping backfill: reason=invalidRepoName, repo={}", safeRepoName);
             return false;
@@ -444,23 +434,21 @@ public class GitHubHistoricalBackfillService {
 
         if (isFirstBatch) {
             log.info(
-                "Starting fresh backfill: repo={}, pullRequestPageSize={}, timeout={}s",
-                safeRepoName,
-                syncProperties.backfillPrPageSize(),
-                syncProperties.backfillGraphqlTimeout().toSeconds()
-            );
+                    "Starting fresh backfill: repo={}, pullRequestPageSize={}, timeout={}s",
+                    safeRepoName,
+                    syncProperties.backfillPrPageSize(),
+                    syncProperties.backfillGraphqlTimeout().toSeconds());
         } else {
             log.info(
-                "Resuming backfill: repo={}, issueCheckpoint=#{}, issueHighWaterMark=#{}, " +
-                    "pullRequestCheckpoint=#{}, pullRequestHighWaterMark=#{}, pullRequestPageSize={}, timeout={}s",
-                safeRepoName,
-                target.issueBackfillCheckpoint(),
-                target.issueBackfillHighWaterMark(),
-                target.pullRequestBackfillCheckpoint(),
-                target.pullRequestBackfillHighWaterMark(),
-                syncProperties.backfillPrPageSize(),
-                syncProperties.backfillGraphqlTimeout().toSeconds()
-            );
+                    "Resuming backfill: repo={}, issueCheckpoint=#{}, issueHighWaterMark=#{}, "
+                            + "pullRequestCheckpoint=#{}, pullRequestHighWaterMark=#{}, pullRequestPageSize={}, timeout={}s",
+                    safeRepoName,
+                    target.issueBackfillCheckpoint(),
+                    target.issueBackfillHighWaterMark(),
+                    target.pullRequestBackfillCheckpoint(),
+                    target.pullRequestBackfillHighWaterMark(),
+                    syncProperties.backfillPrPageSize(),
+                    syncProperties.backfillGraphqlTimeout().toSeconds());
         }
 
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
@@ -472,42 +460,36 @@ public class GitHubHistoricalBackfillService {
 
         // Backfill issues using CREATED_AT DESC (newest first) - pass repositoryId, not the entity
         BackfillBatchResult issueResult = backfillIssues(
-            client,
-            timeout,
-            ownerAndName,
-            scopeId,
-            repositoryId,
-            target.repositoryNameWithOwner(),
-            syncTargetId,
-            target.issueSyncCursor(),
-            batchSize,
-            observer
-        );
+                client,
+                timeout,
+                ownerAndName,
+                scopeId,
+                repositoryId,
+                target.repositoryNameWithOwner(),
+                syncTargetId,
+                target.issueSyncCursor(),
+                batchSize,
+                observer);
         totalIssuesSynced = issueResult.itemsSynced();
 
         // Persist issue backfill progress after each batch, for admin visibility.
         if (issueResult.itemsSynced() > 0) {
             Integer issueCheckpoint = issueResult.minNumber() > 0 ? issueResult.minNumber() : null;
             Integer issueHighWaterMark =
-                isIssueFirstBatch && issueResult.maxNumber() > 0 ? issueResult.maxNumber() : null;
+                    isIssueFirstBatch && issueResult.maxNumber() > 0 ? issueResult.maxNumber() : null;
 
             if (!issueResult.hasMore()) {
                 issueCheckpoint = 0;
             }
 
             backfillStateProvider.updateIssueBackfillState(
-                syncTargetId,
-                issueHighWaterMark,
-                issueCheckpoint,
-                Instant.now()
-            );
+                    syncTargetId, issueHighWaterMark, issueCheckpoint, Instant.now());
 
             if (!issueResult.hasMore()) {
                 log.info(
-                    "Issue backfill complete: repo={}, issuesSynced={}, starting pull requests",
-                    safeRepoName,
-                    totalIssuesSynced
-                );
+                        "Issue backfill complete: repo={}, issuesSynced={}, starting pull requests",
+                        safeRepoName,
+                        totalIssuesSynced);
             }
         } else if (!issueResult.hasMore() && isIssueFirstBatch) {
             // No issues found at all - mark issue backfill as complete with 0
@@ -517,17 +499,16 @@ public class GitHubHistoricalBackfillService {
 
         // Backfill PRs using CREATED_AT DESC (newest first) - pass repositoryId, not the entity
         BackfillBatchResult prResult = backfillPullRequests(
-            client,
-            timeout,
-            ownerAndName,
-            scopeId,
-            repositoryId,
-            target.repositoryNameWithOwner(),
-            syncTargetId,
-            target.pullRequestSyncCursor(),
-            batchSize,
-            observer
-        );
+                client,
+                timeout,
+                ownerAndName,
+                scopeId,
+                repositoryId,
+                target.repositoryNameWithOwner(),
+                syncTargetId,
+                target.pullRequestSyncCursor(),
+                batchSize,
+                observer);
         totalPRsSynced = prResult.itemsSynced();
 
         // Persist pull request backfill progress after each batch, for admin visibility.
@@ -540,18 +521,11 @@ public class GitHubHistoricalBackfillService {
             }
 
             backfillStateProvider.updatePullRequestBackfillState(
-                syncTargetId,
-                prHighWaterMark,
-                prCheckpoint,
-                Instant.now()
-            );
+                    syncTargetId, prHighWaterMark, prCheckpoint, Instant.now());
 
             if (!prResult.hasMore()) {
                 log.info(
-                    "Pull request backfill complete: repo={}, pullRequestsSynced={}",
-                    safeRepoName,
-                    totalPRsSynced
-                );
+                        "Pull request backfill complete: repo={}, pullRequestsSynced={}", safeRepoName, totalPRsSynced);
             }
         } else if (!prResult.hasMore() && isPullRequestFirstBatch) {
             // No PRs found at all - mark PR backfill as complete with 0
@@ -564,29 +538,25 @@ public class GitHubHistoricalBackfillService {
 
         if (issuesComplete && pullRequestsComplete) {
             log.info(
-                "Backfill complete: repo={}, totalIssues={}, totalPullRequests={}",
-                safeRepoName,
-                totalIssuesSynced,
-                totalPRsSynced
-            );
+                    "Backfill complete: repo={}, totalIssues={}, totalPullRequests={}",
+                    safeRepoName,
+                    totalIssuesSynced,
+                    totalPRsSynced);
         } else {
             // Log progress (sync goes newest to oldest by CREATED_AT DESC)
-            String issueProgress =
-                issueResult.itemsSynced() > 0
+            String issueProgress = issueResult.itemsSynced() > 0
                     ? String.format("issues=#%d..#%d", issueResult.minNumber(), issueResult.maxNumber())
                     : "issues=0";
-            String prProgress =
-                prResult.itemsSynced() > 0
+            String prProgress = prResult.itemsSynced() > 0
                     ? String.format("pullRequests=#%d..#%d", prResult.minNumber(), prResult.maxNumber())
                     : "pullRequests=0";
             log.info(
-                "Backfill batch: repo={}, {}, {}, issuesComplete={}, pullRequestsComplete={}",
-                safeRepoName,
-                issueProgress,
-                prProgress,
-                issuesComplete,
-                pullRequestsComplete
-            );
+                    "Backfill batch: repo={}, {}, {}, issuesComplete={}, pullRequestsComplete={}",
+                    safeRepoName,
+                    issueProgress,
+                    prProgress,
+                    issuesComplete,
+                    pullRequestsComplete);
         }
 
         return totalIssuesSynced > 0 || totalPRsSynced > 0;
@@ -611,17 +581,16 @@ public class GitHubHistoricalBackfillService {
      * @return result containing items synced and whether more pages exist
      */
     private BackfillBatchResult backfillIssues(
-        HttpGraphQlClient client,
-        Duration timeout,
-        RepositoryOwnerAndName ownerAndName,
-        Long scopeId,
-        Long repositoryId,
-        String repoNameForLog,
-        Long syncTargetId,
-        @Nullable String startCursor,
-        int maxPages,
-        BackfillPageObserver observer
-    ) {
+            HttpGraphQlClient client,
+            Duration timeout,
+            RepositoryOwnerAndName ownerAndName,
+            Long scopeId,
+            Long repositoryId,
+            String repoNameForLog,
+            Long syncTargetId,
+            @Nullable String startCursor,
+            int maxPages,
+            BackfillPageObserver observer) {
         String cursor = startCursor;
         int totalIssuesSynced = 0;
         int totalCommentsSynced = 0;
@@ -639,20 +608,18 @@ public class GitHubHistoricalBackfillService {
                 // just the HTTP exchange: WebClient's ExchangeFilterFunction retries only cover the
                 // exchange, and PrematureCloseException occurs during body consumption.
                 final String currentCursor = cursor;
-                ClientGraphQlResponse response = Mono.defer(() ->
-                    client
-                        .documentName(ISSUES_HISTORICAL_QUERY)
-                        .variable("owner", ownerAndName.owner())
-                        .variable("name", ownerAndName.name())
-                        .variable(
-                            "first",
-                            adaptPageSize(DEFAULT_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
-                        )
-                        .variable("after", currentCursor)
-                        .execute()
-                )
-                    .retryWhen(createTransportRetrySpec("issues backfill", repoNameForLog, pageCount))
-                    .block(timeout);
+                ClientGraphQlResponse response = Mono.defer(() -> client.documentName(ISSUES_HISTORICAL_QUERY)
+                                .variable("owner", ownerAndName.owner())
+                                .variable("name", ownerAndName.name())
+                                .variable(
+                                        "first",
+                                        adaptPageSize(
+                                                DEFAULT_PAGE_SIZE,
+                                                graphQlClientProvider.getRateLimitRemaining(scopeId)))
+                                .variable("after", currentCursor)
+                                .execute())
+                        .retryWhen(createTransportRetrySpec("issues backfill", repoNameForLog, pageCount))
+                        .block(timeout);
 
                 if (response == null) {
                     log.warn("Null GraphQL response for issues backfill: repo={}", sanitizeForLog(repoNameForLog));
@@ -661,36 +628,34 @@ public class GitHubHistoricalBackfillService {
 
                 // Check for transient errors (timeouts, rate limits, server errors)
                 // These come back as HTTP 200 with error in the response body
-                GitHubGraphQlErrorUtils.TransientError transientError = GitHubGraphQlErrorUtils.detectTransientError(
-                    response
-                );
+                GitHubGraphQlErrorUtils.TransientError transientError =
+                        GitHubGraphQlErrorUtils.detectTransientError(response);
                 if (transientError != null) {
                     log.warn(
-                        "Detected transient GraphQL error for issues backfill: repo={}, type={}, message={}",
-                        sanitizeForLog(repoNameForLog),
-                        transientError.type(),
-                        transientError.message()
-                    );
+                            "Detected transient GraphQL error for issues backfill: repo={}, type={}, message={}",
+                            sanitizeForLog(repoNameForLog),
+                            transientError.type(),
+                            transientError.message());
                     // Throw to trigger cooldown mechanism
                     throw new BackfillTransientException(
-                        "Transient error during issues backfill: " + transientError.message(),
-                        null
-                    );
+                            "Transient error during issues backfill: " + transientError.message(), null);
                 }
 
                 if (!response.isValid()) {
                     log.warn(
-                        "Invalid GraphQL response for issues backfill: repo={}, errors={}",
-                        sanitizeForLog(repoNameForLog),
-                        response.getErrors()
-                    );
+                            "Invalid GraphQL response for issues backfill: repo={}, errors={}",
+                            sanitizeForLog(repoNameForLog),
+                            response.getErrors());
                     break;
                 }
 
                 graphQlClientProvider.trackRateLimit(scopeId, response);
 
-                GHIssueConnection connection = response.field("repository.issues").toEntity(GHIssueConnection.class);
-                if (connection == null || connection.getNodes() == null || connection.getNodes().isEmpty()) {
+                GHIssueConnection connection =
+                        response.field("repository.issues").toEntity(GHIssueConnection.class);
+                if (connection == null
+                        || connection.getNodes() == null
+                        || connection.getNodes().isEmpty()) {
                     hasMore = false;
                     break;
                 }
@@ -707,15 +672,15 @@ public class GitHubHistoricalBackfillService {
                 // indicates more data exists and we have a valid cursor, force-continue.
                 // Safety: if GitHub truly has no more data, the next page returns empty
                 // nodes and the existing isEmpty() check above breaks out cleanly.
-                if (
-                    !hasMore && nextCursor != null && reportedTotalCount > 0 && totalIssuesSynced < reportedTotalCount
-                ) {
+                if (!hasMore
+                        && nextCursor != null
+                        && reportedTotalCount > 0
+                        && totalIssuesSynced < reportedTotalCount) {
                     log.info(
-                        "Forcing pagination past hasNextPage=false (GitHub GraphQL ~500-node bug): fetched={}, totalCount={}, repo={}, entity=issues",
-                        totalIssuesSynced,
-                        reportedTotalCount,
-                        sanitizeForLog(repoNameForLog)
-                    );
+                            "Forcing pagination past hasNextPage=false (GitHub GraphQL ~500-node bug): fetched={}, totalCount={}, repo={}, entity=issues",
+                            totalIssuesSynced,
+                            reportedTotalCount,
+                            sanitizeForLog(repoNameForLog));
                     hasMore = true;
                 }
 
@@ -723,13 +688,8 @@ public class GitHubHistoricalBackfillService {
                 // This ensures that if processing succeeds but cursor save fails (or vice versa),
                 // both are rolled back together, preventing duplicate processing on restart.
                 // Pass repositoryId, not the entity, to avoid LazyInitializationException.
-                IssuePageResult pageResult = processIssuesPage(
-                    connection,
-                    scopeId,
-                    repositoryId,
-                    syncTargetId,
-                    hasMore ? nextCursor : null
-                );
+                IssuePageResult pageResult =
+                        processIssuesPage(connection, scopeId, repositoryId, syncTargetId, hasMore ? nextCursor : null);
                 totalIssuesSynced += pageResult.issueCount();
                 totalCommentsSynced += pageResult.commentCount();
                 // Track min/max across pages (sync goes newest to oldest by CREATED_AT DESC)
@@ -761,16 +721,13 @@ public class GitHubHistoricalBackfillService {
                 // Rethrow to trigger cooldown mechanism in runBackfillCycle.
                 // Progress is preserved: cursor was saved in the last successful transaction.
                 log.warn(
-                    "Error during issues backfill, will retry after cooldown: repo={}, page={}, synced={}, error={}",
-                    sanitizeForLog(repoNameForLog),
-                    pageCount,
-                    totalIssuesSynced,
-                    e.getMessage()
-                );
+                        "Error during issues backfill, will retry after cooldown: repo={}, page={}, synced={}, error={}",
+                        sanitizeForLog(repoNameForLog),
+                        pageCount,
+                        totalIssuesSynced,
+                        e.getMessage());
                 throw new BackfillTransientException(
-                    "Issues backfill failed for " + repoNameForLog + " on page " + pageCount,
-                    e
-                );
+                        "Issues backfill failed for " + repoNameForLog + " on page " + pageCount, e);
             }
         }
 
@@ -789,13 +746,12 @@ public class GitHubHistoricalBackfillService {
 
         if (totalIssuesSynced > 0) {
             log.debug(
-                "Backfill issues batch complete: repo={}, issues={}, comments={}, numberRange=[#{}-#{}]",
-                sanitizeForLog(repoNameForLog),
-                totalIssuesSynced,
-                totalCommentsSynced,
-                batchMinNumber,
-                batchMaxNumber
-            );
+                    "Backfill issues batch complete: repo={}, issues={}, comments={}, numberRange=[#{}-#{}]",
+                    sanitizeForLog(repoNameForLog),
+                    totalIssuesSynced,
+                    totalCommentsSynced,
+                    batchMinNumber,
+                    batchMaxNumber);
         }
 
         return new BackfillBatchResult(totalIssuesSynced, totalCommentsSynced, hasMore, batchMinNumber, batchMaxNumber);
@@ -820,17 +776,16 @@ public class GitHubHistoricalBackfillService {
      * @return result containing items synced and whether more pages exist
      */
     private BackfillBatchResult backfillPullRequests(
-        HttpGraphQlClient client,
-        Duration timeout,
-        RepositoryOwnerAndName ownerAndName,
-        Long scopeId,
-        Long repositoryId,
-        String repoNameForLog,
-        Long syncTargetId,
-        @Nullable String startCursor,
-        int maxPages,
-        BackfillPageObserver observer
-    ) {
+            HttpGraphQlClient client,
+            Duration timeout,
+            RepositoryOwnerAndName ownerAndName,
+            Long scopeId,
+            Long repositoryId,
+            String repoNameForLog,
+            Long syncTargetId,
+            @Nullable String startCursor,
+            int maxPages,
+            BackfillPageObserver observer) {
         String cursor = startCursor;
         int totalPRsSynced = 0;
         int totalReviewsSynced = 0;
@@ -850,60 +805,52 @@ public class GitHubHistoricalBackfillService {
                 // Use Mono.defer() to wrap the entire execute() call so retries cover body streaming.
                 final String currentCursor = cursor;
                 final int prPageSize = resolveBackfillPrPageSize(scopeId, syncTargetId);
-                ClientGraphQlResponse response = Mono.defer(() ->
-                    client
-                        .documentName(PRS_HISTORICAL_QUERY)
-                        .variable("owner", ownerAndName.owner())
-                        .variable("name", ownerAndName.name())
-                        .variable("first", prPageSize)
-                        .variable("after", currentCursor)
-                        .execute()
-                )
-                    .retryWhen(createTransportRetrySpec("pull requests backfill", repoNameForLog, pageCount))
-                    .block(timeout);
+                ClientGraphQlResponse response = Mono.defer(() -> client.documentName(PRS_HISTORICAL_QUERY)
+                                .variable("owner", ownerAndName.owner())
+                                .variable("name", ownerAndName.name())
+                                .variable("first", prPageSize)
+                                .variable("after", currentCursor)
+                                .execute())
+                        .retryWhen(createTransportRetrySpec("pull requests backfill", repoNameForLog, pageCount))
+                        .block(timeout);
 
                 if (response == null) {
                     log.warn(
-                        "Null GraphQL response for pull requests backfill: repo={}",
-                        sanitizeForLog(repoNameForLog)
-                    );
+                            "Null GraphQL response for pull requests backfill: repo={}",
+                            sanitizeForLog(repoNameForLog));
                     break;
                 }
 
                 // Check for transient errors (timeouts, rate limits, server errors)
                 // These come back as HTTP 200 with error in the response body
-                GitHubGraphQlErrorUtils.TransientError transientError = GitHubGraphQlErrorUtils.detectTransientError(
-                    response
-                );
+                GitHubGraphQlErrorUtils.TransientError transientError =
+                        GitHubGraphQlErrorUtils.detectTransientError(response);
                 if (transientError != null) {
                     log.warn(
-                        "Detected transient GraphQL error for pull requests backfill: repo={}, type={}, message={}",
-                        sanitizeForLog(repoNameForLog),
-                        transientError.type(),
-                        transientError.message()
-                    );
+                            "Detected transient GraphQL error for pull requests backfill: repo={}, type={}, message={}",
+                            sanitizeForLog(repoNameForLog),
+                            transientError.type(),
+                            transientError.message());
                     // Throw to trigger cooldown mechanism
                     throw new BackfillTransientException(
-                        "Transient error during pull requests backfill: " + transientError.message(),
-                        null
-                    );
+                            "Transient error during pull requests backfill: " + transientError.message(), null);
                 }
 
                 if (!response.isValid()) {
                     log.warn(
-                        "Invalid GraphQL response for pull requests backfill: repo={}, errors={}",
-                        sanitizeForLog(repoNameForLog),
-                        response.getErrors()
-                    );
+                            "Invalid GraphQL response for pull requests backfill: repo={}, errors={}",
+                            sanitizeForLog(repoNameForLog),
+                            response.getErrors());
                     break;
                 }
 
                 graphQlClientProvider.trackRateLimit(scopeId, response);
 
-                GHPullRequestConnection connection = response
-                    .field("repository.pullRequests")
-                    .toEntity(GHPullRequestConnection.class);
-                if (connection == null || connection.getNodes() == null || connection.getNodes().isEmpty()) {
+                GHPullRequestConnection connection =
+                        response.field("repository.pullRequests").toEntity(GHPullRequestConnection.class);
+                if (connection == null
+                        || connection.getNodes() == null
+                        || connection.getNodes().isEmpty()) {
                     hasMore = false;
                     break;
                 }
@@ -922,25 +869,20 @@ public class GitHubHistoricalBackfillService {
                 // nodes and the existing isEmpty() check above breaks out cleanly.
                 if (!hasMore && nextCursor != null && reportedTotalCount > 0 && totalPRsSynced < reportedTotalCount) {
                     log.info(
-                        "Forcing pagination past hasNextPage=false (GitHub GraphQL ~500-node bug): fetched={}, totalCount={}, repo={}, entity=pullRequests",
-                        totalPRsSynced,
-                        reportedTotalCount,
-                        sanitizeForLog(repoNameForLog)
-                    );
+                            "Forcing pagination past hasNextPage=false (GitHub GraphQL ~500-node bug): fetched={}, totalCount={}, repo={}, entity=pullRequests",
+                            totalPRsSynced,
+                            reportedTotalCount,
+                            sanitizeForLog(repoNameForLog));
                     hasMore = true;
                 }
 
-                // Process PRs AND their embedded reviews/comments, persist cursor in the SAME transaction for atomicity.
+                // Process PRs AND their embedded reviews/comments, persist cursor in the SAME transaction for
+                // atomicity.
                 // This ensures that if processing succeeds but cursor save fails (or vice versa),
                 // both are rolled back together, preventing duplicate processing on restart.
                 // Pass repositoryId, not the entity, to avoid LazyInitializationException.
                 PullRequestPageResult pageResult = processPullRequestsPage(
-                    connection,
-                    scopeId,
-                    repositoryId,
-                    syncTargetId,
-                    hasMore ? nextCursor : null
-                );
+                        connection, scopeId, repositoryId, syncTargetId, hasMore ? nextCursor : null);
                 totalPRsSynced += pageResult.prCount();
                 totalReviewsSynced += pageResult.reviewCount();
                 totalReviewCommentsSynced += pageResult.reviewCommentCount();
@@ -956,13 +898,12 @@ public class GitHubHistoricalBackfillService {
 
                 // See backfillIssues: report every page, not once per batch.
                 notifyPage(
-                    observer,
-                    syncTargetId,
-                    repoNameForLog,
-                    SyncPhase.PULL_REQUESTS,
-                    batchMinNumber,
-                    totalPRsSynced
-                );
+                        observer,
+                        syncTargetId,
+                        repoNameForLog,
+                        SyncPhase.PULL_REQUESTS,
+                        batchMinNumber,
+                        totalPRsSynced);
 
                 cursor = nextCursor;
 
@@ -980,17 +921,14 @@ public class GitHubHistoricalBackfillService {
                 // Rethrow to trigger cooldown mechanism in runBackfillCycle.
                 // Progress is preserved: cursor was saved in the last successful transaction.
                 log.warn(
-                    "Error during pull requests backfill, will retry after cooldown: repo={}, page={}, synced={}, failures={}, error={}",
-                    sanitizeForLog(repoNameForLog),
-                    pageCount,
-                    totalPRsSynced,
-                    consecutiveFailures.getOrDefault(syncTargetId, 0),
-                    e.getMessage()
-                );
+                        "Error during pull requests backfill, will retry after cooldown: repo={}, page={}, synced={}, failures={}, error={}",
+                        sanitizeForLog(repoNameForLog),
+                        pageCount,
+                        totalPRsSynced,
+                        consecutiveFailures.getOrDefault(syncTargetId, 0),
+                        e.getMessage());
                 throw new BackfillTransientException(
-                    "pull requests backfill failed for " + repoNameForLog + " on page " + pageCount,
-                    e
-                );
+                        "pull requests backfill failed for " + repoNameForLog + " on page " + pageCount, e);
             }
         }
 
@@ -1004,45 +942,40 @@ public class GitHubHistoricalBackfillService {
         // This happens OUTSIDE the transaction to avoid long-running transactions during API calls
         if (!allPrsNeedingReviewPagination.isEmpty()) {
             log.debug(
-                "Fetching additional reviews for PRs with pagination: repo={}, prCount={}",
-                sanitizeForLog(repoNameForLog),
-                allPrsNeedingReviewPagination.size()
-            );
+                    "Fetching additional reviews for PRs with pagination: repo={}, prCount={}",
+                    sanitizeForLog(repoNameForLog),
+                    allPrsNeedingReviewPagination.size());
             int processedPrs = 0;
             for (PullRequestWithReviewCursor prWithCursor : allPrsNeedingReviewPagination) {
                 // Check for interrupt (e.g., during application shutdown)
                 if (Thread.interrupted()) {
                     log.info(
-                        "Review pagination interrupted (shutdown requested): repo={}, processed={}/{}, preserving interrupt status",
-                        sanitizeForLog(repoNameForLog),
-                        processedPrs,
-                        allPrsNeedingReviewPagination.size()
-                    );
+                            "Review pagination interrupted (shutdown requested): repo={}, processed={}/{}, preserving interrupt status",
+                            sanitizeForLog(repoNameForLog),
+                            processedPrs,
+                            allPrsNeedingReviewPagination.size());
                     Thread.currentThread().interrupt();
                     break;
                 }
                 processedPrs++;
                 try {
                     int additionalReviews = reviewSyncService.syncRemainingReviews(
-                        scopeId,
-                        prWithCursor.pullRequest(),
-                        prWithCursor.reviewCursor(),
-                        prWithCursor.inlineCount()
-                    );
+                            scopeId,
+                            prWithCursor.pullRequest(),
+                            prWithCursor.reviewCursor(),
+                            prWithCursor.inlineCount());
                     totalReviewsSynced += additionalReviews;
                     if (additionalReviews > 0) {
                         log.debug(
-                            "Fetched additional reviews: prNumber={}, additionalReviews={}",
-                            prWithCursor.pullRequest().getNumber(),
-                            additionalReviews
-                        );
+                                "Fetched additional reviews: prNumber={}, additionalReviews={}",
+                                prWithCursor.pullRequest().getNumber(),
+                                additionalReviews);
                     }
                 } catch (Exception e) {
                     log.warn(
-                        "Failed to fetch additional reviews for PR #{}: {}",
-                        prWithCursor.pullRequest().getNumber(),
-                        e.getMessage()
-                    );
+                            "Failed to fetch additional reviews for PR #{}: {}",
+                            prWithCursor.pullRequest().getNumber(),
+                            e.getMessage());
                 }
             }
         }
@@ -1055,25 +988,23 @@ public class GitHubHistoricalBackfillService {
 
         if (totalPRsSynced > 0) {
             log.debug(
-                "Backfill PRs batch complete: repo={}, prs={}, reviews={}, reviewComments={}, comments={}, numberRange=[#{}..#{}], prsWithReviewPagination={}",
-                sanitizeForLog(repoNameForLog),
-                totalPRsSynced,
-                totalReviewsSynced,
-                totalReviewCommentsSynced,
-                totalCommentsSynced,
-                batchMinNumber,
-                batchMaxNumber,
-                allPrsNeedingReviewPagination.size()
-            );
+                    "Backfill PRs batch complete: repo={}, prs={}, reviews={}, reviewComments={}, comments={}, numberRange=[#{}..#{}], prsWithReviewPagination={}",
+                    sanitizeForLog(repoNameForLog),
+                    totalPRsSynced,
+                    totalReviewsSynced,
+                    totalReviewCommentsSynced,
+                    totalCommentsSynced,
+                    batchMinNumber,
+                    batchMaxNumber,
+                    allPrsNeedingReviewPagination.size());
         }
 
         return new BackfillBatchResult(
-            totalPRsSynced,
-            totalReviewsSynced + totalReviewCommentsSynced + totalCommentsSynced,
-            hasMore,
-            batchMinNumber,
-            batchMaxNumber
-        );
+                totalPRsSynced,
+                totalReviewsSynced + totalReviewCommentsSynced + totalCommentsSynced,
+                hasMore,
+                batchMinNumber,
+                batchMaxNumber);
     }
 
     /**
@@ -1095,20 +1026,18 @@ public class GitHubHistoricalBackfillService {
      * @return result containing counts of issues and comments processed
      */
     private IssuePageResult processIssuesPage(
-        GHIssueConnection connection,
-        Long scopeId,
-        Long repositoryId,
-        Long syncTargetId,
-        @Nullable String nextCursor
-    ) {
+            GHIssueConnection connection,
+            Long scopeId,
+            Long repositoryId,
+            Long syncTargetId,
+            @Nullable String nextCursor) {
         IssuePageResult result = transactionTemplate.execute(status -> {
             // Fetch repository INSIDE the transaction with organization eagerly loaded.
             // This ensures the entity is attached and lazy associations can be accessed.
             Repository repository = repositoryRepository
-                .findByIdWithOrganization(repositoryId)
-                .orElseThrow(() ->
-                    new IllegalStateException("Repository not found during backfill processing: id=" + repositoryId)
-                );
+                    .findByIdWithOrganization(repositoryId)
+                    .orElseThrow(() -> new IllegalStateException(
+                            "Repository not found during backfill processing: id=" + repositoryId));
 
             ProcessingContext context = ProcessingContext.forSync(scopeId, repository);
             int issueCount = 0;
@@ -1177,20 +1106,18 @@ public class GitHubHistoricalBackfillService {
      * @return result containing counts of PRs, reviews, and review comments processed
      */
     private PullRequestPageResult processPullRequestsPage(
-        GHPullRequestConnection connection,
-        Long scopeId,
-        Long repositoryId,
-        Long syncTargetId,
-        @Nullable String nextCursor
-    ) {
+            GHPullRequestConnection connection,
+            Long scopeId,
+            Long repositoryId,
+            Long syncTargetId,
+            @Nullable String nextCursor) {
         PullRequestPageResult result = transactionTemplate.execute(status -> {
             // Fetch repository INSIDE the transaction with organization eagerly loaded.
             // This ensures the entity is attached and lazy associations can be accessed.
             Repository repository = repositoryRepository
-                .findByIdWithOrganization(repositoryId)
-                .orElseThrow(() ->
-                    new IllegalStateException("Repository not found during backfill processing: id=" + repositoryId)
-                );
+                    .findByIdWithOrganization(repositoryId)
+                    .orElseThrow(() -> new IllegalStateException(
+                            "Repository not found during backfill processing: id=" + repositoryId));
 
             ProcessingContext context = ProcessingContext.forSync(scopeId, repository);
             int prCount = 0;
@@ -1237,13 +1164,10 @@ public class GitHubHistoricalBackfillService {
 
                         // Track PRs that need additional review pagination (with cursor for efficient continuation)
                         if (embeddedReviews.needsPagination()) {
-                            prsNeedingReviewPagination.add(
-                                new PullRequestWithReviewCursor(
+                            prsNeedingReviewPagination.add(new PullRequestWithReviewCursor(
                                     processed,
                                     Objects.requireNonNull(embeddedReviews.endCursor()),
-                                    embeddedReviews.reviews().size()
-                                )
-                            );
+                                    embeddedReviews.reviews().size()));
                         }
 
                         // Process embedded review threads and their comments
@@ -1267,14 +1191,13 @@ public class GitHubHistoricalBackfillService {
             }
 
             return new PullRequestPageResult(
-                prCount,
-                reviewCount,
-                reviewCommentCount,
-                commentCount,
-                prsNeedingReviewPagination,
-                minNumber,
-                maxNumber
-            );
+                    prCount,
+                    reviewCount,
+                    reviewCommentCount,
+                    commentCount,
+                    prsNeedingReviewPagination,
+                    minNumber,
+                    maxNumber);
         });
         return result != null ? result : new PullRequestPageResult(0, 0, 0, 0, new ArrayList<>(), 0, 0);
     }
@@ -1343,13 +1266,12 @@ public class GitHubHistoricalBackfillService {
     // Package-private for direct testing: the page loops it is called from need a live GraphQL
     // conversation to reach, and these two rules are worth pinning without one.
     static void notifyPage(
-        BackfillPageObserver observer,
-        Long syncTargetId,
-        String repositoryName,
-        SyncPhase phase,
-        int lowestNumberSeen,
-        int itemsSyncedInBatch
-    ) {
+            BackfillPageObserver observer,
+            Long syncTargetId,
+            String repositoryName,
+            SyncPhase phase,
+            int lowestNumberSeen,
+            int itemsSyncedInBatch) {
         if (lowestNumberSeen == Integer.MAX_VALUE) {
             return;
         }
@@ -1370,12 +1292,7 @@ public class GitHubHistoricalBackfillService {
      * @param maxNumber         highest issue/PR number in this batch (for progress visibility)
      */
     private record BackfillBatchResult(
-        int itemsSynced,
-        int nestedItemsSynced,
-        boolean hasMore,
-        int minNumber,
-        int maxNumber
-    ) {}
+            int itemsSynced, int nestedItemsSynced, boolean hasMore, int minNumber, int maxNumber) {}
 
     /**
      * Result of processing a page of issues with embedded comments.
@@ -1403,14 +1320,13 @@ public class GitHubHistoricalBackfillService {
      * @param maxNumber                    highest PR number in this page
      */
     private record PullRequestPageResult(
-        int prCount,
-        int reviewCount,
-        int reviewCommentCount,
-        int commentCount,
-        List<PullRequestWithReviewCursor> prsNeedingReviewPagination,
-        int minNumber,
-        int maxNumber
-    ) {}
+            int prCount,
+            int reviewCount,
+            int reviewCommentCount,
+            int commentCount,
+            List<PullRequestWithReviewCursor> prsNeedingReviewPagination,
+            int minNumber,
+            int maxNumber) {}
 
     /**
      * Represents the backfill progress for a repository.
@@ -1420,30 +1336,28 @@ public class GitHubHistoricalBackfillService {
      *                       (0 if not initialized, or if the repository has no issues/PRs)
      */
     public record BackfillProgress(
-        String repositoryName,
-        boolean isInitialized,
-        boolean isComplete,
-        @Nullable Instant lastRunAt,
-        @Nullable String issueCursor,
-        @Nullable String prCursor,
-        int itemsRemaining,
-        int itemsTotal
-    ) {
+            String repositoryName,
+            boolean isInitialized,
+            boolean isComplete,
+            @Nullable Instant lastRunAt,
+            @Nullable String issueCursor,
+            @Nullable String prCursor,
+            int itemsRemaining,
+            int itemsTotal) {
         public static BackfillProgress fromSyncTarget(SyncTarget target) {
             int issueHighWaterMark =
-                target.issueBackfillHighWaterMark() != null ? target.issueBackfillHighWaterMark() : 0;
+                    target.issueBackfillHighWaterMark() != null ? target.issueBackfillHighWaterMark() : 0;
             int prHighWaterMark =
-                target.pullRequestBackfillHighWaterMark() != null ? target.pullRequestBackfillHighWaterMark() : 0;
+                    target.pullRequestBackfillHighWaterMark() != null ? target.pullRequestBackfillHighWaterMark() : 0;
             return new BackfillProgress(
-                target.repositoryNameWithOwner(),
-                target.isBackfillInitialized(),
-                target.isBackfillComplete(),
-                target.backfillLastRunAt(),
-                target.issueSyncCursor(),
-                target.pullRequestSyncCursor(),
-                target.getBackfillRemaining(),
-                issueHighWaterMark + prHighWaterMark
-            );
+                    target.repositoryNameWithOwner(),
+                    target.isBackfillInitialized(),
+                    target.isBackfillComplete(),
+                    target.backfillLastRunAt(),
+                    target.issueSyncCursor(),
+                    target.pullRequestSyncCursor(),
+                    target.getBackfillRemaining(),
+                    issueHighWaterMark + prHighWaterMark);
         }
 
         public String summary() {
@@ -1522,19 +1436,17 @@ public class GitHubHistoricalBackfillService {
         if (failures >= MAX_CONSECUTIVE_FAILURES) {
             cooldownDuration = EXTENDED_COOLDOWN;
             log.warn(
-                "Repository entering extended cooldown after {} consecutive failures: repo={}, cooldownMinutes={}",
-                failures,
-                safeRepoName,
-                cooldownDuration.toMinutes()
-            );
+                    "Repository entering extended cooldown after {} consecutive failures: repo={}, cooldownMinutes={}",
+                    failures,
+                    safeRepoName,
+                    cooldownDuration.toMinutes());
         } else {
             cooldownDuration = COOLDOWN_AFTER_5XX_ERROR;
             log.info(
-                "Repository entering cooldown after transient error: repo={}, failures={}, cooldownMinutes={}",
-                safeRepoName,
-                failures,
-                cooldownDuration.toMinutes()
-            );
+                    "Repository entering cooldown after transient error: repo={}, failures={}, cooldownMinutes={}",
+                    safeRepoName,
+                    failures,
+                    cooldownDuration.toMinutes());
         }
 
         repositoryCooldowns.put(syncTargetId, Instant.now().plus(cooldownDuration));
@@ -1563,10 +1475,9 @@ public class GitHubHistoricalBackfillService {
         if (e instanceof BackfillTransientException) {
             markForCooldown(target.id(), safeRepoName);
             log.info(
-                "Backfill failed with transient error, repository in cooldown: repo={}, error={}",
-                safeRepoName,
-                e.getMessage()
-            );
+                    "Backfill failed with transient error, repository in cooldown: repo={}, error={}",
+                    safeRepoName,
+                    e.getMessage());
             return;
         }
 
@@ -1604,12 +1515,10 @@ public class GitHubHistoricalBackfillService {
 
             // Check for WebClientResponseException with 5xx status
             if (className.equals("WebClientResponseException") && message != null) {
-                if (
-                    message.contains("502") ||
-                    message.contains("503") ||
-                    message.contains("504") ||
-                    message.contains("500")
-                ) {
+                if (message.contains("502")
+                        || message.contains("503")
+                        || message.contains("504")
+                        || message.contains("500")) {
                     isTransientError = true;
                     break;
                 }
@@ -1618,16 +1527,14 @@ public class GitHubHistoricalBackfillService {
             // Check message content for 5xx indicators, transport errors, or timeouts
             if (message != null) {
                 String lowerMessage = message.toLowerCase();
-                if (
-                    message.contains("502") ||
-                    message.contains("503") ||
-                    message.contains("504") ||
-                    message.contains("500 Internal") ||
-                    lowerMessage.contains("connection prematurely closed") ||
-                    lowerMessage.contains("connection reset") ||
-                    lowerMessage.contains("transport error") ||
-                    lowerMessage.contains("timeout on blocking read")
-                ) {
+                if (message.contains("502")
+                        || message.contains("503")
+                        || message.contains("504")
+                        || message.contains("500 Internal")
+                        || lowerMessage.contains("connection prematurely closed")
+                        || lowerMessage.contains("connection reset")
+                        || lowerMessage.contains("transport error")
+                        || lowerMessage.contains("timeout on blocking read")) {
                     isTransientError = true;
                     break;
                 }
@@ -1640,21 +1547,19 @@ public class GitHubHistoricalBackfillService {
             // Transient infrastructure or transport error - apply cooldown
             markForCooldown(target.id(), safeRepoName);
             log.warn(
-                "Backfill failed with transient error, repository in cooldown: repo={}, errorType={}, error={}",
-                safeRepoName,
-                e.getClass().getSimpleName(),
-                e.getMessage()
-            );
+                    "Backfill failed with transient error, repository in cooldown: repo={}, errorType={}, error={}",
+                    safeRepoName,
+                    e.getClass().getSimpleName(),
+                    e.getMessage());
         } else {
             // Other error types - log but don't apply cooldown
             // (could be auth errors, not found, etc. which won't resolve with time)
             log.error(
-                "Backfill failed with non-transient error: repo={}, errorType={}, error={}",
-                safeRepoName,
-                e.getClass().getSimpleName(),
-                e.getMessage(),
-                e
-            );
+                    "Backfill failed with non-transient error: repo={}, errorType={}, error={}",
+                    safeRepoName,
+                    e.getClass().getSimpleName(),
+                    e.getMessage(),
+                    e);
         }
     }
 
@@ -1674,19 +1579,16 @@ public class GitHubHistoricalBackfillService {
      */
     private Retry createTransportRetrySpec(String operation, String repoName, int pageNumber) {
         return Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-            .maxBackoff(TRANSPORT_MAX_BACKOFF)
-            .jitter(JITTER_FACTOR)
-            .filter(ScmTransportErrors::isTransportError)
-            .doBeforeRetry(signal ->
-                log.warn(
-                    "Retrying {} after transport error: repo={}, page={}, attempt={}, error={}",
-                    operation,
-                    sanitizeForLog(repoName),
-                    pageNumber,
-                    signal.totalRetries() + 1,
-                    signal.failure().getMessage()
-                )
-            );
+                .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                .jitter(JITTER_FACTOR)
+                .filter(ScmTransportErrors::isTransportError)
+                .doBeforeRetry(signal -> log.warn(
+                        "Retrying {} after transport error: repo={}, page={}, attempt={}, error={}",
+                        operation,
+                        sanitizeForLog(repoName),
+                        pageNumber,
+                        signal.totalRetries() + 1,
+                        signal.failure().getMessage()));
     }
 
     /**
@@ -1698,9 +1600,7 @@ public class GitHubHistoricalBackfillService {
      */
     private int resolveBackfillPrPageSize(Long scopeId, Long syncTargetId) {
         int rateLimitAdjusted = adaptPageSize(
-            syncProperties.backfillPrPageSize(),
-            graphQlClientProvider.getRateLimitRemaining(scopeId)
-        );
+                syncProperties.backfillPrPageSize(), graphQlClientProvider.getRateLimitRemaining(scopeId));
         int failures = consecutiveFailures.getOrDefault(syncTargetId, 0);
 
         if (failures >= MAX_CONSECUTIVE_FAILURES) {

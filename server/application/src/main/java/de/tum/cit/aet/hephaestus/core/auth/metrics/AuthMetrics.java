@@ -99,35 +99,31 @@ public class AuthMetrics {
         this.loginSuccess = login(registry, LoginResult.SUCCESS);
         this.loginFailure = login(registry, LoginResult.FAILURE);
         this.tokenRefresh = Timer.builder("auth.token.refresh")
-            .description("Wall-clock latency of the access-token rotation in AuthSessionService.refresh.")
-            .publishPercentileHistogram()
-            .register(registry);
+                .description("Wall-clock latency of the access-token rotation in AuthSessionService.refresh.")
+                .publishPercentileHistogram()
+                .register(registry);
         this.revocationCheckFailed = Counter.builder(REVOCATION_CHECK_FAILED_METRIC)
-            .description(
-                "Fail-closed revocation lookups in RevocationAwareJwtDecoder (DB unreachable → 401). " +
-                    "A spike means a DB outage is mass-rejecting otherwise-valid cookie-JWTs."
-            )
-            .register(registry);
+                .description("Fail-closed revocation lookups in RevocationAwareJwtDecoder (DB unreachable → 401). "
+                        + "A spike means a DB outage is mass-rejecting otherwise-valid cookie-JWTs.")
+                .register(registry);
         this.rateLimitBackendError = Counter.builder(RATELIMIT_BACKEND_ERROR_METRIC)
-            .description(
-                "Rate-limit backend failures in AuthRateLimitFilter (bucket store unreachable → fail-open). " +
-                    "A spike means the limiter is degraded and auth endpoints are temporarily uncapped."
-            )
-            .register(registry);
+                .description(
+                        "Rate-limit backend failures in AuthRateLimitFilter (bucket store unreachable → fail-open). "
+                                + "A spike means the limiter is degraded and auth endpoints are temporarily uncapped.")
+                .register(registry);
         this.auditWriteFailed = Counter.builder(AUDIT_WRITE_FAILED_METRIC)
-            .description(
-                "Auth-audit persist failures in AuthEventWriter (the sequence value was already consumed → " +
-                    "a permanent gap in auth_event.id). Swallowed so audit never breaks the request, but a " +
-                    "nonzero rate means the tamper-evident trail is silently losing events."
-            )
-            .register(registry);
+                .description(
+                        "Auth-audit persist failures in AuthEventWriter (the sequence value was already consumed → "
+                                + "a permanent gap in auth_event.id). Swallowed so audit never breaks the request, but a "
+                                + "nonzero rate means the tamper-evident trail is silently losing events.")
+                .register(registry);
     }
 
     private static Counter login(MeterRegistry registry, LoginResult result) {
         return Counter.builder(LOGIN_METRIC)
-            .description("Interactive OAuth logins, tagged by terminal result.")
-            .tag("result", result.tag())
-            .register(registry);
+                .description("Interactive OAuth logins, tagged by terminal result.")
+                .tag("result", result.tag())
+                .register(registry);
     }
 
     public void recordLogin(LoginResult result) {
@@ -145,10 +141,10 @@ public class AuthMetrics {
      */
     public void recordRateLimitBlocked(String bucket) {
         Counter.builder(RATELIMIT_BLOCKED_METRIC)
-            .description("Auth requests rejected with HTTP 429 by AuthRateLimitFilter, tagged by bucket namespace.")
-            .tag("bucket", bucket)
-            .register(registry)
-            .increment();
+                .description("Auth requests rejected with HTTP 429 by AuthRateLimitFilter, tagged by bucket namespace.")
+                .tag("bucket", bucket)
+                .register(registry)
+                .increment();
     }
 
     public Timer.Sample startRefreshTimer() {
@@ -166,10 +162,10 @@ public class AuthMetrics {
      */
     public void recordRefreshResult(RefreshResult result) {
         Counter.builder(REFRESH_RESULT_METRIC)
-            .description("Token-refresh attempts in AuthSessionService.refresh, tagged by terminal result.")
-            .tag("result", result.tag())
-            .register(registry)
-            .increment();
+                .description("Token-refresh attempts in AuthSessionService.refresh, tagged by terminal result.")
+                .tag("result", result.tag())
+                .register(registry)
+                .increment();
     }
 
     /**

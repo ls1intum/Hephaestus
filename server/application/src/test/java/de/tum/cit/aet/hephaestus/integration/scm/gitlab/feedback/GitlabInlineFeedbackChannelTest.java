@@ -47,15 +47,14 @@ class GitlabInlineFeedbackChannelTest extends BaseUnitTest {
 
     /** The committed mutation document whose payload each stubbed response path belongs to. */
     private static final Map<String, String> MUTATION_DOCUMENTS = Map.of(
-        "createDiffNote",
-        "CreateDiffNote",
-        "createNote",
-        "CreateMergeRequestNote",
-        "updateNote",
-        "UpdateNote",
-        "destroyNote",
-        "DestroyNote"
-    );
+            "createDiffNote",
+            "CreateDiffNote",
+            "createNote",
+            "CreateMergeRequestNote",
+            "updateNote",
+            "UpdateNote",
+            "destroyNote",
+            "DestroyNote");
 
     @Mock
     private GitLabGraphQlClientProvider gitLabProvider;
@@ -84,9 +83,8 @@ class GitlabInlineFeedbackChannelTest extends BaseUnitTest {
     void rateLimitCriticalShortCircuits() {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(true);
         InlineResult result = channel.postInlineFeedback(
-            gitlabTarget(),
-            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix", MARKER, "ck-1"))
-        );
+                gitlabTarget(),
+                List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix", MARKER, "ck-1")));
         assertThat(result.posted()).isZero();
         assertThat(result.failed()).isEqualTo(1);
     }
@@ -94,14 +92,12 @@ class GitlabInlineFeedbackChannelTest extends BaseUnitTest {
     @Test
     void missingDiffRefsSkips() {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
-        when(mrResolver.resolve(1L, "group/project", 42)).thenReturn(
-            new MrInfo("gid://gitlab/MR/42", null, null, null)
-        );
+        when(mrResolver.resolve(1L, "group/project", 42))
+                .thenReturn(new MrInfo("gid://gitlab/MR/42", null, null, null));
 
         InlineResult result = channel.postInlineFeedback(
-            gitlabTarget(),
-            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix", MARKER, "ck-1"))
-        );
+                gitlabTarget(),
+                List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix", MARKER, "ck-1")));
         assertThat(result.posted()).isZero();
         assertThat(result.failed()).isEqualTo(1);
     }
@@ -114,22 +110,21 @@ class GitlabInlineFeedbackChannelTest extends BaseUnitTest {
         ArgumentCaptor<String> bodyCaptor = stubCreateDiffNoteSuccess("gid://Note/NEW", "gid://Disc/NEW");
 
         InlineResult result = channel.postInlineFeedback(
-            gitlabTarget(),
-            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix-this", MARKER, "ck-new"))
-        );
+                gitlabTarget(),
+                List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix-this", MARKER, "ck-new")));
 
         assertThat(result.posted()).isEqualTo(1);
         assertThat(result.failed()).isZero();
-        assertThat(result.signals())
-            .singleElement()
-            .satisfies(s -> {
-                assertThat(s.recurrenceKey()).isEqualTo("ck-new");
-                assertThat(s.disposition()).isEqualTo(Disposition.POSTED);
-                assertThat(s.externalRef()).isEqualTo("gid://Note/NEW");
-                assertThat(s.threadExternalRef()).isEqualTo("gid://Disc/NEW");
-            });
+        assertThat(result.signals()).singleElement().satisfies(s -> {
+            assertThat(s.recurrenceKey()).isEqualTo("ck-new");
+            assertThat(s.disposition()).isEqualTo(Disposition.POSTED);
+            assertThat(s.externalRef()).isEqualTo("gid://Note/NEW");
+            assertThat(s.threadExternalRef()).isEqualTo("gid://Disc/NEW");
+        });
         // The correlation key must be embedded in the posted body so the next run can match it.
-        assertThat(bodyCaptor.getValue()).contains("hephaestus-diff-note-ck=ck-new").contains(MARKER);
+        assertThat(bodyCaptor.getValue())
+                .contains("hephaestus-diff-note-ck=ck-new")
+                .contains(MARKER);
     }
 
     @Test
@@ -138,17 +133,15 @@ class GitlabInlineFeedbackChannelTest extends BaseUnitTest {
         stubDiscussionsReturning(List.of());
         stubCreateDiffNoteSuccess("gid://Note/NEW", "gid://Disc/NEW");
         doNothing()
-            .doThrow(new OutboundEgressSuppressedException("gitlab.post-inline-finding"))
-            .when(egressGuard)
-            .requireDeliveryAllowed("gitlab.post-inline-finding");
+                .doThrow(new OutboundEgressSuppressedException("gitlab.post-inline-finding"))
+                .when(egressGuard)
+                .requireDeliveryAllowed("gitlab.post-inline-finding");
 
         InlineResult result = channel.postInlineFeedback(
-            gitlabTarget(),
-            List.of(
-                new InlineFeedback(new DiffAnchor("src/One.java", 10, null), "first", MARKER, "ck-1"),
-                new InlineFeedback(new DiffAnchor("src/Two.java", 20, null), "second", MARKER, "ck-2")
-            )
-        );
+                gitlabTarget(),
+                List.of(
+                        new InlineFeedback(new DiffAnchor("src/One.java", 10, null), "first", MARKER, "ck-1"),
+                        new InlineFeedback(new DiffAnchor("src/Two.java", 20, null), "second", MARKER, "ck-2")));
 
         assertThat(result.suppressed()).isTrue();
         assertThat(result.posted()).isEqualTo(1);
@@ -167,24 +160,21 @@ class GitlabInlineFeedbackChannelTest extends BaseUnitTest {
         stubField(failedResponse, "createDiffNote.errors", List.of("validation failed"));
         when(diffSpec.execute()).thenReturn(Mono.just(failedResponse));
         doNothing()
-            .doThrow(new OutboundEgressSuppressedException("gitlab.post-inline-finding"))
-            .when(egressGuard)
-            .requireDeliveryAllowed("gitlab.post-inline-finding");
+                .doThrow(new OutboundEgressSuppressedException("gitlab.post-inline-finding"))
+                .when(egressGuard)
+                .requireDeliveryAllowed("gitlab.post-inline-finding");
 
         InlineResult result = channel.postInlineFeedback(
-            gitlabTarget(),
-            List.of(
-                new InlineFeedback(new DiffAnchor("src/One.java", 10, null), "first", MARKER, "ck-failed"),
-                new InlineFeedback(new DiffAnchor("src/Two.java", 20, null), "second", MARKER, "ck-suppressed")
-            )
-        );
+                gitlabTarget(),
+                List.of(
+                        new InlineFeedback(new DiffAnchor("src/One.java", 10, null), "first", MARKER, "ck-failed"),
+                        new InlineFeedback(
+                                new DiffAnchor("src/Two.java", 20, null), "second", MARKER, "ck-suppressed")));
 
-        assertThat(result.signals())
-            .singleElement()
-            .satisfies(signal -> {
-                assertThat(signal.recurrenceKey()).isEqualTo("ck-failed");
-                assertThat(signal.disposition()).isEqualTo(Disposition.FAILED);
-            });
+        assertThat(result.signals()).singleElement().satisfies(signal -> {
+            assertThat(signal.recurrenceKey()).isEqualTo("ck-failed");
+            assertThat(signal.disposition()).isEqualTo(Disposition.FAILED);
+        });
         assertThat(result.suppressedRecurrenceKeys()).containsExactly("ck-suppressed");
     }
 
@@ -193,13 +183,12 @@ class GitlabInlineFeedbackChannelTest extends BaseUnitTest {
         stubResolvedMr();
         stubDiscussionsReturning(List.of());
         doThrow(new OutboundEgressSuppressedException("gitlab.post-inline-finding"))
-            .when(egressGuard)
-            .requireDeliveryAllowed("gitlab.post-inline-finding");
+                .when(egressGuard)
+                .requireDeliveryAllowed("gitlab.post-inline-finding");
 
         InlineResult result = channel.postInlineFeedback(
-            gitlabTarget(),
-            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix", MARKER, "ck-1"))
-        );
+                gitlabTarget(),
+                List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix", MARKER, "ck-1")));
 
         assertThat(result.suppressed()).isTrue();
         assertThat(result.posted()).isZero();
@@ -211,11 +200,8 @@ class GitlabInlineFeedbackChannelTest extends BaseUnitTest {
     @Test
     void editsInPlaceWhenKeyMatchesPriorBotThread() {
         stubResolvedMr();
-        Map<String, Object> botNote = note(
-            "gid://Note/OLD",
-            "stale finding " + MARKER + "\n" + ckTag("ck-stable"),
-            false
-        );
+        Map<String, Object> botNote =
+                note("gid://Note/OLD", "stale finding " + MARKER + "\n" + ckTag("ck-stable"), false);
         Map<String, Object> disc = discussion("gid://Disc/OLD", List.of(botNote));
         stubDiscussionsReturning(List.of(disc));
 
@@ -226,19 +212,17 @@ class GitlabInlineFeedbackChannelTest extends BaseUnitTest {
         when(updateSpec.execute()).thenReturn(Mono.just(updateResponse));
 
         InlineResult result = channel.postInlineFeedback(
-            gitlabTarget(),
-            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fresh text", MARKER, "ck-stable"))
-        );
+                gitlabTarget(),
+                List.of(new InlineFeedback(
+                        new DiffAnchor("src/Foo.java", 10, null), "fresh text", MARKER, "ck-stable")));
 
         verify(updateSpec).variable("id", "gid://Note/OLD");
         assertThat(result.posted()).isEqualTo(1);
-        assertThat(result.signals())
-            .singleElement()
-            .satisfies(s -> {
-                assertThat(s.disposition()).isEqualTo(Disposition.POSTED);
-                assertThat(s.externalRef()).isEqualTo("gid://Note/OLD");
-                assertThat(s.threadExternalRef()).isEqualTo("gid://Disc/OLD");
-            });
+        assertThat(result.signals()).singleElement().satisfies(s -> {
+            assertThat(s.disposition()).isEqualTo(Disposition.POSTED);
+            assertThat(s.externalRef()).isEqualTo("gid://Note/OLD");
+            assertThat(s.threadExternalRef()).isEqualTo("gid://Disc/OLD");
+        });
         // A matched key must NOT create a fresh thread.
         verify(client, never()).documentName("CreateDiffNote");
     }
@@ -259,18 +243,16 @@ class GitlabInlineFeedbackChannelTest extends BaseUnitTest {
         lenient().when(client.documentName("DestroyNote")).thenReturn(destroySpec);
 
         InlineResult result = channel.postInlineFeedback(
-            gitlabTarget(),
-            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "re-detected", MARKER, "ck-human"))
-        );
+                gitlabTarget(),
+                List.of(new InlineFeedback(
+                        new DiffAnchor("src/Foo.java", 10, null), "re-detected", MARKER, "ck-human")));
 
         verify(updateSpec, never()).execute();
         verify(destroySpec, never()).execute();
-        assertThat(result.signals())
-            .singleElement()
-            .satisfies(s -> {
-                assertThat(s.disposition()).isEqualTo(Disposition.PRESERVED_EXISTING);
-                assertThat(s.externalRef()).isEqualTo("gid://Note/B");
-            });
+        assertThat(result.signals()).singleElement().satisfies(s -> {
+            assertThat(s.disposition()).isEqualTo(Disposition.PRESERVED_EXISTING);
+            assertThat(s.externalRef()).isEqualTo("gid://Note/B");
+        });
     }
 
     /** A prior bot thread whose key is gone this run AND has no human reply → DestroyNote. Human-replied gone → kept. */
@@ -279,26 +261,21 @@ class GitlabInlineFeedbackChannelTest extends BaseUnitTest {
         stubResolvedMr();
         // Gone-A: pure bot, key not emitted this run → delete.
         Map<String, Object> goneA = discussion(
-            "gid://Disc/A",
-            List.of(note("gid://Note/A", "old " + MARKER + "\n" + ckTag("ck-gone-A"), false))
-        );
+                "gid://Disc/A", List.of(note("gid://Note/A", "old " + MARKER + "\n" + ckTag("ck-gone-A"), false)));
         // Gone-B: bot + human reply, key not emitted → preserve (never destroy human work).
         Map<String, Object> goneB = discussion(
-            "gid://Disc/Bb",
-            List.of(
-                note("gid://Note/Bb", "old " + MARKER + "\n" + ckTag("ck-gone-B"), false),
-                note("gid://Note/Hb", "I disagree", false)
-            )
-        );
+                "gid://Disc/Bb",
+                List.of(
+                        note("gid://Note/Bb", "old " + MARKER + "\n" + ckTag("ck-gone-B"), false),
+                        note("gid://Note/Hb", "I disagree", false)));
         stubDiscussionsReturning(List.of(goneA, goneB));
         // This run posts a single, different finding.
         stubCreateDiffNoteSuccess("gid://Note/NEW", "gid://Disc/NEW");
         HttpGraphQlClient.RequestSpec destroySpec = stubDestroy();
 
         channel.postInlineFeedback(
-            gitlabTarget(),
-            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "current", MARKER, "ck-current"))
-        );
+                gitlabTarget(),
+                List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "current", MARKER, "ck-current")));
 
         verify(destroySpec).variable("noteId", "gid://Note/A");
         verify(destroySpec, never()).variable("noteId", "gid://Note/Bb");
@@ -327,18 +304,15 @@ class GitlabInlineFeedbackChannelTest extends BaseUnitTest {
         when(noteSpec.execute()).thenReturn(Mono.just(noteResponse));
 
         InlineResult result = channel.postInlineFeedback(
-            gitlabTarget(),
-            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 999, null), "fix", MARKER, "ck-fb"))
-        );
+                gitlabTarget(),
+                List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 999, null), "fix", MARKER, "ck-fb")));
 
         assertThat(result.posted()).isEqualTo(1);
         assertThat(result.failed()).isZero();
-        assertThat(result.signals())
-            .singleElement()
-            .satisfies(s -> {
-                assertThat(s.disposition()).isEqualTo(Disposition.FELL_BACK);
-                assertThat(s.externalRef()).isEqualTo("gid://Note/FALLBACK");
-            });
+        assertThat(result.signals()).singleElement().satisfies(s -> {
+            assertThat(s.disposition()).isEqualTo(Disposition.FELL_BACK);
+            assertThat(s.externalRef()).isEqualTo("gid://Note/FALLBACK");
+        });
     }
 
     /** A rate-limit error mid-batch stops the run: the offending finding fails and the remaining ones are not posted. */
@@ -354,12 +328,10 @@ class GitlabInlineFeedbackChannelTest extends BaseUnitTest {
         when(diffSpec.execute()).thenReturn(Mono.error(new RuntimeException("429 Too Many Requests")));
 
         InlineResult result = channel.postInlineFeedback(
-            gitlabTarget(),
-            List.of(
-                new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix-a", MARKER, "ck-a"),
-                new InlineFeedback(new DiffAnchor("src/Bar.java", 20, null), "fix-b", MARKER, "ck-b")
-            )
-        );
+                gitlabTarget(),
+                List.of(
+                        new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix-a", MARKER, "ck-a"),
+                        new InlineFeedback(new DiffAnchor("src/Bar.java", 20, null), "fix-b", MARKER, "ck-b")));
 
         // The batch stops at the first finding; both are reported failed (the one that hit the limit + the
         // unattempted remainder), and nothing is posted.
@@ -378,9 +350,8 @@ class GitlabInlineFeedbackChannelTest extends BaseUnitTest {
         stubResolvedMr();
         // Prior bot thread for ck-keep — STILL CURRENT (the batch below still contains ck-keep).
         Map<String, Object> keepDisc = discussion(
-            "gid://Disc/KEEP",
-            List.of(note("gid://Note/KEEP", "kept finding " + MARKER + "\n" + ckTag("ck-keep"), false))
-        );
+                "gid://Disc/KEEP",
+                List.of(note("gid://Note/KEEP", "kept finding " + MARKER + "\n" + ckTag("ck-keep"), false)));
         stubDiscussionsReturning(List.of(keepDisc));
 
         // CreateDiffNote throws a rate-limit error on the FIRST finding (ck-a) → the batch stops before ck-keep
@@ -391,12 +362,10 @@ class GitlabInlineFeedbackChannelTest extends BaseUnitTest {
         when(diffSpec.execute()).thenReturn(Mono.error(new RuntimeException("429 Too Many Requests")));
 
         InlineResult result = channel.postInlineFeedback(
-            gitlabTarget(),
-            List.of(
-                new InlineFeedback(new DiffAnchor("src/A.java", 10, null), "fix-a", MARKER, "ck-a"),
-                new InlineFeedback(new DiffAnchor("src/Keep.java", 20, null), "fix-keep", MARKER, "ck-keep")
-            )
-        );
+                gitlabTarget(),
+                List.of(
+                        new InlineFeedback(new DiffAnchor("src/A.java", 10, null), "fix-a", MARKER, "ck-a"),
+                        new InlineFeedback(new DiffAnchor("src/Keep.java", 20, null), "fix-keep", MARKER, "ck-keep")));
 
         // The rate-limited run must skip the destroy ENTIRELY (no DestroyNote document is even requested), so the
         // still-current ck-keep thread cannot be reaped despite never reaching seenKeys this run.
@@ -434,19 +403,17 @@ class GitlabInlineFeedbackChannelTest extends BaseUnitTest {
         stubCreateDiffNoteSuccess("gid://Note/NEW", "gid://Disc/NEW");
 
         InlineResult result = channel.postInlineFeedback(
-            gitlabTarget(),
-            List.of(
-                new InlineFeedback(new DiffAnchor("src/A.java", 10, null), "first", MARKER, "ck-dup"),
-                new InlineFeedback(new DiffAnchor("src/B.java", 20, null), "twin", MARKER, "ck-dup")
-            )
-        );
+                gitlabTarget(),
+                List.of(
+                        new InlineFeedback(new DiffAnchor("src/A.java", 10, null), "first", MARKER, "ck-dup"),
+                        new InlineFeedback(new DiffAnchor("src/B.java", 20, null), "twin", MARKER, "ck-dup")));
 
         // Exactly one thread is created and exactly one signal emitted; the twin is dropped.
         verify(client).documentName("CreateDiffNote");
         assertThat(result.posted()).isEqualTo(1);
         assertThat(result.signals())
-            .singleElement()
-            .satisfies(s -> assertThat(s.recurrenceKey()).isEqualTo("ck-dup"));
+                .singleElement()
+                .satisfies(s -> assertThat(s.recurrenceKey()).isEqualTo("ck-dup"));
     }
 
     // --- stubbing helpers ----------------------------------------------------------------------------------
@@ -454,9 +421,8 @@ class GitlabInlineFeedbackChannelTest extends BaseUnitTest {
     private void stubResolvedMr() {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         when(gitLabProvider.forScope(1L)).thenReturn(client);
-        when(mrResolver.resolve(1L, "group/project", 42)).thenReturn(
-            new MrInfo("gid://gitlab/MR/42", "base", "head", "start")
-        );
+        when(mrResolver.resolve(1L, "group/project", 42))
+                .thenReturn(new MrInfo("gid://gitlab/MR/42", "base", "head", "start"));
     }
 
     /** Stubs a single page of discussions (pageInfo.hasNextPage=false), the common case. */
@@ -470,15 +436,9 @@ class GitlabInlineFeedbackChannelTest extends BaseUnitTest {
 
     /** Builds a discussions GraphQL response carrying the given nodes + pageInfo. */
     private static ClientGraphQlResponse discussionsResponse(
-        List<Map<String, Object>> discussions,
-        GitLabPageInfo pageInfo
-    ) {
+            List<Map<String, Object>> discussions, GitLabPageInfo pageInfo) {
         assertVendorCouldReturn(
-            GITLAB,
-            "GetMergeRequestDiscussions",
-            "project.mergeRequest.discussions.nodes",
-            discussions
-        );
+                GITLAB, "GetMergeRequestDiscussions", "project.mergeRequest.discussions.nodes", discussions);
         ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
         ClientResponseField nodesField = mock(ClientResponseField.class);
         when(response.field("project.mergeRequest.discussions.nodes")).thenReturn(nodesField);
@@ -530,7 +490,9 @@ class GitlabInlineFeedbackChannelTest extends BaseUnitTest {
     private static String mutationDocument(String path) {
         String payloadRoot = path.substring(0, path.indexOf('.'));
         String document = MUTATION_DOCUMENTS.get(payloadRoot);
-        assertThat(document).as("no GitLab mutation document is known for payload root '%s'", payloadRoot).isNotNull();
+        assertThat(document)
+                .as("no GitLab mutation document is known for payload root '%s'", payloadRoot)
+                .isNotNull();
         return document;
     }
 

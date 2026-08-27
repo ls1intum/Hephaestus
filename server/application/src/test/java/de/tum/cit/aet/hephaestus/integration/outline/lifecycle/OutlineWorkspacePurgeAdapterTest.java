@@ -22,10 +22,7 @@ class OutlineWorkspacePurgeAdapterTest extends BaseUnitTest {
 
     private OutlineWorkspacePurgeAdapter adapter() {
         return new OutlineWorkspacePurgeAdapter(
-            outlineDocumentRepository,
-            outlineCollectionRepository,
-            outlineDocumentEventRepository
-        );
+                outlineDocumentRepository, outlineCollectionRepository, outlineDocumentEventRepository);
     }
 
     @Test

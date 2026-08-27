@@ -64,10 +64,10 @@ public class FxRateLookup {
             return newest.map(this::toInfo);
         }
         return fxRateRepository
-            .findTopByRateDateLessThanEqualOrderByRateDateDesc(month.atEndOfMonth())
-            // The month predates every rate we hold; the reported rateDate makes the approximation visible.
-            .or(fxRateRepository::findTopByOrderByRateDateAsc)
-            .map(this::toInfo);
+                .findTopByRateDateLessThanEqualOrderByRateDateDesc(month.atEndOfMonth())
+                // The month predates every rate we hold; the reported rateDate makes the approximation visible.
+                .or(fxRateRepository::findTopByOrderByRateDateAsc)
+                .map(this::toInfo);
     }
 
     private Optional<FxRate> freshLatest() {
@@ -82,10 +82,9 @@ public class FxRateLookup {
         LocalDate newestDate = newest.get().getRateDate();
         if (newestDate.isBefore(today.minusDays(MAX_RATE_AGE_DAYS))) {
             log.warn(
-                "fx: newest stored rate is {} (older than {} days) — omitting display-currency conversion",
-                newestDate,
-                MAX_RATE_AGE_DAYS
-            );
+                    "fx: newest stored rate is {} (older than {} days) — omitting display-currency conversion",
+                    newestDate,
+                    MAX_RATE_AGE_DAYS);
             return Optional.empty();
         }
         return newest;

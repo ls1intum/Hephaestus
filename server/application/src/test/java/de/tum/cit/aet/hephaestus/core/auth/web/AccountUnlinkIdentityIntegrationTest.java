@@ -63,18 +63,18 @@ class AccountUnlinkIdentityIntegrationTest extends RealAuthIntegrationTest {
         String token = tokenFor(account);
 
         webTestClient
-            .delete()
-            .uri("/user/identities/{id}", persistedId(github.getId()))
-            .headers(h -> h.setBearerAuth(token))
-            .exchange()
-            .expectStatus()
-            .isNoContent();
+                .delete()
+                .uri("/user/identities/{id}", persistedId(github.getId()))
+                .headers(h -> h.setBearerAuth(token))
+                .exchange()
+                .expectStatus()
+                .isNoContent();
 
         // Hard delete: the unlinked row is gone (not soft-disabled), the other identity stays active.
         assertThat(identityLinkRepository.findById(persistedId(github.getId()))).isEmpty();
         assertThat(identityLinkRepository.findActiveByAccountId(persistedId(account.getId())))
-            .extracting(IdentityLink::getId)
-            .containsExactly(persistedId(gitlab.getId()));
+                .extracting(IdentityLink::getId)
+                .containsExactly(persistedId(gitlab.getId()));
     }
 
     @Test
@@ -85,12 +85,12 @@ class AccountUnlinkIdentityIntegrationTest extends RealAuthIntegrationTest {
         String token = tokenFor(account);
 
         webTestClient
-            .delete()
-            .uri("/user/identities/{id}", persistedId(github.getId()))
-            .headers(h -> h.setBearerAuth(token))
-            .exchange()
-            .expectStatus()
-            .isNoContent();
+                .delete()
+                .uri("/user/identities/{id}", persistedId(github.getId()))
+                .headers(h -> h.setBearerAuth(token))
+                .exchange()
+                .expectStatus()
+                .isNoContent();
 
         // The row is gone, so the global (provider, subject) uniqueness is freed and the SAME GitHub
         // identity can be linked again — the promise the disconnect dialog makes. A soft-delete
@@ -98,8 +98,8 @@ class AccountUnlinkIdentityIntegrationTest extends RealAuthIntegrationTest {
         assertThat(identityLinkRepository.findById(persistedId(github.getId()))).isEmpty();
         IdentityLink relinked = seedLink(account, IdentityProviderType.GITHUB, "https://github.com", "gh-rev", "rev");
         assertThat(identityLinkRepository.findActiveByAccountId(persistedId(account.getId())))
-            .extracting(IdentityLink::getId)
-            .contains(persistedId(relinked.getId()));
+                .extracting(IdentityLink::getId)
+                .contains(persistedId(relinked.getId()));
     }
 
     @Test
@@ -109,19 +109,19 @@ class AccountUnlinkIdentityIntegrationTest extends RealAuthIntegrationTest {
         String token = tokenFor(account);
 
         webTestClient
-            .delete()
-            .uri("/user/identities/{id}", persistedId(only.getId()))
-            .headers(h -> h.setBearerAuth(token))
-            .exchange()
-            .expectStatus()
-            .isEqualTo(409)
-            .expectBody()
-            .jsonPath("$.detail")
-            .isEqualTo(
-                "You can't unlink your only sign-in method. Link another provider first, or delete your account."
-            );
+                .delete()
+                .uri("/user/identities/{id}", persistedId(only.getId()))
+                .headers(h -> h.setBearerAuth(token))
+                .exchange()
+                .expectStatus()
+                .isEqualTo(409)
+                .expectBody()
+                .jsonPath("$.detail")
+                .isEqualTo(
+                        "You can't unlink your only sign-in method. Link another provider first, or delete your account.");
 
-        assertThat(identityLinkRepository.findActiveByAccountId(persistedId(account.getId()))).hasSize(1);
+        assertThat(identityLinkRepository.findActiveByAccountId(persistedId(account.getId())))
+                .hasSize(1);
     }
 
     @Test
@@ -132,25 +132,20 @@ class AccountUnlinkIdentityIntegrationTest extends RealAuthIntegrationTest {
         String myToken = tokenFor(me);
 
         Account other = accountRepository.save(new Account("Other"));
-        IdentityLink otherGithub = seedLink(
-            other,
-            IdentityProviderType.GITHUB,
-            "https://github.com",
-            "gh-other",
-            "other"
-        );
+        IdentityLink otherGithub =
+                seedLink(other, IdentityProviderType.GITHUB, "https://github.com", "gh-other", "other");
 
         webTestClient
-            .delete()
-            .uri("/user/identities/{id}", persistedId(otherGithub.getId()))
-            .headers(h -> h.setBearerAuth(myToken))
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+                .delete()
+                .uri("/user/identities/{id}", persistedId(otherGithub.getId()))
+                .headers(h -> h.setBearerAuth(myToken))
+                .exchange()
+                .expectStatus()
+                .isNotFound();
 
         assertThat(identityLinkRepository.findActiveByAccountId(persistedId(other.getId())))
-            .extracting(IdentityLink::getId)
-            .containsExactly(persistedId(otherGithub.getId()));
+                .extracting(IdentityLink::getId)
+                .containsExactly(persistedId(otherGithub.getId()));
     }
 
     @Test
@@ -161,12 +156,12 @@ class AccountUnlinkIdentityIntegrationTest extends RealAuthIntegrationTest {
         String token = tokenFor(account);
 
         webTestClient
-            .delete()
-            .uri("/user/identities/{id}", 9_999_999L)
-            .headers(h -> h.setBearerAuth(token))
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+                .delete()
+                .uri("/user/identities/{id}", 9_999_999L)
+                .headers(h -> h.setBearerAuth(token))
+                .exchange()
+                .expectStatus()
+                .isNotFound();
     }
 
     @Test
@@ -196,7 +191,8 @@ class AccountUnlinkIdentityIntegrationTest extends RealAuthIntegrationTest {
             pool.shutdownNow();
         }
 
-        assertThat(identityLinkRepository.findActiveByAccountId(persistedId(account.getId()))).hasSize(1);
+        assertThat(identityLinkRepository.findActiveByAccountId(persistedId(account.getId())))
+                .hasSize(1);
     }
 
     private Callable<Integer> unlinkStatus(String token, Long identityId, CountDownLatch ready, CountDownLatch go) {
@@ -204,26 +200,21 @@ class AccountUnlinkIdentityIntegrationTest extends RealAuthIntegrationTest {
             ready.countDown();
             go.await(10, TimeUnit.SECONDS);
             return webTestClient
-                .delete()
-                .uri("/user/identities/{id}", identityId)
-                .headers(h -> h.setBearerAuth(token))
-                .exchange()
-                .returnResult(Void.class)
-                .getStatus()
-                .value();
+                    .delete()
+                    .uri("/user/identities/{id}", identityId)
+                    .headers(h -> h.setBearerAuth(token))
+                    .exchange()
+                    .returnResult(Void.class)
+                    .getStatus()
+                    .value();
         };
     }
 
     private IdentityLink seedLink(
-        Account account,
-        IdentityProviderType type,
-        String serverUrl,
-        String subject,
-        String login
-    ) {
+            Account account, IdentityProviderType type, String serverUrl, String subject, String login) {
         IdentityProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(type, serverUrl)
-            .orElseGet(() -> gitProviderRepository.save(new IdentityProvider(type, serverUrl)));
+                .findByTypeAndServerUrl(type, serverUrl)
+                .orElseGet(() -> gitProviderRepository.save(new IdentityProvider(type, serverUrl)));
         IdentityLink link = new IdentityLink();
         link.setAccount(account);
         link.setProviderId(persistedId(provider.getId()));

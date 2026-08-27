@@ -72,11 +72,10 @@ public class TeamController {
     @Operation(summary = "Update team visibility", description = "Show or hide a team in leaderboard calculations")
     @AuditExempt(reason = "team visibility is a reporting view; teams are SCM-synced, not configured here")
     public ResponseEntity<Void> updateTeamVisibility(
-        WorkspaceContext workspaceContext,
-        @PathVariable Long id,
-        @RequestBody(required = false) Boolean hidden,
-        @RequestParam(name = "hidden", required = false) Boolean hiddenParam
-    ) {
+            WorkspaceContext workspaceContext,
+            @PathVariable Long id,
+            @RequestBody(required = false) Boolean hidden,
+            @RequestParam(name = "hidden", required = false) Boolean hiddenParam) {
         log.info("Updating team visibility: teamId={}, workspaceSlug={}", id, workspaceContext.slug());
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
 
@@ -91,22 +90,20 @@ public class TeamController {
     @RequireAtLeastWorkspaceAdmin
     @AuditExempt(reason = "repository visibility is a reporting view; grants no access")
     public ResponseEntity<Void> updateRepositoryVisibility(
-        WorkspaceContext workspaceContext,
-        @PathVariable Long teamId,
-        @PathVariable Long repositoryId,
-        @RequestBody(required = false) Boolean hiddenFromContributions,
-        @RequestParam(name = "hiddenFromContributions", required = false) Boolean hiddenFromContributionsParam
-    ) {
+            WorkspaceContext workspaceContext,
+            @PathVariable Long teamId,
+            @PathVariable Long repositoryId,
+            @RequestBody(required = false) Boolean hiddenFromContributions,
+            @RequestParam(name = "hiddenFromContributions", required = false) Boolean hiddenFromContributionsParam) {
         log.info(
-            "Updating repository visibility: repositoryId={}, teamId={}, workspaceSlug={}",
-            repositoryId,
-            teamId,
-            workspaceContext.slug()
-        );
+                "Updating repository visibility: repositoryId={}, teamId={}, workspaceSlug={}",
+                repositoryId,
+                teamId,
+                workspaceContext.slug());
         Workspace workspace = workspaceResolver.requireWorkspace(workspaceContext);
 
         Boolean resolvedHidden =
-            hiddenFromContributions != null ? hiddenFromContributions : hiddenFromContributionsParam;
+                hiddenFromContributions != null ? hiddenFromContributions : hiddenFromContributionsParam;
         if (resolvedHidden == null) {
             return ResponseEntity.badRequest().build();
         }

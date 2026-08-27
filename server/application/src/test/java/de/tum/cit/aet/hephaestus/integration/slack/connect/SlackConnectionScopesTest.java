@@ -12,30 +12,30 @@ class SlackConnectionScopesTest extends BaseUnitTest {
 
     @Test
     void requestsExactlyTheLiveSubsystemScopes() {
-        assertThat(SlackConnectionStrategy.DEFAULT_SCOPES).containsExactlyInAnyOrder(
-            "chat:write",
-            "assistant:write",
-            "im:history",
-            "channels:history",
-            "groups:history",
-            "channels:read",
-            "channels:join",
-            "groups:read",
-            "users:read"
-        );
+        assertThat(SlackConnectionStrategy.DEFAULT_SCOPES)
+                .containsExactlyInAnyOrder(
+                        "chat:write",
+                        "assistant:write",
+                        "im:history",
+                        "channels:history",
+                        "groups:history",
+                        "channels:read",
+                        "channels:join",
+                        "groups:read",
+                        "users:read");
     }
 
     @Test
     void omitsBroadScopesThatCurrentCodeDoesNotNeed() {
-        assertThat(SlackConnectionStrategy.DEFAULT_SCOPES).doesNotContain(
-            "chat:write.public",
-            "team:read",
-            "commands",
-            "app_mentions:read",
-            "mpim:read",
-            "mpim:history",
-            "im:write",
-            "users:read.email"
-        );
+        assertThat(SlackConnectionStrategy.DEFAULT_SCOPES)
+                .doesNotContain(
+                        "chat:write.public",
+                        "team:read",
+                        "commands",
+                        "app_mentions:read",
+                        "mpim:read",
+                        "mpim:history",
+                        "im:write",
+                        "users:read.email");
     }
 }

@@ -35,9 +35,7 @@ public class SlackConnectionAdminController {
     private final SlackMessageService slackMessageService;
 
     public SlackConnectionAdminController(
-        ConnectionService connectionService,
-        SlackMessageService slackMessageService
-    ) {
+            ConnectionService connectionService, SlackMessageService slackMessageService) {
         this.connectionService = connectionService;
         this.slackMessageService = slackMessageService;
     }
@@ -55,17 +53,16 @@ public class SlackConnectionAdminController {
     @Operation(operationId = "sendSlackTestMessage", summary = "Post a test message to verify the Slack connection")
     @AuditExempt(reason = "sends a message to verify delivery; stores no configuration")
     public SlackTestMessageResponseDTO sendTestMessage(
-        WorkspaceContext workspace,
-        @Valid @RequestBody(required = false) @Nullable SlackTestMessageRequestDTO body
-    ) {
+            WorkspaceContext workspace,
+            @Valid @RequestBody(required = false) @Nullable SlackTestMessageRequestDTO body) {
         long workspaceId = workspace.id();
         String override = body == null ? null : body.channelId();
         String channelId = (override != null && !override.isBlank())
-            ? override.trim()
-            : connectionService
-                  .findSlackNotificationConfig(workspaceId)
-                  .map(c -> c.notificationChannelId())
-                  .orElse(null);
+                ? override.trim()
+                : connectionService
+                        .findSlackNotificationConfig(workspaceId)
+                        .map(c -> c.notificationChannelId())
+                        .orElse(null);
 
         if (channelId == null || channelId.isBlank()) {
             return new SlackTestMessageResponseDTO(false, null, "no_channel_configured");
@@ -73,19 +70,14 @@ public class SlackConnectionAdminController {
 
         try {
             slackMessageService.sendForWorkspace(
-                workspaceId,
-                channelId,
-                List.of(),
-                "Hephaestus test message — your Slack integration is wired up."
-            );
+                    workspaceId, channelId, List.of(), "Hephaestus test message — your Slack integration is wired up.");
             return new SlackTestMessageResponseDTO(true, channelId, null);
         } catch (SlackSendException e) {
             log.warn(
-                "Slack test message failed: workspaceId={}, channelId={}, error={}",
-                workspaceId,
-                channelId,
-                e.slackError()
-            );
+                    "Slack test message failed: workspaceId={}, channelId={}, error={}",
+                    workspaceId,
+                    channelId,
+                    e.slackError());
             return new SlackTestMessageResponseDTO(false, channelId, e.slackError());
         }
     }

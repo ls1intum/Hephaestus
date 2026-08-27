@@ -37,9 +37,9 @@ public enum SubjectEvidenceCollection {
     public static SubjectEvidenceCollection of(String id) {
         Objects.requireNonNull(id, "id");
         return Arrays.stream(values())
-            .filter(collection -> collection.id.equals(id))
-            .findFirst()
-            .orElseThrow(() -> new IllegalArgumentException("Unknown evidence collection: " + id));
+                .filter(collection -> collection.id.equals(id))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Unknown evidence collection: " + id));
     }
 
     @Override

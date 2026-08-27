@@ -62,38 +62,31 @@ class SlackUninstallServiceTest extends BaseUnitTest {
 
     private SlackUninstallService service() {
         return new SlackUninstallService(
-            workspaceResolver,
-            connectionService,
-            purgeAdapter,
-            mentorSlackThreadService,
-            conversationFeedbackErasure,
-            messageService
-        );
+                workspaceResolver,
+                connectionService,
+                purgeAdapter,
+                mentorSlackThreadService,
+                conversationFeedbackErasure,
+                messageService);
     }
 
     private static Stream<Arguments> eventTypeMapping() {
         return Stream.of(
-            Arguments.of("app_uninstalled", "Ev1", "APP_UNINSTALLED", "slack-app_uninstalled-Ev1"),
-            Arguments.of("tokens_revoked", "Ev2", "TOKENS_REVOKED", "slack-tokens_revoked-Ev2")
-        );
+                Arguments.of("app_uninstalled", "Ev1", "APP_UNINSTALLED", "slack-app_uninstalled-Ev1"),
+                Arguments.of("tokens_revoked", "Ev2", "TOKENS_REVOKED", "slack-tokens_revoked-Ev2"));
     }
 
     @ParameterizedTest(name = "{0} maps to eventType {2}")
     @MethodSource("eventTypeMapping")
     void eventTypeMapsToConnectionTransition(
-        String slackEventType,
-        String eventId,
-        String expectedEventType,
-        String expectedCorrelationId
-    ) {
+            String slackEventType, String eventId, String expectedEventType, String expectedCorrelationId) {
         when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(WORKSPACE));
         when(connectionService.findActive(WORKSPACE, IntegrationKind.SLACK)).thenReturn(Optional.of(connection));
 
         service().onUninstall(TEAM, slackEventType, eventId);
 
-        ArgumentCaptor<ConnectionService.TransitionRequest> captor = ArgumentCaptor.forClass(
-            ConnectionService.TransitionRequest.class
-        );
+        ArgumentCaptor<ConnectionService.TransitionRequest> captor =
+                ArgumentCaptor.forClass(ConnectionService.TransitionRequest.class);
         verify(connectionService).transition(eq(connection), captor.capture());
         assertThat(captor.getValue().next()).isEqualTo(IntegrationState.UNINSTALLED);
         assertThat(captor.getValue().eventType()).isEqualTo(expectedEventType);

@@ -33,30 +33,30 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
         Workspace workspace = setupWorkspace("review-read");
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/practices/review-settings", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.deliverToMergedOverride")
-            .doesNotExist()
-            .jsonPath("$.deliverToMerged")
-            .isEqualTo(false)
-            // Whether a draft occasions a review is a property of the practice's binding, so the policy
-            // carries no fleet-wide veto — absent, not merely defaulted.
-            .jsonPath("$.skipDrafts")
-            .doesNotExist()
-            .jsonPath("$.skipDraftsOverride")
-            .doesNotExist()
-            // Feature flags aren't review policy and already live on the workspace itself.
-            .jsonPath("$.practicesEnabled")
-            .doesNotExist()
-            .jsonPath("$.mentorEnabled")
-            .doesNotExist()
-            .jsonPath("$.workspaceConnectionsAllowed")
-            .doesNotExist();
+                .get()
+                .uri("/workspaces/{slug}/practices/review-settings", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.deliverToMergedOverride")
+                .doesNotExist()
+                .jsonPath("$.deliverToMerged")
+                .isEqualTo(false)
+                // Whether a draft occasions a review is a property of the practice's binding, so the policy
+                // carries no fleet-wide veto — absent, not merely defaulted.
+                .jsonPath("$.skipDrafts")
+                .doesNotExist()
+                .jsonPath("$.skipDraftsOverride")
+                .doesNotExist()
+                // Feature flags aren't review policy and already live on the workspace itself.
+                .jsonPath("$.practicesEnabled")
+                .doesNotExist()
+                .jsonPath("$.mentorEnabled")
+                .doesNotExist()
+                .jsonPath("$.workspaceConnectionsAllowed")
+                .doesNotExist();
     }
 
     @Test
@@ -65,14 +65,14 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
         Workspace workspace = setupWorkspace("ai-cooldown");
 
         webTestClient
-            .patch()
-            .uri("/workspaces/{slug}/practices/review-settings", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("cooldownMinutes", 5000))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+                .patch()
+                .uri("/workspaces/{slug}/practices/review-settings", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("cooldownMinutes", 5000))
+                .exchange()
+                .expectStatus()
+                .isBadRequest();
     }
 
     @Test
@@ -81,35 +81,35 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
         Workspace workspace = setupWorkspace("ai-reset");
 
         webTestClient
-            .patch()
-            .uri("/workspaces/{slug}/practices/review-settings", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("deliverToMerged", true))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.deliverToMergedOverride")
-            .isEqualTo(true)
-            .jsonPath("$.deliverToMerged")
-            .isEqualTo(true);
+                .patch()
+                .uri("/workspaces/{slug}/practices/review-settings", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("deliverToMerged", true))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.deliverToMergedOverride")
+                .isEqualTo(true)
+                .jsonPath("$.deliverToMerged")
+                .isEqualTo(true);
 
         // Reset to inherit — the fleet default for deliverToMerged is false.
         webTestClient
-            .patch()
-            .uri("/workspaces/{slug}/practices/review-settings", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("reset", List.of("DELIVER_TO_MERGED")))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.deliverToMergedOverride")
-            .doesNotExist()
-            .jsonPath("$.deliverToMerged")
-            .isEqualTo(false);
+                .patch()
+                .uri("/workspaces/{slug}/practices/review-settings", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("reset", List.of("DELIVER_TO_MERGED")))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.deliverToMergedOverride")
+                .doesNotExist()
+                .jsonPath("$.deliverToMerged")
+                .isEqualTo(false);
     }
 
     @Test
@@ -123,22 +123,22 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
         String slug = workspace.getWorkspaceSlug();
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/practices/review-settings", slug)
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .get()
+                .uri("/workspaces/{slug}/practices/review-settings", slug)
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isForbidden();
 
         webTestClient
-            .patch()
-            .uri("/workspaces/{slug}/practices/review-settings", slug)
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("skipDrafts", false))
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .patch()
+                .uri("/workspaces/{slug}/practices/review-settings", slug)
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("skipDrafts", false))
+                .exchange()
+                .expectStatus()
+                .isForbidden();
     }
 
     @Test
@@ -151,29 +151,24 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
         ensureWorkspaceMembership(own, admin, WorkspaceRole.ADMIN);
 
         Workspace other = createWorkspace(
-            "review-other",
-            "Other",
-            "review-other-org",
-            AccountType.ORG,
-            persistUser("review-other-owner")
-        );
+                "review-other", "Other", "review-other-org", AccountType.ORG, persistUser("review-other-owner"));
 
         webTestClient
-            .patch()
-            .uri("/workspaces/{slug}/practices/review-settings", other.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("skipDrafts", false))
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .patch()
+                .uri("/workspaces/{slug}/practices/review-settings", other.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("skipDrafts", false))
+                .exchange()
+                .expectStatus()
+                .isForbidden();
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/practices/review-settings", own.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk();
+                .get()
+                .uri("/workspaces/{slug}/practices/review-settings", own.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk();
     }
 }

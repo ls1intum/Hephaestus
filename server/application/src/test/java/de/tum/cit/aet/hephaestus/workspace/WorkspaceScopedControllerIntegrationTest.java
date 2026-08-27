@@ -23,20 +23,19 @@ class WorkspaceScopedControllerIntegrationTest extends AbstractWorkspaceIntegrat
         ensureAdminMembership(workspace);
 
         WorkspaceEchoControllers.ScopedEcho response = webTestClient
-            .get()
-            .uri("/workspaces/{workspaceSlug}/scoped-test/echo", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(WorkspaceEchoControllers.ScopedEcho.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces/{workspaceSlug}/scoped-test/echo", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(WorkspaceEchoControllers.ScopedEcho.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(response).isNotNull();
-        assertThat(response.requestPath()).endsWith(
-            "/workspaces/" + workspace.getWorkspaceSlug() + "/scoped-test/echo"
-        );
+        assertThat(response.requestPath())
+                .endsWith("/workspaces/" + workspace.getWorkspaceSlug() + "/scoped-test/echo");
         assertThat(response.contextSlug()).isEqualTo(workspace.getWorkspaceSlug());
         assertThat(response.contextId()).isEqualTo(workspace.getId());
         assertThat(response.roles()).containsExactly("OWNER");
@@ -46,23 +45,23 @@ class WorkspaceScopedControllerIntegrationTest extends AbstractWorkspaceIntegrat
     @WithAdminUser
     void scopedControllerIsNotReachableWithoutWorkspaceSlug() {
         webTestClient
-            .get()
-            .uri("/scoped-test/echo")
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+                .get()
+                .uri("/scoped-test/echo")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNotFound();
     }
 
     @Test
     @WithAdminUser
     void unknownWorkspaceSlugReturnsNotFoundBeforeControllerExecutes() {
         webTestClient
-            .get()
-            .uri("/workspaces/{workspaceSlug}/scoped-test/echo", "missing")
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+                .get()
+                .uri("/workspaces/{workspaceSlug}/scoped-test/echo", "missing")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNotFound();
     }
 }

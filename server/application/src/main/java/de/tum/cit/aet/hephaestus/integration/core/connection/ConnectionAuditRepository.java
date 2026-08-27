@@ -16,10 +16,7 @@ public interface ConnectionAuditRepository extends JpaRepository<ConnectionAudit
      * audit rows are workspace-scoped data, so the repository must expose a way to read them bounded
      * to a single workspace (e.g. a future workspace-wide audit view), not only by connection id.
      */
-    @Query(
-        "SELECT a FROM ConnectionAudit a " +
-            "WHERE a.connection.workspace.id = :workspaceId " +
-            "ORDER BY a.occurredAt DESC"
-    )
+    @Query("SELECT a FROM ConnectionAudit a " + "WHERE a.connection.workspace.id = :workspaceId "
+            + "ORDER BY a.occurredAt DESC")
     List<ConnectionAudit> findByWorkspaceId(@Param("workspaceId") long workspaceId);
 }

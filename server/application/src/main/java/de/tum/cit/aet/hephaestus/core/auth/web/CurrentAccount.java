@@ -85,7 +85,10 @@ public final class CurrentAccount {
             return List.of();
         }
         if (jwt.getClaims().get("roles") instanceof List<?> roles) {
-            return roles.stream().filter(String.class::isInstance).map(String.class::cast).toList();
+            return roles.stream()
+                    .filter(String.class::isInstance)
+                    .map(String.class::cast)
+                    .toList();
         }
         return List.of();
     }

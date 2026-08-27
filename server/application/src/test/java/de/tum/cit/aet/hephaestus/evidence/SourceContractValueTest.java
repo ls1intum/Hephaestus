@@ -47,13 +47,11 @@ class SourceContractValueTest {
 
     @Test
     void shouldForbidArtifactsOnUnavailableCapture() {
-        assertThatIllegalArgumentException().isThrownBy(() ->
-            new SourceCapture(
-                new SourceKind("scm.pull-request.diff"),
-                new SourceCaptureState.Unavailable(SourceAbsenceReason.NO_WORKING_COPY),
-                List.of(new SourceArtifact("inputs/context/diff.patch", "text/x-diff", "a".repeat(64), 1))
-            )
-        );
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new SourceCapture(
+                        new SourceKind("scm.pull-request.diff"),
+                        new SourceCaptureState.Unavailable(SourceAbsenceReason.NO_WORKING_COPY),
+                        List.of(new SourceArtifact("inputs/context/diff.patch", "text/x-diff", "a".repeat(64), 1))));
     }
 
     @Test
@@ -62,22 +60,23 @@ class SourceContractValueTest {
             {"schemaVersion":1,"entries":[]}
             """;
 
-        assertThatThrownBy(() -> objectMapper.readValue(legacy, ArtifactSourceManifest.class)).isInstanceOf(
-            RuntimeException.class
-        );
+        assertThatThrownBy(() -> objectMapper.readValue(legacy, ArtifactSourceManifest.class))
+                .isInstanceOf(RuntimeException.class);
     }
 
     @Test
     void aMirrorCannotPinAnIdentityAndALossyDerivationCannotReportComplete() {
         assertThatIllegalArgumentException()
-            .isThrownBy(() -> source(SourceAuthority.SYNCHRONIZED_MIRROR, IdentityMode.PINNED_IDENTITY, false))
-            .withMessageContaining("can pin an identity");
+                .isThrownBy(() -> source(SourceAuthority.SYNCHRONIZED_MIRROR, IdentityMode.PINNED_IDENTITY, false))
+                .withMessageContaining("can pin an identity");
         assertThatIllegalArgumentException()
-            .isThrownBy(() -> source(SourceAuthority.LOSSY_DERIVATION, IdentityMode.NOT_APPLICABLE, true))
-            .withMessageContaining("cannot report COMPLETE");
+                .isThrownBy(() -> source(SourceAuthority.LOSSY_DERIVATION, IdentityMode.NOT_APPLICABLE, true))
+                .withMessageContaining("cannot report COMPLETE");
 
-        assertThat(source(SourceAuthority.UPSTREAM_SNAPSHOT, IdentityMode.PINNED_IDENTITY, true)).isNotNull();
-        assertThat(source(SourceAuthority.LOSSY_DERIVATION, IdentityMode.NOT_APPLICABLE, false)).isNotNull();
+        assertThat(source(SourceAuthority.UPSTREAM_SNAPSHOT, IdentityMode.PINNED_IDENTITY, true))
+                .isNotNull();
+        assertThat(source(SourceAuthority.LOSSY_DERIVATION, IdentityMode.NOT_APPLICABLE, false))
+                .isNotNull();
     }
 
     /**
@@ -87,89 +86,75 @@ class SourceContractValueTest {
     @Test
     void aSourceCannotDemandAQualityItCanNeverReport() {
         assertThatIllegalArgumentException()
-            .isThrownBy(() -> source(RequiredCaptureQuality.COMPLETE, false, true))
-            .withMessageContaining("cannot report COMPLETE cannot demand it");
+                .isThrownBy(() -> source(RequiredCaptureQuality.COMPLETE, false, true))
+                .withMessageContaining("cannot report COMPLETE cannot demand it");
         assertThatIllegalArgumentException()
-            .isThrownBy(() -> source(RequiredCaptureQuality.COMPLETE_AND_NON_EMPTY, true, false))
-            .withMessageContaining("cannot demand non-emptiness");
+                .isThrownBy(() -> source(RequiredCaptureQuality.COMPLETE_AND_NON_EMPTY, true, false))
+                .withMessageContaining("cannot demand non-emptiness");
 
         assertThat(source(RequiredCaptureQuality.ANY_CAPTURE, false, false)).isNotNull();
-        assertThat(source(RequiredCaptureQuality.COMPLETE_AND_NON_EMPTY, true, true)).isNotNull();
+        assertThat(source(RequiredCaptureQuality.COMPLETE_AND_NON_EMPTY, true, true))
+                .isNotNull();
     }
 
     private static ArtifactSourceContract source(
-        RequiredCaptureQuality requiredQuality,
-        boolean supportsComplete,
-        boolean supportsEmpty
-    ) {
+            RequiredCaptureQuality requiredQuality, boolean supportsComplete, boolean supportsEmpty) {
         return new ArtifactSourceContract(
-            new SourceKind("scm.example.source"),
-            "Example",
-            "An example source.",
-            "Everything in scope.",
-            Set.of("scm.pull_request"),
-            true,
-            supportsComplete ? SourceAuthority.SYNCHRONIZED_MIRROR : SourceAuthority.LOSSY_DERIVATION,
-            new IdentityPolicy(IdentityMode.NOT_APPLICABLE),
-            new CompletenessPolicy(supportsComplete, true, supportsEmpty),
-            requiredQuality,
-            PrivacyClass.INTERNAL,
-            Set.of(SourceAbsenceState.NOT_COLLECTED),
-            RetentionPolicy.AGENT_EVIDENCE_RETENTION,
-            ErasurePolicy.WORKSPACE_AND_PERSON_ERASURE,
-            Set.of("use-example")
-        );
+                new SourceKind("scm.example.source"),
+                "Example",
+                "An example source.",
+                "Everything in scope.",
+                Set.of("scm.pull_request"),
+                true,
+                supportsComplete ? SourceAuthority.SYNCHRONIZED_MIRROR : SourceAuthority.LOSSY_DERIVATION,
+                new IdentityPolicy(IdentityMode.NOT_APPLICABLE),
+                new CompletenessPolicy(supportsComplete, true, supportsEmpty),
+                requiredQuality,
+                PrivacyClass.INTERNAL,
+                Set.of(SourceAbsenceState.NOT_COLLECTED),
+                RetentionPolicy.AGENT_EVIDENCE_RETENTION,
+                ErasurePolicy.WORKSPACE_AND_PERSON_ERASURE,
+                Set.of("use-example"));
     }
 
     private static ArtifactSourceContract source(
-        SourceAuthority authority,
-        IdentityMode freshness,
-        boolean supportsComplete
-    ) {
+            SourceAuthority authority, IdentityMode freshness, boolean supportsComplete) {
         return new ArtifactSourceContract(
-            new SourceKind("scm.example.source"),
-            "Example",
-            "An example source.",
-            "Everything in scope.",
-            Set.of("scm.pull_request"),
-            true,
-            authority,
-            new IdentityPolicy(freshness),
-            new CompletenessPolicy(supportsComplete, true, true),
-            RequiredCaptureQuality.ANY_CAPTURE,
-            PrivacyClass.INTERNAL,
-            Set.of(SourceAbsenceState.NOT_COLLECTED),
-            RetentionPolicy.AGENT_EVIDENCE_RETENTION,
-            ErasurePolicy.WORKSPACE_AND_PERSON_ERASURE,
-            Set.of("use-example")
-        );
+                new SourceKind("scm.example.source"),
+                "Example",
+                "An example source.",
+                "Everything in scope.",
+                Set.of("scm.pull_request"),
+                true,
+                authority,
+                new IdentityPolicy(freshness),
+                new CompletenessPolicy(supportsComplete, true, true),
+                RequiredCaptureQuality.ANY_CAPTURE,
+                PrivacyClass.INTERNAL,
+                Set.of(SourceAbsenceState.NOT_COLLECTED),
+                RetentionPolicy.AGENT_EVIDENCE_RETENTION,
+                ErasurePolicy.WORKSPACE_AND_PERSON_ERASURE,
+                Set.of("use-example"));
     }
 
     @Test
     void shouldRejectEmptyManifestAndReadinessCollections() {
         Instant now = Instant.parse("2026-08-03T10:00:00Z");
 
-        assertThatIllegalArgumentException().isThrownBy(() ->
-            new ArtifactSourceManifest(
-                new SourceContractVersion("1.0.0"),
-                "a".repeat(64),
-                "scm.pull_request",
-                now,
-                List.of()
-            )
-        );
-        assertThatIllegalArgumentException().isThrownBy(() ->
-            new AutomatedReviewReadinessDecision("review-quality", now, true, List.of(), List.of())
-        );
-        assertThat(
-            new AutomatedReviewReadinessDecision(
-                "no-automated-review",
-                now,
-                false,
-                List.of(AutomatedReviewReadinessReason.NO_AUTOMATED_REVIEW),
-                List.of()
-            ).sourceChecks()
-        ).isEmpty();
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new ArtifactSourceManifest(
+                        new SourceContractVersion("1.0.0"), "a".repeat(64), "scm.pull_request", now, List.of()));
+        assertThatIllegalArgumentException()
+                .isThrownBy(
+                        () -> new AutomatedReviewReadinessDecision("review-quality", now, true, List.of(), List.of()));
+        assertThat(new AutomatedReviewReadinessDecision(
+                                "no-automated-review",
+                                now,
+                                false,
+                                List.of(AutomatedReviewReadinessReason.NO_AUTOMATED_REVIEW),
+                                List.of())
+                        .sourceChecks())
+                .isEmpty();
     }
 
     @Test
@@ -178,27 +163,24 @@ class SourceContractValueTest {
         SourceKind kind = new SourceKind("scm.pull-request.diff");
         SourceContractVersion version = new SourceContractVersion("1.0.0");
 
-        assertThatIllegalArgumentException().isThrownBy(() ->
-            new SourceReadinessCheck(kind, version, now, now, true, List.of(SourceReadinessReason.SOURCE_INCOMPLETE))
-        );
-        assertThatIllegalArgumentException().isThrownBy(() ->
-            new SourceReadinessCheck(
-                kind,
-                version,
-                now,
-                now,
-                false,
-                List.of(SourceReadinessReason.SOURCE_INCOMPLETE, SourceReadinessReason.SOURCE_INCOMPLETE)
-            )
-        );
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new SourceReadinessCheck(
+                        kind, version, now, now, true, List.of(SourceReadinessReason.SOURCE_INCOMPLETE)));
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new SourceReadinessCheck(
+                        kind,
+                        version,
+                        now,
+                        now,
+                        false,
+                        List.of(SourceReadinessReason.SOURCE_INCOMPLETE, SourceReadinessReason.SOURCE_INCOMPLETE)));
     }
 
     @Test
     void shouldRejectNonCanonicalArtifactPaths() {
         for (String path : List.of("foo/..", "foo/../bar", "./foo", "foo\\bar")) {
-            assertThatIllegalArgumentException().isThrownBy(() ->
-                new SourceArtifact(path, "application/json", "a".repeat(64), 1)
-            );
+            assertThatIllegalArgumentException()
+                    .isThrownBy(() -> new SourceArtifact(path, "application/json", "a".repeat(64), 1));
         }
     }
 
@@ -207,16 +189,13 @@ class SourceContractValueTest {
         SourceArtifact first = new SourceArtifact("context.json", "application/json", "a".repeat(64), 1);
         SourceArtifact second = new SourceArtifact("context.json", "application/json", "b".repeat(64), 2);
 
-        assertThatIllegalArgumentException().isThrownBy(() ->
-            new SourceCapture(
-                new SourceKind("scm.pull-request.core"),
-                new SourceCaptureState.Available(
-                    SourceContentState.NON_EMPTY,
-                    SourceCompleteness.COMPLETE,
-                    new SourceCaptureFacts(Instant.parse("2026-08-03T10:00:00Z"), null, null, null)
-                ),
-                List.of(first, second)
-            )
-        );
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> new SourceCapture(
+                        new SourceKind("scm.pull-request.core"),
+                        new SourceCaptureState.Available(
+                                SourceContentState.NON_EMPTY,
+                                SourceCompleteness.COMPLETE,
+                                new SourceCaptureFacts(Instant.parse("2026-08-03T10:00:00Z"), null, null, null)),
+                        List.of(first, second)));
     }
 }

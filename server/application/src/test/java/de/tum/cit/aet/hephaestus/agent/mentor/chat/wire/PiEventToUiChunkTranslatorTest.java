@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.agent.mentor.chat.wire;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
 import java.io.InputStream;
@@ -43,7 +42,9 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
 
     private JsonNode fixture(String name) throws IOException {
         try (InputStream in = getClass().getClassLoader().getResourceAsStream(FIXTURE_DIR + name)) {
-            assertThat(in).as("fixture %s must exist on the test classpath", name).isNotNull();
+            assertThat(in)
+                    .as("fixture %s must exist on the test classpath", name)
+                    .isNotNull();
             return mapper.readTree(in);
         }
     }
@@ -56,9 +57,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
 
         List<UIMessageChunk> out = translator.translate(event, state);
 
-        assertThat(out)
-            .extracting(c -> c.getClass().getSimpleName())
-            .containsExactly("Start", "StartStep");
+        assertThat(out).extracting(c -> c.getClass().getSimpleName()).containsExactly("Start", "StartStep");
         UIMessageChunk.Start start = (UIMessageChunk.Start) out.get(0);
         assertThat(start.messageId()).isEqualTo(assistantMessageId);
         // model lives on the message's role-bearing object, NOT a top-level event field.
@@ -93,9 +92,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
 
         List<UIMessageChunk> out = translator.translate(event, state);
 
-        assertThat(out)
-            .extracting(c -> c.getClass().getSimpleName())
-            .containsExactly("StartStep");
+        assertThat(out).extracting(c -> c.getClass().getSimpleName()).containsExactly("StartStep");
     }
 
     @Test
@@ -106,12 +103,8 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         List<UIMessageChunk> first = translator.translate(event, state);
         List<UIMessageChunk> second = translator.translate(event, state);
 
-        assertThat(first)
-            .extracting(c -> c.getClass().getSimpleName())
-            .containsExactly("Start", "StartStep");
-        assertThat(second)
-            .extracting(c -> c.getClass().getSimpleName())
-            .containsExactly("StartStep");
+        assertThat(first).extracting(c -> c.getClass().getSimpleName()).containsExactly("Start", "StartStep");
+        assertThat(second).extracting(c -> c.getClass().getSimpleName()).containsExactly("StartStep");
     }
 
     // message_update (Pi's authoritative shape)
@@ -122,9 +115,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
 
         List<UIMessageChunk> out = translator.translate(event, state);
 
-        assertThat(out)
-            .extracting(c -> c.getClass().getSimpleName())
-            .containsExactly("TextStart", "TextDelta");
+        assertThat(out).extracting(c -> c.getClass().getSimpleName()).containsExactly("TextStart", "TextDelta");
         UIMessageChunk.TextDelta delta = (UIMessageChunk.TextDelta) out.get(1);
         assertThat(delta.delta()).isEqualTo("hel");
         // contentIndex=0 → block id "text-0" (stable across deltas).
@@ -145,9 +136,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
 
         // Just a TextDelta — TextStart already fired on the first delta, and both deltas must
         // reuse the same block id so the AI SDK reconciler merges them into one part.
-        assertThat(out)
-            .extracting(c -> c.getClass().getSimpleName())
-            .containsExactly("TextDelta");
+        assertThat(out).extracting(c -> c.getClass().getSimpleName()).containsExactly("TextDelta");
         assertThat(((UIMessageChunk.TextDelta) out.get(0)).id()).isEqualTo("text-0");
     }
 
@@ -181,11 +170,12 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     void multiStepTurn_sumsEveryCompletedAssistantCall() throws Exception {
         ObjectNode first = (ObjectNode) fixture("message_end_assistant.json").deepCopy();
         ObjectNode second = (ObjectNode) fixture("message_end_assistant.json").deepCopy();
-        ((ObjectNode) second.path("message").path("usage")).put("input", 40)
-            .put("output", 10)
-            .put("cacheRead", 3)
-            .put("cacheWrite", 2)
-            .put("totalTokens", 55);
+        ((ObjectNode) second.path("message").path("usage"))
+                .put("input", 40)
+                .put("output", 10)
+                .put("cacheRead", 3)
+                .put("cacheWrite", 2)
+                .put("totalTokens", 55);
 
         translator.translate(first, state);
         translator.translate(second, state);
@@ -193,7 +183,8 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         ObjectNode end = mapper.createObjectNode();
         end.put("type", "agent_end");
         end.putArray("messages");
-        UIMessageChunk.Finish finish = (UIMessageChunk.Finish) translator.translate(end, state).getLast();
+        UIMessageChunk.Finish finish =
+                (UIMessageChunk.Finish) translator.translate(end, state).getLast();
         assertThat(finish.messageMetadata()).isNotNull();
         assertThat(finish.messageMetadata().usage()).isNotNull();
 
@@ -248,7 +239,11 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         ObjectNode event = mapper.createObjectNode();
         event.put("type", "tool_execution_end");
         event.put("toolCallId", "x");
-        event.putObject("result").putArray("content").addObject().put("type", "text").put("text", "ok");
+        event.putObject("result")
+                .putArray("content")
+                .addObject()
+                .put("type", "text")
+                .put("text", "ok");
         List<UIMessageChunk> out = translator.translate(event, state);
         assertThat(out).isEmpty();
     }
@@ -278,13 +273,12 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         // replaces streaming observations rather than double-counting them.
         ObjectNode event = mapper.createObjectNode();
         event.put("type", "agent_end");
-        event
-            .putArray("messages")
-            .addObject()
-            .put("role", "assistant")
-            .putObject("usage")
-            .put("input", 999)
-            .put("output", 999);
+        event.putArray("messages")
+                .addObject()
+                .put("role", "assistant")
+                .putObject("usage")
+                .put("input", 999)
+                .put("output", 999);
 
         List<UIMessageChunk> out = translator.translate(event, state);
 
@@ -314,14 +308,12 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         // Anything raw-Pi reaching the wire would be a strict-zod rejection at the client.
         assertThat(PiEventToUiChunkTranslator.mapStopReason("stop")).isSameAs(UIMessageChunk.FinishReason.STOP);
         assertThat(PiEventToUiChunkTranslator.mapStopReason("length")).isSameAs(UIMessageChunk.FinishReason.LENGTH);
-        assertThat(PiEventToUiChunkTranslator.mapStopReason("toolUse")).isSameAs(
-            UIMessageChunk.FinishReason.TOOL_CALLS
-        );
+        assertThat(PiEventToUiChunkTranslator.mapStopReason("toolUse"))
+                .isSameAs(UIMessageChunk.FinishReason.TOOL_CALLS);
         assertThat(PiEventToUiChunkTranslator.mapStopReason("error")).isSameAs(UIMessageChunk.FinishReason.ERROR);
         assertThat(PiEventToUiChunkTranslator.mapStopReason("aborted")).isSameAs(UIMessageChunk.FinishReason.ERROR);
-        assertThat(PiEventToUiChunkTranslator.mapStopReason("future-pi-reason")).isSameAs(
-            UIMessageChunk.FinishReason.OTHER
-        );
+        assertThat(PiEventToUiChunkTranslator.mapStopReason("future-pi-reason"))
+                .isSameAs(UIMessageChunk.FinishReason.OTHER);
         // Null Pi-side stopReason → wire-null (AI-SDK schema accepts finishReason as optional).
         // Don't default to STOP — that would mask provider regressions that drop the field.
         assertThat(PiEventToUiChunkTranslator.mapStopReason(null)).isNull();
@@ -351,18 +343,14 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
 
         List<UIMessageChunk> out = translator.translate(mapper.readTree("{\"type\":\"turn_end\"}"), state);
 
-        assertThat(out)
-            .extracting(c -> c.getClass().getSimpleName())
-            .containsExactly("TextEnd", "FinishStep");
+        assertThat(out).extracting(c -> c.getClass().getSimpleName()).containsExactly("TextEnd", "FinishStep");
     }
 
     @Test
     void toolStart_closesOpenText() throws Exception {
         translator.translate(fixture("message_update_text_delta.json"), state);
         List<UIMessageChunk> out = translator.translate(fixture("tool_execution_start.json"), state);
-        assertThat(out)
-            .extracting(c -> c.getClass().getSimpleName())
-            .containsExactly("TextEnd");
+        assertThat(out).extracting(c -> c.getClass().getSimpleName()).containsExactly("TextEnd");
     }
 
     // link_observation (runner-emitted, camelCase canonical)
@@ -381,9 +369,9 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
 
     @Test
     void linkFinding_invalidUuid_dropped() throws Exception {
-        assertThat(
-            translator.translate(mapper.readTree("{\"type\":\"link_observation\",\"observationId\":\"nope\"}"), state)
-        ).isEmpty();
+        assertThat(translator.translate(
+                        mapper.readTree("{\"type\":\"link_observation\",\"observationId\":\"nope\"}"), state))
+                .isEmpty();
     }
 
     // synthetic runner events (snake-case, runner-owned)
@@ -403,12 +391,14 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
 
     @Test
     void runnerReady_dropped() throws Exception {
-        assertThat(translator.translate(mapper.readTree("{\"type\":\"runner_ready\"}"), state)).isEmpty();
+        assertThat(translator.translate(mapper.readTree("{\"type\":\"runner_ready\"}"), state))
+                .isEmpty();
     }
 
     @Test
     void unknownEvent_dropped() throws Exception {
-        assertThat(translator.translate(mapper.readTree("{\"type\":\"future_event_we_dont_know\"}"), state)).isEmpty();
+        assertThat(translator.translate(mapper.readTree("{\"type\":\"future_event_we_dont_know\"}"), state))
+                .isEmpty();
     }
 
     @Test
@@ -432,8 +422,8 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         for (String type : sessionEvents) {
             JsonNode event = mapper.readTree("{\"type\":\"" + type + "\"}");
             assertThat(translator.translate(event, state))
-                .as("session-level event %s must be an explicit no-op", type)
-                .isEmpty();
+                    .as("session-level event %s must be an explicit no-op", type)
+                    .isEmpty();
         }
     }
 
@@ -448,9 +438,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         translator.translate(delta, state);
         JsonNode err = mapper.readTree("{\"type\":\"pi_error\",\"error\":\"upstream timeout\"}");
         List<UIMessageChunk> out = translator.translate(err, state);
-        assertThat(out)
-            .extracting(c -> c.getClass().getSimpleName())
-            .containsExactly("TextEnd", "Error");
+        assertThat(out).extracting(c -> c.getClass().getSimpleName()).containsExactly("TextEnd", "Error");
     }
 
     @Test
@@ -461,9 +449,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         translator.translate(delta, state);
         JsonNode watchdog = mapper.readTree("{\"type\":\"turn_watchdog_fired\"}");
         List<UIMessageChunk> out = translator.translate(watchdog, state);
-        assertThat(out)
-            .extracting(c -> c.getClass().getSimpleName())
-            .containsExactly("TextEnd", "Error");
+        assertThat(out).extracting(c -> c.getClass().getSimpleName()).containsExactly("TextEnd", "Error");
     }
 
     @Test
@@ -484,7 +470,9 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         state.decrementStep();
         state.decrementStep();
         int after = state.incrementStep();
-        assertThat(after).as("incrementStep after over-decrements should yield 1, not 0").isEqualTo(1);
+        assertThat(after)
+                .as("incrementStep after over-decrements should yield 1, not 0")
+                .isEqualTo(1);
     }
 
     @Test
@@ -528,7 +516,8 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
 
     @Test
     void malformedEvent_dropped() {
-        assertThat(translator.translate(mapper.createObjectNode().put("noType", true), state)).isEmpty();
+        assertThat(translator.translate(mapper.createObjectNode().put("noType", true), state))
+                .isEmpty();
     }
 
     // parts accumulation
@@ -537,7 +526,8 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     void stateAccumulatesPartsAcrossDeltas() throws Exception {
         translator.translate(fixture("message_start_assistant.json"), state);
         translator.translate(fixture("message_update_text_delta.json"), state);
-        ObjectNode second = (ObjectNode) fixture("message_update_text_delta.json").deepCopy();
+        ObjectNode second =
+                (ObjectNode) fixture("message_update_text_delta.json").deepCopy();
         ((ObjectNode) second.get("assistantMessageEvent")).put("delta", "lo");
         translator.translate(second, state);
         translator.translate(mapper.readTree("{\"type\":\"turn_end\"}"), state);
@@ -566,7 +556,11 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         end.put("toolCallId", "tc-1");
         end.put("toolName", "fetch_context");
         end.put("isError", false);
-        end.putObject("result").putArray("content").addObject().put("type", "text").put("text", "ok");
+        end.putObject("result")
+                .putArray("content")
+                .addObject()
+                .put("type", "text")
+                .put("text", "ok");
         translator.translate(end, state);
 
         assertThat(state.partsSnapshot()).isEmpty();

@@ -27,15 +27,12 @@ public interface PullRequestReviewCommentRepository extends JpaRepository<PullRe
      * only signal, and counting orphans of a deleted PR would leave this row permanently inflated. The
      * predicate rides the {@code c.pullRequest} join the grouping already needs.
      */
-    @Query(
-        "SELECT c.pullRequest.repository.id AS repositoryId, COUNT(c) AS itemCount " +
-            "FROM PullRequestReviewComment c " +
-            "WHERE c.pullRequest.repository.id IN :repositoryIds AND c.pullRequest.deletedAt IS NULL " +
-            "GROUP BY c.pullRequest.repository.id"
-    )
+    @Query("SELECT c.pullRequest.repository.id AS repositoryId, COUNT(c) AS itemCount "
+            + "FROM PullRequestReviewComment c "
+            + "WHERE c.pullRequest.repository.id IN :repositoryIds AND c.pullRequest.deletedAt IS NULL "
+            + "GROUP BY c.pullRequest.repository.id")
     List<RepositoryItemCountProjection> countGroupedByRepositoryIds(
-        @Param("repositoryIds") Collection<Long> repositoryIds
-    );
+            @Param("repositoryIds") Collection<Long> repositoryIds);
 
     /**
      * Fetch a single review comment with its pull request and PR author eagerly loaded.
@@ -45,15 +42,13 @@ public interface PullRequestReviewCommentRepository extends JpaRepository<PullRe
      * @param id the comment ID
      * @return comment with pullRequest and pullRequest.author eagerly loaded
      */
-    @Query(
-        """
+    @Query("""
         SELECT prrc
         FROM PullRequestReviewComment prrc
         LEFT JOIN FETCH prrc.pullRequest pr
         LEFT JOIN FETCH pr.author
         WHERE prrc.id = :id
-        """
-    )
+        """)
     Optional<PullRequestReviewComment> findByIdWithPullRequestAuthor(@Param("id") Long id);
 
     /**
@@ -62,30 +57,22 @@ public interface PullRequestReviewCommentRepository extends JpaRepository<PullRe
      * @param pullRequestId the pull request ID
      * @return comments with author eagerly loaded, ordered by creation time
      */
-    @Query(
-        """
+    @Query("""
         SELECT prrc
         FROM PullRequestReviewComment prrc
         LEFT JOIN FETCH prrc.author
         WHERE prrc.pullRequest.id = :pullRequestId
         ORDER BY prrc.createdAt ASC
-        """
-    )
+        """)
     List<PullRequestReviewComment> findByPullRequestIdWithAuthorOrderByCreatedAt(
-        @Param("pullRequestId") Long pullRequestId
-    );
+            @Param("pullRequestId") Long pullRequestId);
 
-    @Query(
-        "SELECT prrc FROM PullRequestReviewComment prrc LEFT JOIN FETCH prrc.author " +
-            "WHERE prrc.pullRequest.id = :pullRequestId ORDER BY prrc.createdAt DESC, prrc.id DESC"
-    )
+    @Query("SELECT prrc FROM PullRequestReviewComment prrc LEFT JOIN FETCH prrc.author "
+            + "WHERE prrc.pullRequest.id = :pullRequestId ORDER BY prrc.createdAt DESC, prrc.id DESC")
     List<PullRequestReviewComment> findRecentByPullRequestIdWithAuthor(
-        @Param("pullRequestId") Long pullRequestId,
-        Pageable pageable
-    );
+            @Param("pullRequestId") Long pullRequestId, Pageable pageable);
 
-    @Query(
-        """
+    @Query("""
         SELECT prrc
         FROM PullRequestReviewComment prrc
         LEFT JOIN FETCH prrc.author
@@ -93,8 +80,7 @@ public interface PullRequestReviewCommentRepository extends JpaRepository<PullRe
         LEFT JOIN FETCH pr.author
         LEFT JOIN FETCH pr.repository
         WHERE prrc.id IN :ids
-        """
-    )
+        """)
     List<PullRequestReviewComment> findAllByIdWithRelations(@Param("ids") Collection<Long> ids);
 
     Optional<PullRequestReviewComment> findFirstByThreadIdOrderByCreatedAtAsc(Long threadId);

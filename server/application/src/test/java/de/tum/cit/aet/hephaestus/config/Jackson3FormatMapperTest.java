@@ -22,8 +22,8 @@ class Jackson3FormatMapperTest extends BaseUnitTest {
     @Test
     void malformedJsonWrapsException() {
         assertThatThrownBy(() -> mapper.fromString("{not json", javaTypeOf(JsonNode.class), mock(WrapperOptions.class)))
-            .isInstanceOf(HibernateException.class)
-            .hasRootCauseInstanceOf(JacksonException.class);
+                .isInstanceOf(HibernateException.class)
+                .hasRootCauseInstanceOf(JacksonException.class);
     }
 
     @SuppressWarnings("unchecked")

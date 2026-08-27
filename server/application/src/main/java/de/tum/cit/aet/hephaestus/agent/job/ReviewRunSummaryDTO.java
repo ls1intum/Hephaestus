@@ -8,25 +8,20 @@ import org.jspecify.annotations.NonNull;
 
 @Schema(description = "A review run with observation and feedback outcome counts")
 public record ReviewRunSummaryDTO(
-    @NonNull UUID id,
-    @NonNull AgentJobStatus status,
-    @NonNull ReviewRunTargetDTO target,
-    @NonNull Instant createdAt,
-    @NonNull ReviewObservationCountsDTO observations,
-    @NonNull ReviewFeedbackCountsDTO feedback
-) {
+        @NonNull UUID id,
+        @NonNull AgentJobStatus status,
+        @NonNull ReviewRunTargetDTO target,
+        @NonNull Instant createdAt,
+        @NonNull ReviewObservationCountsDTO observations,
+        @NonNull ReviewFeedbackCountsDTO feedback) {
     static ReviewRunSummaryDTO from(
-        ReviewRunSummaryRow review,
-        ReviewObservationCountsDTO observations,
-        ReviewFeedbackCountsDTO feedback
-    ) {
+            ReviewRunSummaryRow review, ReviewObservationCountsDTO observations, ReviewFeedbackCountsDTO feedback) {
         return new ReviewRunSummaryDTO(
-            review.getId(),
-            review.getStatus(),
-            ReviewRunTargetDTO.from(review),
-            review.getCreatedAt(),
-            observations,
-            feedback
-        );
+                review.getId(),
+                review.getStatus(),
+                ReviewRunTargetDTO.from(review),
+                review.getCreatedAt(),
+                observations,
+                feedback);
     }
 }

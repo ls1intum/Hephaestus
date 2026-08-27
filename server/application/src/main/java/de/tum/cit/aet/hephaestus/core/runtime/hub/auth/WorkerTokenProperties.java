@@ -13,13 +13,12 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  */
 @ConfigurationProperties(prefix = "hephaestus.worker.hub.token")
 public record WorkerTokenProperties(
-    @DefaultValue("hephaestus-hub") String issuer,
-    @DefaultValue("hephaestus-worker") String audience,
-    @DefaultValue("1h") Duration ttl,
-    @Nullable String registrationToken,
-    @DefaultValue List<KeyEntry> keys,
-    @Nullable String activeKid
-) {
+        @DefaultValue("hephaestus-hub") String issuer,
+        @DefaultValue("hephaestus-worker") String audience,
+        @DefaultValue("1h") Duration ttl,
+        @Nullable String registrationToken,
+        @DefaultValue List<KeyEntry> keys,
+        @Nullable String activeKid) {
     public WorkerTokenProperties {
         if (issuer == null || issuer.isBlank()) {
             throw new IllegalArgumentException("token.issuer must not be blank");
@@ -39,22 +38,19 @@ public record WorkerTokenProperties(
 
     @Override
     public String toString() {
-        return (
-            "WorkerTokenProperties[issuer=" +
-            issuer +
-            ", audience=" +
-            audience +
-            ", ttl=" +
-            ttl +
-            ", registrationToken=" +
-            (registrationToken == null || registrationToken.isBlank() ? "<unset>" : "<redacted>") +
-            ", keys=" +
-            (keys == null ? 0 : keys.size()) +
-            " key(s)" +
-            ", activeKid=" +
-            (activeKid == null ? "<unset>" : activeKid) +
-            "]"
-        );
+        return ("WorkerTokenProperties[issuer=" + issuer
+                + ", audience="
+                + audience
+                + ", ttl="
+                + ttl
+                + ", registrationToken="
+                + (registrationToken == null || registrationToken.isBlank() ? "<unset>" : "<redacted>")
+                + ", keys="
+                + (keys == null ? 0 : keys.size())
+                + " key(s)"
+                + ", activeKid="
+                + (activeKid == null ? "<unset>" : activeKid)
+                + "]");
     }
 
     /** One entry in the key ring; the PEM is PKCS#8 RSA private key (public derived). */

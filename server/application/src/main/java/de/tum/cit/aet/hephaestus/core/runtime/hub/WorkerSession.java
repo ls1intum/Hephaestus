@@ -34,13 +34,12 @@ public final class WorkerSession {
     private volatile Instant lastInboundAt;
 
     public WorkerSession(
-        String workerId,
-        String sessionId,
-        String jti,
-        Instant jwtExpiresAt,
-        WebSocketSession transport,
-        FrameCodec codec
-    ) {
+            String workerId,
+            String sessionId,
+            String jti,
+            Instant jwtExpiresAt,
+            WebSocketSession transport,
+            FrameCodec codec) {
         this.workerId = workerId;
         this.sessionId = sessionId;
         this.jti = jti;
@@ -110,7 +109,10 @@ public final class WorkerSession {
         try {
             json = codec.encode(envelope);
         } catch (RuntimeException e) {
-            log.warn("Frame encode failed for worker {}: {}", workerId, e.getClass().getSimpleName());
+            log.warn(
+                    "Frame encode failed for worker {}: {}",
+                    workerId,
+                    e.getClass().getSimpleName());
             return false;
         }
         synchronized (sendLock) {
@@ -121,7 +123,10 @@ public final class WorkerSession {
                 transport.sendMessage(new TextMessage(json));
                 return true;
             } catch (IOException | RuntimeException e) {
-                log.warn("Frame send failed for worker {}: {}", workerId, e.getClass().getSimpleName());
+                log.warn(
+                        "Frame send failed for worker {}: {}",
+                        workerId,
+                        e.getClass().getSimpleName());
                 return false;
             }
         }

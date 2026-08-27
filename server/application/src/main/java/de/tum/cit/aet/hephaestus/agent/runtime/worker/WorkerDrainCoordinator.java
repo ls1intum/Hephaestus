@@ -43,21 +43,20 @@ public class WorkerDrainCoordinator implements SmartLifecycle {
     private final AtomicBoolean draining = new AtomicBoolean(false);
 
     public WorkerDrainCoordinator(
-        WorkerControlClient client,
-        WorkerCapacityState state,
-        WorkerProperties properties,
-        Optional<AgentJobExecutor> executor,
-        ApplicationEventPublisher events,
-        MeterRegistry meterRegistry
-    ) {
+            WorkerControlClient client,
+            WorkerCapacityState state,
+            WorkerProperties properties,
+            Optional<AgentJobExecutor> executor,
+            ApplicationEventPublisher events,
+            MeterRegistry meterRegistry) {
         this.client = client;
         this.state = state;
         this.properties = properties;
         this.executor = executor;
         this.events = events;
         Gauge.builder("worker.drain.active", draining, b -> b.get() ? 1.0 : 0.0)
-            .description("1 while the worker is draining, 0 otherwise")
-            .register(meterRegistry);
+                .description("1 while the worker is draining, 0 otherwise")
+                .register(meterRegistry);
     }
 
     @Override
@@ -81,16 +80,8 @@ public class WorkerDrainCoordinator implements SmartLifecycle {
                 AvailabilityChangeEvent.publish(events, this, ReadinessState.REFUSING_TRAFFIC);
                 safeSend(new Heartbeat(true));
                 CapacityReport snap = state.snapshot();
-                safeSend(
-                    new CapacityReport(
-                        snap.reviewMax(),
-                        snap.mentorMax(),
-                        snap.inFlightReview(),
-                        snap.inFlightMentor(),
-                        0,
-                        0
-                    )
-                );
+                safeSend(new CapacityReport(
+                        snap.reviewMax(), snap.mentorMax(), snap.inFlightReview(), snap.inFlightMentor(), 0, 0));
 
                 executor.ifPresent(e -> drainExecutor(e, timeout));
                 log.info("Worker drain complete.");
@@ -121,10 +112,9 @@ public class WorkerDrainCoordinator implements SmartLifecycle {
             client.send(frame);
         } catch (Exception e) {
             log.warn(
-                "Drain-time send failed for {}: {}",
-                frame.getClass().getSimpleName(),
-                e.getClass().getSimpleName()
-            );
+                    "Drain-time send failed for {}: {}",
+                    frame.getClass().getSimpleName(),
+                    e.getClass().getSimpleName());
         }
     }
 

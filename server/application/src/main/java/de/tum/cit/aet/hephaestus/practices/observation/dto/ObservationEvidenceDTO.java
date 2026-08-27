@@ -7,7 +7,9 @@ import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
 @Schema(description = "Verified, source-bound evidence for an observation")
-public record ObservationEvidenceDTO(@NonNull List<EvidenceCitationDTO> citations, @Nullable String detector) {
+public record ObservationEvidenceDTO(
+        @NonNull List<EvidenceCitationDTO> citations,
+        @Nullable String detector) {
     public ObservationEvidenceDTO {
         citations = List.copyOf(citations);
         if (citations.isEmpty()) {
@@ -18,11 +20,10 @@ public record ObservationEvidenceDTO(@NonNull List<EvidenceCitationDTO> citation
     public static @Nullable ObservationEvidenceDTO from(@Nullable JsonNode evidence) {
         if (evidence == null || !evidence.isObject()) return null;
         String detector = evidence.path("detector").asString(null);
-        List<EvidenceCitationDTO> citations = evidence
-            .path("citations")
-            .valueStream()
-            .map(EvidenceCitationDTO::from)
-            .toList();
+        List<EvidenceCitationDTO> citations = evidence.path("citations")
+                .valueStream()
+                .map(EvidenceCitationDTO::from)
+                .toList();
         return new ObservationEvidenceDTO(citations, detector);
     }
 }

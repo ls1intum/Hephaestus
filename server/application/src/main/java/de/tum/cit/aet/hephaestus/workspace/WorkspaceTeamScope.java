@@ -17,12 +17,10 @@ import org.jspecify.annotations.Nullable;
 public record WorkspaceTeamScope(String accountLogin, Long providerId) {
     /** Whether {@code team} belongs to this workspace. */
     public boolean contains(@Nullable Team team) {
-        return (
-            team != null &&
-            team.getOrganization() != null &&
-            team.getOrganization().equalsIgnoreCase(accountLogin) &&
-            team.getProvider() != null &&
-            providerId.equals(team.getProvider().getId())
-        );
+        return (team != null
+                && team.getOrganization() != null
+                && team.getOrganization().equalsIgnoreCase(accountLogin)
+                && team.getProvider() != null
+                && providerId.equals(team.getProvider().getId()));
     }
 }

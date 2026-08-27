@@ -27,9 +27,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 @WorkspaceScopedController
 @RequestMapping("/llm/settings")
 @Tag(
-    name = "Workspace LLM",
-    description = "Workspace-scoped \"bring your own\" AI provider connections, models and settings"
-)
+        name = "Workspace LLM",
+        description = "Workspace-scoped \"bring your own\" AI provider connections, models and settings")
 @RequiredArgsConstructor
 @Validated
 public class WorkspaceLlmSettingsController {
@@ -38,13 +37,11 @@ public class WorkspaceLlmSettingsController {
 
     @GetMapping
     @Operation(
-        summary = "Get the instance LLM policy as it applies to this workspace",
-        operationId = "workspaceGetLlmSettings"
-    )
+            summary = "Get the instance LLM policy as it applies to this workspace",
+            operationId = "workspaceGetLlmSettings")
     @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<WorkspaceLlmSettingsDTO> get() {
         return ResponseEntity.ok(
-            new WorkspaceLlmSettingsDTO(instanceLlmSettingsService.get().isAllowWorkspaceConnections())
-        );
+                new WorkspaceLlmSettingsDTO(instanceLlmSettingsService.get().isAllowWorkspaceConnections()));
     }
 }

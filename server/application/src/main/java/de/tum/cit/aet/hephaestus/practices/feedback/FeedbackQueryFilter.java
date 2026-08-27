@@ -7,25 +7,24 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 public record FeedbackQueryFilter(
-    @Nullable List<FeedbackDeliveryState> deliveryStates,
-    @Nullable List<FeedbackSuppressionReason> suppressionReasons,
-    @Nullable List<FeedbackChannel> channels,
-    @Nullable UUID agentJobId,
-    @Nullable ArtifactKind artifactKind,
-    @Nullable Long artifactId,
-    @Nullable Long recipientUserId,
-    @Nullable Instant from,
-    @Nullable Instant to
-) {
-    public String@Nullable [] deliveryStateNames() {
+        @Nullable List<FeedbackDeliveryState> deliveryStates,
+        @Nullable List<FeedbackSuppressionReason> suppressionReasons,
+        @Nullable List<FeedbackChannel> channels,
+        @Nullable UUID agentJobId,
+        @Nullable ArtifactKind artifactKind,
+        @Nullable Long artifactId,
+        @Nullable Long recipientUserId,
+        @Nullable Instant from,
+        @Nullable Instant to) {
+    public String @Nullable [] deliveryStateNames() {
         return names(deliveryStates);
     }
 
-    public String@Nullable [] suppressionReasonNames() {
+    public String @Nullable [] suppressionReasonNames() {
         return names(suppressionReasons);
     }
 
-    public String@Nullable [] channelNames() {
+    public String @Nullable [] channelNames() {
         return names(channels);
     }
 
@@ -33,7 +32,7 @@ public record FeedbackQueryFilter(
         return artifactKind == null ? null : artifactKind.value();
     }
 
-    private static String@Nullable [] names(@Nullable List<? extends Enum<?>> values) {
+    private static String @Nullable [] names(@Nullable List<? extends Enum<?>> values) {
         if (values == null || values.isEmpty()) {
             return null;
         }

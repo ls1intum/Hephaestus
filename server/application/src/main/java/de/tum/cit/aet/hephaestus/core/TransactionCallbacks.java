@@ -20,13 +20,11 @@ public final class TransactionCallbacks {
             action.run();
             return;
         }
-        TransactionSynchronizationManager.registerSynchronization(
-            new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    action.run();
-                }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                action.run();
             }
-        );
+        });
     }
 }

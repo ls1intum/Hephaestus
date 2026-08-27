@@ -68,12 +68,12 @@ public class GitLabTokenRotationClient {
         ScopeCredentials creds = resolveCredentials(scopeId);
 
         Map<String, Object> response = webClient
-            .get()
-            .uri(creds.serverUrl() + SELF_TOKEN_ENDPOINT)
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + creds.token())
-            .retrieve()
-            .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
-            .block(REQUEST_TIMEOUT);
+                .get()
+                .uri(creds.serverUrl() + SELF_TOKEN_ENDPOINT)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + creds.token())
+                .retrieve()
+                .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+                .block(REQUEST_TIMEOUT);
 
         if (response == null) {
             throw new IllegalStateException("Empty response from GitLab token self-introspection");
@@ -82,8 +82,7 @@ public class GitLabTokenRotationClient {
         Number idValue = (Number) Objects.requireNonNull(response).get("id");
         if (idValue == null) {
             throw new IllegalStateException(
-                "GitLab token introspection response missing 'id' field: scopeId=" + scopeId
-            );
+                    "GitLab token introspection response missing 'id' field: scopeId=" + scopeId);
         }
         long id = idValue.longValue();
         String name = (String) Objects.requireNonNull(response).get("name");
@@ -107,13 +106,13 @@ public class GitLabTokenRotationClient {
         ScopeCredentials creds = resolveCredentials(scopeId);
 
         Map<String, Object> response = webClient
-            .post()
-            .uri(creds.serverUrl() + SELF_TOKEN_ROTATE_ENDPOINT)
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + creds.token())
-            .bodyValue(Map.of("expires_at", expiresAt.toString()))
-            .retrieve()
-            .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
-            .block(REQUEST_TIMEOUT);
+                .post()
+                .uri(creds.serverUrl() + SELF_TOKEN_ROTATE_ENDPOINT)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + creds.token())
+                .bodyValue(Map.of("expires_at", expiresAt.toString()))
+                .retrieve()
+                .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+                .block(REQUEST_TIMEOUT);
 
         if (response == null) {
             throw new IllegalStateException("Empty response from GitLab token rotation");
@@ -122,9 +121,8 @@ public class GitLabTokenRotationClient {
         String newToken = (String) Objects.requireNonNull(response).get("token");
         if (newToken == null || newToken.isBlank()) {
             throw new IllegalStateException(
-                "GitLab rotation response missing 'token' field. Old token is revoked. Manual intervention required: scopeId=" +
-                    scopeId
-            );
+                    "GitLab rotation response missing 'token' field. Old token is revoked. Manual intervention required: scopeId="
+                            + scopeId);
         }
         String newExpiresAtStr = (String) Objects.requireNonNull(response).get("expires_at");
         LocalDate newExpiresAt = newExpiresAtStr != null ? LocalDate.parse(newExpiresAtStr) : expiresAt;
@@ -140,7 +138,8 @@ public class GitLabTokenRotationClient {
      * @param name      the token name
      * @param expiresAt expiry date (null if no expiry)
      */
-    public record TokenInfo(long id, @Nullable String name, @Nullable LocalDate expiresAt) {}
+    public record TokenInfo(
+            long id, @Nullable String name, @Nullable LocalDate expiresAt) {}
 
     /**
      * Result of a token rotation.

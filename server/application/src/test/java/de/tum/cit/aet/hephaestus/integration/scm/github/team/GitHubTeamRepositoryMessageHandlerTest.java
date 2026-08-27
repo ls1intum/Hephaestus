@@ -28,27 +28,20 @@ class GitHubTeamRepositoryMessageHandlerTest extends BaseUnitTest {
 
     @Test
     void registersUnderRepositoryTeamKey() {
-        GitHubTeamRepositoryMessageHandler handler = new GitHubTeamRepositoryMessageHandler(
-            delegate,
-            mock(),
-            new TransactionTemplate()
-        );
+        GitHubTeamRepositoryMessageHandler handler =
+                new GitHubTeamRepositoryMessageHandler(delegate, mock(), new TransactionTemplate());
 
         assertThat(handler.key()).isEqualTo(new EventTypeKey(IntegrationKind.GITHUB, "repository.team"));
     }
 
     @Test
     void delegatesToSharedTeamDispatch() throws Exception {
-        GitHubTeamRepositoryMessageHandler handler = new GitHubTeamRepositoryMessageHandler(
-            delegate,
-            mock(),
-            new TransactionTemplate()
-        );
+        GitHubTeamRepositoryMessageHandler handler =
+                new GitHubTeamRepositoryMessageHandler(delegate, mock(), new TransactionTemplate());
         GitHubTeamEventDTO event = JSON.readValue(
-            "{\"action\":\"added_to_repository\",\"team\":{\"id\":1,\"name\":\"core\",\"permission\":\"push\"}," +
-                "\"organization\":{\"login\":\"acme\"},\"repository\":{\"id\":9,\"full_name\":\"acme/widgets\"}}",
-            GitHubTeamEventDTO.class
-        );
+                "{\"action\":\"added_to_repository\",\"team\":{\"id\":1,\"name\":\"core\",\"permission\":\"push\"},"
+                        + "\"organization\":{\"login\":\"acme\"},\"repository\":{\"id\":9,\"full_name\":\"acme/widgets\"}}",
+                GitHubTeamEventDTO.class);
 
         handler.handleEvent(event);
 

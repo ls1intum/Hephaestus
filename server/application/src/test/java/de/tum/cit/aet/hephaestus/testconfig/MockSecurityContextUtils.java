@@ -28,11 +28,7 @@ public class MockSecurityContextUtils {
      * @return configured SecurityContext
      */
     public static SecurityContext createSecurityContext(
-        String username,
-        String userId,
-        String[] authorities,
-        String tokenValue
-    ) {
+            String username, String userId, String[] authorities, String tokenValue) {
         SecurityContext context = SecurityContextHolder.createEmptyContext();
 
         // Create mock JWT claims
@@ -49,17 +45,16 @@ public class MockSecurityContextUtils {
 
         // Create mock JWT with specified token value
         Jwt jwt = Jwt.withTokenValue(tokenValue)
-            .header("alg", "HS256")
-            .header("typ", "JWT")
-            .claims(claimsMap -> claimsMap.putAll(claims))
-            .issuedAt(Instant.now())
-            .expiresAt(Instant.now().plusSeconds(3600))
-            .build();
+                .header("alg", "HS256")
+                .header("typ", "JWT")
+                .claims(claimsMap -> claimsMap.putAll(claims))
+                .issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(3600))
+                .build();
 
         // Create authorities from the annotation
-        var springAuthorities = Arrays.stream(authorities)
-            .map(SimpleGrantedAuthority::new)
-            .collect(Collectors.toList());
+        var springAuthorities =
+                Arrays.stream(authorities).map(SimpleGrantedAuthority::new).collect(Collectors.toList());
 
         // Create JWT authentication token
         Authentication authentication = new JwtAuthenticationToken(jwt, springAuthorities);

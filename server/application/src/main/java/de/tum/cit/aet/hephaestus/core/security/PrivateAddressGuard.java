@@ -22,15 +22,13 @@ public final class PrivateAddressGuard {
 
     /** True if {@code addr} must NOT be used as an outbound target (SSRF-unsafe). */
     public static boolean isNonPublic(InetAddress addr) {
-        return (
-            addr.isLoopbackAddress() ||
-            addr.isLinkLocalAddress() ||
-            addr.isSiteLocalAddress() ||
-            addr.isAnyLocalAddress() ||
-            addr.isMulticastAddress() ||
-            isUniqueLocalIpv6(addr) ||
-            isReservedRange(addr)
-        );
+        return (addr.isLoopbackAddress()
+                || addr.isLinkLocalAddress()
+                || addr.isSiteLocalAddress()
+                || addr.isAnyLocalAddress()
+                || addr.isMulticastAddress()
+                || isUniqueLocalIpv6(addr)
+                || isReservedRange(addr));
     }
 
     /** fc00::/7 — IPv6 unique-local; not covered by {@link InetAddress#isSiteLocalAddress()}. */
@@ -49,9 +47,7 @@ public final class PrivateAddressGuard {
     private static boolean isReservedRange(InetAddress addr) {
         byte[] b = addr.getAddress();
         if (b.length == 4) {
-            int b0 = b[0] & 0xFF,
-                b1 = b[1] & 0xFF,
-                b2 = b[2] & 0xFF;
+            int b0 = b[0] & 0xFF, b1 = b[1] & 0xFF, b2 = b[2] & 0xFF;
             if (b0 == 0) return true; // 0.0.0.0/8 "this network"
             if (b0 == 100 && (b1 & 0xC0) == 0x40) return true; // 100.64.0.0/10 carrier-grade NAT
             if (b0 == 192 && b1 == 0 && b2 == 0) return true; // 192.0.0.0/24 IETF protocol assignments

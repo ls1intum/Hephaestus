@@ -128,34 +128,33 @@ public class GithubDataSyncService {
     private final AsyncTaskExecutor monitoringExecutor;
 
     public GithubDataSyncService(
-        SyncSchedulerProperties syncSchedulerProperties,
-        IdentityProviderRepository gitProviderRepository,
-        SyncTargetProvider syncTargetProvider,
-        OrganizationMembershipListener organizationMembershipListener,
-        RepositoryRepository repositoryRepository,
-        OrganizationRepository organizationRepository,
-        GitHubLabelSyncService labelSyncService,
-        GitHubMilestoneSyncService milestoneSyncService,
-        GitHubIssueSyncService issueSyncService,
-        GitHubIssueDependencySyncService issueDependencySyncService,
-        GitHubIssueTypeSyncService issueTypeSyncService,
-        GitHubSubIssueSyncService subIssueSyncService,
-        GitHubPullRequestSyncService pullRequestSyncService,
-        GitHubDiscussionSyncService discussionSyncService,
-        GitHubTeamSyncService teamSyncService,
-        GitHubProjectSyncService projectSyncService,
-        GitHubOrganizationSyncService organizationSyncService,
-        GitHubRepositorySyncService repositorySyncService,
-        GitHubCollaboratorSyncService collaboratorSyncService,
-        GitHubCommitBackfillService commitBackfillService,
-        CommitAuthorEnrichmentService commitAuthorEnrichmentService,
-        CommitMetadataEnrichmentService commitMetadataEnrichmentService,
-        GitHubExceptionClassifier exceptionClassifier,
-        InstallationTokenProvider tokenProvider,
-        GitHubAppTokenService gitHubAppTokenService,
-        RateLimitTracker rateLimitTracker,
-        @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
-    ) {
+            SyncSchedulerProperties syncSchedulerProperties,
+            IdentityProviderRepository gitProviderRepository,
+            SyncTargetProvider syncTargetProvider,
+            OrganizationMembershipListener organizationMembershipListener,
+            RepositoryRepository repositoryRepository,
+            OrganizationRepository organizationRepository,
+            GitHubLabelSyncService labelSyncService,
+            GitHubMilestoneSyncService milestoneSyncService,
+            GitHubIssueSyncService issueSyncService,
+            GitHubIssueDependencySyncService issueDependencySyncService,
+            GitHubIssueTypeSyncService issueTypeSyncService,
+            GitHubSubIssueSyncService subIssueSyncService,
+            GitHubPullRequestSyncService pullRequestSyncService,
+            GitHubDiscussionSyncService discussionSyncService,
+            GitHubTeamSyncService teamSyncService,
+            GitHubProjectSyncService projectSyncService,
+            GitHubOrganizationSyncService organizationSyncService,
+            GitHubRepositorySyncService repositorySyncService,
+            GitHubCollaboratorSyncService collaboratorSyncService,
+            GitHubCommitBackfillService commitBackfillService,
+            CommitAuthorEnrichmentService commitAuthorEnrichmentService,
+            CommitMetadataEnrichmentService commitMetadataEnrichmentService,
+            GitHubExceptionClassifier exceptionClassifier,
+            InstallationTokenProvider tokenProvider,
+            GitHubAppTokenService gitHubAppTokenService,
+            RateLimitTracker rateLimitTracker,
+            @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor) {
         this.syncSchedulerProperties = syncSchedulerProperties;
         this.gitProviderRepository = gitProviderRepository;
         this.syncTargetProvider = syncTargetProvider;
@@ -207,24 +206,22 @@ public class GithubDataSyncService {
         }
 
         IdentityProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
-            .orElseThrow(() ->
-                new IllegalStateException("IdentityProvider not found for type=GITHUB, serverUrl=" + GITHUB_SERVER_URL)
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
+                .orElseThrow(() -> new IllegalStateException(
+                        "IdentityProvider not found for type=GITHUB, serverUrl=" + GITHUB_SERVER_URL));
 
         Repository repository = repositoryRepository
-            .findByNameWithOwnerAndProviderId(nameWithOwner, Objects.requireNonNull(provider.getId()))
-            .orElse(null);
+                .findByNameWithOwnerAndProviderId(nameWithOwner, Objects.requireNonNull(provider.getId()))
+                .orElse(null);
         boolean repositoryCreatedDuringSync = false;
 
         // PAT workspaces start with only a RepositoryToMonitor entry — fetch and create the
         // repository from GitHub on first sync.
         if (repository == null) {
             log.debug(
-                "Repository not found locally, fetching from GitHub: scopeId={}, repoName={}",
-                scopeId,
-                safeNameWithOwner
-            );
+                    "Repository not found locally, fetching from GitHub: scopeId={}, repoName={}",
+                    scopeId,
+                    safeNameWithOwner);
             Optional<Repository> syncedRepository;
             try {
                 syncedRepository = repositorySyncService.syncRepository(scopeId, nameWithOwner, provider);
@@ -236,18 +233,16 @@ public class GithubDataSyncService {
                 // with no stable id fall back to removal.
                 if (syncTarget.nativeId() != null) {
                     log.warn(
-                        "Preserving sync target despite name-404: reason=stableIdPresent(likelyRenameOrTransfer), scopeId={}, repoName={}, nativeId={}",
-                        scopeId,
-                        safeNameWithOwner,
-                        syncTarget.nativeId()
-                    );
+                            "Preserving sync target despite name-404: reason=stableIdPresent(likelyRenameOrTransfer), scopeId={}, repoName={}, nativeId={}",
+                            scopeId,
+                            safeNameWithOwner,
+                            syncTarget.nativeId());
                     return false;
                 }
                 log.info(
-                    "Removing sync target: reason=repositoryNotFoundOnGitHub, scopeId={}, repoName={}",
-                    scopeId,
-                    safeNameWithOwner
-                );
+                        "Removing sync target: reason=repositoryNotFoundOnGitHub, scopeId={}, repoName={}",
+                        scopeId,
+                        safeNameWithOwner);
                 syncTargetProvider.removeSyncTarget(syncTarget.id());
                 return true;
             }
@@ -255,10 +250,9 @@ public class GithubDataSyncService {
                 // Transient failure (auth, transport, rate limit, classification). Leave the
                 // RTM in place so the next cycle retries. See ADR-0012.
                 log.debug(
-                    "Skipped sync (transient): reason=syncReturnedEmpty, scopeId={}, repoName={}",
-                    scopeId,
-                    safeNameWithOwner
-                );
+                        "Skipped sync (transient): reason=syncReturnedEmpty, scopeId={}, repoName={}",
+                        scopeId,
+                        safeNameWithOwner);
                 return false;
             }
             repository = syncedRepository.get();
@@ -272,17 +266,13 @@ public class GithubDataSyncService {
         // the domain repository already reflects an upstream rename. Once the id is captured, the
         // NOT_FOUND handlers can distinguish a rename (heal) from a real deletion (remove).
         syncTargetProvider.reconcileSyncTargetIdentity(
-            syncTarget.id(),
-            repository.getNativeId(),
-            repository.getNameWithOwner()
-        );
+                syncTarget.id(), repository.getNativeId(), repository.getNameWithOwner());
 
         log.info(
-            "Starting repository sync: scopeId={}, repoId={}, repoName={}",
-            scopeId,
-            repositoryId,
-            safeNameWithOwner
-        );
+                "Starting repository sync: scopeId={}, repoId={}, repoName={}",
+                scopeId,
+                repositoryId,
+                safeNameWithOwner);
 
         try {
             if (!repositoryCreatedDuringSync) {
@@ -293,10 +283,9 @@ public class GithubDataSyncService {
                     syncTargetProvider.updateSyncTimestamp(syncTarget.id(), SyncType.FULL_REPOSITORY, Instant.now());
                 } else {
                     log.warn(
-                        "Failed to sync repository metadata, continuing: scopeId={}, repoId={}",
-                        scopeId,
-                        repositoryId
-                    );
+                            "Failed to sync repository metadata, continuing: scopeId={}, repoId={}",
+                            scopeId,
+                            repositoryId);
                 }
             }
 
@@ -332,22 +321,12 @@ public class GithubDataSyncService {
             // lastIssuesSyncedAt/lastPullRequestsSyncedAt, which are the real incremental state.
             // As a bonus, a null cursor re-enables the cheap totalCount probe in issue sync.
             SyncResult issueResult = issueSyncService.syncForRepository(
-                scopeId,
-                repositoryId,
-                null,
-                null,
-                syncTarget.lastIssuesSyncedAt()
-            );
+                    scopeId, repositoryId, null, null, syncTarget.lastIssuesSyncedAt());
 
             // Sync pull requests — same rationale as issues above.
             // Review threads and comments are synced inline with PRs via the GraphQL query.
             SyncResult prResult = pullRequestSyncService.syncForRepository(
-                scopeId,
-                repositoryId,
-                null,
-                null,
-                syncTarget.lastPullRequestsSyncedAt()
-            );
+                    scopeId, repositoryId, null, null, syncTarget.lastPullRequestsSyncedAt());
 
             // Update timestamps independently — each sync type tracks its own progress
             // so completed work isn't wasted when the other sync type hits rate limits
@@ -355,21 +334,19 @@ public class GithubDataSyncService {
                 syncTargetProvider.updateSyncTimestamp(syncTarget.id(), SyncType.ISSUES, Instant.now());
             } else {
                 log.info(
-                    "Skipped issue timestamp update due to incomplete sync: scopeId={}, repoId={}, issueStatus={}",
-                    scopeId,
-                    repositoryId,
-                    issueResult.status()
-                );
+                        "Skipped issue timestamp update due to incomplete sync: scopeId={}, repoId={}, issueStatus={}",
+                        scopeId,
+                        repositoryId,
+                        issueResult.status());
             }
             if (prResult.isCompleted()) {
                 syncTargetProvider.updateSyncTimestamp(syncTarget.id(), SyncType.PULL_REQUESTS, Instant.now());
             } else {
                 log.info(
-                    "Skipped PR timestamp update due to incomplete sync: scopeId={}, repoId={}, prStatus={}",
-                    scopeId,
-                    repositoryId,
-                    prResult.status()
-                );
+                        "Skipped PR timestamp update due to incomplete sync: scopeId={}, repoId={}, prStatus={}",
+                        scopeId,
+                        repositoryId,
+                        prResult.status());
             }
 
             // Enrich unresolved commit authors via stored emails + GitHub GraphQL API. Runs AFTER
@@ -393,41 +370,38 @@ public class GithubDataSyncService {
                 discussionResult = SyncResult.completed(0);
             } else {
                 discussionResult = discussionSyncService.syncForRepository(
-                    scopeId,
-                    repositoryId,
-                    syncTarget.id(),
-                    syncTarget.discussionSyncCursor(),
-                    syncTarget.lastDiscussionsSyncedAt()
-                );
+                        scopeId,
+                        repositoryId,
+                        syncTarget.id(),
+                        syncTarget.discussionSyncCursor(),
+                        syncTarget.lastDiscussionsSyncedAt());
             }
 
             if (discussionResult.isCompleted()) {
                 syncTargetProvider.updateSyncTimestamp(syncTarget.id(), SyncType.DISCUSSIONS, Instant.now());
             } else {
                 log.info(
-                    "Skipped discussion timestamp update due to incomplete sync: scopeId={}, repoId={}, discussionStatus={}",
-                    scopeId,
-                    repositoryId,
-                    discussionResult.status()
-                );
+                        "Skipped discussion timestamp update due to incomplete sync: scopeId={}, repoId={}, discussionStatus={}",
+                        scopeId,
+                        repositoryId,
+                        discussionResult.status());
             }
 
             log.info(
-                "Completed repository sync: scopeId={}, repoId={}, commitsBackfilled={}, commitsEnriched={}, commitsMetadataEnriched={}, collaborators={}, labels={}, milestones={}, issues={}, prs={}, discussions={}, issueStatus={}, prStatus={}",
-                scopeId,
-                repositoryId,
-                commitsBackfilled >= 0 ? commitsBackfilled : "skipped",
-                commitsEnriched >= 0 ? commitsEnriched : "skipped",
-                commitsMetadataEnriched >= 0 ? commitsMetadataEnriched : "skipped",
-                collaboratorsCount >= 0 ? collaboratorsCount : "skipped",
-                labelsCount >= 0 ? labelsCount : "skipped",
-                milestonesCount >= 0 ? milestonesCount : "skipped",
-                issueResult.count(),
-                prResult.count(),
-                discussionResult.count(),
-                issueResult.status(),
-                prResult.status()
-            );
+                    "Completed repository sync: scopeId={}, repoId={}, commitsBackfilled={}, commitsEnriched={}, commitsMetadataEnriched={}, collaborators={}, labels={}, milestones={}, issues={}, prs={}, discussions={}, issueStatus={}, prStatus={}",
+                    scopeId,
+                    repositoryId,
+                    commitsBackfilled >= 0 ? commitsBackfilled : "skipped",
+                    commitsEnriched >= 0 ? commitsEnriched : "skipped",
+                    commitsMetadataEnriched >= 0 ? commitsMetadataEnriched : "skipped",
+                    collaboratorsCount >= 0 ? collaboratorsCount : "skipped",
+                    labelsCount >= 0 ? labelsCount : "skipped",
+                    milestonesCount >= 0 ? milestonesCount : "skipped",
+                    issueResult.count(),
+                    prResult.count(),
+                    discussionResult.count(),
+                    issueResult.status(),
+                    prResult.status());
             return issueResult.isCompleted() && prResult.isCompleted() && discussionResult.isCompleted();
         } catch (InstallationNotFoundException e) {
             // Re-throw to abort the entire sync operation
@@ -445,20 +419,18 @@ public class GithubDataSyncService {
                         // repository.deleted webhook, and deleting here on a rename would lose data. See
                         // the create-block handler above for the full rationale.
                         log.warn(
-                            "Preserving repository and sync target despite NOT_FOUND: reason=stableIdPresent(likelyRenameOrTransfer), scopeId={}, repoId={}, repoName={}, nativeId={}",
-                            scopeId,
-                            repositoryId,
-                            safeNameWithOwner,
-                            syncTarget.nativeId()
-                        );
+                                "Preserving repository and sync target despite NOT_FOUND: reason=stableIdPresent(likelyRenameOrTransfer), scopeId={}, repoId={}, repoName={}, nativeId={}",
+                                scopeId,
+                                repositoryId,
+                                safeNameWithOwner,
+                                syncTarget.nativeId());
                     } else {
                         log.warn(
-                            "Repository sync skipped - resource not found, cleaning up orphan: scopeId={}, repoId={}, repoName={}, error={}",
-                            scopeId,
-                            repositoryId,
-                            safeNameWithOwner,
-                            classification.message()
-                        );
+                                "Repository sync skipped - resource not found, cleaning up orphan: scopeId={}, repoId={}, repoName={}, error={}",
+                                scopeId,
+                                repositoryId,
+                                safeNameWithOwner,
+                                classification.message());
                         // The repository no longer exists on GitHub; delete it locally so sync doesn't
                         // fail indefinitely, and remove the sync target to stop perpetual retries.
                         cleanupOrphanedRepository(repositoryId, safeNameWithOwner);
@@ -466,52 +438,48 @@ public class GithubDataSyncService {
                         removed = true;
                     }
                 }
-                case AUTH_ERROR -> log.error(
-                    "Repository sync failed - authentication error: scopeId={}, repoId={}, error={}",
-                    scopeId,
-                    repositoryId,
-                    classification.message()
-                );
+                case AUTH_ERROR ->
+                    log.error(
+                            "Repository sync failed - authentication error: scopeId={}, repoId={}, error={}",
+                            scopeId,
+                            repositoryId,
+                            classification.message());
                 case RATE_LIMITED -> {
                     log.warn(
-                        "Repository sync failed - rate limited: scopeId={}, repoId={}, error={}",
-                        scopeId,
-                        repositoryId,
-                        classification.message()
-                    );
+                            "Repository sync failed - rate limited: scopeId={}, repoId={}, error={}",
+                            scopeId,
+                            repositoryId,
+                            classification.message());
                     Duration waitTime = classification.suggestedWait();
                     if (waitTime != null && !waitTime.isZero()) {
                         log.info(
-                            "Pausing sync for rate limit: scopeId={}, waitSeconds={}",
-                            scopeId,
-                            waitTime.getSeconds()
-                        );
+                                "Pausing sync for rate limit: scopeId={}, waitSeconds={}",
+                                scopeId,
+                                waitTime.getSeconds());
                         try {
                             Thread.sleep(waitTime.toMillis());
                         } catch (InterruptedException ie) {
                             Thread.currentThread().interrupt();
-                            SyncInterruptedException interrupted = new SyncInterruptedException(
-                                "Sync interrupted while waiting for rate limit",
-                                ie
-                            );
+                            SyncInterruptedException interrupted =
+                                    new SyncInterruptedException("Sync interrupted while waiting for rate limit", ie);
                             interrupted.addSuppressed(e);
                             throw interrupted;
                         }
                     }
                 }
-                case RETRYABLE -> log.warn(
-                    "Repository sync failed - transient error: scopeId={}, repoId={}, error={}",
-                    scopeId,
-                    repositoryId,
-                    classification.message()
-                );
-                default -> log.error(
-                    "Failed to sync repository: scopeId={}, repoId={}, error={}",
-                    scopeId,
-                    repositoryId,
-                    classification.message(),
-                    e
-                );
+                case RETRYABLE ->
+                    log.warn(
+                            "Repository sync failed - transient error: scopeId={}, repoId={}, error={}",
+                            scopeId,
+                            repositoryId,
+                            classification.message());
+                default ->
+                    log.error(
+                            "Failed to sync repository: scopeId={}, repoId={}, error={}",
+                            scopeId,
+                            repositoryId,
+                            classification.message(),
+                            e);
             }
             return removed;
         }
@@ -553,10 +521,9 @@ public class GithubDataSyncService {
         Long installationId = tokenProvider.getInstallationId(scopeId).orElse(null);
         if (installationId != null && gitHubAppTokenService.isInstallationMarkedSuspended(installationId)) {
             log.info(
-                "Skipped all repository syncs: reason=installationSuspended, scopeId={}, installationId={}",
-                scopeId,
-                installationId
-            );
+                    "Skipped all repository syncs: reason=installationSuspended, scopeId={}, installationId={}",
+                    scopeId,
+                    installationId);
             return;
         }
 
@@ -575,17 +542,15 @@ public class GithubDataSyncService {
 
         // Prioritize repos by staleness: never-synced first, then oldest sync timestamp.
         // When rate limit budget runs out mid-sync, the most stale repos have already been handled.
-        syncTargets.sort(
-            Comparator.comparing((SyncTarget t) -> {
-                Instant issues = t.lastIssuesSyncedAt();
-                Instant prs = t.lastPullRequestsSyncedAt();
-                if (issues == null || prs == null) {
-                    return Instant.MIN; // never-synced repos go first
-                }
-                // Use the older of the two timestamps (the more stale dimension)
-                return issues.isBefore(prs) ? issues : prs;
-            })
-        );
+        syncTargets.sort(Comparator.comparing((SyncTarget t) -> {
+            Instant issues = t.lastIssuesSyncedAt();
+            Instant prs = t.lastPullRequestsSyncedAt();
+            if (issues == null || prs == null) {
+                return Instant.MIN; // never-synced repos go first
+            }
+            // Use the older of the two timestamps (the more stale dimension)
+            return issues.isBefore(prs) ? issues : prs;
+        }));
 
         log.info("Starting scope sync: scopeId={}, repoCount={}", scopeId, syncTargets.size());
 
@@ -605,11 +570,10 @@ public class GithubDataSyncService {
                 // checked between repositories only (see class-level SyncExecutionHandle javadoc).
                 if (handle != null && handle.isCancellationRequested()) {
                     log.info(
-                        "Aborting remaining syncs: reason=cancellationRequested, scopeId={}, reposProcessed={}, reposRemaining={}",
-                        scopeId,
-                        reposProcessed,
-                        syncTargets.size() - reposProcessed
-                    );
+                            "Aborting remaining syncs: reason=cancellationRequested, scopeId={}, reposProcessed={}, reposRemaining={}",
+                            scopeId,
+                            reposProcessed,
+                            syncTargets.size() - reposProcessed);
                     break;
                 }
                 // Check if installation became suspended mid-sync - abort remaining syncs
@@ -624,32 +588,29 @@ public class GithubDataSyncService {
                 // until the next daily cron run.
                 if (rateLimitTracker.isCritical(scopeId)) {
                     log.info(
-                        "Rate limit critical during startup sync, waiting for reset: scopeId={}, remaining={}, totalRepos={}, reposProcessed={}, reposRemaining={}",
-                        scopeId,
-                        rateLimitTracker.getRemaining(scopeId),
-                        syncTargets.size(),
-                        reposProcessed,
-                        syncTargets.size() - reposProcessed
-                    );
+                            "Rate limit critical during startup sync, waiting for reset: scopeId={}, remaining={}, totalRepos={}, reposProcessed={}, reposRemaining={}",
+                            scopeId,
+                            rateLimitTracker.getRemaining(scopeId),
+                            syncTargets.size(),
+                            reposProcessed,
+                            syncTargets.size() - reposProcessed);
                     try {
                         waitForRateLimitReset(scopeId, handle == null ? null : handle::isCancellationRequested);
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         log.info(
-                            "Startup sync interrupted while waiting for rate limit: scopeId={}, reposProcessed={}, reposRemaining={}",
-                            scopeId,
-                            reposProcessed,
-                            syncTargets.size() - reposProcessed
-                        );
+                                "Startup sync interrupted while waiting for rate limit: scopeId={}, reposProcessed={}, reposRemaining={}",
+                                scopeId,
+                                reposProcessed,
+                                syncTargets.size() - reposProcessed);
                         break;
                     }
                     if (handle != null && handle.isCancellationRequested()) {
                         log.info(
-                            "Aborting remaining syncs: reason=cancellationRequestedDuringRateLimitWait, scopeId={}, reposProcessed={}, reposRemaining={}",
-                            scopeId,
-                            reposProcessed,
-                            syncTargets.size() - reposProcessed
-                        );
+                                "Aborting remaining syncs: reason=cancellationRequestedDuringRateLimitWait, scopeId={}, reposProcessed={}, reposRemaining={}",
+                                scopeId,
+                                reposProcessed,
+                                syncTargets.size() - reposProcessed);
                         break;
                     }
                 }
@@ -659,18 +620,16 @@ public class GithubDataSyncService {
                 reposProcessed++;
                 if (handle != null) {
                     handle.progress(
-                        reposProcessed,
-                        syncTargets.size(),
-                        // Just the repository — "N of M" is already the progress bar's own reading
-                        // (unitsCompleted/unitsTotal travel on the same record).
-                        SyncProgress.ofResource(
-                            SyncPhase.REPOSITORIES,
-                            "Syncing " + sanitizeForLog(target.repositoryNameWithOwner()),
-                            sanitizeForLog(target.repositoryNameWithOwner()),
                             reposProcessed,
-                            syncTargets.size()
-                        )
-                    );
+                            syncTargets.size(),
+                            // Just the repository — "N of M" is already the progress bar's own reading
+                            // (unitsCompleted/unitsTotal travel on the same record).
+                            SyncProgress.ofResource(
+                                    SyncPhase.REPOSITORIES,
+                                    "Syncing " + sanitizeForLog(target.repositoryNameWithOwner()),
+                                    sanitizeForLog(target.repositoryNameWithOwner()),
+                                    reposProcessed,
+                                    syncTargets.size()));
                 }
             }
 
@@ -680,10 +639,9 @@ public class GithubDataSyncService {
             syncScopeLevelRelationships(scopeId);
         } catch (InstallationNotFoundException e) {
             log.warn(
-                "Aborting scope sync: reason=installationDeleted, scopeId={}, installationId={}",
-                scopeId,
-                e.getInstallationId()
-            );
+                    "Aborting scope sync: reason=installationDeleted, scopeId={}, installationId={}",
+                    scopeId,
+                    e.getInstallationId());
         }
     }
 
@@ -719,8 +677,7 @@ public class GithubDataSyncService {
                 log.debug("Synced organization: scopeId={}, orgLogin={}", scopeId, safeOrgLogin);
 
                 organizationMembershipListener.onOrganizationMembershipsSynced(
-                    new OrganizationSyncedEvent(organization.getId(), organizationLogin)
-                );
+                        new OrganizationSyncedEvent(organization.getId(), organizationLogin));
                 syncTargetProvider.updateUsersSyncTimestamp(scopeId, Instant.now());
             }
         } catch (InstallationNotFoundException e) {
@@ -728,25 +685,25 @@ public class GithubDataSyncService {
         } catch (Exception e) {
             ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
             switch (classification.category()) {
-                case AUTH_ERROR -> log.error(
-                    "Organization sync failed - auth error: scopeId={}, orgLogin={}, error={}",
-                    scopeId,
-                    safeOrgLogin,
-                    classification.message()
-                );
-                case RATE_LIMITED -> log.warn(
-                    "Organization sync failed - rate limited: scopeId={}, orgLogin={}, error={}",
-                    scopeId,
-                    safeOrgLogin,
-                    classification.message()
-                );
-                default -> log.error(
-                    "Failed to sync organization: scopeId={}, orgLogin={}, error={}",
-                    scopeId,
-                    safeOrgLogin,
-                    classification.message(),
-                    e
-                );
+                case AUTH_ERROR ->
+                    log.error(
+                            "Organization sync failed - auth error: scopeId={}, orgLogin={}, error={}",
+                            scopeId,
+                            safeOrgLogin,
+                            classification.message());
+                case RATE_LIMITED ->
+                    log.warn(
+                            "Organization sync failed - rate limited: scopeId={}, orgLogin={}, error={}",
+                            scopeId,
+                            safeOrgLogin,
+                            classification.message());
+                default ->
+                    log.error(
+                            "Failed to sync organization: scopeId={}, orgLogin={}, error={}",
+                            scopeId,
+                            safeOrgLogin,
+                            classification.message(),
+                            e);
             }
         }
     }
@@ -765,9 +722,8 @@ public class GithubDataSyncService {
             // Wrapped with retry because the method is @Transactional and a deadlock would poison
             // the transaction, requiring a fresh invocation.
             int issueTypesCount = retryOnTransientFailure(
-                () -> issueTypeSyncService.syncIssueTypesForScope(scopeId),
-                "issue type sync for scopeId=" + scopeId
-            );
+                    () -> issueTypeSyncService.syncIssueTypesForScope(scopeId),
+                    "issue type sync for scopeId=" + scopeId);
             if (issueTypesCount >= 0) {
                 log.debug("Synced issue types: scopeId={}, issueTypeCount={}", scopeId, issueTypesCount);
             } else {
@@ -778,12 +734,11 @@ public class GithubDataSyncService {
         } catch (Exception e) {
             ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
             log.error(
-                "Failed to sync issue types: scopeId={}, category={}, error={}",
-                scopeId,
-                classification.category(),
-                classification.message(),
-                e
-            );
+                    "Failed to sync issue types: scopeId={}, category={}, error={}",
+                    scopeId,
+                    classification.category(),
+                    classification.message(),
+                    e);
         }
     }
 
@@ -814,9 +769,8 @@ public class GithubDataSyncService {
 
         try {
             int teamsCount = retryOnTransientFailure(
-                () -> teamSyncService.syncTeamsForOrganization(scopeId, organizationLogin),
-                "team sync for scopeId=" + scopeId
-            );
+                    () -> teamSyncService.syncTeamsForOrganization(scopeId, organizationLogin),
+                    "team sync for scopeId=" + scopeId);
             log.debug("Synced teams: scopeId={}, orgLogin={}, teamCount={}", scopeId, safeOrgLogin, teamsCount);
             syncTargetProvider.updateTeamsSyncTimestamp(scopeId, Instant.now());
         } catch (InstallationNotFoundException e) {
@@ -824,25 +778,25 @@ public class GithubDataSyncService {
         } catch (Exception e) {
             ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
             switch (classification.category()) {
-                case AUTH_ERROR -> log.error(
-                    "Team sync failed - auth error: scopeId={}, orgLogin={}, error={}",
-                    scopeId,
-                    safeOrgLogin,
-                    classification.message()
-                );
-                case RATE_LIMITED -> log.warn(
-                    "Team sync failed - rate limited: scopeId={}, orgLogin={}, error={}",
-                    scopeId,
-                    safeOrgLogin,
-                    classification.message()
-                );
-                default -> log.error(
-                    "Failed to sync teams: scopeId={}, orgLogin={}, error={}",
-                    scopeId,
-                    safeOrgLogin,
-                    classification.message(),
-                    e
-                );
+                case AUTH_ERROR ->
+                    log.error(
+                            "Team sync failed - auth error: scopeId={}, orgLogin={}, error={}",
+                            scopeId,
+                            safeOrgLogin,
+                            classification.message());
+                case RATE_LIMITED ->
+                    log.warn(
+                            "Team sync failed - rate limited: scopeId={}, orgLogin={}, error={}",
+                            scopeId,
+                            safeOrgLogin,
+                            classification.message());
+                default ->
+                    log.error(
+                            "Failed to sync teams: scopeId={}, orgLogin={}, error={}",
+                            scopeId,
+                            safeOrgLogin,
+                            classification.message(),
+                            e);
             }
         }
     }
@@ -887,12 +841,11 @@ public class GithubDataSyncService {
             // Phase 1: Sync project list (metadata only)
             SyncResult projectListResult = projectSyncService.syncProjectsForOrganization(scopeId, organizationLogin);
             log.debug(
-                "Synced project list: scopeId={}, orgLogin={}, projectCount={}, status={}",
-                scopeId,
-                safeOrgLogin,
-                projectListResult.count(),
-                projectListResult.status()
-            );
+                    "Synced project list: scopeId={}, orgLogin={}, projectCount={}, status={}",
+                    scopeId,
+                    safeOrgLogin,
+                    projectListResult.count(),
+                    projectListResult.status());
 
             // Phase 2: Sync items for each project (decoupled phase with resumable cursors)
             // Only proceed if project list sync was successful
@@ -900,35 +853,34 @@ public class GithubDataSyncService {
                 syncProjectItems(scopeId, organizationLogin);
             } else {
                 log.info(
-                    "Skipped project items sync: reason=projectListSyncIncomplete, scopeId={}, status={}",
-                    scopeId,
-                    projectListResult.status()
-                );
+                        "Skipped project items sync: reason=projectListSyncIncomplete, scopeId={}, status={}",
+                        scopeId,
+                        projectListResult.status());
             }
         } catch (InstallationNotFoundException e) {
             throw e;
         } catch (Exception e) {
             ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
             switch (classification.category()) {
-                case AUTH_ERROR -> log.error(
-                    "Project sync failed - auth error: scopeId={}, orgLogin={}, error={}",
-                    scopeId,
-                    safeOrgLogin,
-                    classification.message()
-                );
-                case RATE_LIMITED -> log.warn(
-                    "Project sync failed - rate limited: scopeId={}, orgLogin={}, error={}",
-                    scopeId,
-                    safeOrgLogin,
-                    classification.message()
-                );
-                default -> log.error(
-                    "Failed to sync projects: scopeId={}, orgLogin={}, error={}",
-                    scopeId,
-                    safeOrgLogin,
-                    classification.message(),
-                    e
-                );
+                case AUTH_ERROR ->
+                    log.error(
+                            "Project sync failed - auth error: scopeId={}, orgLogin={}, error={}",
+                            scopeId,
+                            safeOrgLogin,
+                            classification.message());
+                case RATE_LIMITED ->
+                    log.warn(
+                            "Project sync failed - rate limited: scopeId={}, orgLogin={}, error={}",
+                            scopeId,
+                            safeOrgLogin,
+                            classification.message());
+                default ->
+                    log.error(
+                            "Failed to sync projects: scopeId={}, orgLogin={}, error={}",
+                            scopeId,
+                            safeOrgLogin,
+                            classification.message(),
+                            e);
             }
         }
     }
@@ -947,8 +899,8 @@ public class GithubDataSyncService {
         String safeOrgLogin = sanitizeForLog(organizationLogin);
 
         Organization organization = organizationRepository
-            .findByLoginIgnoreCaseAndProvider_Type(organizationLogin, IdentityProviderType.GITHUB)
-            .orElse(null);
+                .findByLoginIgnoreCaseAndProvider_Type(organizationLogin, IdentityProviderType.GITHUB)
+                .orElse(null);
         if (organization == null) {
             log.debug("Skipped project items sync: reason=organizationNotFound, orgLogin={}", safeOrgLogin);
             return;
@@ -974,10 +926,9 @@ public class GithubDataSyncService {
                 // If rate limited, stop processing more projects
                 if (itemResult.status() == SyncResult.Status.ABORTED_RATE_LIMIT) {
                     log.info(
-                        "Stopping project items sync: reason=rateLimited, scopeId={}, projectsProcessed={}",
-                        scopeId,
-                        projectsWithItems
-                    );
+                            "Stopping project items sync: reason=rateLimited, scopeId={}, projectsProcessed={}",
+                            scopeId,
+                            projectsWithItems);
                     break;
                 }
             } catch (InstallationNotFoundException e) {
@@ -985,21 +936,19 @@ public class GithubDataSyncService {
             } catch (Exception e) {
                 ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
                 log.warn(
-                    "Failed to sync project items: projectId={}, error={}",
-                    project.getId(),
-                    classification.message()
-                );
+                        "Failed to sync project items: projectId={}, error={}",
+                        project.getId(),
+                        classification.message());
                 // Continue with next project on error
             }
         }
 
         log.info(
-            "Completed project items sync: scopeId={}, orgLogin={}, projectsWithItems={}, totalItems={}",
-            scopeId,
-            safeOrgLogin,
-            projectsWithItems,
-            totalItemsSynced
-        );
+                "Completed project items sync: scopeId={}, orgLogin={}, projectsWithItems={}, totalItems={}",
+                scopeId,
+                safeOrgLogin,
+                projectsWithItems,
+                totalItemsSynced);
     }
 
     /**
@@ -1023,10 +972,9 @@ public class GithubDataSyncService {
         // that will all fail with rate limit errors
         if (rateLimitTracker.isCritical(scopeId)) {
             log.warn(
-                "Skipped scope-level relationship sync: reason=rateLimitCritical, scopeId={}, remaining={}",
-                scopeId,
-                rateLimitTracker.getRemaining(scopeId)
-            );
+                    "Skipped scope-level relationship sync: reason=rateLimitCritical, scopeId={}, remaining={}",
+                    scopeId,
+                    rateLimitTracker.getRemaining(scopeId));
             return;
         }
 
@@ -1042,12 +990,11 @@ public class GithubDataSyncService {
         } catch (Exception e) {
             ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
             log.error(
-                "Failed to sync issue dependencies: scopeId={}, category={}, error={}",
-                scopeId,
-                classification.category(),
-                classification.message(),
-                e
-            );
+                    "Failed to sync issue dependencies: scopeId={}, category={}, error={}",
+                    scopeId,
+                    classification.category(),
+                    classification.message(),
+                    e);
         }
 
         try {
@@ -1062,12 +1009,11 @@ public class GithubDataSyncService {
         } catch (Exception e) {
             ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
             log.error(
-                "Failed to sync sub-issues: scopeId={}, category={}, error={}",
-                scopeId,
-                classification.category(),
-                classification.message(),
-                e
-            );
+                    "Failed to sync sub-issues: scopeId={}, category={}, error={}",
+                    scopeId,
+                    classification.category(),
+                    classification.message(),
+                    e);
         }
     }
 
@@ -1081,23 +1027,20 @@ public class GithubDataSyncService {
      */
     private int syncCollaboratorsIfNeeded(SyncTarget syncTarget, Long scopeId, Long repositoryId) {
         Instant cooldownThreshold = Instant.now().minusSeconds(syncSchedulerProperties.cooldownMinutes() * 60L);
-        boolean shouldSync =
-            syncTarget.lastCollaboratorsSyncedAt() == null ||
-            syncTarget.lastCollaboratorsSyncedAt().isBefore(cooldownThreshold);
+        boolean shouldSync = syncTarget.lastCollaboratorsSyncedAt() == null
+                || syncTarget.lastCollaboratorsSyncedAt().isBefore(cooldownThreshold);
 
         if (!shouldSync) {
             log.debug(
-                "Skipped collaborator sync: reason=cooldownActive, repoId={}, lastSyncedAt={}",
-                repositoryId,
-                syncTarget.lastCollaboratorsSyncedAt()
-            );
+                    "Skipped collaborator sync: reason=cooldownActive, repoId={}, lastSyncedAt={}",
+                    repositoryId,
+                    syncTarget.lastCollaboratorsSyncedAt());
             return -1;
         }
 
         int count = retryOnTransientFailure(
-            () -> collaboratorSyncService.syncCollaboratorsForRepository(scopeId, repositoryId),
-            "collaborator sync for repoId=" + repositoryId
-        );
+                () -> collaboratorSyncService.syncCollaboratorsForRepository(scopeId, repositoryId),
+                "collaborator sync for repoId=" + repositoryId);
 
         syncTargetProvider.updateSyncTimestamp(syncTarget.id(), SyncType.COLLABORATORS, Instant.now());
 
@@ -1114,22 +1057,20 @@ public class GithubDataSyncService {
      */
     private int syncLabelsIfNeeded(SyncTarget syncTarget, Long scopeId, Long repositoryId) {
         Instant cooldownThreshold = Instant.now().minusSeconds(syncSchedulerProperties.cooldownMinutes() * 60L);
-        boolean shouldSync =
-            syncTarget.lastLabelsSyncedAt() == null || syncTarget.lastLabelsSyncedAt().isBefore(cooldownThreshold);
+        boolean shouldSync = syncTarget.lastLabelsSyncedAt() == null
+                || syncTarget.lastLabelsSyncedAt().isBefore(cooldownThreshold);
 
         if (!shouldSync) {
             log.debug(
-                "Skipped label sync: reason=cooldownActive, repoId={}, lastSyncedAt={}",
-                repositoryId,
-                syncTarget.lastLabelsSyncedAt()
-            );
+                    "Skipped label sync: reason=cooldownActive, repoId={}, lastSyncedAt={}",
+                    repositoryId,
+                    syncTarget.lastLabelsSyncedAt());
             return -1;
         }
 
         int count = retryOnTransientFailure(
-            () -> labelSyncService.syncLabelsForRepository(scopeId, repositoryId),
-            "label sync for repoId=" + repositoryId
-        );
+                () -> labelSyncService.syncLabelsForRepository(scopeId, repositoryId),
+                "label sync for repoId=" + repositoryId);
 
         syncTargetProvider.updateSyncTimestamp(syncTarget.id(), SyncType.LABELS, Instant.now());
 
@@ -1146,23 +1087,20 @@ public class GithubDataSyncService {
      */
     private int syncMilestonesIfNeeded(SyncTarget syncTarget, Long scopeId, Long repositoryId) {
         Instant cooldownThreshold = Instant.now().minusSeconds(syncSchedulerProperties.cooldownMinutes() * 60L);
-        boolean shouldSync =
-            syncTarget.lastMilestonesSyncedAt() == null ||
-            syncTarget.lastMilestonesSyncedAt().isBefore(cooldownThreshold);
+        boolean shouldSync = syncTarget.lastMilestonesSyncedAt() == null
+                || syncTarget.lastMilestonesSyncedAt().isBefore(cooldownThreshold);
 
         if (!shouldSync) {
             log.debug(
-                "Skipped milestone sync: reason=cooldownActive, repoId={}, lastSyncedAt={}",
-                repositoryId,
-                syncTarget.lastMilestonesSyncedAt()
-            );
+                    "Skipped milestone sync: reason=cooldownActive, repoId={}, lastSyncedAt={}",
+                    repositoryId,
+                    syncTarget.lastMilestonesSyncedAt());
             return -1;
         }
 
         int count = retryOnTransientFailure(
-            () -> milestoneSyncService.syncMilestonesForRepository(scopeId, repositoryId),
-            "milestone sync for repoId=" + repositoryId
-        );
+                () -> milestoneSyncService.syncMilestonesForRepository(scopeId, repositoryId),
+                "milestone sync for repoId=" + repositoryId);
 
         syncTargetProvider.updateSyncTimestamp(syncTarget.id(), SyncType.MILESTONES, Instant.now());
 
@@ -1171,10 +1109,10 @@ public class GithubDataSyncService {
 
     private boolean shouldSync(SyncTarget target) {
         Instant staleThreshold = Instant.now().minusSeconds(syncSchedulerProperties.cooldownMinutes() * 60L);
-        boolean issuesStale =
-            target.lastIssuesSyncedAt() == null || target.lastIssuesSyncedAt().isBefore(staleThreshold);
-        boolean prsStale =
-            target.lastPullRequestsSyncedAt() == null || target.lastPullRequestsSyncedAt().isBefore(staleThreshold);
+        boolean issuesStale = target.lastIssuesSyncedAt() == null
+                || target.lastIssuesSyncedAt().isBefore(staleThreshold);
+        boolean prsStale = target.lastPullRequestsSyncedAt() == null
+                || target.lastPullRequestsSyncedAt().isBefore(staleThreshold);
         return issuesStale || prsStale;
     }
 
@@ -1192,12 +1130,11 @@ public class GithubDataSyncService {
     private int enrichCommitAuthors(SyncTarget syncTarget, Repository repository) {
         try {
             return commitAuthorEnrichmentService.enrichCommitAuthors(
-                repository.getId(),
-                repository.getNameWithOwner(),
-                syncTarget.scopeId(),
-                Objects.requireNonNull(repository.getProvider().getId()),
-                repository
-            );
+                    repository.getId(),
+                    repository.getNameWithOwner(),
+                    syncTarget.scopeId(),
+                    Objects.requireNonNull(repository.getProvider().getId()),
+                    repository);
         } catch (Exception e) {
             log.warn("Commit author enrichment failed: repoId={}, error={}", repository.getId(), e.getMessage());
             return -1;
@@ -1218,10 +1155,7 @@ public class GithubDataSyncService {
     private int enrichCommitMetadata(SyncTarget syncTarget, Repository repository) {
         try {
             return commitMetadataEnrichmentService.enrichCommitMetadata(
-                repository.getId(),
-                repository.getNameWithOwner(),
-                syncTarget.scopeId()
-            );
+                    repository.getId(), repository.getNameWithOwner(), syncTarget.scopeId());
         } catch (Exception e) {
             log.warn("Commit metadata enrichment failed: repoId={}, error={}", repository.getId(), e.getMessage());
             return -1;
@@ -1239,23 +1173,19 @@ public class GithubDataSyncService {
      */
     private void cleanupOrphanedRepository(Long repositoryId, String safeNameWithOwner) {
         try {
-            repositoryRepository
-                .findById(repositoryId)
-                .ifPresent(repository -> {
-                    repositoryRepository.delete(repository);
-                    log.info(
+            repositoryRepository.findById(repositoryId).ifPresent(repository -> {
+                repositoryRepository.delete(repository);
+                log.info(
                         "Deleted orphaned repository after NOT_FOUND: repoId={}, repoName={}",
                         repositoryId,
-                        safeNameWithOwner
-                    );
-                });
+                        safeNameWithOwner);
+            });
         } catch (Exception cleanupException) {
             log.warn(
-                "Failed to cleanup orphaned repository: repoId={}, repoName={}, error={}",
-                repositoryId,
-                safeNameWithOwner,
-                cleanupException.getMessage()
-            );
+                    "Failed to cleanup orphaned repository: repoId={}, repoName={}, error={}",
+                    repositoryId,
+                    safeNameWithOwner,
+                    cleanupException.getMessage());
         }
     }
 
@@ -1318,38 +1248,33 @@ public class GithubDataSyncService {
                 lastException = e;
                 if (attempt + 1 < TRANSIENT_RETRY_MAX_ATTEMPTS) {
                     log.warn(
-                        "Transient failure in {}, retrying: attempt={}/{}, error={}",
-                        description,
-                        attempt + 1,
-                        TRANSIENT_RETRY_MAX_ATTEMPTS,
-                        errorDetail
-                    );
+                            "Transient failure in {}, retrying: attempt={}/{}, error={}",
+                            description,
+                            attempt + 1,
+                            TRANSIENT_RETRY_MAX_ATTEMPTS,
+                            errorDetail);
                     try {
                         ExponentialBackoff.sleep(attempt);
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
-                        SyncInterruptedException interrupted = new SyncInterruptedException(
-                            "Interrupted while retrying " + description,
-                            ie
-                        );
+                        SyncInterruptedException interrupted =
+                                new SyncInterruptedException("Interrupted while retrying " + description, ie);
                         interrupted.addSuppressed(e);
                         throw interrupted;
                     }
                 } else {
                     log.error(
-                        "Transient failure in {} after all retries exhausted: attempts={}, error={}",
-                        description,
-                        TRANSIENT_RETRY_MAX_ATTEMPTS,
-                        errorDetail
-                    );
+                            "Transient failure in {} after all retries exhausted: attempts={}, error={}",
+                            description,
+                            TRANSIENT_RETRY_MAX_ATTEMPTS,
+                            errorDetail);
                 }
             }
         }
         // All retries exhausted — throw the last exception so the outer catch can classify it
         throw new SyncRetriesExhaustedException(
-            "All " + TRANSIENT_RETRY_MAX_ATTEMPTS + " retries exhausted for " + description,
-            Objects.requireNonNull(lastException)
-        );
+                "All " + TRANSIENT_RETRY_MAX_ATTEMPTS + " retries exhausted for " + description,
+                Objects.requireNonNull(lastException));
     }
 
     /**
@@ -1401,29 +1326,26 @@ public class GithubDataSyncService {
                 rateLimitTracker.waitIfNeeded(scopeId);
                 if (!rateLimitTracker.isCritical(scopeId)) {
                     log.info(
-                        "Rate limit recovered, resuming sync: scopeId={}, remaining={}, waitCycles={}",
-                        scopeId,
-                        rateLimitTracker.getRemaining(scopeId),
-                        cycle + 1
-                    );
+                            "Rate limit recovered, resuming sync: scopeId={}, remaining={}, waitCycles={}",
+                            scopeId,
+                            rateLimitTracker.getRemaining(scopeId),
+                            cycle + 1);
                     return;
                 }
                 // Still critical — wait a bit and retry (handles edge cases like
                 // clock skew or API returning lower-than-expected remaining)
                 log.debug(
-                    "Rate limit still critical after wait, retrying: scopeId={}, remaining={}, cycle={}/{}",
-                    scopeId,
-                    rateLimitTracker.getRemaining(scopeId),
-                    cycle + 1,
-                    MAX_RATE_LIMIT_WAIT_CYCLES
-                );
+                        "Rate limit still critical after wait, retrying: scopeId={}, remaining={}, cycle={}/{}",
+                        scopeId,
+                        rateLimitTracker.getRemaining(scopeId),
+                        cycle + 1,
+                        MAX_RATE_LIMIT_WAIT_CYCLES);
             }
             log.warn(
-                "Rate limit wait cycles exhausted, proceeding anyway: scopeId={}, remaining={}, maxCycles={}",
-                scopeId,
-                rateLimitTracker.getRemaining(scopeId),
-                MAX_RATE_LIMIT_WAIT_CYCLES
-            );
+                    "Rate limit wait cycles exhausted, proceeding anyway: scopeId={}, remaining={}, maxCycles={}",
+                    scopeId,
+                    rateLimitTracker.getRemaining(scopeId),
+                    MAX_RATE_LIMIT_WAIT_CYCLES);
             return;
         }
 
@@ -1433,34 +1355,31 @@ public class GithubDataSyncService {
         while (Instant.now().isBefore(deadline)) {
             if (cancelRequested.getAsBoolean()) {
                 log.info(
-                    "Rate limit wait cancelled: scopeId={}, remaining={}",
-                    scopeId,
-                    rateLimitTracker.getRemaining(scopeId)
-                );
+                        "Rate limit wait cancelled: scopeId={}, remaining={}",
+                        scopeId,
+                        rateLimitTracker.getRemaining(scopeId));
                 return;
             }
             if (!rateLimitTracker.isCritical(scopeId)) {
                 log.info(
-                    "Rate limit recovered, resuming sync: scopeId={}, remaining={}",
-                    scopeId,
-                    rateLimitTracker.getRemaining(scopeId)
-                );
+                        "Rate limit recovered, resuming sync: scopeId={}, remaining={}",
+                        scopeId,
+                        rateLimitTracker.getRemaining(scopeId));
                 return;
             }
             Instant resetAt = rateLimitTracker.getResetAt(scopeId);
             Duration untilReset =
-                resetAt == null ? MAX_CANCELLABLE_WAIT_SLICE : Duration.between(Instant.now(), resetAt);
+                    resetAt == null ? MAX_CANCELLABLE_WAIT_SLICE : Duration.between(Instant.now(), resetAt);
             Duration sleepFor =
-                untilReset.compareTo(MAX_CANCELLABLE_WAIT_SLICE) > 0 ? MAX_CANCELLABLE_WAIT_SLICE : untilReset;
+                    untilReset.compareTo(MAX_CANCELLABLE_WAIT_SLICE) > 0 ? MAX_CANCELLABLE_WAIT_SLICE : untilReset;
             if (sleepFor.isNegative() || sleepFor.isZero()) {
                 sleepFor = Duration.ofSeconds(1);
             }
             Thread.sleep(sleepFor.toMillis());
         }
         log.warn(
-            "Rate limit wait deadline exhausted, proceeding anyway: scopeId={}, remaining={}",
-            scopeId,
-            rateLimitTracker.getRemaining(scopeId)
-        );
+                "Rate limit wait deadline exhausted, proceeding anyway: scopeId={}, remaining={}",
+                scopeId,
+                rateLimitTracker.getRemaining(scopeId));
     }
 }

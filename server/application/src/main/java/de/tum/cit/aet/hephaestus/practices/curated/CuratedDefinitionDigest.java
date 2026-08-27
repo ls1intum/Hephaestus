@@ -12,11 +12,13 @@ final class CuratedDefinitionDigest {
     private CuratedDefinitionDigest() {}
 
     static String of(String slug, CatalogDefinition definition) {
-        String prefix = switch (definition) {
-            case GroupDefinition ignored -> GROUP_V1;
-            case PracticeDefinition ignored -> PRACTICE_V2;
-            default -> throw new IllegalArgumentException("Unsupported catalog definition: " + definition.getClass());
-        };
+        String prefix =
+                switch (definition) {
+                    case GroupDefinition ignored -> GROUP_V1;
+                    case PracticeDefinition ignored -> PRACTICE_V2;
+                    default ->
+                        throw new IllegalArgumentException("Unsupported catalog definition: " + definition.getClass());
+                };
         return prefix + definition.digest(slug);
     }
 }

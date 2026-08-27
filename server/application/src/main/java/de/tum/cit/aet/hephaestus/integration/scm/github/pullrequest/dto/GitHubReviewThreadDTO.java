@@ -18,24 +18,23 @@ import org.jspecify.annotations.Nullable;
  * nested pagination and are not directly exposed through the public API.
  */
 public record GitHubReviewThreadDTO(
-    String nodeId,
-    String path,
-    @Nullable Integer line,
-    @Nullable Integer startLine,
-    @Nullable String diffSide,
-    @Nullable String startDiffSide,
-    boolean isResolved,
-    boolean isOutdated,
-    boolean isCollapsed,
-    @Nullable GitHubUserDTO resolvedBy,
-    /**
-     * The comments connection containing thread comments and pagination info.
-     * This is used internally by GitHubPullRequestReviewCommentSyncService for
-     * processing comments and handling nested pagination. It is not exposed
-     * through the public DTO API.
-     */
-    @Nullable GHPullRequestReviewCommentConnection commentsConnection
-) {
+        String nodeId,
+        String path,
+        @Nullable Integer line,
+        @Nullable Integer startLine,
+        @Nullable String diffSide,
+        @Nullable String startDiffSide,
+        boolean isResolved,
+        boolean isOutdated,
+        boolean isCollapsed,
+        @Nullable GitHubUserDTO resolvedBy,
+        /**
+         * The comments connection containing thread comments and pagination info.
+         * This is used internally by GitHubPullRequestReviewCommentSyncService for
+         * processing comments and handling nested pagination. It is not exposed
+         * through the public DTO API.
+         */
+        @Nullable GHPullRequestReviewCommentConnection commentsConnection) {
     /**
      * Creates a GitHubReviewThreadDTO from a GraphQL GHPullRequestReviewThread model.
      *
@@ -48,17 +47,16 @@ public record GitHubReviewThreadDTO(
             return null;
         }
         return new GitHubReviewThreadDTO(
-            thread.getId(),
-            thread.getPath(),
-            thread.getLine(),
-            thread.getStartLine(),
-            thread.getDiffSide() != null ? thread.getDiffSide().name() : null,
-            thread.getStartDiffSide() != null ? thread.getStartDiffSide().name() : null,
-            thread.getIsResolved(),
-            thread.getIsOutdated(),
-            thread.getIsCollapsed(),
-            GitHubUserDTO.fromUser(thread.getResolvedBy()),
-            thread.getComments()
-        );
+                thread.getId(),
+                thread.getPath(),
+                thread.getLine(),
+                thread.getStartLine(),
+                thread.getDiffSide() != null ? thread.getDiffSide().name() : null,
+                thread.getStartDiffSide() != null ? thread.getStartDiffSide().name() : null,
+                thread.getIsResolved(),
+                thread.getIsOutdated(),
+                thread.getIsCollapsed(),
+                GitHubUserDTO.fromUser(thread.getResolvedBy()),
+                thread.getComments());
     }
 }

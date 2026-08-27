@@ -10,7 +10,6 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -70,11 +69,11 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
     @BeforeEach
     void authorizeObservations() {
         lenient()
-            .when(visibilityPolicy.permitsAll(anyLong(), any(), eq(SourceUsePurpose.CONVERSATIONAL_MENTORING)))
-            .thenAnswer(invocation -> {
-                Collection<Observation> batch = invocation.getArgument(1);
-                return batch.stream().map(Observation::getId).collect(Collectors.toSet());
-            });
+                .when(visibilityPolicy.permitsAll(anyLong(), any(), eq(SourceUsePurpose.CONVERSATIONAL_MENTORING)))
+                .thenAnswer(invocation -> {
+                    Collection<Observation> batch = invocation.getArgument(1);
+                    return batch.stream().map(Observation::getId).collect(Collectors.toSet());
+                });
     }
 
     @Test
@@ -82,18 +81,11 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
         User user = new User();
         user.setLogin("octo");
         when(userRepository.findById(eq(2L))).thenReturn(Optional.of(user));
-        when(
-            observationRepository.findRecentByDeveloperAndWorkspace(
-                eq(2L),
-                eq(1L),
-                any(Instant.class),
-                anyBoolean(),
-                any(Pageable.class)
-            )
-        ).thenReturn(List.of());
-        when(
-            queryRepository.findReviewsReceivedSince(eq(1L), eq(2L), any(Instant.class), any(Pageable.class))
-        ).thenReturn(List.of());
+        when(observationRepository.findRecentByDeveloperAndWorkspace(
+                        eq(2L), eq(1L), any(Instant.class), anyBoolean(), any(Pageable.class)))
+                .thenReturn(List.of());
+        when(queryRepository.findReviewsReceivedSince(eq(1L), eq(2L), any(Instant.class), any(Pageable.class)))
+                .thenReturn(List.of());
 
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID()), files);
@@ -120,21 +112,13 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
         user.setLogin("octo");
         Observation observation = Observation.builder().id(UUID.randomUUID()).build();
         when(userRepository.findById(2L)).thenReturn(Optional.of(user));
-        when(
-            observationRepository.findRecentByDeveloperAndWorkspace(
-                eq(2L),
-                eq(1L),
-                any(Instant.class),
-                anyBoolean(),
-                any(Pageable.class)
-            )
-        ).thenReturn(List.of(observation));
-        when(
-            queryRepository.findReviewsReceivedSince(eq(1L), eq(2L), any(Instant.class), any(Pageable.class))
-        ).thenReturn(List.of());
-        when(
-            visibilityPolicy.permitsAll(1L, List.of(observation), SourceUsePurpose.CONVERSATIONAL_MENTORING)
-        ).thenReturn(Set.of());
+        when(observationRepository.findRecentByDeveloperAndWorkspace(
+                        eq(2L), eq(1L), any(Instant.class), anyBoolean(), any(Pageable.class)))
+                .thenReturn(List.of(observation));
+        when(queryRepository.findReviewsReceivedSince(eq(1L), eq(2L), any(Instant.class), any(Pageable.class)))
+                .thenReturn(List.of());
+        when(visibilityPolicy.permitsAll(1L, List.of(observation), SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                .thenReturn(Set.of());
 
         ObjectNode root = provider.buildPayload(1L, 2L);
 
@@ -153,36 +137,30 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
         practice.setSlug("robust-error-handling");
         // A real student-facing sentence followed by a pure grading-mechanics sentence the detector echoed.
         String reasoning =
-            "The retry block swallows the IOException without logging it. The assessment is BAD, capped at MINOR.";
+                "The retry block swallows the IOException without logging it. The assessment is BAD, capped at MINOR.";
         var observation = Observation.builder()
-            .id(UUID.randomUUID())
-            .summary("Swallowed IOException")
-            .practice(practice)
-            .presence(Presence.PRESENT)
-            .assessment(Assessment.BAD)
-            .severity(Severity.MINOR)
-            .observedAt(Instant.now())
-            .evidenceRationale(reasoning)
-            .build();
+                .id(UUID.randomUUID())
+                .summary("Swallowed IOException")
+                .practice(practice)
+                .presence(Presence.PRESENT)
+                .assessment(Assessment.BAD)
+                .severity(Severity.MINOR)
+                .observedAt(Instant.now())
+                .evidenceRationale(reasoning)
+                .build();
 
-        when(
-            observationRepository.findRecentByDeveloperAndWorkspace(
-                eq(2L),
-                eq(1L),
-                any(Instant.class),
-                anyBoolean(),
-                any(Pageable.class)
-            )
-        ).thenReturn(List.of(observation));
-        when(
-            queryRepository.findReviewsReceivedSince(eq(1L), eq(2L), any(Instant.class), any(Pageable.class))
-        ).thenReturn(List.of());
+        when(observationRepository.findRecentByDeveloperAndWorkspace(
+                        eq(2L), eq(1L), any(Instant.class), anyBoolean(), any(Pageable.class)))
+                .thenReturn(List.of(observation));
+        when(queryRepository.findReviewsReceivedSince(eq(1L), eq(2L), any(Instant.class), any(Pageable.class)))
+                .thenReturn(List.of());
 
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID()), files);
 
         JsonNode root = objectMapper.readTree(files.get("inputs/context/observations_history.json"));
-        String shipped = root.get("recentObservations").get(0).get("evidenceRationale").asString();
+        String shipped =
+                root.get("recentObservations").get(0).get("evidenceRationale").asString();
         // The student-facing sentence survives; the rubric mechanics ("assessment is BAD", "capped at MINOR")
         // do NOT reach the mentor.
         assertThat(shipped).contains("swallows the IOException");
@@ -201,47 +179,39 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
         practiceBad.setSlug("robust-error-handling");
         Instant observedBad = Instant.parse("2025-06-10T08:00:00Z");
         var badObservation = Observation.builder()
-            .id(UUID.randomUUID())
-            .summary("Swallowed IOException")
-            .practice(practiceBad)
-            .artifactKind(ArtifactKinds.PULL_REQUEST)
-            .artifactId(123L)
-            .presence(Presence.PRESENT)
-            .assessment(Assessment.BAD)
-            .severity(Severity.MAJOR)
-            .observedAt(observedBad)
-            .evidence(
-                objectMapper.readTree(
-                    "{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\",\"artifactPath\":\"inputs/context/diff.patch\",\"path\":\"src/Retry.java\",\"side\":\"NEW\",\"startLine\":42,\"endLine\":42,\"quote\":\"catch (IOException ignored) {}\",\"quoteRedacted\":false}]}"
-                )
-            )
-            .evidenceRationale("The retry block swallows the IOException.")
-            .build();
+                .id(UUID.randomUUID())
+                .summary("Swallowed IOException")
+                .practice(practiceBad)
+                .artifactKind(ArtifactKinds.PULL_REQUEST)
+                .artifactId(123L)
+                .presence(Presence.PRESENT)
+                .assessment(Assessment.BAD)
+                .severity(Severity.MAJOR)
+                .observedAt(observedBad)
+                .evidence(
+                        objectMapper.readTree(
+                                "{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\",\"artifactPath\":\"inputs/context/diff.patch\",\"path\":\"src/Retry.java\",\"side\":\"NEW\",\"startLine\":42,\"endLine\":42,\"quote\":\"catch (IOException ignored) {}\",\"quoteRedacted\":false}]}"))
+                .evidenceRationale("The retry block swallows the IOException.")
+                .build();
 
         var practiceNa = new Practice();
         practiceNa.setSlug("writes-tests");
         Instant observedNa = Instant.parse("2025-06-09T08:00:00Z");
         // NOT_APPLICABLE: assessment AND severity are null — must serialise as JSON null, not the enum name.
         var naObservation = Observation.builder()
-            .id(UUID.randomUUID())
-            .summary("No test surface")
-            .practice(practiceNa)
-            .presence(Presence.NOT_APPLICABLE)
-            .assessment(null)
-            .severity(null)
-            .observedAt(observedNa)
-            .evidenceRationale("Docs-only change.")
-            .build();
+                .id(UUID.randomUUID())
+                .summary("No test surface")
+                .practice(practiceNa)
+                .presence(Presence.NOT_APPLICABLE)
+                .assessment(null)
+                .severity(null)
+                .observedAt(observedNa)
+                .evidenceRationale("Docs-only change.")
+                .build();
 
-        when(
-            observationRepository.findRecentByDeveloperAndWorkspace(
-                eq(2L),
-                eq(1L),
-                any(Instant.class),
-                anyBoolean(),
-                any(Pageable.class)
-            )
-        ).thenReturn(List.of(badObservation, naObservation));
+        when(observationRepository.findRecentByDeveloperAndWorkspace(
+                        eq(2L), eq(1L), any(Instant.class), anyBoolean(), any(Pageable.class)))
+                .thenReturn(List.of(badObservation, naObservation));
 
         var pr = new PullRequest();
         pr.setNumber(42);
@@ -255,9 +225,8 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
         review.setBody("Please add a test.");
         review.setHtmlUrl("https://example.test/pr/42#review");
         review.setSubmittedAt(Instant.parse("2025-06-11T12:00:00Z"));
-        when(
-            queryRepository.findReviewsReceivedSince(eq(1L), eq(2L), any(Instant.class), any(Pageable.class))
-        ).thenReturn(List.of(review));
+        when(queryRepository.findReviewsReceivedSince(eq(1L), eq(2L), any(Instant.class), any(Pageable.class)))
+                .thenReturn(List.of(review));
 
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID()), files);
@@ -275,8 +244,10 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
         assertThat(bad.get("observedAt").asString()).isEqualTo(observedBad.toString());
         assertThat(bad.get("artifactKind").asString()).isEqualTo("scm.pull_request");
         assertThat(bad.get("artifactId").asLong()).isEqualTo(123L);
-        assertThat(bad.get("evidence").get("citations").get(0).get("path").asString()).isEqualTo("src/Retry.java");
-        assertThat(bad.get("evidence").get("citations").get(0).get("quote").asString()).contains("IOException");
+        assertThat(bad.get("evidence").get("citations").get(0).get("path").asString())
+                .isEqualTo("src/Retry.java");
+        assertThat(bad.get("evidence").get("citations").get(0).get("quote").asString())
+                .contains("IOException");
 
         JsonNode na = obs.get(1);
         assertThat(na.get("presence").asString()).isEqualTo("NOT_APPLICABLE");

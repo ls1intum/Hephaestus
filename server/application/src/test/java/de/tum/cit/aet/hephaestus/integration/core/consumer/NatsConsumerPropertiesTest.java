@@ -23,13 +23,14 @@ class NatsConsumerPropertiesTest extends BaseUnitTest {
 
         @Test
         void nullPoisonBlockUsesDefaults() throws ReflectiveOperationException {
-            NatsConsumerProperties props = NatsConsumerProperties.class.getDeclaredConstructor(
-                Duration.class,
-                int.class,
-                Duration.class,
-                Duration.class,
-                NatsConsumerProperties.PoisonProperties.class
-            ).newInstance(Duration.ofMinutes(5), 500, Duration.ofSeconds(2), Duration.ofDays(30), null);
+            NatsConsumerProperties props = NatsConsumerProperties.class
+                    .getDeclaredConstructor(
+                            Duration.class,
+                            int.class,
+                            Duration.class,
+                            Duration.class,
+                            NatsConsumerProperties.PoisonProperties.class)
+                    .newInstance(Duration.ofMinutes(5), 500, Duration.ofSeconds(2), Duration.ofDays(30), null);
 
             assertThat(props.poison()).isNotNull();
             assertThat(props.poison().maxRedeliver()).isEqualTo(10);
@@ -39,18 +40,10 @@ class NatsConsumerPropertiesTest extends BaseUnitTest {
 
         @Test
         void explicitPoisonBlockKept() {
-            NatsConsumerProperties.PoisonProperties custom = new NatsConsumerProperties.PoisonProperties(
-                3,
-                Duration.ofSeconds(5),
-                Duration.ofMinutes(1)
-            );
+            NatsConsumerProperties.PoisonProperties custom =
+                    new NatsConsumerProperties.PoisonProperties(3, Duration.ofSeconds(5), Duration.ofMinutes(1));
             NatsConsumerProperties props = new NatsConsumerProperties(
-                Duration.ofMinutes(5),
-                500,
-                Duration.ofSeconds(2),
-                Duration.ofDays(30),
-                custom
-            );
+                    Duration.ofMinutes(5), 500, Duration.ofSeconds(2), Duration.ofDays(30), custom);
 
             assertThat(props.poison()).isSameAs(custom);
         }
@@ -63,10 +56,8 @@ class NatsConsumerPropertiesTest extends BaseUnitTest {
         static class TestConfiguration {}
 
         private ApplicationContextRunner runner() {
-            return new ApplicationContextRunner().withUserConfiguration(
-                TestConfiguration.class,
-                ValidationAutoConfiguration.class
-            );
+            return new ApplicationContextRunner()
+                    .withUserConfiguration(TestConfiguration.class, ValidationAutoConfiguration.class);
         }
 
         @Test
@@ -88,78 +79,67 @@ class NatsConsumerPropertiesTest extends BaseUnitTest {
 
         @Test
         void explicitOverridesBound() {
-            runner()
-                .withPropertyValues(
-                    "hephaestus.integration.consumer.ack-wait=10m",
-                    "hephaestus.integration.consumer.max-ack-pending=1000",
-                    "hephaestus.integration.consumer.poison.max-redeliver=5",
-                    "hephaestus.integration.consumer.poison.base-delay=4s",
-                    "hephaestus.integration.consumer.poison.max-delay=1m"
-                )
-                .run(context -> {
-                    NatsConsumerProperties props = context.getBean(NatsConsumerProperties.class);
-                    assertThat(props.ackWait()).isEqualTo(Duration.ofMinutes(10));
-                    assertThat(props.maxAckPending()).isEqualTo(1000);
-                    assertThat(props.poison().maxRedeliver()).isEqualTo(5);
-                    assertThat(props.poison().baseDelay()).isEqualTo(Duration.ofSeconds(4));
-                    assertThat(props.poison().maxDelay()).isEqualTo(Duration.ofMinutes(1));
-                });
+            runner().withPropertyValues(
+                            "hephaestus.integration.consumer.ack-wait=10m",
+                            "hephaestus.integration.consumer.max-ack-pending=1000",
+                            "hephaestus.integration.consumer.poison.max-redeliver=5",
+                            "hephaestus.integration.consumer.poison.base-delay=4s",
+                            "hephaestus.integration.consumer.poison.max-delay=1m")
+                    .run(context -> {
+                        NatsConsumerProperties props = context.getBean(NatsConsumerProperties.class);
+                        assertThat(props.ackWait()).isEqualTo(Duration.ofMinutes(10));
+                        assertThat(props.maxAckPending()).isEqualTo(1000);
+                        assertThat(props.poison().maxRedeliver()).isEqualTo(5);
+                        assertThat(props.poison().baseDelay()).isEqualTo(Duration.ofSeconds(4));
+                        assertThat(props.poison().maxDelay()).isEqualTo(Duration.ofMinutes(1));
+                    });
         }
 
         @Test
         void shouldBoundDurableLifetimeWhenInactiveThresholdIsUnset() {
             // The default is what a deployment that never configures this gets, and it is the only
             // thing that ever reaps a durable.
-            runner().run(context ->
-                assertThat(context.getBean(NatsConsumerProperties.class).inactiveThreshold()).isEqualTo(
-                    Duration.ofDays(30)
-                )
-            );
+            runner().run(context -> assertThat(
+                            context.getBean(NatsConsumerProperties.class).inactiveThreshold())
+                    .isEqualTo(Duration.ofDays(30)));
         }
 
         @Test
         void shouldDisableReapingOnlyWhenAskedExplicitly() {
-            runner()
-                .withPropertyValues("hephaestus.integration.consumer.inactive-threshold=0s")
-                .run(context -> assertThat(context.getBean(NatsConsumerProperties.class).inactiveThreshold()).isZero());
+            runner().withPropertyValues("hephaestus.integration.consumer.inactive-threshold=0s")
+                    .run(context -> assertThat(context.getBean(NatsConsumerProperties.class)
+                                    .inactiveThreshold())
+                            .isZero());
         }
 
         @Test
         void shouldRejectAThresholdShortEnoughToReapAcrossARestart() {
             // 30m expires the durable during a slow deploy, and its replacement starts at
             // DeliverPolicy.New — losing everything that arrived meanwhile.
-            runner()
-                .withPropertyValues("hephaestus.integration.consumer.inactive-threshold=30m")
-                .run(context -> assertThat(context).hasFailed());
+            runner().withPropertyValues("hephaestus.integration.consumer.inactive-threshold=30m")
+                    .run(context -> assertThat(context).hasFailed());
         }
 
         @Test
         void shouldAcceptAThresholdAtTheFloor() {
-            runner()
-                .withPropertyValues("hephaestus.integration.consumer.inactive-threshold=1h")
-                .run(context ->
-                    assertThat(context.getBean(NatsConsumerProperties.class).inactiveThreshold()).isEqualTo(
-                        Duration.ofHours(1)
-                    )
-                );
+            runner().withPropertyValues("hephaestus.integration.consumer.inactive-threshold=1h")
+                    .run(context -> assertThat(context.getBean(NatsConsumerProperties.class)
+                                    .inactiveThreshold())
+                            .isEqualTo(Duration.ofHours(1)));
         }
 
         @Test
         void shouldReadBareInactiveThresholdAsHours() {
-            runner()
-                .withPropertyValues("hephaestus.integration.consumer.inactive-threshold=72")
-                .run(context ->
-                    assertThat(context.getBean(NatsConsumerProperties.class).inactiveThreshold()).isEqualTo(
-                        Duration.ofHours(72)
-                    )
-                );
+            runner().withPropertyValues("hephaestus.integration.consumer.inactive-threshold=72")
+                    .run(context -> assertThat(context.getBean(NatsConsumerProperties.class)
+                                    .inactiveThreshold())
+                            .isEqualTo(Duration.ofHours(72)));
         }
 
         @Test
         void shouldRejectNegativeInactiveThreshold() {
-            runner()
-                .withPropertyValues("hephaestus.integration.consumer.inactive-threshold=-1h")
-                .run(context -> assertThat(context).hasFailed());
+            runner().withPropertyValues("hephaestus.integration.consumer.inactive-threshold=-1h")
+                    .run(context -> assertThat(context).hasFailed());
         }
     }
 }

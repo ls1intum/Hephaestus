@@ -226,11 +226,8 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         @Test
         void emptyNotes() {
             TreeSet<Integer> lines = new TreeSet<>(List.of(1, 2, 3));
-            List<DiffNote> result = DiffHunkValidator.validateAndCorrect(
-                List.of(),
-                Map.of("File.swift", lines),
-                "job-1"
-            );
+            List<DiffNote> result =
+                    DiffHunkValidator.validateAndCorrect(List.of(), Map.of("File.swift", lines), "job-1");
             assertThat(result).isEmpty();
         }
 
@@ -238,11 +235,8 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         void validNotesUnchanged() {
             TreeSet<Integer> lines = new TreeSet<>(List.of(5, 10, 15, 20));
             DiffNote note = new DiffNote("File.swift", 10, null, "good line");
-            List<DiffNote> result = DiffHunkValidator.validateAndCorrect(
-                List.of(note),
-                Map.of("File.swift", lines),
-                "job-1"
-            );
+            List<DiffNote> result =
+                    DiffHunkValidator.validateAndCorrect(List.of(note), Map.of("File.swift", lines), "job-1");
             assertThat(result).hasSize(1);
             assertThat(result.getFirst().startLine()).isEqualTo(10);
         }
@@ -251,11 +245,8 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         void snapsToFloor() {
             TreeSet<Integer> lines = new TreeSet<>(List.of(5, 10, 20));
             DiffNote note = new DiffNote("File.swift", 12, null, "off by 2");
-            List<DiffNote> result = DiffHunkValidator.validateAndCorrect(
-                List.of(note),
-                Map.of("File.swift", lines),
-                "job-1"
-            );
+            List<DiffNote> result =
+                    DiffHunkValidator.validateAndCorrect(List.of(note), Map.of("File.swift", lines), "job-1");
             assertThat(result).hasSize(1);
             assertThat(result.getFirst().startLine()).isEqualTo(10);
         }
@@ -264,11 +255,8 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         void snapsToCeiling() {
             TreeSet<Integer> lines = new TreeSet<>(List.of(5, 10, 20));
             DiffNote note = new DiffNote("File.swift", 17, null, "closer to 20");
-            List<DiffNote> result = DiffHunkValidator.validateAndCorrect(
-                List.of(note),
-                Map.of("File.swift", lines),
-                "job-1"
-            );
+            List<DiffNote> result =
+                    DiffHunkValidator.validateAndCorrect(List.of(note), Map.of("File.swift", lines), "job-1");
             assertThat(result).hasSize(1);
             assertThat(result.getFirst().startLine()).isEqualTo(20);
         }
@@ -278,11 +266,8 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         void unknownFileKeptAsIs() {
             TreeSet<Integer> lines = new TreeSet<>(List.of(1, 2, 3));
             DiffNote note = new DiffNote("Other.swift", 50, null, "unknown file");
-            List<DiffNote> result = DiffHunkValidator.validateAndCorrect(
-                List.of(note),
-                Map.of("File.swift", lines),
-                "job-1"
-            );
+            List<DiffNote> result =
+                    DiffHunkValidator.validateAndCorrect(List.of(note), Map.of("File.swift", lines), "job-1");
             assertThat(result).hasSize(1);
             assertThat(result.getFirst().startLine()).isEqualTo(50);
             assertThat(result.getFirst().filePath()).isEqualTo("Other.swift");
@@ -294,11 +279,8 @@ class DiffHunkValidatorTest extends BaseUnitTest {
             // (9,10,11,12 all present), so the span-preserving endLine 12 is kept exactly.
             TreeSet<Integer> lines = new TreeSet<>(List.of(5, 9, 10, 11, 12, 20));
             DiffNote note = new DiffNote("File.swift", 8, 11, "range note");
-            List<DiffNote> result = DiffHunkValidator.validateAndCorrect(
-                List.of(note),
-                Map.of("File.swift", lines),
-                "job-1"
-            );
+            List<DiffNote> result =
+                    DiffHunkValidator.validateAndCorrect(List.of(note), Map.of("File.swift", lines), "job-1");
             assertThat(result).hasSize(1);
             assertThat(result.getFirst().startLine()).isEqualTo(9);
             assertThat(result.getFirst().endLine()).isEqualTo(12);
@@ -311,11 +293,8 @@ class DiffHunkValidatorTest extends BaseUnitTest {
             // the range must collapse to single-line rather than emit a gap-crossing endLine.
             TreeSet<Integer> lines = new TreeSet<>(List.of(10, 12, 13));
             DiffNote note = new DiffNote("File.swift", 9, 12, "gap note");
-            List<DiffNote> result = DiffHunkValidator.validateAndCorrect(
-                List.of(note),
-                Map.of("File.swift", lines),
-                "job-1"
-            );
+            List<DiffNote> result =
+                    DiffHunkValidator.validateAndCorrect(List.of(note), Map.of("File.swift", lines), "job-1");
             assertThat(result).hasSize(1);
             assertThat(result.getFirst().startLine()).isEqualTo(10);
             assertThat(result.getFirst().endLine()).isEqualTo(10);
@@ -326,11 +305,8 @@ class DiffHunkValidatorTest extends BaseUnitTest {
             TreeSet<Integer> lines = new TreeSet<>(List.of(5, 10, 100));
             // Note at 12-14 (span=2), snaps to 10, endLine should NOT jump to 100
             DiffNote note = new DiffNote("File.swift", 12, 14, "should not balloon");
-            List<DiffNote> result = DiffHunkValidator.validateAndCorrect(
-                List.of(note),
-                Map.of("File.swift", lines),
-                "job-1"
-            );
+            List<DiffNote> result =
+                    DiffHunkValidator.validateAndCorrect(List.of(note), Map.of("File.swift", lines), "job-1");
             assertThat(result).hasSize(1);
             assertThat(result.getFirst().startLine()).isEqualTo(10);
             // endLine should collapse to 10, not jump to 100
@@ -345,11 +321,8 @@ class DiffHunkValidatorTest extends BaseUnitTest {
             // endLine to startLine, or GitHub rejects the multi-line suggestion anchor at the API.
             TreeSet<Integer> lines = new TreeSet<>(List.of(10, 12, 13));
             DiffNote note = new DiffNote("File.swift", 10, 13, "valid start, gap-crossing end");
-            List<DiffNote> result = DiffHunkValidator.validateAndCorrect(
-                List.of(note),
-                Map.of("File.swift", lines),
-                "job-1"
-            );
+            List<DiffNote> result =
+                    DiffHunkValidator.validateAndCorrect(List.of(note), Map.of("File.swift", lines), "job-1");
             assertThat(result).hasSize(1);
             assertThat(result.getFirst().startLine()).isEqualTo(10);
             assertThat(result.getFirst().endLine()).isEqualTo(10);
@@ -360,11 +333,8 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         void validStartContiguousEndLineKept() {
             TreeSet<Integer> lines = new TreeSet<>(List.of(10, 11, 12, 13));
             DiffNote note = new DiffNote("File.swift", 10, 13, "valid start, contiguous end");
-            List<DiffNote> result = DiffHunkValidator.validateAndCorrect(
-                List.of(note),
-                Map.of("File.swift", lines),
-                "job-1"
-            );
+            List<DiffNote> result =
+                    DiffHunkValidator.validateAndCorrect(List.of(note), Map.of("File.swift", lines), "job-1");
             assertThat(result).hasSize(1);
             assertThat(result.getFirst().startLine()).isEqualTo(10);
             assertThat(result.getFirst().endLine()).isEqualTo(13);
@@ -375,10 +345,9 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         void mixedNotes() {
             TreeSet<Integer> lines = new TreeSet<>(List.of(1, 5, 10, 15));
             List<DiffNote> notes = List.of(
-                new DiffNote("File.swift", 5, null, "valid"),
-                new DiffNote("File.swift", 7, null, "invalid - snap to 5"),
-                new DiffNote("File.swift", 15, null, "valid")
-            );
+                    new DiffNote("File.swift", 5, null, "valid"),
+                    new DiffNote("File.swift", 7, null, "invalid - snap to 5"),
+                    new DiffNote("File.swift", 15, null, "valid"));
             List<DiffNote> result = DiffHunkValidator.validateAndCorrect(notes, Map.of("File.swift", lines), "job-1");
             assertThat(result).hasSize(3);
             assertThat(result.get(0).startLine()).isEqualTo(5);
@@ -390,11 +359,8 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         void tieBreaksToFloor() {
             TreeSet<Integer> lines = new TreeSet<>(List.of(5, 15));
             DiffNote note = new DiffNote("File.swift", 10, null, "equidistant");
-            List<DiffNote> result = DiffHunkValidator.validateAndCorrect(
-                List.of(note),
-                Map.of("File.swift", lines),
-                "job-1"
-            );
+            List<DiffNote> result =
+                    DiffHunkValidator.validateAndCorrect(List.of(note), Map.of("File.swift", lines), "job-1");
             assertThat(result).hasSize(1);
             assertThat(result.getFirst().startLine()).isEqualTo(5);
         }
@@ -403,11 +369,8 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         void dropsNoteBeyondSnapDelta() {
             TreeSet<Integer> lines = new TreeSet<>(List.of(1, 2, 3));
             DiffNote note = new DiffNote("File.swift", 1000, null, "way beyond");
-            List<DiffNote> result = DiffHunkValidator.validateAndCorrect(
-                List.of(note),
-                Map.of("File.swift", lines),
-                "job-1"
-            );
+            List<DiffNote> result =
+                    DiffHunkValidator.validateAndCorrect(List.of(note), Map.of("File.swift", lines), "job-1");
             assertThat(result).isEmpty();
         }
 
@@ -415,11 +378,8 @@ class DiffHunkValidatorTest extends BaseUnitTest {
         void snapsWithinSnapDelta() {
             TreeSet<Integer> lines = new TreeSet<>(List.of(1, 2, 3));
             DiffNote note = new DiffNote("File.swift", 5, null, "close enough"); // delta=2 (to 3)
-            List<DiffNote> result = DiffHunkValidator.validateAndCorrect(
-                List.of(note),
-                Map.of("File.swift", lines),
-                "job-1"
-            );
+            List<DiffNote> result =
+                    DiffHunkValidator.validateAndCorrect(List.of(note), Map.of("File.swift", lines), "job-1");
             assertThat(result).hasSize(1);
             assertThat(result.getFirst().startLine()).isEqualTo(3);
         }

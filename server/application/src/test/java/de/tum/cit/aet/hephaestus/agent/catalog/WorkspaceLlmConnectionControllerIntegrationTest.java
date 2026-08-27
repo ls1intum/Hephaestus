@@ -33,16 +33,14 @@ class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceI
 
     private WorkspaceLlmConnectionDTO createConnection(Workspace workspace, String slug) {
         var request = new CreateWorkspaceLlmConnectionRequestDTO(
-            slug,
-            "My Provider",
-            "https://api.openai.com",
-            "openai-completions",
-            LlmAuthMode.BEARER,
-            "sk-workspace-secret-9999",
-            true
-        );
-        return Objects.requireNonNull(
-            webTestClient
+                slug,
+                "My Provider",
+                "https://api.openai.com",
+                "openai-completions",
+                LlmAuthMode.BEARER,
+                "sk-workspace-secret-9999",
+                true);
+        return Objects.requireNonNull(webTestClient
                 .post()
                 .uri("/workspaces/{slug}/llm/connections", workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
@@ -53,8 +51,7 @@ class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceI
                 .isCreated()
                 .expectBody(WorkspaceLlmConnectionDTO.class)
                 .returnResult()
-                .getResponseBody()
-        );
+                .getResponseBody());
     }
 
     @Test
@@ -68,56 +65,56 @@ class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceI
         assertThat(created.apiKeyLast4()).isEqualTo("9999");
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/connections/{id}", workspace.getWorkspaceSlug(), created.id())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.slug")
-            .isEqualTo("my-openai");
+                .get()
+                .uri("/workspaces/{slug}/llm/connections/{id}", workspace.getWorkspaceSlug(), created.id())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.slug")
+                .isEqualTo("my-openai");
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/connections", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.length()")
-            .isEqualTo(1);
+                .get()
+                .uri("/workspaces/{slug}/llm/connections", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.length()")
+                .isEqualTo(1);
 
         var updateRequest = new UpdateWorkspaceLlmConnectionRequestDTO("Renamed", null, null, null);
         webTestClient
-            .patch()
-            .uri("/workspaces/{slug}/llm/connections/{id}", workspace.getWorkspaceSlug(), created.id())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(updateRequest)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.displayName")
-            .isEqualTo("Renamed");
+                .patch()
+                .uri("/workspaces/{slug}/llm/connections/{id}", workspace.getWorkspaceSlug(), created.id())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(updateRequest)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.displayName")
+                .isEqualTo("Renamed");
 
         webTestClient
-            .delete()
-            .uri("/workspaces/{slug}/llm/connections/{id}", workspace.getWorkspaceSlug(), created.id())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isNoContent();
+                .delete()
+                .uri("/workspaces/{slug}/llm/connections/{id}", workspace.getWorkspaceSlug(), created.id())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNoContent();
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/connections/{id}", workspace.getWorkspaceSlug(), created.id())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+                .get()
+                .uri("/workspaces/{slug}/llm/connections/{id}", workspace.getWorkspaceSlug(), created.id())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNotFound();
     }
 
     @Test
@@ -126,27 +123,24 @@ class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceI
         Workspace workspace = setupWorkspace("byo-redaction-ws");
 
         String body = webTestClient
-            .post()
-            .uri("/workspaces/{slug}/llm/connections", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(
-                new CreateWorkspaceLlmConnectionRequestDTO(
-                    "redact-me",
-                    "Redact Me",
-                    "https://api.openai.com",
-                    "openai-completions",
-                    LlmAuthMode.BEARER,
-                    "sk-super-secret-workspace-value",
-                    true
-                )
-            )
-            .exchange()
-            .expectStatus()
-            .isCreated()
-            .expectBody(String.class)
-            .returnResult()
-            .getResponseBody();
+                .post()
+                .uri("/workspaces/{slug}/llm/connections", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new CreateWorkspaceLlmConnectionRequestDTO(
+                        "redact-me",
+                        "Redact Me",
+                        "https://api.openai.com",
+                        "openai-completions",
+                        LlmAuthMode.BEARER,
+                        "sk-super-secret-workspace-value",
+                        true))
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody(String.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(body).isNotNull();
         assertThat(body).doesNotContain("sk-super-secret-workspace-value");
@@ -164,12 +158,12 @@ class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceI
         ensureWorkspaceMembership(workspace, mentor, WorkspaceRole.MEMBER);
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/connections", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .get()
+                .uri("/workspaces/{slug}/llm/connections", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isForbidden();
     }
 
     @Test
@@ -179,22 +173,17 @@ class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceI
         WorkspaceLlmConnectionDTO connectionInA = createConnection(workspaceA, "conn-in-a");
 
         User ownerB = persistUser("byo-tenancy-owner-b");
-        Workspace workspaceB = createWorkspace(
-            "byo-tenancy-b",
-            "Tenancy B",
-            "byo-tenancy-org-b",
-            AccountType.ORG,
-            ownerB
-        );
+        Workspace workspaceB =
+                createWorkspace("byo-tenancy-b", "Tenancy B", "byo-tenancy-org-b", AccountType.ORG, ownerB);
         ensureAdminMembership(workspaceB);
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/connections/{id}", workspaceB.getWorkspaceSlug(), connectionInA.id())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+                .get()
+                .uri("/workspaces/{slug}/llm/connections/{id}", workspaceB.getWorkspaceSlug(), connectionInA.id())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNotFound();
     }
 
     @Test
@@ -204,38 +193,32 @@ class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceI
         // instance-wide elevation (see WithAdminUser's javadoc); this proves the ordinary
         // membership-scoped path independent of that bypass.
         User admin = persistUser("mentor");
-        Workspace workspace = createWorkspace(
-            "byo-realadmin-ws",
-            "Real Admin",
-            "byo-realadmin-org",
-            AccountType.ORG,
-            admin
-        );
+        Workspace workspace =
+                createWorkspace("byo-realadmin-ws", "Real Admin", "byo-realadmin-org", AccountType.ORG, admin);
         ensureWorkspaceMembership(workspace, admin, WorkspaceRole.ADMIN);
 
         Workspace otherWorkspace = createWorkspace(
-            "byo-nonmember-ws-2",
-            "Non Member 2",
-            "byo-nonmember-org-2",
-            AccountType.ORG,
-            persistUser("byo-nonmember-owner-2")
-        );
+                "byo-nonmember-ws-2",
+                "Non Member 2",
+                "byo-nonmember-org-2",
+                AccountType.ORG,
+                persistUser("byo-nonmember-owner-2"));
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/connections", otherWorkspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .get()
+                .uri("/workspaces/{slug}/llm/connections", otherWorkspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isForbidden();
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/llm/connections", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk();
+                .get()
+                .uri("/workspaces/{slug}/llm/connections", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk();
     }
 
     @Test
@@ -248,23 +231,22 @@ class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceI
         instanceLlmSettingsRepository.save(settings);
 
         var request = new CreateWorkspaceLlmConnectionRequestDTO(
-            "gated-out",
-            "Gated Out",
-            "https://api.openai.com",
-            "openai-completions",
-            LlmAuthMode.BEARER,
-            null,
-            true
-        );
+                "gated-out",
+                "Gated Out",
+                "https://api.openai.com",
+                "openai-completions",
+                LlmAuthMode.BEARER,
+                null,
+                true);
 
         webTestClient
-            .post()
-            .uri("/workspaces/{slug}/llm/connections", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .post()
+                .uri("/workspaces/{slug}/llm/connections", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isForbidden();
     }
 }

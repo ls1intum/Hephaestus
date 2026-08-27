@@ -40,12 +40,7 @@ class SlackOnboardingServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         service = new SlackOnboardingService(
-            workspaceResolver,
-            identityResolver,
-            messageService,
-            "https://heph.example.com/",
-            ""
-        );
+                workspaceResolver, identityResolver, messageService, "https://heph.example.com/", "");
     }
 
     @Test
@@ -88,24 +83,17 @@ class SlackOnboardingServiceTest extends BaseUnitTest {
 
     @Test
     void linkUrl_isTheAuthenticatedLinkModeDeepLink() {
-        assertThat(service.linkUrl()).isEqualTo(
-            "https://heph.example.com/auth/login?provider=slack&mode=link&returnTo=/settings"
-        );
+        assertThat(service.linkUrl())
+                .isEqualTo("https://heph.example.com/auth/login?provider=slack&mode=link&returnTo=/settings");
     }
 
     @Test
     void linkUrl_includesApiBasePathWhenAppServerIsMountedUnderApi() {
         SlackOnboardingService apiMounted = new SlackOnboardingService(
-            workspaceResolver,
-            identityResolver,
-            messageService,
-            "https://heph.example.com/",
-            "/api"
-        );
+                workspaceResolver, identityResolver, messageService, "https://heph.example.com/", "/api");
 
-        assertThat(apiMounted.linkUrl()).isEqualTo(
-            "https://heph.example.com/api/auth/login?provider=slack&mode=link&returnTo=/settings"
-        );
+        assertThat(apiMounted.linkUrl())
+                .isEqualTo("https://heph.example.com/api/auth/login?provider=slack&mode=link&returnTo=/settings");
     }
 
     @Test

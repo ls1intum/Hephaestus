@@ -39,65 +39,64 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void activityDoesNotDependOnLeaderboardServices() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..activity..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("..leaderboard..service..")
-                .orShould()
-                .dependOnClassesThat()
-                .resideInAPackage("..leaderboard..repository..")
-                .because(
-                    "Activity should not depend on leaderboard - use domain events for cross-module communication"
-                );
+                    .that()
+                    .resideInAPackage("..activity..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAPackage("..leaderboard..service..")
+                    .orShould()
+                    .dependOnClassesThat()
+                    .resideInAPackage("..leaderboard..repository..")
+                    .because(
+                            "Activity should not depend on leaderboard - use domain events for cross-module communication");
             rule.check(classes);
         }
 
         @Test
         void activityDoesNotDependOnMentor() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..activity..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("..mentor..")
-                .because("Activity and mentor are independent feature modules");
+                    .that()
+                    .resideInAPackage("..activity..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAPackage("..mentor..")
+                    .because("Activity and mentor are independent feature modules");
             rule.check(classes);
         }
 
         @Test
         void activityDoesNotDependOnNotification() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..activity..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("..notification..")
-                .because("Activity should use domain events to trigger notifications");
+                    .that()
+                    .resideInAPackage("..activity..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAPackage("..notification..")
+                    .because("Activity should use domain events to trigger notifications");
             rule.check(classes);
         }
 
         @Test
         void activityDoesNotDependOnProfile() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..activity..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("..profile..")
-                .because("Profile depends on activity, not vice versa");
+                    .that()
+                    .resideInAPackage("..activity..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAPackage("..profile..")
+                    .because("Profile depends on activity, not vice versa");
             rule.check(classes);
         }
 
         @Test
         void activityDoesNotDependOnContributors() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..activity..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("..contributors..")
-                .because("Activity should not depend on contributors");
+                    .that()
+                    .resideInAPackage("..activity..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAPackage("..contributors..")
+                    .because("Activity should not depend on contributors");
             rule.check(classes);
         }
     }
@@ -110,12 +109,12 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void practicesModelDoesNotDependOnReview() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..practices.model..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("..practices.review..")
-                .because("Model layer (practices.model) should not depend on review logic (practices.review)");
+                    .that()
+                    .resideInAPackage("..practices.model..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAPackage("..practices.review..")
+                    .because("Model layer (practices.model) should not depend on review logic (practices.review)");
             rule.check(classes);
         }
     }
@@ -129,24 +128,24 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void scoringDoesNotDependOnControllers() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..activity.scoring..")
-                .should()
-                .dependOnClassesThat()
-                .haveSimpleNameEndingWith("Controller")
-                .because("Scoring logic should be independent of presentation layer");
+                    .that()
+                    .resideInAPackage("..activity.scoring..")
+                    .should()
+                    .dependOnClassesThat()
+                    .haveSimpleNameEndingWith("Controller")
+                    .because("Scoring logic should be independent of presentation layer");
             rule.check(classes);
         }
 
         @Test
         void scoringHasMinimalExternalDependencies() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage("..activity.scoring..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage("..leaderboard..", "..mentor..", "..notification..", "..profile..")
-                .because("Scoring should be a pure calculation module");
+                    .that()
+                    .resideInAPackage("..activity.scoring..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAnyPackage("..leaderboard..", "..mentor..", "..notification..", "..profile..")
+                    .because("Scoring should be a pure calculation module");
             rule.check(classes);
         }
     }
@@ -159,45 +158,44 @@ class ActivityModuleBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void practicesHasDedicatedController() {
             ArchRule rule = classes()
-                .that()
-                .resideInAPackage("..practices..")
-                .and()
-                .haveSimpleNameEndingWith("Controller")
-                .should()
-                .haveSimpleName("PracticeCatalogController")
-                .orShould()
-                .haveSimpleName("PracticeGroupController")
-                .orShould()
-                .haveSimpleName("ObservationController")
-                .orShould()
-                .haveSimpleName("FeedbackResponseController")
-                .orShould()
-                .haveSimpleName("PracticeReviewSettingsController")
-                .orShould()
-                .haveSimpleName("PracticeReviewOutputController")
-                .orShould()
-                .haveSimpleName("CuratedCatalogAdminController")
-                .orShould()
-                .haveSimpleName("CuratedPracticeCatalogController")
-                .orShould()
-                .haveSimpleName("CatalogAdoptionController")
-                .orShould()
-                .haveSimpleName("ArtifactTraceController")
-                .orShould()
-                .haveSimpleName("InAppFeedbackController")
-                .orShould()
-                .haveSimpleName("PracticeGroupDetailController")
-                .orShould()
-                .haveSimpleName("PracticeGroupStandingController")
-                .orShould()
-                .haveSimpleName("PracticeStandingController")
-                .because(
-                    "Only PracticeCatalogController, PracticeGroupController, ObservationController, " +
-                        "FeedbackResponseController, PracticeReviewSettingsController, PracticeReviewOutputController, " +
-                        "CuratedCatalogAdminController, CuratedPracticeCatalogController, CatalogAdoptionController, " +
-                        "ArtifactTraceController, InAppFeedbackController, PracticeGroupDetailController, " +
-                        "PracticeGroupStandingController and PracticeStandingController are allowed REST entry points"
-                );
+                    .that()
+                    .resideInAPackage("..practices..")
+                    .and()
+                    .haveSimpleNameEndingWith("Controller")
+                    .should()
+                    .haveSimpleName("PracticeCatalogController")
+                    .orShould()
+                    .haveSimpleName("PracticeGroupController")
+                    .orShould()
+                    .haveSimpleName("ObservationController")
+                    .orShould()
+                    .haveSimpleName("FeedbackResponseController")
+                    .orShould()
+                    .haveSimpleName("PracticeReviewSettingsController")
+                    .orShould()
+                    .haveSimpleName("PracticeReviewOutputController")
+                    .orShould()
+                    .haveSimpleName("CuratedCatalogAdminController")
+                    .orShould()
+                    .haveSimpleName("CuratedPracticeCatalogController")
+                    .orShould()
+                    .haveSimpleName("CatalogAdoptionController")
+                    .orShould()
+                    .haveSimpleName("ArtifactTraceController")
+                    .orShould()
+                    .haveSimpleName("InAppFeedbackController")
+                    .orShould()
+                    .haveSimpleName("PracticeGroupDetailController")
+                    .orShould()
+                    .haveSimpleName("PracticeGroupStandingController")
+                    .orShould()
+                    .haveSimpleName("PracticeStandingController")
+                    .because(
+                            "Only PracticeCatalogController, PracticeGroupController, ObservationController, "
+                                    + "FeedbackResponseController, PracticeReviewSettingsController, PracticeReviewOutputController, "
+                                    + "CuratedCatalogAdminController, CuratedPracticeCatalogController, CatalogAdoptionController, "
+                                    + "ArtifactTraceController, InAppFeedbackController, PracticeGroupDetailController, "
+                                    + "PracticeGroupStandingController and PracticeStandingController are allowed REST entry points");
             rule.check(classes);
         }
     }

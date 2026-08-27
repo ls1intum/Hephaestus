@@ -59,12 +59,12 @@ class AuthenticatedGitProviderUserServiceTest extends BaseUnitTest {
     @BeforeEach
     void authenticate() {
         Jwt jwt = Jwt.withTokenValue("t")
-            .header("alg", "ES256")
-            .subject(String.valueOf(ACCOUNT_ID))
-            .claim("preferred_username", "gitlabuser")
-            .issuedAt(Instant.now())
-            .expiresAt(Instant.now().plusSeconds(60))
-            .build();
+                .header("alg", "ES256")
+                .subject(String.valueOf(ACCOUNT_ID))
+                .claim("preferred_username", "gitlabuser")
+                .issuedAt(Instant.now())
+                .expiresAt(Instant.now().plusSeconds(60))
+                .build();
         SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
     }
 
@@ -78,35 +78,31 @@ class AuthenticatedGitProviderUserServiceTest extends BaseUnitTest {
         when(userRepository.getCurrentUser()).thenReturn(Optional.empty());
         IdentityLinkView gitlab = view(100L, GITLAB_PROVIDER_ID, "18024", "gitlabuser");
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(List.of(gitlab));
-        IdentityProvider provider = gitProvider(
-            GITLAB_PROVIDER_ID,
-            IdentityProviderType.GITLAB,
-            "https://gitlab.lrz.de"
-        );
+        IdentityProvider provider =
+                gitProvider(GITLAB_PROVIDER_ID, IdentityProviderType.GITLAB, "https://gitlab.lrz.de");
         when(gitProviderRepository.findById(GITLAB_PROVIDER_ID)).thenReturn(Optional.of(provider));
 
         User provisioned = user(555L, "gitlabuser", 18024L, provider);
-        when(userRepository.findByLoginAndProviderId("gitlabuser", GITLAB_PROVIDER_ID)).thenReturn(
-            Optional.of(provisioned)
-        );
+        when(userRepository.findByLoginAndProviderId("gitlabuser", GITLAB_PROVIDER_ID))
+                .thenReturn(Optional.of(provisioned));
         when(userRepository.findById(555L)).thenReturn(Optional.of(provisioned));
 
         Optional<User> result = service.resolveOrProvisionCurrentUser();
 
         assertThat(result).containsSame(provisioned);
         // native_id = numeric subject; login = usernameAtSignup; never reads a JWT claim.
-        verify(userRepository).upsertUser(
-            eq(18024L),
-            eq(GITLAB_PROVIDER_ID),
-            eq("gitlabuser"),
-            anyString(),
-            anyString(),
-            anyString(),
-            eq("USER"),
-            any(),
-            any(),
-            any()
-        );
+        verify(userRepository)
+                .upsertUser(
+                        eq(18024L),
+                        eq(GITLAB_PROVIDER_ID),
+                        eq("gitlabuser"),
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq("USER"),
+                        any(),
+                        any(),
+                        any());
         // IdentityLink → ExternalActor wiring is closed idempotently.
         verify(accountIdentityQuery).linkExternalActor(100L, 555L);
     }
@@ -122,25 +118,24 @@ class AuthenticatedGitProviderUserServiceTest extends BaseUnitTest {
         lenient().when(gitProviderRepository.findById(GITHUB_PROVIDER_ID)).thenReturn(Optional.of(gh));
         when(gitProviderRepository.findById(GITLAB_PROVIDER_ID)).thenReturn(Optional.of(gl));
         User provisioned = user(555L, "gitlabuser", 18024L, gl);
-        when(userRepository.findByLoginAndProviderId("gitlabuser", GITLAB_PROVIDER_ID)).thenReturn(
-            Optional.of(provisioned)
-        );
+        when(userRepository.findByLoginAndProviderId("gitlabuser", GITLAB_PROVIDER_ID))
+                .thenReturn(Optional.of(provisioned));
         when(userRepository.findById(555L)).thenReturn(Optional.of(provisioned));
 
         service.resolveOrProvisionCurrentUser();
 
-        verify(userRepository).upsertUser(
-            eq(18024L),
-            eq(GITLAB_PROVIDER_ID),
-            eq("gitlabuser"),
-            anyString(),
-            anyString(),
-            anyString(),
-            eq("USER"),
-            any(),
-            any(),
-            any()
-        );
+        verify(userRepository)
+                .upsertUser(
+                        eq(18024L),
+                        eq(GITLAB_PROVIDER_ID),
+                        eq("gitlabuser"),
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        eq("USER"),
+                        any(),
+                        any(),
+                        any());
     }
 
     @Test
@@ -150,9 +145,8 @@ class AuthenticatedGitProviderUserServiceTest extends BaseUnitTest {
         IdentityProvider gl = gitProvider(GITLAB_PROVIDER_ID, IdentityProviderType.GITLAB, "https://gitlab.lrz.de");
         when(gitProviderRepository.findById(GITLAB_PROVIDER_ID)).thenReturn(Optional.of(gl));
         User provisioned = user(555L, "gitlabuser", 18024L, gl);
-        when(userRepository.findByLoginAndProviderId("gitlabuser", GITLAB_PROVIDER_ID)).thenReturn(
-            Optional.of(provisioned)
-        );
+        when(userRepository.findByLoginAndProviderId("gitlabuser", GITLAB_PROVIDER_ID))
+                .thenReturn(Optional.of(provisioned));
         lenient().when(userRepository.findById(555L)).thenReturn(Optional.of(provisioned));
 
         service.ensureCurrentGitLabUserExists();
@@ -168,21 +162,22 @@ class AuthenticatedGitProviderUserServiceTest extends BaseUnitTest {
         when(gitProviderRepository.findById(GITHUB_PROVIDER_ID)).thenReturn(Optional.of(gh));
 
         assertThatThrownBy(() -> service.ensureCurrentGitLabUserExists())
-            .isInstanceOf(ResponseStatusException.class)
-            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode())
+                        .isEqualTo(HttpStatus.CONFLICT));
 
-        verify(userRepository, never()).upsertUser(
-            anyLong(),
-            anyLong(),
-            anyString(),
-            anyString(),
-            anyString(),
-            anyString(),
-            anyString(),
-            any(),
-            any(),
-            any()
-        );
+        verify(userRepository, never())
+                .upsertUser(
+                        anyLong(),
+                        anyLong(),
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        any(),
+                        any(),
+                        any());
     }
 
     @Test
@@ -194,29 +189,27 @@ class AuthenticatedGitProviderUserServiceTest extends BaseUnitTest {
         when(userRepository.getCurrentUser()).thenReturn(Optional.empty());
         IdentityLinkView poisoned = view(100L, GITLAB_PROVIDER_ID, "attacker-handle", "attacker-handle");
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(List.of(poisoned));
-        IdentityProvider provider = gitProvider(
-            GITLAB_PROVIDER_ID,
-            IdentityProviderType.GITLAB,
-            "https://gitlab.lrz.de"
-        );
+        IdentityProvider provider =
+                gitProvider(GITLAB_PROVIDER_ID, IdentityProviderType.GITLAB, "https://gitlab.lrz.de");
         when(gitProviderRepository.findById(GITLAB_PROVIDER_ID)).thenReturn(Optional.of(provider));
 
         assertThatThrownBy(() -> service.resolveOrProvisionCurrentUser())
-            .isInstanceOf(ResponseStatusException.class)
-            .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode())
+                        .isEqualTo(HttpStatus.CONFLICT));
 
-        verify(userRepository, never()).upsertUser(
-            anyLong(),
-            anyLong(),
-            anyString(),
-            anyString(),
-            anyString(),
-            anyString(),
-            anyString(),
-            any(),
-            any(),
-            any()
-        );
+        verify(userRepository, never())
+                .upsertUser(
+                        anyLong(),
+                        anyLong(),
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        any(),
+                        any(),
+                        any());
         verify(accountIdentityQuery, never()).linkExternalActor(anyLong(), anyLong());
     }
 

@@ -48,7 +48,9 @@ public class GitLabPreflightService {
         // ssrfGuarded (not systemDns): serverUrl is user-supplied, so the outbound DNS must be filtered
         // at connect time. ServerUrlValidator already blocks literal private IPs; the guarded resolver
         // extends that same policy to hostnames that RESOLVE to private IPs, closing the DNS-rebind bypass.
-        this.webClient = WebClient.builder().clientConnector(WebClientConnectors.ssrfGuarded()).build();
+        this.webClient = WebClient.builder()
+                .clientConnector(WebClientConnectors.ssrfGuarded())
+                .build();
     }
 
     /**
@@ -60,21 +62,18 @@ public class GitLabPreflightService {
      * @return validation result with user/group info on success, or error message on failure
      */
     public GitLabPreflightResponseDTO validateToken(
-        String token,
-        @Nullable String serverUrl,
-        @Nullable String groupFullPath
-    ) {
+            String token, @Nullable String serverUrl, @Nullable String groupFullPath) {
         String resolvedUrl = resolveAndValidateServerUrl(serverUrl);
 
         // Try personal token endpoint first
         try {
             GitLabUserResponse user = webClient
-                .get()
-                .uri(resolvedUrl + "/api/v4/user")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .retrieve()
-                .bodyToMono(GitLabUserResponse.class)
-                .block(REQUEST_TIMEOUT);
+                    .get()
+                    .uri(resolvedUrl + "/api/v4/user")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                    .retrieve()
+                    .bodyToMono(GitLabUserResponse.class)
+                    .block(REQUEST_TIMEOUT);
 
             if (user != null && user.id() != null) {
                 log.info("GitLab preflight: token valid for user={}, serverUrl={}", user.username(), resolvedUrl);
@@ -99,19 +98,18 @@ public class GitLabPreflightService {
         }
 
         return GitLabPreflightResponseDTO.failure(
-            "Token is invalid or is a group/project token. Provide groupFullPath for group token validation."
-        );
+                "Token is invalid or is a group/project token. Provide groupFullPath for group token validation.");
     }
 
     private GitLabPreflightResponseDTO validateGroupToken(String token, String serverUrl, String groupFullPath) {
         try {
             GitLabGroupResponse group = webClient
-                .get()
-                .uri(serverUrl + "/api/v4/groups/{groupPath}", groupFullPath)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .retrieve()
-                .bodyToMono(GitLabGroupResponse.class)
-                .block(REQUEST_TIMEOUT);
+                    .get()
+                    .uri(serverUrl + "/api/v4/groups/{groupPath}", groupFullPath)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                    .retrieve()
+                    .bodyToMono(GitLabGroupResponse.class)
+                    .block(REQUEST_TIMEOUT);
 
             if (group != null && group.id() != null) {
                 log.info("GitLab preflight: group token valid for group={}, serverUrl={}", group.fullPath(), serverUrl);
@@ -128,11 +126,10 @@ public class GitLabPreflightService {
             return GitLabPreflightResponseDTO.failure("GitLab API returned status " + status);
         } catch (Exception e) {
             log.warn(
-                "GitLab group token validation failed: serverUrl={}, group={}, error={}",
-                serverUrl,
-                groupFullPath,
-                e.getMessage()
-            );
+                    "GitLab group token validation failed: serverUrl={}, group={}, error={}",
+                    serverUrl,
+                    groupFullPath,
+                    e.getMessage());
             return GitLabPreflightResponseDTO.failure("Failed to validate group token");
         }
 
@@ -151,22 +148,22 @@ public class GitLabPreflightService {
 
         try {
             List<GitLabGroupListItem> groups = webClient
-                .get()
-                .uri(resolvedUrl + "/api/v4/groups?min_access_level=10&per_page=100&order_by=name&sort=asc")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-                .retrieve()
-                .bodyToFlux(GitLabGroupListItem.class)
-                .collectList()
-                .block(REQUEST_TIMEOUT);
+                    .get()
+                    .uri(resolvedUrl + "/api/v4/groups?min_access_level=10&per_page=100&order_by=name&sort=asc")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                    .retrieve()
+                    .bodyToFlux(GitLabGroupListItem.class)
+                    .collectList()
+                    .block(REQUEST_TIMEOUT);
 
             if (groups == null) {
                 return List.of();
             }
 
-            return groups
-                .stream()
-                .map(g -> new GitLabGroupDTO(g.id(), g.name(), g.fullPath(), g.avatarUrl(), g.webUrl(), g.visibility()))
-                .toList();
+            return groups.stream()
+                    .map(g -> new GitLabGroupDTO(
+                            g.id(), g.name(), g.fullPath(), g.avatarUrl(), g.webUrl(), g.visibility()))
+                    .toList();
         } catch (Exception e) {
             log.warn("Failed to list accessible GitLab groups: serverUrl={}, error={}", resolvedUrl, e.getMessage());
             return List.of();
@@ -194,29 +191,26 @@ public class GitLabPreflightService {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record GitLabUserResponse(
-        Long id,
-        String username,
-        String name,
-        @JsonProperty("avatar_url") @Nullable String avatarUrl,
-        @JsonProperty("web_url") @Nullable String webUrl
-    ) {}
+            Long id,
+            String username,
+            String name,
+            @JsonProperty("avatar_url") @Nullable String avatarUrl,
+            @JsonProperty("web_url") @Nullable String webUrl) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record GitLabGroupResponse(
-        Long id,
-        String name,
-        @JsonProperty("full_path") String fullPath,
-        @JsonProperty("avatar_url") @Nullable String avatarUrl,
-        @JsonProperty("web_url") @Nullable String webUrl
-    ) {}
+            Long id,
+            String name,
+            @JsonProperty("full_path") String fullPath,
+            @JsonProperty("avatar_url") @Nullable String avatarUrl,
+            @JsonProperty("web_url") @Nullable String webUrl) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record GitLabGroupListItem(
-        Long id,
-        String name,
-        @JsonProperty("full_path") String fullPath,
-        @JsonProperty("avatar_url") @Nullable String avatarUrl,
-        @JsonProperty("web_url") @Nullable String webUrl,
-        @Nullable String visibility
-    ) {}
+            Long id,
+            String name,
+            @JsonProperty("full_path") String fullPath,
+            @JsonProperty("avatar_url") @Nullable String avatarUrl,
+            @JsonProperty("web_url") @Nullable String webUrl,
+            @Nullable String visibility) {}
 }

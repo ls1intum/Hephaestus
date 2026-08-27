@@ -20,7 +20,8 @@ import org.jspecify.annotations.Nullable;
  * round-trips cleanly through code generation, so the webapp consumes the generated client
  * instead of a hand-rolled fetch wrapper.
  */
-public record InitiateConnectionResponseDTO(Type type, @Nullable URI vendorUrl, @Nullable Long connectionId) {
+public record InitiateConnectionResponseDTO(
+        Type type, @Nullable URI vendorUrl, @Nullable Long connectionId) {
     public enum Type {
         REDIRECT,
         LINKED,

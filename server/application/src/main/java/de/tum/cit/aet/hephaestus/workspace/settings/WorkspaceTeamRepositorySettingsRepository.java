@@ -23,8 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 @WorkspaceAgnostic("Queried by explicit workspace ID - settings queries always workspace-scoped")
 public interface WorkspaceTeamRepositorySettingsRepository
-    extends JpaRepository<WorkspaceTeamRepositorySettings, WorkspaceTeamRepositorySettings.Id>
-{
+        extends JpaRepository<WorkspaceTeamRepositorySettings, WorkspaceTeamRepositorySettings.Id> {
     /**
      * Finds all team repository settings for a given workspace.
      *
@@ -51,10 +50,7 @@ public interface WorkspaceTeamRepositorySettingsRepository
      * @return the settings if they exist
      */
     Optional<WorkspaceTeamRepositorySettings> findByWorkspaceIdAndTeamIdAndRepositoryId(
-        Long workspaceId,
-        Long teamId,
-        Long repositoryId
-    );
+            Long workspaceId, Long teamId, Long repositoryId);
 
     /**
      * Finds all team repository settings where the repository is hidden from contributions
@@ -63,12 +59,10 @@ public interface WorkspaceTeamRepositorySettingsRepository
      * @param workspaceId the workspace ID
      * @return list of settings for hidden repositories
      */
-    @Query(
-        """
+    @Query("""
         SELECT wtrs FROM WorkspaceTeamRepositorySettings wtrs
         WHERE wtrs.workspace.id = :workspaceId AND wtrs.hiddenFromContributions = true
-        """
-    )
+        """)
     List<WorkspaceTeamRepositorySettings> findHiddenRepositoriesByWorkspace(@Param("workspaceId") Long workspaceId);
 
     /**
@@ -80,12 +74,10 @@ public interface WorkspaceTeamRepositorySettingsRepository
      * @param workspaceId the workspace ID
      * @return set of repository IDs that are hidden from contributions
      */
-    @Query(
-        """
+    @Query("""
         SELECT wtrs.repository.id FROM WorkspaceTeamRepositorySettings wtrs
         WHERE wtrs.workspace.id = :workspaceId AND wtrs.hiddenFromContributions = true
-        """
-    )
+        """)
     Set<Long> findHiddenRepositoryIdsByWorkspace(@Param("workspaceId") Long workspaceId);
 
     /**
@@ -98,18 +90,14 @@ public interface WorkspaceTeamRepositorySettingsRepository
      * @param teamIds the set of team IDs to check
      * @return set of repository IDs that are hidden from contributions for the specified teams
      */
-    @Query(
-        """
+    @Query("""
         SELECT wtrs.repository.id FROM WorkspaceTeamRepositorySettings wtrs
         WHERE wtrs.workspace.id = :workspaceId
           AND wtrs.team.id IN :teamIds
           AND wtrs.hiddenFromContributions = true
-        """
-    )
+        """)
     Set<Long> findHiddenRepositoryIdsByWorkspaceAndTeams(
-        @Param("workspaceId") Long workspaceId,
-        @Param("teamIds") Set<Long> teamIds
-    );
+            @Param("workspaceId") Long workspaceId, @Param("teamIds") Set<Long> teamIds);
 
     /**
      * Finds all team repository settings where the repository is hidden from contributions
@@ -123,18 +111,14 @@ public interface WorkspaceTeamRepositorySettingsRepository
      * @param teamIds the set of team IDs to check
      * @return list of settings with hidden repositories for the specified teams
      */
-    @Query(
-        """
+    @Query("""
         SELECT wtrs FROM WorkspaceTeamRepositorySettings wtrs
         WHERE wtrs.workspace.id = :workspaceId
           AND wtrs.team.id IN :teamIds
           AND wtrs.hiddenFromContributions = true
-        """
-    )
+        """)
     List<WorkspaceTeamRepositorySettings> findHiddenRepositorySettingsByWorkspaceAndTeams(
-        @Param("workspaceId") Long workspaceId,
-        @Param("teamIds") Set<Long> teamIds
-    );
+            @Param("workspaceId") Long workspaceId, @Param("teamIds") Set<Long> teamIds);
 
     /**
      * Deletes all team repository settings for a workspace.

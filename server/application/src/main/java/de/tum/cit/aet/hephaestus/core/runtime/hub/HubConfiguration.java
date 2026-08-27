@@ -31,7 +31,7 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(name = RuntimeRole.SERVER_PROPERTY, havingValue = "true", matchIfMissing = true)
-@EnableConfigurationProperties({ WorkerTokenProperties.class })
+@EnableConfigurationProperties({WorkerTokenProperties.class})
 @EnableWebSocket
 public class HubConfiguration {
 
@@ -61,12 +61,13 @@ public class HubConfiguration {
             // restarts must verify already-issued JWTs), so only the prod profile warns.
             if (environment.acceptsProfiles(Profiles.of("prod"))) {
                 log.warn(
-                    "Worker JWT is using an EPHEMERAL signing key (kid={}). Configure a stable key via " +
-                        "hephaestus.worker.hub.token.keys[*].private-key for production.",
-                    ring.active().kid()
-                );
+                        "Worker JWT is using an EPHEMERAL signing key (kid={}). Configure a stable key via "
+                                + "hephaestus.worker.hub.token.keys[*].private-key for production.",
+                        ring.active().kid());
             } else {
-                log.info("Worker JWT using ephemeral signing key (kid={}) — fine for dev.", ring.active().kid());
+                log.info(
+                        "Worker JWT using ephemeral signing key (kid={}) — fine for dev.",
+                        ring.active().kid());
             }
         }
         return ring;
@@ -79,11 +80,10 @@ public class HubConfiguration {
 
     @Bean
     WorkerJwtVerifier workerJwtVerifier(
-        WorkerKeyRing keyRing,
-        WorkerTokenProperties properties,
-        WorkerTokenDenylistService denylist,
-        MeterRegistry meterRegistry
-    ) {
+            WorkerKeyRing keyRing,
+            WorkerTokenProperties properties,
+            WorkerTokenDenylistService denylist,
+            MeterRegistry meterRegistry) {
         return new JavaJwtWorkerJwtVerifier(keyRing, properties, denylist, meterRegistry);
     }
 
@@ -99,18 +99,13 @@ public class HubConfiguration {
 
     @Bean
     WorkerControlWebSocketHandler workerControlWebSocketHandler(
-        WorkerSessionRegistry registry,
-        FrameCodec codec,
-        MeterRegistry meterRegistry
-    ) {
+            WorkerSessionRegistry registry, FrameCodec codec, MeterRegistry meterRegistry) {
         return new WorkerControlWebSocketHandler(registry, codec, meterRegistry);
     }
 
     @Bean
     HubWebSocketRegistration hubWebSocketRegistration(
-        WorkerControlWebSocketHandler handler,
-        WorkerJwtHandshakeInterceptor interceptor
-    ) {
+            WorkerControlWebSocketHandler handler, WorkerJwtHandshakeInterceptor interceptor) {
         return new HubWebSocketRegistration(handler, interceptor);
     }
 }

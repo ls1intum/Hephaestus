@@ -56,11 +56,10 @@ class InContextDeliveryGate {
     private final WorkspaceReviewDefaultsProvider workspaceDefaults;
 
     InContextDeliveryGate(
-        PracticeRepository practiceRepository,
-        ObservationRepository observationRepository,
-        FeedbackLedgerRecorder feedbackLedgerRecorder,
-        WorkspaceReviewDefaultsProvider workspaceDefaults
-    ) {
+            PracticeRepository practiceRepository,
+            ObservationRepository observationRepository,
+            FeedbackLedgerRecorder feedbackLedgerRecorder,
+            WorkspaceReviewDefaultsProvider workspaceDefaults) {
         this.practiceRepository = practiceRepository;
         this.observationRepository = observationRepository;
         this.feedbackLedgerRecorder = feedbackLedgerRecorder;
@@ -70,28 +69,29 @@ class InContextDeliveryGate {
     /** The subset of {@code observations} that may be placed on the artifact, in the order given. */
     @Transactional(readOnly = true)
     public List<ValidatedObservation> admitInContext(AgentJob job, List<ValidatedObservation> observations) {
-        if (observations.isEmpty() || job.getWorkspace() == null || job.getWorkspace().getId() == null) {
+        if (observations.isEmpty()
+                || job.getWorkspace() == null
+                || job.getWorkspace().getId() == null) {
             return observations;
         }
         ObservationOrigin origin = PracticeDetectionDeliveryService.originOf(job.getMetadata());
         if (!origin.delivers(FeedbackChannel.IN_CONTEXT)) {
             log.info(
-                "Provenance withheld all {} observation(s) from the artifact: origin={}, jobId={}",
-                observations.size(),
-                origin,
-                job.getId()
-            );
+                    "Provenance withheld all {} observation(s) from the artifact: origin={}, jobId={}",
+                    observations.size(),
+                    origin,
+                    job.getId());
             recordWithheld(job, observations, FeedbackSuppressionReason.BACKFILL_QUIET);
             return List.of();
         }
 
-        WorkspaceReviewDefaults defaults = workspaceDefaults.forWorkspace(job.getWorkspace().getId());
+        WorkspaceReviewDefaults defaults =
+                workspaceDefaults.forWorkspace(job.getWorkspace().getId());
         Map<String, PracticeAutonomy> autonomyBySlug = new HashMap<>();
-        for (Practice practice : practiceRepository.findByWorkspaceId(job.getWorkspace().getId())) {
+        for (Practice practice :
+                practiceRepository.findByWorkspaceId(job.getWorkspace().getId())) {
             autonomyBySlug.put(
-                practice.getSlug(),
-                AutonomyResolver.effectiveAutonomyOf(practice, defaults.defaultAutonomy())
-            );
+                    practice.getSlug(), AutonomyResolver.effectiveAutonomyOf(practice, defaults.defaultAutonomy()));
         }
 
         List<ValidatedObservation> admitted = new ArrayList<>(observations.size());
@@ -100,10 +100,9 @@ class InContextDeliveryGate {
             PracticeAutonomy autonomy = autonomyBySlug.get(observation.practiceSlug());
             if (autonomy == null) {
                 log.warn(
-                    "No autonomy resolved for observation; withholding it: slug={}, jobId={}",
-                    observation.practiceSlug(),
-                    job.getId()
-                );
+                        "No autonomy resolved for observation; withholding it: slug={}, jobId={}",
+                        observation.practiceSlug(),
+                        job.getId());
             }
             if (PracticeAutonomyPolicy.delivers(origin, autonomy, FeedbackChannel.IN_CONTEXT)) {
                 admitted.add(observation);
@@ -115,34 +114,33 @@ class InContextDeliveryGate {
             return admitted.size() == observations.size() ? observations : List.copyOf(admitted);
         }
         log.info(
-            "Practice autonomy withheld {} of {} observation(s) from the artifact: jobId={}",
-            withheld.size(),
-            observations.size(),
-            job.getId()
-        );
+                "Practice autonomy withheld {} of {} observation(s) from the artifact: jobId={}",
+                withheld.size(),
+                observations.size(),
+                job.getId());
         recordWithheld(job, withheld, FeedbackSuppressionReason.PRACTICE_REQUIRES_APPROVAL);
         return admitted;
     }
 
     @Transactional(readOnly = true)
     public List<ValidatedObservation> awaitingApproval(AgentJob job, List<ValidatedObservation> observations) {
-        if (
-            observations.isEmpty() || job.getWorkspace() == null || job.getWorkspace().getId() == null
-        ) return List.of();
+        if (observations.isEmpty()
+                || job.getWorkspace() == null
+                || job.getWorkspace().getId() == null) return List.of();
         ObservationOrigin origin = PracticeDetectionDeliveryService.originOf(job.getMetadata());
         if (!origin.delivers(FeedbackChannel.IN_CONTEXT)) return List.of();
-        WorkspaceReviewDefaults defaults = workspaceDefaults.forWorkspace(job.getWorkspace().getId());
+        WorkspaceReviewDefaults defaults =
+                workspaceDefaults.forWorkspace(job.getWorkspace().getId());
         Map<String, PracticeAutonomy> autonomyBySlug = new HashMap<>();
-        for (Practice practice : practiceRepository.findByWorkspaceId(job.getWorkspace().getId())) {
+        for (Practice practice :
+                practiceRepository.findByWorkspaceId(job.getWorkspace().getId())) {
             autonomyBySlug.put(
-                practice.getSlug(),
-                AutonomyResolver.effectiveAutonomyOf(practice, defaults.defaultAutonomy())
-            );
+                    practice.getSlug(), AutonomyResolver.effectiveAutonomyOf(practice, defaults.defaultAutonomy()));
         }
-        return observations
-            .stream()
-            .filter(observation -> autonomyBySlug.get(observation.practiceSlug()) == PracticeAutonomy.HUMAN_APPROVAL)
-            .toList();
+        return observations.stream()
+                .filter(observation ->
+                        autonomyBySlug.get(observation.practiceSlug()) == PracticeAutonomy.HUMAN_APPROVAL)
+                .toList();
     }
 
     private void recordWithheld(AgentJob job, List<ValidatedObservation> withheld, FeedbackSuppressionReason reason) {
@@ -156,10 +154,9 @@ class InContextDeliveryGate {
             // guard would then read as "already recorded" and drop.
             if (index >= FeedbackLedgerRecorder.UNIT_ORDINAL_BAND_WIDTH) {
                 log.warn(
-                    "Withheld-feedback ledger band full at {} rows; remaining withheld observations are unrecorded: jobId={}",
-                    index,
-                    job.getId()
-                );
+                        "Withheld-feedback ledger band full at {} rows; remaining withheld observations are unrecorded: jobId={}",
+                        index,
+                        job.getId());
                 return;
             }
             String occurrenceKey = measured.occurrenceKey();

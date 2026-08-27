@@ -55,18 +55,16 @@ class GithubCredentialProviderTest extends BaseUnitTest {
         Workspace ws = new Workspace();
         ws.setId(workspaceId);
         Connection connection = new Connection(
-            ws,
-            IntegrationKind.GITHUB,
-            "pat",
-            new ConnectionConfig.GitHubPatConfig(/* orgLogin */ "acme", null, Set.of())
-        );
+                ws,
+                IntegrationKind.GITHUB,
+                "pat",
+                new ConnectionConfig.GitHubPatConfig(/* orgLogin */ "acme", null, Set.of()));
         connection.setCredentials(new BearerToken("ghp_secretToken", null), converter);
         connection.setState(IntegrationState.ACTIVE);
         when(connectionService.findActive(workspaceId, IntegrationKind.GITHUB)).thenReturn(Optional.of(connection));
 
-        Optional<CredentialBundle> resolved = provider.resolve(
-            new IntegrationRef(IntegrationKind.GITHUB, workspaceId, "pat")
-        );
+        Optional<CredentialBundle> resolved =
+                provider.resolve(new IntegrationRef(IntegrationKind.GITHUB, workspaceId, "pat"));
 
         assertThat(resolved).contains(new BearerToken("ghp_secretToken", null));
     }
@@ -76,17 +74,12 @@ class GithubCredentialProviderTest extends BaseUnitTest {
         long workspaceId = 17L;
         Workspace ws = new Workspace();
         Connection connection = new Connection(
-            ws,
-            IntegrationKind.GITHUB,
-            "100",
-            new ConnectionConfig.GitHubAppConfig(100L, "acme", null, Set.of())
-        );
+                ws, IntegrationKind.GITHUB, "100", new ConnectionConfig.GitHubAppConfig(100L, "acme", null, Set.of()));
         connection.setState(IntegrationState.ACTIVE);
         when(connectionService.findActive(workspaceId, IntegrationKind.GITHUB)).thenReturn(Optional.of(connection));
 
-        Optional<CredentialBundle> resolved = provider.resolve(
-            new IntegrationRef(IntegrationKind.GITHUB, workspaceId, "100")
-        );
+        Optional<CredentialBundle> resolved =
+                provider.resolve(new IntegrationRef(IntegrationKind.GITHUB, workspaceId, "100"));
 
         assertThat(resolved).hasValueSatisfying(bundle -> {
             assertThat(bundle).isInstanceOf(InstallationCredential.class);
@@ -100,14 +93,11 @@ class GithubCredentialProviderTest extends BaseUnitTest {
         long workspaceId = 17L;
         Workspace ws = new Workspace();
         Connection connection = new Connection(
-            ws,
-            IntegrationKind.GITHUB,
-            "pat",
-            new ConnectionConfig.GitHubPatConfig(null, null, Set.of())
-        );
+                ws, IntegrationKind.GITHUB, "pat", new ConnectionConfig.GitHubPatConfig(null, null, Set.of()));
         connection.setState(IntegrationState.ACTIVE);
         when(connectionService.findActive(workspaceId, IntegrationKind.GITHUB)).thenReturn(Optional.of(connection));
 
-        assertThat(provider.resolve(new IntegrationRef(IntegrationKind.GITHUB, workspaceId, "pat"))).isEmpty();
+        assertThat(provider.resolve(new IntegrationRef(IntegrationKind.GITHUB, workspaceId, "pat")))
+                .isEmpty();
     }
 }

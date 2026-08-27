@@ -26,13 +26,8 @@ class AgentsPathDispatchIntegrationTest extends AbstractWorkspaceIntegrationTest
 
     private Workspace setupWorkspace() {
         User owner = persistUser("dispatch-owner");
-        Workspace workspace = createWorkspace(
-            "dispatch-ws",
-            "Dispatch Workspace",
-            "dispatch-org",
-            AccountType.ORG,
-            owner
-        );
+        Workspace workspace =
+                createWorkspace("dispatch-ws", "Dispatch Workspace", "dispatch-org", AccountType.ORG, owner);
         ensureAdminMembership(workspace);
         return workspace;
     }
@@ -46,17 +41,17 @@ class AgentsPathDispatchIntegrationTest extends AbstractWorkspaceIntegrationTest
         // A paginated envelope can only have come from AgentJobController; the binding controller
         // returns a bare array.
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/agents/jobs", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.content")
-            .isArray()
-            .jsonPath("$.totalElements")
-            .isEqualTo(0);
+                .get()
+                .uri("/workspaces/{slug}/agents/jobs", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.content")
+                .isArray()
+                .jsonPath("$.totalElements")
+                .isEqualTo(0);
     }
 
     @Test
@@ -67,15 +62,15 @@ class AgentsPathDispatchIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         // A bare array is the binding controller's shape.
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/agents", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$")
-            .isArray();
+                .get()
+                .uri("/workspaces/{slug}/agents", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$")
+                .isArray();
     }
 
     @Test
@@ -85,13 +80,13 @@ class AgentsPathDispatchIntegrationTest extends AbstractWorkspaceIntegrationTest
         Workspace workspace = setupWorkspace();
 
         webTestClient
-            .put()
-            .uri("/workspaces/{slug}/agents/not-a-purpose", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("instanceModelId", 1))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+                .put()
+                .uri("/workspaces/{slug}/agents/not-a-purpose", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("instanceModelId", 1))
+                .exchange()
+                .expectStatus()
+                .isBadRequest();
     }
 }

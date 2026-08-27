@@ -22,45 +22,42 @@ class GitLabSyncConstantsTest extends BaseUnitTest {
     class ExtractNumericId {
 
         @ParameterizedTest(name = "should extract {1} from \"{0}\"")
-        @CsvSource(
-            {
-                "gid://gitlab/Project/123, 123",
-                "gid://gitlab/User/42, 42",
-                "gid://gitlab/MergeRequest/999, 999",
-                "gid://gitlab/Issue/1, 1",
-                "gid://gitlab/Milestone/1000000, 1000000",
-                "gid://gitlab/Group/0, 0",
-            }
-        )
+        @CsvSource({
+            "gid://gitlab/Project/123, 123",
+            "gid://gitlab/User/42, 42",
+            "gid://gitlab/MergeRequest/999, 999",
+            "gid://gitlab/Issue/1, 1",
+            "gid://gitlab/Milestone/1000000, 1000000",
+            "gid://gitlab/Group/0, 0",
+        })
         void shouldExtractNumericId(String globalId, long expectedId) {
             assertThat(GitLabSyncConstants.extractNumericId(globalId)).isEqualTo(expectedId);
         }
 
         @ParameterizedTest(name = "should reject invalid format: \"{0}\"")
         @ValueSource(
-            strings = {
-                "gid://github/Project/123", // wrong provider
-                "gid://gitlab/123", // missing type
-                "gid://gitlab//123", // empty type
-                "gitlab/Project/123", // missing prefix
-                "gid://gitlab/Project/abc", // non-numeric ID
-                "gid://gitlab/Project/", // empty ID
-                "random-string", // completely wrong
-            }
-        )
+                strings = {
+                    "gid://github/Project/123", // wrong provider
+                    "gid://gitlab/123", // missing type
+                    "gid://gitlab//123", // empty type
+                    "gitlab/Project/123", // missing prefix
+                    "gid://gitlab/Project/abc", // non-numeric ID
+                    "gid://gitlab/Project/", // empty ID
+                    "random-string", // completely wrong
+                })
         void shouldRejectInvalidFormat(String invalidId) {
             assertThatThrownBy(() -> GitLabSyncConstants.extractNumericId(invalidId))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Invalid GitLab Global ID format");
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Invalid GitLab Global ID format");
         }
 
         @ParameterizedTest(name = "should reject null/blank input")
         @NullAndEmptySource
-        @ValueSource(strings = { "  ", "\t" })
+        @ValueSource(strings = {"  ", "\t"})
         void shouldRejectNullAndBlank(String input) {
             assertThatThrownBy(() -> GitLabSyncConstants.extractNumericId(input))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("must not be null or blank");
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("must not be null or blank");
         }
     }
 
@@ -110,9 +107,8 @@ class GitLabSyncConstantsTest extends BaseUnitTest {
             assertThat(GitLabSyncConstants.CRITICAL_REMAINING_THRESHOLD).isEqualTo(5);
 
             // Thresholds must be ordered correctly
-            assertThat(GitLabSyncConstants.CRITICAL_REMAINING_THRESHOLD).isLessThan(
-                GitLabSyncConstants.LOW_REMAINING_THRESHOLD
-            );
+            assertThat(GitLabSyncConstants.CRITICAL_REMAINING_THRESHOLD)
+                    .isLessThan(GitLabSyncConstants.LOW_REMAINING_THRESHOLD);
             assertThat(GitLabSyncConstants.LOW_REMAINING_THRESHOLD).isLessThan(GitLabSyncConstants.DEFAULT_RATE_LIMIT);
         }
 

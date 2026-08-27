@@ -119,16 +119,14 @@ public class GitRepositoryLockManager {
      * @return true if the lock was removed or didn't exist, false if it was still held
      */
     public boolean removeLock(Long repositoryId) {
-        return (
-            locks.computeIfPresent(repositoryId, (k, lock) -> {
-                if (!lock.isWriteLocked() && lock.getReadLockCount() == 0) {
-                    return null; // removes entry
-                }
-                log.warn("Cannot remove lock for repository {}: still held", repositoryId);
-                return lock; // keep it
-            }) ==
-            null
-        );
+        return (locks.computeIfPresent(repositoryId, (k, lock) -> {
+                    if (!lock.isWriteLocked() && lock.getReadLockCount() == 0) {
+                        return null; // removes entry
+                    }
+                    log.warn("Cannot remove lock for repository {}: still held", repositoryId);
+                    return lock; // keep it
+                })
+                == null);
     }
 
     /**
@@ -158,13 +156,11 @@ public class GitRepositoryLockManager {
         }
 
         int before = locks.size();
-        locks
-            .entrySet()
-            .removeIf(entry -> {
-                ReentrantReadWriteLock lock = entry.getValue();
-                // Only evict if nobody is reading or writing
-                return !lock.isWriteLocked() && lock.getReadLockCount() == 0;
-            });
+        locks.entrySet().removeIf(entry -> {
+            ReentrantReadWriteLock lock = entry.getValue();
+            // Only evict if nobody is reading or writing
+            return !lock.isWriteLocked() && lock.getReadLockCount() == 0;
+        });
 
         int evicted = before - locks.size();
         if (evicted > 0) {

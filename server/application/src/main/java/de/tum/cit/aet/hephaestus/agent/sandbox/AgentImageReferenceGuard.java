@@ -61,78 +61,67 @@ public class AgentImageReferenceGuard {
     private static final String DOCS = "See docs/admin/agent-image-digests.md.";
 
     private static final String FIX =
-        "Pin the digest, or leave the reference unset so it follows this deployment's image tag. " + DOCS;
+            "Pin the digest, or leave the reference unset so it follows this deployment's image tag. " + DOCS;
 
     private static final String CHANNEL_ADVICE =
-        "A channel tag tracks whatever built most recently, so it resolves to an image built from a " +
-        "different commit than this server — a pairing no release can produce. " +
-        FIX;
+            "A channel tag tracks whatever built most recently, so it resolves to an image built from a "
+                    + "different commit than this server — a pairing no release can produce. "
+                    + FIX;
 
     private static final String SERIES_ADVICE =
-        "A `major.minor` tag is retagged onto every patch release in its line, so it resolves to an " +
-        "image built from a different commit than this server. Name the full version instead. " +
-        FIX;
+            "A `major.minor` tag is retagged onto every patch release in its line, so it resolves to an "
+                    + "image built from a different commit than this server. Name the full version instead. "
+                    + FIX;
 
     public AgentImageReferenceGuard(AgentImageProperties properties) {
         String reference = properties.reference();
         if (reference == null || reference.isBlank()) {
             throw new IllegalStateException(
-                "hephaestus.agent.image.reference is not set and could not be derived. " + DOCS
-            );
+                    "hephaestus.agent.image.reference is not set and could not be derived. " + DOCS);
         }
         if (reference.indexOf('@') >= 0) {
             if (!DIGEST_PINNED.matcher(reference).matches()) {
                 throw new IllegalStateException(
-                    "hephaestus.agent.image.reference is digest-pinned but the digest is not a sha256 of " +
-                        "64 lowercase hex characters: " +
-                        reference +
-                        ". " +
-                        DOCS
-                );
+                        "hephaestus.agent.image.reference is digest-pinned but the digest is not a sha256 of "
+                                + "64 lowercase hex characters: "
+                                + reference
+                                + ". "
+                                + DOCS);
             }
             return;
         }
         String tag = tagOf(reference);
         if (tag == null) {
             throw new IllegalStateException(
-                "hephaestus.agent.image.reference names no tag, so it resolves to `" +
-                    IMPLICIT_TAG +
-                    "`: " +
-                    reference +
-                    ". " +
-                    CHANNEL_ADVICE
-            );
+                    "hephaestus.agent.image.reference names no tag, so it resolves to `" + IMPLICIT_TAG
+                            + "`: "
+                            + reference
+                            + ". "
+                            + CHANNEL_ADVICE);
         }
         if (!TAG.matcher(tag).matches()) {
-            throw new IllegalStateException(
-                "hephaestus.agent.image.reference carries no usable tag: " +
-                    reference +
-                    ". The tag follows spring.application.version, so an empty one means APP_VERSION reached " +
-                    "this container empty — give the deployment its image tag, or name the agent image " +
-                    "explicitly. " +
-                    DOCS
-            );
+            throw new IllegalStateException("hephaestus.agent.image.reference carries no usable tag: " + reference
+                    + ". The tag follows spring.application.version, so an empty one means APP_VERSION reached "
+                    + "this container empty — give the deployment its image tag, or name the agent image "
+                    + "explicitly. "
+                    + DOCS);
         }
         if (NAMED_CHANNELS.contains(tag)) {
             throw new IllegalStateException(
-                "hephaestus.agent.image.reference must not be a channel tag: " + reference + ". " + CHANNEL_ADVICE
-            );
+                    "hephaestus.agent.image.reference must not be a channel tag: " + reference + ". " + CHANNEL_ADVICE);
         }
         if (VERSION_SERIES.matcher(tag).matches()) {
             throw new IllegalStateException(
-                "hephaestus.agent.image.reference names a version series rather than one release: " +
-                    reference +
-                    ". " +
-                    SERIES_ADVICE
-            );
+                    "hephaestus.agent.image.reference names a version series rather than one release: " + reference
+                            + ". "
+                            + SERIES_ADVICE);
         }
         if (DEVELOPMENT_VERSION.equals(tag)) {
             log.warn(
-                "Agent image reference {} was derived from an unset APP_VERSION, so no such image is published. " +
-                    "Set HEPHAESTUS_AGENT_IMAGE_REFERENCE to the agent image this checkout should run against. {}",
-                reference,
-                DOCS
-            );
+                    "Agent image reference {} was derived from an unset APP_VERSION, so no such image is published. "
+                            + "Set HEPHAESTUS_AGENT_IMAGE_REFERENCE to the agent image this checkout should run against. {}",
+                    reference,
+                    DOCS);
         }
     }
 

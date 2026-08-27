@@ -60,32 +60,30 @@ class AuditByDefaultGateDetectionTest {
         public void list() {}
     }
 
-    private static final JavaClasses FIXTURES = new ClassFileImporter().importClasses(
-        ClassGatedController.class,
-        MethodGatedController.class,
-        InstanceAdminGatedController.class,
-        UngatedController.class,
-        ReadOnlyController.class
-    );
+    private static final JavaClasses FIXTURES = new ClassFileImporter()
+            .importClasses(
+                    ClassGatedController.class,
+                    MethodGatedController.class,
+                    InstanceAdminGatedController.class,
+                    UngatedController.class,
+                    ReadOnlyController.class);
 
     static Stream<Arguments> endpoints() {
         return Stream.of(
-            Arguments.of(ClassGatedController.class, "create", true, "gate declared on the controller, not the method"),
-            Arguments.of(MethodGatedController.class, "update", true, "gate declared on the method"),
-            Arguments.of(InstanceAdminGatedController.class, "create", true, "instance-admin authority gate"),
-            Arguments.of(
-                UngatedController.class,
-                "create",
-                false,
-                "a public endpoint is not an admin action and must not be forced to declare one"
-            ),
-            Arguments.of(
-                ReadOnlyController.class,
-                "list",
-                false,
-                "reading changes nothing, so there is nothing to record"
-            )
-        );
+                Arguments.of(
+                        ClassGatedController.class, "create", true, "gate declared on the controller, not the method"),
+                Arguments.of(MethodGatedController.class, "update", true, "gate declared on the method"),
+                Arguments.of(InstanceAdminGatedController.class, "create", true, "instance-admin authority gate"),
+                Arguments.of(
+                        UngatedController.class,
+                        "create",
+                        false,
+                        "a public endpoint is not an admin action and must not be forced to declare one"),
+                Arguments.of(
+                        ReadOnlyController.class,
+                        "list",
+                        false,
+                        "reading changes nothing, so there is nothing to record"));
     }
 
     @ParameterizedTest(name = "{3}")

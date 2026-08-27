@@ -22,9 +22,9 @@ public class LlmBudgetExhaustedException extends RuntimeException {
 
     private static String message(FundingSource fundingSource) {
         return fundingSource == FundingSource.WORKSPACE
-            ? "This workspace's monthly AI cap is reached. Work is paused until next month, or until a " +
-              "workspace admin raises the cap."
-            : "This workspace's monthly AI budget is reached. Work is paused until next month, or until " +
-              "an instance admin raises the budget.";
+                ? "This workspace's monthly AI cap is reached. Work is paused until next month, or until a "
+                        + "workspace admin raises the cap."
+                : "This workspace's monthly AI budget is reached. Work is paused until next month, or until "
+                        + "an instance admin raises the budget.";
     }
 }

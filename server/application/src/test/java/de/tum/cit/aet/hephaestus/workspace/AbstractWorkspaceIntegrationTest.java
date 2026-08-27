@@ -45,18 +45,16 @@ public abstract class AbstractWorkspaceIntegrationTest extends BaseIntegrationTe
 
     protected IdentityProvider ensureGitHubProvider() {
         return gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
     }
 
     protected IdentityProvider ensureGitLabProvider() {
         return gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.com")));
     }
 
     protected User persistUser(String login) {
@@ -76,12 +74,7 @@ public abstract class AbstractWorkspaceIntegrationTest extends BaseIntegrationTe
     }
 
     protected Workspace createWorkspace(
-        String slug,
-        String displayName,
-        String accountLogin,
-        AccountType accountType,
-        User owner
-    ) {
+            String slug, String displayName, String accountLogin, AccountType accountType, User owner) {
         if (owner == null || owner.getId() == null) {
             throw new IllegalArgumentException("Owner user must be persisted before creating a workspace");
         }
@@ -89,13 +82,10 @@ public abstract class AbstractWorkspaceIntegrationTest extends BaseIntegrationTe
     }
 
     protected WorkspaceMembership ensureWorkspaceMembership(
-        Workspace workspace,
-        User user,
-        WorkspaceMembership.WorkspaceRole role
-    ) {
+            Workspace workspace, User user, WorkspaceMembership.WorkspaceRole role) {
         return workspaceMembershipRepository
-            .findByWorkspace_IdAndUser_Id(workspace.getId(), user.getId())
-            .orElseGet(() -> workspaceMembershipService.createMembership(workspace, user.getId(), role));
+                .findByWorkspace_IdAndUser_Id(workspace.getId(), user.getId())
+                .orElseGet(() -> workspaceMembershipService.createMembership(workspace, user.getId(), role));
     }
 
     protected WorkspaceMembership ensureAdminMembership(Workspace workspace) {

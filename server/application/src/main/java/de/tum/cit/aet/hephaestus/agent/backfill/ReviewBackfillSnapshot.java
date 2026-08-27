@@ -14,23 +14,22 @@ import org.jspecify.annotations.Nullable;
  * hand-scoped campaign share this row shape but carry different accountability.
  */
 record ReviewBackfillSnapshot(
-    String artifactKind,
-    DiscoveredVia discoveredVia,
-    Instant fromAt,
-    Instant toAt,
-    ReviewBackfillStatus status,
-    Integer estimatedArtifacts,
-    @Nullable BigDecimal estimatedCostUsd
-) implements ConfigAuditSnapshot {
+        String artifactKind,
+        DiscoveredVia discoveredVia,
+        Instant fromAt,
+        Instant toAt,
+        ReviewBackfillStatus status,
+        Integer estimatedArtifacts,
+        @Nullable BigDecimal estimatedCostUsd)
+        implements ConfigAuditSnapshot {
     static ReviewBackfillSnapshot of(ReviewBackfillRun run) {
         return new ReviewBackfillSnapshot(
-            run.getArtifactKind(),
-            run.getDiscoveredVia(),
-            run.getFromAt(),
-            run.getToAt(),
-            run.getStatus(),
-            run.getEstimatedArtifacts(),
-            run.getEstimatedCostUsd()
-        );
+                run.getArtifactKind(),
+                run.getDiscoveredVia(),
+                run.getFromAt(),
+                run.getToAt(),
+                run.getStatus(),
+                run.getEstimatedArtifacts(),
+                run.getEstimatedCostUsd());
     }
 }

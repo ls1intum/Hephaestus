@@ -68,9 +68,9 @@ final class ConfigAuditDiff {
             return;
         }
         if (node.isObject() && !node.isEmpty()) {
-            node
-                .properties()
-                .forEach(e -> collect(prefix.isEmpty() ? e.getKey() : prefix + "." + e.getKey(), e.getValue(), out));
+            node.properties()
+                    .forEach(
+                            e -> collect(prefix.isEmpty() ? e.getKey() : prefix + "." + e.getKey(), e.getValue(), out));
             return;
         }
         if (!prefix.isEmpty()) {

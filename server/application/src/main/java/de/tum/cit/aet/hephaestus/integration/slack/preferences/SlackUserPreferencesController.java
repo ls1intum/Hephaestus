@@ -76,20 +76,13 @@ class SlackWorkspaceUserPreferencesController extends SlackUserPreferencesContro
 
     @PatchMapping
     @Operation(
-        summary = "Update current user's Slack workspace preferences",
-        operationId = "updateSlackUserPreferences"
-    )
+            summary = "Update current user's Slack workspace preferences",
+            operationId = "updateSlackUserPreferences")
     ResponseEntity<SlackUserWorkspacePreferencesDTO> update(
-        WorkspaceContext workspace,
-        JwtAuthenticationToken auth,
-        @Valid @RequestBody UpdateSlackUserPreferencesRequestDTO request
-    ) {
-        return ResponseEntity.ok(
-            service.updateChannelMessagesAllowed(
-                workspace.id(),
-                accountId(auth),
-                Boolean.TRUE.equals(request.channelMessagesAllowed())
-            )
-        );
+            WorkspaceContext workspace,
+            JwtAuthenticationToken auth,
+            @Valid @RequestBody UpdateSlackUserPreferencesRequestDTO request) {
+        return ResponseEntity.ok(service.updateChannelMessagesAllowed(
+                workspace.id(), accountId(auth), Boolean.TRUE.equals(request.channelMessagesAllowed())));
     }
 }

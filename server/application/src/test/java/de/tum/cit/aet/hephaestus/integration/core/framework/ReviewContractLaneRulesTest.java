@@ -28,15 +28,15 @@ class ReviewContractLaneRulesTest extends BaseUnitTest {
         unclassified.removeAll(ReviewContractValidator.HEPHAESTUS_OWNED_LANES);
 
         assertThat(unclassified)
-            .as("add each lane to LANE_CAPABILITIES or HEPHAESTUS_OWNED_LANES in ReviewContractValidator")
-            .isEmpty();
+                .as("add each lane to LANE_CAPABILITIES or HEPHAESTUS_OWNED_LANES in ReviewContractValidator")
+                .isEmpty();
     }
 
     @Test
     @DisplayName("no lane is both vendor-deliverable and reserved to Hephaestus")
     void noLaneIsClassifiedTwice() {
         assertThat(ReviewContractValidator.LANE_CAPABILITIES.keySet())
-            .as("a lane a vendor can be required to hold a capability for cannot also be unreachable to vendors")
-            .doesNotContainAnyElementsOf(ReviewContractValidator.HEPHAESTUS_OWNED_LANES);
+                .as("a lane a vendor can be required to hold a capability for cannot also be unreachable to vendors")
+                .doesNotContainAnyElementsOf(ReviewContractValidator.HEPHAESTUS_OWNED_LANES);
     }
 }

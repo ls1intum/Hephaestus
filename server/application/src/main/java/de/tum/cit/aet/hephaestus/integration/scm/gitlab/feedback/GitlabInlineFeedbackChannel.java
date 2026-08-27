@@ -84,10 +84,7 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
     private final OutboundEgressGuard egressGuard;
 
     public GitlabInlineFeedbackChannel(
-        GitLabGraphQlClientProvider gitLabProvider,
-        GitlabMrResolver mrResolver,
-        OutboundEgressGuard egressGuard
-    ) {
+            GitLabGraphQlClientProvider gitLabProvider, GitlabMrResolver mrResolver, OutboundEgressGuard egressGuard) {
         this.gitLabProvider = gitLabProvider;
         this.mrResolver = mrResolver;
         this.egressGuard = egressGuard;
@@ -125,10 +122,9 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
         long scopeId = target.ref().workspaceId();
         if (gitLabProvider.isRateLimitCritical(scopeId)) {
             log.warn(
-                "GitLab rate limit critical — skipping {} inline feedbackItems: workspaceId={}",
-                feedbackItems.size(),
-                scopeId
-            );
+                    "GitLab rate limit critical — skipping {} inline feedbackItems: workspaceId={}",
+                    feedbackItems.size(),
+                    scopeId);
             return InlineResult.counts(0, feedbackItems.size());
         }
 
@@ -136,10 +132,9 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
         MrInfo mrInfo = mrResolver.resolve(scopeId, mr.projectPath(), mr.iid());
         if (mrInfo.headSha() == null || mrInfo.startSha() == null) {
             log.warn(
-                "GitLab MR missing diffRefs — skipping diff notes: workspaceId={}, mrGid={}",
-                scopeId,
-                mrInfo.globalId()
-            );
+                    "GitLab MR missing diffRefs — skipping diff notes: workspaceId={}, mrGid={}",
+                    scopeId,
+                    mrInfo.globalId());
             return InlineResult.counts(0, feedbackItems.size());
         }
 
@@ -193,35 +188,28 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
             // A prior thread a developer engaged with is left exactly as is — neither edited nor deleted.
             if (prior != null && prior.humanReplied()) {
                 posted++; // the finding IS represented on the MR, just not by us this run
-                signals.add(
-                    new DeliveredSignal(key, diff, Disposition.PRESERVED_EXISTING, prior.noteId(), prior.discussionId())
-                );
+                signals.add(new DeliveredSignal(
+                        key, diff, Disposition.PRESERVED_EXISTING, prior.noteId(), prior.discussionId()));
                 continue;
             }
 
             String body = appendCorrelationTag(
-                appendMarker(GitlabSummaryChannel.escapeSlashCommands(finding.body()), marker),
-                key
-            );
+                    appendMarker(GitlabSummaryChannel.escapeSlashCommands(finding.body()), marker), key);
 
             try {
-                Outcome outcome =
-                    prior != null ? editInPlace(scopeId, prior, body, diff) : createThread(scopeId, mrInfo, diff, body);
+                Outcome outcome = prior != null
+                        ? editInPlace(scopeId, prior, body, diff)
+                        : createThread(scopeId, mrInfo, diff, body);
                 if (outcome.disposition() == Disposition.FELL_BACK || outcome.disposition() == Disposition.POSTED) {
                     posted++;
                 } else {
                     failed++;
                 }
-                signals.add(
-                    new DeliveredSignal(key, diff, outcome.disposition(), outcome.noteId(), outcome.discussionId())
-                );
+                signals.add(new DeliveredSignal(
+                        key, diff, outcome.disposition(), outcome.noteId(), outcome.discussionId()));
             } catch (OutboundEgressSuppressedException e) {
                 return InlineResult.suppressed(
-                    posted,
-                    failed,
-                    signals,
-                    recurrenceKeys(feedbackItems.subList(index, feedbackItems.size()))
-                );
+                        posted, failed, signals, recurrenceKeys(feedbackItems.subList(index, feedbackItems.size())));
             } catch (RateLimitHit e) {
                 log.warn("GitLab rate limit hit during diff note posting — stopping: workspaceId={}", scopeId);
                 failed += remaining + 1;
@@ -239,17 +227,19 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
         }
 
         log.info(
-            "Reconciled GitLab inline feedbackItems: posted/edited={}, failed={}, deleted-gone={}, workspaceId={}",
-            posted,
-            failed,
-            deletedGone,
-            scopeId
-        );
+                "Reconciled GitLab inline feedbackItems: posted/edited={}, failed={}, deleted-gone={}, workspaceId={}",
+                posted,
+                failed,
+                deletedGone,
+                scopeId);
         return new InlineResult(posted, failed, List.copyOf(signals));
     }
 
     private static List<String> recurrenceKeys(List<InlineFeedback> feedbackItems) {
-        return feedbackItems.stream().map(InlineFeedback::recurrenceKey).filter(Objects::nonNull).toList();
+        return feedbackItems.stream()
+                .map(InlineFeedback::recurrenceKey)
+                .filter(Objects::nonNull)
+                .toList();
     }
 
     /** Posts a brand-new diff-note thread; falls back to an MR comment when the line is outside the diff hunk. */
@@ -258,38 +248,38 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
             Map<String, Object> position = buildPosition(diff, mrInfo);
             egressGuard.requireDeliveryAllowed("gitlab.post-inline-finding");
             ClientGraphQlResponse response = gitLabProvider
-                .forScope(scopeId)
-                .documentName("CreateDiffNote")
-                .variable("noteableId", mrInfo.globalId())
-                .variable("body", body)
-                .variable("position", position)
-                .execute()
-                .block(GRAPHQL_TIMEOUT);
+                    .forScope(scopeId)
+                    .documentName("CreateDiffNote")
+                    .variable("noteableId", mrInfo.globalId())
+                    .variable("body", body)
+                    .variable("position", position)
+                    .execute()
+                    .block(GRAPHQL_TIMEOUT);
 
             if (response == null) {
                 log.warn("Null response posting GitLab diff note: workspaceId={}, file={}", scopeId, diff.filePath());
                 return Outcome.failed();
             }
 
-            List<String> errors = Objects.requireNonNull(response).field("createDiffNote.errors").getValue();
+            List<String> errors = Objects.requireNonNull(response)
+                    .field("createDiffNote.errors")
+                    .getValue();
             if (errors != null && !errors.isEmpty()) {
                 if (isLineCodeError(errors)) {
                     log.info(
-                        "Diff note line outside diff hunk, falling back to MR comment: workspaceId={}, file={}, line={}",
-                        scopeId,
-                        diff.filePath(),
-                        diff.newLineNumber()
-                    );
+                            "Diff note line outside diff hunk, falling back to MR comment: workspaceId={}, file={}, line={}",
+                            scopeId,
+                            diff.filePath(),
+                            diff.newLineNumber());
                     String noteId = postFallbackComment(scopeId, mrInfo.globalId(), diff, body);
                     return noteId != null ? new Outcome(Disposition.FELL_BACK, noteId, null) : Outcome.failed();
                 }
                 log.warn(
-                    "GitLab createDiffNote failed: workspaceId={}, file={}, line={}, errors={}",
-                    scopeId,
-                    sanitizeForLog(diff.filePath()),
-                    diff.newLineNumber(),
-                    sanitizeForLog(errors.toString())
-                );
+                        "GitLab createDiffNote failed: workspaceId={}, file={}, line={}, errors={}",
+                        scopeId,
+                        sanitizeForLog(diff.filePath()),
+                        diff.newLineNumber(),
+                        sanitizeForLog(errors.toString()));
                 return Outcome.failed();
             }
 
@@ -301,12 +291,11 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
                 throw new RateLimitHit(e);
             }
             log.warn(
-                "GitLab diff note failed: workspaceId={}, file={}, line={}",
-                scopeId,
-                sanitizeForLog(diff.filePath()),
-                diff.newLineNumber(),
-                e
-            );
+                    "GitLab diff note failed: workspaceId={}, file={}, line={}",
+                    scopeId,
+                    sanitizeForLog(diff.filePath()),
+                    diff.newLineNumber(),
+                    e);
             return Outcome.failed();
         }
     }
@@ -315,26 +304,26 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
         try {
             egressGuard.requireDeliveryAllowed("gitlab.update-inline-finding");
             ClientGraphQlResponse response = gitLabProvider
-                .forScope(scopeId)
-                .documentName("UpdateNote")
-                .variable("id", prior.noteId())
-                .variable("body", body)
-                .execute()
-                .block(GRAPHQL_TIMEOUT);
+                    .forScope(scopeId)
+                    .documentName("UpdateNote")
+                    .variable("id", prior.noteId())
+                    .variable("body", body)
+                    .execute()
+                    .block(GRAPHQL_TIMEOUT);
 
             if (response == null) {
                 log.warn("Null response editing GitLab diff note: workspaceId={}, noteId={}", scopeId, prior.noteId());
                 return Outcome.failed();
             }
 
-            List<String> errors = Objects.requireNonNull(response).field("updateNote.errors").getValue();
+            List<String> errors =
+                    Objects.requireNonNull(response).field("updateNote.errors").getValue();
             if (errors != null && !errors.isEmpty()) {
                 log.warn(
-                    "GitLab updateNote failed: workspaceId={}, noteId={}, errors={}",
-                    scopeId,
-                    prior.noteId(),
-                    sanitizeForLog(errors.toString())
-                );
+                        "GitLab updateNote failed: workspaceId={}, noteId={}, errors={}",
+                        scopeId,
+                        prior.noteId(),
+                        sanitizeForLog(errors.toString()));
                 return Outcome.failed();
             }
             return new Outcome(Disposition.POSTED, prior.noteId(), prior.discussionId());
@@ -345,12 +334,11 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
                 throw new RateLimitHit(e);
             }
             log.warn(
-                "GitLab diff note edit failed: workspaceId={}, file={}, line={}",
-                scopeId,
-                sanitizeForLog(diff.filePath()),
-                diff.newLineNumber(),
-                e
-            );
+                    "GitLab diff note edit failed: workspaceId={}, file={}, line={}",
+                    scopeId,
+                    sanitizeForLog(diff.filePath()),
+                    diff.newLineNumber(),
+                    e);
             return Outcome.failed();
         }
     }
@@ -390,27 +378,27 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
         int page = 0;
         while (page < MAX_DISCUSSION_PAGES) {
             ClientGraphQlResponse response = gitLabProvider
-                .forScope(scopeId)
-                .documentName("GetMergeRequestDiscussions")
-                .variable("fullPath", projectPath)
-                .variable("iid", String.valueOf(mrIid))
-                .variable("first", DISCUSSIONS_PAGE_SIZE)
-                .variable("after", cursor)
-                .execute()
-                .block(GRAPHQL_TIMEOUT);
+                    .forScope(scopeId)
+                    .documentName("GetMergeRequestDiscussions")
+                    .variable("fullPath", projectPath)
+                    .variable("iid", String.valueOf(mrIid))
+                    .variable("first", DISCUSSIONS_PAGE_SIZE)
+                    .variable("after", cursor)
+                    .execute()
+                    .block(GRAPHQL_TIMEOUT);
 
             if (response == null) {
                 break;
             }
             List<Map<String, Object>> nodes = Objects.requireNonNull(response)
-                .field("project.mergeRequest.discussions.nodes")
-                .getValue();
+                    .field("project.mergeRequest.discussions.nodes")
+                    .getValue();
             if (nodes != null) {
                 all.addAll(nodes);
             }
             GitLabPageInfo pageInfo = Objects.requireNonNull(response)
-                .field("project.mergeRequest.discussions.pageInfo")
-                .toEntity(GitLabPageInfo.class);
+                    .field("project.mergeRequest.discussions.pageInfo")
+                    .toEntity(GitLabPageInfo.class);
             page++;
             if (pageInfo == null || !pageInfo.hasNextPage() || pageInfo.endCursor() == null) {
                 break;
@@ -480,7 +468,9 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
 
     @Nullable
     private static String discussionIdOf(ClientGraphQlResponse response) {
-        return Objects.requireNonNull(response).field("createDiffNote.note.discussion.id").getValue();
+        return Objects.requireNonNull(response)
+                .field("createDiffNote.note.discussion.id")
+                .getValue();
     }
 
     @Nullable
@@ -498,10 +488,14 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
     }
 
     /** A prior diff-note thread we posted, matched by its embedded correlation key. */
-    private record PriorThread(String key, String noteId, @Nullable String discussionId, boolean humanReplied) {}
+    private record PriorThread(
+            String key, String noteId, @Nullable String discussionId, boolean humanReplied) {}
 
     /** Result of a single create/edit attempt: what happened plus the durable note/discussion handles. */
-    private record Outcome(Disposition disposition, @Nullable String noteId, @Nullable String discussionId) {
+    private record Outcome(
+            Disposition disposition,
+            @Nullable String noteId,
+            @Nullable String discussionId) {
         static Outcome failed() {
             return new Outcome(Disposition.FAILED, null, null);
         }
@@ -592,13 +586,12 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
 
             if (deleted > 0 || preserved > 0) {
                 log.info(
-                    "Reconciled stale inline notes: deleted={}, preserved(human-replied)={}, workspaceId={}, mr={}!{}",
-                    deleted,
-                    preserved,
-                    scopeId,
-                    projectPath,
-                    mrIid
-                );
+                        "Reconciled stale inline notes: deleted={}, preserved(human-replied)={}, workspaceId={}, mr={}!{}",
+                        deleted,
+                        preserved,
+                        scopeId,
+                        projectPath,
+                        mrIid);
             }
         } catch (OutboundEgressSuppressedException e) {
             throw e;
@@ -622,11 +615,11 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
         try {
             egressGuard.requireDeliveryAllowed("gitlab.delete-inline-finding");
             ClientGraphQlResponse deleteResponse = gitLabProvider
-                .forScope(scopeId)
-                .documentName("DestroyNote")
-                .variable("noteId", noteId)
-                .execute()
-                .block(GRAPHQL_TIMEOUT);
+                    .forScope(scopeId)
+                    .documentName("DestroyNote")
+                    .variable("noteId", noteId)
+                    .execute()
+                    .block(GRAPHQL_TIMEOUT);
             if (deleteResponse == null) {
                 return false;
             }
@@ -651,34 +644,30 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
      */
     @Nullable
     private String postFallbackComment(
-        long scopeId,
-        String mrGlobalId,
-        FeedbackAnchor.DiffAnchor diff,
-        String markedBody
-    ) {
+            long scopeId, String mrGlobalId, FeedbackAnchor.DiffAnchor diff, String markedBody) {
         try {
             String fallbackBody = String.format("**`%s:%d`**%n%n%s", diff.filePath(), diff.newLineNumber(), markedBody);
             egressGuard.requireDeliveryAllowed("gitlab.post-inline-fallback");
             ClientGraphQlResponse response = gitLabProvider
-                .forScope(scopeId)
-                .documentName("CreateMergeRequestNote")
-                .variable("noteableId", mrGlobalId)
-                .variable("body", fallbackBody)
-                .execute()
-                .block(GRAPHQL_TIMEOUT);
+                    .forScope(scopeId)
+                    .documentName("CreateMergeRequestNote")
+                    .variable("noteableId", mrGlobalId)
+                    .variable("body", fallbackBody)
+                    .execute()
+                    .block(GRAPHQL_TIMEOUT);
 
             if (response == null) {
                 log.warn("Null response posting fallback MR comment: workspaceId={}", scopeId);
                 return null;
             }
 
-            List<String> errors = Objects.requireNonNull(response).field("createNote.errors").getValue();
+            List<String> errors =
+                    Objects.requireNonNull(response).field("createNote.errors").getValue();
             if (errors != null && !errors.isEmpty()) {
                 log.warn(
-                    "Fallback MR comment failed: workspaceId={}, errors={}",
-                    scopeId,
-                    sanitizeForLog(errors.toString())
-                );
+                        "Fallback MR comment failed: workspaceId={}, errors={}",
+                        scopeId,
+                        sanitizeForLog(errors.toString()));
                 return null;
             }
             return Objects.requireNonNull(response).field("createNote.note.id").getValue();
@@ -686,11 +675,7 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
             throw e;
         } catch (Exception e) {
             log.warn(
-                "Fallback MR comment failed: workspaceId={}, file={}",
-                scopeId,
-                sanitizeForLog(diff.filePath()),
-                e
-            );
+                    "Fallback MR comment failed: workspaceId={}, file={}", scopeId, sanitizeForLog(diff.filePath()), e);
             return null;
         }
     }
@@ -709,8 +694,8 @@ public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
     }
 
     private static boolean isLineCodeError(List<String> errors) {
-        return errors
-            .stream()
-            .anyMatch(e -> e.toLowerCase().contains("line code") || e.toLowerCase().contains("line_code"));
+        return errors.stream()
+                .anyMatch(e ->
+                        e.toLowerCase().contains("line code") || e.toLowerCase().contains("line_code"));
     }
 }

@@ -89,14 +89,14 @@ public class GitHubGraphQlConfig {
 
     public GitHubGraphQlConfig(MeterRegistry meterRegistry) {
         Gauge.builder("github.graphql.ratelimit.remaining", rateLimitRemaining, AtomicInteger::get)
-            .description("GitHub GraphQL API rate limit points remaining")
-            .register(meterRegistry);
+                .description("GitHub GraphQL API rate limit points remaining")
+                .register(meterRegistry);
         Gauge.builder("github.graphql.ratelimit.limit", rateLimitLimit, AtomicInteger::get)
-            .description("GitHub GraphQL API rate limit total points")
-            .register(meterRegistry);
+                .description("GitHub GraphQL API rate limit total points")
+                .register(meterRegistry);
         Gauge.builder("github.graphql.ratelimit.used", rateLimitUsed, AtomicInteger::get)
-            .description("GitHub GraphQL API rate limit points used")
-            .register(meterRegistry);
+                .description("GitHub GraphQL API rate limit points used")
+                .register(meterRegistry);
     }
 
     /**
@@ -114,18 +114,18 @@ public class GitHubGraphQlConfig {
     public static JsonMapper gitHubGraphQlObjectMapper(JsonMapper baseObjectMapper) {
         // GitHub databaseId values exceed 32-bit int range.
         return baseObjectMapper
-            .rebuild()
-            .enable(DeserializationFeature.USE_LONG_FOR_INTS)
-            .addMixIn(GHActor.class, GitHubActorMixin.class)
-            .addMixIn(GHRequestedReviewer.class, GitHubRequestedReviewerMixin.class)
-            .addMixIn(GHRepositoryOwner.class, GitHubRepositoryOwnerMixin.class)
-            .addMixIn(GHProjectV2Owner.class, GitHubProjectV2OwnerMixin.class)
-            .addMixIn(GHProjectV2FieldConfiguration.class, GitHubProjectV2FieldConfigurationMixin.class)
-            .addMixIn(GHProjectV2ItemContent.class, GitHubProjectV2ItemContentMixin.class)
-            .addMixIn(GHProjectV2ItemFieldValue.class, GitHubProjectV2ItemFieldValueMixin.class)
-            .addMixIn(GHIssue.class, GitHubIssueMixin.class)
-            .addMixIn(GHPullRequest.class, GitHubPullRequestMixin.class)
-            .build();
+                .rebuild()
+                .enable(DeserializationFeature.USE_LONG_FOR_INTS)
+                .addMixIn(GHActor.class, GitHubActorMixin.class)
+                .addMixIn(GHRequestedReviewer.class, GitHubRequestedReviewerMixin.class)
+                .addMixIn(GHRepositoryOwner.class, GitHubRepositoryOwnerMixin.class)
+                .addMixIn(GHProjectV2Owner.class, GitHubProjectV2OwnerMixin.class)
+                .addMixIn(GHProjectV2FieldConfiguration.class, GitHubProjectV2FieldConfigurationMixin.class)
+                .addMixIn(GHProjectV2ItemContent.class, GitHubProjectV2ItemContentMixin.class)
+                .addMixIn(GHProjectV2ItemFieldValue.class, GitHubProjectV2ItemFieldValueMixin.class)
+                .addMixIn(GHIssue.class, GitHubIssueMixin.class)
+                .addMixIn(GHPullRequest.class, GitHubPullRequestMixin.class)
+                .build();
     }
 
     @Bean
@@ -141,63 +141,59 @@ public class GitHubGraphQlConfig {
         graphQlJsonDecoder.setMaxInMemorySize(MAX_BUFFER_SIZE);
 
         ExchangeStrategies strategies = ExchangeStrategies.builder()
-            .codecs(config -> {
-                config.defaultCodecs().maxInMemorySize(MAX_BUFFER_SIZE);
-                config.customCodecs().register(new JacksonJsonEncoder(graphQlObjectMapper));
-                config.customCodecs().register(graphQlJsonDecoder);
-            })
-            .build();
+                .codecs(config -> {
+                    config.defaultCodecs().maxInMemorySize(MAX_BUFFER_SIZE);
+                    config.customCodecs().register(new JacksonJsonEncoder(graphQlObjectMapper));
+                    config.customCodecs().register(graphQlJsonDecoder);
+                })
+                .build();
 
         // Aggressive eviction mitigates PrematureCloseException: GitHub's load balancers close
         // connections after ~60s of idle time, so recycling connections more frequently reduces
         // the chance of reusing a stale connection that gets closed mid-response.
         ConnectionProvider connectionProvider = ConnectionProvider.builder("github-graphql")
-            .maxConnections(50)
-            .maxIdleTime(Duration.ofSeconds(20))
-            .maxLifeTime(Duration.ofMinutes(3))
-            .pendingAcquireTimeout(Duration.ofSeconds(60))
-            .evictInBackground(Duration.ofSeconds(60))
-            .lifo() // prefer fresher connections
-            .build();
+                .maxConnections(50)
+                .maxIdleTime(Duration.ofSeconds(20))
+                .maxLifeTime(Duration.ofMinutes(3))
+                .pendingAcquireTimeout(Duration.ofSeconds(60))
+                .evictInBackground(Duration.ofSeconds(60))
+                .lifo() // prefer fresher connections
+                .build();
 
         HttpClient httpClient = HttpClient.create(connectionProvider)
-            .resolver(DefaultAddressResolverGroup.INSTANCE)
-            .responseTimeout(Duration.ofSeconds(135)); // Must exceed longest block() timeout (backfillGraphqlTimeout=120s)
+                .resolver(DefaultAddressResolverGroup.INSTANCE)
+                .responseTimeout(
+                        Duration.ofSeconds(135)); // Must exceed longest block() timeout (backfillGraphqlTimeout=120s)
 
         return WebClient.builder()
-            .clientConnector(new ReactorClientHttpConnector(httpClient))
-            .baseUrl(GITHUB_GRAPHQL_URL)
-            .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-            .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
-            .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
-            .exchangeStrategies(strategies)
-            .filter(rateLimitLoggingFilter())
-            .filter(retryFilter())
-            .filter(transportErrorRetryFilter())
-            .build();
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .baseUrl(GITHUB_GRAPHQL_URL)
+                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .defaultHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE)
+                .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
+                .exchangeStrategies(strategies)
+                .filter(rateLimitLoggingFilter())
+                .filter(retryFilter())
+                .filter(transportErrorRetryFilter())
+                .build();
     }
 
     @Bean
     public HttpGraphQlClient gitHubGraphQlClient(
-        WebClient gitHubGraphQlWebClient,
-        SilentModeGraphQlClientFactory clientFactory
-    ) {
+            WebClient gitHubGraphQlWebClient, SilentModeGraphQlClientFactory clientFactory) {
         // Operations are loaded from graphql/github/operations/ by name.
         // Shared fragments are appended selectively: only those actually referenced (transitively via
         // ...FragmentName spreads) are included, which is what satisfies GraphQL spec §5.5.1.4
         // (fragments must be used) while keeping the definitions in documents the validators can see.
         List<Resource> fragmentFiles = List.of(
-            new ClassPathResource(GitHubGraphQlFragments.PROJECT_FRAGMENTS_RESOURCE),
-            new ClassPathResource(GitHubGraphQlFragments.COMMIT_ENRICHMENT_FIELDS_RESOURCE)
-        );
+                new ClassPathResource(GitHubGraphQlFragments.PROJECT_FRAGMENTS_RESOURCE),
+                new ClassPathResource(GitHubGraphQlFragments.COMMIT_ENRICHMENT_FIELDS_RESOURCE));
         FragmentMergingDocumentSource documentSource = new FragmentMergingDocumentSource(
-            List.of(
-                new ClassPathResource("graphql/github/operations/"),
-                new ClassPathResource("graphql/github/fragments/")
-            ),
-            List.of(".graphql", ".gql"),
-            fragmentFiles
-        );
+                List.of(
+                        new ClassPathResource("graphql/github/operations/"),
+                        new ClassPathResource("graphql/github/fragments/")),
+                List.of(".graphql", ".gql"),
+                fragmentFiles);
         return clientFactory.create(gitHubGraphQlWebClient, documentSource);
     }
 
@@ -239,12 +235,11 @@ public class GitHubGraphQlConfig {
             double usagePercent = (100.0 * (limitInt - remainingInt)) / limitInt;
             if (usagePercent > 80) {
                 log.warn(
-                    "Approaching GitHub GraphQL rate limit: remaining={}, limit={}, usagePercent={}, resetEpoch={}",
-                    remaining,
-                    limit,
-                    String.format("%.1f", usagePercent),
-                    reset
-                );
+                        "Approaching GitHub GraphQL rate limit: remaining={}, limit={}, usagePercent={}, resetEpoch={}",
+                        remaining,
+                        limit,
+                        String.format("%.1f", usagePercent),
+                        reset);
             }
         }
 
@@ -259,9 +254,7 @@ public class GitHubGraphQlConfig {
      * {@link #MAX_RETRIES} for the timing rationale.
      */
     private ExchangeFilterFunction retryFilter() {
-        return (request, next) ->
-            next
-                .exchange(request)
+        return (request, next) -> next.exchange(request)
                 .flatMap(response -> {
                     HttpStatusCode status = response.statusCode();
 
@@ -276,33 +269,28 @@ public class GitHubGraphQlConfig {
 
                     return Mono.just(response);
                 })
-                .retryWhen(
-                    Retry.backoff(MAX_RETRIES, INITIAL_BACKOFF)
+                .retryWhen(Retry.backoff(MAX_RETRIES, INITIAL_BACKOFF)
                         .maxBackoff(MAX_BACKOFF)
                         .jitter(JITTER_FACTOR)
                         .filter(throwable -> throwable instanceof RetryableException)
                         .doBeforeRetry(signal -> {
                             RetryableException ex = (RetryableException) signal.failure();
                             log.warn(
-                                "Retrying GitHub GraphQL request: statusCode={}, attempt={}, maxRetries={}",
-                                ex.getStatusCode(),
-                                signal.totalRetries() + 1,
-                                MAX_RETRIES
-                            );
+                                    "Retrying GitHub GraphQL request: statusCode={}, attempt={}, maxRetries={}",
+                                    ex.getStatusCode(),
+                                    signal.totalRetries() + 1,
+                                    MAX_RETRIES);
                         })
                         .onRetryExhaustedThrow((spec, signal) -> {
                             RetryableException ex = (RetryableException) signal.failure();
                             log.error(
-                                "Failed GitHub GraphQL request after retries exhausted: retryCount={}, statusCode={}",
-                                MAX_RETRIES,
-                                ex.getStatusCode()
-                            );
+                                    "Failed GitHub GraphQL request after retries exhausted: retryCount={}, statusCode={}",
+                                    MAX_RETRIES,
+                                    ex.getStatusCode());
                             return new GitHubGraphQlException(
-                                "GitHub GraphQL request failed after " + MAX_RETRIES + " retries",
-                                ex.getStatusCode()
-                            );
-                        })
-                );
+                                    "GitHub GraphQL request failed after " + MAX_RETRIES + " retries",
+                                    ex.getStatusCode());
+                        }));
     }
 
     /**
@@ -321,41 +309,33 @@ public class GitHubGraphQlConfig {
      * Uses shorter backoff than HTTP errors since transport issues often resolve quickly.
      */
     private ExchangeFilterFunction transportErrorRetryFilter() {
-        return (request, next) ->
-            next
-                .exchange(request)
-                .retryWhen(
-                    Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+        return (request, next) -> next.exchange(request)
+                .retryWhen(Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
                         .maxBackoff(TRANSPORT_MAX_BACKOFF)
                         .jitter(JITTER_FACTOR)
                         .filter(ScmTransportErrors::isTransportError)
                         .doBeforeRetry(signal -> {
                             Throwable failure = signal.failure();
                             log.warn(
-                                "Retrying GitHub GraphQL request after transport error: errorType={}, message={}, attempt={}, maxRetries={}",
-                                failure.getClass().getSimpleName(),
-                                failure.getMessage(),
-                                signal.totalRetries() + 1,
-                                TRANSPORT_MAX_RETRIES
-                            );
+                                    "Retrying GitHub GraphQL request after transport error: errorType={}, message={}, attempt={}, maxRetries={}",
+                                    failure.getClass().getSimpleName(),
+                                    failure.getMessage(),
+                                    signal.totalRetries() + 1,
+                                    TRANSPORT_MAX_RETRIES);
                         })
                         .onRetryExhaustedThrow((spec, signal) -> {
                             Throwable failure = signal.failure();
                             log.error(
-                                "Failed GitHub GraphQL request after transport retries exhausted: retryCount={}, errorType={}, message={}",
-                                TRANSPORT_MAX_RETRIES,
-                                failure.getClass().getSimpleName(),
-                                failure.getMessage()
-                            );
+                                    "Failed GitHub GraphQL request after transport retries exhausted: retryCount={}, errorType={}, message={}",
+                                    TRANSPORT_MAX_RETRIES,
+                                    failure.getClass().getSimpleName(),
+                                    failure.getMessage());
                             return new TransportException(
-                                "GitHub GraphQL request failed after " +
-                                    TRANSPORT_MAX_RETRIES +
-                                    " retries due to transport error: " +
-                                    failure.getMessage(),
-                                failure
-                            );
-                        })
-                );
+                                    "GitHub GraphQL request failed after " + TRANSPORT_MAX_RETRIES
+                                            + " retries due to transport error: "
+                                            + failure.getMessage(),
+                                    failure);
+                        }));
     }
 
     private static class RetryableException extends RuntimeException {

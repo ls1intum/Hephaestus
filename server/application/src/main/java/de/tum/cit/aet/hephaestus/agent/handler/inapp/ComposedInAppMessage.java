@@ -21,12 +21,11 @@ import org.jspecify.annotations.Nullable;
  *     read by the time the server acts, which is not knowable when the words are written
  */
 public record ComposedInAppMessage(
-    String practiceSlug,
-    String title,
-    String body,
-    String nextStep,
-    @Nullable String supersedesThreadKey
-) {
+        String practiceSlug,
+        String title,
+        String body,
+        String nextStep,
+        @Nullable String supersedesThreadKey) {
     /** Guards on the ledger's own column widths, so a message can never be truncated after it is admitted. */
     public static final int MAX_TITLE_LENGTH = 255;
 

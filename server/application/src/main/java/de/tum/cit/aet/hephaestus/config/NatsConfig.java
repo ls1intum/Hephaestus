@@ -38,7 +38,10 @@ public class NatsConfig {
         // permanently kill the shared subscriptions riding this bean (SyncPushService's
         // hephaestus.syncstatus.> live-push and the webhook JetStreamPublisher) installation-wide
         // until redeploy. Matches IntegrationNatsConsumer#buildOptions.
-        Options options = Options.builder().server(natsProperties.server()).maxReconnects(-1).build();
+        Options options = Options.builder()
+                .server(natsProperties.server())
+                .maxReconnects(-1)
+                .build();
         return Nats.connect(options);
     }
 }

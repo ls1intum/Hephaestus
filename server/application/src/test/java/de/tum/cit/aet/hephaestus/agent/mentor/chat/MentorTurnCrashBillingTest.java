@@ -51,15 +51,14 @@ class MentorTurnCrashBillingTest extends BaseUnitTest {
     private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
 
     private static final LlmPriceSnapshot PRICE = new LlmPriceSnapshot(
-        FundingSource.INSTANCE,
-        PricingState.PRICED,
-        1L,
-        null,
-        new BigDecimal("10"),
-        new BigDecimal("20"),
-        new BigDecimal("1"),
-        new BigDecimal("1")
-    );
+            FundingSource.INSTANCE,
+            PricingState.PRICED,
+            1L,
+            null,
+            new BigDecimal("10"),
+            new BigDecimal("20"),
+            new BigDecimal("1"),
+            new BigDecimal("1"));
 
     private ChatMessageRepository chatMessageRepository;
     private LlmUsageRecorder usageRecorder;
@@ -72,13 +71,12 @@ class MentorTurnCrashBillingTest extends BaseUnitTest {
         chatMessageRepository = mock(ChatMessageRepository.class);
         usageRecorder = mock(LlmUsageRecorder.class);
         persistence = new MentorTurnPersistence(
-            mock(ChatThreadRepository.class),
-            chatMessageRepository,
-            mock(WorkspaceRepository.class),
-            mock(ConversationalDeliveryReconciler.class),
-            usageRecorder,
-            noOpTransactionManager()
-        );
+                mock(ChatThreadRepository.class),
+                chatMessageRepository,
+                mock(WorkspaceRepository.class),
+                mock(ConversationalDeliveryReconciler.class),
+                usageRecorder,
+                noOpTransactionManager());
 
         Workspace workspace = new Workspace();
         workspace.setId(WORKSPACE_ID);
@@ -98,13 +96,7 @@ class MentorTurnCrashBillingTest extends BaseUnitTest {
 
     private MentorTurnPersistence.TurnPersistenceCookie cookie() {
         return new MentorTurnPersistence.TurnPersistenceCookie(
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            assistantId,
-            Instant.now(),
-            "gpt-x",
-            PRICE
-        );
+                UUID.randomUUID(), UUID.randomUUID(), assistantId, Instant.now(), "gpt-x", PRICE);
     }
 
     private void proxyRecorded(MentorTurnLlmUsage usage) {
@@ -125,9 +117,8 @@ class MentorTurnCrashBillingTest extends BaseUnitTest {
 
         persistence.interrupt(cookie(), startedTurnWithNoRunnerReport(), new IllegalStateException("runner died"));
 
-        ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample = ArgumentCaptor.forClass(
-            LlmUsageRecorder.LlmUsageSample.class
-        );
+        ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
+                ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
         verify(usageRecorder).record(eq(WORKSPACE_ID), sample.capture());
         verify(usageRecorder, never()).recordUnverifiable(any(), any());
         assertThat(sample.getValue().sourceType()).isEqualTo(LlmUsageSourceType.MENTOR_TURN);
@@ -148,15 +139,13 @@ class MentorTurnCrashBillingTest extends BaseUnitTest {
         state.observeUsage(reported);
 
         persistence.finalise(
-            cookie(),
-            state,
-            new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, null),
-            MentorChannel.DeliveryOutcome.NOT_DELIVERED
-        );
+                cookie(),
+                state,
+                new UIMessageChunk.Finish(UIMessageChunk.FinishReason.STOP, null),
+                MentorChannel.DeliveryOutcome.NOT_DELIVERED);
 
-        ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample = ArgumentCaptor.forClass(
-            LlmUsageRecorder.LlmUsageSample.class
-        );
+        ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
+                ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
         verify(usageRecorder).record(eq(WORKSPACE_ID), sample.capture());
         assertThat(sample.getValue().inputTokens()).isEqualTo(11);
         assertThat(sample.getValue().outputTokens()).isEqualTo(22);
@@ -166,15 +155,12 @@ class MentorTurnCrashBillingTest extends BaseUnitTest {
 
     static Stream<Arguments> nothingToBillFrom() {
         return Stream.of(
-            Arguments.of(
-                "a row of zeroes — the turn died before its first call returned",
-                Optional.of(MentorTurnLlmUsage.NONE)
-            ),
-            Arguments.of(
-                "no row at all — the thread was deleted under us mid-turn",
-                Optional.<MentorTurnLlmUsage>empty()
-            )
-        );
+                Arguments.of(
+                        "a row of zeroes — the turn died before its first call returned",
+                        Optional.of(MentorTurnLlmUsage.NONE)),
+                Arguments.of(
+                        "no row at all — the thread was deleted under us mid-turn",
+                        Optional.<MentorTurnLlmUsage>empty()));
     }
 
     /**
@@ -190,9 +176,8 @@ class MentorTurnCrashBillingTest extends BaseUnitTest {
 
         persistence.interrupt(cookie(), startedTurnWithNoRunnerReport(), new IllegalStateException("runner died"));
 
-        ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample = ArgumentCaptor.forClass(
-            LlmUsageRecorder.LlmUsageSample.class
-        );
+        ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
+                ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
         verify(usageRecorder).recordUnverifiable(eq(WORKSPACE_ID), sample.capture());
         verify(usageRecorder, never()).record(any(), any());
         assertThat(sample.getValue().sourceType()).isEqualTo(LlmUsageSourceType.MENTOR_TURN);

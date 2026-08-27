@@ -26,8 +26,7 @@ public interface ProfileRepositoryQueryRepository extends JpaRepository<Reposito
      * @param workspaceId the workspace to scope to
      * @return repositories the user has contributed to (via pull requests)
      */
-    @Query(
-        """
+    @Query("""
         SELECT DISTINCT r
         FROM Repository r
         JOIN PullRequest pr ON r.id = pr.repository.id
@@ -35,10 +34,7 @@ public interface ProfileRepositoryQueryRepository extends JpaRepository<Reposito
         WHERE pr.author.login ILIKE :developerLogin
             AND rtm.workspace.id = :workspaceId
         ORDER BY r.name ASC
-        """
-    )
+        """)
     List<Repository> findContributedByLogin(
-        @Param("developerLogin") String developerLogin,
-        @Param("workspaceId") Long workspaceId
-    );
+            @Param("developerLogin") String developerLogin, @Param("workspaceId") Long workspaceId);
 }

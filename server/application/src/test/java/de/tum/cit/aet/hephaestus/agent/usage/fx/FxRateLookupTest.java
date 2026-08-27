@@ -24,8 +24,10 @@ class FxRateLookupTest extends BaseUnitTest {
 
     /** A Saturday — the ECB publishes nothing on weekends, so "today" has no rate of its own. */
     private static final LocalDate SATURDAY = LocalDate.of(2026, 7, 25);
+
     private static final LocalDate FRIDAY = LocalDate.of(2026, 7, 24);
-    private static final Clock CLOCK = Clock.fixed(SATURDAY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC);
+    private static final Clock CLOCK =
+            Clock.fixed(SATURDAY.atStartOfDay(ZoneOffset.UTC).toInstant(), ZoneOffset.UTC);
 
     private static final YearMonth CURRENT_MONTH = YearMonth.of(2026, 7);
     private static final YearMonth CLOSED_MONTH = YearMonth.of(2026, 6);
@@ -44,10 +46,7 @@ class FxRateLookupTest extends BaseUnitTest {
 
     private FxRateLookup lookup(String configuredCurrency) {
         LlmProperties properties = new LlmProperties(
-            configuredCurrency,
-            new LlmProperties.Egress(false),
-            new LlmProperties.Fx(LlmProperties.ECB_DAILY_URL)
-        );
+                configuredCurrency, new LlmProperties.Egress(false), new LlmProperties.Fx(LlmProperties.ECB_DAILY_URL));
         return new FxRateLookup(repository, CLOCK, properties);
     }
 
@@ -77,7 +76,8 @@ class FxRateLookupTest extends BaseUnitTest {
         FxRateLookup fx = lookup("eur");
 
         assertThat(fx.isEnabled()).isTrue();
-        assertThat(fx.latest()).hasValueSatisfying(info -> assertThat(info.currencyCode()).isEqualTo("EUR"));
+        assertThat(fx.latest())
+                .hasValueSatisfying(info -> assertThat(info.currencyCode()).isEqualTo("EUR"));
     }
 
     @Test
@@ -103,9 +103,8 @@ class FxRateLookupTest extends BaseUnitTest {
     @Test
     @DisplayName("should resolve a closed month to its last in-month rate and keep it after newer rates arrive")
     void shouldFreezeClosedMonthOnItsLastInMonthRate() {
-        when(repository.findTopByRateDateLessThanEqualOrderByRateDateDesc(LocalDate.of(2026, 6, 30))).thenReturn(
-            Optional.of(rate(LocalDate.of(2026, 6, 30), "1.1200"))
-        );
+        when(repository.findTopByRateDateLessThanEqualOrderByRateDateDesc(LocalDate.of(2026, 6, 30)))
+                .thenReturn(Optional.of(rate(LocalDate.of(2026, 6, 30), "1.1200")));
         when(repository.findTopByOrderByRateDateDesc()).thenReturn(Optional.of(rate(FRIDAY, "1.1377")));
         FxRateLookup fx = enabledLookup();
 
@@ -124,12 +123,10 @@ class FxRateLookupTest extends BaseUnitTest {
     @DisplayName("should fall back to the oldest stored rate for a month that predates every rate")
     void shouldUseOldestRateWhenMonthPredatesAllStoredRates() {
         when(repository.findTopByOrderByRateDateDesc()).thenReturn(Optional.of(rate(FRIDAY, "1.1377")));
-        when(repository.findTopByRateDateLessThanEqualOrderByRateDateDesc(LocalDate.of(2026, 1, 31))).thenReturn(
-            Optional.empty()
-        );
-        when(repository.findTopByOrderByRateDateAsc()).thenReturn(
-            Optional.of(rate(LocalDate.of(2026, 5, 4), "1.0800"))
-        );
+        when(repository.findTopByRateDateLessThanEqualOrderByRateDateDesc(LocalDate.of(2026, 1, 31)))
+                .thenReturn(Optional.empty());
+        when(repository.findTopByOrderByRateDateAsc())
+                .thenReturn(Optional.of(rate(LocalDate.of(2026, 5, 4), "1.0800")));
 
         Optional<FxRateInfoDTO> info = enabledLookup().forMonth(PRE_FEATURE_MONTH);
 

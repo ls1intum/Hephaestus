@@ -19,31 +19,27 @@ final class SecretDiffScanner {
     private record PrefixRule(String id, Pattern pattern) {}
 
     private static final List<PrefixRule> PREFIX_RULES = List.of(
-        new PrefixRule("openai-key", Pattern.compile("sk-(?:proj-|admin-|svcacct-)?[A-Za-z0-9_-]{16,}")),
-        new PrefixRule("github-pat", Pattern.compile("gh[pousr]_[A-Za-z0-9_]{36,}")),
-        new PrefixRule("github-fine-grained-pat", Pattern.compile("github_pat_[A-Za-z0-9_]{22,}")),
-        new PrefixRule("gitlab-pat", Pattern.compile("glpat-[A-Za-z0-9_-]{20,}")),
-        new PrefixRule("aws-access-key", Pattern.compile("(?:AKIA|ASIA)[0-9A-Z]{16}")),
-        new PrefixRule("slack-token", Pattern.compile("xox[baprs]-[A-Za-z0-9-]{10,48}")),
-        new PrefixRule("google-api-key", Pattern.compile("AIza[0-9A-Za-z_-]{35}")),
-        new PrefixRule("stripe-key", Pattern.compile("(?:sk|rk)_(?:live|test)_[0-9A-Za-z]{16,}")),
-        new PrefixRule("sendgrid-key", Pattern.compile("SG\\.[A-Za-z0-9_-]{16,}\\.[A-Za-z0-9_-]{16,}")),
-        new PrefixRule("huggingface-token", Pattern.compile("hf_[A-Za-z0-9]{30,}"))
-    );
+            new PrefixRule("openai-key", Pattern.compile("sk-(?:proj-|admin-|svcacct-)?[A-Za-z0-9_-]{16,}")),
+            new PrefixRule("github-pat", Pattern.compile("gh[pousr]_[A-Za-z0-9_]{36,}")),
+            new PrefixRule("github-fine-grained-pat", Pattern.compile("github_pat_[A-Za-z0-9_]{22,}")),
+            new PrefixRule("gitlab-pat", Pattern.compile("glpat-[A-Za-z0-9_-]{20,}")),
+            new PrefixRule("aws-access-key", Pattern.compile("(?:AKIA|ASIA)[0-9A-Z]{16}")),
+            new PrefixRule("slack-token", Pattern.compile("xox[baprs]-[A-Za-z0-9-]{10,48}")),
+            new PrefixRule("google-api-key", Pattern.compile("AIza[0-9A-Za-z_-]{35}")),
+            new PrefixRule("stripe-key", Pattern.compile("(?:sk|rk)_(?:live|test)_[0-9A-Za-z]{16,}")),
+            new PrefixRule("sendgrid-key", Pattern.compile("SG\\.[A-Za-z0-9_-]{16,}\\.[A-Za-z0-9_-]{16,}")),
+            new PrefixRule("huggingface-token", Pattern.compile("hf_[A-Za-z0-9]{30,}")));
 
-    private static final Pattern PRIVATE_KEY = Pattern.compile(
-        "-----BEGIN (?:RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----"
-    );
+    private static final Pattern PRIVATE_KEY =
+            Pattern.compile("-----BEGIN (?:RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----");
 
     private static final Pattern CONNECTION_STRING = Pattern.compile(
-        "(?:postgres|postgresql|mysql|mongodb|mongodb\\+srv|redis|amqp|amqps)://[^\\s:@/]+:[^\\s:@/]+@"
-    );
+            "(?:postgres|postgresql|mysql|mongodb|mongodb\\+srv|redis|amqp|amqps)://[^\\s:@/]+:[^\\s:@/]+@");
 
     /** {@code (api_key|secret|token|password|...) = "value"} — the generic high-entropy arm. */
     private static final Pattern ASSIGNMENT = Pattern.compile(
-        "(?i)(?:api[_-]?key|secret|token|passwd|password|auth[_-]?token|access[_-]?key|client[_-]?secret|credential)s?" +
-            "\\s*[:=]\\s*[\"']([^\"'\\s]{12,150})[\"']"
-    );
+            "(?i)(?:api[_-]?key|secret|token|passwd|password|auth[_-]?token|access[_-]?key|client[_-]?secret|credential)s?"
+                    + "\\s*[:=]\\s*[\"']([^\"'\\s]{12,150})[\"']");
 
     /** gitleaks community-tuned threshold for a generic high-entropy secret. */
     private static final double ENTROPY_THRESHOLD = 3.5;
@@ -55,41 +51,38 @@ final class SecretDiffScanner {
      * {@code sk_test_} keys are real credentials.
      */
     private static final Set<String> PLACEHOLDER_WORDS = Set.of(
-        "your",
-        "my",
-        "the",
-        "some",
-        "placeholder",
-        "example",
-        "sample",
-        "dummy",
-        "fake",
-        "changeme",
-        "replace",
-        "replaceme",
-        "todo",
-        "fixme",
-        "redacted",
-        "none",
-        "null",
-        "xxx",
-        "xxxx"
-    );
+            "your",
+            "my",
+            "the",
+            "some",
+            "placeholder",
+            "example",
+            "sample",
+            "dummy",
+            "fake",
+            "changeme",
+            "replace",
+            "replaceme",
+            "todo",
+            "fixme",
+            "redacted",
+            "none",
+            "null",
+            "xxx",
+            "xxxx");
 
     /** Env-var read, not a hardcode (the value comes from the environment, not the source). */
     private static final Pattern ENV_REFERENCE = Pattern.compile(
-        "(?:process\\.env|import\\.meta\\.env|System\\.getenv|os\\.getenv|os\\.environ|getenv\\(|ENV\\[|" +
-            "Deno\\.env|Bundle\\.main|Keychain|ProcessInfo\\.processInfo\\.environment|Secrets\\.|\\$\\{[^}]+}|\\$[A-Z_]+)"
-    );
+            "(?:process\\.env|import\\.meta\\.env|System\\.getenv|os\\.getenv|os\\.environ|getenv\\(|ENV\\[|"
+                    + "Deno\\.env|Bundle\\.main|Keychain|ProcessInfo\\.processInfo\\.environment|Secrets\\.|\\$\\{[^}]+}|\\$[A-Z_]+)");
 
     /** Documentation example keys that are intentionally public. */
     private static final List<String> DOC_EXAMPLE_KEYS = List.of("AKIAIOSFODNN7EXAMPLE", "sk-test_example");
 
     /** Paths whose hits are downgraded to non-blocking (test/example/doc fixtures). */
-    private static final Pattern LOW_SIGNAL_PATH = Pattern.compile(
-        "(?i)(?:^|/)(?:tests?|spec|specs|fixtures?|__tests__|__mocks__|examples?|samples?|docs?)/" +
-            "|\\.(?:example|sample|md)$|(?:^|/)\\.env\\.example$"
-    );
+    private static final Pattern LOW_SIGNAL_PATH =
+            Pattern.compile("(?i)(?:^|/)(?:tests?|spec|specs|fixtures?|__tests__|__mocks__|examples?|samples?|docs?)/"
+                    + "|\\.(?:example|sample|md)$|(?:^|/)\\.env\\.example$");
 
     /**
      * Scan a raw or Hephaestus-annotated unified diff for hardcoded secrets on added lines.
@@ -144,9 +137,10 @@ final class SecretDiffScanner {
         String trimmed = content.stripLeading();
         // Skip comment lines (low signal; a commented-out key is not live in source). Note the
         // "-- " SQL-comment guard requires a trailing space so it never eats a "-----BEGIN ... KEY".
-        if (
-            trimmed.startsWith("//") || trimmed.startsWith("#") || trimmed.startsWith("* ") || trimmed.startsWith("-- ")
-        ) {
+        if (trimmed.startsWith("//")
+                || trimmed.startsWith("#")
+                || trimmed.startsWith("* ")
+                || trimmed.startsWith("-- ")) {
             return;
         }
         boolean envRef = ENV_REFERENCE.matcher(content).find();
@@ -185,14 +179,13 @@ final class SecretDiffScanner {
         Matcher assign = ASSIGNMENT.matcher(content);
         if (assign.find()) {
             String value = assign.group(1);
-            boolean alreadyFlagged = hits.stream().anyMatch(h -> h.newLine() == line && h.path().equals(path));
-            if (
-                !alreadyFlagged &&
-                !envRef &&
-                !isPlaceholder(value) &&
-                !looksLikePathOrUrl(value) &&
-                shannonEntropy(value) >= ENTROPY_THRESHOLD
-            ) {
+            boolean alreadyFlagged =
+                    hits.stream().anyMatch(h -> h.newLine() == line && h.path().equals(path));
+            if (!alreadyFlagged
+                    && !envRef
+                    && !isPlaceholder(value)
+                    && !looksLikePathOrUrl(value)
+                    && shannonEntropy(value) >= ENTROPY_THRESHOLD) {
                 hits.add(new SecretHit(path, line, content.strip(), "generic-entropy", value));
             }
         }
@@ -207,13 +200,11 @@ final class SecretDiffScanner {
      * under one slash). The entropy gate remains the precision backstop.
      */
     private static boolean looksLikePathOrUrl(String value) {
-        if (
-            value.startsWith("/") ||
-            value.startsWith("./") ||
-            value.startsWith("../") ||
-            value.startsWith("http") ||
-            value.contains("://")
-        ) {
+        if (value.startsWith("/")
+                || value.startsWith("./")
+                || value.startsWith("../")
+                || value.startsWith("http")
+                || value.contains("://")) {
             return true;
         }
         int slashes = 0;

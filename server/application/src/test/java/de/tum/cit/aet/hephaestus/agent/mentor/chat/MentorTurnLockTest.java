@@ -84,34 +84,32 @@ class MentorTurnLockTest extends BaseUnitTest {
         CountDownLatch bothInside = new CountDownLatch(2);
         CountDownLatch release = new CountDownLatch(1);
         try {
-            var fa = pool.submit(() ->
-                lock.withLockOr409(a, () -> {
-                    long enteredA = System.nanoTime();
-                    bothInside.countDown();
-                    try {
-                        release.await(5, TimeUnit.SECONDS);
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                    }
-                    return enteredA;
-                })
-            );
-            var fb = pool.submit(() ->
-                lock.withLockOr409(b, () -> {
-                    long enteredB = System.nanoTime();
-                    bothInside.countDown();
-                    try {
-                        release.await(5, TimeUnit.SECONDS);
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                    }
-                    return enteredB;
-                })
-            );
+            var fa = pool.submit(() -> lock.withLockOr409(a, () -> {
+                long enteredA = System.nanoTime();
+                bothInside.countDown();
+                try {
+                    release.await(5, TimeUnit.SECONDS);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                }
+                return enteredA;
+            }));
+            var fb = pool.submit(() -> lock.withLockOr409(b, () -> {
+                long enteredB = System.nanoTime();
+                bothInside.countDown();
+                try {
+                    release.await(5, TimeUnit.SECONDS);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                }
+                return enteredB;
+            }));
             // Both threads MUST be inside their critical sections at the same time. If the lock
             // were global, only one would arrive; bothInside would never reach zero and this
             // assertion times out.
-            assertThat(bothInside.await(5, TimeUnit.SECONDS)).as("both threads inside concurrently").isTrue();
+            assertThat(bothInside.await(5, TimeUnit.SECONDS))
+                    .as("both threads inside concurrently")
+                    .isTrue();
             release.countDown();
             assertThat(fa.get(5, TimeUnit.SECONDS)).isPresent();
             assertThat(fb.get(5, TimeUnit.SECONDS)).isPresent();
@@ -182,7 +180,9 @@ class MentorTurnLockTest extends BaseUnitTest {
 
             assertThat(firstInside.await(5, TimeUnit.SECONDS)).isTrue();
             // Different-key thread completes while same-key thread holds.
-            assertThat(isolatedRan.await(2, TimeUnit.SECONDS)).as("different-key thread must run in parallel").isTrue();
+            assertThat(isolatedRan.await(2, TimeUnit.SECONDS))
+                    .as("different-key thread must run in parallel")
+                    .isTrue();
             firstMayLeave.countDown();
         } finally {
             pool.shutdown();

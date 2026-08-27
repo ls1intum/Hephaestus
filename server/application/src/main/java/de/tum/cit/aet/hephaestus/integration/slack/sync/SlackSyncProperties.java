@@ -18,14 +18,13 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  */
 @ConfigurationProperties(prefix = "hephaestus.sync.slack")
 public record SlackSyncProperties(
-    @DefaultValue("0 0 4 * * *") String cron,
-    @DefaultValue("120") int historyRequestBudget,
-    @DefaultValue("15") int historyPageLimit,
-    @DefaultValue("60s") Duration historyRequestInterval,
-    @DefaultValue("true") boolean repliesEnabled,
-    @DefaultValue("30") int repliesRequestBudget,
-    @DefaultValue("true") boolean metadataEnabled
-) {
+        @DefaultValue("0 0 4 * * *") String cron,
+        @DefaultValue("120") int historyRequestBudget,
+        @DefaultValue("15") int historyPageLimit,
+        @DefaultValue("60s") Duration historyRequestInterval,
+        @DefaultValue("true") boolean repliesEnabled,
+        @DefaultValue("30") int repliesRequestBudget,
+        @DefaultValue("true") boolean metadataEnabled) {
     public SlackSyncProperties {
         if (historyRequestBudget < 1) {
             throw new IllegalArgumentException("sync.slack.historyRequestBudget must be >= 1");

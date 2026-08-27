@@ -34,12 +34,11 @@ public class PolyglotEvaluator implements AchievementEvaluator {
         Long authorId = userAchievement.getUser().getId();
         var extensions = commitRepository.findDistinctFileExtensionsByAuthorId(authorId, event.occurredAt());
 
-        Set<String> languages = extensions
-            .stream()
-            .filter(Objects::nonNull)
-            .map(ext -> LanguageExtensions.EXTENSION_TO_LANGUAGE.get(ext.toLowerCase()))
-            .filter(Objects::nonNull)
-            .collect(Collectors.toSet());
+        Set<String> languages = extensions.stream()
+                .filter(Objects::nonNull)
+                .map(ext -> LanguageExtensions.EXTENSION_TO_LANGUAGE.get(ext.toLowerCase()))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
 
         if (languages.size() >= MIN_LANGUAGES) {
             userAchievement.setProgressData(new BinaryAchievementProgress(true));

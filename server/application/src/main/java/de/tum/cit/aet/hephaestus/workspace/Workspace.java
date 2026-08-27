@@ -165,11 +165,10 @@ public class Workspace {
      * and the set is bounded (typically &lt;100 repos per workspace).
      */
     @OneToMany(
-        mappedBy = "workspace",
-        fetch = FetchType.EAGER,
-        cascade = { CascadeType.PERSIST, CascadeType.REMOVE },
-        orphanRemoval = true
-    )
+            mappedBy = "workspace",
+            fetch = FetchType.EAGER,
+            cascade = {CascadeType.PERSIST, CascadeType.REMOVE},
+            orphanRemoval = true)
     @ToString.Exclude
     private Set<RepositoryToMonitor> repositoriesToMonitor = new HashSet<>();
 

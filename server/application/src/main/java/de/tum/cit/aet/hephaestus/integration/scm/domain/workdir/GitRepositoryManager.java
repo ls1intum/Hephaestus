@@ -83,10 +83,7 @@ public class GitRepositoryManager {
     private final FabricLayout fabricLayout;
 
     public GitRepositoryManager(
-        GitRepositoryProperties properties,
-        GitRepositoryLockManager lockManager,
-        FabricLayout fabricLayout
-    ) {
+            GitRepositoryProperties properties, GitRepositoryLockManager lockManager, FabricLayout fabricLayout) {
         this.properties = properties;
         this.lockManager = lockManager;
         this.fabricLayout = fabricLayout;
@@ -141,30 +138,25 @@ public class GitRepositoryManager {
                     // stale-checkout cleanup); if even that fails, surface the failure so the purge caller
                     // can react instead of silently leaving a corrupt clone in place.
                     log.warn(
-                        "Recursive delete failed, retrying with forced delete: repoId={}, path={}, error={}",
-                        repositoryId,
-                        repoPath,
-                        e.getMessage()
-                    );
+                            "Recursive delete failed, retrying with forced delete: repoId={}, path={}, error={}",
+                            repositoryId,
+                            repoPath,
+                            e.getMessage());
                     try {
                         FileUtils.delete(repoPath.toFile(), FileUtils.RECURSIVE | FileUtils.SKIP_MISSING);
                         log.info(
-                            "Deleted local git clone via forced delete: repoId={}, path={}",
-                            repositoryId,
-                            repoPath
-                        );
+                                "Deleted local git clone via forced delete: repoId={}, path={}",
+                                repositoryId,
+                                repoPath);
                     } catch (IOException forced) {
                         log.error(
-                            "Failed to delete local git clone: repoId={}, path={}, error={}",
-                            repositoryId,
-                            repoPath,
-                            forced.getMessage(),
-                            forced
-                        );
-                        GitOperationException failure = new GitOperationException(
-                            "Failed to delete local git clone: " + repositoryId,
-                            forced
-                        );
+                                "Failed to delete local git clone: repoId={}, path={}, error={}",
+                                repositoryId,
+                                repoPath,
+                                forced.getMessage(),
+                                forced);
+                        GitOperationException failure =
+                                new GitOperationException("Failed to delete local git clone: " + repositoryId, forced);
                         failure.addSuppressed(e);
                         throw failure;
                     }
@@ -213,7 +205,7 @@ public class GitRepositoryManager {
      * Clone a repository as a full clone.
      */
     private void cloneRepository(Path repoPath, String cloneUrl, @Nullable String token)
-        throws GitAPIException, IOException {
+            throws GitAPIException, IOException {
         log.info("Cloning repository: url={}, path={}", sanitizeUrl(cloneUrl), repoPath);
 
         // We only reach here when isRepositoryCloned() is false, so any directory already at
@@ -228,10 +220,10 @@ public class GitRepositoryManager {
         Files.createDirectories(repoPath.getParent());
 
         var cloneCommand = Git.cloneRepository()
-            .setURI(cloneUrl)
-            .setDirectory(repoPath.toFile())
-            .setBare(false)
-            .setCloneAllBranches(true);
+                .setURI(cloneUrl)
+                .setDirectory(repoPath.toFile())
+                .setBare(false)
+                .setCloneAllBranches(true);
 
         if (token != null && !token.isBlank()) {
             cloneCommand.setCredentialsProvider(new UsernamePasswordCredentialsProvider("x-access-token", token));
@@ -319,11 +311,10 @@ public class GitRepositoryManager {
                 return null;
             } catch (IOException e) {
                 log.error(
-                    "Failed to resolve default branch HEAD: repoId={}, branch={}, error={}",
-                    repositoryId,
-                    defaultBranch,
-                    e.getMessage()
-                );
+                        "Failed to resolve default branch HEAD: repoId={}, branch={}, error={}",
+                        repositoryId,
+                        defaultBranch,
+                        e.getMessage());
                 return null;
             }
         });
@@ -343,7 +334,8 @@ public class GitRepositoryManager {
 
         return lockManager.withReadLock(repositoryId, () -> {
             Path repoPath = getRepositoryPath(repositoryId);
-            try (Git git = Git.open(repoPath.toFile()); RevWalk walk = new RevWalk(git.getRepository())) {
+            try (Git git = Git.open(repoPath.toFile());
+                    RevWalk walk = new RevWalk(git.getRepository())) {
                 ObjectId objectId = git.getRepository().resolve(sha);
                 if (objectId == null) {
                     return false;
@@ -352,11 +344,10 @@ public class GitRepositoryManager {
                 return true;
             } catch (IOException e) {
                 log.debug(
-                    "Cannot check commit existence: repoId={}, sha={}, error={}",
-                    repositoryId,
-                    sha,
-                    e.getMessage()
-                );
+                        "Cannot check commit existence: repoId={}, sha={}, error={}",
+                        repositoryId,
+                        sha,
+                        e.getMessage());
                 return false;
             }
         });
@@ -394,12 +385,10 @@ public class GitRepositoryManager {
                             }
                             RevCommit commit = revWalk.parseCommit(objectId);
                             result.put(
-                                sha,
-                                new EmailPair(
-                                    commit.getAuthorIdent().getEmailAddress(),
-                                    commit.getCommitterIdent().getEmailAddress()
-                                )
-                            );
+                                    sha,
+                                    new EmailPair(
+                                            commit.getAuthorIdent().getEmailAddress(),
+                                            commit.getCommitterIdent().getEmailAddress()));
                             revWalk.reset();
                         } catch (IOException e) {
                             log.debug("Failed to parse commit for email: sha={}, error={}", sha, e.getMessage());
@@ -408,10 +397,7 @@ public class GitRepositoryManager {
                 }
             } catch (IOException e) {
                 log.error(
-                    "Failed to open repo for email resolution: repoId={}, error={}",
-                    repositoryId,
-                    e.getMessage()
-                );
+                        "Failed to open repo for email resolution: repoId={}, error={}", repositoryId, e.getMessage());
             }
 
             return result;
@@ -508,9 +494,8 @@ public class GitRepositoryManager {
             try (Git git = Git.open(repoPath.toFile())) {
                 Repository repo = git.getRepository();
 
-                List<org.eclipse.jgit.lib.Ref> remoteRefs = new ArrayList<>(
-                    repo.getRefDatabase().getRefsByPrefix("refs/remotes/origin/")
-                );
+                List<org.eclipse.jgit.lib.Ref> remoteRefs =
+                        new ArrayList<>(repo.getRefDatabase().getRefsByPrefix("refs/remotes/origin/"));
                 if (remoteRefs.isEmpty()) {
                     log.warn("No remote branches found for multi-branch walk: repoId={}", repositoryId);
                     // Return a mutable empty list, matching the normal-path return below, so callers see one
@@ -534,11 +519,10 @@ public class GitRepositoryManager {
                             revWalk.markStart(revWalk.parseCommit(objectId));
                         } catch (IOException e) {
                             log.debug(
-                                "Skipped ref during multi-branch walk: repoId={}, ref={}, error={}",
-                                repositoryId,
-                                ref.getName(),
-                                e.getMessage()
-                            );
+                                    "Skipped ref during multi-branch walk: repoId={}, ref={}, error={}",
+                                    repositoryId,
+                                    ref.getName(),
+                                    e.getMessage());
                         }
                     }
 
@@ -547,11 +531,10 @@ public class GitRepositoryManager {
                             revWalk.markUninteresting(revWalk.parseCommit(fromId));
                         } catch (IOException e) {
                             log.debug(
-                                "Cannot mark fromSha uninteresting — falling back to full walk: repoId={}, fromSha={}, error={}",
-                                repositoryId,
-                                fromSha,
-                                e.getMessage()
-                            );
+                                    "Cannot mark fromSha uninteresting — falling back to full walk: repoId={}, fromSha={}, error={}",
+                                    repositoryId,
+                                    fromSha,
+                                    e.getMessage());
                         }
                     }
 
@@ -620,21 +603,20 @@ public class GitRepositoryManager {
         }
 
         return new CommitInfo(
-            revCommit.getName(),
-            message,
-            messageBody,
-            authorIdent.getName(),
-            authorIdent.getEmailAddress(),
-            authorIdent.getWhen().toInstant(),
-            committerIdent.getName(),
-            committerIdent.getEmailAddress(),
-            committerIdent.getWhen().toInstant(),
-            totalAdditions,
-            totalDeletions,
-            fileChanges.size(),
-            fileChanges,
-            parentShas
-        );
+                revCommit.getName(),
+                message,
+                messageBody,
+                authorIdent.getName(),
+                authorIdent.getEmailAddress(),
+                authorIdent.getWhen().toInstant(),
+                committerIdent.getName(),
+                committerIdent.getEmailAddress(),
+                committerIdent.getWhen().toInstant(),
+                totalAdditions,
+                totalDeletions,
+                fileChanges.size(),
+                fileChanges,
+                parentShas);
     }
 
     /**
@@ -647,11 +629,9 @@ public class GitRepositoryManager {
     private List<FileChange> extractFileChanges(Repository repo, RevCommit commit) throws IOException {
         List<FileChange> changes = new ArrayList<>();
 
-        try (
-            RevWalk parentWalk = new RevWalk(repo);
-            ObjectReader reader = repo.newObjectReader();
-            DiffFormatter diffFormatter = new DiffFormatter(DisabledOutputStream.INSTANCE)
-        ) {
+        try (RevWalk parentWalk = new RevWalk(repo);
+                ObjectReader reader = repo.newObjectReader();
+                DiffFormatter diffFormatter = new DiffFormatter(DisabledOutputStream.INSTANCE)) {
             diffFormatter.setRepository(repo);
             diffFormatter.setDiffComparator(RawTextComparator.DEFAULT);
             diffFormatter.setDetectRenames(true);
@@ -780,7 +760,8 @@ public class GitRepositoryManager {
                     throw new IOException("Cannot resolve commit SHA: " + commitSha);
                 }
 
-                try (RevWalk revWalk = new RevWalk(repo); ObjectReader reader = repo.newObjectReader()) {
+                try (RevWalk revWalk = new RevWalk(repo);
+                        ObjectReader reader = repo.newObjectReader()) {
                     RevCommit commit = revWalk.parseCommit(commitId);
                     resolvedCommitSha = commit.getId().getName();
                     treeSha = commit.getTree().getId().getName();
@@ -819,11 +800,10 @@ public class GitRepositoryManager {
                             if (result.size() >= maxFiles) {
                                 limitations.add(TREE_LIMITATION_FILE_COUNT);
                                 log.warn(
-                                    "Repository tree hit the file-count bound; snapshot is partial: repoId={}, commit={}, maxFiles={}",
-                                    repositoryId,
-                                    commitSha,
-                                    maxFiles
-                                );
+                                        "Repository tree hit the file-count bound; snapshot is partial: repoId={}, commit={}, maxFiles={}",
+                                        repositoryId,
+                                        commitSha,
+                                        maxFiles);
                                 break;
                             }
                             ObjectId blobId = treeWalk.getObjectId(0);
@@ -839,11 +819,10 @@ public class GitRepositoryManager {
                             if (totalBytes + blobSize > maxTotalBytes) {
                                 limitations.add(TREE_LIMITATION_TOTAL_SIZE);
                                 log.warn(
-                                    "Repository tree hit the total-size bound; snapshot is partial: repoId={}, commit={}, maxTotalBytes={}",
-                                    repositoryId,
-                                    commitSha,
-                                    maxTotalBytes
-                                );
+                                        "Repository tree hit the total-size bound; snapshot is partial: repoId={}, commit={}, maxTotalBytes={}",
+                                        repositoryId,
+                                        commitSha,
+                                        maxTotalBytes);
                                 break;
                             }
                             Path target = stagingDir.resolve(sourcePath);
@@ -859,35 +838,30 @@ public class GitRepositoryManager {
             } catch (IOException e) {
                 deleteTreeQuietly(stagingDir);
                 throw new GitOperationException(
-                    "Failed to read files at commit: repoId=" + repositoryId + ", commit=" + commitSha,
-                    e
-                );
+                        "Failed to read files at commit: repoId=" + repositoryId + ", commit=" + commitSha, e);
             }
 
             return new GitTreeSnapshot(
-                stagingDir,
-                resolvedCommitSha,
-                treeSha,
-                result,
-                totalBytes,
-                visitedFiles,
-                limitations.isEmpty(),
-                limitations
-            );
+                    stagingDir,
+                    resolvedCommitSha,
+                    treeSha,
+                    result,
+                    totalBytes,
+                    visitedFiles,
+                    limitations.isEmpty(),
+                    limitations);
         });
     }
 
     static void deleteTreeQuietly(Path root) {
         try (Stream<Path> paths = Files.walk(root)) {
-            paths
-                .sorted(Comparator.reverseOrder())
-                .forEach(path -> {
-                    try {
-                        Files.deleteIfExists(path);
-                    } catch (IOException e) {
-                        log.warn("Could not delete staged file {}", path, e);
-                    }
-                });
+            paths.sorted(Comparator.reverseOrder()).forEach(path -> {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (IOException e) {
+                    log.warn("Could not delete staged file {}", path, e);
+                }
+            });
         } catch (IOException e) {
             log.warn("Could not delete staging directory {}", root, e);
         }
@@ -910,15 +884,15 @@ public class GitRepositoryManager {
      * under {@code stagingDir}; closing deletes the whole directory.
      */
     public record GitTreeSnapshot(
-        Path stagingDir,
-        String commitSha,
-        String treeSha,
-        Map<String, Path> files,
-        long totalBytes,
-        int visitedFiles,
-        boolean complete,
-        Set<String> limitations
-    ) implements AutoCloseable {
+            Path stagingDir,
+            String commitSha,
+            String treeSha,
+            Map<String, Path> files,
+            long totalBytes,
+            int visitedFiles,
+            boolean complete,
+            Set<String> limitations)
+            implements AutoCloseable {
         public GitTreeSnapshot {
             Objects.requireNonNull(treeSha, "treeSha");
             files = Collections.unmodifiableMap(new LinkedHashMap<>(files));
@@ -954,12 +928,10 @@ public class GitRepositoryManager {
                     return "";
                 }
 
-                try (
-                    RevWalk revWalk = new RevWalk(repo);
-                    ObjectReader reader = repo.newObjectReader();
-                    ByteArrayOutputStream out = new ByteArrayOutputStream();
-                    DiffFormatter formatter = new DiffFormatter(out)
-                ) {
+                try (RevWalk revWalk = new RevWalk(repo);
+                        ObjectReader reader = repo.newObjectReader();
+                        ByteArrayOutputStream out = new ByteArrayOutputStream();
+                        DiffFormatter formatter = new DiffFormatter(out)) {
                     RevCommit baseCommit = revWalk.parseCommit(baseId);
                     RevCommit headCommit = revWalk.parseCommit(headId);
 
@@ -979,14 +951,12 @@ public class GitRepositoryManager {
                 }
             } catch (IOException e) {
                 throw new GitOperationException(
-                    "Failed to generate unified diff: repoId=" +
-                        repositoryId +
-                        ", base=" +
-                        baseRef +
-                        ", head=" +
-                        headRef,
-                    e
-                );
+                        "Failed to generate unified diff: repoId=" + repositoryId
+                                + ", base="
+                                + baseRef
+                                + ", head="
+                                + headRef,
+                        e);
             }
         });
     }
@@ -1065,33 +1035,31 @@ public class GitRepositoryManager {
      * Commit information extracted from git.
      */
     public record CommitInfo(
-        String sha,
-        String message,
-        @Nullable String messageBody,
-        String authorName,
-        String authorEmail,
-        Instant authoredAt,
-        String committerName,
-        String committerEmail,
-        Instant committedAt,
-        int additions,
-        int deletions,
-        int changedFiles,
-        List<FileChange> fileChanges,
-        List<String> parentShas
-    ) {}
+            String sha,
+            String message,
+            @Nullable String messageBody,
+            String authorName,
+            String authorEmail,
+            Instant authoredAt,
+            String committerName,
+            String committerEmail,
+            Instant committedAt,
+            int additions,
+            int deletions,
+            int changedFiles,
+            List<FileChange> fileChanges,
+            List<String> parentShas) {}
 
     /**
      * File change information.
      */
     public record FileChange(
-        String filename,
-        ChangeType changeType,
-        int additions,
-        int deletions,
-        int changes,
-        @Nullable String previousFilename
-    ) {}
+            String filename,
+            ChangeType changeType,
+            int additions,
+            int deletions,
+            int changes,
+            @Nullable String previousFilename) {}
 
     /**
      * Type of file change.

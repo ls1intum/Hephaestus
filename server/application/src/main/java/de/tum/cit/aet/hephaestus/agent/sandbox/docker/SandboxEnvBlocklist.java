@@ -19,23 +19,15 @@ public final class SandboxEnvBlocklist {
     static final Set<String> BLOCKED_NAMES;
 
     /** Prefix matches catch new credentials in known families (e.g. {@code AWS_ROLE_ARN}). */
-    static final List<String> BLOCKED_PREFIXES = List.of(
-        "AWS_",
-        "GOOGLE_",
-        "GCP_",
-        "AZURE_",
-        "DOCKER_",
-        "ALIBABA_CLOUD_",
-        "GIT_CONFIG_"
-    );
+    static final List<String> BLOCKED_PREFIXES =
+            List.of("AWS_", "GOOGLE_", "GCP_", "AZURE_", "DOCKER_", "ALIBABA_CLOUD_", "GIT_CONFIG_");
 
     /** Names re-allowed even when they match a blocked prefix (legitimate SDK config). */
     static final Set<String> ALLOWED_PREFIX_EXCEPTIONS;
 
     static {
         TreeSet<String> names = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-        names.addAll(
-            List.of(
+        names.addAll(List.of(
                 // Library / module injection.
                 "LD_PRELOAD",
                 "LD_LIBRARY_PATH",
@@ -80,15 +72,12 @@ public final class SandboxEnvBlocklist {
                 "GIT_SEQUENCE_EDITOR",
                 "GIT_PAGER",
                 "GIT_TERMINAL_PROMPT",
-                "GIT_ATTR_NOSYSTEM"
-            )
-        );
+                "GIT_ATTR_NOSYSTEM"));
         BLOCKED_NAMES = Collections.unmodifiableSet(names);
 
         TreeSet<String> allowed = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         allowed.addAll(
-            List.of("AZURE_OPENAI_DEPLOYMENT_NAME_MAP", "AZURE_OPENAI_BASE_URL", "AZURE_OPENAI_API_VERSION")
-        );
+                List.of("AZURE_OPENAI_DEPLOYMENT_NAME_MAP", "AZURE_OPENAI_BASE_URL", "AZURE_OPENAI_API_VERSION"));
         ALLOWED_PREFIX_EXCEPTIONS = Collections.unmodifiableSet(allowed);
     }
 

@@ -57,12 +57,11 @@ public class OutlineWebhookRegistrar {
     private final ObjectProvider<IntegrationNatsConsumer> natsConsumer;
 
     public OutlineWebhookRegistrar(
-        ConnectionService connectionService,
-        OutlineWebhookClient outlineApiClient,
-        EncryptedStringConverter secretCipher,
-        @Value("${hephaestus.webhook.external-url:}") String externalUrl,
-        ObjectProvider<IntegrationNatsConsumer> natsConsumer
-    ) {
+            ConnectionService connectionService,
+            OutlineWebhookClient outlineApiClient,
+            EncryptedStringConverter secretCipher,
+            @Value("${hephaestus.webhook.external-url:}") String externalUrl,
+            ObjectProvider<IntegrationNatsConsumer> natsConsumer) {
         this.connectionService = connectionService;
         this.outlineApiClient = outlineApiClient;
         this.secretCipher = secretCipher;
@@ -116,10 +115,9 @@ public class OutlineWebhookRegistrar {
                 return; // healthy, or unverifiable — don't churn a subscription we cannot see
             }
             log.info(
-                "outline.webhook: stored subscription {} is missing/disabled upstream for workspaceId={} — re-registering",
-                storedId,
-                workspaceId
-            );
+                    "outline.webhook: stored subscription {} is missing/disabled upstream for workspaceId={} — re-registering",
+                    storedId,
+                    workspaceId);
             clearStoredSubscription(workspaceId);
         }
         register(workspaceId, serverUrl, token);
@@ -131,10 +129,8 @@ public class OutlineWebhookRegistrar {
      */
     private @Nullable Boolean isSubscriptionHealthy(String serverUrl, String token, String subscriptionId) {
         try {
-            for (OutlineWebhookSubscription subscription : outlineApiClient.listWebhookSubscriptions(
-                serverUrl,
-                token
-            )) {
+            for (OutlineWebhookSubscription subscription :
+                    outlineApiClient.listWebhookSubscriptions(serverUrl, token)) {
                 if (subscriptionId.equals(subscription.getId())) {
                     return !Boolean.FALSE.equals(subscription.getEnabled());
                 }
@@ -156,13 +152,12 @@ public class OutlineWebhookRegistrar {
         String encryptedSecret = secretCipher.convertToDatabaseColumn(signingSecret);
         try {
             String subscriptionId = outlineApiClient.createWebhookSubscription(
-                serverUrl,
-                token,
-                SUBSCRIPTION_NAME,
-                deliveryUrl,
-                signingSecret,
-                OutlineWebhookEvents.SUBSCRIBED_EVENTS
-            );
+                    serverUrl,
+                    token,
+                    SUBSCRIPTION_NAME,
+                    deliveryUrl,
+                    signingSecret,
+                    OutlineWebhookEvents.SUBSCRIBED_EVENTS);
             if (subscriptionId == null || subscriptionId.isBlank()) {
                 log.warn("outline.webhook: register returned no subscription id for workspaceId={}", workspaceId);
                 return;
@@ -193,10 +188,9 @@ public class OutlineWebhookRegistrar {
             });
         } catch (RuntimeException e) {
             log.warn(
-                "outline.webhook: clearing stale subscription fields failed for workspaceId={}: {}",
-                workspaceId,
-                e.toString()
-            );
+                    "outline.webhook: clearing stale subscription fields failed for workspaceId={}: {}",
+                    workspaceId,
+                    e.toString());
         }
     }
 
@@ -230,7 +224,8 @@ public class OutlineWebhookRegistrar {
         Optional<BearerToken> bearer = connectionService.findActiveBearerToken(workspaceId, IntegrationKind.OUTLINE);
         if (serverUrl != null && !serverUrl.isBlank() && bearer.isPresent()) {
             try {
-                outlineApiClient.deleteWebhookSubscription(serverUrl, bearer.get().token(), subscriptionId);
+                outlineApiClient.deleteWebhookSubscription(
+                        serverUrl, bearer.get().token(), subscriptionId);
             } catch (RuntimeException e) {
                 log.warn("outline.webhook: deregistration failed for workspaceId={}: {}", workspaceId, e.toString());
             }
@@ -288,10 +283,9 @@ public class OutlineWebhookRegistrar {
         }
         outlineApiClient.deleteWebhookSubscription(serverUrl, bearer.get().token(), subscriptionId);
         log.info(
-            "outline.webhook: deleted subscription {} for deactivated connectionId={}",
-            subscriptionId,
-            connectionId
-        );
+                "outline.webhook: deleted subscription {} for deactivated connectionId={}",
+                subscriptionId,
+                connectionId);
         return true;
     }
 

@@ -49,13 +49,7 @@ public final class WorkerCapacityState {
         int review = inFlightReview.get();
         int mentor = inFlightMentor.get();
         return new CapacityReport(
-            reviewMax,
-            mentorMax,
-            review,
-            mentor,
-            Math.max(0, reviewMax - review),
-            Math.max(0, mentorMax - mentor)
-        );
+                reviewMax, mentorMax, review, mentor, Math.max(0, reviewMax - review), Math.max(0, mentorMax - mentor));
     }
 
     public int reviewMax() {

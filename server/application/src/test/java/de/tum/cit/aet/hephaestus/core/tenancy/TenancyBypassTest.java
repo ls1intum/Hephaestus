@@ -43,7 +43,7 @@ class TenancyBypassTest extends BaseUnitTest {
             // swallow
         }
         assertThat(TenancyBypass.isActive())
-            .as("try-with-resources must decrement depth even when the body throws")
-            .isFalse();
+                .as("try-with-resources must decrement depth even when the body throws")
+                .isFalse();
     }
 }

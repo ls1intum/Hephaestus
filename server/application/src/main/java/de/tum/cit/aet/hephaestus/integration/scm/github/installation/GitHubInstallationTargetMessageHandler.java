@@ -23,8 +23,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Component
 public class GitHubInstallationTargetMessageHandler
-    extends AbstractIntegrationMessageHandler<GitHubInstallationTargetEventDTO>
-{
+        extends AbstractIntegrationMessageHandler<GitHubInstallationTargetEventDTO> {
 
     private static final Logger log = LoggerFactory.getLogger(GitHubInstallationTargetMessageHandler.class);
 
@@ -35,19 +34,17 @@ public class GitHubInstallationTargetMessageHandler
     private final IdentityProviderRepository gitProviderRepository;
 
     GitHubInstallationTargetMessageHandler(
-        ProvisioningListener provisioningListener,
-        OrganizationService organizationService,
-        IdentityProviderRepository gitProviderRepository,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            ProvisioningListener provisioningListener,
+            OrganizationService organizationService,
+            IdentityProviderRepository gitProviderRepository,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITHUB,
-            "installation." + GitHubEventType.INSTALLATION_TARGET.getValue(),
-            GitHubInstallationTargetEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITHUB,
+                "installation." + GitHubEventType.INSTALLATION_TARGET.getValue(),
+                GitHubInstallationTargetEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.provisioningListener = provisioningListener;
         this.organizationService = organizationService;
         this.gitProviderRepository = gitProviderRepository;
@@ -84,11 +81,10 @@ public class GitHubInstallationTargetMessageHandler
         upsertOrganization(event, installationId, newLogin);
 
         log.info(
-            "Processed installation_target rename: installationId={}, previousLogin={}, newLogin={}",
-            installationId,
-            sanitizeForLog(previousLogin),
-            sanitizeForLog(newLogin)
-        );
+                "Processed installation_target rename: installationId={}, previousLogin={}, newLogin={}",
+                installationId,
+                sanitizeForLog(previousLogin),
+                sanitizeForLog(newLogin));
     }
 
     private void upsertOrganization(GitHubInstallationTargetEventDTO event, long installationId, String login) {
@@ -103,9 +99,9 @@ public class GitHubInstallationTargetMessageHandler
         }
 
         Long providerId = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
-            .orElseThrow(() -> new IllegalStateException("IdentityProvider not found for GitHub"))
-            .getId();
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
+                .orElseThrow(() -> new IllegalStateException("IdentityProvider not found for GitHub"))
+                .getId();
         organizationService.upsertIdentity(account.id(), login, Objects.requireNonNull(providerId));
     }
 }

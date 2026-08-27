@@ -53,9 +53,8 @@ class OAuthStateNonceCleanupJobTest extends BaseUnitTest {
 
     @Test
     void schedulerLockPresent() throws NoSuchMethodException {
-        SchedulerLock lock = OAuthStateNonceCleanupJob.class.getMethod("cleanupExpired").getAnnotation(
-            SchedulerLock.class
-        );
+        SchedulerLock lock =
+                OAuthStateNonceCleanupJob.class.getMethod("cleanupExpired").getAnnotation(SchedulerLock.class);
         assertThat(lock).as("@SchedulerLock must be present").isNotNull();
         assertThat(lock.name()).isEqualTo("oauth-state-nonce-cleanup");
         assertThat(lock.lockAtMostFor()).isEqualTo("PT10M");

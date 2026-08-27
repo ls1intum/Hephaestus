@@ -17,10 +17,7 @@ abstract class SlackChannelLifecycleMessageHandler extends AbstractSlackEnvelope
     protected final SlackChannelLifecycleService lifecycleService;
 
     SlackChannelLifecycleMessageHandler(
-        String eventType,
-        SlackChannelLifecycleService lifecycleService,
-        NatsMessageDeserializer deserializer
-    ) {
+            String eventType, SlackChannelLifecycleService lifecycleService, NatsMessageDeserializer deserializer) {
         super(eventType, deserializer);
         this.lifecycleService = lifecycleService;
     }

@@ -69,10 +69,7 @@ public class InAppFeedbackService {
         }
         Long recipientUserId = currentUser.get().getId();
         List<Feedback> units = feedbackRepository.findReadableInAppForRecipient(
-            workspaceId,
-            recipientUserId,
-            PageRequest.of(0, MAX_CARDS)
-        );
+                workspaceId, recipientUserId, PageRequest.of(0, MAX_CARDS));
         if (units.isEmpty()) {
             return List.of();
         }
@@ -111,10 +108,9 @@ public class InAppFeedbackService {
     private Map<UUID, List<Observation>> visibleEvidence(Long workspaceId, List<Feedback> units) {
         List<UUID> ids = units.stream().map(Feedback::getId).toList();
         var rows = feedbackObservationRepository.findForVisibility(workspaceId, ids);
-        List<Observation> all = rows
-            .stream()
-            .map(FeedbackObservationRepository.FeedbackObservationVisibility::getObservation)
-            .toList();
+        List<Observation> all = rows.stream()
+                .map(FeedbackObservationRepository.FeedbackObservationVisibility::getObservation)
+                .toList();
         Set<UUID> visible = visibilityPolicy.permitsAll(workspaceId, all, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
         Map<UUID, List<Observation>> byUnit = new LinkedHashMap<>();
         for (var row : rows) {
@@ -122,14 +118,13 @@ public class InAppFeedbackService {
             if (observation.getId() == null || !visible.contains(observation.getId())) {
                 continue;
             }
-            byUnit.computeIfAbsent(row.getFeedbackId(), key -> new ArrayList<>()).add(observation);
+            byUnit.computeIfAbsent(row.getFeedbackId(), key -> new ArrayList<>())
+                    .add(observation);
         }
         // Newest occurrence first: the card's evidence list reads as "this is still happening", which the
         // oldest-first order would invert.
         Comparator<Observation> newestFirst = Comparator.comparing(
-            Observation::getObservedAt,
-            Comparator.nullsLast(Comparator.<Instant>reverseOrder())
-        );
+                Observation::getObservedAt, Comparator.nullsLast(Comparator.<Instant>reverseOrder()));
         byUnit.values().forEach(list -> list.sort(newestFirst));
         return byUnit;
     }
@@ -139,19 +134,18 @@ public class InAppFeedbackService {
         PracticeGroup group = practice == null ? null : practice.getGroup();
         String headline = InAppFeedbackBody.headlineOf(unit.getBody());
         return new InAppFeedbackDTO(
-            unit.getId(),
-            headline != null ? headline : (practice == null ? "" : practice.getName()),
-            InAppFeedbackBody.messageOf(unit.getBody()),
-            practice == null ? "" : practice.getSlug(),
-            practice == null ? "" : practice.getName(),
-            group == null ? null : group.getSlug(),
-            group == null ? null : group.getName(),
-            practice == null ? null : practice.getWhyItMatters(),
-            practice == null ? null : practice.getWhatGoodLooksLike(),
-            evidence.stream().map(InAppEvidenceDTO::from).toList(),
-            evidence.size(),
-            unit.getCreatedAt(),
-            unit.getDeliveredAt()
-        );
+                unit.getId(),
+                headline != null ? headline : (practice == null ? "" : practice.getName()),
+                InAppFeedbackBody.messageOf(unit.getBody()),
+                practice == null ? "" : practice.getSlug(),
+                practice == null ? "" : practice.getName(),
+                group == null ? null : group.getSlug(),
+                group == null ? null : group.getName(),
+                practice == null ? null : practice.getWhyItMatters(),
+                practice == null ? null : practice.getWhatGoodLooksLike(),
+                evidence.stream().map(InAppEvidenceDTO::from).toList(),
+                evidence.size(),
+                unit.getCreatedAt(),
+                unit.getDeliveredAt());
     }
 }

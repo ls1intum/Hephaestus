@@ -83,6 +83,7 @@ public class IssuerDiscoveryProbe {
     private static final int TIMEOUT_MS = (int) TIMEOUT.toMillis();
     /** Cap the discovery body we will buffer (a JSON metadata doc is tiny; reject runaway responses). */
     private static final int MAX_BODY_BYTES = 256 * 1024;
+
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final HostResolver resolver;
@@ -144,12 +145,10 @@ public class IssuerDiscoveryProbe {
         }
         if (!vetted.containsAll(liveStrings)) {
             log.warn(
-                "auth.oidc: rejecting discovery — host {} re-resolved to a new/changed address (possible DNS rebind)",
-                discovery.getHost()
-            );
-            throw new IssuerValidationException(
-                "host " + discovery.getHost() + " resolved to a different address on re-check (possible DNS rebind)"
-            );
+                    "auth.oidc: rejecting discovery — host {} re-resolved to a new/changed address (possible DNS rebind)",
+                    discovery.getHost());
+            throw new IssuerValidationException("host " + discovery.getHost()
+                    + " resolved to a different address on re-check (possible DNS rebind)");
         }
         // Connect to the vetted IP LITERAL (no further DNS lookup), with SNI + hostname verification
         // pinned to the original hostname. This is the step that actually closes the rebind window.
@@ -198,16 +197,14 @@ public class IssuerDiscoveryProbe {
             socket.setSSLParameters(params);
             socket.startHandshake();
 
-            String request =
-                "GET " +
-                path +
-                " HTTP/1.1\r\n" +
-                "Host: " +
-                host +
-                "\r\n" +
-                "Accept: application/json\r\n" +
-                "User-Agent: Hephaestus-IssuerDiscoveryProbe\r\n" +
-                "Connection: close\r\n\r\n";
+            String request = "GET " + path
+                    + " HTTP/1.1\r\n"
+                    + "Host: "
+                    + host
+                    + "\r\n"
+                    + "Accept: application/json\r\n"
+                    + "User-Agent: Hephaestus-IssuerDiscoveryProbe\r\n"
+                    + "Connection: close\r\n\r\n";
             OutputStream out = socket.getOutputStream();
             out.write(request.getBytes(StandardCharsets.UTF_8));
             out.flush();
@@ -295,8 +292,7 @@ public class IssuerDiscoveryProbe {
         for (InetAddress addr : addresses) {
             if (PrivateAddressGuard.isNonPublic(addr)) {
                 throw new IssuerValidationException(
-                    "host " + host + " resolves to a non-public address (" + addr.getHostAddress() + ")"
-                );
+                        "host " + host + " resolves to a non-public address (" + addr.getHostAddress() + ")");
             }
         }
         return List.of(addresses);

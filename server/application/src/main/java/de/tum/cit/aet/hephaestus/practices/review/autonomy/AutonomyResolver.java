@@ -14,12 +14,10 @@ public final class AutonomyResolver {
     }
 
     public static EffectiveAutonomy resolveGroup(
-        @Nullable PracticeAutonomy groupAutonomy,
-        PracticeAutonomy workspaceDefault
-    ) {
+            @Nullable PracticeAutonomy groupAutonomy, PracticeAutonomy workspaceDefault) {
         return groupAutonomy != null
-            ? new EffectiveAutonomy(groupAutonomy, AutonomySource.GROUP)
-            : new EffectiveAutonomy(workspaceDefault, AutonomySource.WORKSPACE);
+                ? new EffectiveAutonomy(groupAutonomy, AutonomySource.GROUP)
+                : new EffectiveAutonomy(workspaceDefault, AutonomySource.WORKSPACE);
     }
 
     public static EffectiveAutonomy resolveGroup(@Nullable PracticeGroup group, PracticeAutonomy workspaceDefault) {
@@ -27,10 +25,9 @@ public final class AutonomyResolver {
     }
 
     public static EffectiveAutonomy resolvePractice(
-        @Nullable PracticeAutonomy practiceAutonomy,
-        @Nullable PracticeAutonomy groupAutonomy,
-        PracticeAutonomy workspaceDefault
-    ) {
+            @Nullable PracticeAutonomy practiceAutonomy,
+            @Nullable PracticeAutonomy groupAutonomy,
+            PracticeAutonomy workspaceDefault) {
         if (practiceAutonomy != null) {
             return new EffectiveAutonomy(practiceAutonomy, AutonomySource.PRACTICE);
         }

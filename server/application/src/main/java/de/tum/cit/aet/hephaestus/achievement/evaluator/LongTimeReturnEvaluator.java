@@ -31,15 +31,15 @@ public class LongTimeReturnEvaluator implements AchievementEvaluator {
         Long actorId = userAchievement.getUser().getId();
 
         return activityEventRepository
-            .findMaxOccurredAtByActorIdBefore(actorId, event.occurredAt())
-            .map(previousActivity -> {
-                Duration gap = Duration.between(previousActivity, event.occurredAt());
-                if (gap.compareTo(MIN_ABSENCE) >= 0) {
-                    userAchievement.setProgressData(new BinaryAchievementProgress(true));
-                    return true;
-                }
-                return false;
-            })
-            .orElse(false);
+                .findMaxOccurredAtByActorIdBefore(actorId, event.occurredAt())
+                .map(previousActivity -> {
+                    Duration gap = Duration.between(previousActivity, event.occurredAt());
+                    if (gap.compareTo(MIN_ABSENCE) >= 0) {
+                        userAchievement.setProgressData(new BinaryAchievementProgress(true));
+                        return true;
+                    }
+                    return false;
+                })
+                .orElse(false);
     }
 }

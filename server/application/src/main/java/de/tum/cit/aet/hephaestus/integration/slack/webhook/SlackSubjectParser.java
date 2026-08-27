@@ -38,8 +38,7 @@ public class SlackSubjectParser implements SubjectParser {
         String[] parts = fullSubject.split("\\.", -1);
         if (parts.length < 4) {
             throw new IllegalArgumentException(
-                "subject must have >= 4 dot-separated components, got " + parts.length + ": " + fullSubject
-            );
+                    "subject must have >= 4 dot-separated components, got " + parts.length + ": " + fullSubject);
         }
         // parts[0] = "slack", parts[1] = team, parts[2] = channel, parts[3..] = event.
         StringBuilder eventBuilder = new StringBuilder(parts[3]);

@@ -67,8 +67,8 @@ public class RecentAuthoredWorkContentSource implements ContentSource {
         String key = req.workspaceId() + ":" + req.developerId();
         Cache cache = cacheManager.getCache(CACHE_NAME);
         ObjectNode payload = (cache != null)
-            ? cache.get(key, () -> buildPayload(req.workspaceId(), req.developerId()))
-            : buildPayload(req.workspaceId(), req.developerId());
+                ? cache.get(key, () -> buildPayload(req.workspaceId(), req.developerId()))
+                : buildPayload(req.workspaceId(), req.developerId());
         try {
             files.put(OUTPUT_KEY, objectMapper.writeValueAsBytes(payload));
         } catch (JacksonException e) {
@@ -79,19 +79,13 @@ public class RecentAuthoredWorkContentSource implements ContentSource {
     /** Pure function of (workspaceId, developerId). Callers cache through {@link CacheManager}. */
     public ObjectNode buildPayload(Long workspaceId, Long developerId) {
         User user = userRepository
-            .findById(developerId)
-            .orElseThrow(() -> new EntityNotFoundException("User", developerId.toString()));
+                .findById(developerId)
+                .orElseThrow(() -> new EntityNotFoundException("User", developerId.toString()));
 
         List<PullRequest> prs = queryRepository.findRecentAuthoredPullRequests(
-            workspaceId,
-            developerId,
-            PageRequest.of(0, MAX_PULL_REQUESTS)
-        );
-        List<Issue> issues = queryRepository.findRecentAuthoredIssues(
-            workspaceId,
-            developerId,
-            PageRequest.of(0, MAX_ISSUES)
-        );
+                workspaceId, developerId, PageRequest.of(0, MAX_PULL_REQUESTS));
+        List<Issue> issues =
+                queryRepository.findRecentAuthoredIssues(workspaceId, developerId, PageRequest.of(0, MAX_ISSUES));
 
         ObjectNode root = objectMapper.createObjectNode();
         root.putObject("user").put("login", user.getLogin()).put("name", user.getName());

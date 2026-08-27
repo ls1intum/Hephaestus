@@ -40,15 +40,14 @@ import tools.jackson.databind.node.JsonNodeFactory;
 class MentorTurnUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final LlmPriceSnapshot TEN_DOLLARS_PER_MILLION = new LlmPriceSnapshot(
-        FundingSource.INSTANCE,
-        PricingState.PRICED,
-        1L,
-        null,
-        new BigDecimal("10"),
-        BigDecimal.ZERO,
-        BigDecimal.ZERO,
-        BigDecimal.ZERO
-    );
+            FundingSource.INSTANCE,
+            PricingState.PRICED,
+            1L,
+            null,
+            new BigDecimal("10"),
+            BigDecimal.ZERO,
+            BigDecimal.ZERO,
+            BigDecimal.ZERO);
 
     @Autowired
     private ChatMessageRepository chatMessageRepository;
@@ -71,13 +70,8 @@ class MentorTurnUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegra
         accumulator = new MentorTurnUsageAccumulator(chatMessageRepository, credentials, meters);
 
         User owner = persistUser("mentor-usage-owner");
-        Workspace workspace = createWorkspace(
-            "mentor-usage-ws",
-            "Mentor Usage",
-            "mentor-usage-org",
-            AccountType.ORG,
-            owner
-        );
+        Workspace workspace =
+                createWorkspace("mentor-usage-ws", "Mentor Usage", "mentor-usage-org", AccountType.ORG, owner);
         thread = new ChatThread();
         thread.setId(UUID.randomUUID());
         thread.setUser(owner);
@@ -150,16 +144,14 @@ class MentorTurnUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegra
     void theMeterFollowsTheRow() {
         UUID sessionId = UUID.randomUUID();
         String token = credentials.mint(
-            sessionId,
-            new MentorProxyCredentialRegistry.Route(
-                "openai-responses",
-                "https://upstream.example.com/v1",
-                FundingSource.INSTANCE,
-                1L,
-                2L,
-                thread.getWorkspace().getId()
-            )
-        );
+                sessionId,
+                new MentorProxyCredentialRegistry.Route(
+                        "openai-responses",
+                        "https://upstream.example.com/v1",
+                        FundingSource.INSTANCE,
+                        1L,
+                        2L,
+                        thread.getWorkspace().getId()));
         UUID inFlight = turn(ChatMessage.Status.in_flight);
         MentorTurnMeter meter = new MentorTurnMeter(inFlight, TEN_DOLLARS_PER_MILLION);
         credentials.bindTurn(sessionId, meter);
@@ -206,19 +198,15 @@ class MentorTurnUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegra
     @DisplayName("a failed write is swallowed, but counted so the under-billing is visible")
     void failedAccumulationIsCountedNotSilent() {
         ChatMessageRepository failing = mock(ChatMessageRepository.class);
-        when(failing.accumulateLlmUsage(any(), anyLong(), anyLong(), anyLong(), anyLong())).thenThrow(
-            new IllegalStateException("connection reset")
-        );
+        when(failing.accumulateLlmUsage(any(), anyLong(), anyLong(), anyLong(), anyLong()))
+                .thenThrow(new IllegalStateException("connection reset"));
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
-        MentorTurnUsageAccumulator failingAccumulator = new MentorTurnUsageAccumulator(
-            failing,
-            new MentorProxyCredentialRegistry(),
-            registry
-        );
+        MentorTurnUsageAccumulator failingAccumulator =
+                new MentorTurnUsageAccumulator(failing, new MentorProxyCredentialRegistry(), registry);
 
         assertThatCode(() ->
-            failingAccumulator.accumulate(attempt(UUID.randomUUID()), new ProxyTokenUsage(10, 1, 0, 0))
-        ).doesNotThrowAnyException();
+                        failingAccumulator.accumulate(attempt(UUID.randomUUID()), new ProxyTokenUsage(10, 1, 0, 0)))
+                .doesNotThrowAnyException();
 
         assertThat(registry.counter("llm.proxy.usage.mentor.failure").count()).isEqualTo(1.0);
     }

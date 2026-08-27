@@ -38,11 +38,10 @@ public class PracticeReviewDetectionGate {
     private final PracticeSignalOptions signalOptions;
 
     public PracticeReviewDetectionGate(
-        PracticeReviewReadiness practiceDetectionReadiness,
-        PracticeRepository practiceRepository,
-        WorkspaceResolver workspaceResolver,
-        PracticeSignalOptions signalOptions
-    ) {
+            PracticeReviewReadiness practiceDetectionReadiness,
+            PracticeRepository practiceRepository,
+            WorkspaceResolver workspaceResolver,
+            PracticeSignalOptions signalOptions) {
         this.practiceDetectionReadiness = practiceDetectionReadiness;
         this.practiceRepository = practiceRepository;
         this.workspaceResolver = workspaceResolver;
@@ -50,10 +49,7 @@ public class PracticeReviewDetectionGate {
     }
 
     public GateDecision evaluate(
-        @NonNull PullRequest pullRequest,
-        @NonNull SignalName signal,
-        @NonNull TriggerMode triggerMode
-    ) {
+            @NonNull PullRequest pullRequest, @NonNull SignalName signal, @NonNull TriggerMode triggerMode) {
         return evaluateReviewable(pullRequest, pullRequest.isDraft(), signal, triggerMode);
     }
 
@@ -62,10 +58,7 @@ public class PracticeReviewDetectionGate {
      * issue practices can match an issue signal; an issue is never a draft.
      */
     public GateDecision evaluateIssue(
-        @NonNull Issue issue,
-        @NonNull SignalName signal,
-        @NonNull TriggerMode triggerMode
-    ) {
+            @NonNull Issue issue, @NonNull SignalName signal, @NonNull TriggerMode triggerMode) {
         return evaluateReviewable(issue, false, signal, triggerMode);
     }
 
@@ -76,38 +69,25 @@ public class PracticeReviewDetectionGate {
      * caller that resolved the subject is the one that must answer for them.
      */
     public GateDecision evaluateSignal(
-        @NonNull Workspace workspace,
-        @NonNull SignalName signal,
-        @NonNull TriggerMode triggerMode
-    ) {
+            @NonNull Workspace workspace, @NonNull SignalName signal, @NonNull TriggerMode triggerMode) {
         // Never a draft: draftness is a pull request's state, so the draft half of a binding must not
         // filter a kind that has no such state.
         return evaluateWorkspaceAndSignal(
-            workspace,
-            signal,
-            false,
-            triggerMode,
-            "workspace:" + workspace.getId(),
-            null
-        );
+                workspace, signal, false, triggerMode, "workspace:" + workspace.getId(), null);
     }
 
     private GateDecision evaluateReviewable(
-        @NonNull Issue reviewable,
-        boolean draft,
-        @NonNull SignalName signal,
-        @NonNull TriggerMode triggerMode
-    ) {
+            @NonNull Issue reviewable, boolean draft, @NonNull SignalName signal, @NonNull TriggerMode triggerMode) {
         // Workspace resolution first: per-workspace settings drive the checks below.
         String nameWithOwner =
-            reviewable.getRepository() != null ? reviewable.getRepository().getNameWithOwner() : null;
-        Workspace workspace = workspaceResolver.resolveForRepository(nameWithOwner).orElse(null);
+                reviewable.getRepository() != null ? reviewable.getRepository().getNameWithOwner() : null;
+        Workspace workspace =
+                workspaceResolver.resolveForRepository(nameWithOwner).orElse(null);
         if (workspace == null) {
             log.debug(
-                "Practice review gate: SKIP, reason=noWorkspace, prId={}, repo={}",
-                reviewable.getId(),
-                nameWithOwner
-            );
+                    "Practice review gate: SKIP, reason=noWorkspace, prId={}, repo={}",
+                    reviewable.getId(),
+                    nameWithOwner);
             return new GateDecision.Skip("no workspace");
         }
 
@@ -120,27 +100,18 @@ public class PracticeReviewDetectionGate {
             String targetBranch = reviewable instanceof PullRequest pr ? pr.getBaseRefName() : null;
             if (!scope.admits(nameWithOwner, targetBranch)) {
                 log.debug(
-                    "Practice review gate: SKIP, reason=outOfReviewScope, prId={}, repo={}, targetBranch={}",
-                    reviewable.getId(),
-                    nameWithOwner,
-                    targetBranch
-                );
+                        "Practice review gate: SKIP, reason=outOfReviewScope, prId={}, repo={}, targetBranch={}",
+                        reviewable.getId(),
+                        nameWithOwner,
+                        targetBranch);
                 scopeSkip = new GateDecision.Skip(
-                    "outside the workspace review scope",
-                    SignalStateReason.OUT_OF_REVIEW_SCOPE
-                );
+                        "outside the workspace review scope", SignalStateReason.OUT_OF_REVIEW_SCOPE);
             }
         }
 
         // Workspace- and signal-level checks, shared with evaluateSignal.
         GateDecision shared = evaluateWorkspaceAndSignal(
-            workspace,
-            signal,
-            draft,
-            triggerMode,
-            String.valueOf(reviewable.getId()),
-            scopeSkip
-        );
+                workspace, signal, draft, triggerMode, String.valueOf(reviewable.getId()), scopeSkip);
         if (shared instanceof GateDecision.Skip) {
             return shared;
         }
@@ -154,19 +125,17 @@ public class PracticeReviewDetectionGate {
      * @param subject an identifier for the logs only; the gate makes no decision from it
      */
     private GateDecision evaluateWorkspaceAndSignal(
-        Workspace workspace,
-        SignalName signal,
-        boolean draft,
-        TriggerMode triggerMode,
-        String subject,
-        GateDecision.@Nullable Skip scopeSkip
-    ) {
+            Workspace workspace,
+            SignalName signal,
+            boolean draft,
+            TriggerMode triggerMode,
+            String subject,
+            GateDecision.@Nullable Skip scopeSkip) {
         if (!Boolean.TRUE.equals(workspace.getFeatures().getPracticesEnabled())) {
             log.debug(
-                "Practice review gate: SKIP, reason=practicesDisabled, subject={}, workspaceId={}",
-                subject,
-                workspace.getId()
-            );
+                    "Practice review gate: SKIP, reason=practicesDisabled, subject={}, workspaceId={}",
+                    subject,
+                    workspace.getId());
             return new GateDecision.Skip("practices disabled for workspace");
         }
 
@@ -176,36 +145,29 @@ public class PracticeReviewDetectionGate {
             return scopeSkip;
         }
 
-        if (
-            triggerMode == TriggerMode.AUTO &&
-            !Boolean.TRUE.equals(workspace.getFeatures().getPracticeReviewAutoTriggerEnabled())
-        ) {
+        if (triggerMode == TriggerMode.AUTO
+                && !Boolean.TRUE.equals(workspace.getFeatures().getPracticeReviewAutoTriggerEnabled())) {
             log.debug(
-                "Practice review gate: SKIP, reason=autoTriggerDisabled, subject={}, workspaceId={}",
-                subject,
-                workspace.getId()
-            );
+                    "Practice review gate: SKIP, reason=autoTriggerDisabled, subject={}, workspaceId={}",
+                    subject,
+                    workspace.getId());
             return new GateDecision.Skip("auto-trigger disabled for workspace");
         }
-        if (
-            triggerMode == TriggerMode.MANUAL &&
-            !Boolean.TRUE.equals(workspace.getFeatures().getPracticeReviewManualTriggerEnabled())
-        ) {
+        if (triggerMode == TriggerMode.MANUAL
+                && !Boolean.TRUE.equals(workspace.getFeatures().getPracticeReviewManualTriggerEnabled())) {
             log.debug(
-                "Practice review gate: SKIP, reason=manualTriggerDisabled, subject={}, workspaceId={}",
-                subject,
-                workspace.getId()
-            );
+                    "Practice review gate: SKIP, reason=manualTriggerDisabled, subject={}, workspaceId={}",
+                    subject,
+                    workspace.getId());
             return new GateDecision.Skip("manual trigger disabled for workspace");
         }
 
         // Skip rather than incur LLM cost for a detection run that would submit no jobs.
         if (!practiceDetectionReadiness.hasRunnableAgent(workspace.getId())) {
             log.debug(
-                "Practice review gate: SKIP, reason=noRunnableDetectionAgent, subject={}, workspaceId={}",
-                subject,
-                workspace.getId()
-            );
+                    "Practice review gate: SKIP, reason=noRunnableDetectionAgent, subject={}, workspaceId={}",
+                    subject,
+                    workspace.getId());
             return new GateDecision.Skip("no runnable practice-review agent");
         }
 
@@ -217,27 +179,22 @@ public class PracticeReviewDetectionGate {
             // answerable apart from "nothing bound".
             if (match.hasDisabledPractice()) {
                 log.debug(
-                    "Practice review gate: SKIP, reason=allBoundPracticesOff, subject={}, signal={}, workspaceId={}",
-                    subject,
-                    signal,
-                    workspace.getId()
-                );
+                        "Practice review gate: SKIP, reason=allBoundPracticesOff, subject={}, signal={}, workspaceId={}",
+                        subject,
+                        signal,
+                        workspace.getId());
                 return new GateDecision.Skip(
-                    "every practice bound to this signal is off",
-                    SignalStateReason.PRACTICE_AUTONOMY_OFF
-                );
+                        "every practice bound to this signal is off", SignalStateReason.PRACTICE_AUTONOMY_OFF);
             }
             log.debug(
-                "Practice review gate: SKIP, reason=noMatchingPractices, subject={}, signal={}, draft={}, " +
-                    "workspaceId={}",
-                subject,
-                signal,
-                draft,
-                workspace.getId()
-            );
+                    "Practice review gate: SKIP, reason=noMatchingPractices, subject={}, signal={}, draft={}, "
+                            + "workspaceId={}",
+                    subject,
+                    signal,
+                    draft,
+                    workspace.getId());
             return new GateDecision.Skip(
-                draft ? "no practices bound to this signal on drafts" : "no matching practices"
-            );
+                    draft ? "no practices bound to this signal on drafts" : "no matching practices");
         }
         return new GateDecision.Detect(workspace, match.admitted());
     }
@@ -256,25 +213,20 @@ public class PracticeReviewDetectionGate {
      */
     private SignalMatch findMatchingPractices(Workspace workspace, SignalName signal, boolean draft) {
         boolean requestedByHand = signalOptions.isManualRequest(signal);
-        List<Practice> bound = practiceRepository
-            .findByWorkspaceId(workspace.getId())
-            .stream()
-            .filter(p ->
-                p
-                    .getBindings()
-                    .stream()
-                    .anyMatch(binding ->
-                        requestedByHand ? binding.appliesTo(signal.artifactKind()) : binding.occasionedBy(signal, draft)
-                    )
-            )
-            .toList();
+        List<Practice> bound = practiceRepository.findByWorkspaceId(workspace.getId()).stream()
+                .filter(p -> p.getBindings().stream()
+                        .anyMatch(binding -> requestedByHand
+                                ? binding.appliesTo(signal.artifactKind())
+                                : binding.occasionedBy(signal, draft)))
+                .toList();
         // Reading the autonomy column raw would ask a practice that holds no opinion for one; resolve it
         // through practice -> group -> workspace instead.
-        PracticeAutonomy workspaceDefault = WorkspaceReviewDefaults.of(workspace).defaultAutonomy();
-        List<Practice> admitted = bound
-            .stream()
-            .filter(p -> AutonomyResolver.effectiveAutonomyOf(p, workspaceDefault).admitsReview())
-            .toList();
+        PracticeAutonomy workspaceDefault =
+                WorkspaceReviewDefaults.of(workspace).defaultAutonomy();
+        List<Practice> admitted = bound.stream()
+                .filter(p -> AutonomyResolver.effectiveAutonomyOf(p, workspaceDefault)
+                        .admitsReview())
+                .toList();
         return new SignalMatch(admitted, admitted.isEmpty() && !bound.isEmpty());
     }
 }

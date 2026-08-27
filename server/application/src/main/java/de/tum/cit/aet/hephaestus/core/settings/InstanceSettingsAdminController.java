@@ -44,29 +44,26 @@ public class InstanceSettingsAdminController {
     }
 
     public record InstanceSettingsDTO(
-        @NonNull Boolean silentModeEngaged,
-        @NonNull String etag,
-        @Nullable String silentModeReason,
-        @Nullable Instant silentModeChangedAt,
-        @Nullable String silentModeChangedBy
-    ) {
+            @NonNull Boolean silentModeEngaged,
+            @NonNull String etag,
+            @Nullable String silentModeReason,
+            @Nullable Instant silentModeChangedAt,
+            @Nullable String silentModeChangedBy) {
         static InstanceSettingsDTO from(InstanceSettings settings) {
             return new InstanceSettingsDTO(
-                settings.isSilentModeEngaged(),
-                EntityTagPrecondition.format(Long.toString(settings.getVersion())),
-                settings.getSilentModeReason(),
-                settings.getSilentModeChangedAt(),
-                settings.getSilentModeChangedBy()
-            );
+                    settings.isSilentModeEngaged(),
+                    EntityTagPrecondition.format(Long.toString(settings.getVersion())),
+                    settings.getSilentModeReason(),
+                    settings.getSilentModeChangedAt(),
+                    settings.getSilentModeChangedBy());
         }
     }
 
     public record UpdateSilentModeRequestDTO(
-        // Boxed on purpose: a primitive would let Jackson default a missing field to false, silently
-        // releasing the brake on a malformed request.
-        @NonNull @NotNull Boolean engaged,
-        @Nullable @Size(max = 500) String reason
-    ) {}
+            // Boxed on purpose: a primitive would let Jackson default a missing field to false, silently
+            // releasing the brake on a malformed request.
+            @NonNull @NotNull Boolean engaged,
+            @Nullable @Size(max = 500) String reason) {}
 
     @GetMapping
     @Operation(summary = "Get instance settings", operationId = "adminGetInstanceSettings")
@@ -77,34 +74,29 @@ public class InstanceSettingsAdminController {
     @PatchMapping("/silent-mode")
     @Operation(summary = "Engage or release the instance-wide silent mode", operationId = "adminUpdateSilentMode")
     @ApiResponse(
-        responseCode = "200",
-        description = "Silent Mode updated",
-        content = @Content(schema = @Schema(implementation = InstanceSettingsDTO.class))
-    )
+            responseCode = "200",
+            description = "Silent Mode updated",
+            content = @Content(schema = @Schema(implementation = InstanceSettingsDTO.class)))
     @ApiResponse(
-        responseCode = "412",
-        description = "The supplied ETag is stale",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class))
-    )
+            responseCode = "412",
+            description = "The supplied ETag is stale",
+            content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(
-        responseCode = "428",
-        description = "If-Match is required when releasing Silent Mode",
-        content = @Content(schema = @Schema(implementation = ProblemDetail.class))
-    )
+            responseCode = "428",
+            description = "If-Match is required when releasing Silent Mode",
+            content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
     @Audited(ledger = AuditLedger.AUTH_EVENT, type = "SILENT_MODE_CHANGED")
     public ResponseEntity<InstanceSettingsDTO> updateSilentMode(
-        @Parameter(description = "Current settings ETag; required when releasing Silent Mode") @RequestHeader(
-            name = HttpHeaders.IF_MATCH,
-            required = false
-        ) @Nullable String ifMatch,
-        @Valid @RequestBody UpdateSilentModeRequestDTO body
-    ) {
+            @Parameter(description = "Current settings ETag; required when releasing Silent Mode")
+                    @RequestHeader(name = HttpHeaders.IF_MATCH, required = false)
+                    @Nullable
+                    String ifMatch,
+            @Valid @RequestBody UpdateSilentModeRequestDTO body) {
         InstanceSettings updated = instanceSettingsService.updateSilentMode(
-            body.engaged(),
-            body.reason(),
-            CurrentAccount.preferredUsernameOrNull(),
-            ifMatch == null ? null : EntityTagPrecondition.parse(ifMatch)
-        );
+                body.engaged(),
+                body.reason(),
+                CurrentAccount.preferredUsernameOrNull(),
+                ifMatch == null ? null : EntityTagPrecondition.parse(ifMatch));
         return response(updated);
     }
 

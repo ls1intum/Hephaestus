@@ -15,26 +15,20 @@ import org.springframework.data.repository.query.Param;
  */
 @WorkspaceAgnostic("Collaborators scoped through repository_id -> repository.workspace_id")
 public interface RepositoryCollaboratorRepository
-    extends JpaRepository<RepositoryCollaborator, RepositoryCollaborator.Id>
-{
+        extends JpaRepository<RepositoryCollaborator, RepositoryCollaborator.Id> {
     @Query("SELECT c FROM RepositoryCollaborator c WHERE c.repository.id = :repositoryId AND c.user.id = :userId")
     Optional<RepositoryCollaborator> findByRepositoryIdAndUserId(
-        @Param("repositoryId") Long repositoryId,
-        @Param("userId") Long userId
-    );
+            @Param("repositoryId") Long repositoryId, @Param("userId") Long userId);
 
     List<RepositoryCollaborator> findByRepository_Id(Long repositoryId);
 
-    @Query(
-        """
+    @Query("""
             SELECT DISTINCT c FROM RepositoryCollaborator c
             JOIN FETCH c.user
             WHERE c.repository.organization.login = :orgLogin
             AND c.permission IN :permissions
-        """
-    )
+        """)
     List<RepositoryCollaborator> findByOrgLoginAndPermissions(
-        @Param("orgLogin") String orgLogin,
-        @Param("permissions") List<RepositoryCollaborator.Permission> permissions
-    );
+            @Param("orgLogin") String orgLogin,
+            @Param("permissions") List<RepositoryCollaborator.Permission> permissions);
 }

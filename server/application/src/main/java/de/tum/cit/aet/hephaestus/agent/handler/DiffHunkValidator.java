@@ -118,10 +118,7 @@ class DiffHunkValidator {
      * </ul>
      */
     static List<DiffNote> validateAndCorrect(
-        List<DiffNote> notes,
-        Map<String, TreeSet<Integer>> validLines,
-        String jobId
-    ) {
+            List<DiffNote> notes, Map<String, TreeSet<Integer>> validLines, String jobId) {
         if (notes.isEmpty() || validLines.isEmpty()) return notes;
 
         List<DiffNote> corrected = new ArrayList<>(notes.size());
@@ -145,9 +142,8 @@ class DiffHunkValidator {
                 if (java.util.Objects.equals(validatedEnd, note.endLine())) {
                     corrected.add(note);
                 } else {
-                    corrected.add(
-                        new DiffNote(note.filePath(), note.startLine(), validatedEnd, note.body(), note.recurrenceKey())
-                    );
+                    corrected.add(new DiffNote(
+                            note.filePath(), note.startLine(), validatedEnd, note.body(), note.recurrenceKey()));
                 }
                 continue;
             }
@@ -162,25 +158,23 @@ class DiffHunkValidator {
             int delta = Math.abs(nearest - note.startLine());
             if (delta > MAX_SNAP_DELTA) {
                 log.info(
-                    "Dropped diff note: file={}, originalLine={}, nearestValid={} (delta={} > {}), jobId={}",
-                    note.filePath(),
-                    note.startLine(),
-                    nearest,
-                    delta,
-                    MAX_SNAP_DELTA,
-                    jobId
-                );
+                        "Dropped diff note: file={}, originalLine={}, nearestValid={} (delta={} > {}), jobId={}",
+                        note.filePath(),
+                        note.startLine(),
+                        nearest,
+                        delta,
+                        MAX_SNAP_DELTA,
+                        jobId);
                 dropped++;
                 continue;
             }
 
             log.info(
-                "Corrected diff note position: file={}, original={}, corrected={}, jobId={}",
-                note.filePath(),
-                note.startLine(),
-                nearest,
-                jobId
-            );
+                    "Corrected diff note position: file={}, original={}, corrected={}, jobId={}",
+                    note.filePath(),
+                    note.startLine(),
+                    nearest,
+                    jobId);
             corrections++;
 
             // Create corrected note with new position, preserving the original span width
@@ -252,10 +246,7 @@ class DiffHunkValidator {
      * otherwise collapses to single-line ({@code startLine}). A null {@code endLine} stays null.
      */
     private static @Nullable Integer containedEnd(
-        TreeSet<Integer> fileLines,
-        int startLine,
-        @Nullable Integer endLine
-    ) {
+            TreeSet<Integer> fileLines, int startLine, @Nullable Integer endLine) {
         if (endLine == null || endLine <= startLine) {
             return endLine;
         }

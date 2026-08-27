@@ -31,12 +31,10 @@ public class SlackChannelControllerAdvice {
     ProblemDetail handleConsentViolation(SlackChannelConsentViolationException exception) {
         ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.CONFLICT);
         problem.setTitle("Slack channel consent violation");
-        problem.setDetail(
-            Optional.ofNullable(exception.getMessage())
+        problem.setDetail(Optional.ofNullable(exception.getMessage())
                 .map(LoggingUtils::sanitizeForLog)
                 .filter(s -> !s.isBlank())
-                .orElse("The requested consent transition is not allowed from the channel's current state.")
-        );
+                .orElse("The requested consent transition is not allowed from the channel's current state."));
         return problem;
     }
 

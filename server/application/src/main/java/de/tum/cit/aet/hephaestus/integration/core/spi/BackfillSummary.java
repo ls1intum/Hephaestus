@@ -12,4 +12,5 @@ import org.jspecify.annotations.Nullable;
  *                          integration's backfill vocabulary doesn't have to be unified in v1
  * @param percent           0-100 estimate, if the integration can compute one
  */
-public record BackfillSummary(@NonNull String state, @Nullable Integer percent) {}
+public record BackfillSummary(
+        @NonNull String state, @Nullable Integer percent) {}

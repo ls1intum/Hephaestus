@@ -5,9 +5,8 @@ import org.jspecify.annotations.Nullable;
 
 /** Status of a requested data export; timestamps are null until the matching transition occurs. */
 public record ExportStatusDTO(
-    Long id,
-    String status,
-    Instant requestedAt,
-    @Nullable Instant completedAt,
-    @Nullable Instant expiresAt
-) {}
+        Long id,
+        String status,
+        Instant requestedAt,
+        @Nullable Instant completedAt,
+        @Nullable Instant expiresAt) {}

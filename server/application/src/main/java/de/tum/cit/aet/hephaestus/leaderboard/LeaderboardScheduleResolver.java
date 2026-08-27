@@ -35,7 +35,9 @@ public class LeaderboardScheduleResolver {
     /** Effective time-of-day ("HH:mm" / "H"), workspace override or global default. */
     public String time(Workspace workspace) {
         String time = workspace.getLeaderboardScheduleTime();
-        return time != null && !time.isBlank() ? time : leaderboardProperties.schedule().time();
+        return time != null && !time.isBlank()
+                ? time
+                : leaderboardProperties.schedule().time();
     }
 
     /**
@@ -57,11 +59,11 @@ public class LeaderboardScheduleResolver {
     public CycleWindow previousCycleWindow(Workspace workspace) {
         String[] parts = time(workspace).split(":");
         ZonedDateTime before = ZonedDateTime.now(ZoneId.systemDefault())
-            .with(TemporalAdjusters.previousOrSame(DayOfWeek.of(day(workspace))))
-            .withHour(Integer.parseInt(parts[0]))
-            .withMinute(parts.length > 1 ? Integer.parseInt(parts[1]) : 0)
-            .withSecond(0)
-            .withNano(0);
+                .with(TemporalAdjusters.previousOrSame(DayOfWeek.of(day(workspace))))
+                .withHour(Integer.parseInt(parts[0]))
+                .withMinute(parts.length > 1 ? Integer.parseInt(parts[1]) : 0)
+                .withSecond(0)
+                .withNano(0);
         return new CycleWindow(before.minusWeeks(1).toInstant(), before.toInstant());
     }
 

@@ -13,8 +13,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 @WorkspaceAgnostic("PracticeRevision scoped through practice.workspace relationship")
 public interface PracticeRevisionRepository
-    extends org.springframework.data.repository.Repository<PracticeRevision, Long>
-{
+        extends org.springframework.data.repository.Repository<PracticeRevision, Long> {
     PracticeRevision save(PracticeRevision revision);
 
     Optional<PracticeRevision> findById(Long id);
@@ -23,34 +22,29 @@ public interface PracticeRevisionRepository
 
     Optional<PracticeRevision> findFirstByPracticeIdOrderByRevisionNumberDesc(Long practiceId);
 
-    @Query(
-        """
+    @Query("""
         SELECT DISTINCT r.practice.workspace.id FROM PracticeRevision r
         WHERE r.slug IS NOT NULL
           AND r.reviewRuleFingerprint IS NULL
           AND r.automatedReviewPolicy IS NOT NULL
         ORDER BY r.practice.workspace.id
-        """
-    )
+        """)
     List<Long> findWorkspaceIdsWithDefinitionRevisionsMissingFingerprint();
 
-    @Query(
-        """
+    @Query("""
         SELECT r FROM PracticeRevision r
         WHERE r.practice.workspace.id = :workspaceId
           AND r.slug IS NOT NULL
           AND r.reviewRuleFingerprint IS NULL
           AND r.automatedReviewPolicy IS NOT NULL
         ORDER BY r.id
-        """
-    )
+        """)
     List<PracticeRevision> findDefinitionRevisionsMissingFingerprint(@Param("workspaceId") Long workspaceId);
 
     @Modifying
     @Query(
-        value = "UPDATE practice_revision SET review_rule_fingerprint = :fingerprint WHERE id = :revisionId",
-        nativeQuery = true
-    )
+            value = "UPDATE practice_revision SET review_rule_fingerprint = :fingerprint WHERE id = :revisionId",
+            nativeQuery = true)
     void setReviewRuleFingerprint(@Param("revisionId") long revisionId, @Param("fingerprint") String fingerprint);
 
     /**
@@ -58,7 +52,5 @@ public interface PracticeRevisionRepository
      * recorded provenance.
      */
     Optional<PracticeRevision> findFirstByPracticeIdAndCreatedAtLessThanEqualOrderByRevisionNumberDesc(
-        Long practiceId,
-        Instant asOf
-    );
+            Long practiceId, Instant asOf);
 }

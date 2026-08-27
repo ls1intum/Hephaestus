@@ -31,11 +31,10 @@ public class PracticesWorkspacePurgeAdapter implements WorkspacePurgeContributor
     private final PracticeGroupRepository practiceGroupRepository;
 
     public PracticesWorkspacePurgeAdapter(
-        FeedbackRepository feedbackRepository,
-        ObservationRepository observationRepository,
-        PracticeRepository practiceRepository,
-        PracticeGroupRepository practiceGroupRepository
-    ) {
+            FeedbackRepository feedbackRepository,
+            ObservationRepository observationRepository,
+            PracticeRepository practiceRepository,
+            PracticeGroupRepository practiceGroupRepository) {
         this.feedbackRepository = feedbackRepository;
         this.observationRepository = observationRepository;
         this.practiceRepository = practiceRepository;

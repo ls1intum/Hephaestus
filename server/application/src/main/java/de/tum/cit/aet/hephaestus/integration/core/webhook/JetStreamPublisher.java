@@ -42,8 +42,10 @@ public class JetStreamPublisher {
         this.jetStream = jetStream;
         this.retry = retry;
         this.properties = properties;
-        this.successCounter = Counter.builder("webhook.publish").tag("outcome", "success").register(meterRegistry);
-        this.failureCounter = Counter.builder("webhook.publish").tag("outcome", "failure").register(meterRegistry);
+        this.successCounter =
+                Counter.builder("webhook.publish").tag("outcome", "success").register(meterRegistry);
+        this.failureCounter =
+                Counter.builder("webhook.publish").tag("outcome", "failure").register(meterRegistry);
         this.retryCounter = Counter.builder("webhook.publish.retry").register(meterRegistry);
         retry.getEventPublisher().onRetry(event -> retryCounter.increment());
     }
@@ -51,14 +53,15 @@ public class JetStreamPublisher {
     public void publish(PublishRequest request) {
         inFlight.register();
         try {
-            Retry.decorateCallable(retry, () -> publishOnce(request, properties.publish().timeout())).call();
+            Retry.decorateCallable(
+                            retry,
+                            () -> publishOnce(request, properties.publish().timeout()))
+                    .call();
             successCounter.increment();
         } catch (Exception e) {
             failureCounter.increment();
             throw new PublishFailedException(
-                "Failed to publish webhook to NATS after retries: subject=" + request.subject(),
-                e
-            );
+                    "Failed to publish webhook to NATS after retries: subject=" + request.subject(), e);
         } finally {
             inFlight.arriveAndDeregister();
         }
@@ -78,18 +81,18 @@ public class JetStreamPublisher {
     }
 
     private PublishAck publishOnce(PublishRequest request, Duration timeout)
-        throws IOException, JetStreamApiException, InterruptedException, ExecutionException, TimeoutException {
+            throws IOException, JetStreamApiException, InterruptedException, ExecutionException, TimeoutException {
         Headers headers = new Headers();
         for (Map.Entry<String, String> entry : request.headers().entrySet()) {
             headers.add(entry.getKey(), entry.getValue());
         }
         PublishOptions options = PublishOptions.builder()
-            .messageId(request.dedupId())
-            .expectedStream(streamFor(request.subject()))
-            .build();
+                .messageId(request.dedupId())
+                .expectedStream(streamFor(request.subject()))
+                .build();
         return jetStream
-            .publishAsync(request.subject(), headers, request.body(), options)
-            .get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+                .publishAsync(request.subject(), headers, request.body(), options)
+                .get(timeout.toMillis(), TimeUnit.MILLISECONDS);
     }
 
     /**

@@ -6,21 +6,23 @@ import org.jspecify.annotations.Nullable;
 
 @Schema(description = "Available workspace creation providers and their configuration")
 public record WorkspaceProvidersDTO(
-    @Schema(description = "GitHub workspace provider config, null if not available") @Nullable GitHubProviderDTO github,
-    @Schema(description = "GitLab workspace provider config, null if not available") @Nullable GitLabProviderDTO gitlab,
-    @Schema(description = "Who may create workspaces — ADMIN_ONLY restricts creation to instance admins")
-    WorkspaceProperties.CreationPolicy creationPolicy
-) {
+        @Schema(description = "GitHub workspace provider config, null if not available") @Nullable
+        GitHubProviderDTO github,
+
+        @Schema(description = "GitLab workspace provider config, null if not available") @Nullable
+        GitLabProviderDTO gitlab,
+
+        @Schema(description = "Who may create workspaces — ADMIN_ONLY restricts creation to instance admins")
+        WorkspaceProperties.CreationPolicy creationPolicy) {
     @Schema(description = "GitHub provider configuration")
     public record GitHubProviderDTO(
-        @Schema(
-            description = "GitHub App installation URL",
-            example = "https://github.com/apps/hephaestus/installations/new"
-        ) String appInstallationUrl
-    ) {}
+            @Schema(
+                    description = "GitHub App installation URL",
+                    example = "https://github.com/apps/hephaestus/installations/new")
+            String appInstallationUrl) {}
 
     @Schema(description = "GitLab provider configuration")
     public record GitLabProviderDTO(
-        @Schema(description = "Default GitLab server URL", example = "https://gitlab.lrz.de") String defaultServerUrl
-    ) {}
+            @Schema(description = "Default GitLab server URL", example = "https://gitlab.lrz.de")
+            String defaultServerUrl) {}
 }

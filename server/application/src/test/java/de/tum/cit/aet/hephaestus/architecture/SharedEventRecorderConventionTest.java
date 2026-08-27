@@ -28,9 +28,8 @@ class SharedEventRecorderConventionTest {
 
     /** {@code @EventListener} on a method whose parameter is an SCM / GitHub-project domain event. */
     private static final Pattern PER_CLASS_LISTENER = Pattern.compile(
-        "@EventListener\\b[\\s\\S]{0,200}?\\((?:final\\s+)?(?:ScmDomainEvent|GitHubProjectEvent)\\.",
-        Pattern.DOTALL
-    );
+            "@EventListener\\b[\\s\\S]{0,200}?\\((?:final\\s+)?(?:ScmDomainEvent|GitHubProjectEvent)\\.",
+            Pattern.DOTALL);
 
     @Test
     void scmDomainEventsAreRecordedViaTheSharedRecorderNotPerClassListeners() {
@@ -38,34 +37,31 @@ class SharedEventRecorderConventionTest {
         Set<String> violations = new TreeSet<>();
 
         try (Stream<Path> sources = Files.walk(testRoot)) {
-            sources
-                .filter(Files::isRegularFile)
-                .filter(p -> p.toString().endsWith(".java"))
-                .filter(p -> !p.getFileName().toString().equals(ALLOWED))
-                .forEach(p -> {
-                    String content;
-                    try {
-                        content = Files.readString(p);
-                    } catch (IOException e) {
-                        throw new UncheckedIOException(e);
-                    }
-                    if (PER_CLASS_LISTENER.matcher(content).find()) {
-                        violations.add("  " + p.getFileName());
-                    }
-                });
+            sources.filter(Files::isRegularFile)
+                    .filter(p -> p.toString().endsWith(".java"))
+                    .filter(p -> !p.getFileName().toString().equals(ALLOWED))
+                    .forEach(p -> {
+                        String content;
+                        try {
+                            content = Files.readString(p);
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+                        if (PER_CLASS_LISTENER.matcher(content).find()) {
+                            violations.add("  " + p.getFileName());
+                        }
+                    });
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
 
         assertThat(violations)
-            .as(
-                "These tests declare a per-class @EventListener for SCM / GitHub-project domain events, " +
-                    "which forks a fresh Spring context (a Testcontainers boot) per class. Record via the " +
-                    "shared RecordingScmEventListener (imported by BaseIntegrationTest) instead — " +
-                    "recorder.ofType(SomeEvent.class):\n" +
-                    String.join("\n", violations)
-            )
-            .isEmpty();
+                .as("These tests declare a per-class @EventListener for SCM / GitHub-project domain events, "
+                        + "which forks a fresh Spring context (a Testcontainers boot) per class. Record via the "
+                        + "shared RecordingScmEventListener (imported by BaseIntegrationTest) instead — "
+                        + "recorder.ofType(SomeEvent.class):\n"
+                        + String.join("\n", violations))
+                .isEmpty();
     }
 
     private static Path locateTestRoot() {

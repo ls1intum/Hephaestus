@@ -19,12 +19,12 @@ public class PracticeRevisionService {
     @Transactional(propagation = Propagation.MANDATORY)
     public PracticeRevision append(Practice practice) {
         practiceRepository
-            .findByIdForUpdate(practice.getId())
-            .orElseThrow(() -> new EntityNotFoundException("Practice", String.valueOf(practice.getId())));
+                .findByIdForUpdate(practice.getId())
+                .orElseThrow(() -> new EntityNotFoundException("Practice", String.valueOf(practice.getId())));
         int revisionNumber = practiceRevisionRepository
-            .findFirstByPracticeIdOrderByRevisionNumberDesc(practice.getId())
-            .map(revision -> revision.getRevisionNumber() + 1)
-            .orElse(1);
+                .findFirstByPracticeIdOrderByRevisionNumberDesc(practice.getId())
+                .map(revision -> revision.getRevisionNumber() + 1)
+                .orElse(1);
         PracticeRevision saved = practiceRevisionRepository.save(new PracticeRevision(practice, revisionNumber));
         practice.setCurrentRevision(saved);
         practiceRepository.save(practice);
@@ -33,6 +33,8 @@ public class PracticeRevisionService {
 
     @Transactional(readOnly = true)
     public @Nullable Integer currentRevisionNumber(Practice practice) {
-        return practice.getCurrentRevision() == null ? null : practice.getCurrentRevision().getRevisionNumber();
+        return practice.getCurrentRevision() == null
+                ? null
+                : practice.getCurrentRevision().getRevisionNumber();
     }
 }

@@ -20,12 +20,11 @@ public class PracticeReviewHealthIndicator implements HealthIndicator {
     private final boolean workerRole;
 
     public PracticeReviewHealthIndicator(
-        AgentProperties agentProperties,
-        GitRepositoryProperties gitProperties,
-        ArtifactSourceCatalogRegistry sourceCatalog,
-        Clock clock,
-        @Value("${hephaestus.runtime.worker.enabled:true}") boolean workerRole
-    ) {
+            AgentProperties agentProperties,
+            GitRepositoryProperties gitProperties,
+            ArtifactSourceCatalogRegistry sourceCatalog,
+            Clock clock,
+            @Value("${hephaestus.runtime.worker.enabled:true}") boolean workerRole) {
         this.agentProperties = agentProperties;
         this.gitProperties = gitProperties;
         this.sourceCatalog = sourceCatalog;
@@ -40,20 +39,18 @@ public class PracticeReviewHealthIndicator implements HealthIndicator {
         }
         if (!gitProperties.enabled()) {
             return Health.outOfService()
-                .withDetail("reviewsEnabled", true)
-                .withDetail("reason", "GIT_CHECKOUT_DISABLED")
-                .build();
+                    .withDetail("reviewsEnabled", true)
+                    .withDetail("reason", "GIT_CHECKOUT_DISABLED")
+                    .build();
         }
-        if (
-            sourceCatalog
+        if (sourceCatalog
                 .earliestUseDecisionExpiry(SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)
                 .filter(expiry -> !expiry.isAfter(clock.instant()))
-                .isPresent()
-        ) {
+                .isPresent()) {
             return Health.outOfService()
-                .withDetail("reviewsEnabled", true)
-                .withDetail("reason", "SOURCE_AUTHORIZATION_EXPIRED")
-                .build();
+                    .withDetail("reviewsEnabled", true)
+                    .withDetail("reason", "SOURCE_AUTHORIZATION_EXPIRED")
+                    .build();
         }
         return Health.up().withDetail("reviewsEnabled", true).build();
     }

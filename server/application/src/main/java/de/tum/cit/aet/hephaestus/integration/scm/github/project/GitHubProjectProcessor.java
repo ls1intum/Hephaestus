@@ -34,13 +34,12 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
     private final ApplicationEventPublisher eventPublisher;
 
     public GitHubProjectProcessor(
-        ProjectRepository projectRepository,
-        UserRepository userRepository,
-        LabelRepository labelRepository,
-        MilestoneRepository milestoneRepository,
-        GitHubUserProcessor gitHubUserProcessor,
-        ApplicationEventPublisher eventPublisher
-    ) {
+            ProjectRepository projectRepository,
+            UserRepository userRepository,
+            LabelRepository labelRepository,
+            MilestoneRepository milestoneRepository,
+            GitHubUserProcessor gitHubUserProcessor,
+            ApplicationEventPublisher eventPublisher) {
         super(userRepository, labelRepository, milestoneRepository, gitHubUserProcessor);
         this.projectRepository = projectRepository;
         this.eventPublisher = eventPublisher;
@@ -57,11 +56,7 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public @Nullable Project process(
-        GitHubProjectDTO dto,
-        Project.OwnerType ownerType,
-        Long ownerId,
-        ProcessingContext context
-    ) {
+            GitHubProjectDTO dto, Project.OwnerType ownerType, Long ownerId, ProcessingContext context) {
         return processInternal(dto, ownerType, ownerId, context, null);
     }
 
@@ -77,48 +72,42 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public @Nullable Project process(
-        GitHubProjectDTO dto,
-        Project.OwnerType ownerType,
-        Long ownerId,
-        ProcessingContext context,
-        @Nullable Long actorId
-    ) {
+            GitHubProjectDTO dto,
+            Project.OwnerType ownerType,
+            Long ownerId,
+            ProcessingContext context,
+            @Nullable Long actorId) {
         return processInternal(dto, ownerType, ownerId, context, actorId);
     }
 
     private @Nullable Project processInternal(
-        GitHubProjectDTO dto,
-        Project.OwnerType ownerType,
-        Long ownerId,
-        ProcessingContext context,
-        @Nullable Long actorId
-    ) {
+            GitHubProjectDTO dto,
+            Project.OwnerType ownerType,
+            Long ownerId,
+            ProcessingContext context,
+            @Nullable Long actorId) {
         UpsertResult result = upsertProject(dto, ownerType, ownerId, context);
         if (result == null) {
             return null;
         }
 
         // Publish domain events with actor information
-        GitHubProjectEventPayload.ProjectData projectData = GitHubProjectEventPayload.ProjectData.from(
-            result.project(),
-            actorId
-        );
+        GitHubProjectEventPayload.ProjectData projectData =
+                GitHubProjectEventPayload.ProjectData.from(result.project(), actorId);
         EventContext eventContext = EventContext.from(context);
 
         if (result.isNew()) {
             eventPublisher.publishEvent(new GitHubProjectEvent.ProjectCreated(projectData, eventContext));
             log.debug(
-                "Created project: projectId={}, projectNumber={}",
-                result.project().getId(),
-                result.project().getNumber()
-            );
+                    "Created project: projectId={}, projectNumber={}",
+                    result.project().getId(),
+                    result.project().getNumber());
         } else {
             eventPublisher.publishEvent(new GitHubProjectEvent.ProjectUpdated(projectData, Set.of(), eventContext));
             log.debug(
-                "Updated project: projectId={}, projectNumber={}",
-                result.project().getId(),
-                result.project().getNumber()
-            );
+                    "Updated project: projectId={}, projectNumber={}",
+                    result.project().getId(),
+                    result.project().getNumber());
         }
 
         return result.project();
@@ -140,11 +129,7 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
      * @return UpsertResult containing the project and whether it was new, or null if processing was skipped
      */
     private @Nullable UpsertResult upsertProject(
-        GitHubProjectDTO dto,
-        Project.OwnerType ownerType,
-        Long ownerId,
-        ProcessingContext context
-    ) {
+            GitHubProjectDTO dto, Project.OwnerType ownerType, Long ownerId, ProcessingContext context) {
         if (dto == null) {
             log.warn("Skipped project processing: reason=nullDto, ownerId={}", ownerId);
             return null;
@@ -164,39 +149,33 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
 
         // Perform atomic upsert
         projectRepository.upsertCore(
-            dbId,
-            providerId,
-            dto.nodeId(),
-            ownerType.name(),
-            ownerId,
-            dto.number(),
-            Objects.requireNonNullElse(sanitize(dto.title()), ""),
-            sanitize(dto.shortDescription()),
-            sanitize(dto.readme()),
-            dto.template(),
-            dto.url(),
-            dto.isClosed(),
-            dto.closedAt(),
-            dto.isPublic(),
-            creator != null ? creator.getId() : null,
-            Instant.now(),
-            dto.createdAt(),
-            dto.updatedAt()
-        );
+                dbId,
+                providerId,
+                dto.nodeId(),
+                ownerType.name(),
+                ownerId,
+                dto.number(),
+                Objects.requireNonNullElse(sanitize(dto.title()), ""),
+                sanitize(dto.shortDescription()),
+                sanitize(dto.readme()),
+                dto.template(),
+                dto.url(),
+                dto.isClosed(),
+                dto.closedAt(),
+                dto.isPublic(),
+                creator != null ? creator.getId() : null,
+                Instant.now(),
+                dto.createdAt(),
+                dto.updatedAt());
 
         // Fetch the entity to return a managed instance
         Project project = projectRepository
-            .findByOwnerTypeAndOwnerIdAndNumber(ownerType, ownerId, dto.number())
-            .orElseThrow(() ->
-                new IllegalStateException(
-                    "Project not found after upsert: ownerType=" +
-                        ownerType +
-                        ", ownerId=" +
-                        ownerId +
-                        ", number=" +
-                        dto.number()
-                )
-            );
+                .findByOwnerTypeAndOwnerIdAndNumber(ownerType, ownerId, dto.number())
+                .orElseThrow(() -> new IllegalStateException("Project not found after upsert: ownerType=" + ownerType
+                        + ", ownerId="
+                        + ownerId
+                        + ", number="
+                        + dto.number()));
 
         return new UpsertResult(project, isNew);
     }
@@ -212,11 +191,7 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public @Nullable Project processClosed(
-        GitHubProjectDTO dto,
-        Project.OwnerType ownerType,
-        Long ownerId,
-        ProcessingContext context
-    ) {
+            GitHubProjectDTO dto, Project.OwnerType ownerType, Long ownerId, ProcessingContext context) {
         return processClosedInternal(dto, ownerType, ownerId, context, null);
     }
 
@@ -232,32 +207,28 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public @Nullable Project processClosed(
-        GitHubProjectDTO dto,
-        Project.OwnerType ownerType,
-        Long ownerId,
-        ProcessingContext context,
-        @Nullable Long actorId
-    ) {
+            GitHubProjectDTO dto,
+            Project.OwnerType ownerType,
+            Long ownerId,
+            ProcessingContext context,
+            @Nullable Long actorId) {
         return processClosedInternal(dto, ownerType, ownerId, context, actorId);
     }
 
     private @Nullable Project processClosedInternal(
-        GitHubProjectDTO dto,
-        Project.OwnerType ownerType,
-        Long ownerId,
-        ProcessingContext context,
-        @Nullable Long actorId
-    ) {
+            GitHubProjectDTO dto,
+            Project.OwnerType ownerType,
+            Long ownerId,
+            ProcessingContext context,
+            @Nullable Long actorId) {
         UpsertResult result = upsertProject(dto, ownerType, ownerId, context);
         if (result == null) {
             return null;
         }
 
         Project project = result.project();
-        GitHubProjectEventPayload.ProjectData projectData = GitHubProjectEventPayload.ProjectData.from(
-            project,
-            actorId
-        );
+        GitHubProjectEventPayload.ProjectData projectData =
+                GitHubProjectEventPayload.ProjectData.from(project, actorId);
         eventPublisher.publishEvent(new GitHubProjectEvent.ProjectClosed(projectData, EventContext.from(context)));
         log.info("Project closed: projectId={}, projectNumber={}", project.getId(), project.getNumber());
         return project;
@@ -274,11 +245,7 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public @Nullable Project processReopened(
-        GitHubProjectDTO dto,
-        Project.OwnerType ownerType,
-        Long ownerId,
-        ProcessingContext context
-    ) {
+            GitHubProjectDTO dto, Project.OwnerType ownerType, Long ownerId, ProcessingContext context) {
         return processReopenedInternal(dto, ownerType, ownerId, context, null);
     }
 
@@ -294,32 +261,28 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public @Nullable Project processReopened(
-        GitHubProjectDTO dto,
-        Project.OwnerType ownerType,
-        Long ownerId,
-        ProcessingContext context,
-        @Nullable Long actorId
-    ) {
+            GitHubProjectDTO dto,
+            Project.OwnerType ownerType,
+            Long ownerId,
+            ProcessingContext context,
+            @Nullable Long actorId) {
         return processReopenedInternal(dto, ownerType, ownerId, context, actorId);
     }
 
     private @Nullable Project processReopenedInternal(
-        GitHubProjectDTO dto,
-        Project.OwnerType ownerType,
-        Long ownerId,
-        ProcessingContext context,
-        @Nullable Long actorId
-    ) {
+            GitHubProjectDTO dto,
+            Project.OwnerType ownerType,
+            Long ownerId,
+            ProcessingContext context,
+            @Nullable Long actorId) {
         UpsertResult result = upsertProject(dto, ownerType, ownerId, context);
         if (result == null) {
             return null;
         }
 
         Project project = result.project();
-        GitHubProjectEventPayload.ProjectData projectData = GitHubProjectEventPayload.ProjectData.from(
-            project,
-            actorId
-        );
+        GitHubProjectEventPayload.ProjectData projectData =
+                GitHubProjectEventPayload.ProjectData.from(project, actorId);
         eventPublisher.publishEvent(new GitHubProjectEvent.ProjectReopened(projectData, EventContext.from(context)));
         log.info("Project reopened: projectId={}, projectNumber={}", project.getId(), project.getNumber());
         return project;
@@ -337,15 +300,12 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
             return;
         }
 
-        projectRepository
-            .findById(projectId)
-            .ifPresent(project -> {
-                String title = project.getTitle();
-                projectRepository.delete(project);
-                eventPublisher.publishEvent(
-                    new GitHubProjectEvent.ProjectDeleted(projectId, title, EventContext.from(context))
-                );
-                log.info("Deleted project: projectId={}, projectNumber={}", projectId, project.getNumber());
-            });
+        projectRepository.findById(projectId).ifPresent(project -> {
+            String title = project.getTitle();
+            projectRepository.delete(project);
+            eventPublisher.publishEvent(
+                    new GitHubProjectEvent.ProjectDeleted(projectId, title, EventContext.from(context)));
+            log.info("Deleted project: projectId={}, projectNumber={}", projectId, project.getNumber());
+        });
     }
 }

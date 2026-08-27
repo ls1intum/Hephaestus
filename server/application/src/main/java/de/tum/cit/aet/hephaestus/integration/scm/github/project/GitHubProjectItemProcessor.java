@@ -38,14 +38,13 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
     private final ApplicationEventPublisher eventPublisher;
 
     public GitHubProjectItemProcessor(
-        ProjectItemRepository projectItemRepository,
-        IssueRepository issueRepository,
-        UserRepository userRepository,
-        LabelRepository labelRepository,
-        MilestoneRepository milestoneRepository,
-        GitHubUserProcessor gitHubUserProcessor,
-        ApplicationEventPublisher eventPublisher
-    ) {
+            ProjectItemRepository projectItemRepository,
+            IssueRepository issueRepository,
+            UserRepository userRepository,
+            LabelRepository labelRepository,
+            MilestoneRepository milestoneRepository,
+            GitHubUserProcessor gitHubUserProcessor,
+            ApplicationEventPublisher eventPublisher) {
         super(userRepository, labelRepository, milestoneRepository, gitHubUserProcessor);
         this.projectItemRepository = projectItemRepository;
         this.issueRepository = issueRepository;
@@ -62,10 +61,7 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public @Nullable ProjectItem process(
-        @Nullable GitHubProjectItemDTO dto,
-        Project project,
-        ProcessingContext context
-    ) {
+            @Nullable GitHubProjectItemDTO dto, Project project, ProcessingContext context) {
         return processInternal(dto, project, context, null);
     }
 
@@ -80,33 +76,23 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public @Nullable ProjectItem process(
-        @Nullable GitHubProjectItemDTO dto,
-        Project project,
-        ProcessingContext context,
-        @Nullable Long actorId
-    ) {
+            @Nullable GitHubProjectItemDTO dto, Project project, ProcessingContext context, @Nullable Long actorId) {
         return processInternal(dto, project, context, actorId);
     }
 
     private @Nullable ProjectItem processInternal(
-        @Nullable GitHubProjectItemDTO dto,
-        Project project,
-        ProcessingContext context,
-        @Nullable Long actorId
-    ) {
+            @Nullable GitHubProjectItemDTO dto, Project project, ProcessingContext context, @Nullable Long actorId) {
         if (dto == null) {
             log.warn(
-                "Skipped project item processing: reason=nullDto, projectId={}",
-                project != null ? project.getId() : null
-            );
+                    "Skipped project item processing: reason=nullDto, projectId={}",
+                    project != null ? project.getId() : null);
             return null;
         }
 
         if (dto.nodeId() == null || dto.nodeId().isBlank()) {
             log.warn(
-                "Skipped project item processing: reason=missingNodeId, projectId={}",
-                project != null ? project.getId() : null
-            );
+                    "Skipped project item processing: reason=missingNodeId, projectId={}",
+                    project != null ? project.getId() : null);
             return null;
         }
 
@@ -140,46 +126,38 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
 
         // Perform atomic upsert
         projectItemRepository.upsertCore(
-            dbId,
-            Objects.requireNonNull(context.providerId(), "Project item processing requires a provider"),
-            dto.nodeId(),
-            project.getId(),
-            contentType.name(),
-            issueId,
-            contentDatabaseId,
-            sanitize(dto.draftTitle()),
-            sanitize(dto.draftBody()),
-            dto.archived(),
-            creatorId,
-            dto.createdAt(),
-            dto.updatedAt()
-        );
+                dbId,
+                Objects.requireNonNull(context.providerId(), "Project item processing requires a provider"),
+                dto.nodeId(),
+                project.getId(),
+                contentType.name(),
+                issueId,
+                contentDatabaseId,
+                sanitize(dto.draftTitle()),
+                sanitize(dto.draftBody()),
+                dto.archived(),
+                creatorId,
+                dto.createdAt(),
+                dto.updatedAt());
 
         // Fetch the entity to return a managed instance
         ProjectItem item = projectItemRepository
-            .findByProjectIdAndNodeId(project.getId(), dto.nodeId())
-            .orElseThrow(() ->
-                new IllegalStateException(
-                    "ProjectItem not found after upsert: projectId=" + project.getId() + ", nodeId=" + dto.nodeId()
-                )
-            );
+                .findByProjectIdAndNodeId(project.getId(), dto.nodeId())
+                .orElseThrow(() -> new IllegalStateException("ProjectItem not found after upsert: projectId="
+                        + project.getId() + ", nodeId=" + dto.nodeId()));
 
         // Publish domain events with actor information
-        GitHubProjectEventPayload.ProjectItemData itemData = GitHubProjectEventPayload.ProjectItemData.from(
-            item,
-            actorId
-        );
+        GitHubProjectEventPayload.ProjectItemData itemData =
+                GitHubProjectEventPayload.ProjectItemData.from(item, actorId);
         EventContext eventContext = EventContext.from(context);
 
         if (isNew) {
             eventPublisher.publishEvent(
-                new GitHubProjectEvent.ProjectItemCreated(itemData, project.getId(), eventContext)
-            );
+                    new GitHubProjectEvent.ProjectItemCreated(itemData, project.getId(), eventContext));
             log.debug("Created project item: itemId={}, nodeId={}", item.getId(), item.getNodeId());
         } else {
             eventPublisher.publishEvent(
-                new GitHubProjectEvent.ProjectItemUpdated(itemData, project.getId(), Set.of(), eventContext)
-            );
+                    new GitHubProjectEvent.ProjectItemUpdated(itemData, project.getId(), Set.of(), eventContext));
             log.debug("Updated project item: itemId={}, nodeId={}", item.getId(), item.getNodeId());
         }
 
@@ -196,10 +174,7 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public @Nullable ProjectItem processArchived(
-        @Nullable GitHubProjectItemDTO dto,
-        Project project,
-        ProcessingContext context
-    ) {
+            @Nullable GitHubProjectItemDTO dto, Project project, ProcessingContext context) {
         return processArchivedInternal(dto, project, context, null);
     }
 
@@ -214,20 +189,12 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public @Nullable ProjectItem processArchived(
-        GitHubProjectItemDTO dto,
-        Project project,
-        ProcessingContext context,
-        @Nullable Long actorId
-    ) {
+            GitHubProjectItemDTO dto, Project project, ProcessingContext context, @Nullable Long actorId) {
         return processArchivedInternal(dto, project, context, actorId);
     }
 
     private @Nullable ProjectItem processArchivedInternal(
-        @Nullable GitHubProjectItemDTO dto,
-        Project project,
-        ProcessingContext context,
-        @Nullable Long actorId
-    ) {
+            @Nullable GitHubProjectItemDTO dto, Project project, ProcessingContext context, @Nullable Long actorId) {
         if (dto == null) {
             return null;
         }
@@ -235,13 +202,10 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
         // so the primitive defaults to false during deserialization. Force it to true.
         ProjectItem item = processInternal(dto.withArchived(true), project, context, actorId);
         if (item != null) {
-            GitHubProjectEventPayload.ProjectItemData itemData = GitHubProjectEventPayload.ProjectItemData.from(
-                item,
-                actorId
-            );
+            GitHubProjectEventPayload.ProjectItemData itemData =
+                    GitHubProjectEventPayload.ProjectItemData.from(item, actorId);
             eventPublisher.publishEvent(
-                new GitHubProjectEvent.ProjectItemArchived(itemData, project.getId(), EventContext.from(context))
-            );
+                    new GitHubProjectEvent.ProjectItemArchived(itemData, project.getId(), EventContext.from(context)));
             log.info("Project item archived: itemId={}, nodeId={}", item.getId(), item.getNodeId());
         }
         return item;
@@ -257,10 +221,7 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public @Nullable ProjectItem processRestored(
-        @Nullable GitHubProjectItemDTO dto,
-        Project project,
-        ProcessingContext context
-    ) {
+            @Nullable GitHubProjectItemDTO dto, Project project, ProcessingContext context) {
         return processRestoredInternal(dto, project, context, null);
     }
 
@@ -275,20 +236,12 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public @Nullable ProjectItem processRestored(
-        GitHubProjectItemDTO dto,
-        Project project,
-        ProcessingContext context,
-        @Nullable Long actorId
-    ) {
+            GitHubProjectItemDTO dto, Project project, ProcessingContext context, @Nullable Long actorId) {
         return processRestoredInternal(dto, project, context, actorId);
     }
 
     private @Nullable ProjectItem processRestoredInternal(
-        @Nullable GitHubProjectItemDTO dto,
-        Project project,
-        ProcessingContext context,
-        @Nullable Long actorId
-    ) {
+            @Nullable GitHubProjectItemDTO dto, Project project, ProcessingContext context, @Nullable Long actorId) {
         if (dto == null) {
             return null;
         }
@@ -296,13 +249,10 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
         // defaults to false. This makes the intent unambiguous.
         ProjectItem item = processInternal(dto.withArchived(false), project, context, actorId);
         if (item != null) {
-            GitHubProjectEventPayload.ProjectItemData itemData = GitHubProjectEventPayload.ProjectItemData.from(
-                item,
-                actorId
-            );
+            GitHubProjectEventPayload.ProjectItemData itemData =
+                    GitHubProjectEventPayload.ProjectItemData.from(item, actorId);
             eventPublisher.publishEvent(
-                new GitHubProjectEvent.ProjectItemRestored(itemData, project.getId(), EventContext.from(context))
-            );
+                    new GitHubProjectEvent.ProjectItemRestored(itemData, project.getId(), EventContext.from(context)));
             log.info("Project item restored: itemId={}, nodeId={}", item.getId(), item.getNodeId());
         }
         return item;
@@ -318,10 +268,7 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public @Nullable ProjectItem processConverted(
-        GitHubProjectItemDTO dto,
-        Project project,
-        ProcessingContext context
-    ) {
+            GitHubProjectItemDTO dto, Project project, ProcessingContext context) {
         return processConvertedInternal(dto, project, context, null);
     }
 
@@ -336,29 +283,18 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public @Nullable ProjectItem processConverted(
-        GitHubProjectItemDTO dto,
-        Project project,
-        ProcessingContext context,
-        @Nullable Long actorId
-    ) {
+            GitHubProjectItemDTO dto, Project project, ProcessingContext context, @Nullable Long actorId) {
         return processConvertedInternal(dto, project, context, actorId);
     }
 
     private @Nullable ProjectItem processConvertedInternal(
-        GitHubProjectItemDTO dto,
-        Project project,
-        ProcessingContext context,
-        @Nullable Long actorId
-    ) {
+            GitHubProjectItemDTO dto, Project project, ProcessingContext context, @Nullable Long actorId) {
         ProjectItem item = processInternal(dto, project, context, actorId);
         if (item != null) {
-            GitHubProjectEventPayload.ProjectItemData itemData = GitHubProjectEventPayload.ProjectItemData.from(
-                item,
-                actorId
-            );
+            GitHubProjectEventPayload.ProjectItemData itemData =
+                    GitHubProjectEventPayload.ProjectItemData.from(item, actorId);
             eventPublisher.publishEvent(
-                new GitHubProjectEvent.ProjectItemConverted(itemData, project.getId(), EventContext.from(context))
-            );
+                    new GitHubProjectEvent.ProjectItemConverted(itemData, project.getId(), EventContext.from(context)));
             log.info("Project item converted: itemId={}, nodeId={}", item.getId(), item.getNodeId());
         }
         return item;
@@ -374,10 +310,7 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public @Nullable ProjectItem processReordered(
-        GitHubProjectItemDTO dto,
-        Project project,
-        ProcessingContext context
-    ) {
+            GitHubProjectItemDTO dto, Project project, ProcessingContext context) {
         return processReorderedInternal(dto, project, context, null);
     }
 
@@ -392,29 +325,18 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public @Nullable ProjectItem processReordered(
-        GitHubProjectItemDTO dto,
-        Project project,
-        ProcessingContext context,
-        @Nullable Long actorId
-    ) {
+            GitHubProjectItemDTO dto, Project project, ProcessingContext context, @Nullable Long actorId) {
         return processReorderedInternal(dto, project, context, actorId);
     }
 
     private @Nullable ProjectItem processReorderedInternal(
-        GitHubProjectItemDTO dto,
-        Project project,
-        ProcessingContext context,
-        @Nullable Long actorId
-    ) {
+            GitHubProjectItemDTO dto, Project project, ProcessingContext context, @Nullable Long actorId) {
         ProjectItem item = processInternal(dto, project, context, actorId);
         if (item != null) {
-            GitHubProjectEventPayload.ProjectItemData itemData = GitHubProjectEventPayload.ProjectItemData.from(
-                item,
-                actorId
-            );
+            GitHubProjectEventPayload.ProjectItemData itemData =
+                    GitHubProjectEventPayload.ProjectItemData.from(item, actorId);
             eventPublisher.publishEvent(
-                new GitHubProjectEvent.ProjectItemReordered(itemData, project.getId(), EventContext.from(context))
-            );
+                    new GitHubProjectEvent.ProjectItemReordered(itemData, project.getId(), EventContext.from(context)));
             log.debug("Project item reordered: itemId={}, nodeId={}", item.getId(), item.getNodeId());
         }
         return item;
@@ -433,15 +355,12 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
             return;
         }
 
-        projectItemRepository
-            .findById(itemId)
-            .ifPresent(item -> {
-                projectItemRepository.delete(item);
-                eventPublisher.publishEvent(
-                    new GitHubProjectEvent.ProjectItemDeleted(itemId, projectId, EventContext.from(context))
-                );
-                log.info("Deleted project item: itemId={}, nodeId={}", itemId, item.getNodeId());
-            });
+        projectItemRepository.findById(itemId).ifPresent(item -> {
+            projectItemRepository.delete(item);
+            eventPublisher.publishEvent(
+                    new GitHubProjectEvent.ProjectItemDeleted(itemId, projectId, EventContext.from(context)));
+            log.info("Deleted project item: itemId={}, nodeId={}", itemId, item.getNodeId());
+        });
     }
 
     /**
@@ -457,10 +376,7 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public int removeStaleDraftIssues(
-        @Nullable Long projectId,
-        @Nullable List<String> syncedDraftIssueNodeIds,
-        ProcessingContext context
-    ) {
+            @Nullable Long projectId, @Nullable List<String> syncedDraftIssueNodeIds, ProcessingContext context) {
         if (projectId == null) {
             return 0;
         }
@@ -469,16 +385,11 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
         if (syncedDraftIssueNodeIds == null || syncedDraftIssueNodeIds.isEmpty()) {
             // No Draft Issues were synced - remove all Draft Issues for this project
             removed = projectItemRepository.deleteByProjectIdAndContentType(
-                projectId,
-                ProjectItem.ContentType.DRAFT_ISSUE
-            );
+                    projectId, ProjectItem.ContentType.DRAFT_ISSUE);
         } else {
             // Remove only Draft Issues not in the synced list
             removed = projectItemRepository.deleteByProjectIdAndContentTypeAndNodeIdNotIn(
-                projectId,
-                ProjectItem.ContentType.DRAFT_ISSUE,
-                syncedDraftIssueNodeIds
-            );
+                    projectId, ProjectItem.ContentType.DRAFT_ISSUE, syncedDraftIssueNodeIds);
         }
 
         if (removed > 0) {
@@ -506,18 +417,13 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public int removeStaleIssuePrItems(
-        @Nullable Long projectId,
-        @Nullable List<String> syncedIssuePrNodeIds,
-        ProcessingContext context
-    ) {
+            @Nullable Long projectId, @Nullable List<String> syncedIssuePrNodeIds, ProcessingContext context) {
         if (projectId == null) {
             return 0;
         }
 
-        List<ProjectItem.ContentType> issuePrTypes = List.of(
-            ProjectItem.ContentType.ISSUE,
-            ProjectItem.ContentType.PULL_REQUEST
-        );
+        List<ProjectItem.ContentType> issuePrTypes =
+                List.of(ProjectItem.ContentType.ISSUE, ProjectItem.ContentType.PULL_REQUEST);
 
         int removed;
         if (syncedIssuePrNodeIds == null || syncedIssuePrNodeIds.isEmpty()) {
@@ -526,10 +432,7 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
         } else {
             // Remove only Issue/PR items not in the synced list
             removed = projectItemRepository.deleteByProjectIdAndContentTypeInAndNodeIdNotIn(
-                projectId,
-                issuePrTypes,
-                syncedIssuePrNodeIds
-            );
+                    projectId, issuePrTypes, syncedIssuePrNodeIds);
         }
 
         if (removed > 0) {
@@ -582,10 +485,9 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
         // Issue doesn't exist locally - this is expected for cross-repository items
         // in projects that span multiple repositories (some of which may not be monitored).
         log.debug(
-            "Project item references issue not synced locally: issueId={}, itemNodeId={}",
-            dto.issueId(),
-            dto.nodeId()
-        );
+                "Project item references issue not synced locally: issueId={}, itemNodeId={}",
+                dto.issueId(),
+                dto.nodeId());
         return null;
     }
 

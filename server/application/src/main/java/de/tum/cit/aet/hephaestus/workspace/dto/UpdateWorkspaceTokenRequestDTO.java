@@ -8,7 +8,6 @@ import jakarta.validation.constraints.NotBlank;
  */
 @Schema(description = "Request to update the workspace's SCM Personal Access Token")
 public record UpdateWorkspaceTokenRequestDTO(
-    @NotBlank(message = "Personal access token is required")
-    @Schema(description = "SCM Personal Access Token for API access")
-    String personalAccessToken
-) {}
+        @NotBlank(message = "Personal access token is required")
+        @Schema(description = "SCM Personal Access Token for API access")
+        String personalAccessToken) {}

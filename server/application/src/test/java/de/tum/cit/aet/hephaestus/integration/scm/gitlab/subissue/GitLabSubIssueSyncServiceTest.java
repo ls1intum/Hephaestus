@@ -76,14 +76,10 @@ class GitLabSubIssueSyncServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         lenient()
-            .when(responseHandler.handle(any(), anyString(), any()))
-            .thenReturn(new HandleResult(HandleResult.Action.CONTINUE, null));
+                .when(responseHandler.handle(any(), anyString(), any()))
+                .thenReturn(new HandleResult(HandleResult.Action.CONTINUE, null));
         service = new GitLabSubIssueSyncService(
-            issueRepository,
-            repositoryRepository,
-            graphQlClientProvider,
-            responseHandler
-        );
+                issueRepository, repositoryRepository, graphQlClientProvider, responseHandler);
     }
 
     @Test
@@ -129,12 +125,8 @@ class GitLabSubIssueSyncServiceTest extends BaseUnitTest {
      * extractor — the branch GitLab can never trigger.
      */
     private static Map<String, Object> workItemNode(int iid, int parentIid, String parentNamespace) {
-        Map<String, Object> parent = Map.of(
-            "iid",
-            String.valueOf(parentIid),
-            "namespace",
-            Map.of("fullPath", parentNamespace)
-        );
+        Map<String, Object> parent =
+                Map.of("iid", String.valueOf(parentIid), "namespace", Map.of("fullPath", parentNamespace));
         Map<String, Object> hierarchyWidget = Map.of("type", "HIERARCHY", "parent", parent);
         return Map.of("iid", String.valueOf(iid), "widgets", List.of(hierarchyWidget));
     }

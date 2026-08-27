@@ -38,10 +38,9 @@ public class ReviewSweepScheduleService {
     private final ConfigAuditPort configAudit;
 
     public ReviewSweepScheduleService(
-        ReviewSweepScheduleRepository scheduleRepository,
-        WorkspaceRepository workspaceRepository,
-        ConfigAuditPort configAudit
-    ) {
+            ReviewSweepScheduleRepository scheduleRepository,
+            WorkspaceRepository workspaceRepository,
+            ConfigAuditPort configAudit) {
         this.scheduleRepository = scheduleRepository;
         this.workspaceRepository = workspaceRepository;
         this.configAudit = configAudit;
@@ -49,11 +48,9 @@ public class ReviewSweepScheduleService {
 
     @Transactional(readOnly = true)
     public List<ReviewSweepScheduleDTO> list(WorkspaceContext context) {
-        return scheduleRepository
-            .findByWorkspaceIdOrderByArtifactKindAsc(context.id())
-            .stream()
-            .map(ReviewSweepScheduleDTO::from)
-            .toList();
+        return scheduleRepository.findByWorkspaceIdOrderByArtifactKindAsc(context.id()).stream()
+                .map(ReviewSweepScheduleDTO::from)
+                .toList();
     }
 
     @Transactional
@@ -64,13 +61,12 @@ public class ReviewSweepScheduleService {
         ReviewBackfillService.jobTypeFor(kind);
         validateLookback(request.cadence(), request.lookbackDays());
         if (scheduleRepository.existsByWorkspaceIdAndArtifactKind(context.id(), kind.value())) {
-            throw new ReviewSweepScheduleConflictException(
-                "This workspace already sweeps " + kind.value() + ". Change that schedule instead of adding a second."
-            );
+            throw new ReviewSweepScheduleConflictException("This workspace already sweeps " + kind.value()
+                    + ". Change that schedule instead of adding a second.");
         }
         Workspace workspace = workspaceRepository
-            .findById(context.id())
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", context.slug()));
+                .findById(context.id())
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", context.slug()));
 
         ReviewSweepSchedule schedule = new ReviewSweepSchedule();
         schedule.setWorkspace(workspace);
@@ -79,42 +75,34 @@ public class ReviewSweepScheduleService {
         schedule.setLookbackDays(request.lookbackDays());
         schedule.setEnabled(true);
         schedule.setNextRunAt(ReviewSweepSchedule.firstRunAt(context.id(), Instant.now()));
-        schedule.setCreatedByAccountId(
-            SecurityUtils.getCurrentAccountId().orElseThrow(() ->
-                // A schedule nobody can be named for is a recurring spend nobody can be asked about.
-                new IllegalStateException("A sweep schedule must be attributable to an authenticated account.")
-            )
-        );
+        schedule.setCreatedByAccountId(SecurityUtils.getCurrentAccountId()
+                .orElseThrow(() ->
+                        // A schedule nobody can be named for is a recurring spend nobody can be asked about.
+                        new IllegalStateException(
+                                "A sweep schedule must be attributable to an authenticated account.")));
         ReviewSweepSchedule saved = scheduleRepository.save(schedule);
-        configAudit.record(
-            ConfigAuditEntry.created(
+        configAudit.record(ConfigAuditEntry.created(
                 ConfigAuditEntityType.REVIEW_SWEEP_SCHEDULE,
                 saved.getId(),
                 context.id(),
-                ReviewSweepScheduleSnapshot.of(saved)
-            )
-        );
+                ReviewSweepScheduleSnapshot.of(saved)));
         log.info(
-            "Review sweep schedule created: scheduleId={}, workspaceId={}, kind={}, cadence={}, lookbackDays={}",
-            saved.getId(),
-            context.id(),
-            kind.value(),
-            saved.getCadence(),
-            saved.getLookbackDays()
-        );
+                "Review sweep schedule created: scheduleId={}, workspaceId={}, kind={}, cadence={}, lookbackDays={}",
+                saved.getId(),
+                context.id(),
+                kind.value(),
+                saved.getCadence(),
+                saved.getLookbackDays());
         return ReviewSweepScheduleDTO.from(saved);
     }
 
     @Transactional
     public ReviewSweepScheduleDTO replace(
-        WorkspaceContext context,
-        UUID scheduleId,
-        UpdateReviewSweepScheduleRequestDTO request
-    ) {
+            WorkspaceContext context, UUID scheduleId, UpdateReviewSweepScheduleRequestDTO request) {
         validateLookback(request.cadence(), request.lookbackDays());
         ReviewSweepSchedule schedule = scheduleRepository
-            .findByIdAndWorkspaceId(scheduleId, context.id())
-            .orElseThrow(() -> new EntityNotFoundException("ReviewSweepSchedule", scheduleId.toString()));
+                .findByIdAndWorkspaceId(scheduleId, context.id())
+                .orElseThrow(() -> new EntityNotFoundException("ReviewSweepSchedule", scheduleId.toString()));
         ReviewSweepScheduleSnapshot before = ReviewSweepScheduleSnapshot.of(schedule);
 
         // Keep nextRunAt's phase: narrowing a lookback is not a request to move the sweep's time of day.
@@ -124,15 +112,12 @@ public class ReviewSweepScheduleService {
         schedule.setUpdatedAt(Instant.now());
         ReviewSweepSchedule saved = scheduleRepository.save(schedule);
 
-        configAudit.record(
-            ConfigAuditEntry.updated(
+        configAudit.record(ConfigAuditEntry.updated(
                 ConfigAuditEntityType.REVIEW_SWEEP_SCHEDULE,
                 saved.getId(),
                 context.id(),
                 before,
-                ReviewSweepScheduleSnapshot.of(saved)
-            )
-        );
+                ReviewSweepScheduleSnapshot.of(saved)));
         return ReviewSweepScheduleDTO.from(saved);
     }
 
@@ -143,16 +128,13 @@ public class ReviewSweepScheduleService {
     @Transactional
     public void delete(WorkspaceContext context, UUID scheduleId) {
         ReviewSweepSchedule schedule = scheduleRepository
-            .findByIdAndWorkspaceId(scheduleId, context.id())
-            .orElseThrow(() -> new EntityNotFoundException("ReviewSweepSchedule", scheduleId.toString()));
-        configAudit.record(
-            ConfigAuditEntry.deleted(
+                .findByIdAndWorkspaceId(scheduleId, context.id())
+                .orElseThrow(() -> new EntityNotFoundException("ReviewSweepSchedule", scheduleId.toString()));
+        configAudit.record(ConfigAuditEntry.deleted(
                 ConfigAuditEntityType.REVIEW_SWEEP_SCHEDULE,
                 schedule.getId(),
                 context.id(),
-                ReviewSweepScheduleSnapshot.of(schedule)
-            )
-        );
+                ReviewSweepScheduleSnapshot.of(schedule)));
         scheduleRepository.delete(schedule);
         log.info("Review sweep schedule deleted: scheduleId={}, workspaceId={}", scheduleId, context.id());
     }
@@ -169,15 +151,12 @@ public class ReviewSweepScheduleService {
         Duration lookback = Duration.ofDays(lookbackDays);
         Duration max = cadence.maxLookback();
         if (lookback.compareTo(max) > 0) {
-            throw new IllegalArgumentException(
-                "A " +
-                    cadence.name() +
-                    " sweep may look back at most " +
-                    max.toDays() +
-                    " days, not " +
-                    lookbackDays +
-                    ". Reviewing further back is a backfill campaign, which is measured apart from live work."
-            );
+            throw new IllegalArgumentException("A " + cadence.name()
+                    + " sweep may look back at most "
+                    + max.toDays()
+                    + " days, not "
+                    + lookbackDays
+                    + ". Reviewing further back is a backfill campaign, which is measured apart from live work.");
         }
     }
 }

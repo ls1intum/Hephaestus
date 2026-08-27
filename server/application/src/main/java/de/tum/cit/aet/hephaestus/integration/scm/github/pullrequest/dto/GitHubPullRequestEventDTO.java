@@ -15,15 +15,15 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubPullRequestEventDTO(
-    @JsonProperty("action") String action,
-    @JsonProperty("number") int number,
-    @JsonProperty("pull_request") @Nullable GitHubPullRequestDTO pullRequest,
-    @JsonProperty("repository") @Nullable GitHubRepositoryRefDTO repository,
-    @JsonProperty("sender") @Nullable GitHubUserDTO sender,
-    @JsonProperty("label") @Nullable GitHubLabelDTO label,
-    @JsonProperty("requested_reviewer") @Nullable GitHubUserDTO requestedReviewer,
-    @JsonProperty("changes") @Nullable Map<String, Object> changes
-) implements GitHubWebhookEvent {
+        @JsonProperty("action") String action,
+        @JsonProperty("number") int number,
+        @JsonProperty("pull_request") @Nullable GitHubPullRequestDTO pullRequest,
+        @JsonProperty("repository") @Nullable GitHubRepositoryRefDTO repository,
+        @JsonProperty("sender") @Nullable GitHubUserDTO sender,
+        @JsonProperty("label") @Nullable GitHubLabelDTO label,
+        @JsonProperty("requested_reviewer") @Nullable GitHubUserDTO requestedReviewer,
+        @JsonProperty("changes") @Nullable Map<String, Object> changes)
+        implements GitHubWebhookEvent {
     @Override
     public GitHubEventAction.PullRequest actionType() {
         return GitHubEventAction.PullRequest.fromString(action);

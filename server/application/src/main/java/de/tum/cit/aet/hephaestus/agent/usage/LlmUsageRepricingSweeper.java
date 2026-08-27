@@ -56,10 +56,7 @@ public class LlmUsageRepricingSweeper {
     private final MeterRegistry meterRegistry;
 
     public LlmUsageRepricingSweeper(
-        LlmUsageEventRepository usageRepository,
-        LlmUsageRepricer repricer,
-        MeterRegistry meterRegistry
-    ) {
+            LlmUsageEventRepository usageRepository, LlmUsageRepricer repricer, MeterRegistry meterRegistry) {
         this.usageRepository = usageRepository;
         this.repricer = repricer;
         this.meterRegistry = meterRegistry;
@@ -78,14 +75,10 @@ public class LlmUsageRepricingSweeper {
      * @return how many rows each outcome applied to
      */
     public Map<Outcome, Integer> repriceNow(Instant now) {
-        LlmBudgetService.MonthWindow window = LlmBudgetService.MonthWindow.of(
-            YearMonth.from(now.atOffset(ZoneOffset.UTC))
-        );
-        List<UnpricedLedgerRow> unpriced = usageRepository.findUnpricedInWindow(
-            window.from(),
-            window.to(),
-            PageRequest.of(0, MAX_ROWS_PER_PASS)
-        );
+        LlmBudgetService.MonthWindow window =
+                LlmBudgetService.MonthWindow.of(YearMonth.from(now.atOffset(ZoneOffset.UTC)));
+        List<UnpricedLedgerRow> unpriced =
+                usageRepository.findUnpricedInWindow(window.from(), window.to(), PageRequest.of(0, MAX_ROWS_PER_PASS));
         Map<Outcome, Integer> tally = new EnumMap<>(Outcome.class);
         for (Outcome outcome : Outcome.values()) {
             tally.put(outcome, 0);
@@ -109,13 +102,12 @@ public class LlmUsageRepricingSweeper {
         }
         meterRegistry.counter("llm.usage.reprice.unresolved").increment(tally.getOrDefault(Outcome.UNIDENTIFIABLE, 0));
         log.info(
-            "llm.usage.reprice: {} unpriced event(s) this month; {} repriced, {} still awaiting a catalogue price, " +
-                "{} name a model this instance cannot identify",
-            unpriced.size(),
-            tally.get(Outcome.REPRICED),
-            tally.get(Outcome.STILL_UNPRICEABLE),
-            tally.get(Outcome.UNIDENTIFIABLE)
-        );
+                "llm.usage.reprice: {} unpriced event(s) this month; {} repriced, {} still awaiting a catalogue price, "
+                        + "{} name a model this instance cannot identify",
+                unpriced.size(),
+                tally.get(Outcome.REPRICED),
+                tally.get(Outcome.STILL_UNPRICEABLE),
+                tally.get(Outcome.UNIDENTIFIABLE));
         return tally;
     }
 }

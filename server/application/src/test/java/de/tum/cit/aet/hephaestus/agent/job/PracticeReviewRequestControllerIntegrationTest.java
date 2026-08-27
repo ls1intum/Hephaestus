@@ -69,6 +69,7 @@ class PracticeReviewRequestControllerIntegrationTest extends AbstractWorkspaceIn
      * only way to be somebody other than {@code testuser} is to sign a request as {@code mentor}.
      */
     private User colleague;
+
     private long pullRequestId;
 
     @BeforeEach
@@ -96,12 +97,12 @@ class PracticeReviewRequestControllerIntegrationTest extends AbstractWorkspaceIn
         @Test
         void refusesAnAnonymousCaller() {
             webTestClient
-                .post()
-                .uri(REQUESTS, workspace.getWorkspaceSlug())
-                .bodyValue(body(ArtifactKinds.PULL_REQUEST.value(), pullRequestId))
-                .exchange()
-                .expectStatus()
-                .isForbidden();
+                    .post()
+                    .uri(REQUESTS, workspace.getWorkspaceSlug())
+                    .bodyValue(body(ArtifactKinds.PULL_REQUEST.value(), pullRequestId))
+                    .exchange()
+                    .expectStatus()
+                    .isForbidden();
         }
 
         /**
@@ -112,13 +113,17 @@ class PracticeReviewRequestControllerIntegrationTest extends AbstractWorkspaceIn
         @Test
         @WithMentorUser
         void refusesAWorkspaceMemberWhoIsNeitherAuthorNorAssignee() {
-            post(ArtifactKinds.PULL_REQUEST.value(), pullRequestId).expectStatus().isForbidden();
+            post(ArtifactKinds.PULL_REQUEST.value(), pullRequestId)
+                    .expectStatus()
+                    .isForbidden();
         }
 
         @Test
         @WithUser
         void admitsTheAuthorOfTheWork() {
-            post(ArtifactKinds.PULL_REQUEST.value(), pullRequestId).expectStatus().isOk();
+            post(ArtifactKinds.PULL_REQUEST.value(), pullRequestId)
+                    .expectStatus()
+                    .isOk();
         }
 
         @Test
@@ -126,7 +131,9 @@ class PracticeReviewRequestControllerIntegrationTest extends AbstractWorkspaceIn
         void admitsAWorkspaceAdminAskingAboutSomebodyElsesWork() {
             promoteColleagueToAdmin();
 
-            post(ArtifactKinds.PULL_REQUEST.value(), pullRequestId).expectStatus().isOk();
+            post(ArtifactKinds.PULL_REQUEST.value(), pullRequestId)
+                    .expectStatus()
+                    .isOk();
         }
     }
 
@@ -144,30 +151,34 @@ class PracticeReviewRequestControllerIntegrationTest extends AbstractWorkspaceIn
         @WithUser
         void answersARefusalAsTwoHundredWithASentence() {
             post(ArtifactKinds.PULL_REQUEST.value(), pullRequestId)
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.status")
-                .isEqualTo("REFUSED")
-                .jsonPath("$.reason")
-                .isNotEmpty()
-                .jsonPath("$.reasonDescription")
-                .isNotEmpty()
-                .jsonPath("$.jobId")
-                .doesNotExist();
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.status")
+                    .isEqualTo("REFUSED")
+                    .jsonPath("$.reason")
+                    .isNotEmpty()
+                    .jsonPath("$.reasonDescription")
+                    .isNotEmpty()
+                    .jsonPath("$.jobId")
+                    .doesNotExist();
         }
 
         @Test
         @WithUser
         void answersNotFoundForWorkThisWorkspaceDoesNotMonitor() {
-            post(ArtifactKinds.PULL_REQUEST.value(), pullRequestId + 9999).expectStatus().isNotFound();
+            post(ArtifactKinds.PULL_REQUEST.value(), pullRequestId + 9999)
+                    .expectStatus()
+                    .isNotFound();
         }
 
         /** A chat thread is reviewed on the occasion its source produces; there is nothing to point at. */
         @Test
         @WithUser
         void refusesAKindThatHasNoFrontDoorHere() {
-            post(ArtifactKinds.CONVERSATION_THREAD.value(), pullRequestId).expectStatus().isBadRequest();
+            post(ArtifactKinds.CONVERSATION_THREAD.value(), pullRequestId)
+                    .expectStatus()
+                    .isBadRequest();
         }
 
         @Test
@@ -185,11 +196,11 @@ class PracticeReviewRequestControllerIntegrationTest extends AbstractWorkspaceIn
         @WithUser
         void namesTheMissingFieldWhenTheArtifactIdIsAbsent() {
             postBody(Map.of("artifactKind", ArtifactKinds.PULL_REQUEST.value()))
-                .expectStatus()
-                .isBadRequest()
-                .expectBody()
-                .jsonPath("$.errors.artifactId")
-                .exists();
+                    .expectStatus()
+                    .isBadRequest()
+                    .expectBody()
+                    .jsonPath("$.errors.artifactId")
+                    .exists();
         }
     }
 
@@ -209,13 +220,13 @@ class PracticeReviewRequestControllerIntegrationTest extends AbstractWorkspaceIn
             recordManualRequest(pullRequestId, author.getId(), Instant.now());
 
             post(ArtifactKinds.PULL_REQUEST.value(), pullRequestId)
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.status")
-                .isEqualTo("REFUSED")
-                .jsonPath("$.reason")
-                .isEqualTo("REQUEST_COOLDOWN_ACTIVE");
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.status")
+                    .isEqualTo("REFUSED")
+                    .jsonPath("$.reason")
+                    .isEqualTo("REQUEST_COOLDOWN_ACTIVE");
         }
 
         /** An ask older than the window does not hold the door shut forever. */
@@ -241,13 +252,13 @@ class PracticeReviewRequestControllerIntegrationTest extends AbstractWorkspaceIn
             }
 
             post(ArtifactKinds.PULL_REQUEST.value(), pullRequestId)
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.status")
-                .isEqualTo("REFUSED")
-                .jsonPath("$.reason")
-                .isEqualTo("REQUESTER_QUOTA_EXHAUSTED");
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.status")
+                    .isEqualTo("REFUSED")
+                    .jsonPath("$.reason")
+                    .isEqualTo("REQUESTER_QUOTA_EXHAUSTED");
         }
 
         /** The allowance is per person: somebody else's asks do not spend mine. */
@@ -272,11 +283,13 @@ class PracticeReviewRequestControllerIntegrationTest extends AbstractWorkspaceIn
             giveTheWorkspaceACooldown();
             recordManualRequest(pullRequestId, author.getId(), Instant.now());
 
-            post(ArtifactKinds.PULL_REQUEST.value(), pullRequestId).expectStatus().isOk();
+            post(ArtifactKinds.PULL_REQUEST.value(), pullRequestId)
+                    .expectStatus()
+                    .isOk();
 
-            org.assertj.core.api.Assertions.assertThat(
-                signalRepository.findForArtifact(workspace.getId(), ArtifactKinds.PULL_REQUEST.value(), pullRequestId)
-            ).hasSize(1);
+            org.assertj.core.api.Assertions.assertThat(signalRepository.findForArtifact(
+                            workspace.getId(), ArtifactKinds.PULL_REQUEST.value(), pullRequestId))
+                    .hasSize(1);
         }
     }
 
@@ -294,11 +307,11 @@ class PracticeReviewRequestControllerIntegrationTest extends AbstractWorkspaceIn
 
     private void promoteColleagueToAdmin() {
         workspaceMembershipRepository
-            .findByWorkspace_IdAndUser_Id(workspace.getId(), colleague.getId())
-            .ifPresent(membership -> {
-                membership.setRole(WorkspaceRole.ADMIN);
-                workspaceMembershipRepository.save(membership);
-            });
+                .findByWorkspace_IdAndUser_Id(workspace.getId(), colleague.getId())
+                .ifPresent(membership -> {
+                    membership.setRole(WorkspaceRole.ADMIN);
+                    workspaceMembershipRepository.save(membership);
+                });
     }
 
     /**
@@ -306,17 +319,12 @@ class PracticeReviewRequestControllerIntegrationTest extends AbstractWorkspaceIn
      * and is not what these tests are about; that it is not one of the two limits is.
      */
     private static void expectRefusedButNotLimited(WebTestClient.ResponseSpec response) {
-        response
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.reason")
-            .value(reason ->
-                org.assertj.core.api.Assertions.assertThat(reason).isNotIn(
-                    "REQUEST_COOLDOWN_ACTIVE",
-                    "REQUESTER_QUOTA_EXHAUSTED"
-                )
-            );
+        response.expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.reason")
+                .value(reason -> org.assertj.core.api.Assertions.assertThat(reason)
+                        .isNotIn("REQUEST_COOLDOWN_ACTIVE", "REQUESTER_QUOTA_EXHAUSTED"));
     }
 
     private WebTestClient.ResponseSpec post(String kind, long artifactId) {
@@ -325,11 +333,11 @@ class PracticeReviewRequestControllerIntegrationTest extends AbstractWorkspaceIn
 
     private WebTestClient.ResponseSpec postBody(Map<String, Object> body) {
         return webTestClient
-            .post()
-            .uri(REQUESTS, workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .bodyValue(body)
-            .exchange();
+                .post()
+                .uri(REQUESTS, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .bodyValue(body)
+                .exchange();
     }
 
     private static Map<String, Object> body(String kind, long artifactId) {
@@ -352,41 +360,43 @@ class PracticeReviewRequestControllerIntegrationTest extends AbstractWorkspaceIn
         Long providerId = repository.getProvider().getId();
         org.junit.jupiter.api.Assertions.assertNotNull(providerId);
         pullRequestRepository.upsertCore(
-            9200L + number,
-            providerId,
-            number,
-            "A change worth reviewing",
-            "Body",
-            "OPEN",
-            null,
-            "https://github.com/" + repository.getNameWithOwner() + "/pull/" + number,
-            false,
-            null,
-            0,
-            now,
-            now,
-            now,
-            prAuthor.getId(),
-            repository.getId(),
-            null,
-            null,
-            false,
-            false,
-            1,
-            10,
-            5,
-            3,
-            null,
-            null,
-            null,
-            "feature/branch",
-            "main",
-            "headsha",
-            "basesha",
-            null,
-            null
-        );
-        return pullRequestRepository.findByRepositoryIdAndNumber(repository.getId(), number).orElseThrow().getId();
+                9200L + number,
+                providerId,
+                number,
+                "A change worth reviewing",
+                "Body",
+                "OPEN",
+                null,
+                "https://github.com/" + repository.getNameWithOwner() + "/pull/" + number,
+                false,
+                null,
+                0,
+                now,
+                now,
+                now,
+                prAuthor.getId(),
+                repository.getId(),
+                null,
+                null,
+                false,
+                false,
+                1,
+                10,
+                5,
+                3,
+                null,
+                null,
+                null,
+                "feature/branch",
+                "main",
+                "headsha",
+                "basesha",
+                null,
+                null);
+        return pullRequestRepository
+                .findByRepositoryIdAndNumber(repository.getId(), number)
+                .orElseThrow()
+                .getId();
     }
 
     /** A ledger row exactly as {@code ManualReviewRequests} would leave one, for the limits to count. */

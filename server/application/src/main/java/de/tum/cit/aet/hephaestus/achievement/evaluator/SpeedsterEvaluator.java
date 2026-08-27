@@ -28,18 +28,18 @@ public class SpeedsterEvaluator implements AchievementEvaluator {
         }
 
         return pullRequestRepository
-            .findById(event.targetId())
-            .map(pr -> {
-                if (pr.getCreatedAt() == null || pr.getMergedAt() == null) {
+                .findById(event.targetId())
+                .map(pr -> {
+                    if (pr.getCreatedAt() == null || pr.getMergedAt() == null) {
+                        return false;
+                    }
+                    Duration mergeTime = Duration.between(pr.getCreatedAt(), pr.getMergedAt());
+                    if (!mergeTime.isNegative() && mergeTime.compareTo(MAX_MERGE_TIME) <= 0) {
+                        userAchievement.setProgressData(new BinaryAchievementProgress(true));
+                        return true;
+                    }
                     return false;
-                }
-                Duration mergeTime = Duration.between(pr.getCreatedAt(), pr.getMergedAt());
-                if (!mergeTime.isNegative() && mergeTime.compareTo(MAX_MERGE_TIME) <= 0) {
-                    userAchievement.setProgressData(new BinaryAchievementProgress(true));
-                    return true;
-                }
-                return false;
-            })
-            .orElse(false);
+                })
+                .orElse(false);
     }
 }

@@ -54,7 +54,7 @@ public class StaleAuthCookieFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
-        throws ServletException, IOException {
+            throws ServletException, IOException {
         String token = readAuthCookie(request);
         if (token != null) {
             try {

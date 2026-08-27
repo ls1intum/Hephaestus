@@ -25,10 +25,9 @@ import org.springframework.boot.convert.DurationUnit;
  */
 @ConfigurationProperties(prefix = "hephaestus.integration.outline")
 public record OutlineProperties(
-    @DefaultValue Sync sync,
-    @DefaultValue Cache cache,
-    @DurationUnit(HOURS) @DefaultValue("720h") Duration staleness
-) {
+        @DefaultValue Sync sync,
+        @DefaultValue Cache cache,
+        @DurationUnit(HOURS) @DefaultValue("720h") Duration staleness) {
     /**
      * The {@code cron} and {@code catch-up-delay} yml keys are read straight off the Environment by the
      * {@code @Scheduled} SpEL in {@code OutlineDocumentSyncScheduler} (matching the Slack sibling), so they

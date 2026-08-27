@@ -83,9 +83,8 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
         // The inspector MUST treat this as a legitimate workspace_id reference and not
         // throw. Regression for false positive that broke ObservationControllerIntegrationTest.
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
-        String sql =
-            "select wm.user_id, wm.workspace_id from workspace_membership wm " +
-            "where (wm.user_id, wm.workspace_id) in ((?,?))";
+        String sql = "select wm.user_id, wm.workspace_id from workspace_membership wm "
+                + "where (wm.user_id, wm.workspace_id) in ((?,?))";
         inspector.inspect(sql);
         verifyNoInteractions(reporter, scopedTables);
     }
@@ -174,8 +173,7 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
         // Hibernate appends "AND version = ?" to UPDATEs for entities with @Version.
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
         inspector.inspect(
-            "update chat_message set metadata=?,parts=?,role=?,status=?,thread_id=?,version=? where id=? and version=?"
-        );
+                "update chat_message set metadata=?,parts=?,role=?,status=?,thread_id=?,version=? where id=? and version=?");
         verifyNoInteractions(reporter, scopedTables);
     }
 
@@ -186,11 +184,8 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.LOG);
         when(scopedTables.isScoped("practice")).thenReturn(true);
         inspector.inspect("delete from practice where id=? and slug=?");
-        verify(reporter).report(
-            "delete from practice where id=? and slug=?",
-            Set.of("practice"),
-            TenancyEnforcement.LOG
-        );
+        verify(reporter)
+                .report("delete from practice where id=? and slug=?", Set.of("practice"), TenancyEnforcement.LOG);
     }
 
     @Test
@@ -198,10 +193,8 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
         // Hibernate-emitted entity load / lazy fetch SQL: SELECT ... FROM table alias
         // WHERE alias.id = ?. Safe because the caller already had the surrogate PK.
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
-        inspector.inspect(
-            "select r1_0.id,r1_0.archived,r1_0.created_at,r1_0.html_url,r1_0.name " +
-                "from repository r1_0 where r1_0.id=?"
-        );
+        inspector.inspect("select r1_0.id,r1_0.archived,r1_0.created_at,r1_0.html_url,r1_0.name "
+                + "from repository r1_0 where r1_0.id=?");
         verifyNoInteractions(reporter, scopedTables);
     }
 
@@ -209,12 +202,9 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
     void hibernateEntityLoadByPkWithJoinsIsAllowed() {
         // Eager @ManyToOne fetches add LEFT JOINs but the WHERE is still <alias>.id = ?.
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
-        inspector.inspect(
-            "select r1_0.id,o1_0.id,o1_0.login " +
-                "from repository r1_0 " +
-                "left join organization o1_0 on r1_0.organization_id=o1_0.id " +
-                "where r1_0.id=?"
-        );
+        inspector.inspect("select r1_0.id,o1_0.id,o1_0.login " + "from repository r1_0 "
+                + "left join organization o1_0 on r1_0.organization_id=o1_0.id "
+                + "where r1_0.id=?");
         verifyNoInteractions(reporter, scopedTables);
     }
 
@@ -224,11 +214,11 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.LOG);
         when(scopedTables.isScoped("pull_request")).thenReturn(true);
         inspector.inspect("select pr1_0.id from pull_request pr1_0 where pr1_0.state=?");
-        verify(reporter).report(
-            "select pr1_0.id from pull_request pr1_0 where pr1_0.state=?",
-            Set.of("pull_request"),
-            TenancyEnforcement.LOG
-        );
+        verify(reporter)
+                .report(
+                        "select pr1_0.id from pull_request pr1_0 where pr1_0.state=?",
+                        Set.of("pull_request"),
+                        TenancyEnforcement.LOG);
     }
 
     @Test
@@ -237,12 +227,9 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
         // filtered by the parent's FK column. The join table inherits scope from the
         // parent's PK, which the caller already had.
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
-        inspector.inspect(
-            "select i1_0.label_id,i1_1.id,i1_1.body,i1_1.title " +
-                "from issue_label i1_0 " +
-                "join issue i1_1 on i1_0.issue_id=i1_1.id " +
-                "where i1_0.label_id=?"
-        );
+        inspector.inspect("select i1_0.label_id,i1_1.id,i1_1.body,i1_1.title " + "from issue_label i1_0 "
+                + "join issue i1_1 on i1_0.issue_id=i1_1.id "
+                + "where i1_0.label_id=?");
         verifyNoInteractions(reporter, scopedTables);
     }
 
@@ -293,11 +280,8 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
         // Single-table inheritance: SELECT … FROM issue alias WHERE alias.id = ? AND
         // alias.<discriminator> = '<subtype>'. The PK predicate still pins the result set.
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
-        inspector.inspect(
-            "select pr1_0.id,pr1_0.body,pr1_0.title " +
-                "from issue pr1_0 " +
-                "where pr1_0.id=? and pr1_0.issue_type='PullRequest'"
-        );
+        inspector.inspect("select pr1_0.id,pr1_0.body,pr1_0.title " + "from issue pr1_0 "
+                + "where pr1_0.id=? and pr1_0.issue_type='PullRequest'");
         verifyNoInteractions(reporter, scopedTables);
     }
 

@@ -62,17 +62,13 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
     public static final double XP_REVIEW_COMMENT = 0.5;
 
     public ExperiencePointCalculator(
-        PullRequestRepository pullRequestRepository,
-        ExperiencePointProperties properties
-    ) {
+            PullRequestRepository pullRequestRepository, ExperiencePointProperties properties) {
         this.pullRequestRepository = pullRequestRepository;
         this.properties = properties;
-        this.selfReviewAuthorLogins = properties
-            .selfReviewAuthorLogins()
-            .stream()
-            .filter(Objects::nonNull)
-            .map(login -> login.toLowerCase(Locale.ROOT))
-            .collect(Collectors.toUnmodifiableSet());
+        this.selfReviewAuthorLogins = properties.selfReviewAuthorLogins().stream()
+                .filter(Objects::nonNull)
+                .map(login -> login.toLowerCase(Locale.ROOT))
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     // XP Accessors (use configured values from properties)
@@ -186,10 +182,8 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
      * @return total XP for all reviews and comments
      */
     public double calculateReviewExperiencePoints(List<PullRequestReview> reviews, int issueCommentCount) {
-        List<PullRequestReview> eligibleReviews = reviews
-            .stream()
-            .filter(review -> !isSelfAssignedReview(review))
-            .toList();
+        List<PullRequestReview> eligibleReviews =
+                reviews.stream().filter(review -> !isSelfAssignedReview(review)).toList();
 
         if (eligibleReviews.isEmpty()) {
             return 0.0;
@@ -204,45 +198,34 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
         double weightChangesRequested = properties.reviewWeights().changesRequested();
         double weightComment = properties.reviewWeights().comment();
 
-        double approvalExperiencePoints = eligibleReviews
-            .stream()
-            .filter(review -> review.getState() == PullRequestReview.State.APPROVED)
-            .filter(review -> !isSelfReview(review))
-            .mapToDouble(
-                review -> weightApproval * calculateCodeReviewBonus(review.getComments().size(), complexityScore)
-            )
-            .sum();
+        double approvalExperiencePoints = eligibleReviews.stream()
+                .filter(review -> review.getState() == PullRequestReview.State.APPROVED)
+                .filter(review -> !isSelfReview(review))
+                .mapToDouble(review -> weightApproval
+                        * calculateCodeReviewBonus(review.getComments().size(), complexityScore))
+                .sum();
 
-        double changesRequestedExperiencePoints = eligibleReviews
-            .stream()
-            .filter(review -> review.getState() == PullRequestReview.State.CHANGES_REQUESTED)
-            .filter(review -> !isSelfReview(review))
-            .mapToDouble(
-                review ->
-                    weightChangesRequested * calculateCodeReviewBonus(review.getComments().size(), complexityScore)
-            )
-            .sum();
+        double changesRequestedExperiencePoints = eligibleReviews.stream()
+                .filter(review -> review.getState() == PullRequestReview.State.CHANGES_REQUESTED)
+                .filter(review -> !isSelfReview(review))
+                .mapToDouble(review -> weightChangesRequested
+                        * calculateCodeReviewBonus(review.getComments().size(), complexityScore))
+                .sum();
 
-        double commentExperiencePoints = eligibleReviews
-            .stream()
-            .filter(
-                review ->
-                    review.getState() == PullRequestReview.State.COMMENTED ||
-                    review.getState() == PullRequestReview.State.UNKNOWN
-            )
-            .filter(review -> !isSelfReview(review))
-            .mapToDouble(
-                review -> weightComment * calculateCodeReviewBonus(review.getComments().size(), complexityScore)
-            )
-            .sum();
+        double commentExperiencePoints = eligibleReviews.stream()
+                .filter(review -> review.getState() == PullRequestReview.State.COMMENTED
+                        || review.getState() == PullRequestReview.State.UNKNOWN)
+                .filter(review -> !isSelfReview(review))
+                .mapToDouble(review -> weightComment
+                        * calculateCodeReviewBonus(review.getComments().size(), complexityScore))
+                .sum();
 
         double issueCommentExperiencePoints = weightComment * issueCommentCount;
 
-        double interactionScore =
-            approvalExperiencePoints +
-            changesRequestedExperiencePoints +
-            commentExperiencePoints +
-            issueCommentExperiencePoints;
+        double interactionScore = approvalExperiencePoints
+                + changesRequestedExperiencePoints
+                + commentExperiencePoints
+                + issueCommentExperiencePoints;
 
         // Guard against division by zero in harmonic mean
         double denominator = interactionScore + complexityScore;
@@ -350,18 +333,13 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
      * @return XP for the standalone review comment
      */
     public double calculateStandaloneReviewCommentXp(
-        PullRequest pullRequest,
-        @Nullable Long commentAuthorId,
-        int bodyLength
-    ) {
+            PullRequest pullRequest, @Nullable Long commentAuthorId, int bodyLength) {
         // Self-review check: no XP for commenting on your own PR
         User prAuthor = pullRequest.getAuthor();
-        if (
-            prAuthor != null &&
-            commentAuthorId != null &&
-            prAuthor.getId() != null &&
-            prAuthor.getId().equals(commentAuthorId)
-        ) {
+        if (prAuthor != null
+                && commentAuthorId != null
+                && prAuthor.getId() != null
+                && prAuthor.getId().equals(commentAuthorId)) {
             return 0.0;
         }
 
@@ -380,9 +358,8 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
         Issue issue = issueComment.getIssue();
         if (issue == null) {
             log.warn(
-                "Skipped XP calculation, issue comment has no associated issue: commentId={}",
-                issueComment.getId()
-            );
+                    "Skipped XP calculation, issue comment has no associated issue: commentId={}",
+                    issueComment.getId());
             return 0;
         }
 
@@ -402,16 +379,13 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
                 return 0;
             }
             var optionalPullRequest = pullRequestRepository.findByRepositoryIdAndNumber(
-                issue.getRepository().getId(),
-                issue.getNumber()
-            );
+                    issue.getRepository().getId(), issue.getNumber());
             if (optionalPullRequest.isEmpty()) {
                 // Expected case: comment is on a regular issue, not a PR - no XP awarded
                 log.debug(
-                    "Skipped XP for non-PR issue comment: commentId={}, issueNumber={}",
-                    issueComment.getId(),
-                    issue.getNumber()
-                );
+                        "Skipped XP for non-PR issue comment: commentId={}, issueNumber={}",
+                        issueComment.getId(),
+                        issue.getNumber());
                 return 0;
             }
             pullRequest = optionalPullRequest.get();
@@ -420,13 +394,11 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
         // No XP for commenting on your own pull request (with null checks)
         User prAuthor = pullRequest.getAuthor();
         User commentAuthor = issueComment.getAuthor();
-        if (
-            prAuthor != null &&
-            commentAuthor != null &&
-            prAuthor.getId() != null &&
-            commentAuthor.getId() != null &&
-            prAuthor.getId().equals(commentAuthor.getId())
-        ) {
+        if (prAuthor != null
+                && commentAuthor != null
+                && prAuthor.getId() != null
+                && commentAuthor.getId() != null
+                && prAuthor.getId().equals(commentAuthor.getId())) {
             return 0;
         }
 
@@ -455,12 +427,11 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
      * @return complexity score (1, 3, 7, 17, or 33)
      */
     public int calculateComplexityScore(PullRequest pullRequest) {
-        double rawComplexity =
-            ((pullRequest.getChangedFiles() * 3) +
-                (pullRequest.getCommits() * 0.5) +
-                pullRequest.getAdditions() +
-                pullRequest.getDeletions()) /
-            10.0;
+        double rawComplexity = ((pullRequest.getChangedFiles() * 3)
+                        + (pullRequest.getCommits() * 0.5)
+                        + pullRequest.getAdditions()
+                        + pullRequest.getDeletions())
+                / 10.0;
 
         if (rawComplexity < 10) {
             return 1; // Simple
@@ -488,7 +459,7 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
         if (codeComments < complexityScore) {
             // Function goes from 0 at codeComments = 0 to 1 at codeComments = complexityScore
             codeReviewBonus +=
-                (2 * Math.sqrt(complexityScore) * Math.sqrt(codeComments)) / (codeComments + complexityScore);
+                    (2 * Math.sqrt(complexityScore) * Math.sqrt(codeComments)) / (codeComments + complexityScore);
         } else {
             // Saturate at 1
             codeReviewBonus += 1;
@@ -542,18 +513,13 @@ public class ExperiencePointCalculator implements ExperiencePointStrategy {
         Long reviewerId = reviewer.getId();
         String reviewerLogin = reviewer.getLogin();
 
-        return assignees
-            .stream()
-            .filter(Objects::nonNull)
-            .anyMatch(assignee -> {
-                if (assignee.getId() != null && reviewerId != null) {
-                    return assignee.getId().equals(reviewerId);
-                }
-                return (
-                    assignee.getLogin() != null &&
-                    reviewerLogin != null &&
-                    assignee.getLogin().equalsIgnoreCase(reviewerLogin)
-                );
-            });
+        return assignees.stream().filter(Objects::nonNull).anyMatch(assignee -> {
+            if (assignee.getId() != null && reviewerId != null) {
+                return assignee.getId().equals(reviewerId);
+            }
+            return (assignee.getLogin() != null
+                    && reviewerLogin != null
+                    && assignee.getLogin().equalsIgnoreCase(reviewerLogin));
+        });
     }
 }

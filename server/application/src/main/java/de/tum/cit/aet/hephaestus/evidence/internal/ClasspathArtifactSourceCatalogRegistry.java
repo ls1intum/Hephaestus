@@ -62,22 +62,19 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
         this.catalogDigest = sha256(catalogBytes);
         this.useDecisions = parseUseDecisions(read(objectMapper, USE_DECISIONS_RESOURCE));
         validateUseDecisions(catalog, useDecisions);
-        useDecisions
-            .values()
-            .stream()
-            .map(SourceUseDecision::expiresAt)
-            .filter(java.util.Objects::nonNull)
-            .min(Instant::compareTo)
-            .ifPresent(expiry -> {
-                long days = ChronoUnit.DAYS.between(clock.instant(), expiry);
-                if (days <= 30) {
-                    log.warn(
-                        "Artifact-source governance approval expires in {} day(s) at {}; renew the versioned source-use decisions before that deadline",
-                        days,
-                        expiry
-                    );
-                }
-            });
+        useDecisions.values().stream()
+                .map(SourceUseDecision::expiresAt)
+                .filter(java.util.Objects::nonNull)
+                .min(Instant::compareTo)
+                .ifPresent(expiry -> {
+                    long days = ChronoUnit.DAYS.between(clock.instant(), expiry);
+                    if (days <= 30) {
+                        log.warn(
+                                "Artifact-source governance approval expires in {} day(s) at {}; renew the versioned source-use decisions before that deadline",
+                                days,
+                                expiry);
+                    }
+                });
     }
 
     @Override
@@ -93,11 +90,9 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
     @Override
     public ArtifactSourceContract requireSource(SourceContractVersion version, SourceKind kind) {
         requireSupported(version);
-        ArtifactSourceContract contract = catalog
-            .source(kind)
-            .orElseThrow(() ->
-                new IllegalArgumentException("Unknown source kind for contract " + version + ": " + kind)
-            );
+        ArtifactSourceContract contract = catalog.source(kind)
+                .orElseThrow(() ->
+                        new IllegalArgumentException("Unknown source kind for contract " + version + ": " + kind));
         return contract;
     }
 
@@ -112,11 +107,9 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
      */
     @Override
     public boolean isSourceUsePermitted(SourceContractVersion version, SourceKind kind, SourceUsePurpose purpose) {
-        return requireSource(version, kind)
-            .useDecisionIds()
-            .stream()
-            .map(id -> requireUseDecision(version, id))
-            .anyMatch(decision -> decision.permitsAt(clock.instant(), purpose));
+        return requireSource(version, kind).useDecisionIds().stream()
+                .map(id -> requireUseDecision(version, id))
+                .anyMatch(decision -> decision.permitsAt(clock.instant(), purpose));
     }
 
     @Override
@@ -125,8 +118,7 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
         Set<SourceKind> sources = catalog.sourcesFor(artifactKind);
         if (sources.isEmpty()) {
             throw new IllegalArgumentException(
-                "No evidence source in contract " + version + " applies to artifact kind: " + artifactKind
-            );
+                    "No evidence source in contract " + version + " applies to artifact kind: " + artifactKind);
         }
         return sources;
     }
@@ -143,21 +135,18 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
         SourceUseDecision decision = useDecisions.get(decisionId);
         if (decision == null) {
             throw new IllegalArgumentException(
-                "Unknown source-use decision for contract " + version + ": " + decisionId
-            );
+                    "Unknown source-use decision for contract " + version + ": " + decisionId);
         }
         return decision;
     }
 
     @Override
     public Optional<Instant> earliestUseDecisionExpiry(@Nullable SourceUsePurpose purpose) {
-        return useDecisions
-            .values()
-            .stream()
-            .filter(decision -> purpose == null || decision.purpose() == purpose)
-            .map(SourceUseDecision::expiresAt)
-            .filter(java.util.Objects::nonNull)
-            .min(Instant::compareTo);
+        return useDecisions.values().stream()
+                .filter(decision -> purpose == null || decision.purpose() == purpose)
+                .map(SourceUseDecision::expiresAt)
+                .filter(java.util.Objects::nonNull)
+                .min(Instant::compareTo);
     }
 
     private void requireSupported(SourceContractVersion version) {
@@ -184,79 +173,66 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
     private static ArtifactSourceContract parseSource(JsonNode node) {
         requireObject(node, "source");
         rejectUnknown(
-            node,
-            Set.of(
-                "kind",
-                "displayName",
-                "description",
-                "selectionScope",
-                "artifactKinds",
-                "defaultRequirement",
-                "authority",
-                "identity",
-                "completeness",
-                "requiredQuality",
-                "privacyClass",
-                "supportedAbsenceStates",
-                "retentionPolicy",
-                "erasurePolicy",
-                "useDecisionIds"
-            ),
-            "source"
-        );
+                node,
+                Set.of(
+                        "kind",
+                        "displayName",
+                        "description",
+                        "selectionScope",
+                        "artifactKinds",
+                        "defaultRequirement",
+                        "authority",
+                        "identity",
+                        "completeness",
+                        "requiredQuality",
+                        "privacyClass",
+                        "supportedAbsenceStates",
+                        "retentionPolicy",
+                        "erasurePolicy",
+                        "useDecisionIds"),
+                "source");
         SourceKind kind = new SourceKind(requiredText(node, "kind", "source"));
         JsonNode identity = requiredObject(node, "identity", kind.toString());
         rejectUnknown(identity, Set.of("mode"), "identity " + kind);
-        IdentityMode identityMode = enumValue(
-            IdentityMode.class,
-            requiredText(identity, "mode", "identity " + kind),
-            "identity mode"
-        );
+        IdentityMode identityMode =
+                enumValue(IdentityMode.class, requiredText(identity, "mode", "identity " + kind), "identity mode");
 
         JsonNode completeness = requiredObject(node, "completeness", kind.toString());
         rejectUnknown(
-            completeness,
-            Set.of("supportsComplete", "supportsPartial", "supportsEmpty"),
-            "completeness " + kind
-        );
+                completeness, Set.of("supportsComplete", "supportsPartial", "supportsEmpty"), "completeness " + kind);
 
         return new ArtifactSourceContract(
-            kind,
-            requiredText(node, "displayName", kind.toString()),
-            requiredText(node, "description", kind.toString()),
-            requiredText(node, "selectionScope", kind.toString()),
-            textSet(node, "artifactKinds", kind.toString()),
-            requiredBoolean(node, "defaultRequirement", kind.toString()),
-            enumValue(SourceAuthority.class, requiredText(node, "authority", kind.toString()), "authority"),
-            new IdentityPolicy(identityMode),
-            new CompletenessPolicy(
-                requiredBoolean(completeness, "supportsComplete", kind.toString()),
-                requiredBoolean(completeness, "supportsPartial", kind.toString()),
-                requiredBoolean(completeness, "supportsEmpty", kind.toString())
-            ),
-            enumValue(
-                RequiredCaptureQuality.class,
-                requiredText(node, "requiredQuality", kind.toString()),
-                "required capture quality"
-            ),
-            enumValue(PrivacyClass.class, requiredText(node, "privacyClass", kind.toString()), "privacy class"),
-            enumSet(SourceAbsenceState.class, node, "supportedAbsenceStates", kind.toString()),
-            enumValue(
-                RetentionPolicy.class,
-                requiredText(node, "retentionPolicy", kind.toString()),
-                "retention policy"
-            ),
-            enumValue(ErasurePolicy.class, requiredText(node, "erasurePolicy", kind.toString()), "erasure policy"),
-            textSet(node, "useDecisionIds", kind.toString())
-        );
+                kind,
+                requiredText(node, "displayName", kind.toString()),
+                requiredText(node, "description", kind.toString()),
+                requiredText(node, "selectionScope", kind.toString()),
+                textSet(node, "artifactKinds", kind.toString()),
+                requiredBoolean(node, "defaultRequirement", kind.toString()),
+                enumValue(SourceAuthority.class, requiredText(node, "authority", kind.toString()), "authority"),
+                new IdentityPolicy(identityMode),
+                new CompletenessPolicy(
+                        requiredBoolean(completeness, "supportsComplete", kind.toString()),
+                        requiredBoolean(completeness, "supportsPartial", kind.toString()),
+                        requiredBoolean(completeness, "supportsEmpty", kind.toString())),
+                enumValue(
+                        RequiredCaptureQuality.class,
+                        requiredText(node, "requiredQuality", kind.toString()),
+                        "required capture quality"),
+                enumValue(PrivacyClass.class, requiredText(node, "privacyClass", kind.toString()), "privacy class"),
+                enumSet(SourceAbsenceState.class, node, "supportedAbsenceStates", kind.toString()),
+                enumValue(
+                        RetentionPolicy.class,
+                        requiredText(node, "retentionPolicy", kind.toString()),
+                        "retention policy"),
+                enumValue(ErasurePolicy.class, requiredText(node, "erasurePolicy", kind.toString()), "erasure policy"),
+                textSet(node, "useDecisionIds", kind.toString()));
     }
 
     static Map<String, SourceUseDecision> parseUseDecisions(JsonNode root) {
         requireObject(root, "source-use decisions");
         rejectUnknown(root, Set.of("contractVersion", "decisions"), "source-use decisions");
-        SourceContractVersion version = new SourceContractVersion(
-            requiredText(root, "contractVersion", "source-use decisions")
-        );
+        SourceContractVersion version =
+                new SourceContractVersion(requiredText(root, "contractVersion", "source-use decisions"));
         if (!CURRENT_VERSION.equals(version)) {
             throw new IllegalStateException("Source-use decisions have unexpected contract version: " + version);
         }
@@ -264,38 +240,35 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
         for (JsonNode node : requiredArray(root, "decisions", "source-use decisions")) {
             requireObject(node, "source-use decision");
             rejectUnknown(
-                node,
-                Set.of(
-                    "id",
-                    "sourceKind",
-                    "purpose",
-                    "basis",
-                    "outcome",
-                    "modelProcessor",
-                    "retentionPolicy",
-                    "erasurePolicy",
-                    "recordedAt",
-                    "reviewer",
-                    "decidedAt",
-                    "expiresAt"
-                ),
-                "source-use decision"
-            );
+                    node,
+                    Set.of(
+                            "id",
+                            "sourceKind",
+                            "purpose",
+                            "basis",
+                            "outcome",
+                            "modelProcessor",
+                            "retentionPolicy",
+                            "erasurePolicy",
+                            "recordedAt",
+                            "reviewer",
+                            "decidedAt",
+                            "expiresAt"),
+                    "source-use decision");
             String id = requiredText(node, "id", "source-use decision");
             SourceUseDecision decision = new SourceUseDecision(
-                id,
-                new SourceKind(requiredText(node, "sourceKind", id)),
-                enumValue(SourceUsePurpose.class, requiredText(node, "purpose", id), "source-use purpose"),
-                enumValue(SourceUseBasis.class, requiredText(node, "basis", id), "source-use basis"),
-                enumValue(SourceUseOutcome.class, requiredText(node, "outcome", id), "source-use outcome"),
-                optionalText(node, "modelProcessor", id),
-                enumValue(RetentionPolicy.class, requiredText(node, "retentionPolicy", id), "retention policy"),
-                enumValue(ErasurePolicy.class, requiredText(node, "erasurePolicy", id), "erasure policy"),
-                requiredInstant(node, "recordedAt", id),
-                optionalText(node, "reviewer", id),
-                optionalInstant(node, "decidedAt", id),
-                optionalInstant(node, "expiresAt", id)
-            );
+                    id,
+                    new SourceKind(requiredText(node, "sourceKind", id)),
+                    enumValue(SourceUsePurpose.class, requiredText(node, "purpose", id), "source-use purpose"),
+                    enumValue(SourceUseBasis.class, requiredText(node, "basis", id), "source-use basis"),
+                    enumValue(SourceUseOutcome.class, requiredText(node, "outcome", id), "source-use outcome"),
+                    optionalText(node, "modelProcessor", id),
+                    enumValue(RetentionPolicy.class, requiredText(node, "retentionPolicy", id), "retention policy"),
+                    enumValue(ErasurePolicy.class, requiredText(node, "erasurePolicy", id), "erasure policy"),
+                    requiredInstant(node, "recordedAt", id),
+                    optionalText(node, "reviewer", id),
+                    optionalInstant(node, "decidedAt", id),
+                    optionalInstant(node, "expiresAt", id));
             if (decisions.put(id, decision) != null) {
                 throw new IllegalStateException("Duplicate source-use decision: " + id);
             }
@@ -304,11 +277,9 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
     }
 
     static void validateUseDecisions(ArtifactSourceCatalog catalog, Map<String, SourceUseDecision> decisions) {
-        Set<String> referencedDecisionIds = catalog
-            .sources()
-            .stream()
-            .flatMap(source -> source.useDecisionIds().stream())
-            .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        Set<String> referencedDecisionIds = catalog.sources().stream()
+                .flatMap(source -> source.useDecisionIds().stream())
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
         if (!decisions.keySet().equals(referencedDecisionIds)) {
             throw new IllegalStateException("Source-use decisions must match the catalog exactly");
         }
@@ -322,17 +293,14 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
                 if (!covered.add(decision.purpose())) {
                     throw new IllegalStateException("Duplicate source-use purpose decision: " + decisionId);
                 }
-                if (
-                    !decision.retentionPolicy().equals(source.retentionPolicy()) ||
-                    !decision.erasurePolicy().equals(source.erasurePolicy())
-                ) {
+                if (!decision.retentionPolicy().equals(source.retentionPolicy())
+                        || !decision.erasurePolicy().equals(source.erasurePolicy())) {
                     throw new IllegalStateException("Source-use decision lifecycle does not match: " + decisionId);
                 }
             }
             if (!covered.equals(java.util.EnumSet.allOf(SourceUsePurpose.class))) {
                 throw new IllegalStateException(
-                    "Source-use decisions do not cover every product purpose: " + source.kind()
-                );
+                        "Source-use decisions do not cover every product purpose: " + source.kind());
             }
         }
     }
@@ -463,12 +431,10 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
     }
 
     private static void rejectUnknown(JsonNode node, Set<String> allowed, String context) {
-        node
-            .properties()
-            .forEach(entry -> {
-                if (!allowed.contains(entry.getKey())) {
-                    throw new IllegalStateException("Unknown field in " + context + ": " + entry.getKey());
-                }
-            });
+        node.properties().forEach(entry -> {
+            if (!allowed.contains(entry.getKey())) {
+                throw new IllegalStateException("Unknown field in " + context + ": " + entry.getKey());
+            }
+        });
     }
 }

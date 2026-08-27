@@ -14,7 +14,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organizatio
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.milestone.dto.GitHubMilestoneDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.milestone.dto.GitHubMilestoneEventDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryRefDTO;
@@ -91,10 +90,9 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private void setupTestData() {
         // Create GitHub provider
         gitProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
 
         // Create organization matching fixture data
         Organization org = new Organization();
@@ -146,21 +144,23 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         GitHubMilestoneEventDTO event = loadPayload("milestone.created");
 
         // Verify milestone doesn't exist initially
-        assertThat(milestoneRepository.findByNativeIdAndProviderId(FIXTURE_MILESTONE_ID, providerId())).isEmpty();
+        assertThat(milestoneRepository.findByNativeIdAndProviderId(FIXTURE_MILESTONE_ID, providerId()))
+                .isEmpty();
 
         handler.handleEvent(event);
 
         assertThat(milestoneRepository.findByNativeIdAndProviderId(FIXTURE_MILESTONE_ID, providerId()))
-            .isPresent()
-            .get()
-            .satisfies(milestone -> {
-                assertThat(milestone.getNativeId()).isEqualTo(FIXTURE_MILESTONE_ID);
-                assertNotNull(event.milestone());
-                assertThat(milestone.getTitle()).isEqualTo(event.milestone().title());
-                assertThat(milestone.getDescription()).isEqualTo(event.milestone().description());
-                assertThat(milestone.getState()).isEqualTo(Milestone.State.OPEN);
-                assertThat(milestone.getNumber()).isEqualTo(3);
-            });
+                .isPresent()
+                .get()
+                .satisfies(milestone -> {
+                    assertThat(milestone.getNativeId()).isEqualTo(FIXTURE_MILESTONE_ID);
+                    assertNotNull(event.milestone());
+                    assertThat(milestone.getTitle()).isEqualTo(event.milestone().title());
+                    assertThat(milestone.getDescription())
+                            .isEqualTo(event.milestone().description());
+                    assertThat(milestone.getState()).isEqualTo(Milestone.State.OPEN);
+                    assertThat(milestone.getNumber()).isEqualTo(3);
+                });
     }
 
     @Test
@@ -175,13 +175,15 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         handler.handleEvent(editEvent);
 
         assertThat(milestoneRepository.findByNativeIdAndProviderId(FIXTURE_MILESTONE_ID, providerId()))
-            .isPresent()
-            .get()
-            .satisfies(milestone -> {
-                assertNotNull(editEvent.milestone());
-                assertThat(milestone.getTitle()).isEqualTo(editEvent.milestone().title());
-                assertThat(milestone.getDescription()).isEqualTo(editEvent.milestone().description());
-            });
+                .isPresent()
+                .get()
+                .satisfies(milestone -> {
+                    assertNotNull(editEvent.milestone());
+                    assertThat(milestone.getTitle())
+                            .isEqualTo(editEvent.milestone().title());
+                    assertThat(milestone.getDescription())
+                            .isEqualTo(editEvent.milestone().description());
+                });
     }
 
     @Test
@@ -196,11 +198,11 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         handler.handleEvent(closedEvent);
 
         assertThat(milestoneRepository.findByNativeIdAndProviderId(FIXTURE_MILESTONE_ID, providerId()))
-            .isPresent()
-            .get()
-            .satisfies(milestone -> {
-                assertThat(milestone.getState()).isEqualTo(Milestone.State.CLOSED);
-            });
+                .isPresent()
+                .get()
+                .satisfies(milestone -> {
+                    assertThat(milestone.getState()).isEqualTo(Milestone.State.CLOSED);
+                });
     }
 
     @Test
@@ -222,11 +224,11 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         handler.handleEvent(openedEvent);
 
         assertThat(milestoneRepository.findByNativeIdAndProviderId(FIXTURE_MILESTONE_ID, providerId()))
-            .isPresent()
-            .get()
-            .satisfies(milestone -> {
-                assertThat(milestone.getState()).isEqualTo(Milestone.State.OPEN);
-            });
+                .isPresent()
+                .get()
+                .satisfies(milestone -> {
+                    assertThat(milestone.getState()).isEqualTo(Milestone.State.OPEN);
+                });
     }
 
     @Test
@@ -236,14 +238,16 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         handler.handleEvent(createEvent);
 
         // Verify it exists
-        assertThat(milestoneRepository.findByNativeIdAndProviderId(FIXTURE_MILESTONE_ID, providerId())).isPresent();
+        assertThat(milestoneRepository.findByNativeIdAndProviderId(FIXTURE_MILESTONE_ID, providerId()))
+                .isPresent();
 
         // Load deleted event
         GitHubMilestoneEventDTO deleteEvent = loadPayload("milestone.deleted");
 
         handler.handleEvent(deleteEvent);
 
-        assertThat(milestoneRepository.findByNativeIdAndProviderId(FIXTURE_MILESTONE_ID, providerId())).isEmpty();
+        assertThat(milestoneRepository.findByNativeIdAndProviderId(FIXTURE_MILESTONE_ID, providerId()))
+                .isEmpty();
     }
 
     private GitHubMilestoneEventDTO loadPayload(String filename) throws IOException {
@@ -257,14 +261,13 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
      */
     private GitHubRepositoryRefDTO createTestRepoRef() {
         return new GitHubRepositoryRefDTO(
-            FIXTURE_REPO_ID,
-            "R_kgDOO4CKWw",
-            FIXTURE_REPO_NAME,
-            FIXTURE_REPO_FULL_NAME,
-            false,
-            "https://github.com/" + FIXTURE_REPO_FULL_NAME,
-            null
-        );
+                FIXTURE_REPO_ID,
+                "R_kgDOO4CKWw",
+                FIXTURE_REPO_NAME,
+                FIXTURE_REPO_FULL_NAME,
+                false,
+                "https://github.com/" + FIXTURE_REPO_FULL_NAME,
+                null);
     }
 
     // Edge Case Tests
@@ -288,19 +291,19 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         void shouldHandleMissingRepositoryContext() {
             // Given - event without repository
             GitHubMilestoneDTO milestoneDto = new GitHubMilestoneDTO(
-                999999L,
-                1,
-                "orphan-milestone",
-                "Test description",
-                "open",
-                null,
-                "https://example.com",
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null // closedAt
-            );
+                    999999L,
+                    1,
+                    "orphan-milestone",
+                    "Test description",
+                    "open",
+                    null,
+                    "https://example.com",
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null // closedAt
+                    );
             GitHubMilestoneEventDTO event = new GitHubMilestoneEventDTO("created", milestoneDto, null, null);
 
             // When/Then - should not throw
@@ -312,69 +315,61 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
             // Given - create milestone DTO with null description
             Long milestoneId = 123456789L;
             GitHubMilestoneDTO milestoneDto = new GitHubMilestoneDTO(
-                milestoneId,
-                1,
-                "no-description-milestone",
-                null, // null description
-                "open",
-                null,
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/1",
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null // closedAt
-            );
-            GitHubMilestoneEventDTO event = new GitHubMilestoneEventDTO(
-                "created",
-                milestoneDto,
-                createTestRepoRef(),
-                null
-            );
+                    milestoneId,
+                    1,
+                    "no-description-milestone",
+                    null, // null description
+                    "open",
+                    null,
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/1",
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null // closedAt
+                    );
+            GitHubMilestoneEventDTO event =
+                    new GitHubMilestoneEventDTO("created", milestoneDto, createTestRepoRef(), null);
 
             handler.handleEvent(event);
 
             assertThat(milestoneRepository.findByNativeIdAndProviderId(milestoneId, providerId()))
-                .isPresent()
-                .get()
-                .satisfies(milestone -> {
-                    assertThat(milestone.getTitle()).isEqualTo("no-description-milestone");
-                    assertThat(milestone.getDescription()).isNull();
-                });
+                    .isPresent()
+                    .get()
+                    .satisfies(milestone -> {
+                        assertThat(milestone.getTitle()).isEqualTo("no-description-milestone");
+                        assertThat(milestone.getDescription()).isNull();
+                    });
         }
 
         @Test
         void shouldHandleMilestoneWithNullDueOn() {
             Long milestoneId = 234567890L;
             GitHubMilestoneDTO milestoneDto = new GitHubMilestoneDTO(
-                milestoneId,
-                2,
-                "no-due-date-milestone",
-                "Description",
-                "open",
-                null, // null dueOn
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/2",
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null // closedAt
-            );
-            GitHubMilestoneEventDTO event = new GitHubMilestoneEventDTO(
-                "created",
-                milestoneDto,
-                createTestRepoRef(),
-                null
-            );
+                    milestoneId,
+                    2,
+                    "no-due-date-milestone",
+                    "Description",
+                    "open",
+                    null, // null dueOn
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/2",
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null // closedAt
+                    );
+            GitHubMilestoneEventDTO event =
+                    new GitHubMilestoneEventDTO("created", milestoneDto, createTestRepoRef(), null);
 
             handler.handleEvent(event);
 
             assertThat(milestoneRepository.findByNativeIdAndProviderId(milestoneId, providerId()))
-                .isPresent()
-                .get()
-                .satisfies(milestone -> {
-                    assertThat(milestone.getDueOn()).isNull();
-                });
+                    .isPresent()
+                    .get()
+                    .satisfies(milestone -> {
+                        assertThat(milestone.getDueOn()).isNull();
+                    });
         }
 
         @Test
@@ -394,33 +389,29 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
             // When - update with null description (note: handler checks if dto.description() != null before setting)
             GitHubMilestoneDTO milestoneDto = new GitHubMilestoneDTO(
-                milestoneId,
-                10,
-                "has-description",
-                null, // setting to null
-                "open",
-                null,
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/10",
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null // closedAt
-            );
-            GitHubMilestoneEventDTO event = new GitHubMilestoneEventDTO(
-                "edited",
-                milestoneDto,
-                createTestRepoRef(),
-                null
-            );
+                    milestoneId,
+                    10,
+                    "has-description",
+                    null, // setting to null
+                    "open",
+                    null,
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/10",
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null // closedAt
+                    );
+            GitHubMilestoneEventDTO event =
+                    new GitHubMilestoneEventDTO("edited", milestoneDto, createTestRepoRef(), null);
             handler.handleEvent(event);
 
             // Then - description should remain unchanged (handler only updates if not null)
             assertThat(milestoneRepository.findByNativeIdAndProviderId(milestoneId, providerId()))
-                .isPresent()
-                .get()
-                .extracting(Milestone::getDescription)
-                .isEqualTo("original description");
+                    .isPresent()
+                    .get()
+                    .extracting(Milestone::getDescription)
+                    .isEqualTo("original description");
         }
 
         @Test
@@ -432,7 +423,8 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(event);
 
             // Then - only one milestone should exist
-            assertThat(milestoneRepository.findByNativeIdAndProviderId(FIXTURE_MILESTONE_ID, providerId())).isPresent();
+            assertThat(milestoneRepository.findByNativeIdAndProviderId(FIXTURE_MILESTONE_ID, providerId()))
+                    .isPresent();
             assertThat(milestoneRepository.count()).isEqualTo(1);
         }
 
@@ -440,7 +432,8 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         void shouldHandleDeletionOfNonExistentMilestone() throws Exception {
             // Given - milestone doesn't exist
             GitHubMilestoneEventDTO event = loadPayload("milestone.deleted");
-            assertThat(milestoneRepository.findByNativeIdAndProviderId(FIXTURE_MILESTONE_ID, providerId())).isEmpty();
+            assertThat(milestoneRepository.findByNativeIdAndProviderId(FIXTURE_MILESTONE_ID, providerId()))
+                    .isEmpty();
 
             // When/Then - should not throw
             assertThatCode(() -> handler.handleEvent(event)).doesNotThrowAnyException();
@@ -450,25 +443,24 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         void shouldHandleUnknownAction() {
             // Given - event with unknown action
             GitHubMilestoneDTO milestoneDto = new GitHubMilestoneDTO(
-                111222333L,
-                1,
-                "unknown-action-milestone",
-                "desc",
-                "open",
-                null,
-                "https://example.com",
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null // closedAt
-            );
+                    111222333L,
+                    1,
+                    "unknown-action-milestone",
+                    "desc",
+                    "open",
+                    null,
+                    "https://example.com",
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null // closedAt
+                    );
             GitHubMilestoneEventDTO event = new GitHubMilestoneEventDTO(
-                "unknown_action", // not created/edited/closed/opened/deleted
-                milestoneDto,
-                createTestRepoRef(),
-                null
-            );
+                    "unknown_action", // not created/edited/closed/opened/deleted
+                    milestoneDto,
+                    createTestRepoRef(),
+                    null);
 
             // When/Then - should not throw, handler will process it as non-delete
             assertThatCode(() -> handler.handleEvent(event)).doesNotThrowAnyException();
@@ -487,13 +479,13 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(event);
 
             assertThat(milestoneRepository.findByNativeIdAndProviderId(FIXTURE_MILESTONE_ID, providerId()))
-                .isPresent()
-                .get()
-                .satisfies(milestone -> {
-                    assertThat(milestone.getRepository()).isNotNull();
-                    assertThat(milestone.getRepository().getNativeId()).isEqualTo(FIXTURE_REPO_ID);
-                    assertThat(milestone.getRepository().getNameWithOwner()).isEqualTo(FIXTURE_REPO_FULL_NAME);
-                });
+                    .isPresent()
+                    .get()
+                    .satisfies(milestone -> {
+                        assertThat(milestone.getRepository()).isNotNull();
+                        assertThat(milestone.getRepository().getNativeId()).isEqualTo(FIXTURE_REPO_ID);
+                        assertThat(milestone.getRepository().getNameWithOwner()).isEqualTo(FIXTURE_REPO_FULL_NAME);
+                    });
         }
 
         @Test
@@ -503,18 +495,13 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
             assertNotNull(event.milestone());
             var foundMilestone = milestoneRepository.findByNumberAndRepositoryId(
-                event.milestone().number(),
-                testRepository.getId()
-            );
+                    event.milestone().number(), testRepository.getId());
 
-            assertThat(foundMilestone)
-                .isPresent()
-                .get()
-                .satisfies(milestone -> {
-                    assertThat(milestone.getNativeId()).isEqualTo(FIXTURE_MILESTONE_ID);
-                    assertNotNull(event.milestone());
-                    assertThat(milestone.getTitle()).isEqualTo(event.milestone().title());
-                });
+            assertThat(foundMilestone).isPresent().get().satisfies(milestone -> {
+                assertThat(milestone.getNativeId()).isEqualTo(FIXTURE_MILESTONE_ID);
+                assertNotNull(event.milestone());
+                assertThat(milestone.getTitle()).isEqualTo(event.milestone().title());
+            });
         }
     }
 
@@ -530,8 +517,8 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(createEvent);
 
             Milestone milestone = milestoneRepository
-                .findByNativeIdAndProviderId(FIXTURE_MILESTONE_ID, providerId())
-                .orElseThrow();
+                    .findByNativeIdAndProviderId(FIXTURE_MILESTONE_ID, providerId())
+                    .orElseThrow();
 
             Issue issue = new Issue();
             issue.setNativeId(12345L);
@@ -547,35 +534,31 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
             // When - edit the milestone
             GitHubMilestoneDTO editedDto = new GitHubMilestoneDTO(
-                FIXTURE_MILESTONE_ID,
-                3,
-                "Renamed Fixture Milestone",
-                "Updated description",
-                "open",
-                Instant.parse("2026-01-14T08:00:00Z"),
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/3",
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null // closedAt
-            );
-            GitHubMilestoneEventDTO editEvent = new GitHubMilestoneEventDTO(
-                "edited",
-                editedDto,
-                createTestRepoRef(),
-                null
-            );
+                    FIXTURE_MILESTONE_ID,
+                    3,
+                    "Renamed Fixture Milestone",
+                    "Updated description",
+                    "open",
+                    Instant.parse("2026-01-14T08:00:00Z"),
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/3",
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null // closedAt
+                    );
+            GitHubMilestoneEventDTO editEvent =
+                    new GitHubMilestoneEventDTO("edited", editedDto, createTestRepoRef(), null);
             handler.handleEvent(editEvent);
 
             // Then - issue should still have the milestone (now with updated title)
-            Issue updatedIssue = issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 1).orElseThrow();
-            assertThat(updatedIssue.getMilestone())
-                .isNotNull()
-                .satisfies(m -> {
-                    assertThat(m.getTitle()).isEqualTo("Renamed Fixture Milestone");
-                    assertThat(m.getDescription()).isEqualTo("Updated description");
-                });
+            Issue updatedIssue = issueRepository
+                    .findByRepositoryIdAndNumber(testRepository.getId(), 1)
+                    .orElseThrow();
+            assertThat(updatedIssue.getMilestone()).isNotNull().satisfies(m -> {
+                assertThat(m.getTitle()).isEqualTo("Renamed Fixture Milestone");
+                assertThat(m.getDescription()).isEqualTo("Updated description");
+            });
         }
     }
 

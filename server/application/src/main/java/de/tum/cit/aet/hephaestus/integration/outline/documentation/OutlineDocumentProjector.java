@@ -57,9 +57,8 @@ public class OutlineDocumentProjector implements DocumentProjection {
      * segment); a non-Outline URL that happens to match resolves to no row, so no foreign document is
      * materialised.
      */
-    private static final Pattern OUTLINE_LINK = Pattern.compile(
-        "https?://[\\w.-]+(?::\\d+)?/(?:doc|s)/[A-Za-z0-9._~-]+"
-    );
+    private static final Pattern OUTLINE_LINK =
+            Pattern.compile("https?://[\\w.-]+(?::\\d+)?/(?:doc|s)/[A-Za-z0-9._~-]+");
 
     private final OutlineDocumentRepository documentRepository;
     private final OutlineCollectionRepository collectionRepository;
@@ -69,13 +68,12 @@ public class OutlineDocumentProjector implements DocumentProjection {
     private final OutlineOriginPolicy originPolicy;
 
     public OutlineDocumentProjector(
-        OutlineDocumentRepository documentRepository,
-        OutlineCollectionRepository collectionRepository,
-        ConnectionService connectionService,
-        OutlineIdentityResolver identityResolver,
-        OutlineDocumentSelector documentSelector,
-        OutlineOriginPolicy originPolicy
-    ) {
+            OutlineDocumentRepository documentRepository,
+            OutlineCollectionRepository collectionRepository,
+            ConnectionService connectionService,
+            OutlineIdentityResolver identityResolver,
+            OutlineDocumentSelector documentSelector,
+            OutlineOriginPolicy originPolicy) {
         this.documentRepository = documentRepository;
         this.collectionRepository = collectionRepository;
         this.connectionService = connectionService;
@@ -89,20 +87,18 @@ public class OutlineDocumentProjector implements DocumentProjection {
         if (!isOriginApproved(workspaceId)) return List.of();
         AuthorContext authors = authorContext(workspaceId);
         Map<String, String> collectionNames = collectionNames(workspaceId);
-        return documentRepository
-            .findForProjection(workspaceId, PageRequest.of(0, MAX_DOCUMENTS))
-            .stream()
-            .map(doc -> project(doc, authors, collectionNames))
-            .toList();
+        return documentRepository.findForProjection(workspaceId, PageRequest.of(0, MAX_DOCUMENTS)).stream()
+                .map(doc -> project(doc, authors, collectionNames))
+                .toList();
     }
 
     @Override
     public Optional<ProjectedDocument> documentById(long workspaceId, long documentId) {
         if (!isOriginApproved(workspaceId)) return Optional.empty();
         return documentRepository
-            .findById(documentId)
-            .filter(doc -> doc.getWorkspaceId() != null && doc.getWorkspaceId() == workspaceId)
-            .map(doc -> project(doc, authorContext(workspaceId), collectionNames(workspaceId)));
+                .findById(documentId)
+                .filter(doc -> doc.getWorkspaceId() != null && doc.getWorkspaceId() == workspaceId)
+                .map(doc -> project(doc, authorContext(workspaceId), collectionNames(workspaceId)));
     }
 
     @Override
@@ -122,7 +118,7 @@ public class OutlineDocumentProjector implements DocumentProjection {
             tokens.add(trimmed);
             int lastSlash = trimmed.lastIndexOf('/');
             String lastSegment =
-                lastSlash >= 0 && lastSlash < trimmed.length() - 1 ? trimmed.substring(lastSlash + 1) : trimmed;
+                    lastSlash >= 0 && lastSlash < trimmed.length() - 1 ? trimmed.substring(lastSlash + 1) : trimmed;
             if (lastSlash >= 0 && lastSlash < trimmed.length() - 1) {
                 tokens.add(lastSegment);
             }
@@ -142,11 +138,9 @@ public class OutlineDocumentProjector implements DocumentProjection {
         }
         AuthorContext authors = authorContext(workspaceId);
         Map<String, String> collectionNames = collectionNames(workspaceId);
-        return documentRepository
-            .findByWorkspaceIdAndReferenceIn(workspaceId, tokens)
-            .stream()
-            .map(doc -> project(doc, authors, collectionNames))
-            .toList();
+        return documentRepository.findByWorkspaceIdAndReferenceIn(workspaceId, tokens).stream()
+                .map(doc -> project(doc, authors, collectionNames))
+                .toList();
     }
 
     @Override
@@ -158,10 +152,7 @@ public class OutlineDocumentProjector implements DocumentProjection {
         }
         AuthorContext authors = authorContext(workspaceId);
         Map<String, String> collectionNames = collectionNames(workspaceId);
-        return hits
-            .stream()
-            .map(doc -> project(doc, authors, collectionNames))
-            .toList();
+        return hits.stream().map(doc -> project(doc, authors, collectionNames)).toList();
     }
 
     @Override
@@ -179,39 +170,35 @@ public class OutlineDocumentProjector implements DocumentProjection {
 
     private boolean isOriginApproved(long workspaceId) {
         return connectionService
-            .findActiveOutlineConfig(workspaceId)
-            .map(ConnectionConfig.OutlineConfig::serverUrl)
-            .filter(url -> url != null && !url.isBlank())
-            .filter(originPolicy::allows)
-            .isPresent();
+                .findActiveOutlineConfig(workspaceId)
+                .map(ConnectionConfig.OutlineConfig::serverUrl)
+                .filter(url -> url != null && !url.isBlank())
+                .filter(originPolicy::allows)
+                .isPresent();
     }
 
     /** Maps a mirrored row to the agent view; a tombstoned/evicted document serves a null body. */
     private static ProjectedDocument project(
-        OutlineDocument doc,
-        AuthorContext authors,
-        Map<String, String> collectionNames
-    ) {
+            OutlineDocument doc, AuthorContext authors, Map<String, String> collectionNames) {
         boolean deleted = doc.isDeleted();
         String body = deleted ? null : doc.getBodyMarkdown();
         return new ProjectedDocument(
-            orEmpty(doc.getCollectionSlug()),
-            orEmpty(doc.getSlug()),
-            orEmpty(doc.getTitle()),
-            body,
-            deleted,
-            doc.getOutlineCreatedAt(),
-            doc.getOutlineUpdatedAt(),
-            doc.getCreatedByName(),
-            doc.getCreatedBySubject(),
-            authors.memberIdFor(doc.getCreatedBySubject()),
-            doc.getUpdatedByName(),
-            doc.getUpdatedBySubject(),
-            authors.memberIdFor(doc.getUpdatedBySubject()),
-            collaborators(doc, authors),
-            doc.isArchived(),
-            collectionNames.get(doc.getCollectionId())
-        );
+                orEmpty(doc.getCollectionSlug()),
+                orEmpty(doc.getSlug()),
+                orEmpty(doc.getTitle()),
+                body,
+                deleted,
+                doc.getOutlineCreatedAt(),
+                doc.getOutlineUpdatedAt(),
+                doc.getCreatedByName(),
+                doc.getCreatedBySubject(),
+                authors.memberIdFor(doc.getCreatedBySubject()),
+                doc.getUpdatedByName(),
+                doc.getUpdatedBySubject(),
+                authors.memberIdFor(doc.getUpdatedBySubject()),
+                collaborators(doc, authors),
+                doc.isArchived(),
+                collectionNames.get(doc.getCollectionId()));
     }
 
     /**
@@ -271,7 +258,8 @@ public class OutlineDocumentProjector implements DocumentProjection {
         if (serverUrl == null || serverUrl.isBlank()) {
             return AuthorContext.unresolvable();
         }
-        return new AuthorContext(identityResolver, workspaceId, serverUrl, active.get().getInstanceKey());
+        return new AuthorContext(
+                identityResolver, workspaceId, serverUrl, active.get().getInstanceKey());
     }
 
     /** Memoises resolver lookups so each distinct author subject resolves at most once per batch. */
@@ -284,11 +272,10 @@ public class OutlineDocumentProjector implements DocumentProjection {
         private final Map<String, Optional<Long>> memberIdBySubject = new HashMap<>();
 
         private AuthorContext(
-            @Nullable OutlineIdentityResolver resolver,
-            long workspaceId,
-            @Nullable String serverUrl,
-            @Nullable String teamId
-        ) {
+                @Nullable OutlineIdentityResolver resolver,
+                long workspaceId,
+                @Nullable String serverUrl,
+                @Nullable String teamId) {
             this.resolver = resolver;
             this.workspaceId = workspaceId;
             this.serverUrl = serverUrl;
@@ -305,8 +292,8 @@ public class OutlineDocumentProjector implements DocumentProjection {
                 return null;
             }
             return memberIdBySubject
-                .computeIfAbsent(subject, s -> resolver.resolveMemberId(workspaceId, serverUrl, teamId, s))
-                .orElse(null);
+                    .computeIfAbsent(subject, s -> resolver.resolveMemberId(workspaceId, serverUrl, teamId, s))
+                    .orElse(null);
         }
     }
 

@@ -37,41 +37,35 @@ public class UserProfileController {
 
     @GetMapping("/{login}")
     @Operation(
-        summary = "Get user profile",
-        description = "Returns user profile with workspace-scoped activity data including open PRs, review activity, and league points"
-    )
+            summary = "Get user profile",
+            description =
+                    "Returns user profile with workspace-scoped activity data including open PRs, review activity, and league points")
     @SecurityRequirements
     public ResponseEntity<ProfileDTO> getUserProfile(
-        WorkspaceContext workspaceContext,
-        @PathVariable String login,
-        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant after,
-        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant before
-    ) {
-        return ResponseEntity.ok(
-            userProfileService
+            WorkspaceContext workspaceContext,
+            @PathVariable String login,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant after,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant before) {
+        return ResponseEntity.ok(userProfileService
                 .getUserProfile(login, workspaceContext.id(), after, before)
-                .orElseThrow(() -> new EntityNotFoundException("User", login))
-        );
+                .orElseThrow(() -> new EntityNotFoundException("User", login)));
     }
 
     @GetMapping("/{login}/activity-monitor")
     @Operation(
-        summary = "Get contributor activity monitor",
-        description = "Returns workspace-scoped activity monitor data for a contributor with optional repository and limit filters"
-    )
+            summary = "Get contributor activity monitor",
+            description =
+                    "Returns workspace-scoped activity monitor data for a contributor with optional repository and limit filters")
     @SecurityRequirements
     public ResponseEntity<ProfileActivityMonitorDTO> getActivityMonitor(
-        WorkspaceContext workspaceContext,
-        @PathVariable String login,
-        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant after,
-        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant before,
-        @RequestParam(required = false) @Size(max = 100) Set<Long> repositoryIds,
-        @RequestParam(required = false) @Min(1) @Max(100) Integer limit
-    ) {
-        return ResponseEntity.ok(
-            userProfileService
+            WorkspaceContext workspaceContext,
+            @PathVariable String login,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant after,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant before,
+            @RequestParam(required = false) @Size(max = 100) Set<Long> repositoryIds,
+            @RequestParam(required = false) @Min(1) @Max(100) Integer limit) {
+        return ResponseEntity.ok(userProfileService
                 .getActivityMonitor(login, workspaceContext.id(), after, before, repositoryIds, limit)
-                .orElseThrow(() -> new EntityNotFoundException("User", login))
-        );
+                .orElseThrow(() -> new EntityNotFoundException("User", login)));
     }
 }

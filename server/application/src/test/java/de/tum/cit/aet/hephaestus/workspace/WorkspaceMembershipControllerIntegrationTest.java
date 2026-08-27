@@ -27,13 +27,8 @@ class WorkspaceMembershipControllerIntegrationTest extends AbstractWorkspaceInte
     @WithAdminUser
     void listMembersReturnsAllWorkspaceMembersForAdmin() {
         User owner = persistUser("membership-owner");
-        Workspace workspace = createWorkspace(
-            "membership-space",
-            "Membership Space",
-            "membership",
-            AccountType.ORG,
-            owner
-        );
+        Workspace workspace =
+                createWorkspace("membership-space", "Membership Space", "membership", AccountType.ORG, owner);
 
         User adminUser = TestUserFactory.ensureUser(userRepository, "admin", 3L, ensureGitHubProvider());
         workspaceMembershipService.createMembership(workspace, adminUser.getId(), WorkspaceRole.ADMIN);
@@ -42,33 +37,28 @@ class WorkspaceMembershipControllerIntegrationTest extends AbstractWorkspaceInte
         workspaceMembershipService.createMembership(workspace, member.getId(), WorkspaceRole.MEMBER);
 
         List<WorkspaceMembershipDTO> memberships = webTestClient
-            .get()
-            .uri("/workspaces/{slug}/members", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBodyList(WorkspaceMembershipDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces/{slug}/members", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBodyList(WorkspaceMembershipDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(memberships).isNotNull();
         assertThat(memberships)
-            .extracting(WorkspaceMembershipDTO::userLogin)
-            .containsExactlyInAnyOrder("admin", "membership-member", "membership-owner");
+                .extracting(WorkspaceMembershipDTO::userLogin)
+                .containsExactlyInAnyOrder("admin", "membership-member", "membership-owner");
     }
 
     @Test
     @WithAdminUser
     void adminCanAssignRoleToMember() {
         User owner = persistUser("membership-owner-2");
-        Workspace workspace = createWorkspace(
-            "membership-space-2",
-            "Membership Space 2",
-            "membership2",
-            AccountType.ORG,
-            owner
-        );
+        Workspace workspace =
+                createWorkspace("membership-space-2", "Membership Space 2", "membership2", AccountType.ORG, owner);
 
         User adminUser = TestUserFactory.ensureUser(userRepository, "admin", 3L, ensureGitHubProvider());
         workspaceMembershipService.createMembership(workspace, adminUser.getId(), WorkspaceRole.ADMIN);
@@ -79,24 +69,24 @@ class WorkspaceMembershipControllerIntegrationTest extends AbstractWorkspaceInte
         AssignRoleRequestDTO request = new AssignRoleRequestDTO(targetUser.getId(), WorkspaceRole.ADMIN);
 
         WorkspaceMembershipDTO response = webTestClient
-            .post()
-            .uri("/workspaces/{slug}/members/assign", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(request)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(WorkspaceMembershipDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .post()
+                .uri("/workspaces/{slug}/members/assign", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(WorkspaceMembershipDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(response).isNotNull();
         assertThat(response.role()).isEqualTo(WorkspaceRole.ADMIN);
 
         WorkspaceMembership updated = workspaceMembershipRepository
-            .findByWorkspace_IdAndUser_Id(workspace.getId(), targetUser.getId())
-            .orElseThrow();
+                .findByWorkspace_IdAndUser_Id(workspace.getId(), targetUser.getId())
+                .orElseThrow();
         assertThat(updated.getRole()).isEqualTo(WorkspaceRole.ADMIN);
     }
 
@@ -104,13 +94,8 @@ class WorkspaceMembershipControllerIntegrationTest extends AbstractWorkspaceInte
     @WithAdminUser
     void updateMemberVisibilityTogglesHiddenFlag() {
         User owner = persistUser("visibility-owner");
-        Workspace workspace = createWorkspace(
-            "visibility-space",
-            "Visibility Space",
-            "visibility",
-            AccountType.ORG,
-            owner
-        );
+        Workspace workspace =
+                createWorkspace("visibility-space", "Visibility Space", "visibility", AccountType.ORG, owner);
 
         User adminUser = TestUserFactory.ensureUser(userRepository, "admin", 3L, ensureGitHubProvider());
         workspaceMembershipService.createMembership(workspace, adminUser.getId(), WorkspaceRole.ADMIN);
@@ -119,22 +104,25 @@ class WorkspaceMembershipControllerIntegrationTest extends AbstractWorkspaceInte
         workspaceMembershipService.createMembership(workspace, target.getId(), WorkspaceRole.MEMBER);
 
         WorkspaceMembershipDTO hidden = webTestClient
-            .patch()
-            .uri("/workspaces/{slug}/members/{userId}/hidden?hidden=true", workspace.getWorkspaceSlug(), target.getId())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(WorkspaceMembershipDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .patch()
+                .uri(
+                        "/workspaces/{slug}/members/{userId}/hidden?hidden=true",
+                        workspace.getWorkspaceSlug(),
+                        target.getId())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(WorkspaceMembershipDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(hidden).isNotNull();
         assertThat(hidden.hidden()).isTrue();
         assertThat(workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(workspace.getId(), target.getId()))
-            .get()
-            .extracting(WorkspaceMembership::isHidden)
-            .isEqualTo(true);
+                .get()
+                .extracting(WorkspaceMembership::isHidden)
+                .isEqualTo(true);
     }
 
     @Test
@@ -165,15 +153,15 @@ class WorkspaceMembershipControllerIntegrationTest extends AbstractWorkspaceInte
 
         // Hidden member must survive the sync with hidden=true intact.
         assertThat(workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(workspace.getId(), hiddenUser.getId()))
-            .as("hidden membership must not be deleted by org sync")
-            .get()
-            .extracting(WorkspaceMembership::isHidden)
-            .isEqualTo(true);
+                .as("hidden membership must not be deleted by org sync")
+                .get()
+                .extracting(WorkspaceMembership::isHidden)
+                .isEqualTo(true);
 
         // Non-hidden absent member is still cleaned up (pre-existing behavior).
         assertThat(workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(workspace.getId(), visibleUser.getId()))
-            .as("non-hidden absent member is still removed")
-            .isEmpty();
+                .as("non-hidden absent member is still removed")
+                .isEmpty();
     }
 
     @Test
@@ -182,13 +170,8 @@ class WorkspaceMembershipControllerIntegrationTest extends AbstractWorkspaceInte
         // Defensive: ensure an unrelated role change in the same sync transaction
         // does not write-back a stale hidden=false for the hidden member.
         User owner = persistUser("rolechange-owner");
-        Workspace workspace = createWorkspace(
-            "rolechange-space",
-            "Role Change Space",
-            "rolechange",
-            AccountType.ORG,
-            owner
-        );
+        Workspace workspace =
+                createWorkspace("rolechange-space", "Role Change Space", "rolechange", AccountType.ORG, owner);
 
         User hiddenUser = persistUser("rolechange-hidden");
         workspaceMembershipService.createMembership(workspace, hiddenUser.getId(), WorkspaceRole.MEMBER);
@@ -205,14 +188,14 @@ class WorkspaceMembershipControllerIntegrationTest extends AbstractWorkspaceInte
         workspaceMembershipService.syncWorkspaceMembers(workspace, desiredRoles);
 
         assertThat(workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(workspace.getId(), hiddenUser.getId()))
-            .get()
-            .extracting(WorkspaceMembership::isHidden)
-            .isEqualTo(true);
+                .get()
+                .extracting(WorkspaceMembership::isHidden)
+                .isEqualTo(true);
 
         assertThat(workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(workspace.getId(), promoted.getId()))
-            .get()
-            .extracting(WorkspaceMembership::getRole)
-            .isEqualTo(WorkspaceRole.ADMIN);
+                .get()
+                .extracting(WorkspaceMembership::getRole)
+                .isEqualTo(WorkspaceRole.ADMIN);
     }
 
     @Test
@@ -222,22 +205,17 @@ class WorkspaceMembershipControllerIntegrationTest extends AbstractWorkspaceInte
         persistUser("mentor");
 
         User owner = persistUser("membership-owner-3");
-        Workspace workspace = createWorkspace(
-            "membership-space-3",
-            "Membership Space 3",
-            "membership3",
-            AccountType.ORG,
-            owner
-        );
+        Workspace workspace =
+                createWorkspace("membership-space-3", "Membership Space 3", "membership3", AccountType.ORG, owner);
 
         // mentor is intentionally not added to the workspace
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/members", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .get()
+                .uri("/workspaces/{slug}/members", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isForbidden();
     }
 }

@@ -56,10 +56,9 @@ public class AchievementRecalculationService {
     public void recalculateUser(User user) {
         if (ACTIVE_RECALCULATIONS.putIfAbsent(user.getId(), Boolean.TRUE) != null) {
             log.warn(
-                "Recalculation already in progress for user: userId={}, login={}. Skipping.",
-                user.getId(),
-                LoggingUtils.sanitizeForLog(user.getLogin())
-            );
+                    "Recalculation already in progress for user: userId={}, login={}. Skipping.",
+                    user.getId(),
+                    LoggingUtils.sanitizeForLog(user.getLogin()));
             return;
         }
 
@@ -77,10 +76,9 @@ public class AchievementRecalculationService {
      */
     void recalculateUserInternal(User user) {
         log.info(
-            "Starting complete achievement recalculation for user: userId={}, login={}",
-            user.getId(),
-            LoggingUtils.sanitizeForLog(user.getLogin())
-        );
+                "Starting complete achievement recalculation for user: userId={}, login={}",
+                user.getId(),
+                LoggingUtils.sanitizeForLog(user.getLogin()));
 
         // 1. Wipe existing state in its own transaction
         transactionTemplate.executeWithoutResult(status -> userAchievementRepository.deleteByUserId(user.getId()));
@@ -93,40 +91,36 @@ public class AchievementRecalculationService {
         while (true) {
             final Pageable currentPage = pageable;
             Slice<ActivityEvent> slice = transactionTemplate.execute(status ->
-                activityEventRepository.findSliceByActorIdOrderByOccurredAtAsc(user.getId(), currentPage)
-            );
+                    activityEventRepository.findSliceByActorIdOrderByOccurredAtAsc(user.getId(), currentPage));
             if (slice == null || !slice.hasContent()) {
                 break;
             }
             for (ActivityEvent event : slice.getContent()) {
                 ActivitySavedEvent savedEvent = new ActivitySavedEvent(
-                    Optional.ofNullable(event.getActor()),
-                    event.getEventType(),
-                    event.getOccurredAt(),
-                    event.getWorkspace().getId(),
-                    ActivityTargetType.fromValue(event.getTargetType()),
-                    event.getTargetId()
-                );
+                        Optional.ofNullable(event.getActor()),
+                        event.getEventType(),
+                        event.getOccurredAt(),
+                        event.getWorkspace().getId(),
+                        ActivityTargetType.fromValue(event.getTargetType()),
+                        event.getTargetId());
                 try {
                     achievementService.checkAndUnlock(savedEvent);
                 } catch (ObjectOptimisticLockingFailureException e) {
                     // Advisory lock + @Retryable should prevent this; a lost increment self-heals on the next event.
                     log.warn(
-                        "Optimistic locking conflict during recalculation (after retries exhausted) " +
-                            "for user {}, eventId={}: {}. This event's progress increment was lost.",
-                        LoggingUtils.sanitizeForLog(user.getLogin()),
-                        event.getId(),
-                        e.getMessage()
-                    );
+                            "Optimistic locking conflict during recalculation (after retries exhausted) "
+                                    + "for user {}, eventId={}: {}. This event's progress increment was lost.",
+                            LoggingUtils.sanitizeForLog(user.getLogin()),
+                            event.getId(),
+                            e.getMessage());
                 }
                 count++;
 
                 if (count % 1000 == 0) {
                     log.debug(
-                        "Recalculation progress for user {}: processed {} events",
-                        LoggingUtils.sanitizeForLog(user.getLogin()),
-                        count
-                    );
+                            "Recalculation progress for user {}: processed {} events",
+                            LoggingUtils.sanitizeForLog(user.getLogin()),
+                            count);
                 }
             }
             if (!slice.hasNext()) {
@@ -139,9 +133,8 @@ public class AchievementRecalculationService {
         achievementService.evictAchievementCache(user.getId());
 
         log.info(
-            "Completed achievement recalculation for user: login={}, eventsProcessed={}",
-            LoggingUtils.sanitizeForLog(user.getLogin()),
-            count
-        );
+                "Completed achievement recalculation for user: login={}, eventsProcessed={}",
+                LoggingUtils.sanitizeForLog(user.getLogin()),
+                count);
     }
 }
