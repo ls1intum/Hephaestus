@@ -23,7 +23,7 @@ class PrecomputeScriptPurityTest extends BaseUnitTest {
 
     private static final Path PRECOMPUTE_DIR = resolveDir(
         "src/main/resources/practices/precompute",
-        "server/src/main/resources/practices/precompute"
+        "server/application/src/main/resources/practices/precompute"
     );
 
     // The sign-neutral observation vocabulary (ADR 0021, F-6). A precompute script produces hints, never

@@ -103,7 +103,7 @@ class OrchestratorPromptWorkspaceTest extends BaseUnitTest {
         Path candidate = Path.of("src/main/resources/agent/pi-orchestrator.md");
         Path resolved = Files.exists(candidate)
             ? candidate
-            : Path.of("server/src/main/resources/agent/pi-orchestrator.md");
+            : Path.of("server/application/src/main/resources/agent/pi-orchestrator.md");
         assertThat(resolved).isRegularFile();
         return Files.readString(resolved, StandardCharsets.UTF_8);
     }

@@ -77,7 +77,7 @@ class AgentImageContractSyncTest extends BaseUnitTest {
     }
 
     private static Path resolveRepoFile(String relativePath) {
-        Path candidate = Path.of("..").resolve(relativePath);
+        Path candidate = Path.of("..", "..").resolve(relativePath);
         return Files.exists(candidate) ? candidate : Path.of(relativePath);
     }
 }

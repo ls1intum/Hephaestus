@@ -61,6 +61,8 @@ class TaskEnvelopeFixtureTest extends BaseUnitTest {
 
     private static Path resolveFixturePath() {
         Path candidate = Path.of("src/test/resources").resolve(FIXTURE_PATH);
-        return Files.exists(candidate) ? candidate : Path.of("server/src/test/resources").resolve(FIXTURE_PATH);
+        return Files.exists(candidate)
+            ? candidate
+            : Path.of("server/application/src/test/resources").resolve(FIXTURE_PATH);
     }
 }

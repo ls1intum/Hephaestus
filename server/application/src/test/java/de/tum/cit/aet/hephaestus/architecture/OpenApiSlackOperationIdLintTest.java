@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test;
 @Tag("unit")
 class OpenApiSlackOperationIdLintTest extends BaseUnitTest {
 
-    private static final Path SPEC = Path.of("openapi.yaml");
+    private static final Path SPEC = Path.of("..", "openapi.yaml");
     private static final Pattern OPERATION_ID = Pattern.compile("operationId:\\s*(\\S+)");
 
     @Test

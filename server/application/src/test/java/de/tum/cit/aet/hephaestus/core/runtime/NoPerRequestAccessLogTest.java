@@ -32,8 +32,8 @@ import org.springframework.core.io.FileSystemResource;
  */
 class NoPerRequestAccessLogTest extends BaseUnitTest {
 
-    private static final Path WEBAPP_NGINX_CONF = Path.of("..", "webapp", "docker", "nginx.conf");
-    private static final Path PROXY_COMPOSE = Path.of("..", "docker", "compose.proxy.yaml");
+    private static final Path WEBAPP_NGINX_CONF = Path.of("..", "..", "webapp", "docker", "nginx.conf");
+    private static final Path PROXY_COMPOSE = Path.of("..", "..", "docker", "compose.proxy.yaml");
     private static final Path PROD_PROFILE = Path.of("src", "main", "resources", "application-prod.yml");
 
     @Test

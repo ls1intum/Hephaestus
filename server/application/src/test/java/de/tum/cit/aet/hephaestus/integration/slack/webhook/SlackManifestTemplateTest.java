@@ -25,7 +25,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 class SlackManifestTemplateTest extends BaseUnitTest {
 
-    private static final Path MANIFEST = Path.of("..", "docs", "admin", "slack-app-manifest-template.yml");
+    private static final Path MANIFEST = Path.of("..", "..", "docs", "admin", "slack-app-manifest-template.yml");
 
     @Test
     void manifestUsesAgentViewEventsNotLegacyAssistantViewEvents() throws Exception {

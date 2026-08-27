@@ -43,8 +43,8 @@ import org.springframework.util.unit.DataSize;
  */
 class WebhookIngestionCannotFailSilentlyTest extends BaseUnitTest {
 
-    private static final Path NATS_COMPOSE = Path.of("..", "docker", "compose.core.yaml");
-    private static final Path SHIPPED_ENV = Path.of("..", "docker", ".env.example");
+    private static final Path NATS_COMPOSE = Path.of("..", "..", "docker", "compose.core.yaml");
+    private static final Path SHIPPED_ENV = Path.of("..", "..", "docker", ".env.example");
 
     /**
      * Peak measured on the deployment that filled its disk: ~46,500 GitHub deliveries and 0.75 GB in

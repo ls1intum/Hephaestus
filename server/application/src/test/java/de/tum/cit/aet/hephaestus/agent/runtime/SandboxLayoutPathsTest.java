@@ -24,7 +24,7 @@ class SandboxLayoutPathsTest extends HephaestusArchitectureTest {
 
     @Test
     void agentResourcesAreOnContextTarget() throws IOException {
-        Path agentResources = resolveDir("src/main/resources/agent", "server/src/main/resources/agent");
+        Path agentResources = resolveDir("src/main/resources/agent", "server/application/src/main/resources/agent");
         assertThat(agentResources).isDirectory();
 
         try (Stream<Path> stream = Files.walk(agentResources)) {

@@ -31,7 +31,7 @@ class ContentSourceContractTest extends BaseUnitTest {
 
     private static final Path PROVIDERS_DIR = resolveDir(
         "src/main/java/de/tum/cit/aet/hephaestus/agent/context/providers",
-        "server/src/main/java/de/tum/cit/aet/hephaestus/agent/context/providers"
+        "server/application/src/main/java/de/tum/cit/aet/hephaestus/agent/context/providers"
     );
 
     @Test

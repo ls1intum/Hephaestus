@@ -139,7 +139,7 @@ class TestTierTagCompletenessTest {
         Path serverDir = Paths.get(System.getProperty("user.dir")).toAbsolutePath();
         Path testRoot = serverDir.resolve("src/test/java/de/tum/cit/aet/hephaestus");
         if (!Files.isDirectory(testRoot)) {
-            testRoot = serverDir.resolve("server/src/test/java/de/tum/cit/aet/hephaestus");
+            testRoot = serverDir.resolve("server/application/src/test/java/de/tum/cit/aet/hephaestus");
         }
         if (!Files.isDirectory(testRoot)) {
             throw new IllegalStateException("Could not locate test source root from user.dir=" + serverDir);
