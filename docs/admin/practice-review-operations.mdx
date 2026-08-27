@@ -81,7 +81,11 @@ Metric names in the instrumented code are the source of truth for dashboards and
 **Retention.** Terminal job payloads are stripped before their rows are deleted, so row retention shorter
 than payload retention is incoherent — the application refuses to start rather than accept it. Treat the
 fabric root as sensitive storage. Delivery-policy evaluations and dispatch intents follow their owning
-job or workspace; selected coverage targets follow their workspace membership or monitored repository.
+review ledger. Disconnect, person erasure, and workspace purge remove their matching copies. Once a sent
+or withheld dispatch has been projected into that ledger, its duplicate summary and inline-comment payload
+is erased while the destination key and provider references remain as the idempotency record. A failed
+dispatch keeps its package because an administrator can still retry it. Selected coverage targets follow
+their workspace membership or monitored repository.
 
 **Dispatch recovery.** One dispatch owns the exact summary and inline comments in a review. Before each
 provider create, it reconciles the stable marker or recurrence key already stored with the provider. A

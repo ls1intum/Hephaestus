@@ -175,7 +175,11 @@ public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispat
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(
         value = "UPDATE feedback_dispatch SET projected_at = CURRENT_TIMESTAMP, projection_owner = NULL, " +
-            "projection_expires_at = NULL, updated_at = CURRENT_TIMESTAMP " +
+            "projection_expires_at = NULL, " +
+            "body = CASE WHEN state IN ('SENT', 'SUPPRESSED') THEN '' ELSE body END, " +
+            "practice_slugs = CASE WHEN state IN ('SENT', 'SUPPRESSED') THEN '[]'::jsonb ELSE practice_slugs END, " +
+            "package_content = CASE WHEN state IN ('SENT', 'SUPPRESSED') THEN '{}'::jsonb ELSE package_content END, " +
+            "updated_at = CURRENT_TIMESTAMP " +
             "WHERE id = :id AND workspace_id = :workspaceId AND projected_at IS NULL " +
             "AND projection_owner = :owner AND state IN ('SENT', 'SUPPRESSED', 'FAILED')",
         nativeQuery = true
@@ -185,7 +189,11 @@ public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispat
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(
         value = "UPDATE feedback_dispatch SET projected_at = CURRENT_TIMESTAMP, projection_owner = NULL, " +
-            "projection_expires_at = NULL, updated_at = CURRENT_TIMESTAMP " +
+            "projection_expires_at = NULL, " +
+            "body = CASE WHEN state IN ('SENT', 'SUPPRESSED') THEN '' ELSE body END, " +
+            "practice_slugs = CASE WHEN state IN ('SENT', 'SUPPRESSED') THEN '[]'::jsonb ELSE practice_slugs END, " +
+            "package_content = CASE WHEN state IN ('SENT', 'SUPPRESSED') THEN '{}'::jsonb ELSE package_content END, " +
+            "updated_at = CURRENT_TIMESTAMP " +
             "WHERE destination_key = :destinationKey AND workspace_id = :workspaceId AND projected_at IS NULL " +
             "AND projection_owner = :owner AND state IN ('SENT', 'SUPPRESSED', 'FAILED')",
         nativeQuery = true
@@ -223,4 +231,22 @@ public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispat
         nativeQuery = true
     )
     int resetFailedAutomaticPackage(@Param("jobId") UUID jobId, @Param("workspaceId") Long workspaceId);
+
+    @Modifying
+    @Query(
+        value = """
+        DELETE FROM feedback_dispatch dispatch
+        USING agent_job job
+        WHERE dispatch.workspace_id = :workspaceId
+          AND job.workspace_id = dispatch.workspace_id
+          AND job.id = dispatch.agent_job_id
+          AND job.artifact_kind IN ('scm.pull_request', 'scm.issue')
+        """,
+        nativeQuery = true
+    )
+    int deleteScmArtifactDispatches(@Param("workspaceId") long workspaceId);
+
+    @Modifying
+    @Query("DELETE FROM FeedbackDispatch dispatch WHERE dispatch.workspaceId = :workspaceId")
+    int deleteAllByWorkspaceId(@Param("workspaceId") long workspaceId);
 }

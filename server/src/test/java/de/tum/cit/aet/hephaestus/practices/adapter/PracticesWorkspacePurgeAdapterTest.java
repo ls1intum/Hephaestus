@@ -5,6 +5,8 @@ import static org.mockito.Mockito.*;
 
 import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -20,6 +22,12 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
     private FeedbackRepository feedbackRepository;
 
     @Mock
+    private DeliveryPolicyEvaluationRepository evaluationRepository;
+
+    @Mock
+    private FeedbackDispatchRepository dispatchRepository;
+
+    @Mock
     private ObservationRepository observationRepository;
 
     @Mock
@@ -33,6 +41,8 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         adapter = new PracticesWorkspacePurgeAdapter(
+            evaluationRepository,
+            dispatchRepository,
             feedbackRepository,
             observationRepository,
             practiceRepository,
@@ -50,11 +60,15 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
         // practice -> practice_area references before areas are removed). Assert the ORDER, not just the
         // calls, so a reordering refactor fails the unit test instead of only failing on a real DB.
         InOrder inOrder = inOrder(
+            evaluationRepository,
+            dispatchRepository,
             feedbackRepository,
             observationRepository,
             practiceRepository,
             practiceAreaRepository
         );
+        inOrder.verify(evaluationRepository).deleteAllByWorkspaceId(workspaceId);
+        inOrder.verify(dispatchRepository).deleteAllByWorkspaceId(workspaceId);
         inOrder.verify(feedbackRepository).deleteAllByWorkspaceId(workspaceId);
         inOrder.verify(observationRepository).deleteAllByPracticeWorkspaceId(workspaceId);
         inOrder.verify(practiceRepository).deleteAllByWorkspaceId(workspaceId);

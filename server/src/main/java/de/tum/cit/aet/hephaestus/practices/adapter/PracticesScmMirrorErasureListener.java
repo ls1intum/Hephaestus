@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.adapter;
 
 import de.tum.cit.aet.hephaestus.core.event.ScmMirrorErasedEvent;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import org.slf4j.Logger;
@@ -33,13 +35,19 @@ public class PracticesScmMirrorErasureListener {
 
     private static final Logger log = LoggerFactory.getLogger(PracticesScmMirrorErasureListener.class);
 
+    private final DeliveryPolicyEvaluationRepository evaluationRepository;
+    private final FeedbackDispatchRepository dispatchRepository;
     private final FeedbackRepository feedbackRepository;
     private final ObservationRepository observationRepository;
 
     public PracticesScmMirrorErasureListener(
+        DeliveryPolicyEvaluationRepository evaluationRepository,
+        FeedbackDispatchRepository dispatchRepository,
         FeedbackRepository feedbackRepository,
         ObservationRepository observationRepository
     ) {
+        this.evaluationRepository = evaluationRepository;
+        this.dispatchRepository = dispatchRepository;
         this.feedbackRepository = feedbackRepository;
         this.observationRepository = observationRepository;
     }
@@ -48,13 +56,17 @@ public class PracticesScmMirrorErasureListener {
     @Transactional
     public void onScmMirrorErased(ScmMirrorErasedEvent event) {
         long workspaceId = event.workspaceId();
+        int evaluationsDeleted = evaluationRepository.deleteScmArtifactEvaluations(workspaceId);
+        int dispatchesDeleted = dispatchRepository.deleteScmArtifactDispatches(workspaceId);
         // Feedback first: its DB ON DELETE CASCADE clears feedback_observation / _placement / _reaction.
         int feedbackDeleted = feedbackRepository.deleteAllScmArtifactFeedback(workspaceId);
         int observationsDeleted = observationRepository.deleteAllScmArtifactObservations(workspaceId);
-        if (feedbackDeleted > 0 || observationsDeleted > 0) {
+        if (evaluationsDeleted > 0 || dispatchesDeleted > 0 || feedbackDeleted > 0 || observationsDeleted > 0) {
             log.info(
-                "Erased SCM-derived practice rows: workspaceId={}, feedback={}, observations={}",
+                "Erased SCM-derived practice rows: workspaceId={}, evaluations={}, dispatches={}, feedback={}, observations={}",
                 workspaceId,
+                evaluationsDeleted,
+                dispatchesDeleted,
                 feedbackDeleted,
                 observationsDeleted
             );

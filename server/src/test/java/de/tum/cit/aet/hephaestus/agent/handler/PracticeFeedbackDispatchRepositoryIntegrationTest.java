@@ -7,7 +7,12 @@ import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluation;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyStage;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicySurface;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
@@ -17,6 +22,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -39,6 +45,9 @@ class PracticeFeedbackDispatchRepositoryIntegrationTest extends AbstractWorkspac
 
     @Autowired
     private FeedbackDispatchRepository dispatchRepository;
+
+    @Autowired
+    private DeliveryPolicyEvaluationRepository evaluationRepository;
 
     @Autowired
     private AgentJobRepository jobRepository;
@@ -65,6 +74,7 @@ class PracticeFeedbackDispatchRepositoryIntegrationTest extends AbstractWorkspac
         job.setWorkspace(workspace);
         job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
+        job.setArtifactKind(ArtifactKinds.PULL_REQUEST);
         job.setStatus(AgentJobStatus.COMPLETED);
         job.setConfigSnapshot(tools.jackson.databind.node.JsonNodeFactory.instance.objectNode());
         jobId = jobRepository.saveAndFlush(job).getId();
@@ -113,6 +123,37 @@ class PracticeFeedbackDispatchRepositoryIntegrationTest extends AbstractWorkspac
     }
 
     @Test
+    void scmErasureDeletesOnlyArtifactDispatchesFromTheNamedWorkspace() {
+        UUID scmDispatch = insertDispatch(workspace.getId(), jobId, "scm-erasure");
+        UUID conversationJob = saveJob(workspace, AgentJobType.CONVERSATION_REVIEW, ArtifactKinds.CONVERSATION_THREAD);
+        UUID conversationDispatch = insertDispatch(workspace.getId(), conversationJob, "conversation-survivor");
+        UUID scmEvaluation = seedEvaluation(workspace, jobId, DeliveryPolicySurface.ARTIFACT);
+        UUID conversationEvaluation = seedEvaluation(workspace, conversationJob, DeliveryPolicySurface.CONVERSATION);
+
+        User otherOwner = persistUser("other-erasure-owner");
+        Workspace other = createWorkspace(
+            "other-erasure",
+            "Other erasure",
+            "other-erasure-org",
+            AccountType.ORG,
+            otherOwner
+        );
+        UUID otherJob = saveJob(other, AgentJobType.PULL_REQUEST_REVIEW, ArtifactKinds.PULL_REQUEST);
+        UUID otherDispatch = insertDispatch(other.getId(), otherJob, "other-tenant-survivor");
+        UUID otherEvaluation = seedEvaluation(other, otherJob, DeliveryPolicySurface.ARTIFACT);
+
+        assertThat(dispatchRepository.deleteScmArtifactDispatches(workspace.getId())).isEqualTo(1);
+        assertThat(evaluationRepository.deleteScmArtifactEvaluations(workspace.getId())).isEqualTo(1);
+
+        assertThat(dispatchRepository.findById(scmDispatch)).isEmpty();
+        assertThat(dispatchRepository.findById(conversationDispatch)).isPresent();
+        assertThat(dispatchRepository.findById(otherDispatch)).isPresent();
+        assertThat(evaluationRepository.findById(scmEvaluation)).isEmpty();
+        assertThat(evaluationRepository.findById(conversationEvaluation)).isPresent();
+        assertThat(evaluationRepository.findById(otherEvaluation)).isPresent();
+    }
+
+    @Test
     void shouldNotReclaimTerminalFailure() {
         UUID dispatchId = insertDispatch(workspace.getId(), jobId, "terminal-failure");
         jdbcTemplate.update(
@@ -122,6 +163,54 @@ class PracticeFeedbackDispatchRepositoryIntegrationTest extends AbstractWorkspac
         );
 
         assertThat(claim(dispatchId, "late-redelivery", Instant.now().plusSeconds(60))).isZero();
+    }
+
+    @Test
+    void projectionErasesDeliveredPayloadButKeepsTheIdempotencyFence() {
+        String key = "projected-payload";
+        UUID dispatchId = insertDispatch(workspace.getId(), jobId, key);
+        jdbcTemplate.update(
+            "UPDATE feedback_dispatch SET state = 'SENT', delivered_external_ref = 'summary-1' WHERE id = ?",
+            dispatchId
+        );
+
+        assertThat(
+            dispatchRepository.claimProjection(
+                dispatchId,
+                workspace.getId(),
+                "projector",
+                Instant.now().plusSeconds(60)
+            )
+        ).isEqualTo(1);
+        assertThat(dispatchRepository.markProjected(dispatchId, workspace.getId(), "projector")).isEqualTo(1);
+
+        assertThat(dispatchRepository.findById(dispatchId)).hasValueSatisfying(dispatch -> {
+            assertThat(dispatch.getBody()).isEmpty();
+            assertThat(dispatch.getPracticeSlugs()).isEmpty();
+            assertThat(dispatch.packageContent()).isEmpty();
+        });
+        assertThat(tryInsertDispatch(workspace.getId(), jobId, key)).isNull();
+    }
+
+    @Test
+    void projectionKeepsFailedPayloadAvailableForAnExplicitRetry() {
+        UUID dispatchId = insertDispatch(workspace.getId(), jobId, "failed-payload");
+        jdbcTemplate.update("UPDATE feedback_dispatch SET state = 'FAILED' WHERE id = ?", dispatchId);
+
+        assertThat(
+            dispatchRepository.claimProjection(
+                dispatchId,
+                workspace.getId(),
+                "projector",
+                Instant.now().plusSeconds(60)
+            )
+        ).isEqualTo(1);
+        assertThat(dispatchRepository.markProjected(dispatchId, workspace.getId(), "projector")).isEqualTo(1);
+
+        assertThat(dispatchRepository.findById(dispatchId)).hasValueSatisfying(dispatch -> {
+            assertThat(dispatch.getBody()).isEqualTo("body");
+            assertThat(dispatch.packageContent().path("mrNote").asText()).isEqualTo("body");
+        });
     }
 
     @Test
@@ -271,6 +360,35 @@ class PracticeFeedbackDispatchRepositoryIntegrationTest extends AbstractWorkspac
             tryInsertDispatch(workspaceId, owningJobId, key),
             "the insert this test builds on must land"
         );
+    }
+
+    private UUID saveJob(Workspace owningWorkspace, AgentJobType type, ArtifactKind kind) {
+        AgentJob job = new AgentJob();
+        job.setWorkspace(owningWorkspace);
+        job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
+        job.setJobType(type);
+        job.setArtifactKind(kind);
+        job.setStatus(AgentJobStatus.COMPLETED);
+        job.setConfigSnapshot(tools.jackson.databind.node.JsonNodeFactory.instance.objectNode());
+        return jobRepository.saveAndFlush(job).getId();
+    }
+
+    private UUID seedEvaluation(Workspace owningWorkspace, UUID owningJobId, DeliveryPolicySurface surface) {
+        return evaluationRepository
+            .saveAndFlush(
+                DeliveryPolicyEvaluation.builder()
+                    .workspaceId(owningWorkspace.getId())
+                    .agentJobId(owningJobId)
+                    .admittedRevision(0L)
+                    .resolverVersion("1")
+                    .surface(surface)
+                    .stage(DeliveryPolicyStage.EGRESS)
+                    .allowed(true)
+                    .checks(tools.jackson.databind.node.JsonNodeFactory.instance.arrayNode())
+                    .facts(tools.jackson.databind.node.JsonNodeFactory.instance.objectNode())
+                    .build()
+            )
+            .getId();
     }
 
     private @Nullable UUID tryInsertDispatch(long workspaceId, UUID owningJobId, String key) {
