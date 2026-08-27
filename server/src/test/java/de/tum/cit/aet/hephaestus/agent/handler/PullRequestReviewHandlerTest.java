@@ -295,8 +295,17 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 base.headRefOid(),
                 base.baseRefName(),
                 de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals.PULL_REQUEST_REVIEWED,
-                100L,
-                200L
+                new ScmEventPayload.ReviewData(
+                    100L,
+                    "Review body",
+                    de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview.State.COMMENTED,
+                    false,
+                    null,
+                    200L,
+                    456L,
+                    null,
+                    123L
+                )
             );
 
             JobSubmission submission = handler.createSubmission(request);

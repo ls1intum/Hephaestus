@@ -21,7 +21,6 @@ import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceResolver;
-import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -335,8 +334,7 @@ public class AgentJobEventListener {
                       headRefOid,
                       pr.getBaseRefName(),
                       signalKey.signalName(),
-                      reviewData.id(),
-                      Objects.requireNonNull(reviewData.authorId())
+                      reviewData
                   );
 
         try {

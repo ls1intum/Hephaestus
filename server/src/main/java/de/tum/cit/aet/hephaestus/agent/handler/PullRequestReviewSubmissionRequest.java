@@ -86,8 +86,7 @@ public record PullRequestReviewSubmissionRequest(
         String headRefOid,
         String baseRefName,
         SignalName triggerSignal,
-        long reviewId,
-        long reviewerUserId
+        ScmEventPayload.ReviewData review
     ) {
         return new PullRequestReviewSubmissionRequest(
             pullRequest,
@@ -96,8 +95,8 @@ public record PullRequestReviewSubmissionRequest(
             baseRefName,
             triggerSignal,
             null,
-            reviewId,
-            reviewerUserId
+            review.id(),
+            Objects.requireNonNull(review.authorId(), "submitted review must have an author")
         );
     }
 }
