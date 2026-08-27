@@ -11,8 +11,8 @@ import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionItemDTO;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionPracticeDTO;
+import de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingDTO;
+import de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingObservationDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.PracticeTrend;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.PracticeTrendService;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.dto.TrendSupportDTO;
@@ -39,16 +39,16 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Builds the current developer's per-practice reflection read model. */
+/** Builds the current developer's per-practice standing read model. */
 @Service
 @RequiredArgsConstructor
-public class PracticeReflectionService {
+public class PracticeStandingService {
 
     public static final int LOOKBACK_DAYS = 90;
-    private static final int MAX_ITEMS_PER_PRACTICE = 5;
+    private static final int MAX_FEEDBACK_PER_PRACTICE = 5;
     private static final int STANDING_WINDOW = 4;
     /**
-     * Per-opportunity weight decay, newest first. Derived rather than picked: two problem-free work items in a
+     * Per-opportunity weight decay, newest first. Derived rather than picked: two problem-free pieces of reviewed work in a
      * row must be enough to acknowledge a fixed habit, which with weights {@code 1, d, d², d³} holds exactly
      * when {@code (1 + d) > 4·(d² + d³)}, i.e. {@code d < 0.5}. The effect is symmetric and intended: a fresh
      * regression shows up as fast as a fresh fix.
@@ -66,14 +66,14 @@ public class PracticeReflectionService {
     private final Clock clock;
 
     @Transactional(readOnly = true)
-    public List<ReflectionPracticeDTO> getReflection(Long workspaceId) {
-        return getReflectionSnapshot(workspaceId).cards();
+    public List<PracticeStandingDTO> getStandings(Long workspaceId) {
+        return getStandingSnapshot(workspaceId).practices();
     }
 
-    public ReflectionSnapshot getReflectionSnapshot(Long workspaceId) {
+    public StandingSnapshot getStandingSnapshot(Long workspaceId) {
         Optional<Long> currentDeveloperId = currentDeveloperLookup.currentDeveloperId();
         if (currentDeveloperId.isEmpty()) {
-            return ReflectionSnapshot.EMPTY;
+            return StandingSnapshot.EMPTY;
         }
         Instant since = clock.instant().minus(LOOKBACK_DAYS, ChronoUnit.DAYS);
         Long developerId = currentDeveloperId.get();
@@ -127,7 +127,7 @@ public class PracticeReflectionService {
         Map<String, Double> standingShareByPractice = evidenceBySlug
             .values()
             .stream()
-            .filter(PracticeEvidence::hasCard)
+            .filter(PracticeEvidence::hasStanding)
             .collect(
                 Collectors.toMap(
                     PracticeEvidence::slug,
@@ -151,7 +151,7 @@ public class PracticeReflectionService {
                     .add(practice.getSlug());
             }
         }
-        List<ReflectionPracticeDTO> cards = cards(
+        List<PracticeStandingDTO> practices = practices(
             evidenceBySlug,
             eligiblePractices,
             trends,
@@ -159,9 +159,9 @@ public class PracticeReflectionService {
             deliveredGuidance
         );
 
-        return new ReflectionSnapshot(
+        return new StandingSnapshot(
             developerId,
-            cards,
+            practices,
             evidenceByPractice,
             eligiblePracticesByArea,
             standingShareByPractice
@@ -174,10 +174,10 @@ public class PracticeReflectionService {
      * <p>The UNION of two sets, both needed. The eligible practices are what the workspace currently watches;
      * they belong here even with nothing to report, because "no observation reached this" and "the reviews ran
      * and found nothing" are different answers a developer cannot otherwise tell apart.
-     * The practices that produced a card are added even when review is no longer admitted for them: that
+     * The practices that has a standing are added even when review is no longer admitted for them: that
      * feedback was raised and delivered, and switching a practice off does not un-say it.
      */
-    private static List<ReflectionPracticeDTO> cards(
+    private static List<PracticeStandingDTO> practices(
         Map<String, PracticeEvidence> evidenceBySlug,
         List<Practice> eligiblePractices,
         Map<String, PracticeTrend> trends,
@@ -195,13 +195,13 @@ public class PracticeReflectionService {
                 PracticeEvidence evidence = evidenceBySlug.get(entry.getKey());
                 Double share = standingShareByPractice.get(entry.getKey());
                 return evidence != null && share != null
-                    ? toCard(evidence, requireTrend(trends, entry.getKey()), deliveredGuidance, share)
-                    : silentCard(entry.getValue(), evidence);
+                    ? toStanding(evidence, requireTrend(trends, entry.getKey()), deliveredGuidance, share)
+                    : silentStanding(entry.getValue(), evidence);
             })
             .sorted(
-                Comparator.<ReflectionPracticeDTO>comparingInt(card -> standingRank(card.standing())).thenComparingInt(
-                    PracticeReflectionService::worstSeverityOrdinal
-                )
+                Comparator.<PracticeStandingDTO>comparingInt(practiceStanding ->
+                    standingRank(practiceStanding.standing())
+                ).thenComparingInt(PracticeStandingService::worstSeverityOrdinal)
             )
             .toList();
     }
@@ -215,18 +215,18 @@ public class PracticeReflectionService {
      *
      * <p>No trend either: a direction over evidence that produced no verdict would be a claim about nothing.
      */
-    private static ReflectionPracticeDTO silentCard(Practice practice, @Nullable PracticeEvidence evidence) {
+    private static PracticeStandingDTO silentStanding(Practice practice, @Nullable PracticeEvidence evidence) {
         boolean exercised =
             evidence != null && (!evidence.withoutVerdict().isEmpty() || evidence.suppressedStrengths() > 0);
         PracticeArea area = practice.getArea();
-        return new ReflectionPracticeDTO(
+        return new PracticeStandingDTO(
             practice.getSlug(),
             practice.getName(),
             area != null ? area.getSlug() : null,
             area != null ? area.getName() : null,
             practice.getWhyItMatters(),
             practice.getWhatGoodLooksLike(),
-            exercised ? ReflectionPracticeDTO.Standing.NO_OPPORTUNITY : ReflectionPracticeDTO.Standing.NOT_OBSERVED,
+            exercised ? PracticeStandingDTO.Standing.NO_OPPORTUNITY : PracticeStandingDTO.Standing.NOT_OBSERVED,
             List.of(),
             List.of(),
             null,
@@ -235,13 +235,13 @@ public class PracticeReflectionService {
     }
 
     /**
-     * One card, complete on first construction.
+     * One practice response, complete on first construction.
      *
-     * <p>The trend is required, not optional: every practice that has a card has an entry in the evidence map
+     * <p>The trend is required, not optional: every practice that has a standing has an entry in the evidence map
      * the trends were derived from, so a missing trend is a programming error rather than a state to render
      * around.
      */
-    private static ReflectionPracticeDTO toCard(
+    private static PracticeStandingDTO toStanding(
         PracticeEvidence evidence,
         PracticeTrend trend,
         Map<UUID, String> deliveredGuidance,
@@ -249,7 +249,7 @@ public class PracticeReflectionService {
     ) {
         Practice practice = evidence.practice();
         PracticeArea area = practice.getArea();
-        return new ReflectionPracticeDTO(
+        return new PracticeStandingDTO(
             practice.getSlug(),
             practice.getName(),
             area != null ? area.getSlug() : null,
@@ -257,24 +257,24 @@ public class PracticeReflectionService {
             practice.getWhyItMatters(),
             practice.getWhatGoodLooksLike(),
             StandingScale.classify(standingShare),
-            items(evidence.problems(), MAX_ITEMS_PER_PRACTICE, deliveredGuidance),
-            items(evidence.strengths(), MAX_STRENGTHS_PER_PRACTICE, deliveredGuidance),
+            feedback(evidence.problems(), MAX_FEEDBACK_PER_PRACTICE, deliveredGuidance),
+            feedback(evidence.strengths(), MAX_STRENGTHS_PER_PRACTICE, deliveredGuidance),
             trend.direction(),
             TrendSupportDTO.from(trend.support())
         );
     }
 
     /**
-     * The trend of a practice that produced a card.
+     * The trend of a practice that has a standing.
      *
      * <p>Never absent: the trends were derived from exactly the evidence map these practices came from,
      * so a missing entry is a programming error rather than a state to render around.
      */
     private static PracticeTrend requireTrend(Map<String, PracticeTrend> trends, String slug) {
-        return Objects.requireNonNull(trends.get(slug), () -> "no trend for practice with a card: " + slug);
+        return Objects.requireNonNull(trends.get(slug), () -> "no trend for practice with a standing: " + slug);
     }
 
-    private static List<ReflectionItemDTO> items(
+    private static List<PracticeStandingObservationDTO> feedback(
         List<Observation> observations,
         int cap,
         Map<UUID, String> deliveredGuidance
@@ -282,7 +282,9 @@ public class PracticeReflectionService {
         return observations
             .stream()
             .limit(cap)
-            .map(observation -> ReflectionItemDTO.from(observation, deliveredGuidance.get(observation.getId())))
+            .map(observation ->
+                PracticeStandingObservationDTO.from(observation, deliveredGuidance.get(observation.getId()))
+            )
             .toList();
     }
 
@@ -291,11 +293,11 @@ public class PracticeReflectionService {
      * this number, and the level above consumes the number rather than the label.
      *
      * <p>One rule over the newest {@link #STANDING_WINDOW} opportunities, weighted by recency. It replaced a
-     * pair that disagreed about both unit and denominator: an existence test over items that could not tell
+     * pair that disagreed about both unit and denominator: an existence test over observations that could not tell
      * one problem from fifty, plus a clean-streak override over opportunities that could.
      *
      * <p>The fallback is unreachable while the look-back and the trend horizon are both
-     * {@link #LOOKBACK_DAYS} days, since a card exists only where some observation produced a verdict.
+     * {@link #LOOKBACK_DAYS} days, since a standing exists only where some observation produced a verdict.
      */
     private static double standingShare(PracticeEvidence evidence, PracticeTrend trend) {
         return trend
@@ -306,9 +308,9 @@ public class PracticeReflectionService {
     /**
      * One practice's window of observations, split by what each one says about the developer.
      *
-     * <p>Split once, then read by everything downstream: the card's two lists, the trend's evidence, the
+     * <p>Split once, then read by everything downstream: the practice's two lists, the trend's evidence, the
      * census. Deriving each separately from the raw group is what previously required three output parameters
-     * and a provisional card.
+     * and a provisional standing.
      */
     private record PracticeEvidence(
         Practice practice,
@@ -352,7 +354,7 @@ public class PracticeReflectionService {
                     bucket(byOutcome, ObservationOutcome.COMMISSION_PROBLEM).stream(),
                     bucket(byOutcome, ObservationOutcome.OMISSION_GAP).stream()
                 )
-                    .sorted(Comparator.comparingInt(PracticeReflectionService::severityOrdinal))
+                    .sorted(Comparator.comparingInt(PracticeStandingService::severityOrdinal))
                     .toList(),
                 detectorStrengthIsIncoherent
                     ? avoided
@@ -378,7 +380,7 @@ public class PracticeReflectionService {
          *
          * <p>The verdictless rows belong here even though they can never move a direction. The bundler drops an
          * opportunity that produced no verdict at all, so including them changes no share and no posterior; what
-         * it does change is that a work item the practice looked at and could not judge is visible as an
+         * it does change is that a piece of reviewed work that the practice looked at and could not judge is visible as an
          * opportunity that yielded nothing, rather than as an absence indistinguishable from work that was never
          * reviewed. That is the same distinction {@code NO_OPPORTUNITY} draws one level up.
          */
@@ -390,29 +392,29 @@ public class PracticeReflectionService {
         }
 
         /** Whether this practice has anything to say to the developer. */
-        boolean hasCard() {
+        boolean hasStanding() {
             return !problems.isEmpty() || !strengths.isEmpty();
         }
     }
 
     /**
-     * @param standingShareByPractice the continuous standing of every practice that produced a card, keyed by
+     * @param standingShareByPractice the continuous standing of every practice that has a standing, keyed by
      *     slug. The level above aggregates THIS rather than the rendered labels, which would put 0.79 and 0.51
-     *     at the same weight. Kept out of {@link ReflectionPracticeDTO}: the developer's card carries no score.
+     *     at the same weight. Kept out of {@link PracticeStandingDTO}: the developer-facing response carries no score.
      */
-    public record ReflectionSnapshot(
+    public record StandingSnapshot(
         @Nullable Long developerId,
-        List<ReflectionPracticeDTO> cards,
+        List<PracticeStandingDTO> practices,
         Map<String, List<Observation>> evidenceByPractice,
         Map<String, List<String>> eligiblePracticesByArea,
         Map<String, Double> standingShareByPractice
     ) {
-        static final ReflectionSnapshot EMPTY = new ReflectionSnapshot(null, List.of(), Map.of(), Map.of(), Map.of());
+        static final StandingSnapshot EMPTY = new StandingSnapshot(null, List.of(), Map.of(), Map.of(), Map.of());
     }
 
     /**
      * The lanes whose text this read model's guidance means: the ones that speak about the one observation
-     * they are bound to. {@code IN_APP} is excluded because it is a message about a habit across several
+     * they are bound to. {@code IN_APP} is excluded because it is feedback about a habit across several
      * pieces of work, so it would answer "what did you tell me about this observation" with a paragraph that
      * is explicitly not about it.
      */
@@ -432,7 +434,7 @@ public class PracticeReflectionService {
     }
 
     /** Verdicts first and worst first; silences last. */
-    private static int standingRank(ReflectionPracticeDTO.Standing standing) {
+    private static int standingRank(PracticeStandingDTO.Standing standing) {
         return switch (standing) {
             case DEVELOPING -> 0;
             case MIXED -> 1;
@@ -442,11 +444,13 @@ public class PracticeReflectionService {
         };
     }
 
-    private static int worstSeverityOrdinal(ReflectionPracticeDTO card) {
-        return card
+    private static int worstSeverityOrdinal(PracticeStandingDTO practiceStanding) {
+        return practiceStanding
             .toWorkOn()
             .stream()
-            .mapToInt(item -> item.severity() == null ? Severity.values().length : item.severity().ordinal())
+            .mapToInt(observation ->
+                observation.severity() == null ? Severity.values().length : observation.severity().ordinal()
+            )
             .min()
             .orElse(Severity.values().length);
     }

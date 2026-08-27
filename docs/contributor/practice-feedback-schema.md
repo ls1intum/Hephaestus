@@ -122,18 +122,17 @@ record perceived usefulness (`HELPFUL` or `UNHELPFUL`), a resolution (`ADDRESSED
 `NOT_APPLICABLE`), or both. `DISPUTED` requires a comment because it rejects the feedback's judgement;
 usefulness alone does not change standing, trend, or re-nag suppression.
 
-Usefulness, resolution, and the optional comment are retained independently when a later submission omits
-them. A withdrawal clears all three.
+PUT replaces the complete response; omitted dimensions are cleared. DELETE removes the response. Both
+operations are idempotent at the API boundary.
 
-Responses are append-only. Each submission records an event, and read projections fold the active events
-for that feedback and recipient into the current response. This preserves changes of mind without counting
-historical answers as several currently resolved pieces of feedback.
+Response history is append-only in persistence. Read projections expose only the current response, so a
+change of mind never counts as several currently resolved pieces of feedback.
 
 ## Read projections and access
 
 The persistence model is not an authorization boundary. Controllers define who may see each projection:
 
-- developer observation list, detail, summary, and reflection endpoints are scoped to the authenticated
+- developer observation list, detail, and summary endpoints, and practice standings are scoped to the authenticated
   developer;
 - the pull-request observation projection shows workspace members every relevant observation for that pull
   request;

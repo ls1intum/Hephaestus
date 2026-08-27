@@ -26,17 +26,17 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Functional coverage for {@code GET /practice-areas/{areaSlug}/review-history} — the developer-facing record of
+ * Functional coverage for {@code GET /practice-areas/{areaSlug}/review-runs} — the developer-facing record of
  * what each review run saw.
  *
  * <p>The grain is the point: a run is returned whole or not at all, so the two queries behind it (which runs,
  * then their observations) must agree. And an undecided observation has to survive to the payload — this surface is
  * the inspectable record, so a practice that ran and hedged must not read like one that never ran.
  */
-class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrationTest {
+class PracticeAreaReviewRunIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static final String HISTORY_URI = "/workspaces/{workspaceSlug}/practice-areas/{areaSlug}/review-history";
+    private static final String REVIEW_RUNS_URI = "/workspaces/{workspaceSlug}/practice-areas/{areaSlug}/review-runs";
 
     /** Delivery authorization reads the run's evidence contract, so every fixture observation cites a source. */
     private static final String DIFF_EVIDENCE_JSON =
@@ -70,14 +70,8 @@ class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrat
 
     @BeforeEach
     void setUpWorkspace() {
-        User owner = persistUser("review-history-owner");
-        workspace = createWorkspace(
-            "review-history-ws",
-            "Review History WS",
-            "review-history-org",
-            AccountType.ORG,
-            owner
-        );
+        User owner = persistUser("review-runs-owner");
+        workspace = createWorkspace("review-runs-ws", "Review History WS", "review-runs-org", AccountType.ORG, owner);
 
         developer = persistUser("testuser");
         ensureWorkspaceMembership(workspace, developer, WorkspaceMembership.WorkspaceRole.MEMBER);
@@ -117,7 +111,7 @@ class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrat
         return agentJobRepository.save(job);
     }
 
-    private void insertFinding(
+    private void insertObservation(
         String title,
         String presence,
         @org.jspecify.annotations.Nullable String assessment,
@@ -125,7 +119,7 @@ class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrat
         String artifactKind,
         Long artifactId
     ) {
-        insertFinding(
+        insertObservation(
             practice,
             agentJob,
             title,
@@ -138,7 +132,7 @@ class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrat
         );
     }
 
-    private void insertFinding(
+    private void insertObservation(
         Practice observedPractice,
         AgentJob reviewJob,
         String title,
@@ -174,7 +168,7 @@ class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrat
     private WebTestClient.BodyContentSpec getHistory() {
         return webTestClient
             .get()
-            .uri(HISTORY_URI, workspace.getWorkspaceSlug(), area.getSlug())
+            .uri(REVIEW_RUNS_URI, workspace.getWorkspaceSlug(), area.getSlug())
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()
@@ -186,8 +180,8 @@ class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrat
     @WithUser
     @DisplayName("returns a review run whole, with every observation that explains it")
     void shouldReturnCompleteRun() {
-        insertFinding("Motivation is clear", "PRESENT", "GOOD", null, ArtifactKinds.PULL_REQUEST.value(), 1L);
-        insertFinding("No testing notes", "ABSENT", "BAD", "MAJOR", ArtifactKinds.PULL_REQUEST.value(), 1L);
+        insertObservation("Motivation is clear", "PRESENT", "GOOD", null, ArtifactKinds.PULL_REQUEST.value(), 1L);
+        insertObservation("No testing notes", "ABSENT", "BAD", "MAJOR", ArtifactKinds.PULL_REQUEST.value(), 1L);
 
         getHistory()
             .jsonPath("$.content.length()")
@@ -201,8 +195,8 @@ class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrat
     @Test
     @WithUser
     @DisplayName("carries an undecided observation with a null assessment rather than dropping it")
-    void shouldCarryInconclusiveFindingWithoutAnAssessment() {
-        insertFinding("Could not tell from the diff", "INCONCLUSIVE", null, null, "scm.pull_request", 1L);
+    void shouldCarryInconclusiveObservationWithoutAnAssessment() {
+        insertObservation("Could not tell from the diff", "INCONCLUSIVE", null, null, "scm.pull_request", 1L);
 
         getHistory()
             .jsonPath("$.content.length()")
@@ -219,7 +213,7 @@ class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrat
     @WithUser
     @DisplayName("an unfiltered request is not silently narrowed to pull requests")
     void shouldNotDefaultToPullRequestsWhenNoKindFilterIsGiven() {
-        insertFinding("Issue lacks acceptance criteria", "ABSENT", "BAD", "MINOR", ArtifactKinds.ISSUE.value(), 7L);
+        insertObservation("Issue lacks acceptance criteria", "ABSENT", "BAD", "MINOR", ArtifactKinds.ISSUE.value(), 7L);
 
         getHistory()
             .jsonPath("$.content.length()")
@@ -232,9 +226,16 @@ class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrat
 
     @Test
     @WithUser
-    @DisplayName("a run that produced nothing to judge is not a moment in the history")
+    @DisplayName("a run that produced nothing to judge is absent from the history")
     void shouldOmitRunsWithoutAnythingToJudge() {
-        insertFinding("Nothing to judge here", "NOT_APPLICABLE", null, null, ArtifactKinds.PULL_REQUEST.value(), 1L);
+        insertObservation(
+            "Nothing to judge here",
+            "NOT_APPLICABLE",
+            null,
+            null,
+            ArtifactKinds.PULL_REQUEST.value(),
+            1L
+        );
 
         getHistory().jsonPath("$.content.length()").isEqualTo(0);
     }
@@ -242,13 +243,13 @@ class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrat
     @Test
     @WithUser
     void shouldSelectRunsByMatchingSeverityWithoutTreatingStrengthsAsMatches() {
-        insertFinding("Motivation is clear", "PRESENT", "GOOD", null, ArtifactKinds.PULL_REQUEST.value(), 1L);
+        insertObservation("Motivation is clear", "PRESENT", "GOOD", null, ArtifactKinds.PULL_REQUEST.value(), 1L);
 
         webTestClient
             .get()
             .uri(uriBuilder ->
                 uriBuilder
-                    .path(HISTORY_URI)
+                    .path(REVIEW_RUNS_URI)
                     .queryParam("severities", "MAJOR")
                     .build(workspace.getWorkspaceSlug(), area.getSlug())
             )
@@ -265,7 +266,7 @@ class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrat
     @WithUser
     void shouldFillAPageAfterWithholdingANewerRun() {
         AgentJob olderJob = persistAgentJob(workspace);
-        insertFinding(
+        insertObservation(
             practice,
             olderJob,
             "Visible observation",
@@ -279,7 +280,7 @@ class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrat
 
         Practice superseded = persistPractice(workspace, area, "superseded", "Superseded");
         AgentJob newerJob = persistAgentJob(workspace);
-        insertFinding(
+        insertObservation(
             superseded,
             newerJob,
             "Withheld observation",
@@ -298,7 +299,10 @@ class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrat
         webTestClient
             .get()
             .uri(uriBuilder ->
-                uriBuilder.path(HISTORY_URI).queryParam("size", 1).build(workspace.getWorkspaceSlug(), area.getSlug())
+                uriBuilder
+                    .path(REVIEW_RUNS_URI)
+                    .queryParam("size", 1)
+                    .build(workspace.getWorkspaceSlug(), area.getSlug())
             )
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
@@ -315,7 +319,7 @@ class PracticeAreaReviewHistoryIntegrationTest extends AbstractWorkspaceIntegrat
     @WithUser
     @DisplayName("a run whose observations the visibility gate withholds leaves the page entirely")
     void shouldWithholdARunMeasuredAgainstSupersededReviewRules() {
-        insertFinding("Motivation is clear", "PRESENT", "GOOD", null, ArtifactKinds.PULL_REQUEST.value(), 1L);
+        insertObservation("Motivation is clear", "PRESENT", "GOOD", null, ArtifactKinds.PULL_REQUEST.value(), 1L);
         practice.setCriteria("Rewritten criteria, which is what makes the fingerprint differ");
         practice.setArea(area);
         practice.setCurrentRevision(practiceRevisionRepository.save(new PracticeRevision(practice, 2)));

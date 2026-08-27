@@ -16,11 +16,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
-class ReflectionItemDTOTest extends BaseUnitTest {
+class PracticeStandingObservationDTOTest extends BaseUnitTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private static Observation finding(@Nullable String evidenceJson) {
+    private static Observation observation(@Nullable String evidenceJson) {
         return Observation.builder()
             .id(UUID.randomUUID())
             .summary("Distance-warning logic ships with no test")
@@ -52,57 +52,78 @@ class ReflectionItemDTOTest extends BaseUnitTest {
     @Test
     @DisplayName("a real source location renders as path:line")
     void realSourceLocation() {
-        var item = ReflectionItemDTO.from(finding(citation("client/App/Services/AR/FrameRecorder.swift", 212)), null);
-        assertThat(item.locator()).isEqualTo("client/App/Services/AR/FrameRecorder.swift:212");
+        var result = PracticeStandingObservationDTO.from(
+            observation(citation("client/App/Services/AR/FrameRecorder.swift", 212)),
+            null
+        );
+        assertThat(result.locator()).isEqualTo("client/App/Services/AR/FrameRecorder.swift:212");
     }
 
     @Test
     @DisplayName("an agent-internal context file is NOT leaked as a locator")
     void internalContextPathSuppressed() {
         assertThat(
-            ReflectionItemDTO.from(finding(citation("test_presence.json", 1, "scm.pull-request.core")), null).locator()
+            PracticeStandingObservationDTO.from(
+                observation(citation("test_presence.json", 1, "scm.pull-request.core")),
+                null
+            ).locator()
         ).isNull();
         assertThat(
-            ReflectionItemDTO.from(finding(citation("review_threads.json", 1, "scm.pull-request.core")), null).locator()
+            PracticeStandingObservationDTO.from(
+                observation(citation("review_threads.json", 1, "scm.pull-request.core")),
+                null
+            ).locator()
         ).isNull();
         assertThat(
-            ReflectionItemDTO.from(finding(citation("metadata.json", 1, "scm.pull-request.core")), null).locator()
+            PracticeStandingObservationDTO.from(
+                observation(citation("metadata.json", 1, "scm.pull-request.core")),
+                null
+            ).locator()
         ).isNull();
     }
 
     @Test
     @DisplayName("a repository file named metadata.json remains a valid code locator")
     void repositoryMetadataFileIsNotMistakenForInternalContext() {
-        var item = ReflectionItemDTO.from(finding(citation("metadata.json", 12)), null);
-        assertThat(item.locator()).isEqualTo("metadata.json:12");
+        var result = PracticeStandingObservationDTO.from(observation(citation("metadata.json", 12)), null);
+        assertThat(result.locator()).isEqualTo("metadata.json:12");
     }
 
     @Test
     @DisplayName("C2: inputs/practices and the input manifest stay suppressed as internal plumbing")
     void practicesAndManifestStillSuppressed() {
         assertThat(
-            ReflectionItemDTO.from(finding(citation("index.json", 1, "scm.pull-request.core")), null).locator()
+            PracticeStandingObservationDTO.from(
+                observation(citation("index.json", 1, "scm.pull-request.core")),
+                null
+            ).locator()
         ).isNull();
         assertThat(
-            ReflectionItemDTO.from(finding(citation("manifest.json", 1, "scm.pull-request.core")), null).locator()
+            PracticeStandingObservationDTO.from(
+                observation(citation("manifest.json", 1, "scm.pull-request.core")),
+                null
+            ).locator()
         ).isNull();
     }
 
     @Test
     @DisplayName("no evidence / no location → no locator (not an error)")
     void noLocation() {
-        assertThat(ReflectionItemDTO.from(finding(null), null).locator()).isNull();
-        assertThatThrownBy(() -> ReflectionItemDTO.from(finding("{\"citations\":[]}"), null)).isInstanceOf(
-            IllegalArgumentException.class
-        );
+        assertThat(PracticeStandingObservationDTO.from(observation(null), null).locator()).isNull();
+        assertThatThrownBy(() ->
+            PracticeStandingObservationDTO.from(observation("{\"citations\":[]}"), null)
+        ).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     @DisplayName("deliveredFeedback is the delivered feedback body passed in — null when nothing was delivered")
     void deliveredFeedbackComesFromDeliveredBody() {
         assertThat(
-            ReflectionItemDTO.from(finding(null), "Add a unit test for evaluateDistance.").deliveredFeedback()
+            PracticeStandingObservationDTO.from(
+                observation(null),
+                "Add a unit test for evaluateDistance."
+            ).deliveredFeedback()
         ).isEqualTo("Add a unit test for evaluateDistance.");
-        assertThat(ReflectionItemDTO.from(finding(null), null).deliveredFeedback()).isNull();
+        assertThat(PracticeStandingObservationDTO.from(observation(null), null).deliveredFeedback()).isNull();
     }
 }

@@ -16,8 +16,8 @@ import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionItemDTO;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionPracticeDTO;
+import de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingDTO;
+import de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingObservationDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.PracticeTrendService;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.TrendProperties;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
@@ -39,15 +39,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
 
-/**
- * Guards the reflection surface's severity sort, which orders a card's "to work on" items CRITICAL-first.
- * A BAD observation can legitimately carry a {@code null} severity (the band is only meaningful when the
- * detector assigned one); a naive {@code Comparator.comparingInt(severity::ordinal)} NPEs the whole
- * {@code /reflection} endpoint. The sort treats {@code null} as least-severe, so it must not throw and the
- * null-severity item sorts after a graded one.
- */
 @ExtendWith(MockitoExtension.class)
-class PracticeReflectionServiceTest extends BaseUnitTest {
+class PracticeStandingServiceTest extends BaseUnitTest {
 
     private static final Long WORKSPACE_ID = 1L;
     private static final Long USER_ID = 7L;
@@ -74,7 +67,7 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
     @Mock
     private Clock clock;
 
-    private PracticeReflectionService practiceReflectionService;
+    private PracticeStandingService practiceStandingService;
 
     @BeforeEach
     void setUp() {
@@ -89,7 +82,7 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
         lenient()
             .when(workspaceReviewDefaultsProvider.forWorkspace(WORKSPACE_ID))
             .thenReturn(WorkspaceReviewDefaults.UNSET);
-        practiceReflectionService = new PracticeReflectionService(
+        practiceStandingService = new PracticeStandingService(
             observationRepository,
             feedbackObservationRepository,
             currentDeveloperLookup,
@@ -130,7 +123,7 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
             .build();
     }
 
-    /** A problem-free review of one work item: what a recovered practice looks like in the evidence. */
+    /** A problem-free review of one piece of reviewed work: what a recovered practice looks like in the evidence. */
     private Observation good(Practice practice, long artifactId) {
         return Observation.builder()
             .id(UUID.randomUUID())
@@ -146,7 +139,7 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
     }
 
     /**
-     * One review run per artifact, ordered so a higher artifact id is the more recent work item. The trend's
+     * One review run per artifact, ordered so a higher artifact id is the more recent piece of reviewed work. The trend's
      * bundling is opportunity-indexed, so the exact instants only have to be distinct and inside the window.
      */
     private static Instant observedAtOf(long artifactId) {
@@ -166,7 +159,7 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("two clean newer work items restore STRENGTH even though an older review found a problem")
+    @DisplayName("two clean newer pieces of reviewed work restore STRENGTH even though an older review found a problem")
     void recentCleanEvidenceOutweighsTheOlderRecord() {
         Practice practice = practice("robust-error-handling");
         when(
@@ -182,15 +175,15 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
             List.of()
         );
 
-        List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
+        List<PracticeStandingDTO> standings = practiceStandingService.getStandings(WORKSPACE_ID);
 
-        assertThat(cards).hasSize(1);
-        assertThat(cards.get(0).standing()).isEqualTo(ReflectionPracticeDTO.Standing.STRENGTH);
-        assertThat(cards.get(0).toWorkOn()).hasSize(1);
+        assertThat(standings).hasSize(1);
+        assertThat(standings.get(0).standing()).isEqualTo(PracticeStandingDTO.Standing.STRENGTH);
+        assertThat(standings.get(0).toWorkOn()).hasSize(1);
     }
 
     @Test
-    @DisplayName("one clean work item after a problem does not outweigh it — the standing stays MIXED")
+    @DisplayName("one clean piece of reviewed work after a problem does not outweigh it — the standing stays MIXED")
     void singleCleanOpportunityDoesNotRestoreStrength() {
         Practice practice = practice("robust-error-handling");
         when(
@@ -206,14 +199,14 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
             List.of()
         );
 
-        List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
+        List<PracticeStandingDTO> standings = practiceStandingService.getStandings(WORKSPACE_ID);
 
-        assertThat(cards).hasSize(1);
-        assertThat(cards.get(0).standing()).isEqualTo(ReflectionPracticeDTO.Standing.MIXED);
+        assertThat(standings).hasSize(1);
+        assertThat(standings.get(0).standing()).isEqualTo(PracticeStandingDTO.Standing.MIXED);
     }
 
     @Test
-    @DisplayName("one problem on the newest work item moves the standing to MIXED, but does not condemn")
+    @DisplayName("one problem on the newest piece of reviewed work moves the standing to MIXED, but does not condemn")
     void aSingleFreshProblemDoesNotCondemn() {
         Practice practice = practice("robust-error-handling");
         when(
@@ -231,10 +224,10 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
             List.of()
         );
 
-        List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
+        List<PracticeStandingDTO> standings = practiceStandingService.getStandings(WORKSPACE_ID);
 
-        assertThat(cards).hasSize(1);
-        assertThat(cards.get(0).standing()).isEqualTo(ReflectionPracticeDTO.Standing.MIXED);
+        assertThat(standings).hasSize(1);
+        assertThat(standings.get(0).standing()).isEqualTo(PracticeStandingDTO.Standing.MIXED);
     }
 
     @Test
@@ -261,14 +254,14 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
             List.of()
         );
 
-        List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
+        List<PracticeStandingDTO> standings = practiceStandingService.getStandings(WORKSPACE_ID);
 
-        assertThat(cards).hasSize(1);
-        assertThat(cards.get(0).standing()).isEqualTo(ReflectionPracticeDTO.Standing.DEVELOPING);
+        assertThat(standings).hasSize(1);
+        assertThat(standings.get(0).standing()).isEqualTo(PracticeStandingDTO.Standing.DEVELOPING);
     }
 
     @Test
-    @DisplayName("only the newest four work items decide the standing, however long the older record is")
+    @DisplayName("only the newest four pieces of reviewed work decide the standing, however long the older record is")
     void olderWorkItemsFallOutOfTheStandingWindow() {
         Practice practice = practice("robust-error-handling");
         when(
@@ -296,16 +289,16 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
             List.of()
         );
 
-        List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
+        List<PracticeStandingDTO> standings = practiceStandingService.getStandings(WORKSPACE_ID);
 
-        assertThat(cards).hasSize(1);
-        assertThat(cards.get(0).standing()).isEqualTo(ReflectionPracticeDTO.Standing.STRENGTH);
-        assertThat(cards.get(0).toWorkOn()).hasSize(5);
+        assertThat(standings).hasSize(1);
+        assertThat(standings.get(0).standing()).isEqualTo(PracticeStandingDTO.Standing.STRENGTH);
+        assertThat(standings.get(0).toWorkOn()).hasSize(5);
     }
 
     @Test
     @DisplayName("a BAD observation with null severity does not NPE the sort and ranks after a graded one")
-    void nullSeverityDoesNotBreakReflectionSort() {
+    void nullSeverityDoesNotBreakStandingSort() {
         Practice practice = new Practice();
         practice.setSlug("robust-error-handling");
         practice.setName("Handling failure robustly");
@@ -324,10 +317,10 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
             List.of()
         );
 
-        List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
+        List<PracticeStandingDTO> standings = practiceStandingService.getStandings(WORKSPACE_ID);
 
-        assertThat(cards).hasSize(1);
-        List<Severity> order = cards
+        assertThat(standings).hasSize(1);
+        List<Severity> order = standings
             .get(0)
             .toWorkOn()
             .stream()
@@ -337,7 +330,7 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("a problem seen on a single work item is shown, not withheld for lack of corroboration")
+    @DisplayName("a problem seen on a single piece of reviewed work is shown, not withheld for lack of corroboration")
     void singleArtifactProblemIsShownWorstFirst() {
         Practice practice = practice("robust-error-handling");
         Observation critical = bad(practice, Severity.CRITICAL, 42L);
@@ -356,18 +349,20 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
             List.of()
         );
 
-        List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
+        List<PracticeStandingDTO> standings = practiceStandingService.getStandings(WORKSPACE_ID);
 
-        assertThat(cards).hasSize(1);
-        List<ReflectionItemDTO> items = cards.get(0).toWorkOn();
-        assertThat(items.stream().map(ReflectionItemDTO::observationId)).containsExactly(
+        assertThat(standings).hasSize(1);
+        List<PracticeStandingObservationDTO> observations = standings.get(0).toWorkOn();
+        assertThat(observations.stream().map(PracticeStandingObservationDTO::observationId)).containsExactly(
             critical.getId(),
             minor.getId()
         );
     }
 
     @Test
-    @DisplayName("every problem in the window reaches the card, whichever locus or work item it came from")
+    @DisplayName(
+        "every problem in the window reaches the standing, whichever locus or piece of reviewed work it came from"
+    )
     void unrelatedProblemsAcrossLociAreAllListed() {
         Practice practice = practice("robust-error-handling");
         Observation locusA = bad(practice, Severity.CRITICAL, 42L, "locus-A");
@@ -386,12 +381,11 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
             List.of()
         );
 
-        List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
+        List<PracticeStandingDTO> standings = practiceStandingService.getStandings(WORKSPACE_ID);
 
-        assertThat(cards).hasSize(1);
-        assertThat(cards.get(0).toWorkOn().stream().map(ReflectionItemDTO::observationId)).containsExactlyInAnyOrder(
-            locusA.getId(),
-            locusB.getId()
-        );
+        assertThat(standings).hasSize(1);
+        assertThat(
+            standings.get(0).toWorkOn().stream().map(PracticeStandingObservationDTO::observationId)
+        ).containsExactlyInAnyOrder(locusA.getId(), locusB.getId());
     }
 }

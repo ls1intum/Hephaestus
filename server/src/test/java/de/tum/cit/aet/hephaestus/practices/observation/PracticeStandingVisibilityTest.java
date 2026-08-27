@@ -18,8 +18,8 @@ import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionItemDTO;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionPracticeDTO;
+import de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingDTO;
+import de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingObservationDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.PracticeTrendService;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.TrendProperties;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
@@ -42,15 +42,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
 
-/**
- * Guards the reflection read model's severity sort, which orders a card's "to work on" items CRITICAL-first.
- * A BAD observation can legitimately carry a {@code null} severity (the band is only meaningful when the
- * detector assigned one); a naive {@code Comparator.comparingInt(severity::ordinal)} NPEs the whole
- * {@code /reflection} endpoint. The sort treats {@code null} as least-severe, so it must not throw and the
- * null-severity item sorts after a graded one.
- */
 @ExtendWith(MockitoExtension.class)
-class PracticeReflectionVisibilityTest extends BaseUnitTest {
+class PracticeStandingVisibilityTest extends BaseUnitTest {
 
     private static final Long WORKSPACE_ID = 1L;
     private static final Instant NOW = Instant.parse("2026-08-05T10:00:00Z");
@@ -77,7 +70,7 @@ class PracticeReflectionVisibilityTest extends BaseUnitTest {
     @Mock
     private Clock clock;
 
-    private PracticeReflectionService practiceReflectionService;
+    private PracticeStandingService practiceStandingService;
 
     @BeforeEach
     void setUp() {
@@ -92,7 +85,7 @@ class PracticeReflectionVisibilityTest extends BaseUnitTest {
                 Collection<Observation> batch = invocation.getArgument(1);
                 return batch.stream().map(Observation::getId).collect(Collectors.toSet());
             });
-        practiceReflectionService = new PracticeReflectionService(
+        practiceStandingService = new PracticeStandingService(
             observationRepository,
             feedbackObservationRepository,
             currentDeveloperLookup,
@@ -144,13 +137,13 @@ class PracticeReflectionVisibilityTest extends BaseUnitTest {
             visibilityPolicy.permitsAll(WORKSPACE_ID, List.of(observation), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)
         ).thenReturn(Set.of());
 
-        assertThat(practiceReflectionService.getReflection(WORKSPACE_ID)).isEmpty();
+        assertThat(practiceStandingService.getStandings(WORKSPACE_ID)).isEmpty();
         verifyNoInteractions(feedbackObservationRepository);
     }
 
     @Test
     @DisplayName("a BAD observation with null severity does not NPE the sort and ranks after a graded one")
-    void nullSeverityDoesNotBreakReflectionSort() {
+    void nullSeverityDoesNotBreakStandingSort() {
         Practice practice = new Practice();
         practice.setSlug("robust-error-handling");
         practice.setName("Handling failure robustly");
@@ -169,10 +162,10 @@ class PracticeReflectionVisibilityTest extends BaseUnitTest {
             List.of()
         );
 
-        List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
+        List<PracticeStandingDTO> standings = practiceStandingService.getStandings(WORKSPACE_ID);
 
-        assertThat(cards).hasSize(1);
-        List<Severity> order = cards
+        assertThat(standings).hasSize(1);
+        List<Severity> order = standings
             .get(0)
             .toWorkOn()
             .stream()
@@ -182,7 +175,7 @@ class PracticeReflectionVisibilityTest extends BaseUnitTest {
         assertThat(order).containsExactly(Severity.CRITICAL, null);
     }
 
-    // ── A defect detector's strength reaches the card ─────────────────────────
+    // ── A defect detector's strength reaches the standing ─────────────────────────
     //
     // The point of making (ABSENT, GOOD) reachable at all. Suppressing every GOOD row for a defect detector
     // was the read-time half of a rule that turned "you wrote clean error handling" into "this work had no
@@ -231,28 +224,28 @@ class PracticeReflectionVisibilityTest extends BaseUnitTest {
         Practice practice = defectDetector("handles-errors-instead-of-swallowing-them");
         feeds(strength(practice, Presence.ABSENT));
 
-        List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
+        List<PracticeStandingDTO> standings = practiceStandingService.getStandings(WORKSPACE_ID);
 
-        assertThat(cards).hasSize(1);
-        assertThat(cards.get(0).strengths()).hasSize(1);
-        assertThat(cards.get(0).toWorkOn()).isEmpty();
+        assertThat(standings).hasSize(1);
+        assertThat(standings.get(0).strengths()).hasSize(1);
+        assertThat(standings.get(0).toWorkOn()).isEmpty();
     }
 
     @Test
-    @DisplayName("a defect detector's (PRESENT, GOOD) is still withheld, but the card says the detector ran")
+    @DisplayName("a defect detector's (PRESENT, GOOD) is still withheld, but the standing says the detector ran")
     void defectDetectorPresentGoodIsStillWithheld() {
         Practice practice = defectDetector("handles-errors-instead-of-swallowing-them");
         feeds(strength(practice, Presence.PRESENT));
 
-        List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
+        List<PracticeStandingDTO> standings = practiceStandingService.getStandings(WORKSPACE_ID);
 
         // The suppression holds: an incoherent strength never becomes one. But the run is still evidence that
-        // the practice was exercised, so the card reports NO_OPPORTUNITY rather than vanishing — silently
+        // the practice was exercised, so the standing reports NO_OPPORTUNITY rather than vanishing — silently
         // dropping it would make a working detector read exactly like one that was never configured.
-        assertThat(cards).hasSize(1);
-        assertThat(cards.get(0).standing()).isEqualTo(ReflectionPracticeDTO.Standing.NO_OPPORTUNITY);
-        assertThat(cards.get(0).strengths()).isEmpty();
-        assertThat(cards.get(0).toWorkOn()).isEmpty();
+        assertThat(standings).hasSize(1);
+        assertThat(standings.get(0).standing()).isEqualTo(PracticeStandingDTO.Standing.NO_OPPORTUNITY);
+        assertThat(standings.get(0).strengths()).isEmpty();
+        assertThat(standings.get(0).toWorkOn()).isEmpty();
     }
 
     @Test
@@ -263,9 +256,9 @@ class PracticeReflectionVisibilityTest extends BaseUnitTest {
         Practice practice = practice("robust-error-handling");
         feeds(strength(practice, Presence.PRESENT), strength(practice, Presence.ABSENT));
 
-        List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
+        List<PracticeStandingDTO> standings = practiceStandingService.getStandings(WORKSPACE_ID);
 
-        assertThat(cards).hasSize(1);
-        assertThat(cards.get(0).strengths()).hasSize(2);
+        assertThat(standings).hasSize(1);
+        assertThat(standings.get(0).strengths()).hasSize(2);
     }
 }

@@ -126,11 +126,7 @@ class CatalogOriginPresentationTest extends BaseUnitTest {
         CatalogOriginPresenter presenter = mock(CatalogOriginPresenter.class);
         List<PracticeArea> areas = List.of(mock(PracticeArea.class), mock(PracticeArea.class));
         when(service.listAreas(CTX, null)).thenReturn(areas);
-        PracticeAreaController controller = new PracticeAreaController(
-            service,
-            mock(PracticeAreaStandingService.class),
-            presenter
-        );
+        PracticeAreaController controller = new PracticeAreaController(service, presenter);
 
         controller.listAreas(CTX, null);
 

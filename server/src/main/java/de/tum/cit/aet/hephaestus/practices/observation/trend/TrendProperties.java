@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.observation.trend;
 
-import de.tum.cit.aet.hephaestus.practices.observation.PracticeReflectionService;
+import de.tum.cit.aet.hephaestus.practices.observation.PracticeStandingService;
 import jakarta.annotation.PostConstruct;
 import lombok.Getter;
 import lombok.Setter;
@@ -29,8 +29,8 @@ public class TrendProperties {
         if (!(credibilityThreshold > 0.5 && credibilityThreshold < 1.0)) {
             throw new IllegalArgumentException("Trend credibility-threshold must be between 0.5 and 1");
         }
-        if (horizonDays < 1 || horizonDays > PracticeReflectionService.LOOKBACK_DAYS) {
-            throw new IllegalArgumentException("Trend horizon-days must not exceed the reflection lookback");
+        if (horizonDays < 1 || horizonDays > PracticeStandingService.LOOKBACK_DAYS) {
+            throw new IllegalArgumentException("Trend horizon-days must not exceed the standing lookback");
         }
     }
 }

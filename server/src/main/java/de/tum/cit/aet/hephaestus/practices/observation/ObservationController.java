@@ -5,7 +5,6 @@ import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ObservationDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ObservationListDTO;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionPracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
@@ -45,7 +44,6 @@ public class ObservationController {
 
     private final ObservationService observationService;
     private final EvidenceAuthorization evidenceAuthorization;
-    private final PracticeReflectionService practiceReflectionService;
 
     @GetMapping
     @Operation(
@@ -84,24 +82,6 @@ public class ObservationController {
             .map(DeveloperPracticeSummaryDTO::from)
             .toList();
         return ResponseEntity.ok(summaries);
-    }
-
-    @GetMapping("/reflection")
-    @Operation(
-        summary = "Reflective dashboard feedback for the current developer",
-        description = "Per-practice cards a developer can READ — why the practice matters, what good looks like, " +
-            "where they stand, the specific feedback to act on, and what they already do well. The third feedback " +
-            "channel alongside in-context SCM notes and the conversational mentor; the same observations " +
-            "reorganised by practice for self-paced reflection, not a scoreboard of counts."
-    )
-    @ApiResponse(
-        responseCode = "200",
-        description = "Per-practice reflection cards returned",
-        content = @Content(array = @ArraySchema(schema = @Schema(implementation = ReflectionPracticeDTO.class)))
-    )
-    @SecurityRequirements
-    public ResponseEntity<List<ReflectionPracticeDTO>> getReflection(WorkspaceContext workspaceContext) {
-        return ResponseEntity.ok(practiceReflectionService.getReflection(workspaceContext.id()));
     }
 
     @GetMapping("/{observationId}")

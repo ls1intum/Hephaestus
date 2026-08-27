@@ -5,12 +5,10 @@ import de.tum.cit.aet.hephaestus.core.AuditLedger;
 import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeAreaDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.PracticeAreaStandingDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticeAreasRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeAutonomyRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
-import de.tum.cit.aet.hephaestus.practices.observation.PracticeAreaStandingService;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
@@ -55,7 +53,6 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 public class PracticeAreaController {
 
     private final PracticeAreaService areaService;
-    private final PracticeAreaStandingService practiceAreaStandingService;
     private final CatalogOriginPresenter presenter;
 
     @GetMapping
@@ -96,25 +93,6 @@ public class PracticeAreaController {
         return ResponseEntity.ok(
             presenter.present(workspaceContext.id(), areaService.getArea(workspaceContext, areaSlug))
         );
-    }
-
-    @GetMapping("/standings")
-    @Operation(
-        summary = "Derived practice-area standings for the current developer",
-        description = "Aggregates the authenticated developer's latest-run observations across every active practice " +
-            "area into qualitative standings, with supporting feedback attached so each standing stays " +
-            "traceable to real feedback. Without a displayable observation the standing reports why: NOT_OBSERVED " +
-            "or NO_OPPORTUNITY."
-    )
-    @ApiResponse(
-        responseCode = "200",
-        description = "Active-area standings returned",
-        content = @Content(array = @ArraySchema(schema = @Schema(implementation = PracticeAreaStandingDTO.class)))
-    )
-    @SecurityRequirements
-    public ResponseEntity<List<PracticeAreaStandingDTO>> getPracticeAreaStandings(WorkspaceContext workspaceContext) {
-        List<PracticeArea> activeAreas = areaService.listAreas(workspaceContext, true);
-        return ResponseEntity.ok(practiceAreaStandingService.getAreaStandings(workspaceContext.id(), activeAreas));
     }
 
     @PostMapping

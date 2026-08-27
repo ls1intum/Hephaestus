@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.OptionalDouble;
 import org.jspecify.annotations.Nullable;
 
-/** Complete internal trend result; learner DTOs intentionally omit its scalar posterior diagnostics. */
+/** Complete internal trend result; developer-facing DTOs intentionally omit its scalar posterior diagnostics. */
 public final class PracticeTrend {
 
     private final String slug;
@@ -61,13 +61,13 @@ public final class PracticeTrend {
      * or empty when none of them produced a verdict.
      *
      * <p>Opportunity-indexed like the trend itself, so a single busy day cannot manufacture a standing and a
-     * quiet week cannot erode one — the unit is a reviewed work item, never a calendar bin. Opportunities that
+     * quiet week cannot erode one — the unit is a reviewed piece of reviewed work, never a calendar bin. Opportunities that
      * carry no applicable outcome are skipped rather than counted as either side, so a review that had no
      * chance to exercise the practice neither helps nor hurts, and it does not push genuine evidence out of
      * the window either.
      *
      * <p>Each opportunity contributes its own {@link OutcomeVector#positiveShare()}, not a clean/dirty bit, so
-     * a work item that went half well is counted as half well rather than rounded to a problem.
+     * a piece of reviewed work that went half well is counted as half well rather than rounded to a problem.
      *
      * <p>Weights fall geometrically with age ({@code decay^0, decay^1, …} from the newest), which is what lets
      * one rule do the job two used to: recent evidence dominates, so a fixed habit is acknowledged within a

@@ -29,7 +29,7 @@ public class FeedbackResponseService {
     private final FeedbackRepository feedbackRepository;
     private final CurrentDeveloperLookup currentDeveloperLookup;
 
-    public FeedbackResponseDTO submitResponse(
+    public FeedbackResponseDTO replaceResponse(
         WorkspaceContext workspaceContext,
         UUID feedbackId,
         FeedbackResponseRequestDTO request
@@ -38,26 +38,49 @@ public class FeedbackResponseService {
         Feedback feedback = requireDeliveredFeedback(workspaceContext.id(), feedbackId, recipientId);
         validate(request);
 
-        boolean withdrawing = Boolean.TRUE.equals(request.withdraw());
+        Optional<FeedbackResponseDTO> current = currentResponse(feedbackId, recipientId);
+        if (current.filter(response -> sameResponse(response, request)).isPresent()) {
+            return current.get();
+        }
+
         Reaction response = Reaction.builder()
             .feedback(feedback)
             .feedbackId(feedbackId)
             .reactorUserId(recipientId)
-            .usefulness(withdrawing ? null : request.usefulness())
-            .resolution(withdrawing ? null : request.resolution())
-            .explanation(withdrawing ? null : request.comment())
+            .usefulness(request.usefulness())
+            .resolution(request.resolution())
+            .explanation(request.comment())
             .build();
         reactionRepository.save(response);
 
         log.info(
-            "Recorded feedback response: feedbackId={}, usefulness={}, resolution={}, withdrawn={}, recipientUserId={}",
+            "Replaced feedback response: feedbackId={}, usefulness={}, resolution={}, recipientUserId={}",
             feedbackId,
             response.getUsefulness(),
             response.getResolution(),
-            withdrawing,
             recipientId
         );
         return currentResponse(feedbackId, recipientId).orElseGet(() -> FeedbackResponseDTO.none(feedbackId));
+    }
+
+    public void deleteResponse(WorkspaceContext workspaceContext, UUID feedbackId) {
+        long recipientId = currentDeveloperLookup.currentDeveloperIdElseThrow();
+        Feedback feedback = requireDeliveredFeedback(workspaceContext.id(), feedbackId, recipientId);
+        if (currentResponse(feedbackId, recipientId).isEmpty()) {
+            return;
+        }
+        reactionRepository.save(
+            Reaction.builder().feedback(feedback).feedbackId(feedbackId).reactorUserId(recipientId).build()
+        );
+        log.info("Deleted feedback response: feedbackId={}, recipientUserId={}", feedbackId, recipientId);
+    }
+
+    private boolean sameResponse(FeedbackResponseDTO current, FeedbackResponseRequestDTO replacement) {
+        return (
+            current.usefulness() == replacement.usefulness() &&
+            current.resolution() == replacement.resolution() &&
+            java.util.Objects.equals(current.comment(), replacement.comment())
+        );
     }
 
     @Transactional(readOnly = true)
@@ -110,12 +133,6 @@ public class FeedbackResponseService {
     }
 
     private void validate(FeedbackResponseRequestDTO request) {
-        if (Boolean.TRUE.equals(request.withdraw())) {
-            if (request.usefulness() != null || request.resolution() != null || request.comment() != null) {
-                throw new IllegalArgumentException("A withdrawal cannot carry an answer");
-            }
-            return;
-        }
         if (request.usefulness() == null && request.resolution() == null) {
             throw new IllegalArgumentException("A feedback response requires usefulness or resolution");
         }

@@ -3,20 +3,20 @@
  * moving.
  *
  * <p><b>The one idea the package rests on:</b> the unit of analysis is an evidence opportunity, meaning one
- * reviewed work item, and never a unit of clock time. Repository activity is bursty, so a calendar bin gives
+ * reviewed piece of reviewed work, and never a unit of clock time. Repository activity is bursty, so a calendar bin gives
  * unequal and partly empty samples; a day with six pull requests and a day with one are not two comparable
  * draws. Timestamps survive as provenance only, never as a bin, an axis, or a comparison boundary.
  *
- * <p>Same choice as opportunity-indexed learner models (Bayesian Knowledge Tracing, Performance Factors
+ * <p>Same choice as opportunity-indexed developer-facing models (Bayesian Knowledge Tracing, Performance Factors
  * Analysis), which count practice opportunities rather than calendar periods.
  *
  * <h2>The pipeline, in order</h2>
  * <ol>
  *   <li>{@code OutcomeVector} — what one observation, or one run's worth of them, said: strengths and safe
  *       avoidances against commission problems and omission gaps, plus the ones that produced no verdict.</li>
- *   <li>{@code EvidenceOpportunity} — one reviewed work item, its outcomes normalized across the latest run
+ *   <li>{@code EvidenceOpportunity} — one reviewed piece of reviewed work, its outcomes normalized across the latest run
  *       that judged it. This is the sample.</li>
- *   <li>{@code OpportunityBundler} — groups observations per artifact and splits the newest opportunities
+ *   <li>{@code OpportunityBundler} — groups observations per piece of reviewed work and splits the newest opportunities
  *       into the two bundles a comparison needs.</li>
  *   <li>{@code BetaPosterior} — the mathematics, and the only place any is done. A Jeffreys-prior beta
  *       posterior per bundle, and their difference on a discrete grid because a difference of two beta
@@ -33,7 +33,7 @@
  *
  * <h2>The three small enums, and why they are separate files</h2>
  * They are vocabulary, not logic, and Java admits one public top-level type per file. The house rule is to
- * nest an enum in the type that owns it — as {@code ReflectionPracticeDTO.Standing} is nested — and to keep
+ * nest an enum in the type that owns it — as {@code PracticeStandingDTO.Standing} is nested — and to keep
  * it top-level when several types share it. These are shared:
  * <ul>
  *   <li>{@code TrendDirection} — the package's OUTWARD term. It reaches {@code practices.dto} and

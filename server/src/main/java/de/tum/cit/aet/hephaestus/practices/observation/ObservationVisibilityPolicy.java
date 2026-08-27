@@ -28,7 +28,7 @@ public class ObservationVisibilityPolicy {
      * decided first and per observation, so a stale claim costs no authorization read at all.
      *
      * <p>Every observation that clears currentness is authorized in one round trip rather than one each.
-     * The surfaces that ask this ask it about a whole page — a reflection dashboard authorizes every
+     * The surfaces that ask this ask it about a whole page — a practice standings authorizes every
      * observation a developer has in the window — so a per-observation form made the round trips a
      * function of how much work the developer did.
      *

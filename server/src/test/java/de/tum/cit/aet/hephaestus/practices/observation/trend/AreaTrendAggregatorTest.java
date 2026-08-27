@@ -68,7 +68,7 @@ class AreaTrendAggregatorTest {
 
     @Test
     void shouldMergeOneArtifactSeveralPracticesSawIntoOnePoint() {
-        // Two practices reviewing the same pull request is one work item to a reader. Merging them by artifact
+        // Two practices reviewing the same pull request is one piece of reviewed work to a reader. Merging them by artifact
         // is what stops an area's chart from drawing the same PR once per practice — and what stops the
         // opportunity counts from inflating with the number of practices rather than the amount of work.
         PracticeTrend naming = PracticeTrendCalculator.calculatePractice(

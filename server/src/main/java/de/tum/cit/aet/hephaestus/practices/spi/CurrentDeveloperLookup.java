@@ -8,7 +8,7 @@ import java.util.Optional;
  * and feedback against.
  *
  * <p>Practices needs one fact about the caller — their developer id — and used to reach into the SCM
- * user store for it. That coupled a learner-facing read model to an integration's entity, so the whole
+ * user store for it. That coupled a developer-facing read model to an integration's entity, so the whole
  * module could not be reasoned about without it. The id is deliberately the only thing this port
  * returns: a caller that wants a name, an avatar, or a provider identity is asking a question that
  * belongs to whoever owns users, not to a practice surface.

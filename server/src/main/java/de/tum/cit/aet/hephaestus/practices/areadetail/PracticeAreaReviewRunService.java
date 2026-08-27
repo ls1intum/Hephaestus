@@ -3,9 +3,9 @@ package de.tum.cit.aet.hephaestus.practices.areadetail;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeAreaService;
-import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewHistoryPageDTO;
 import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewObservationDTO;
 import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewRunDTO;
+import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewRunsPageDTO;
 import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewedWorkDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.DeliveredFeedbackBinding;
@@ -38,7 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 /** Builds the developer-facing history at review-run grain instead of leaking raw observation pagination. */
 @Service
 @RequiredArgsConstructor
-public class PracticeAreaReviewHistoryService {
+public class PracticeAreaReviewRunService {
 
     private final PracticeAreaService practiceAreaService;
     private final ObservationRepository observationRepository;
@@ -48,7 +48,7 @@ public class PracticeAreaReviewHistoryService {
     private final ObservationVisibilityPolicy visibilityPolicy;
 
     @Transactional(readOnly = true)
-    public PracticeAreaReviewHistoryPageDTO list(
+    public PracticeAreaReviewRunsPageDTO list(
         WorkspaceContext workspaceContext,
         String areaSlug,
         @Nullable String practiceSlug,
@@ -59,7 +59,7 @@ public class PracticeAreaReviewHistoryService {
         practiceAreaService.getArea(workspaceContext, areaSlug);
         var currentDeveloperId = currentDeveloperLookup.currentDeveloperId();
         if (currentDeveloperId.isEmpty()) {
-            return new PracticeAreaReviewHistoryPageDTO(
+            return new PracticeAreaReviewRunsPageDTO(
                 List.of(),
                 pageable.getPageNumber(),
                 pageable.getPageSize(),
@@ -82,7 +82,7 @@ public class PracticeAreaReviewHistoryService {
         int candidatePage = 0;
         boolean moreCandidates;
         do {
-            Slice<ReviewHistoryRunRow> runs = observationRepository.findReviewHistoryRuns(
+            Slice<ReviewHistoryRunRow> runs = observationRepository.findPracticeAreaReviewRuns(
                 currentDeveloperId.get(),
                 workspaceContext.id(),
                 areaSlug,
@@ -100,7 +100,7 @@ public class PracticeAreaReviewHistoryService {
         int end = Math.min(first + pageable.getPageSize(), visibleRuns.size());
         List<PracticeAreaReviewRunDTO> content =
             first >= visibleRuns.size() ? List.of() : List.copyOf(visibleRuns.subList(first, end));
-        return new PracticeAreaReviewHistoryPageDTO(
+        return new PracticeAreaReviewRunsPageDTO(
             content,
             pageable.getPageNumber(),
             pageable.getPageSize(),
@@ -119,7 +119,7 @@ public class PracticeAreaReviewHistoryService {
         }
 
         List<UUID> jobIds = runs.stream().map(ReviewHistoryRunRow::getJobId).toList();
-        List<Observation> found = observationRepository.findReviewHistoryObservationsByJobs(
+        List<Observation> found = observationRepository.findPracticeAreaReviewRunObservations(
             jobIds,
             developerId,
             workspaceId,

@@ -68,11 +68,7 @@ final class TrendSupportFactory {
         @Nullable Integer eligiblePractices,
         List<EvidenceOpportunity> trail
     ) {
-        // Provenance for what was COMPARED, so only opportunities that produced a verdict date it. The trail
-        // also carries the ones where the practice looked and found nothing to judge — they belong in it, and
-        // in the chart drawn from it, because "we saw this work item" is a fact worth showing. But letting one
-        // date the span would answer a question nobody asked: a stretch of work offering no opportunity would
-        // stretch "these N comparisons span X days" without adding a comparison.
+        // The comparison span excludes work that offered no opportunity to apply the practice.
         List<Instant> dated = trail
             .stream()
             .filter(EvidenceOpportunity::applicable)

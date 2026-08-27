@@ -5,7 +5,7 @@ import java.util.List;
 import org.jspecify.annotations.NonNull;
 
 @Schema(description = "A page of visible review runs")
-public record PracticeAreaReviewHistoryPageDTO(
+public record PracticeAreaReviewRunsPageDTO(
     @NonNull List<PracticeAreaReviewRunDTO> content,
     int page,
     int size,

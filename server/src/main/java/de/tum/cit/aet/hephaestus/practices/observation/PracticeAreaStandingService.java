@@ -5,8 +5,8 @@ import de.tum.cit.aet.hephaestus.practices.dto.FeedbackSourceCountDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeAreaStandingDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionItemDTO;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionPracticeDTO;
+import de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingDTO;
+import de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingObservationDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.PracticeTrend;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.PracticeTrendService;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.TrendDirection;
@@ -36,27 +36,25 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class PracticeAreaStandingService {
 
-    /** Evidence cap: enough to make a status inspectable, not an exhaustive log. */
+    /** Evidence cap: enough to make a standing inspectable, not an exhaustive log. */
     private static final int MAX_AREA_EVIDENCE_ITEMS = 5;
 
-    private final PracticeReflectionService practiceReflectionService;
+    private final PracticeStandingService practiceStandingService;
     private final PracticeTrendService practiceTrendService;
     private final Clock clock;
 
     /**
      * One standing per requested area, rolled up from the practice standings of the same developer snapshot
      * the per-practice surface renders. Observations are loaded once and partitioned in memory rather than
-     * queried per card.
+     * queried per practice.
      *
      * <p>With nothing displayable the standing reports why, as {@code NO_OPPORTUNITY} or {@code NOT_OBSERVED},
      * instead of one undifferentiated empty state.
      */
     @Transactional(readOnly = true)
     public List<PracticeAreaStandingDTO> getAreaStandings(Long workspaceId, List<PracticeArea> areas) {
-        PracticeReflectionService.ReflectionSnapshot snapshot = practiceReflectionService.getReflectionSnapshot(
-            workspaceId
-        );
-        Map<String, List<ReflectionPracticeDTO>> cardsByArea = cardsByArea(snapshot.cards());
+        PracticeStandingService.StandingSnapshot snapshot = practiceStandingService.getStandingSnapshot(workspaceId);
+        Map<String, List<PracticeStandingDTO>> cardsByArea = cardsByArea(snapshot.practices());
         Map<String, PracticeTrend> practiceTrends = practiceTrendService.calculatePractices(
             snapshot.evidenceByPractice()
         );
@@ -79,9 +77,9 @@ public class PracticeAreaStandingService {
             .toList();
     }
 
-    private static Map<String, List<ReflectionPracticeDTO>> cardsByArea(List<ReflectionPracticeDTO> cards) {
-        Map<String, List<ReflectionPracticeDTO>> cardsByArea = new LinkedHashMap<>();
-        for (ReflectionPracticeDTO card : cards) {
+    private static Map<String, List<PracticeStandingDTO>> cardsByArea(List<PracticeStandingDTO> cards) {
+        Map<String, List<PracticeStandingDTO>> cardsByArea = new LinkedHashMap<>();
+        for (PracticeStandingDTO card : cards) {
             if (card.areaSlug() != null) {
                 cardsByArea.computeIfAbsent(card.areaSlug(), ignored -> new ArrayList<>()).add(card);
             }
@@ -91,12 +89,12 @@ public class PracticeAreaStandingService {
 
     private static PracticeAreaStandingDTO toAreaStanding(
         PracticeArea area,
-        List<ReflectionPracticeDTO> cards,
+        List<PracticeStandingDTO> cards,
         Map<String, Double> standingShareByPractice,
         Set<String> eligiblePracticeSlugs,
         AreaSignal signal
     ) {
-        List<ReflectionPracticeDTO> verdicts = votingVerdicts(cards, eligiblePracticeSlugs);
+        List<PracticeStandingDTO> verdicts = votingVerdicts(cards, eligiblePracticeSlugs);
         PracticeAreaStandingDTO.Standing standing = areaStanding(cards, verdicts, standingShareByPractice);
         boolean hasDisplayableData = PracticeAreaStandingDTO.isVerdict(standing);
         // Item-level, unlike the standing: the question here is which KINDS of evidence exist to show, which a
@@ -124,24 +122,24 @@ public class PracticeAreaStandingService {
         );
     }
 
-    private static List<ReflectionPracticeDTO> votingVerdicts(
-        List<ReflectionPracticeDTO> cards,
+    private static List<PracticeStandingDTO> votingVerdicts(
+        List<PracticeStandingDTO> cards,
         Set<String> eligiblePracticeSlugs
     ) {
         return cards
             .stream()
-            .filter(card -> ReflectionPracticeDTO.isVerdict(card.standing()))
+            .filter(card -> PracticeStandingDTO.isVerdict(card.standing()))
             .filter(card -> eligiblePracticeSlugs.contains(card.slug()))
             .toList();
     }
 
     private static PracticeAreaStandingDTO.Standing areaStanding(
-        List<ReflectionPracticeDTO> cards,
-        List<ReflectionPracticeDTO> verdicts,
+        List<PracticeStandingDTO> cards,
+        List<PracticeStandingDTO> verdicts,
         Map<String, Double> standingShareByPractice
     ) {
         if (verdicts.isEmpty()) {
-            return cards.stream().anyMatch(card -> card.standing() == ReflectionPracticeDTO.Standing.NO_OPPORTUNITY)
+            return cards.stream().anyMatch(card -> card.standing() == PracticeStandingDTO.Standing.NO_OPPORTUNITY)
                 ? PracticeAreaStandingDTO.Standing.NO_OPPORTUNITY
                 : PracticeAreaStandingDTO.Standing.NOT_OBSERVED;
         }
@@ -161,19 +159,19 @@ public class PracticeAreaStandingService {
     }
 
     /**
-     * Problems lead because they explain the action-oriented status. A mixed status always reserves one
+     * Problems lead because they explain the action-oriented standing. A mixed standing always reserves one
      * of the five evidence slots for a strength, so the payload cannot say MIXED while showing only one side.
      */
-    private static List<ReflectionItemDTO> areaEvidence(
-        List<ReflectionPracticeDTO> cards,
+    private static List<PracticeStandingObservationDTO> areaEvidence(
+        List<PracticeStandingDTO> cards,
         boolean hasProblems,
         boolean hasStrengths
     ) {
-        List<ReflectionItemDTO> problems = cards
+        List<PracticeStandingObservationDTO> problems = cards
             .stream()
             .flatMap(card -> card.toWorkOn().stream())
             .toList();
-        List<ReflectionItemDTO> strengths = cards
+        List<PracticeStandingObservationDTO> strengths = cards
             .stream()
             .flatMap(card -> card.strengths().stream())
             .toList();
@@ -186,7 +184,7 @@ public class PracticeAreaStandingService {
         return Stream.concat(problems.stream(), strengths.stream()).limit(MAX_AREA_EVIDENCE_ITEMS).toList();
     }
 
-    /** Area-level direction and provenance, derived from the same visible evidence as its card. */
+    /** Area-level direction and provenance, derived from the same visible evidence as its standing. */
     private record AreaSignal(
         @Nullable TrendDirection direction,
         @Nullable TrendSupportDTO trendSupport,
@@ -221,7 +219,7 @@ public class PracticeAreaStandingService {
             evidenceByArea.computeIfAbsent(area.getSlug(), ignored -> new ArrayList<>()).addAll(practiceEvidence);
             PracticeTrend practiceTrend = practiceTrends.get(entry.getKey());
             // Only an eligible practice's trend joins the group's. The evidence map stays unfiltered on
-            // purpose: a practice review is no longer admitted for still has findings worth showing, and the
+            // purpose: a practice review is no longer admitted for still has observations worth showing, and the
             // feedback span is still dated by them. Its VERDICT is what it has stopped casting, and the
             // standing beside this already excludes it.
             if (practiceTrend != null && eligibleSlugs.contains(entry.getKey())) {
@@ -272,7 +270,7 @@ public class PracticeAreaStandingService {
                 newest.atZone(ZoneOffset.UTC).toLocalDate()
             ) +
             1;
-        return (int) Math.max(1, Math.min(PracticeReflectionService.LOOKBACK_DAYS, calendarDays));
+        return (int) Math.max(1, Math.min(PracticeStandingService.LOOKBACK_DAYS, calendarDays));
     }
 
     private static List<FeedbackSourceCountDTO> sourceCounts(List<Observation> evidence) {

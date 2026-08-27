@@ -309,7 +309,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
             webTestClient
                 .get()
-                .uri(BASE_URI + "?artifactKinds=chat.conversation_thread", workspace.getWorkspaceSlug())
+                .uri(BASE_URI + "?workKinds=chat.conversation_thread", workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
@@ -558,61 +558,27 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
         @Test
         @WithUser
-        void shouldCapPageSize() {
-            insertFinding(
-                practiceA,
-                developer,
-                "Single",
-                "PRESENT",
-                "INFO",
-                0.9f,
-                "scm.pull_request",
-                1L,
-                Instant.now()
-            );
-
+        void shouldRejectPageSizeAboveLimit() {
             webTestClient
                 .get()
                 .uri(BASE_URI + "?size=999", workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.size")
-                .isEqualTo(100);
+                .isBadRequest();
         }
 
         @Test
         @WithUser
-        @DisplayName("normalizes negative page to 0 and zero/negative size to 1")
-        void shouldNormalizeBoundaryPaginationValues() {
-            insertFinding(
-                practiceA,
-                developer,
-                "Boundary",
-                "PRESENT",
-                "INFO",
-                0.9f,
-                "scm.pull_request",
-                1L,
-                Instant.now()
-            );
-
+        @DisplayName("rejects a negative page and a zero page size")
+        void shouldRejectInvalidPagination() {
             webTestClient
                 .get()
                 .uri(BASE_URI + "?page=-1&size=0", workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.number")
-                .isEqualTo(0)
-                .jsonPath("$.size")
-                .isEqualTo(1)
-                .jsonPath("$.content.length()")
-                .isEqualTo(1);
+                .isBadRequest();
         }
 
         @Test
@@ -1359,15 +1325,15 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         }
     }
 
-    // GET /practices/observations/reflection
+    // GET /practices/standings
 
     @Nested
-    class GetReflection {
+    class GetStandings {
 
         @Test
         @WithUser
-        @DisplayName("returns per-practice reflection cards with the standing/toWorkOn/strengths shape")
-        void shouldReturnReflectionCards() {
+        @DisplayName("returns per-practice practice standings with the standing/toWorkOn/strengths shape")
+        void shouldReturnPracticeStandings() {
             Instant now = Instant.now();
             insertFinding(
                 practiceA,
@@ -1394,7 +1360,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
             webTestClient
                 .get()
-                .uri(BASE_URI + "/reflection", workspace.getWorkspaceSlug())
+                .uri("/workspaces/{workspaceSlug}/practices/standings", workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
@@ -1426,11 +1392,6 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         @WithUser
         @DisplayName("a watched practice with nothing to say appears, and says which silence it is")
         void shouldReportWhyAWatchedPracticeHasNothingToSay() {
-            // A practice the workspace reviews but that has never produced an observation about this
-            // developer. Leaving it off the surface would make "we are watching this and it has not come up"
-            // indistinguishable from "this is not being looked at", which is precisely what the learner needs
-            // to tell apart. It carries no items and no direction: a direction over nothing is a claim
-            // about nothing.
             insertFinding(
                 practiceA,
                 developer,
@@ -1445,7 +1406,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
 
             webTestClient
                 .get()
-                .uri(BASE_URI + "/reflection", workspace.getWorkspaceSlug())
+                .uri("/workspaces/{workspaceSlug}/practices/standings", workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
@@ -1453,7 +1414,6 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .expectBody()
                 .jsonPath("$.length()")
                 .isEqualTo(2)
-                // Verdicts lead, silences sort last — the order is what a learner can act on.
                 .jsonPath("$[0].slug")
                 .isEqualTo(practiceA.getSlug())
                 .jsonPath("$[0].standing")
@@ -1474,7 +1434,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         void shouldReturn401ForUnauthenticated() {
             webTestClient
                 .get()
-                .uri(BASE_URI + "/reflection", workspace.getWorkspaceSlug())
+                .uri("/workspaces/{workspaceSlug}/practices/standings", workspace.getWorkspaceSlug())
                 .exchange()
                 .expectStatus()
                 .isUnauthorized();

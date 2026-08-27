@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.observation;
 
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeAreaStandingDTO;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionPracticeDTO;
+import de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingDTO;
 import java.util.List;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
@@ -19,7 +19,7 @@ final class DeterministicAreaGuidanceComposer {
      * Detection criteria never enters this method: {@code whatGoodLooksLike}/{@code whyItMatters} are the
      * catalog's dedicated developer-facing layer.
      */
-    static @Nullable String compose(PracticeAreaStandingDTO.Standing status, List<ReflectionPracticeDTO> cards) {
+    static @Nullable String compose(PracticeAreaStandingDTO.Standing status, List<PracticeStandingDTO> cards) {
         // Without a verdict there is nothing to summarise, and inventing encouragement here would state
         // more than the evidence supports. The surface renders its own reason-specific empty copy.
         if (!PracticeAreaStandingDTO.isVerdict(status)) {
@@ -34,17 +34,17 @@ final class DeterministicAreaGuidanceComposer {
         // Non-verdict practices are dropped FIRST. Their standing is neither DEVELOPING nor STRENGTH, so a
         // negated filter would put a practice with nothing to say on both sides at once and name it as a
         // strength and a gap in the same sentence.
-        List<ReflectionPracticeDTO> verdicts = cards
+        List<PracticeStandingDTO> verdicts = cards
             .stream()
-            .filter(card -> ReflectionPracticeDTO.isVerdict(card.standing()))
+            .filter(card -> PracticeStandingDTO.isVerdict(card.standing()))
             .toList();
-        List<ReflectionPracticeDTO> strengths = verdicts
+        List<PracticeStandingDTO> strengths = verdicts
             .stream()
-            .filter(card -> card.standing() != ReflectionPracticeDTO.Standing.DEVELOPING)
+            .filter(card -> card.standing() != PracticeStandingDTO.Standing.DEVELOPING)
             .toList();
-        List<ReflectionPracticeDTO> gaps = verdicts
+        List<PracticeStandingDTO> gaps = verdicts
             .stream()
-            .filter(card -> card.standing() != ReflectionPracticeDTO.Standing.STRENGTH)
+            .filter(card -> card.standing() != PracticeStandingDTO.Standing.STRENGTH)
             .toList();
 
         StringBuilder summary = new StringBuilder();
@@ -91,7 +91,7 @@ final class DeterministicAreaGuidanceComposer {
         return summary.toString();
     }
 
-    private static void appendCatalogReminder(StringBuilder summary, ReflectionPracticeDTO practice) {
+    private static void appendCatalogReminder(StringBuilder summary, PracticeStandingDTO practice) {
         String exemplar = nonBlank(practice.whatGoodLooksLike());
         if (exemplar != null) {
             summary.append(" What good looks like: ").append(conciseReminder(exemplar));
@@ -103,21 +103,21 @@ final class DeterministicAreaGuidanceComposer {
         }
     }
 
-    private static boolean samePractices(List<ReflectionPracticeDTO> strengths, List<ReflectionPracticeDTO> gaps) {
+    private static boolean samePractices(List<PracticeStandingDTO> strengths, List<PracticeStandingDTO> gaps) {
         return (
             !strengths.isEmpty() &&
             strengths
                 .stream()
-                .map(ReflectionPracticeDTO::slug)
+                .map(PracticeStandingDTO::slug)
                 .toList()
-                .equals(gaps.stream().map(ReflectionPracticeDTO::slug).toList())
+                .equals(gaps.stream().map(PracticeStandingDTO::slug).toList())
         );
     }
 
-    private static String nameList(List<ReflectionPracticeDTO> cards) {
+    private static String nameList(List<PracticeStandingDTO> cards) {
         List<String> names = cards
             .stream()
-            .map(ReflectionPracticeDTO::name)
+            .map(PracticeStandingDTO::name)
             .filter(Objects::nonNull)
             .map(name -> "“" + name + "”")
             .distinct()

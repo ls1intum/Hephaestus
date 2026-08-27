@@ -7,8 +7,8 @@ import de.tum.cit.aet.hephaestus.practices.dto.PracticeAreaStandingDTO;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.ObservationOutcome;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionItemDTO;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionPracticeDTO;
+import de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingDTO;
+import de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingObservationDTO;
 import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
@@ -22,7 +22,7 @@ class DeterministicAreaGuidanceComposerTest {
 
     @Test
     void shouldCombineStandingFocusAndCatalogExemplar() {
-        ReflectionPracticeDTO gap = card(
+        PracticeStandingDTO gap = card(
             "tests",
             "Test Coverage",
             "Tests make changes safer.",
@@ -44,8 +44,8 @@ class DeterministicAreaGuidanceComposerTest {
 
     @Test
     void shouldAcknowledgeStrengthBeforeNamingTheNextFocus() {
-        ReflectionPracticeDTO strength = card("reviews", "Actionable Reviews", null, null, List.of(), List.of(item()));
-        ReflectionPracticeDTO gap = card("tests", "Test Coverage", null, null, List.of(item()), List.of());
+        PracticeStandingDTO strength = card("reviews", "Actionable Reviews", null, null, List.of(), List.of(item()));
+        PracticeStandingDTO gap = card("tests", "Test Coverage", null, null, List.of(item()), List.of());
 
         String guidance = DeterministicAreaGuidanceComposer.compose(
             PracticeAreaStandingDTO.Standing.MIXED,
@@ -61,14 +61,14 @@ class DeterministicAreaGuidanceComposerTest {
     void shouldNotNameAPracticeItsOwnStandingCallsFixedAsTheNextFocus() {
         // A clean streak has already moved this practice to STRENGTH. The older problems still on its card
         // must not name it as the area's next focus — the sentence would contradict the card beside it.
-        ReflectionPracticeDTO fixed = new ReflectionPracticeDTO(
+        PracticeStandingDTO fixed = new PracticeStandingDTO(
             "tests",
             "Test Coverage",
             "code-quality",
             "Code Quality",
             null,
             null,
-            ReflectionPracticeDTO.Standing.STRENGTH,
+            PracticeStandingDTO.Standing.STRENGTH,
             List.of(item()),
             List.of(item()),
             null,
@@ -97,7 +97,7 @@ class DeterministicAreaGuidanceComposerTest {
             "Explain the motivation, constraints, rollout, alternatives, and expected outcome " +
             "in language that lets a reviewer understand the decision without reconstructing it from code.\n"
         ).repeat(3);
-        ReflectionPracticeDTO gap = card(
+        PracticeStandingDTO gap = card(
             "pr-descriptions",
             "PR Descriptions",
             null,
@@ -114,21 +114,21 @@ class DeterministicAreaGuidanceComposerTest {
         assertThat(guidance).doesNotContain("\n").endsWith("…").hasSizeLessThan(300);
     }
 
-    private static ReflectionPracticeDTO card(
+    private static PracticeStandingDTO card(
         String slug,
         String name,
         @Nullable String whyItMatters,
         @Nullable String whatGoodLooksLike,
-        List<ReflectionItemDTO> toWorkOn,
-        List<ReflectionItemDTO> strengths
+        List<PracticeStandingObservationDTO> toWorkOn,
+        List<PracticeStandingObservationDTO> strengths
     ) {
-        ReflectionPracticeDTO.Standing standing =
+        PracticeStandingDTO.Standing standing =
             !toWorkOn.isEmpty() && !strengths.isEmpty()
-                ? ReflectionPracticeDTO.Standing.MIXED
+                ? PracticeStandingDTO.Standing.MIXED
                 : !toWorkOn.isEmpty()
-                    ? ReflectionPracticeDTO.Standing.DEVELOPING
-                    : ReflectionPracticeDTO.Standing.STRENGTH;
-        return new ReflectionPracticeDTO(
+                    ? PracticeStandingDTO.Standing.DEVELOPING
+                    : PracticeStandingDTO.Standing.STRENGTH;
+        return new PracticeStandingDTO(
             slug,
             name,
             "code-quality",
@@ -143,10 +143,10 @@ class DeterministicAreaGuidanceComposerTest {
         );
     }
 
-    private static ReflectionItemDTO item() {
-        return new ReflectionItemDTO(
+    private static PracticeStandingObservationDTO item() {
+        return new PracticeStandingObservationDTO(
             UUID.randomUUID(),
-            "Finding",
+            "Observation",
             null,
             null,
             ObservationOutcome.OMISSION_GAP,

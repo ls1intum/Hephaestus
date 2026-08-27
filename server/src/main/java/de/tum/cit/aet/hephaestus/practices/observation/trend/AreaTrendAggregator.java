@@ -136,7 +136,7 @@ final class AreaTrendAggregator {
     /**
      * One entry per artifact the area saw, whichever of its practices saw it.
      *
-     * <p>Two practices reviewing the same pull request is one work item to a reader, so their outcomes are
+     * <p>Two practices reviewing the same pull request is one piece of reviewed work to a reader, so their outcomes are
      * summed into a single point rather than drawn twice. The merged point takes the stronger bundle of the
      * two: an artifact that is current evidence for any practice is current evidence for the area.
      */

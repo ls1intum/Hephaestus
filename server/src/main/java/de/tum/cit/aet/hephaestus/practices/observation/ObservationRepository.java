@@ -40,7 +40,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * Excludes observations about an artifact in a repository a workspace team has hidden from contributions.
      *
      * <p>One text, concatenated into every native query that needs it, because five hand-kept copies is five
-     * chances for one of them to be forgotten — which is exactly what happened to the review-history queries.
+     * chances for one of them to be forgotten — which is exactly what happened to the review-runs queries.
      * Adding a surface now means adding this constant to it, and a surface that omits it omits it visibly.
      *
      * <p>Binds to the aliases {@code f} (the observation) and {@code p} (its practice), so every query using
@@ -428,11 +428,11 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     /**
      * Review-history page at the run grain. Paging observations directly can split one review across pages,
      * which leaves the developer with an incomplete explanation of what the reviewer saw. This projection first
-     * selects complete agent-job runs; {@link #findReviewHistoryObservationsByJobs} loads their observations next.
+     * selects complete agent-job runs; {@link #findPracticeAreaReviewRunObservations} loads their observations next.
      *
      * <p>Carries {@link #HIDDEN_REPOSITORY_GUARD}, which is what keeps a hidden repository out of the whole
      * surface: the second query reads only the job ids this one returns, and an agent job reviews one
-     * artifact, so a run dropped here takes its findings with it.
+     * artifact, so a run dropped here takes its observations with it.
      */
     @Query(
         value = """
@@ -456,7 +456,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
             """,
         nativeQuery = true
     )
-    Slice<ReviewHistoryRunRow> findReviewHistoryRuns(
+    Slice<ReviewHistoryRunRow> findPracticeAreaReviewRuns(
         @Param("aboutUserId") Long aboutUserId,
         @Param("workspaceId") Long workspaceId,
         @Param("areaSlug") @Nullable String areaSlug,
@@ -467,7 +467,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     );
 
     /**
-     * Every observation in the area for the runs {@link #findReviewHistoryRuns} returned. Filters select
+     * Every observation in the area for the runs {@link #findPracticeAreaReviewRuns} returned. Filters select
      * matching runs; they do not truncate a selected review run.
      *
      * <p>Fetches both revisions because every row is handed straight to {@code ObservationVisibilityPolicy},
@@ -488,7 +488,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         ORDER BY o.observedAt DESC, o.id ASC
         """
     )
-    List<Observation> findReviewHistoryObservationsByJobs(
+    List<Observation> findPracticeAreaReviewRunObservations(
         @Param("jobIds") Collection<UUID> jobIds,
         @Param("aboutUserId") Long aboutUserId,
         @Param("workspaceId") Long workspaceId,
@@ -605,7 +605,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * valence} is listed, because the two kinds of caller need opposite answers. The context providers pass
      * {@code true}: {@code NOT_APPLICABLE} would bury the actionable {@code BAD}/{@code GOOD} rows within their
      * page budget, and coaching on {@code INCONCLUSIVE} would invite the mentor to invent a direction the
-     * measurement declined to take — both totals still reach it via the presence-count summary. The reflection
+     * measurement declined to take — both totals still reach it via the presence-count summary. The practice standing
      * surface passes {@code false}: it does not render those rows either, but it must COUNT them, because "the
      * practice ran and found nothing to judge" and "the practice was never looked at" are different answers and
      * only the rows themselves can tell them apart. It filters them out one layer up, where the same pass that
@@ -628,7 +628,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * and excluding it made a campaign produce nothing any developer could see. The latest-run correlation is
      * evaluated <em>within</em> each origin class ({@code (f2.origin = 'BACKFILL') = (f.origin = 'BACKFILL')})
      * rather than over the union: origin-blind, a campaign's job could become "the latest run" and erase
-     * already-delivered live feedback from the list. {@code ReflectionItemDTO.origin()} carries the class
+     * already-delivered live feedback from the list. {@code PracticeStandingObservationDTO.origin()} carries the class
      * through so the surface can label a backfilled item rather than pass it off as live.
      */
     @Query(

@@ -69,12 +69,26 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
         @Nullable FeedbackResolution resolution,
         @Nullable String comment
     ) {
+        stubCurrentResponse(usefulness, resolution, comment, false);
+    }
+
+    private void stubCurrentResponse(
+        @Nullable FeedbackUsefulness usefulness,
+        @Nullable FeedbackResolution resolution,
+        @Nullable String comment,
+        boolean absentBeforeReplacement
+    ) {
         var projection = org.mockito.Mockito.mock(ReactionRepository.CurrentResponseProjection.class);
         when(projection.getUsefulness()).thenReturn(usefulness == null ? null : usefulness.name());
         when(projection.getResolution()).thenReturn(resolution == null ? null : resolution.name());
         when(projection.getComment()).thenReturn(comment);
         when(projection.getRespondedAt()).thenReturn(Instant.now());
-        when(reactionRepository.findCurrentResponse(FEEDBACK_ID, CONTRIBUTOR_ID)).thenReturn(Optional.of(projection));
+        var response = when(reactionRepository.findCurrentResponse(FEEDBACK_ID, CONTRIBUTOR_ID));
+        if (absentBeforeReplacement) {
+            response.thenReturn(Optional.empty(), Optional.of(projection));
+        } else {
+            response.thenReturn(Optional.of(projection));
+        }
     }
 
     private Feedback createFeedback(Long recipientUserId) {
@@ -103,12 +117,16 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
             var request = new FeedbackResponseRequestDTO(
                 FeedbackUsefulness.HELPFUL,
                 FeedbackResolution.ADDRESSED,
-                "Clear and actionable.",
-                null
+                "Clear and actionable."
             );
-            stubCurrentResponse(FeedbackUsefulness.HELPFUL, FeedbackResolution.ADDRESSED, "Clear and actionable.");
+            stubCurrentResponse(
+                FeedbackUsefulness.HELPFUL,
+                FeedbackResolution.ADDRESSED,
+                "Clear and actionable.",
+                true
+            );
 
-            FeedbackResponseDTO result = service.submitResponse(workspaceContext, FEEDBACK_ID, request);
+            FeedbackResponseDTO result = service.replaceResponse(workspaceContext, FEEDBACK_ID, request);
 
             verify(reactionRepository).save(reactionCaptor.capture());
             Reaction saved = reactionCaptor.getValue();
@@ -131,11 +149,7 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
             ).thenReturn(Optional.of(feedback));
 
             assertThatThrownBy(() ->
-                service.submitResponse(
-                    workspaceContext,
-                    FEEDBACK_ID,
-                    new FeedbackResponseRequestDTO(null, null, null, null)
-                )
+                service.replaceResponse(workspaceContext, FEEDBACK_ID, new FeedbackResponseRequestDTO(null, null, null))
             )
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("usefulness or resolution");
@@ -153,8 +167,8 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
                 )
             ).thenReturn(Optional.of(feedback));
 
-            var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null, null);
-            service.submitResponse(workspaceContext, FEEDBACK_ID, request);
+            var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null);
+            service.replaceResponse(workspaceContext, FEEDBACK_ID, request);
 
             verify(reactionRepository).save(reactionCaptor.capture());
             Reaction saved = reactionCaptor.getValue();
@@ -173,8 +187,8 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
                 )
             ).thenReturn(Optional.empty());
 
-            var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null, null);
-            assertThatThrownBy(() -> service.submitResponse(workspaceContext, FEEDBACK_ID, request)).isInstanceOf(
+            var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null);
+            assertThatThrownBy(() -> service.replaceResponse(workspaceContext, FEEDBACK_ID, request)).isInstanceOf(
                 EntityNotFoundException.class
             );
         }
@@ -194,10 +208,9 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
             var request = new FeedbackResponseRequestDTO(
                 null,
                 FeedbackResolution.DISPUTED,
-                "The AI is wrong about this",
-                null
+                "The AI is wrong about this"
             );
-            service.submitResponse(workspaceContext, FEEDBACK_ID, request);
+            service.replaceResponse(workspaceContext, FEEDBACK_ID, request);
 
             verify(reactionRepository).save(reactionCaptor.capture());
             assertThat(reactionCaptor.getValue().getResolution()).isEqualTo(FeedbackResolution.DISPUTED);
@@ -219,10 +232,9 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
             var request = new FeedbackResponseRequestDTO(
                 null,
                 FeedbackResolution.NOT_APPLICABLE,
-                "Not relevant to my use case",
-                null
+                "Not relevant to my use case"
             );
-            service.submitResponse(workspaceContext, FEEDBACK_ID, request);
+            service.replaceResponse(workspaceContext, FEEDBACK_ID, request);
 
             verify(reactionRepository).save(reactionCaptor.capture());
             assertThat(reactionCaptor.getValue().getResolution()).isEqualTo(FeedbackResolution.NOT_APPLICABLE);
@@ -240,8 +252,8 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
                 )
             ).thenReturn(Optional.of(feedback));
 
-            var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, null, null);
-            assertThatThrownBy(() -> service.submitResponse(workspaceContext, FEEDBACK_ID, request))
+            var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, null);
+            assertThatThrownBy(() -> service.replaceResponse(workspaceContext, FEEDBACK_ID, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("comment is required");
         }
@@ -258,8 +270,8 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
                 )
             ).thenReturn(Optional.of(feedback));
 
-            var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, "   ", null);
-            assertThatThrownBy(() -> service.submitResponse(workspaceContext, FEEDBACK_ID, request))
+            var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, "   ");
+            assertThatThrownBy(() -> service.replaceResponse(workspaceContext, FEEDBACK_ID, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("comment is required");
         }
@@ -276,8 +288,8 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
                 )
             ).thenReturn(Optional.empty());
 
-            var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null, null);
-            assertThatThrownBy(() -> service.submitResponse(workspaceContext, FEEDBACK_ID, request)).isInstanceOf(
+            var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null);
+            assertThatThrownBy(() -> service.replaceResponse(workspaceContext, FEEDBACK_ID, request)).isInstanceOf(
                 EntityNotFoundException.class
             );
         }
@@ -293,8 +305,8 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
                 )
             ).thenReturn(Optional.empty());
 
-            var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null, null);
-            assertThatThrownBy(() -> service.submitResponse(workspaceContext, FEEDBACK_ID, request)).isInstanceOf(
+            var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null);
+            assertThatThrownBy(() -> service.replaceResponse(workspaceContext, FEEDBACK_ID, request)).isInstanceOf(
                 EntityNotFoundException.class
             );
         }
@@ -345,7 +357,7 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
         @DisplayName("answers a signed-in non-developer with nothing rather than an error")
         void returnsEmptyForACallerWhoIsNotASyncedDeveloper() {
             // A read answers absence with absence — the contract CurrentDeveloperLookup states, and the one
-            // the reflection and review-history surfaces already keep.
+            // the practice standing and review-runs surfaces already keep.
             when(currentDeveloperLookup.currentDeveloperId()).thenReturn(Optional.empty());
 
             assertThat(service.getResponse(workspaceContext, FEEDBACK_ID)).isEmpty();

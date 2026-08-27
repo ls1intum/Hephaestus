@@ -20,7 +20,7 @@ class PracticeTrendCalculatorTest {
     @Test
     void shouldDateAPracticeSpanFromComparedOpportunitiesOnly() {
         // The run in March looked and found nothing to judge. It belongs in the trail — the practice DID see
-        // that work item — but "these comparisons span N days" must not count it, or a quiet stretch would
+        // that piece of reviewed work — but "these comparisons span N days" must not count it, or a quiet stretch would
         // stretch the provenance without adding a comparison.
         PracticeTrend trend = PracticeTrendCalculator.calculatePractice(
             "testing",

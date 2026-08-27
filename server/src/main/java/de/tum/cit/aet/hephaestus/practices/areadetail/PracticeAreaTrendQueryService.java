@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.areadetail;
 
 import de.tum.cit.aet.hephaestus.practices.PracticeAreaService;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.observation.PracticeReflectionService;
+import de.tum.cit.aet.hephaestus.practices.observation.PracticeStandingService;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.PracticeTrendService;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.dto.PracticeAreaTrendDTO;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -21,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PracticeAreaTrendQueryService {
 
     private final PracticeAreaService practiceAreaService;
-    private final PracticeReflectionService reflectionService;
+    private final PracticeStandingService standingService;
     private final PracticeTrendService trendService;
 
     @Transactional(readOnly = true)
@@ -29,7 +29,7 @@ public class PracticeAreaTrendQueryService {
         practiceAreaService.getArea(context, areaSlug);
         // Eligibility comes from the snapshot rather than a second query: the area standings and this detail
         // trend must agree on which practices count toward an area, and two derivations would drift.
-        PracticeReflectionService.ReflectionSnapshot snapshot = reflectionService.getReflectionSnapshot(context.id());
+        PracticeStandingService.StandingSnapshot snapshot = standingService.getStandingSnapshot(context.id());
         List<String> eligible = snapshot.eligiblePracticesByArea().getOrDefault(areaSlug, List.of());
         Set<String> eligibleSet = Set.copyOf(eligible);
         Map<String, List<Observation>> evidence = snapshot

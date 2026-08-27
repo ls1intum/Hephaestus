@@ -2546,98 +2546,6 @@ export type RegisterOutlineCollectionRequest = {
 };
 
 /**
- * A developer's readable feedback for one practice
- */
-export type ReflectionPractice = {
-    /**
-     * Area name this practice belongs to, if any
-     */
-    areaName?: string;
-    /**
-     * Area slug this practice belongs to, if any
-     */
-    areaSlug?: string;
-    /**
-     * Opportunity-indexed direction of this practice's recent evidence
-     */
-    direction?: 'IMPROVING' | 'DECLINING' | 'UNCERTAIN' | 'INSUFFICIENT_EVIDENCE';
-    /**
-     * Practice name
-     */
-    name: string;
-    /**
-     * Practice slug
-     */
-    slug: string;
-    /**
-     * Where the developer stands on this practice, or why no standing could be formed
-     */
-    standing: 'DEVELOPING' | 'STRENGTH' | 'MIXED' | 'NOT_OBSERVED' | 'NO_OPPORTUNITY';
-    /**
-     * What the developer already does well here
-     */
-    strengths: Array<ReflectionItem>;
-    /**
-     * Specific feedback to act on (highest-impact first)
-     */
-    toWorkOn: Array<ReflectionItem>;
-    /**
-     * Evidence support and provenance for the direction
-     */
-    trendSupport?: TrendSupport;
-    /**
-     * A concrete picture of doing this well
-     */
-    whatGoodLooksLike?: string;
-    /**
-     * Why this practice matters, in plain language
-     */
-    whyItMatters?: string;
-};
-
-/**
- * A single piece of practice feedback to read and act on
- */
-export type ReflectionItem = {
-    /**
-     * Id of the PR / issue this is about
-     */
-    artifactId: number;
-    /**
-     * The kind of work this is about (PR / issue)
-     */
-    artifactKind: string;
-    /**
-     * What to do — the delivered feedback for this observation (null if nothing was delivered)
-     */
-    deliveredFeedback?: string;
-    /**
-     * Where in the work, e.g. "FrameRecorder.swift:212", when known
-     */
-    locator?: string;
-    /**
-     * Observation id — handle to open the full detail
-     */
-    observationId: string;
-    /**
-     * What occasioned the measurement. BACKFILL means it came from a review of past work rather than from something that just happened, and nothing was posted anywhere at the time.
-     */
-    origin: 'LIVE' | 'MANUAL' | 'BACKFILL';
-    /**
-     * What this item says about the developer, which selects how to read it: a behaviour demonstrated, a trap avoided, something harmful done, or something needed left out. A card's lists only separate positive from negative, so this is what tells the two kinds of each apart.
-     */
-    outcome: 'DEMONSTRATED_STRENGTH' | 'SAFE_AVOIDANCE' | 'COMMISSION_PROBLEM' | 'OMISSION_GAP';
-    /**
-     * Impact level (null unless assessed BAD)
-     */
-    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
-    /**
-     * The headline of the feedback
-     */
-    title: string;
-};
-
-/**
  * Vendor API rate-limit observation, read from in-memory trackers (not persisted across restarts). Every field except observedAt is present only if the vendor actually reported it.
  */
 export type RateLimitSnapshot = {
@@ -3107,6 +3015,98 @@ export type PracticeTraceEntry = {
 };
 
 /**
+ * A single piece of practice feedback to read and act on
+ */
+export type PracticeStandingObservation = {
+    /**
+     * What to do — the delivered feedback for this observation (null if nothing was delivered)
+     */
+    deliveredFeedback?: string;
+    /**
+     * Where in the work, e.g. "FrameRecorder.swift:212", when known
+     */
+    locator?: string;
+    /**
+     * Observation id — handle to open the full detail
+     */
+    observationId: string;
+    /**
+     * Why this observation was recorded. BACKFILL means it came from a review of past work rather than from something that just happened, and nothing was posted anywhere at the time.
+     */
+    origin: 'LIVE' | 'MANUAL' | 'BACKFILL';
+    /**
+     * What this observation says about the developer: a behaviour demonstrated, a trap avoided, something harmful done, or something needed left out. The lists only separate positive from negative, so this is what tells the two kinds of each apart.
+     */
+    outcome: 'DEMONSTRATED_STRENGTH' | 'SAFE_AVOIDANCE' | 'COMMISSION_PROBLEM' | 'OMISSION_GAP';
+    /**
+     * Identifier of the reviewed work
+     */
+    reviewedWorkId: number;
+    /**
+     * Impact level (null unless assessed BAD)
+     */
+    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    /**
+     * The headline of the feedback
+     */
+    title: string;
+    /**
+     * The kind of reviewed work this is about
+     */
+    workKind: string;
+};
+
+/**
+ * A developer's readable feedback for one practice
+ */
+export type PracticeStanding = {
+    /**
+     * Area name this practice belongs to, if any
+     */
+    areaName?: string;
+    /**
+     * Area slug this practice belongs to, if any
+     */
+    areaSlug?: string;
+    /**
+     * Opportunity-indexed direction of this practice's recent evidence
+     */
+    direction?: 'IMPROVING' | 'DECLINING' | 'UNCERTAIN' | 'INSUFFICIENT_EVIDENCE';
+    /**
+     * Practice name
+     */
+    name: string;
+    /**
+     * Practice slug
+     */
+    slug: string;
+    /**
+     * Where the developer stands on this practice, or why no standing could be formed
+     */
+    standing: 'DEVELOPING' | 'STRENGTH' | 'MIXED' | 'NOT_OBSERVED' | 'NO_OPPORTUNITY';
+    /**
+     * What the developer already does well here
+     */
+    strengths: Array<PracticeStandingObservation>;
+    /**
+     * Specific feedback to act on (highest-impact first)
+     */
+    toWorkOn: Array<PracticeStandingObservation>;
+    /**
+     * Evidence support and provenance for the direction
+     */
+    trendSupport?: TrendSupport;
+    /**
+     * A concrete picture of doing this well
+     */
+    whatGoodLooksLike?: string;
+    /**
+     * Why this practice matters, in plain language
+     */
+    whyItMatters?: string;
+};
+
+/**
  * A workspace's practice-review policy: effective values plus raw overrides
  */
 export type PracticeReviewSettings = {
@@ -3251,11 +3251,11 @@ export type PracticeAreaStanding = {
      */
     guidanceSource?: 'RULE_BASED';
     /**
-     * Supporting feedback the status derives from (problems first); empty without a verdict
+     * Supporting observations the standing derives from (problems first); empty without a verdict
      */
-    items: Array<ReflectionItem>;
+    observations: Array<PracticeStandingObservation>;
     /**
-     * Distinct work artifacts the feedback comes from, per kind (provenance, not a score); empty without a verdict
+     * Distinct pieces of reviewed work the observations come from, per kind (provenance, not a score); empty without a verdict
      */
     sources: Array<FeedbackSourceCount>;
     /**
@@ -3273,13 +3273,13 @@ export type PracticeAreaStanding = {
  */
 export type FeedbackSourceCount = {
     /**
-     * The kind of work the feedback came from
-     */
-    artifactKind: string;
-    /**
      * Distinct artifacts of this kind in the selected time period
      */
     count: number;
+    /**
+     * The kind of work the feedback came from
+     */
+    workKind: string;
 };
 
 /**
@@ -3297,13 +3297,13 @@ export type PracticeAreaReviewedWork = {
 };
 
 /**
- * A complete review run in a developer's practice-area history
+ * A page of visible review runs
  */
-export type PracticeAreaReviewRun = {
-    observations: Array<PracticeAreaReviewObservation>;
-    reviewId: string;
-    reviewedAt: Date;
-    reviewedWork: PracticeAreaReviewedWork;
+export type PracticeAreaReviewRunsPage = {
+    content: Array<PracticeAreaReviewRun>;
+    hasNext?: boolean;
+    page?: number;
+    size?: number;
 };
 
 /**
@@ -3328,13 +3328,13 @@ export type PracticeAreaReviewObservation = {
 };
 
 /**
- * A page of visible review runs
+ * A complete review run in a developer's practice-area history
  */
-export type PracticeAreaReviewHistoryPage = {
-    content: Array<PracticeAreaReviewRun>;
-    hasNext?: boolean;
-    page?: number;
-    size?: number;
+export type PracticeAreaReviewRun = {
+    observations: Array<PracticeAreaReviewObservation>;
+    reviewId: string;
+    reviewedAt: Date;
+    reviewedWork: PracticeAreaReviewedWork;
 };
 
 /**
@@ -4640,11 +4640,11 @@ export type GitLabGroup = {
 };
 
 /**
- * Assess delivered feedback, say what you will do with it, or take your answer back
+ * The complete response to delivered feedback
  */
 export type FeedbackResponseRequest = {
     /**
-     * Optional explanation; required when resolution is DISPUTED. Omit it to retain the current comment.
+     * Optional explanation; required when resolution is DISPUTED.
      */
     comment?: string;
     /**
@@ -4655,10 +4655,6 @@ export type FeedbackResponseRequest = {
      * How useful the feedback was
      */
     usefulness?: 'HELPFUL' | 'UNHELPFUL';
-    /**
-     * Take the whole response back, leaving no answer on record. Carries nothing else.
-     */
-    withdraw?: boolean;
 };
 
 /**
@@ -9217,7 +9213,7 @@ export type ReorderAreasResponses = {
 
 export type ReorderAreasResponse = ReorderAreasResponses[keyof ReorderAreasResponses];
 
-export type GetPracticeAreaStandingsData = {
+export type ListPracticeAreaStandingsData = {
     body?: never;
     path: {
         /**
@@ -9229,14 +9225,14 @@ export type GetPracticeAreaStandingsData = {
     url: '/workspaces/{workspaceSlug}/practice-areas/standings';
 };
 
-export type GetPracticeAreaStandingsResponses = {
+export type ListPracticeAreaStandingsResponses = {
     /**
-     * Active-area standings returned
+     * Practice area standings returned
      */
     200: Array<PracticeAreaStanding>;
 };
 
-export type GetPracticeAreaStandingsResponse = GetPracticeAreaStandingsResponses[keyof GetPracticeAreaStandingsResponses];
+export type ListPracticeAreaStandingsResponse = ListPracticeAreaStandingsResponses[keyof ListPracticeAreaStandingsResponses];
 
 export type DeleteAreaData = {
     body?: never;
@@ -9356,7 +9352,7 @@ export type SetAreaAutonomyResponses = {
 
 export type SetAreaAutonomyResponse = SetAreaAutonomyResponses[keyof SetAreaAutonomyResponses];
 
-export type ListPracticeAreaReviewHistoryData = {
+export type ListPracticeAreaReviewRunsData = {
     body?: never;
     path: {
         /**
@@ -9373,18 +9369,18 @@ export type ListPracticeAreaReviewHistoryData = {
         workKinds?: Array<string>;
         severities?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO'>;
         /**
-         * Zero-based page; a negative value is read as the first page
+         * Zero-based page
          */
         page?: number;
         /**
-         * Page size, clamped to 1..50
+         * Page size from 1 to 50
          */
         size?: number;
     };
-    url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}/review-history';
+    url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}/review-runs';
 };
 
-export type ListPracticeAreaReviewHistoryErrors = {
+export type ListPracticeAreaReviewRunsErrors = {
     /**
      * Invalid filter or pagination
      */
@@ -9395,16 +9391,16 @@ export type ListPracticeAreaReviewHistoryErrors = {
     404: unknown;
 };
 
-export type ListPracticeAreaReviewHistoryError = ListPracticeAreaReviewHistoryErrors[keyof ListPracticeAreaReviewHistoryErrors];
+export type ListPracticeAreaReviewRunsError = ListPracticeAreaReviewRunsErrors[keyof ListPracticeAreaReviewRunsErrors];
 
-export type ListPracticeAreaReviewHistoryResponses = {
+export type ListPracticeAreaReviewRunsResponses = {
     /**
      * Paginated review runs returned
      */
-    200: PracticeAreaReviewHistoryPage;
+    200: PracticeAreaReviewRunsPage;
 };
 
-export type ListPracticeAreaReviewHistoryResponse = ListPracticeAreaReviewHistoryResponses[keyof ListPracticeAreaReviewHistoryResponses];
+export type ListPracticeAreaReviewRunsResponse = ListPracticeAreaReviewRunsResponses[keyof ListPracticeAreaReviewRunsResponses];
 
 export type GetPracticeAreaTrendData = {
     body?: never;
@@ -9876,6 +9872,35 @@ export type GetFeedbackResolutionCountsResponses = {
 
 export type GetFeedbackResolutionCountsResponse = GetFeedbackResolutionCountsResponses[keyof GetFeedbackResolutionCountsResponses];
 
+export type DeleteFeedbackResponseData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        feedbackId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response';
+};
+
+export type DeleteFeedbackResponseErrors = {
+    /**
+     * Delivered feedback not found for the current recipient
+     */
+    404: unknown;
+};
+
+export type DeleteFeedbackResponseResponses = {
+    /**
+     * Response deleted or no response was recorded
+     */
+    204: void;
+};
+
+export type DeleteFeedbackResponseResponse = DeleteFeedbackResponseResponses[keyof DeleteFeedbackResponseResponses];
+
 export type GetFeedbackResponseData = {
     body?: never;
     path: {
@@ -9893,10 +9918,8 @@ export type GetFeedbackResponseErrors = {
     /**
      * Delivered feedback not found for the current recipient
      */
-    404: FeedbackResponse;
+    404: unknown;
 };
-
-export type GetFeedbackResponseError = GetFeedbackResponseErrors[keyof GetFeedbackResponseErrors];
 
 export type GetFeedbackResponseResponses = {
     /**
@@ -9906,12 +9929,12 @@ export type GetFeedbackResponseResponses = {
     /**
      * No response is currently recorded
      */
-    204: FeedbackResponse;
+    204: void;
 };
 
 export type GetFeedbackResponseResponse = GetFeedbackResponseResponses[keyof GetFeedbackResponseResponses];
 
-export type SubmitFeedbackResponseData = {
+export type ReplaceFeedbackResponseData = {
     body: FeedbackResponseRequest;
     path: {
         /**
@@ -9924,7 +9947,7 @@ export type SubmitFeedbackResponseData = {
     url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response';
 };
 
-export type SubmitFeedbackResponseErrors = {
+export type ReplaceFeedbackResponseErrors = {
     /**
      * Invalid response
      */
@@ -9932,19 +9955,17 @@ export type SubmitFeedbackResponseErrors = {
     /**
      * Delivered feedback not found for the current recipient
      */
-    404: FeedbackResponse;
+    404: unknown;
 };
 
-export type SubmitFeedbackResponseError = SubmitFeedbackResponseErrors[keyof SubmitFeedbackResponseErrors];
-
-export type SubmitFeedbackResponseResponses = {
+export type ReplaceFeedbackResponseResponses = {
     /**
-     * Response recorded
+     * Response replaced
      */
-    201: FeedbackResponse;
+    200: FeedbackResponse;
 };
 
-export type SubmitFeedbackResponseResponse = SubmitFeedbackResponseResponses[keyof SubmitFeedbackResponseResponses];
+export type ReplaceFeedbackResponseResponse = ReplaceFeedbackResponseResponses[keyof ReplaceFeedbackResponseResponses];
 
 export type ListLearnerPracticesData = {
     body?: never;
@@ -9989,9 +10010,9 @@ export type ListObservationsData = {
          */
         presence?: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INCONCLUSIVE';
         /**
-         * Only observations on these artifact kinds, e.g. scm.pull_request (repeatable)
+         * Only observations on these kinds of reviewed work, e.g. scm.pull_request (repeatable)
          */
-        artifactKinds?: Array<string>;
+        workKinds?: Array<string>;
         /**
          * Only observations with these severities (repeatable); omit for all
          */
@@ -10009,11 +10030,11 @@ export type ListObservationsData = {
          */
         direction?: 'ASC' | 'DESC';
         /**
-         * Zero-based page; a negative value is read as the first page
+         * Zero-based page
          */
         page?: number;
         /**
-         * Page size, clamped to 1..100
+         * Page size from 1 to 100
          */
         size?: number;
     };
@@ -10050,27 +10071,6 @@ export type GetObservationsForPullRequestResponses = {
 };
 
 export type GetObservationsForPullRequestResponse = GetObservationsForPullRequestResponses[keyof GetObservationsForPullRequestResponses];
-
-export type GetReflectionData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/observations/reflection';
-};
-
-export type GetReflectionResponses = {
-    /**
-     * Per-practice reflection cards returned
-     */
-    200: Array<ReflectionPractice>;
-};
-
-export type GetReflectionResponse = GetReflectionResponses[keyof GetReflectionResponses];
 
 export type GetSummaryData = {
     body?: never;
@@ -10518,6 +10518,27 @@ export type GetPracticeReviewObservationResponses = {
 };
 
 export type GetPracticeReviewObservationResponse = GetPracticeReviewObservationResponses[keyof GetPracticeReviewObservationResponses];
+
+export type ListPracticeStandingsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/standings';
+};
+
+export type ListPracticeStandingsResponses = {
+    /**
+     * Practice standings returned
+     */
+    200: Array<PracticeStanding>;
+};
+
+export type ListPracticeStandingsResponse = ListPracticeStandingsResponses[keyof ListPracticeStandingsResponses];
 
 export type ListSweepSchedulesData = {
     body?: never;

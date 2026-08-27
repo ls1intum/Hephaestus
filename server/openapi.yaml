@@ -34,8 +34,12 @@ tags:
   name: Practice Areas
 - description: Workspace-scoped mentor chat threads
   name: Mentor Threads
+- description: The current developer's standing in each practice
+  name: Practice Standings
 - description: Recipient responses to delivered practice feedback
   name: Feedback Response
+- description: The current developer's standing in each practice area
+  name: Practice Area Standings
 - description: "User account management (settings, deletion)"
   name: Account
 - description: Instance-admin account management
@@ -65,8 +69,6 @@ tags:
   name: Practice reviews
 - description: GDPR Art. 20 self-service data export
   name: Account
-- description: Developer practice-area detail views
-  name: Practice Area Detail
 - description: Workspace-scoped history of admin configuration changes
   name: Config Audit
 - description: |-
@@ -114,6 +116,8 @@ tags:
 - description: "Workspace-scoped \"bring your own\" AI provider connections, models\
     \ and settings"
   name: Workspace LLM
+- description: Practice area trends and review runs for the current developer
+  name: Practice Area Detail
 - description: Contributor rankings and league statistics
   name: Leaderboard
 - description: Why each practice did or did not run on one piece of work; readable
@@ -4107,11 +4111,9 @@ paths:
       - Practice Areas
   /workspaces/{workspaceSlug}/practice-areas/standings:
     get:
-      description: "Aggregates the authenticated developer's latest-run observations\
-        \ across every active practice area into qualitative standings, with supporting\
-        \ feedback attached so each standing stays traceable to real feedback. Without\
-        \ a displayable observation the standing reports why: NOT_OBSERVED or NO_OPPORTUNITY."
-      operationId: getPracticeAreaStandings
+      description: "Returns every active practice area's standing, direction, guidance,\
+        \ and supporting observations."
+      operationId: listPracticeAreaStandings
       parameters:
       - description: Workspace slug
         in: path
@@ -4128,11 +4130,10 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/PracticeAreaStanding"
-          description: Active-area standings returned
-      security: []
-      summary: Derived practice-area standings for the current developer
+          description: Practice area standings returned
+      summary: List the current developer's practice area standings
       tags:
-      - Practice Areas
+      - Practice Area Standings
   /workspaces/{workspaceSlug}/practice-areas/{areaSlug}:
     delete:
       description: Deletes the area. By default its practices move to Unassigned;
@@ -4267,12 +4268,12 @@ paths:
       summary: Set how much autonomy the system has over one area
       tags:
       - Practice Areas
-  /workspaces/{workspaceSlug}/practice-areas/{areaSlug}/review-history:
+  /workspaces/{workspaceSlug}/practice-areas/{areaSlug}/review-runs:
     get:
       description: Returns complete review runs newest first. Each review run contains
         the concrete positive and negative observations that explain what the review
         observed.
-      operationId: listPracticeAreaReviewHistory
+      operationId: listPracticeAreaReviewRuns
       parameters:
       - description: Workspace slug
         in: path
@@ -4312,26 +4313,29 @@ paths:
             - MAJOR
             - MINOR
             - INFO
-      - description: Zero-based page; a negative value is read as the first page
+      - description: Zero-based page
         in: query
         name: page
         required: false
         schema:
           type: integer
           format: int32
-      - description: "Page size, clamped to 1..50"
+          minimum: 0
+      - description: Page size from 1 to 50
         in: query
         name: size
         required: false
         schema:
           type: integer
           format: int32
+          maximum: 50
+          minimum: 1
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PracticeAreaReviewHistoryPage"
+                $ref: "#/components/schemas/PracticeAreaReviewRunsPage"
           description: Paginated review runs returned
         "400":
           content:
@@ -4341,7 +4345,6 @@ paths:
           description: Invalid filter or pagination
         "404":
           description: Practice area not found
-      security: []
       summary: List complete review runs for a practice area
       tags:
       - Practice Area Detail
@@ -4372,7 +4375,6 @@ paths:
           description: Practice-area trend returned
         "404":
           description: Practice area not found
-      security: []
       summary: Get the evidence-supported trend for a practice area
       tags:
       - Practice Area Detail
@@ -4898,6 +4900,30 @@ paths:
       tags:
       - Feedback Response
   /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response:
+    delete:
+      operationId: deleteFeedbackResponse
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: feedbackId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: Response deleted or no response was recorded
+        "404":
+          description: Delivered feedback not found for the current recipient
+      summary: Delete the response to delivered feedback
+      tags:
+      - Feedback Response
     get:
       operationId: getFeedbackResponse
       parameters:
@@ -4922,23 +4948,16 @@ paths:
                 $ref: "#/components/schemas/FeedbackResponse"
           description: Current response returned
         "204":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/FeedbackResponse"
           description: No response is currently recorded
         "404":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/FeedbackResponse"
           description: Delivered feedback not found for the current recipient
       summary: Get the current feedback response
       tags:
       - Feedback Response
-    post:
-      description: Appends a response event and returns the recipient's current response.
-      operationId: submitFeedbackResponse
+    put:
+      description: Sets the complete current response. Repeating the same request
+        has no effect.
+      operationId: replaceFeedbackResponse
       parameters:
       - description: Workspace slug
         in: path
@@ -4960,21 +4979,17 @@ paths:
               $ref: "#/components/schemas/FeedbackResponseRequest"
         required: true
       responses:
-        "201":
+        "200":
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/FeedbackResponse"
-          description: Response recorded
+          description: Response replaced
         "400":
           description: Invalid response
         "404":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/FeedbackResponse"
           description: Delivered feedback not found for the current recipient
-      summary: Respond to delivered feedback
+      summary: Replace the response to delivered feedback
       tags:
       - Feedback Response
   /workspaces/{workspaceSlug}/practices/learner:
@@ -5039,10 +5054,10 @@ paths:
           - ABSENT
           - NOT_APPLICABLE
           - INCONCLUSIVE
-      - description: "Only observations on these artifact kinds, e.g. scm.pull_request\
+      - description: "Only observations on these kinds of reviewed work, e.g. scm.pull_request\
           \ (repeatable)"
         in: query
-        name: artifactKinds
+        name: workKinds
         required: false
         schema:
           type: array
@@ -5089,20 +5104,23 @@ paths:
           enum:
           - ASC
           - DESC
-      - description: Zero-based page; a negative value is read as the first page
+      - description: Zero-based page
         in: query
         name: page
         required: false
         schema:
           type: integer
           format: int32
-      - description: "Page size, clamped to 1..100"
+          minimum: 0
+      - description: Page size from 1 to 100
         in: query
         name: size
         required: false
         schema:
           type: integer
           format: int32
+          maximum: 100
+          minimum: 1
       responses:
         "200":
           content:
@@ -5143,35 +5161,6 @@ paths:
           description: PR observations returned
       security: []
       summary: List observations for a pull request
-      tags:
-      - Practice Observations
-  /workspaces/{workspaceSlug}/practices/observations/reflection:
-    get:
-      description: "Per-practice cards a developer can READ — why the practice matters,\
-        \ what good looks like, where they stand, the specific feedback to act on,\
-        \ and what they already do well. The third feedback channel alongside in-context\
-        \ SCM notes and the conversational mentor; the same observations reorganised\
-        \ by practice for self-paced reflection, not a scoreboard of counts."
-      operationId: getReflection
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ReflectionPractice"
-          description: Per-practice reflection cards returned
-      security: []
-      summary: Reflective dashboard feedback for the current developer
       tags:
       - Practice Observations
   /workspaces/{workspaceSlug}/practices/observations/summary:
@@ -5882,6 +5871,31 @@ paths:
       summary: Get an observation with its evidence and linked feedback
       tags:
       - Practice reviews
+  /workspaces/{workspaceSlug}/practices/standings:
+    get:
+      description: "Returns each practice's standing, direction, supporting observations,\
+        \ and developer guidance."
+      operationId: listPracticeStandings
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PracticeStanding"
+          description: Practice standings returned
+      summary: List the current developer's practice standings
+      tags:
+      - Practice Standings
   /workspaces/{workspaceSlug}/practices/sweep-schedules:
     get:
       operationId: listSweepSchedules
@@ -9730,13 +9744,11 @@ components:
       - feedbackId
     FeedbackResponseRequest:
       type: object
-      description: "Assess delivered feedback, say what you will do with it, or take\
-        \ your answer back"
+      description: The complete response to delivered feedback
       properties:
         comment:
           type: string
           description: Optional explanation; required when resolution is DISPUTED.
-            Omit it to retain the current comment.
           maxLength: 2000
           minLength: 0
         resolution:
@@ -9752,24 +9764,20 @@ components:
           enum:
           - HELPFUL
           - UNHELPFUL
-        withdraw:
-          type: boolean
-          description: "Take the whole response back, leaving no answer on record.\
-            \ Carries nothing else."
     FeedbackSourceCount:
       type: object
       description: Distinct work artifacts of one kind that contributed feedback
       properties:
-        artifactKind:
-          type: string
-          description: The kind of work the feedback came from
         count:
           type: integer
           format: int64
           description: Distinct artifacts of this kind in the selected time period
+        workKind:
+          type: string
+          description: The kind of work the feedback came from
       required:
-      - artifactKind
       - count
+      - workKind
     FxRateInfo:
       type: object
       description: "Display-only currency conversion for the USD amounts in this response.\
@@ -11362,24 +11370,6 @@ components:
       - name
       - slug
       - visibleInPracticeDashboards
-    PracticeAreaReviewHistoryPage:
-      type: object
-      description: A page of visible review runs
-      properties:
-        content:
-          type: array
-          items:
-            $ref: "#/components/schemas/PracticeAreaReviewRun"
-        hasNext:
-          type: boolean
-        page:
-          type: integer
-          format: int32
-        size:
-          type: integer
-          format: int32
-      required:
-      - content
     PracticeAreaReviewObservation:
       type: object
       description: "One concrete, evidence-backed observation from a review run"
@@ -11459,6 +11449,24 @@ components:
       - reviewId
       - reviewedAt
       - reviewedWork
+    PracticeAreaReviewRunsPage:
+      type: object
+      description: A page of visible review runs
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeAreaReviewRun"
+        hasNext:
+          type: boolean
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+      required:
+      - content
     PracticeAreaReviewedWork:
       type: object
       description: The work assessed in a developer-facing review run
@@ -11529,16 +11537,16 @@ components:
           description: How the guidance text was produced (null when there is no guidance)
           enum:
           - RULE_BASED
-        items:
+        observations:
           type: array
-          description: Supporting feedback the status derives from (problems first);
-            empty without a verdict
+          description: Supporting observations the standing derives from (problems
+            first); empty without a verdict
           items:
-            $ref: "#/components/schemas/ReflectionItem"
+            $ref: "#/components/schemas/PracticeStandingObservation"
         sources:
           type: array
-          description: "Distinct work artifacts the feedback comes from, per kind\
-            \ (provenance, not a score); empty without a verdict"
+          description: "Distinct pieces of reviewed work the observations come from,\
+            \ per kind (provenance, not a score); empty without a verdict"
           items:
             $ref: "#/components/schemas/FeedbackSourceCount"
         standing:
@@ -11556,7 +11564,7 @@ components:
       required:
       - areaName
       - areaSlug
-      - items
+      - observations
       - sources
       - standing
     PracticeAreaTrend:
@@ -11903,6 +11911,126 @@ components:
       - displayName
       - recommended
       - signal
+    PracticeStanding:
+      type: object
+      description: A developer's readable feedback for one practice
+      properties:
+        areaName:
+          type: string
+          description: "Area name this practice belongs to, if any"
+        areaSlug:
+          type: string
+          description: "Area slug this practice belongs to, if any"
+        direction:
+          type: string
+          description: Opportunity-indexed direction of this practice's recent evidence
+          enum:
+          - IMPROVING
+          - DECLINING
+          - UNCERTAIN
+          - INSUFFICIENT_EVIDENCE
+        name:
+          type: string
+          description: Practice name
+        slug:
+          type: string
+          description: Practice slug
+        standing:
+          type: string
+          description: "Where the developer stands on this practice, or why no standing\
+            \ could be formed"
+          enum:
+          - DEVELOPING
+          - STRENGTH
+          - MIXED
+          - NOT_OBSERVED
+          - NO_OPPORTUNITY
+        strengths:
+          type: array
+          description: What the developer already does well here
+          items:
+            $ref: "#/components/schemas/PracticeStandingObservation"
+        toWorkOn:
+          type: array
+          description: Specific feedback to act on (highest-impact first)
+          items:
+            $ref: "#/components/schemas/PracticeStandingObservation"
+        trendSupport:
+          $ref: "#/components/schemas/TrendSupport"
+          description: Evidence support and provenance for the direction
+        whatGoodLooksLike:
+          type: string
+          description: A concrete picture of doing this well
+        whyItMatters:
+          type: string
+          description: "Why this practice matters, in plain language"
+      required:
+      - name
+      - slug
+      - standing
+      - strengths
+      - toWorkOn
+    PracticeStandingObservation:
+      type: object
+      description: A single piece of practice feedback to read and act on
+      properties:
+        deliveredFeedback:
+          type: string
+          description: What to do — the delivered feedback for this observation (null
+            if nothing was delivered)
+        locator:
+          type: string
+          description: "Where in the work, e.g. \"FrameRecorder.swift:212\", when\
+            \ known"
+        observationId:
+          type: string
+          format: uuid
+          description: Observation id — handle to open the full detail
+        origin:
+          type: string
+          description: "Why this observation was recorded. BACKFILL means it came\
+            \ from a review of past work rather than from something that just happened,\
+            \ and nothing was posted anywhere at the time."
+          enum:
+          - LIVE
+          - MANUAL
+          - BACKFILL
+        outcome:
+          type: string
+          description: "What this observation says about the developer: a behaviour\
+            \ demonstrated, a trap avoided, something harmful done, or something needed\
+            \ left out. The lists only separate positive from negative, so this is\
+            \ what tells the two kinds of each apart."
+          enum:
+          - DEMONSTRATED_STRENGTH
+          - SAFE_AVOIDANCE
+          - COMMISSION_PROBLEM
+          - OMISSION_GAP
+        reviewedWorkId:
+          type: integer
+          format: int64
+          description: Identifier of the reviewed work
+        severity:
+          type: string
+          description: Impact level (null unless assessed BAD)
+          enum:
+          - CRITICAL
+          - MAJOR
+          - MINOR
+          - INFO
+        title:
+          type: string
+          description: The headline of the feedback
+        workKind:
+          type: string
+          description: The kind of reviewed work this is about
+      required:
+      - observationId
+      - origin
+      - outcome
+      - reviewedWorkId
+      - title
+      - workKind
     PracticeSubject:
       type: object
       description: What must be in a piece of work for this practice to have anything
@@ -12564,126 +12692,6 @@ components:
             null if the vendor never told us to back off
       required:
       - observedAt
-    ReflectionItem:
-      type: object
-      description: A single piece of practice feedback to read and act on
-      properties:
-        artifactId:
-          type: integer
-          format: int64
-          description: Id of the PR / issue this is about
-        artifactKind:
-          type: string
-          description: The kind of work this is about (PR / issue)
-        deliveredFeedback:
-          type: string
-          description: What to do — the delivered feedback for this observation (null
-            if nothing was delivered)
-        locator:
-          type: string
-          description: "Where in the work, e.g. \"FrameRecorder.swift:212\", when\
-            \ known"
-        observationId:
-          type: string
-          format: uuid
-          description: Observation id — handle to open the full detail
-        origin:
-          type: string
-          description: "What occasioned the measurement. BACKFILL means it came from\
-            \ a review of past work rather than from something that just happened,\
-            \ and nothing was posted anywhere at the time."
-          enum:
-          - LIVE
-          - MANUAL
-          - BACKFILL
-        outcome:
-          type: string
-          description: "What this item says about the developer, which selects how\
-            \ to read it: a behaviour demonstrated, a trap avoided, something harmful\
-            \ done, or something needed left out. A card's lists only separate positive\
-            \ from negative, so this is what tells the two kinds of each apart."
-          enum:
-          - DEMONSTRATED_STRENGTH
-          - SAFE_AVOIDANCE
-          - COMMISSION_PROBLEM
-          - OMISSION_GAP
-        severity:
-          type: string
-          description: Impact level (null unless assessed BAD)
-          enum:
-          - CRITICAL
-          - MAJOR
-          - MINOR
-          - INFO
-        title:
-          type: string
-          description: The headline of the feedback
-      required:
-      - artifactId
-      - artifactKind
-      - observationId
-      - origin
-      - outcome
-      - title
-    ReflectionPractice:
-      type: object
-      description: A developer's readable feedback for one practice
-      properties:
-        areaName:
-          type: string
-          description: "Area name this practice belongs to, if any"
-        areaSlug:
-          type: string
-          description: "Area slug this practice belongs to, if any"
-        direction:
-          type: string
-          description: Opportunity-indexed direction of this practice's recent evidence
-          enum:
-          - IMPROVING
-          - DECLINING
-          - UNCERTAIN
-          - INSUFFICIENT_EVIDENCE
-        name:
-          type: string
-          description: Practice name
-        slug:
-          type: string
-          description: Practice slug
-        standing:
-          type: string
-          description: "Where the developer stands on this practice, or why no standing\
-            \ could be formed"
-          enum:
-          - DEVELOPING
-          - STRENGTH
-          - MIXED
-          - NOT_OBSERVED
-          - NO_OPPORTUNITY
-        strengths:
-          type: array
-          description: What the developer already does well here
-          items:
-            $ref: "#/components/schemas/ReflectionItem"
-        toWorkOn:
-          type: array
-          description: Specific feedback to act on (highest-impact first)
-          items:
-            $ref: "#/components/schemas/ReflectionItem"
-        trendSupport:
-          $ref: "#/components/schemas/TrendSupport"
-          description: Evidence support and provenance for the direction
-        whatGoodLooksLike:
-          type: string
-          description: A concrete picture of doing this well
-        whyItMatters:
-          type: string
-          description: "Why this practice matters, in plain language"
-      required:
-      - name
-      - slug
-      - standing
-      - strengths
-      - toWorkOn
     RegisterOutlineCollectionRequest:
       type: object
       description: Register an Outline collection for mirroring (lands ENABLED + PENDING)

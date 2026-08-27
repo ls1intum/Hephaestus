@@ -5,6 +5,9 @@ import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.web.QueryFilterSupport;
 import io.swagger.v3.oas.annotations.Parameter;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.PositiveOrZero;
 import java.util.List;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
@@ -32,10 +35,10 @@ public record ObservationFeedFilterParams(
      * Bare strings, not {@link ArtifactKind}s — {@link QueryFilterSupport#artifactKind} has the reason,
      * and parses them in {@link #toQuery()}, where a malformed value becomes a 400.
      */
-    @Parameter(description = "Only observations on these artifact kinds, e.g. scm.pull_request (repeatable)")
+    @Parameter(description = "Only observations on these kinds of reviewed work, e.g. scm.pull_request (repeatable)")
     @RequestParam(required = false)
     @Nullable
-    List<String> artifactKinds,
+    List<String> workKinds,
     @Parameter(description = "Only observations with these severities (repeatable); omit for all")
     @RequestParam(required = false)
     @Nullable
@@ -50,11 +53,13 @@ public record ObservationFeedFilterParams(
     @Parameter(description = "Ordering direction: for DATE newest/oldest first, for SEVERITY most/least severe first")
     @RequestParam(required = false)
     Sort.@Nullable Direction direction,
-    @Parameter(description = "Zero-based page; a negative value is read as the first page")
+    @Parameter(description = "Zero-based page") @RequestParam(required = false) @PositiveOrZero @Nullable Integer page,
+    @Parameter(description = "Page size from 1 to 100")
     @RequestParam(required = false)
+    @Min(1)
+    @Max(100)
     @Nullable
-    Integer page,
-    @Parameter(description = "Page size, clamped to 1..100") @RequestParam(required = false) @Nullable Integer size
+    Integer size
 ) {
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final int MAX_PAGE_SIZE = 100;
@@ -88,7 +93,7 @@ public record ObservationFeedFilterParams(
             practiceSlug,
             areaSlug,
             presence,
-            QueryFilterSupport.artifactKinds(artifactKinds),
+            QueryFilterSupport.artifactKinds(workKinds),
             severities,
             Objects.requireNonNull(displayableOnly),
             Objects.requireNonNull(sort),

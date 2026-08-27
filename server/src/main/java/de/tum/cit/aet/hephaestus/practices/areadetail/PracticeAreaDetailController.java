@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.areadetail;
 
-import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewHistoryPageDTO;
+import de.tum.cit.aet.hephaestus.practices.areadetail.dto.PracticeAreaReviewRunsPageDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.dto.PracticeAreaTrendDTO;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
@@ -8,7 +8,6 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,12 +24,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 @WorkspaceScopedController
 @PreAuthorize("@workspaceSecure.isMember()")
 @RequestMapping("/practice-areas/{areaSlug}")
-@Tag(name = "Practice Area Detail", description = "Developer practice-area detail views")
+@Tag(name = "Practice Area Detail", description = "Practice area trends and review runs for the current developer")
 @RequiredArgsConstructor
 @Validated
 public class PracticeAreaDetailController {
 
-    private final PracticeAreaReviewHistoryService reviewHistoryService;
+    private final PracticeAreaReviewRunService reviewRunService;
     private final PracticeAreaTrendQueryService trendQueryService;
 
     @GetMapping("/trend")
@@ -45,7 +44,6 @@ public class PracticeAreaDetailController {
         description = "Practice area not found",
         content = @Content(schema = @Schema(hidden = true))
     )
-    @SecurityRequirements
     public ResponseEntity<PracticeAreaTrendDTO> getTrend(
         WorkspaceContext workspaceContext,
         @PathVariable String areaSlug
@@ -53,9 +51,9 @@ public class PracticeAreaDetailController {
         return ResponseEntity.ok(trendQueryService.get(workspaceContext, areaSlug));
     }
 
-    @GetMapping("/review-history")
+    @GetMapping("/review-runs")
     @Operation(
-        operationId = "listPracticeAreaReviewHistory",
+        operationId = "listPracticeAreaReviewRuns",
         summary = "List complete review runs for a practice area",
         description = "Returns complete review runs newest first. Each review run contains the concrete positive and " +
             "negative observations that explain what the review observed."
@@ -74,14 +72,13 @@ public class PracticeAreaDetailController {
         description = "Practice area not found",
         content = @Content(schema = @Schema(hidden = true))
     )
-    @SecurityRequirements
-    public ResponseEntity<PracticeAreaReviewHistoryPageDTO> listReviewHistory(
+    public ResponseEntity<PracticeAreaReviewRunsPageDTO> listReviewRuns(
         WorkspaceContext workspaceContext,
         @PathVariable String areaSlug,
-        @Valid @ParameterObject PracticeAreaReviewHistoryFilterParams filter
+        @Valid @ParameterObject PracticeAreaReviewRunFilterParams filter
     ) {
         return ResponseEntity.ok(
-            reviewHistoryService.list(
+            reviewRunService.list(
                 workspaceContext,
                 areaSlug,
                 filter.practiceSlug(),

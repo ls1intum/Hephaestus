@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
-import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionItemDTO;
+import de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingObservationDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.TrendDirection;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.dto.TrendSupportDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -34,11 +34,11 @@ public record PracticeAreaStandingDTO(
     @Schema(description = "Oldest contributing observation, for provenance only (null without a verdict)")
     Instant feedbackSince,
     @NonNull
-    @Schema(description = "Supporting feedback the status derives from (problems first); empty without a verdict")
-    List<ReflectionItemDTO> items,
+    @Schema(description = "Supporting observations the standing derives from (problems first); empty without a verdict")
+    List<PracticeStandingObservationDTO> observations,
     @NonNull
     @Schema(
-        description = "Distinct work artifacts the feedback comes from, per kind (provenance, not a score); empty without a verdict"
+        description = "Distinct pieces of reviewed work the observations come from, per kind (provenance, not a score); empty without a verdict"
     )
     List<FeedbackSourceCountDTO> sources
 ) {

@@ -84,15 +84,16 @@ optional `explanation`. Submissions were append-only and the GET returned the la
 also accepts an independent, optional `usefulness` answer:
 
 ```
-POST /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response
-GET  /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response
+PUT    /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response
+GET    /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response
+DELETE /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response
 GET  /workspaces/{workspaceSlug}/practices/feedback/resolution-counts
 ```
 
-The request body carries `usefulness` (`HELPFUL` / `UNHELPFUL`), `resolution` (`ADDRESSED` /
-`DISPUTED` / `NOT_APPLICABLE`), an optional `comment` — required when disputing — and `withdraw`,
-which takes the whole answer back. Every submit appends; the GET returns the answer as it currently
-stands. Omitted fields retain their current values; `withdraw` clears the complete response.
+PUT replaces the complete response with `usefulness` (`HELPFUL` / `UNHELPFUL`), `resolution`
+(`ADDRESSED` / `DISPUTED` / `NOT_APPLICABLE`), or both, plus an optional `comment` that is required
+when disputing. Omitted fields are cleared. Repeating the same PUT has no effect. DELETE removes the
+complete response and is safe to repeat. GET returns the response that currently stands.
 
 **Action**: repoint any direct API caller at the new endpoint. Stored reactions are untouched and
 keep answering; nothing needs migrating and no data is lost.

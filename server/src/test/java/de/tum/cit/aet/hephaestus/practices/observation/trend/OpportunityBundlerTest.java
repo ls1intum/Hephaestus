@@ -104,7 +104,7 @@ class OpportunityBundlerTest {
 
     @Test
     void shouldKeepAnOpportunityThatProducedNoVerdictOutOfTheBundles() {
-        // It stays in the trail: the practice looked at this work item, which is a different fact from never
+        // It stays in the trail: the practice looked at this piece of reviewed work, which is a different fact from never
         // having reviewed it. But it carries no verdict, so it must not become a sample.
         OpportunityBundler.Bundles result = bundle(
             observation(1, UUID.randomUUID(), "2026-08-11T09:00:00Z", Assessment.GOOD),
