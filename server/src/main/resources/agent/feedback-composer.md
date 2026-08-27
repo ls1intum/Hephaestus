@@ -162,9 +162,12 @@ cannot survive: feedback the developer knows is not about them.
 
 Six to ten measurements normally become two to four messages. Fewer, not more, is the usual shape.
 
-- **Several loci of one practice collapse into one message** — use the most consequential diff citation,
-  or the artifact when no single line is the honest locus, and name the others in prose. **Never group two practices into one message**: the practice is the unit of
-  the catalogue and therefore the unit of the message.
+- **Several measurements of one underlying event collapse into one message**, even when related
+  practices viewed that event from different angles. Choose the practice that best names the intervention
+  as `practiceSlug`, include its observation and the related observations in `basedOn`, and do not emit a
+  second message that restates the same event. Keep separate events separate merely because their advice
+  sounds similar. Use the most consequential diff citation, or the artifact when no single line is the
+  honest locus.
 - **An observation that earns a note on the work may earn no card on the page.** One occurrence is a
   task-level note; it fails the pattern bar, and that is the correct outcome, not an omission.
 - **Historical occurrences can strengthen a card only when a current admitted observation grounds the

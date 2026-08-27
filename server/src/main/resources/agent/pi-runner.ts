@@ -34,6 +34,7 @@ import {
 	type ComposedFeedbackUnit,
 	type PreparedFeedbackTarget,
 	undeliverableUnits,
+	validateFeedbackEvidence,
 } from "./pi-runner-composition.ts";
 import { deriveTimeouts, deriveTurnTiming, deriveWorkstreamBudget } from "./pi-runner-timings.ts";
 import {
@@ -656,9 +657,20 @@ interface ReportObservationDetails {
 	duplicates?: number;
 	totalObservations?: number;
 	measurementClosed?: boolean;
+	remainingPractices?: string[];
 }
 
-function buildReportObservationTool(allowedPracticeSlug?: string) {
+function buildReportObservationTool(allowedPracticeSlugs?: readonly string[]) {
+	const allowed = allowedPracticeSlugs ? new Set(allowedPracticeSlugs) : null;
+	const scopedObservationSchema = allowedPracticeSlugs
+		? {
+				...observationSchema,
+				properties: {
+					...observationSchema.properties,
+					practiceSlug: { type: "string", enum: allowedPracticeSlugs },
+				},
+			}
+		: observationSchema;
 	return defineTool({
 		name: "report_observation",
 		label: "Report Observation",
@@ -669,7 +681,7 @@ function buildReportObservationTool(allowedPracticeSlug?: string) {
 			additionalProperties: false,
 			required: ["observation"],
 			properties: {
-				observation: observationSchema,
+				observation: scopedObservationSchema,
 			},
 		},
 		execute: (_toolCallId, params): Promise<AgentToolResult<ReportObservationDetails>> => {
@@ -685,26 +697,41 @@ function buildReportObservationTool(allowedPracticeSlug?: string) {
 				});
 			}
 			const normalized = normalizeObservation(params.observation);
-			if (allowedPracticeSlug && normalized.practiceSlug !== allowedPracticeSlug) {
+			if (allowed && !allowed.has(normalized.practiceSlug)) {
 				return Promise.resolve({
 					content: [
 						{
 							type: "text",
-							text: `This observer is scoped to '${allowedPracticeSlug}', not '${normalized.practiceSlug}'.`,
+							text: `This observer is scoped to ${[...allowed].join(", ")}, not '${normalized.practiceSlug}'.`,
 						},
 					],
-					details: { inserted: 0 },
+					details: { inserted: 0, remainingPractices: [...allowed] },
 				});
 			}
 			const { inserted, duplicates, negatives } = appendObservations([params.observation]);
+			const observed = new Set(reviewState.observations.map((item) => item.practiceSlug));
+			const remainingPractices = allowed
+				? [...allowed].filter((practiceSlug) => !observed.has(practiceSlug))
+				: [];
 			return Promise.resolve({
 				content: [
 					{
 						type: "text",
-						text: `Stored ${inserted} observation${duplicates > 0 ? ` (${duplicates} duplicate skipped)` : ""}. Negative observations in this call: ${negatives}.`,
+						text: `Stored ${inserted} observation${duplicates > 0 ? ` (${duplicates} duplicate skipped)` : ""}. Negative observations in this call: ${negatives}. ${
+							allowed
+								? remainingPractices.length > 0
+									? `Still required from this group: ${remainingPractices.join(", ")}.`
+									: "This group is complete."
+								: ""
+						}`,
 					},
 				],
-				details: { inserted, duplicates, totalObservations: reviewState.observations.length },
+				details: {
+					inserted,
+					duplicates,
+					totalObservations: reviewState.observations.length,
+					remainingPractices,
+				},
 			});
 		},
 	});
@@ -1120,14 +1147,15 @@ function buildFeedbackTool(
 						practiceSlug: {
 							type: "string",
 							enum: practiceSlugs,
-							description: "The practice this unit is about. One unit per practice per channel.",
+							description:
+								"The primary practice whose intervention this unit advances. Related observations may support it.",
 						},
 						basedOn: {
 							type: "array",
 							minItems: 1,
 							items: { type: "string", minLength: 1 },
 							description:
-								"What this rests on: ids of admitted observations from this run for the same practice.",
+								"What this rests on: admitted observation ids from this run. Include related practices only when they describe the same underlying event.",
 						},
 						action: {
 							type: "string",
@@ -1349,12 +1377,12 @@ function validateUnit(
 	preparedTargets: readonly PreparedFeedbackTarget[],
 	placementKinds: readonly PlacementKind[],
 ): string | null {
-	const invalidEvidence = unit.basedOn.find(
-		(reference) => observationsById.get(reference)?.practiceSlug !== unit.practiceSlug,
+	const evidenceError = validateFeedbackEvidence(
+		unit.practiceSlug,
+		unit.basedOn,
+		new Map([...observationsById].map(([id, observation]) => [id, observation.practiceSlug])),
 	);
-	if (invalidEvidence) {
-		return `Evidence '${invalidEvidence}' does not name an admitted observation for ${unit.practiceSlug}; skipped.`;
-	}
+	if (evidenceError) return evidenceError;
 	if (unit.action === "WITHHOLD") {
 		if (!unit.withholdReason) return "WITHHOLD needs a withholdReason; skipped.";
 		return null;
@@ -1690,86 +1718,68 @@ async function main() {
 		`[pi-runner] Review tree: ${tree.practiceCount} practices, ${tree.groups.length} reconnaissance parent(s), concurrency=${concurrency}`,
 	);
 
-	interface ObserverTask {
-		practiceSlug: string;
-		groupId: string;
-		sessionFile?: string;
+	const groupSessionFiles = new Map<string, string>();
+	const groupSeedFiles = new Map<string, string>();
+	if (!hardAborted) {
+		const manager = SessionManager.create(CWD, sessionDir);
+		const { session: reconSession } = await createAgentSession({
+			cwd: CWD,
+			agentDir: AGENT_DIR,
+			tools: [...EVIDENCE_TOOLS],
+			customTools: [],
+			sessionManager: manager,
+			settingsManager,
+			modelRuntime,
+			model,
+		});
+		const unsubscribeRecon = subscribeSession(reconSession, "recon:shared");
+		activeSessions.add(reconSession);
+		const reconBudgetMs = Math.min(
+			180_000,
+			Math.max(45_000, Math.floor(INITIAL_TIMEOUT_MS * 0.05)),
+		);
+		const reconDeadline = scheduleDeadline(reconBudgetMs, () => reconSession.dispose());
+		try {
+			const groupScope = tree.groups
+				.map((group) => `${group.id} [${group.practiceSlugs.join(", ")}]`)
+				.join("; ");
+			await Promise.race([
+				reconSession.prompt(
+					`Build one factual reconnaissance map for this review. Read the manifest and the artifact summary first, then inspect only enough shared evidence to identify changed surfaces, review activity, linked work, tests, and likely code paths. Record exact artifact paths and diff coordinates. Do not evaluate a practice or claim GOOD/BAD. The following group sessions will continue from this checkpoint: ${groupScope}`,
+				),
+				reconDeadline.elapsed,
+			]);
+			const checkpointEntryId = reconSession.sessionManager.getLeafId();
+			const seedSessionFile = reconSession.sessionManager.getSessionFile();
+			if (!checkpointEntryId || !seedSessionFile)
+				throw new Error("shared reconnaissance produced no persistent checkpoint");
+			for (const fork of forkPracticeSessions({
+				seedSessionFile,
+				checkpointEntryId,
+				practiceSlugs: tree.groups.map((group) => group.id),
+				sessionDir,
+			})) {
+				groupSeedFiles.set(fork.practiceSlug, fork.sessionFile);
+			}
+		} catch (error) {
+			console.error(`[pi-runner] shared reconnaissance failed: ${errorText(error)}`);
+		} finally {
+			clearTimeout(reconDeadline.timer);
+			activeSessions.delete(reconSession);
+			unsubscribeRecon();
+			reconSession.dispose();
+		}
 	}
-	const observerSessionFiles = new Map<string, string>();
 
 	try {
-		const groupedTasks = await mapConcurrent(
-			tree.groups,
-			concurrency,
-			async (group): Promise<ObserverTask[]> => {
-				if (hardAborted) return [];
-				const manager = SessionManager.create(CWD, sessionDir);
-				const { session: parentSession } = await createAgentSession({
-					cwd: CWD,
-					agentDir: AGENT_DIR,
-					tools: [...EVIDENCE_TOOLS],
-					customTools: [],
-					sessionManager: manager,
-					settingsManager,
-					modelRuntime,
-					model,
-				});
-				const unsubscribeParent = subscribeSession(parentSession, `recon:${group.id}`);
-				activeSessions.add(parentSession);
-				const remainingMs = Math.max(1, reviewDeadline - Date.now());
-				const parentBudgetMs = Math.min(
-					180_000,
-					Math.max(
-						45_000,
-						Math.floor((remainingMs * concurrency) / (tree.groups.length + allSlugs.length)),
-					),
-				);
-				const parentDeadline = scheduleDeadline(parentBudgetMs, () => {
-					parentSession.dispose();
-				});
-				try {
-					await Promise.race([
-						parentSession.prompt(
-							`Build shared reconnaissance for the '${group.id}' observation group. ` +
-								`The child observers will evaluate these practices later: ${group.practiceSlugs.join(", ")}. ` +
-								`Read only the evidence needed to understand their shared context, starting with these source kinds: ${group.evidenceSources.join(", ") || "the staged manifest"}. ` +
-								`Map relevant files, hunks, symbols, metadata, tests, and uncertainties with exact paths and lines. ` +
-								`Do not assess a practice, recommend feedback, or claim GOOD/BAD. End with a compact factual evidence map for child sessions.`,
-						),
-						parentDeadline.elapsed,
-					]);
-					const checkpointEntryId = parentSession.sessionManager.getLeafId();
-					const seedSessionFile = parentSession.sessionManager.getSessionFile();
-					if (!checkpointEntryId || !seedSessionFile)
-						throw new Error("reconnaissance produced no persistent checkpoint");
-					return forkPracticeSessions({
-						seedSessionFile,
-						checkpointEntryId,
-						practiceSlugs: group.practiceSlugs,
-						sessionDir,
-					}).map((fork) => ({ ...fork, groupId: group.id }));
-				} catch (error) {
-					console.error(`[pi-runner] reconnaissance ${group.id} failed: ${errorText(error)}`);
-					return group.practiceSlugs.map((practiceSlug) => ({ practiceSlug, groupId: group.id }));
-				} finally {
-					clearTimeout(parentDeadline.timer);
-					activeSessions.delete(parentSession);
-					unsubscribeParent();
-					parentSession.dispose();
-				}
-			},
-		);
-		const observerTasks = groupedTasks.flat();
-		for (const task of observerTasks) {
-			if (task.sessionFile) observerSessionFiles.set(task.practiceSlug, task.sessionFile);
-		}
-		let remainingObservers = observerTasks.length;
-		await mapConcurrent(observerTasks, concurrency, async (task, index) => {
+		let remainingGroups = tree.groups.length;
+		await mapConcurrent(tree.groups, concurrency, async (group, index) => {
 			if (hardAborted) return;
-			const manager = task.sessionFile
-				? SessionManager.open(task.sessionFile, sessionDir)
-				: SessionManager.inMemory();
-			const scopedTool = buildReportObservationTool(task.practiceSlug);
+			const seedFile = groupSeedFiles.get(group.id);
+			const manager = seedFile
+				? SessionManager.open(seedFile, sessionDir)
+				: SessionManager.create(CWD, sessionDir);
+			const scopedTool = buildReportObservationTool(group.practiceSlugs);
 			const { session: observerSession } = await createAgentSession({
 				cwd: CWD,
 				agentDir: AGENT_DIR,
@@ -1780,41 +1790,43 @@ async function main() {
 				modelRuntime,
 				model,
 			});
-			const unsubscribeObserver = subscribeSession(
-				observerSession,
-				`observer:${task.practiceSlug}`,
-			);
+			const unsubscribeObserver = subscribeSession(observerSession, `observer:${group.id}`);
 			activeSessions.add(observerSession);
 			const remainingMs = Math.max(1, reviewDeadline - Date.now());
-			const activeSlots = Math.min(concurrency, remainingObservers);
-			const leafBudgetMs = deriveWorkstreamBudget(remainingMs, activeSlots, remainingObservers);
-			const timing = deriveTurnTiming(leafBudgetMs, 1);
+			const activeSlots = Math.min(concurrency, remainingGroups);
+			const groupBudgetMs = deriveWorkstreamBudget(remainingMs, activeSlots, remainingGroups);
+			const timing = deriveTurnTiming(groupBudgetMs, 1);
 			const timers = scheduleTurnTimers(
 				observerSession,
 				index + 1,
-				observerTasks.length,
+				tree.groups.length,
 				timing.softNudgeMs,
 				timing.fairShareMs,
 			);
 			try {
 				await Promise.race([
 					observerSession.prompt(
-						`${prompt}\n\n## Practice branch\nContinue from the shared '${task.groupId}' reconnaissance above. ` +
-							`Read inputs/practices/${task.practiceSlug}.md and evaluate ONLY '${task.practiceSlug}'. ` +
-							`Persist the result with report_observation before doing anything else outside this scope.`,
+						`${prompt}\n\n## Practice group: ${group.id}\nEvaluate exactly these practices: ${group.practiceSlugs.join(", ")}. ` +
+							`Read their files under inputs/practices/ and build one shared evidence map before drawing conclusions. ` +
+							`First report practices whose explicit review occasion clearly did not occur. Then investigate the ` +
+							`remaining practices together, reusing reads across them. Persist exactly one observation for every ` +
+							`listed practice. Do not turn missing evidence into NO_REVIEW_OCCASION, and do not skip a practice ` +
+							`because its behavior is absent.`,
 					),
 					timers.hardDeadline,
 				]);
 			} catch (error) {
-				console.error(`[pi-runner] observer ${task.practiceSlug} failed: ${errorText(error)}`);
+				console.error(`[pi-runner] observer ${group.id} failed: ${errorText(error)}`);
 			} finally {
+				const sessionFile = observerSession.sessionManager.getSessionFile();
+				if (sessionFile) groupSessionFiles.set(group.id, sessionFile);
 				softTimeoutFired ||= timers.state.softTimedOut;
 				clearTimeout(timers.softTimer);
 				clearTimeout(timers.hardTimer);
 				activeSessions.delete(observerSession);
 				unsubscribeObserver();
 				observerSession.dispose();
-				remainingObservers--;
+				remainingGroups--;
 			}
 		});
 	} finally {
@@ -1877,11 +1889,18 @@ async function main() {
 	const retryStartMs = Date.now();
 
 	try {
-		let retriesRemaining = missingAfterInitial.length;
-		await mapConcurrent(missingAfterInitial, concurrency, async (practiceSlug) => {
+		const missingSet = new Set(missingAfterInitial);
+		const retryGroups = tree.groups
+			.map((group) => ({
+				...group,
+				practiceSlugs: group.practiceSlugs.filter((slug) => missingSet.has(slug)),
+			}))
+			.filter((group) => group.practiceSlugs.length > 0);
+		let retriesRemaining = retryGroups.length;
+		await mapConcurrent(retryGroups, concurrency, async (group) => {
 			if (retryAborted) return;
-			const retryTool = buildReportObservationTool(practiceSlug);
-			const priorSessionFile = observerSessionFiles.get(practiceSlug);
+			const retryTool = buildReportObservationTool(group.practiceSlugs);
+			const priorSessionFile = groupSessionFiles.get(group.id);
 			const { session: retrySession } = await createAgentSession({
 				cwd: CWD,
 				agentDir: AGENT_DIR,
@@ -1894,7 +1913,7 @@ async function main() {
 				modelRuntime,
 				model,
 			});
-			const unsubscribeRetry = subscribeSession(retrySession, `retry:${practiceSlug}`);
+			const unsubscribeRetry = subscribeSession(retrySession, `retry:${group.id}`);
 			activeSessions.add(retrySession);
 			const activeSlots = Math.min(concurrency, retriesRemaining);
 			const retryBudgetMs = deriveWorkstreamBudget(RETRY_TIMEOUT_MS, activeSlots, retriesRemaining);
@@ -1904,15 +1923,15 @@ async function main() {
 			try {
 				await Promise.race([
 					retrySession.prompt(
-						`${prompt}\n\n## Recovery practice branch\nThe earlier observer did not persist '${practiceSlug}'. ` +
-							`Continue from its evidence and tool feedback when they are available. Persist the best justified ` +
-							`outcome now; read more only to resolve a specific validation failure or genuinely open evidence question. ` +
-							`Evaluate no other practice. ${PERSIST_DISCIPLINE}`,
+						`${prompt}\n\n## Recovery practice group\nThe earlier group did not persist: ${group.practiceSlugs.join(", ")}. ` +
+							`Continue from its evidence and tool feedback. Persist one best-justified outcome for each missing ` +
+							`practice now; read more only to resolve a specific validation failure or genuinely open evidence ` +
+							`question. Evaluate no other practice. ${PERSIST_DISCIPLINE}`,
 					),
 					retryDeadline.elapsed,
 				]);
 			} catch (error) {
-				console.error(`[pi-runner] retry ${practiceSlug} failed: ${errorText(error)}`);
+				console.error(`[pi-runner] retry ${group.id} failed: ${errorText(error)}`);
 			} finally {
 				clearTimeout(retryDeadline.timer);
 				activeSessions.delete(retrySession);

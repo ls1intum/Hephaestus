@@ -8,6 +8,7 @@ import {
 	type ComposedFeedbackEnvelope,
 	type ComposedFeedbackUnit,
 	undeliverableUnits,
+	validateFeedbackEvidence,
 } from "../../../main/resources/agent/pi-runner-composition.ts";
 
 const supersede = (threadKey: string): ComposedFeedbackUnit => ({
@@ -71,4 +72,24 @@ void test("units that supersede nothing are unaffected by an empty thread list",
 void test("an envelope missing the fields entirely reports nothing rather than throwing", () => {
 	assert.deepEqual(undeliverableUnits({}), []);
 	assert.deepEqual(undeliverableUnits(undefined), []);
+});
+
+void test("one feedback intervention may synthesize related practice observations", () => {
+	const practices = new Map([
+		["primary-1", "review-loop"],
+		["support-1", "handoff"],
+	]);
+
+	assert.equal(
+		validateFeedbackEvidence("review-loop", ["primary-1", "support-1"], practices),
+		null,
+	);
+	assert.match(
+		validateFeedbackEvidence("review-loop", ["support-1"], practices) ?? "",
+		/primary practice 'review-loop'/,
+	);
+	assert.match(
+		validateFeedbackEvidence("review-loop", ["missing"], practices) ?? "",
+		/does not name an admitted observation/,
+	);
 });

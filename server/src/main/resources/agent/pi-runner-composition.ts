@@ -32,6 +32,20 @@ export interface ComposedFeedbackEnvelope {
 	lead?: string | null;
 }
 
+export function validateFeedbackEvidence(
+	primaryPractice: string,
+	basedOn: readonly string[],
+	observationPractices: ReadonlyMap<string, string>,
+): string | null {
+	const unknown = basedOn.find((id) => !observationPractices.has(id));
+	if (unknown)
+		return `Evidence '${unknown}' does not name an admitted observation from this run; skipped.`;
+	if (!basedOn.some((id) => observationPractices.get(id) === primaryPractice)) {
+		return `At least one basedOn observation must belong to the primary practice '${primaryPractice}'; skipped.`;
+	}
+	return null;
+}
+
 /**
  * Units the reader will discard. It resolves every SUPERSEDE against the envelope's own
  * staged targets, including their channel and practice, so a unit naming a mismatched target is
