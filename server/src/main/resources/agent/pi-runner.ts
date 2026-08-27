@@ -1800,8 +1800,9 @@ async function main() {
 				await Promise.race([
 					observerSession.prompt(
 						`${prompt}\n\n## Practice group: ${group.id}\nEvaluate exactly these practices: ${group.practiceSlugs.join(", ")}. ` +
-							`Read their files under inputs/practices/ and build one shared evidence map before drawing conclusions. ` +
-							`Investigate the practices together and reuse reads across them. Persist at least one disposition for ` +
+							`Read their files under inputs/practices/, then start with the cheapest decisive practice. Persist each ` +
+							`observation as soon as it is supported; do not finish a group-wide evidence map first. Reuse evidence ` +
+							`already gathered when investigating the remaining practices. Persist at least one disposition for ` +
 							`every listed practice, plus any distinct material problems a practice exposes. Use ` +
 							`NO_REVIEW_OCCASION only after complete evidence proves the practice's explicit prerequisite did not ` +
 							`occur; missing evidence is not an occasion that failed to happen. Do not skip a practice because its ` +
