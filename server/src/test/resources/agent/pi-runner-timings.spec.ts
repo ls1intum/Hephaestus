@@ -6,8 +6,6 @@ import {
 	deriveWorkstreamBudget,
 } from "../../../main/resources/agent/pi-runner-timings.ts";
 
-// `void`: node:test's own runner owns the promise each test hands back, and awaiting one here
-// would register the next test only after the previous had finished.
 void test("review budget reserves fifteen percent for a retry", () => {
 	assert.deepEqual(deriveTimeouts(900_000), {
 		initialMs: 765_000,

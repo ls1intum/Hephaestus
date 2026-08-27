@@ -1,5 +1,3 @@
-// Registers the server-selected model against the job-scoped LLM proxy.
-
 import { existsSync, readFileSync } from "node:fs";
 import type { ModelRuntime, ProviderModelConfig } from "@earendil-works/pi-coding-agent";
 import { errorText } from "./pi-error-text.ts";
@@ -40,7 +38,6 @@ function asProviderConfig(parsed: unknown): ProviderConfig | null {
 	};
 }
 
-/** Loads the provider snapshot, returning null when absent or invalid. */
 export function loadProviderConfig(cwd = DEFAULT_WORKSPACE_ROOT): ProviderConfig | null {
 	const path = `${cwd}/${PROVIDER_CONFIG_FILENAME}`;
 	if (!existsSync(path)) return null;

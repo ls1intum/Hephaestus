@@ -165,7 +165,7 @@ Six to ten measurements normally become two to four messages. Fewer, not more, i
 - **Several measurements of one underlying event collapse into one message**, even when related
   practices viewed that event from different angles. Choose the practice that best names the intervention
   as `practiceSlug`, include its observation and the related observations in `basedOn`, and do not emit a
-  second message that restates the same event. Keep separate events separate merely because their advice
+  second message that restates the same event. Do not merge separate events merely because their advice
   sounds similar. Use the most consequential diff citation, or the artifact when no single line is the
   honest locus.
 - **An observation that earns a note on the work may earn no card on the page.** One occurrence is a

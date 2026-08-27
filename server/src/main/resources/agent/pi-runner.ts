@@ -43,7 +43,7 @@ import {
 	newUsageLedger,
 	type UsageReport,
 } from "./pi-runner-usage.ts";
-import { forkPracticeSessions } from "./pi-session-tree.ts";
+import { forkSessions } from "./pi-session-tree.ts";
 
 // ── Reading what other processes wrote ───────────────────────────────────────
 // Everything this runner is handed — the task envelope, the manifest, the practice index, the
@@ -249,7 +249,6 @@ function readPracticeIndex(): PracticeIndexEntry[] {
 		}
 		return {
 			slug: practice.slug,
-			// A blank area is no area: the fan-out groups a practice without one under its own slug.
 			area: typeof practice.area === "string" && practice.area !== "" ? practice.area : undefined,
 			readsSources: jsonArray(practice.readsSources).filter(
 				(kind): kind is string => typeof kind === "string",
@@ -1735,13 +1734,13 @@ async function main() {
 			const seedSessionFile = reconSession.sessionManager.getSessionFile();
 			if (!checkpointEntryId || !seedSessionFile)
 				throw new Error("shared reconnaissance produced no persistent checkpoint");
-			for (const fork of forkPracticeSessions({
+			for (const fork of forkSessions({
 				seedSessionFile,
 				checkpointEntryId,
-				practiceSlugs: tree.groups.map((group) => group.id),
+				keys: tree.groups.map((group) => group.id),
 				sessionDir,
 			})) {
-				groupSeedFiles.set(fork.practiceSlug, fork.sessionFile);
+				groupSeedFiles.set(fork.key, fork.sessionFile);
 			}
 		} catch (error) {
 			console.error(`[pi-runner] shared reconnaissance failed: ${errorText(error)}`);

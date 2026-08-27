@@ -171,8 +171,6 @@ const UNDECIDABLE = {
 	wouldSettleIt: "The body of the issue the description defers to",
 };
 
-// `void`: node:test's own runner owns the promise each test hands back, and awaiting one here
-// would register the next test only after the previous had finished.
 void test("lowercase enums + underscored slug normalize and are accepted (not dropped)", () => {
 	const out = normalizeObservation(baseObservation());
 	assert.equal(out.practiceSlug, "writes-focused-pull-requests");
@@ -189,12 +187,6 @@ void test("mixed-case enums up-case", () => {
 	assert.equal(out.assessment, "GOOD");
 	assert.equal(out.severity, "INFO");
 });
-
-// ── No confidence ────────────────────────────────────────────────────────────
-// Measured over 580 live observations, confidence never fell below 0.90 and was exactly 1.00 in 55% of
-// them. A field with no usable range is not a measurement, and every consumer that ranked on it was
-// ranking on noise. It is gone from the final schema, so emitting it is a contract error rather than a
-// silently accepted alternate payload.
 
 void test("an observation carries no confidence, and one offered is rejected", () => {
 	const out = normalizeObservation(baseObservation());
@@ -745,10 +737,6 @@ void test("each presence description discriminates it from its nearest neighbour
 	}
 });
 
-// Measured against gpt-oss-120b: asked to quote the merge-request title
-// `Resolve "Connect data between screens"` verbatim, it returned curly quotes in 6 of 6 runs across
-// three tool-schema shapes. The transcription was faithful; only the glyphs moved. Before this fold
-// the citation failed `includes`, report_observation threw, and the observation was lost.
 void test("a citation survives the typographic substitutions a model makes while transcribing", () => {
 	const content = 'Resolve "Connect data between screens" — see the plan';
 	const cite = (quote: string): NormalizedCitation => ({
@@ -789,10 +777,6 @@ void test("folding glyphs never makes a quote the artifact does not contain matc
 	assert.equal(citationMatchesArtifact(cite("a rationale the author never wrote"), content), false);
 });
 
-// INCONCLUSIVE was the one presence with no ground, and the bench says that mattered in both
-// directions: it made the value cheap to write, and — because it appeared in no schema — hard to find.
-// Moving evidence ahead of the verdict dropped it from 6/6 of the undecidable cases to 1/6; adding this
-// block restored 6/6.
 void test("an INCONCLUSIVE observation must say what it could not settle", () => {
 	const base = {
 		practiceSlug: "describe-what-and-why",

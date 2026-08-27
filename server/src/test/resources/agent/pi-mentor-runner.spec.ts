@@ -1,19 +1,3 @@
-// pi-mentor-runner.spec.ts — smoke suite for the mentor runner.
-//
-// Runs the runner as a child process in PROTOCOL_ONLY mode (stub Pi SDK) so we can exercise:
-//   1. U+2028/U+2029 framing — the single highest-bang-for-buck test per the audit
-//   2. Hello handshake roundtrip
-//   3. Concurrent prompt rejection (-32001 turn_already_in_flight)
-//
-// Frames are typed against pi-mentor-protocol.ts, the same declarations the runner emits against,
-// so a change to the wire contract that this suite does not follow is a type error rather than an
-// assertion that quietly stops matching anything.
-//
-// Wired into CI via `.github/workflows/ci-quality-gates.yml` (application-server-quality
-// step). Non-zero exit fails the gate, so a regression to framing or concurrent-prompt
-// rejection logic blocks merge. Run locally with:
-//   pnpm run test:agents
-
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -233,8 +217,6 @@ async function readError(reader: Reader, id: string): Promise<JsonRpcErrorRespon
 	return frame.error;
 }
 
-// `void`: node:test's own runner owns the promise each test hands back, and awaiting one here
-// would register the next test only after the previous had finished.
 void test("hello handshake returns protocolVersion 1", async () => {
 	const runner = spawnRunner();
 	try {
@@ -428,9 +410,6 @@ void test("watchdog cross-thread rebind: no event leakage from concurrently-boun
 			if (eventType(parsed) === "turn_watchdog_fired") {
 				watchdogSeenAtIndex = events.length - 1;
 			}
-			// Stop ≈400 ms after the watchdog fired so the residue text_delta + natural
-			// agent_end from the first prompt's setTimeout chain have time to reach us
-			// (stub is 200 ms total; watchdog fires at 80 ms → residue at 100 ms, 200 ms).
 			if (watchdogSeenAtIndex >= 0 && Date.now() - start > 600) break;
 		}
 
@@ -442,23 +421,6 @@ void test("watchdog cross-thread rebind: no event leakage from concurrently-boun
 			`expected turn_watchdog_fired event during the watchdog window; got events: ${summarise(events)}`,
 		);
 
-		// The watchdog emits three events for thread A in close sequence:
-		//   1. turn_watchdog_fired (direct sendEvent, before abort)
-		//   2. abort-broadcast agent_end (fires through whatever subscriber is active at that
-		//      instant — pre-rebind that's B_callback, so ONE legitimate threadId=B agent_end
-		//      arrives here. Not a leak: the fix's order-of-operations puts the teardown of
-		//      B's subscription AFTER the abort, by design.)
-		//   3. direct sendEvent agent_end (post-rebind, marks "subscribers Set is now in the
-		//      fixed state — only newA_callback".)
-		//
-		// The leak signal is anything broadcast AFTER step 3: the stub's residue setTimeout
-		// chain (text_delta, natural agent_end) fires through whatever subscribers remain.
-		// WITH the fix → only newA_callback → no thread-B events. WITHOUT → also B_callback →
-		// duplicate thread-B events.
-		//
-		// We demarcate "post-rebind" as the FIRST threadId=A agent_end after the watchdog
-		// marker (that is the direct sendEvent in step 3, since the abort-broadcast above
-		// tags threadId=B — A_callback was already removed by bindThread B's teardown).
 		const directRebindIdx = events.findIndex(
 			(f, i) =>
 				i > watchdogSeenAtIndex && eventThreadId(f) === threadA && eventType(f) === "agent_end",
@@ -473,10 +435,7 @@ void test("watchdog cross-thread rebind: no event leakage from concurrently-boun
 		assert.deepEqual(
 			leakedB.map((f) => eventType(f)),
 			[],
-			"thread B's subscription must be torn down by the watchdog rebind — any threadId=B " +
-				"event AFTER the watchdog's direct agent_end indicates a leaked subscription " +
-				"(the first prompt's residue setTimeout chain broadcast through B_callback). " +
-				`post-rebind frames seen: ${summarise(postRebind)}`,
+			`thread B received events after thread A rebound: ${summarise(postRebind)}`,
 		);
 	} finally {
 		await shutdown(runner);

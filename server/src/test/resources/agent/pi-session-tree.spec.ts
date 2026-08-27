@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
-import { forkPracticeSessions } from "../../../main/resources/agent/pi-session-tree.ts";
+import { forkSessions } from "../../../main/resources/agent/pi-session-tree.ts";
 
 function assistantMessage(text: string) {
 	return {
@@ -26,7 +26,7 @@ function assistantMessage(text: string) {
 	};
 }
 
-void test("forks the same persisted checkpoint into independent practice sessions", () => {
+void test("forks the same persisted checkpoint into independent session branches", () => {
 	const root = mkdtempSync(join(tmpdir(), "pi-session-tree-"));
 	try {
 		const sessionDir = join(root, "sessions");
@@ -40,10 +40,10 @@ void test("forks the same persisted checkpoint into independent practice session
 		const seedSessionFile = seed.getSessionFile();
 		assert.ok(seedSessionFile);
 
-		const forks = forkPracticeSessions({
+		const forks = forkSessions({
 			seedSessionFile,
 			checkpointEntryId,
-			practiceSlugs: ["practice-a", "practice-b"],
+			keys: ["group-a", "group-b"],
 			sessionDir,
 		});
 
@@ -80,22 +80,22 @@ void test("forks the same persisted checkpoint into independent practice session
 	}
 });
 
-void test("rejects duplicate and empty practice slugs before reusing a fork", () => {
+void test("rejects duplicate and empty keys before creating a fork", () => {
 	assert.throws(
 		() =>
-			forkPracticeSessions({
+			forkSessions({
 				seedSessionFile: "unused",
 				checkpointEntryId: "unused",
-				practiceSlugs: ["practice-a", "practice-a"],
+				keys: ["group-a", "group-a"],
 			}),
 		/unique/,
 	);
 	assert.throws(
 		() =>
-			forkPracticeSessions({
+			forkSessions({
 				seedSessionFile: "unused",
 				checkpointEntryId: "unused",
-				practiceSlugs: [""],
+				keys: [""],
 			}),
 		/non-empty/,
 	);

@@ -1,37 +1,33 @@
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 
-export interface PracticeSessionFork {
-	practiceSlug: string;
+export interface SessionFork {
+	key: string;
 	sessionFile: string;
 }
 
-export interface ForkPracticeSessionsOptions {
+export interface ForkSessionsOptions {
 	seedSessionFile: string;
 	checkpointEntryId: string;
-	practiceSlugs: readonly string[];
+	keys: readonly string[];
 	sessionDir?: string;
 }
 
-/**
- * Copies one settled session path into an independent session file per practice.
- * The caller owns lifecycle settlement; this function only operates on persisted session state.
- */
-export function forkPracticeSessions({
+export function forkSessions({
 	seedSessionFile,
 	checkpointEntryId,
-	practiceSlugs,
+	keys,
 	sessionDir,
-}: ForkPracticeSessionsOptions): PracticeSessionFork[] {
-	const uniqueSlugs = new Set<string>();
-	for (const practiceSlug of practiceSlugs) {
-		if (!practiceSlug || uniqueSlugs.has(practiceSlug)) {
-			throw new Error(`Practice slugs must be non-empty and unique: ${practiceSlug}`);
+}: ForkSessionsOptions): SessionFork[] {
+	const uniqueKeys = new Set<string>();
+	for (const key of keys) {
+		if (!key || uniqueKeys.has(key)) {
+			throw new Error(`Keys must be non-empty and unique: ${key}`);
 		}
-		uniqueSlugs.add(practiceSlug);
+		uniqueKeys.add(key);
 	}
 
-	const forks: PracticeSessionFork[] = [];
-	for (const practiceSlug of practiceSlugs) {
+	const forks: SessionFork[] = [];
+	for (const key of keys) {
 		// createBranchedSession replaces the manager's active file, so every fork must
 		// start from a newly opened view of the immutable seed.
 		const seed = SessionManager.open(seedSessionFile, sessionDir);
@@ -39,7 +35,7 @@ export function forkPracticeSessions({
 		if (!sessionFile) {
 			throw new Error("Persistent Pi session fork did not produce a session file");
 		}
-		forks.push({ practiceSlug, sessionFile });
+		forks.push({ key, sessionFile });
 	}
 
 	return forks;

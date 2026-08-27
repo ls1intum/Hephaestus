@@ -1,4 +1,3 @@
-/** Review attempt timing within the detector's budget. */
 export function deriveTimeouts(agentBudgetMs: number, compositionEnabled = false) {
 	if (!Number.isFinite(agentBudgetMs) || agentBudgetMs <= 0) {
 		throw new Error(`agentBudgetMs must be a positive number, got: ${agentBudgetMs}`);
@@ -14,7 +13,6 @@ export function deriveTimeouts(agentBudgetMs: number, compositionEnabled = false
 	};
 }
 
-/** Fair share of the remaining analysis time for the next focused turn. */
 export function deriveTurnTiming(remainingMs: number, remainingTurns: number) {
 	if (!Number.isFinite(remainingMs) || remainingMs < 0) {
 		throw new Error(`remainingMs must be a non-negative number, got: ${remainingMs}`);
@@ -30,7 +28,6 @@ export function deriveTurnTiming(remainingMs: number, remainingTurns: number) {
 	};
 }
 
-/** Wall-clock budget for one workstream while several workstreams run concurrently. */
 export function deriveWorkstreamBudget(
 	remainingMs: number,
 	activeSlots: number,

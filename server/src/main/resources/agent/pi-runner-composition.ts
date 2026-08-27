@@ -46,14 +46,7 @@ export function validateFeedbackEvidence(
 	return null;
 }
 
-/**
- * Units the reader will discard. It resolves every SUPERSEDE against the envelope's own
- * staged targets, including their channel and practice, so a unit naming a mismatched target is
- * feedback that was composed, accepted by the tool, and then dropped on the way out.
- *
- * The tool already refuses a SUPERSEDE whose key is not staged, so this can only be non-empty when
- * the envelope and the tool disagree about which threads were staged.
- */
+/** Returns SUPERSEDE units whose thread key, channel, and practice do not match a staged target. */
 export function undeliverableUnits(
 	envelope?: ComposedFeedbackEnvelope | null,
 ): ComposedFeedbackUnit[] {

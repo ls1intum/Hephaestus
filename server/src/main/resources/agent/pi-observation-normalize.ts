@@ -609,18 +609,7 @@ export function validateInapplicabilityScope(
 	}
 }
 
-/**
- * Typographic substitutions a model makes while transcribing, folded before comparison.
- *
- * Measured, not guessed: asked to quote the title `Resolve "Connect data between screens"` verbatim,
- * gpt-oss-120b returned it with curly quotes in 6 of 6 runs across three different tool schemas. The
- * text was faithful; only the glyphs moved. Without this fold the citation fails `includes`, the
- * observation throws, and a correct measurement is lost — so the check was rejecting transcription rather
- * than fabrication, which is the opposite of its job.
- *
- * Deliberately narrow. Only characters with an unambiguous ASCII original are folded, so a quote that
- * says something the artifact does not still fails: this cannot turn a wrong quote into a right one.
- */
+/** ASCII-equivalent punctuation folded before citation comparison. */
 const CONFUSABLES = new Map(
 	Object.entries({
 		"‘": "'",

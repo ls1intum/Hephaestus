@@ -9,7 +9,7 @@ import org.jspecify.annotations.Nullable;
  * One composition decision for one channel. It references observations but carries no measurement
  * verdict; the server resolves evidence and placement independently.
  *
- * @param basedOn ids of admitted observations from this run for the same practice
+ * @param basedOn ids of admitted observations from this run; at least one belongs to {@code practiceSlug}
  * @param body the in-app words, read verbatim. Null on the in-context lane, where the server renders
  *     evidence around {@link #nextStep}, and on the conversation lane, where {@link #notes} carries notes
  *     to the mentor

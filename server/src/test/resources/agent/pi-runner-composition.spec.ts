@@ -24,8 +24,6 @@ const target = (threadKey: string, channel: Channel = "IN_CONTEXT") => ({
 	practiceSlug: "writes-focused-pull-requests",
 });
 
-// `void`: node:test's own runner owns the promise each test hands back, and awaiting one here
-// would register the next test only after the previous had finished.
 void test("an envelope that lists the threads its units supersede delivers all of them", () => {
 	const envelope = {
 		preparedTargets: [target("t-1"), target("t-2")],

@@ -296,6 +296,10 @@ class ThreadState {
 		this.threadId = threadId;
 		this.sessionPath = sessionPath;
 	}
+
+	hasTurnInFlight() {
+		return this.inFlight;
+	}
 }
 
 // Currently-bound thread on the AgentSessionRuntime (since runtime is single-session at a time).
@@ -333,7 +337,6 @@ function enqueue(fn: () => unknown): void {
 	})().catch((e: unknown) => log("dispatch queue swallowed:", errorText(e)));
 }
 
-// Protocol-only tests do not initialize Pi. Real sessions require the product's mentor prompt.
 function cacheSystemPrompt() {
 	if (!existsSync(SYSTEM_PROMPT_PATH)) {
 		if (PROTOCOL_ONLY) return;
@@ -376,7 +379,6 @@ async function createPiRuntime(sdk: PiSdk, agentDir: string): Promise<MentorRunt
 		`registered hephaestus provider: apiProtocol=${providerConfig.apiProtocol} model=${providerConfig.modelId}`,
 	);
 
-	// The services factory owns the resource loader, so supply the prompt through its options.
 	const mentorSystemPrompt = systemPrompt;
 	if (mentorSystemPrompt === null) throw new Error("mentor system prompt was not loaded");
 	const resourceLoaderOptions = { systemPromptOverride: () => mentorSystemPrompt };
@@ -666,7 +668,7 @@ function forwardEvent(state: ThreadState, event: AgentSessionEvent) {
 			log(`assistant end: ${event.message.stopReason}`);
 		}
 	}
-	// Pi ends each attempt with agent_end; release only the last attempt after agent_settled.
+	// agent_end is attempt-level; expose only the final attempt after agent_settled.
 	if (event.type === "agent_end") {
 		state.lastAgentEnd = event;
 		return;
@@ -809,7 +811,7 @@ async function handleAbort(id: JsonRpcId | undefined, params: MentorParams) {
 	if (!state) {
 		return sendError(id, ERR.THREAD_NOT_OPEN, `thread ${threadId} is not open`);
 	}
-	if (!state.inFlight) {
+	if (!state.hasTurnInFlight()) {
 		return sendError(id, ERR.INVALID_STATE, "no turn in flight for this thread");
 	}
 	try {
@@ -960,7 +962,6 @@ function handleFetchContextResponse(frame: Record<string, unknown>) {
 	log(`fetch_context response had no matching pending callback: id=${callbackId}`);
 }
 
-// Rebuild a turn that exceeds its budget, then unblock Java with a terminal event.
 function startTurnWatchdog(state: ThreadState) {
 	clearTurnWatchdog(state);
 	// Serialize rebinding with RPC-driven session switches.
@@ -1024,17 +1025,12 @@ async function runWatchdogRebind(state: ThreadState) {
 			}
 		}
 	} finally {
-		// Settlement may win the race with watchdog recovery.
-		if (turnIsInFlight(state)) {
+		if (state.hasTurnInFlight()) {
 			state.lastAgentEnd = null;
 			sendEvent(state.threadId, { type: "agent_end", messages: [], willRetry: false });
 			state.inFlight = false;
 		}
 	}
-}
-
-function turnIsInFlight(state: ThreadState) {
-	return state.inFlight;
 }
 
 function clearTurnWatchdog(state: ThreadState) {
@@ -1117,7 +1113,6 @@ async function dispatch(frame: unknown) {
 	log("unrecognised frame:", JSON.stringify(frame).slice(0, 200));
 }
 
-// Test runtime for JSON-RPC protocol tests; enabled by MENTOR_RUNNER_PROTOCOL_ONLY=1.
 type StubAssistantMessage = Extract<
 	Extract<AgentSessionEvent, { type: "message_update" }>["assistantMessageEvent"],
 	{ type: "text_delta" }
@@ -1146,6 +1141,7 @@ function stubAssistantMessage(text: string): StubAssistantMessage {
 function createStubRuntime(): MentorRuntime {
 	const subscribers = new Set<(event: AgentSessionEvent) => void>();
 	let isStreaming = false;
+	let attemptGeneration = 0;
 	const emit = (event: AgentSessionEvent) => {
 		for (const s of subscribers) {
 			try {
@@ -1167,11 +1163,13 @@ function createStubRuntime(): MentorRuntime {
 				throw new Error("stub: already streaming (caller should pass streamingBehavior)");
 			}
 			isStreaming = true;
+			const attempt = ++attemptGeneration;
 			const delay = Number(process.env.MENTOR_RUNNER_STUB_DELAY_MS) || 5;
 			emit({ type: "agent_start" });
 			await new Promise((resolve) => {
 				setTimeout(resolve, delay);
 			});
+			if (attempt !== attemptGeneration) return;
 			const delta = `stub: ${text}`;
 			emit({
 				type: "message_update",
@@ -1186,6 +1184,7 @@ function createStubRuntime(): MentorRuntime {
 			await new Promise((resolve) => {
 				setTimeout(resolve, delay);
 			});
+			if (attempt !== attemptGeneration) return;
 			const retryDelay = Number(process.env.MENTOR_RUNNER_STUB_RETRY_DELAY_MS) || 0;
 			if (retryDelay > 0) {
 				emit({
@@ -1196,6 +1195,7 @@ function createStubRuntime(): MentorRuntime {
 				await new Promise((resolve) => {
 					setTimeout(resolve, retryDelay);
 				});
+				if (attempt !== attemptGeneration) return;
 			}
 			emit({ type: "agent_end", messages: [stubAssistantMessage(delta)], willRetry: false });
 			emit({ type: "agent_settled" });
@@ -1206,6 +1206,7 @@ function createStubRuntime(): MentorRuntime {
 		},
 		abort() {
 			if (isStreaming) {
+				attemptGeneration++;
 				emit({ type: "agent_end", messages: [], willRetry: false });
 				emit({ type: "agent_settled" });
 				isStreaming = false;

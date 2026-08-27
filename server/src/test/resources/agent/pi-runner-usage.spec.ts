@@ -58,8 +58,6 @@ function sessionOf(...messages: SessionMessage[]) {
 	return { messages };
 }
 
-// `void`: node:test's own runner owns the promise each test hands back, and awaiting one here
-// would register the next test only after the previous had finished.
 void test("a ledger with nothing in it reports nothing", () => {
 	const ledger = newUsageLedger();
 
@@ -121,8 +119,6 @@ void test("the same message counted twice is billed once", () => {
 	assert.equal(ledger.inputTokens, 100);
 });
 
-// THE regression. The ledger was fed at message_end, so the call is on it before compaction can drop
-// the message; a walk of what compaction left behind sees only the survivor.
 void test("a call compaction removed from the session is still billed", () => {
 	const ledger = newUsageLedger();
 	const compacted = assistant("dropped", { input: 4_000_000, output: 300_000 });
@@ -131,7 +127,6 @@ void test("a call compaction removed from the session is still billed", () => {
 	addAssistantUsage(ledger, compacted);
 	addAssistantUsage(ledger, survivor);
 
-	// What the session can still show afterwards: one message.
 	const reported = extractUsageFromSession(sessionOf(survivor), ledger);
 
 	assert.equal(reported.totalCalls, 2);
