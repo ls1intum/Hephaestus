@@ -18,7 +18,7 @@ function citation(overrides: Partial<EvidenceCitation> = {}): EvidenceCitation {
 
 describe("toEvidenceLocations", () => {
 	it("carries a quote with the lines it came from", () => {
-		expect(toEvidenceLocations({ citations: [citation()] })).toEqual([
+		expect(toEvidenceLocations({ citations: [citation()] })).toStrictEqual([
 			{
 				path: "src/Main.java",
 				startLine: 42,
@@ -45,25 +45,25 @@ describe("toEvidenceLocations", () => {
 			citations: [citation({ path: "b.java" }), citation({ path: "a.java" })],
 		});
 
-		expect(locations.map((location) => location.path)).toEqual(["b.java", "a.java"]);
+		expect(locations.map((location) => location.path)).toStrictEqual(["b.java", "a.java"]);
 	});
 
 	it("treats absent evidence as no citations", () => {
-		expect(toEvidenceLocations(undefined)).toEqual([]);
-		expect(toEvidenceLocations({ citations: [] })).toEqual([]);
+		expect(toEvidenceLocations(undefined)).toStrictEqual([]);
+		expect(toEvidenceLocations({ citations: [] })).toStrictEqual([]);
 	});
 });
 
 describe("splitPath", () => {
 	it("splits so the directory can absorb truncation", () => {
-		expect(splitPath("src/main/java/Foo.java")).toEqual({
+		expect(splitPath("src/main/java/Foo.java")).toStrictEqual({
 			directory: "src/main/java/",
 			fileName: "Foo.java",
 		});
 	});
 
 	it("treats a bare file name as having no directory", () => {
-		expect(splitPath("Foo.java")).toEqual({ directory: "", fileName: "Foo.java" });
+		expect(splitPath("Foo.java")).toStrictEqual({ directory: "", fileName: "Foo.java" });
 	});
 });
 

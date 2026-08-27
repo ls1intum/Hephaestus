@@ -1,8 +1,7 @@
 import { ChevronDownIcon, FileCodeIcon } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import type { EvidenceLocation } from "./evidence";
-import { evidenceLineRangeLabel, splitPath } from "./evidence";
+import { type EvidenceLocation, evidenceLineRangeLabel, splitPath } from "./evidence";
 
 interface EvidenceFileBlockProps {
 	location: EvidenceLocation;

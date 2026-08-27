@@ -3,7 +3,7 @@ import type { ObservationList } from "@/api/types.gen";
 export type SeverityKey = NonNullable<ObservationList["severity"]>;
 
 /**
- * Learner-facing vocabulary for a finding's severity band.
+ * Developer-facing vocabulary for a finding's severity band.
  *
  * <p>Severity is a COACHING band — how much a developer should care — not a measured consequence.
  * The server sets it only on a `BAD` assessment and documents an `ABSENT, BAD` gap as anything from a

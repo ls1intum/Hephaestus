@@ -7,21 +7,20 @@ import {
 	CircleDashedIcon,
 	CircleMinusIcon,
 	InfoIcon,
-	LayersIcon,
 	Settings2Icon,
 	XIcon,
 } from "lucide-react";
 import { useState } from "react";
 import type {
-	ObservationList,
-	PracticeArea,
-	PracticeAreaReviewMoment,
-	PracticeAreaStatus,
+	PracticeGroup,
+	PracticeGroupReviewObservation,
+	PracticeGroupReviewRun,
+	PracticeGroupStanding,
+	PracticeStanding,
 	PracticeTrend,
-	ReflectionPractice,
 } from "@/api/types.gen";
+import { getGroupVisual } from "@/components/admin/practice-catalog/group-visuals";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
-import { ICON_COMPONENTS } from "@/components/shared/area-visuals";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,29 +35,15 @@ import {
 	PopoverTrigger,
 } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { ProviderType } from "@/lib/provider";
 import { cn } from "@/lib/utils";
 import { PracticeNextStepCallout } from "./PracticeNextStepCallout";
 import { PracticeTrendChip } from "./PracticeTrendChip";
-import { PRACTICE_AREA_STATUS_BADGE } from "./practice-area-status-presentation";
-import { ReviewHistoryTimeline } from "./ReviewHistoryTimeline";
-import {
-	type ObservationDetailState,
-	observationsToReviewedArtifacts,
-	reviewMomentsToReviewedArtifacts,
-} from "./review-history";
+import { PRACTICE_GROUP_STANDING_BADGE } from "./practice-group-standing-presentation";
+import { ReviewRunTimeline } from "./ReviewRunTimeline";
+import type { FeedbackUsefulness, ObservationDetailState } from "./review-runs";
 import { SEVERITY_ORDER, SEVERITY_PRESENTATION, type SeverityKey } from "./severity-presentation";
 
-/**
- * A single practice's standing in the selection list.
- *
- * <p>Keyed by the PRACTICE standing vocabulary plus one local absent marker. The no-verdict reasons used to
- * be area-only facts that could not be attributed to a single practice, which is what the local marker stood
- * in for; the reflection payload now carries them per practice, so they are rendered from the practice's own
- * evidence rather than inherited from its area. `UNMEASURED` remains for the one case the payload still
- * cannot answer: a practice absent from the standings map entirely.
- */
-type PracticeStandingKey = NonNullable<ReflectionPractice["standing"]> | "UNMEASURED";
+type PracticeStandingKey = NonNullable<PracticeStanding["standing"]> | "UNMEASURED";
 
 const STANDING_NODE: Record<
 	PracticeStandingKey,
@@ -102,21 +87,15 @@ const STANDING_NODE: Record<
 	},
 };
 
-export type ActivitySource = ObservationList["artifactKind"];
+export type ReviewRunSource = string;
 
-export interface ActivityFilters {
-	/** Artifact kinds shown in the feed; empty means all. */
-	sources: ActivitySource[];
-	/** Severities shown in the feed; empty means all (strengths carry no severity and stay visible). */
+export interface ReviewRunFilters {
+	sources: ReviewRunSource[];
 	severities: SeverityKey[];
 }
 
-const NO_FILTERS: ActivityFilters = { sources: [], severities: [] };
+const NO_FILTERS: ReviewRunFilters = { sources: [], severities: [] };
 
-/**
- * A developer-facing practice bound to this area. Mirrors the fields the page actually renders so
- * stories and tests do not have to build full API objects.
- */
 export interface ContributingPractice {
 	slug: string;
 	name: string;
@@ -124,58 +103,36 @@ export interface ContributingPractice {
 	whatGoodLooksLike?: string;
 }
 
-export interface PracticeAreaDetailPageProps {
-	/** The practice area this page is about; undefined while loading or when the slug is unknown. */
-	area?: PracticeArea;
-	/** The derived status for the current user (undefined while loading or when it failed). */
-	status?: PracticeAreaStatus;
-	/** Active practices bound to this area, in catalog order. */
+export interface PracticeGroupDetailPageProps {
+	group?: PracticeGroup;
+	standing?: PracticeGroupStanding;
 	practices?: ContributingPractice[];
-	/** The caller's standing per practice slug, where feedback exists (from the reflection surface). */
-	practiceStandings?: Record<string, ReflectionPractice["standing"] | undefined>;
-	/** Opportunity-indexed direction per practice, from the detail trend endpoint. */
+	practiceStandings?: Record<string, PracticeStanding["standing"] | undefined>;
 	practiceTrends?: Record<string, PracticeTrend | undefined>;
-	/** Area-level comparison from the same detail trend response as the practice entries. */
-	areaTrend?: PracticeTrend;
-	/** Highest-priority delivered action per practice, derived from the reflection surface. */
+	groupTrend?: PracticeTrend;
 	practiceNextSteps?: Record<string, string | undefined>;
-	/**
-	 * Importance weight per practice slug for the area aggregation. Shown as secondary context when
-	 * present and ≠ 1 — the UI seam for the planned admin-configurable weighting.
-	 */
-	practiceWeights?: Record<string, number | undefined>;
-	/** The practice currently selected in the list — filters the feedback history. */
 	selectedPracticeSlug?: string;
-	/** Select (or, with undefined, clear) a practice. */
 	onSelectPractice?: (practiceSlug: string | undefined) => void;
-	/** The workspace's SCM provider — labels PR/issue events as GitHub or GitLab. */
-	providerType?: ProviderType;
-	/** Newest-first observation feed for this area, already filtered by the active filters. */
-	activity?: ObservationList[];
-	/** Complete review moments from the learner detail endpoint. */
-	reviewHistory?: PracticeAreaReviewMoment[];
-	isActivityLoading?: boolean;
-	activityError?: unknown;
-	onRetryActivity?: () => void;
-	activityFilters?: ActivityFilters;
-	onActivityFiltersChange?: (filters: ActivityFilters) => void;
-	hasMoreActivity?: boolean;
-	isLoadingMoreActivity?: boolean;
-	onLoadMoreActivity?: () => void;
-	/** The feed entry currently expanded inline (guidance + reasoning). */
+	reviewRuns?: PracticeGroupReviewRun[];
+	isReviewRunsLoading?: boolean;
+	reviewRunsError?: unknown;
+	onRetryReviewRuns?: () => void;
+	reviewRunFilters?: ReviewRunFilters;
+	onReviewRunFiltersChange?: (filters: ReviewRunFilters) => void;
+	hasMoreReviewRuns?: boolean;
+	isLoadingMoreReviewRuns?: boolean;
+	onLoadMoreReviewRuns?: () => void;
 	openObservationId?: string;
-	/** Fetch state for the expanded entry. */
 	observationDetail?: ObservationDetailState;
-	/** Expand an entry, or collapse it when it is already open. */
 	onToggleObservation?: (observationId: string) => void;
-	/** Rate the usefulness of delivered feedback, or clear the current rating with undefined. */
-	onRateFeedback?: (feedbackId: string, helpful?: boolean) => void;
+	onChangeUsefulness?: (
+		observation: PracticeGroupReviewObservation,
+		usefulness?: FeedbackUsefulness,
+	) => void;
 	pendingFeedbackId?: string;
 	isLoading: boolean;
-	/** The thrown query error, if the status request failed. */
 	error?: unknown;
 	onRetry?: () => void;
-	/** Navigates back to the profile. */
 	onBack?: () => void;
 }
 
@@ -185,7 +142,6 @@ interface DetailSectionIntroProps {
 	description: string;
 }
 
-/** One shared type and spacing rhythm for the two parallel detail sections. */
 function DetailSectionIntro({ id, title, description }: DetailSectionIntroProps) {
 	return (
 		<div className="grid content-start gap-1 lg:min-h-20">
@@ -197,52 +153,41 @@ function DetailSectionIntro({ id, title, description }: DetailSectionIntroProps)
 	);
 }
 
-/**
- * Per-area detail page for repeat use: standing, recent direction, and the next step stay compact in
- * the header; background is available on demand; practices and their feedback history share the main
- * desktop row. On narrow screens the same content returns to one reading column.
- *
- * <p>The feed deliberately shows RAW history (including superseded runs) — it is an activity monitor,
- * not a verdict surface; the curated status above stays quarantine- and latest-run-filtered.
- */
-export function PracticeAreaDetailPage({
-	area,
-	status,
+export function PracticeGroupDetailPage({
+	group,
+	standing,
 	practices,
 	practiceStandings,
 	practiceTrends,
-	areaTrend,
+	groupTrend,
 	practiceNextSteps,
-	practiceWeights,
 	selectedPracticeSlug,
 	onSelectPractice,
-	providerType = "GITHUB",
-	activity,
-	reviewHistory,
-	isActivityLoading,
-	activityError,
-	onRetryActivity,
-	activityFilters = NO_FILTERS,
-	onActivityFiltersChange,
-	hasMoreActivity,
-	isLoadingMoreActivity,
-	onLoadMoreActivity,
+	reviewRuns,
+	isReviewRunsLoading,
+	reviewRunsError,
+	onRetryReviewRuns,
+	reviewRunFilters = NO_FILTERS,
+	onReviewRunFiltersChange,
+	hasMoreReviewRuns,
+	isLoadingMoreReviewRuns,
+	onLoadMoreReviewRuns,
 	openObservationId,
 	observationDetail,
 	onToggleObservation,
-	onRateFeedback,
+	onChangeUsefulness,
 	pendingFeedbackId,
 	isLoading,
 	error,
 	onRetry,
 	onBack,
-}: PracticeAreaDetailPageProps) {
-	const [isAreaDescriptionOpen, setIsAreaDescriptionOpen] = useState(false);
+}: PracticeGroupDetailPageProps) {
+	const [isGroupDescriptionOpen, setIsGroupDescriptionOpen] = useState(false);
 	const [openPracticeInfoSlug, setOpenPracticeInfoSlug] = useState<string>();
 
 	if (isLoading) {
 		return (
-			<div className="flex flex-col gap-4" data-testid="practice-area-detail-loading">
+			<div className="flex flex-col gap-4">
 				<Skeleton className="h-10 w-2/3" />
 				<Skeleton className="h-48 w-full" />
 				<Skeleton className="h-48 w-full" />
@@ -255,18 +200,20 @@ export function PracticeAreaDetailPage({
 			<QueryErrorAlert
 				error={error}
 				title={
-					area ? `Could not load your status for ${area.name}` : "Could not load this practice area"
+					group
+						? `Could not load your standing for ${group.name}`
+						: "Could not load this practice group"
 				}
 				onRetry={onRetry}
 			/>
 		);
 	}
 
-	if (!area) {
+	if (!group) {
 		return (
 			<div className="flex flex-col items-start gap-3">
 				<p className="text-sm text-muted-foreground">
-					This practice area does not exist or is not active in this workspace.
+					This practice group does not exist or is not active in this workspace.
 				</p>
 				{onBack && (
 					<Button type="button" size="sm" variant="outline" onClick={onBack}>
@@ -278,53 +225,42 @@ export function PracticeAreaDetailPage({
 		);
 	}
 
-	const areaStatus = status?.status ?? "NOT_OBSERVED";
-	const badge = PRACTICE_AREA_STATUS_BADGE[areaStatus];
-	// Same identity rule as the overview card: the admin-set icon when configured, else a neutral
-	// default — no seeded guessing, so the card and its detail page never disagree about an area's face.
-	const AreaIcon = (area.icon ? ICON_COMPONENTS[area.icon] : undefined) ?? LayersIcon;
+	const groupStanding = standing?.standing ?? "NOT_OBSERVED";
+	const badge = PRACTICE_GROUP_STANDING_BADGE[groupStanding];
+	const { Icon: GroupIcon, pill: groupPill } = getGroupVisual(group.icon, group.color);
 	const selectedPractice = practices?.find((practice) => practice.slug === selectedPracticeSlug);
-	const activeFilterCount = activityFilters.sources.length + activityFilters.severities.length;
+	const activeFilterCount = reviewRunFilters.sources.length + reviewRunFilters.severities.length;
 	const hasAnyFeedNarrowing = activeFilterCount > 0 || selectedPractice !== undefined;
-	const reviewedArtifacts = reviewHistory
-		? reviewMomentsToReviewedArtifacts(reviewHistory)
-		: observationsToReviewedArtifacts(activity ?? [], providerType);
-	const hasReviewHistory = reviewedArtifacts.some((artifact) => artifact.runs.length > 0);
+	const hasReviewRuns = (reviewRuns?.length ?? 0) > 0;
 
-	const providerLabel = providerType === "GITLAB" ? "GitLab" : "GitHub";
-	const sourceOptions: { value: ActivitySource; label: string }[] = [
-		{ value: "PULL_REQUEST", label: `Pull requests (${providerLabel})` },
-		{ value: "ISSUE", label: `Issues (${providerLabel})` },
-		{ value: "CONVERSATION_THREAD", label: "Conversations (Slack)" },
+	const sourceOptions: { value: ReviewRunSource; label: string }[] = [
+		{ value: "scm.pull_request", label: "Pull requests" },
+		{ value: "scm.issue", label: "Issues" },
+		{ value: "chat.conversation_thread", label: "Slack conversations" },
 	];
 
-	const toggleSource = (source: ActivitySource, checked: boolean) => {
+	const toggleSource = (source: ReviewRunSource, checked: boolean) => {
 		const sources = checked
-			? [...new Set([...activityFilters.sources, source])]
-			: activityFilters.sources.filter((candidate) => candidate !== source);
-		onActivityFiltersChange?.({ ...activityFilters, sources });
+			? [...new Set([...reviewRunFilters.sources, source])]
+			: reviewRunFilters.sources.filter((candidate) => candidate !== source);
+		onReviewRunFiltersChange?.({ ...reviewRunFilters, sources });
 	};
 	const toggleSeverity = (severity: SeverityKey, checked: boolean) => {
 		const severities = checked
-			? [...new Set([...activityFilters.severities, severity])]
-			: activityFilters.severities.filter((candidate) => candidate !== severity);
-		onActivityFiltersChange?.({ ...activityFilters, severities });
+			? [...new Set([...reviewRunFilters.severities, severity])]
+			: reviewRunFilters.severities.filter((candidate) => candidate !== severity);
+		onReviewRunFiltersChange?.({ ...reviewRunFilters, severities });
 	};
-	const weightOf = (practice: ContributingPractice) => {
-		const weight = practiceWeights?.[practice.slug];
-		return weight !== undefined && weight !== 1 ? weight : undefined;
-	};
-
-	const nextStepFor = (practice: ContributingPractice, standing: PracticeStandingKey) => {
+	const nextStepFor = (practice: ContributingPractice, practiceStanding: PracticeStandingKey) => {
 		const deliveredStep = practiceNextSteps?.[practice.slug]?.trim();
 		if (deliveredStep) return deliveredStep;
-		if (standing === "STRENGTH" && practice.whatGoodLooksLike) {
+		if (practiceStanding === "STRENGTH" && practice.whatGoodLooksLike) {
 			return `Keep doing this: ${practice.whatGoodLooksLike}`;
 		}
-		if (standing === "NO_OPPORTUNITY") {
+		if (practiceStanding === "NO_OPPORTUNITY") {
 			return "Nothing to act on yet — the reviews ran and your work offered no occasion for this practice.";
 		}
-		if (standing === "NOT_OBSERVED" || standing === "UNMEASURED") {
+		if (practiceStanding === "NOT_OBSERVED" || practiceStanding === "UNMEASURED") {
 			return "No focused next step yet. It will appear after this practice is observed in reviewed work.";
 		}
 		return practice.whatGoodLooksLike;
@@ -343,53 +279,55 @@ export function PracticeAreaDetailPage({
 
 			<header className="flex max-w-4xl flex-col gap-4 lg:col-span-2">
 				<div className="flex flex-wrap items-center gap-3">
-					<span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-						<AreaIcon className="size-5" aria-hidden />
+					<span
+						className={cn(
+							"flex size-10 shrink-0 items-center justify-center rounded-lg",
+							groupPill,
+						)}
+					>
+						<GroupIcon className="size-5" aria-hidden />
 					</span>
-					<h1 className="min-w-0 text-pretty text-2xl font-semibold">{area.name}</h1>
+					<h1 className="min-w-0 text-pretty text-2xl font-semibold">{group.name}</h1>
 					<Badge variant={badge.variant}>{badge.label}</Badge>
-					{/* Only the compact direction for now. The inspectable comparison (PracticeTrendPanel,
-					    still covered by its own stories and tests) is parked until its wording and the
-					    per-practice standing agree on one window — see practice-trend-display-spec.md. */}
-					{areaTrend && (
-						<PracticeTrendChip direction={areaTrend.direction} support={areaTrend.support} />
+					{groupTrend && (
+						<PracticeTrendChip direction={groupTrend.direction} support={groupTrend.support} />
 					)}
 				</div>
-				{status?.guidance && (
+				{standing?.guidance && (
 					<PracticeNextStepCallout label="Suggested next step">
-						{status.guidance}
+						{standing.guidance}
 					</PracticeNextStepCallout>
 				)}
-				{area.description && (
+				{group.description && (
 					<div className="flex w-full flex-col items-start gap-2">
 						<Button
 							type="button"
 							variant="ghost"
 							size="sm"
-							aria-expanded={isAreaDescriptionOpen}
-							aria-controls="practice-area-description"
+							aria-expanded={isGroupDescriptionOpen}
+							aria-controls="practice-group-description"
 							className={cn(
 								"text-muted-foreground hover:text-foreground",
-								isAreaDescriptionOpen && "bg-muted text-foreground",
+								isGroupDescriptionOpen && "bg-muted text-foreground",
 							)}
-							onClick={() => setIsAreaDescriptionOpen((open) => !open)}
+							onClick={() => setIsGroupDescriptionOpen((open) => !open)}
 						>
 							<InfoIcon className="size-3.5" aria-hidden />
-							About this area
+							About this group
 							<ChevronDownIcon
 								className={cn(
 									"size-3.5 transition-transform",
-									isAreaDescriptionOpen && "rotate-180",
+									isGroupDescriptionOpen && "rotate-180",
 								)}
 								aria-hidden
 							/>
 						</Button>
-						{isAreaDescriptionOpen && (
+						{isGroupDescriptionOpen && (
 							<p
-								id="practice-area-description"
+								id="practice-group-description"
 								className="w-full rounded-lg border bg-muted/20 p-3 text-pretty text-sm leading-5 text-muted-foreground"
 							>
-								{area.description}
+								{group.description}
 							</p>
 						)}
 					</div>
@@ -400,19 +338,18 @@ export function PracticeAreaDetailPage({
 				<section className="flex min-w-0 flex-col gap-3" aria-labelledby="practices-heading">
 					<DetailSectionIntro
 						id="practices-heading"
-						title="Practices in this area"
-						description="Select a practice to filter the history. Use its info button for more context."
+						title="Practices in this group"
+						description="Select a practice to filter the review runs. Use its info button for more context."
 					/>
 					<div className="hidden h-8 lg:block" aria-hidden />
 					<ul className="flex flex-col gap-3">
 						{practices.map((practice) => {
-							const standing = practiceStandings?.[practice.slug] ?? "UNMEASURED";
-							const node = STANDING_NODE[standing];
+							const practiceStanding = practiceStandings?.[practice.slug] ?? "UNMEASURED";
+							const node = STANDING_NODE[practiceStanding];
 							const practiceTrend = practiceTrends?.[practice.slug];
 							const isSelected = practice.slug === selectedPracticeSlug;
 							const isInfoOpen = practice.slug === openPracticeInfoSlug;
-							const weight = weightOf(practice);
-							const nextStep = nextStepFor(practice, standing);
+							const nextStep = nextStepFor(practice, practiceStanding);
 							const infoId = `practice-info-${practice.slug}`;
 							const nextStepId = `practice-next-step-${practice.slug}`;
 							return (
@@ -426,7 +363,7 @@ export function PracticeAreaDetailPage({
 									<div className="relative">
 										<button
 											type="button"
-											aria-label={`${isSelected ? "Clear feedback filter for" : "Show feedback for"} ${practice.name}`}
+											aria-label={`${isSelected ? "Clear review-run filter for" : "Show review runs for"} ${practice.name}`}
 											aria-pressed={isSelected}
 											aria-expanded={isSelected}
 											aria-controls={nextStepId}
@@ -453,9 +390,6 @@ export function PracticeAreaDetailPage({
 															direction={practiceTrend.direction}
 															support={practiceTrend.support}
 														/>
-													)}
-													{weight !== undefined && (
-														<span className="text-muted-foreground">{`Importance ×${weight}`}</span>
 													)}
 												</div>
 											</div>
@@ -521,7 +455,7 @@ export function PracticeAreaDetailPage({
 			)}
 
 			<section
-				aria-labelledby="feedback-history-heading"
+				aria-labelledby="review-runs-heading"
 				className={cn(
 					"flex min-w-0 flex-col gap-3",
 					practices && practices.length > 0
@@ -530,9 +464,9 @@ export function PracticeAreaDetailPage({
 				)}
 			>
 				<DetailSectionIntro
-					id="feedback-history-heading"
-					title="Feedback history"
-					description="Feedback from this area, including earlier reviews of the same work. Your standing uses only the latest eligible review."
+					id="review-runs-heading"
+					title="Review runs"
+					description="Complete reviews of your work in this group, newest first."
 				/>
 				<div className="flex min-h-8 flex-wrap items-center gap-2">
 					{selectedPractice && (
@@ -548,7 +482,7 @@ export function PracticeAreaDetailPage({
 						</Button>
 					)}
 					<div className="ml-auto flex flex-wrap items-center gap-2">
-						{onActivityFiltersChange && (
+						{onReviewRunFiltersChange && (
 							<Popover>
 								<PopoverTrigger
 									render={
@@ -561,16 +495,16 @@ export function PracticeAreaDetailPage({
 								/>
 								<PopoverContent align="end" className="w-80">
 									<PopoverHeader>
-										<PopoverTitle>Feedback history</PopoverTitle>
+										<PopoverTitle>Review runs</PopoverTitle>
 										<PopoverDescription>
-											Narrow the feed; nothing selected shows everything.
+											Narrow the review runs; nothing selected shows everything.
 										</PopoverDescription>
 									</PopoverHeader>
 									<div className="grid gap-4">
 										<div className="grid gap-2">
 											<p className="text-sm font-medium">Sources</p>
 											{sourceOptions.map((option) => {
-												const id = `related-activity-source-${option.value}`;
+												const id = `review-run-source-${option.value}`;
 												return (
 													<Label
 														key={option.value}
@@ -579,10 +513,8 @@ export function PracticeAreaDetailPage({
 													>
 														<Checkbox
 															id={id}
-															checked={activityFilters.sources.includes(option.value)}
-															onCheckedChange={(checked) =>
-																toggleSource(option.value, checked === true)
-															}
+															checked={reviewRunFilters.sources.includes(option.value)}
+															onCheckedChange={(checked) => toggleSource(option.value, checked)}
 														/>
 														<span className="truncate">{option.label}</span>
 													</Label>
@@ -592,7 +524,7 @@ export function PracticeAreaDetailPage({
 										<div className="grid gap-2">
 											<p className="text-sm font-medium">Severity</p>
 											{SEVERITY_ORDER.map((severity) => {
-												const id = `related-activity-severity-${severity}`;
+												const id = `review-run-severity-${severity}`;
 												return (
 													<Label
 														key={severity}
@@ -601,10 +533,8 @@ export function PracticeAreaDetailPage({
 													>
 														<Checkbox
 															id={id}
-															checked={activityFilters.severities.includes(severity)}
-															onCheckedChange={(checked) =>
-																toggleSeverity(severity, checked === true)
-															}
+															checked={reviewRunFilters.severities.includes(severity)}
+															onCheckedChange={(checked) => toggleSeverity(severity, checked)}
 														/>
 														<span>{SEVERITY_PRESENTATION[severity].label}</span>
 													</Label>
@@ -620,49 +550,48 @@ export function PracticeAreaDetailPage({
 						)}
 					</div>
 				</div>
-				{activityError ? (
+				{reviewRunsError ? (
 					<QueryErrorAlert
-						error={activityError}
-						title="Could not load feedback history"
-						onRetry={onRetryActivity}
+						error={reviewRunsError}
+						title="Could not load review runs"
+						onRetry={onRetryReviewRuns}
 					/>
-				) : isActivityLoading ? (
-					<div className="flex flex-col gap-3" data-testid="related-activity-loading">
+				) : isReviewRunsLoading ? (
+					<div className="flex flex-col gap-3">
 						{Array.from({ length: 3 }, (_, i) => (
 							<Skeleton key={i} className="h-16 w-full" />
 						))}
 					</div>
-				) : hasReviewHistory ? (
+				) : hasReviewRuns ? (
 					<>
-						<ReviewHistoryTimeline
-							artifacts={reviewedArtifacts}
-							selectedPracticeSlug={selectedPracticeSlug}
+						<ReviewRunTimeline
+							runs={reviewRuns ?? []}
 							openObservationId={openObservationId}
 							observationDetail={observationDetail}
 							onToggleObservation={onToggleObservation}
-							onRateFeedback={onRateFeedback}
+							onChangeUsefulness={onChangeUsefulness}
 							pendingFeedbackId={pendingFeedbackId}
 						/>
-						{hasMoreActivity && onLoadMoreActivity && (
+						{hasMoreReviewRuns && onLoadMoreReviewRuns && (
 							<Button
 								type="button"
 								variant="link"
 								className="w-fit px-0 text-primary"
-								onClick={onLoadMoreActivity}
-								disabled={isLoadingMoreActivity}
+								onClick={onLoadMoreReviewRuns}
+								disabled={isLoadingMoreReviewRuns}
 							>
-								{isLoadingMoreActivity ? "Loading…" : "View earlier reviews"}
+								{isLoadingMoreReviewRuns ? "Loading…" : "View earlier reviews"}
 							</Button>
 						)}
 					</>
 				) : (
 					<EmptyState
 						icon={PulseIcon}
-						title="No feedback history"
+						title="No review runs"
 						description={
 							hasAnyFeedNarrowing
-								? "No feedback matches the current filters. Clear them to see everything in this area."
-								: "Feedback appears here once your work has been reviewed."
+								? "No review runs match the current filters. Clear them to see every review in this group."
+								: "Review runs appear here once your work has been reviewed."
 						}
 					/>
 				)}

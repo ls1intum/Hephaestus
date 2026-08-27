@@ -8,7 +8,7 @@ const meta = {
 		docs: {
 			description: {
 				component:
-					"One quoted file behind a finding: path as header, lines beneath. The path truncates in the " +
+					"One quoted file behind an observation: path as header, lines beneath. The path truncates in the " +
 					"middle so the file name survives, and long lines scroll with the line gutter pinned.",
 			},
 		},
@@ -43,7 +43,7 @@ export const Default: Story = {
 	},
 };
 
-/** A single named line, the shape most findings carry. */
+/** A single named line, the shape most observations carry. */
 export const SingleLine: Story = {
 	args: {
 		location: {
@@ -52,12 +52,12 @@ export const SingleLine: Story = {
 			endLine: 118,
 			redacted: false,
 			snippet:
-				"  const statusesQuery = useQuery(getPracticeAreaStatusesOptions({ path: { workspaceSlug } }));",
+				"  const statusesQuery = useQuery(listPracticeGroupStandingsOptions({ path: { workspaceSlug } }));",
 		},
 	},
 };
 
-/** Collapsed: the second and later files of a finding start closed so the panel stays scannable. */
+/** Collapsed: the second and later files of a observation start closed so the panel stays scannable. */
 export const Collapsed: Story = {
 	args: {
 		defaultOpen: false,
@@ -107,7 +107,7 @@ export const LongLines: Story = {
 			redacted: false,
 			snippet: [
 				'SELECT o.agent_job_id AS "jobId", MAX(o.observed_at) AS "reviewedAt" FROM observation o JOIN practice p ON p.id = o.practice_id JOIN practice_area a ON a.id = p.practice_area_id',
-				"WHERE o.about_user_id = :aboutUserId AND p.workspace_id = :workspaceId AND a.slug = :areaSlug AND o.presence <> 'NOT_APPLICABLE'",
+				"WHERE o.about_user_id = :aboutUserId AND p.workspace_id = :workspaceId AND a.slug = :groupSlug AND o.presence <> 'NOT_APPLICABLE'",
 			].join("\n"),
 		},
 	},

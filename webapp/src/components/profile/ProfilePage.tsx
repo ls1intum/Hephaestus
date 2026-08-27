@@ -6,9 +6,9 @@ import type { ActivityMonitorFilters } from "@/lib/activity-monitor";
 import type { ProviderType } from "@/lib/provider";
 import type { LeaderboardSchedule } from "@/lib/timeframe";
 import {
-	PracticeAreaStatusCard,
-	type PracticeAreaStatusSectionProps,
-} from "./PracticeAreaStatusCard";
+	PracticeGroupStandingCard,
+	type PracticeGroupStandingSectionProps,
+} from "./PracticeGroupStandingCard";
 import { ProfileContent } from "./ProfileContent";
 import { ProfileHeader } from "./ProfileHeader";
 
@@ -26,13 +26,11 @@ interface ProfileProps {
 	after?: string;
 	before?: string;
 	onTimeframeChange?: (afterDate: string, beforeDate?: string) => void;
-	/** Leaderboard schedule for proper week calculations */
 	schedule?: LeaderboardSchedule;
 	achievementsEnabled?: boolean;
 	progressionEnabled?: boolean;
 	leaguesEnabled?: boolean;
-	/** Own-profile practice-area status section; omit to hide (e.g. on someone else's profile). */
-	practiceAreaStatus?: PracticeAreaStatusSectionProps;
+	practiceGroupStandings?: PracticeGroupStandingSectionProps;
 }
 
 export function ProfilePage({
@@ -53,7 +51,7 @@ export function ProfilePage({
 	achievementsEnabled = true,
 	progressionEnabled = true,
 	leaguesEnabled = true,
-	practiceAreaStatus,
+	practiceGroupStandings,
 }: ProfileProps) {
 	if (error) {
 		return (
@@ -81,11 +79,9 @@ export function ProfilePage({
 				progressionEnabled={progressionEnabled}
 				leaguesEnabled={leaguesEnabled}
 			/>
-			{practiceAreaStatus && (
+			{practiceGroupStandings && (
 				<>
-					<PracticeAreaStatusCard {...practiceAreaStatus} />
-					{/* Same section rule the area detail page uses, so the practice surfaces read as one
-					    family and the activity monitor is visibly a separate section. */}
+					<PracticeGroupStandingCard {...practiceGroupStandings} />
 					<Separator />
 				</>
 			)}

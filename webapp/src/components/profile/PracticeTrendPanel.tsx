@@ -1,3 +1,4 @@
+import { useId } from "react";
 import type { OutcomeVector, PracticeTrend, TrendOpportunity } from "@/api/types.gen";
 import { cn } from "@/lib/utils";
 import { OBSERVATION_OUTCOME_PRESENTATION } from "./observation-outcome";
@@ -22,17 +23,17 @@ const OUTCOME_SEGMENTS = [
 ] as const;
 
 const count = (outcomes: OutcomeVector, key: (typeof OUTCOME_SEGMENTS)[number]["key"]) =>
-	outcomes[key] ?? 0;
+	outcomes[key];
 const strengths = (outcomes: OutcomeVector) =>
-	(outcomes.demonstratedStrengths ?? 0) + (outcomes.safeAvoidances ?? 0);
+	outcomes.demonstratedStrengths + outcomes.safeAvoidances;
 const difficulties = (outcomes: OutcomeVector) =>
-	(outcomes.commissionProblems ?? 0) + (outcomes.omissionGaps ?? 0);
+	outcomes.commissionProblems + outcomes.omissionGaps;
 const applicable = (outcomes: OutcomeVector) => strengths(outcomes) + difficulties(outcomes);
 
 function outcomeSummary(label: string, opportunities: number, outcomes: OutcomeVector): string {
 	const positive = strengths(outcomes);
 	const negative = difficulties(outcomes);
-	const notAssessed = outcomes.notApplicable ?? 0;
+	const notAssessed = outcomes.notApplicable;
 	return `${label} ${opportunities} ${opportunities === 1 ? "review" : "reviews"}: ${positive} ${
 		positive === 1 ? "strength" : "strengths"
 	}, ${negative} to work on${notAssessed > 0 ? `, ${notAssessed} not assessed` : ""}.`;
@@ -120,7 +121,7 @@ function OpportunityStrip({ opportunities }: { opportunities: TrendOpportunity[]
 						opportunities[index - 1]?.bundle !== "CURRENT";
 					return (
 						<span
-							key={`${opportunity.artifactKind}-${opportunity.artifactId}-${opportunity.index}`}
+							key={`${opportunity.workKind}-${opportunity.reviewedWorkId}-${opportunity.index}`}
 							className={cn("flex items-center", beginsCurrent && "ml-1 border-l pl-3")}
 						>
 							<OpportunityMark opportunity={opportunity} />
@@ -141,8 +142,9 @@ export interface PracticeTrendPanelProps {
 	className?: string;
 }
 
-/** Inspectable comparison behind a practice or area direction. */
+/** Inspectable comparison behind a practice or group direction. */
 export function PracticeTrendPanel({ trend, className }: PracticeTrendPanelProps) {
+	const headingId = useId();
 	const presentation = PRACTICE_TREND_PRESENTATION[trend.direction];
 	const insufficient = trend.direction === "INSUFFICIENT_EVIDENCE";
 	const coverage = formatTrendCoverage(trend.support);
@@ -150,18 +152,18 @@ export function PracticeTrendPanel({ trend, className }: PracticeTrendPanelProps
 		trend.currentOutcomes && trend.previousOutcomes
 			? `${outcomeSummary(
 					"Latest",
-					trend.support.currentOpportunities ?? 0,
+					trend.support.currentOpportunities,
 					trend.currentOutcomes,
 				)} ${outcomeSummary(
 					"Earlier",
-					trend.support.previousOpportunities ?? 0,
+					trend.support.previousOpportunities,
 					trend.previousOutcomes,
 				)}`
 			: undefined;
 
 	return (
 		<section
-			aria-labelledby="recent-direction-heading"
+			aria-labelledby={headingId}
 			className={cn("grid gap-4 rounded-xl border bg-card p-4", className)}
 		>
 			<div className="flex flex-wrap items-start justify-between gap-3">
@@ -177,7 +179,7 @@ export function PracticeTrendPanel({ trend, className }: PracticeTrendPanelProps
 						aria-hidden
 					/>
 					<div>
-						<h2 id="recent-direction-heading" className="text-base font-semibold">
+						<h2 id={headingId} className="text-base font-semibold">
 							Recent direction
 						</h2>
 						<p className="text-sm text-muted-foreground">{presentation.label}</p>
@@ -198,13 +200,13 @@ export function PracticeTrendPanel({ trend, className }: PracticeTrendPanelProps
 						<div role="img" aria-label={comparisonLabel} className="grid gap-3">
 							<ComparisonBar
 								label="Earlier"
-								opportunities={trend.support.previousOpportunities ?? 0}
+								opportunities={trend.support.previousOpportunities}
 								outcomes={trend.previousOutcomes}
 								muted={trend.direction === "UNCERTAIN"}
 							/>
 							<ComparisonBar
 								label="Latest"
-								opportunities={trend.support.currentOpportunities ?? 0}
+								opportunities={trend.support.currentOpportunities}
 								outcomes={trend.currentOutcomes}
 								muted={trend.direction === "UNCERTAIN"}
 							/>

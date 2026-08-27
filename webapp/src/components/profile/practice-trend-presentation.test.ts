@@ -46,12 +46,12 @@ describe("practice trend copy", () => {
 		expect(formatTrendGap(support())).toBe("A comparison is available.");
 	});
 
-	it("formats area coverage and omits it for a practice", () => {
+	it("formats group coverage and omits it for a practice", () => {
 		expect(formatTrendCoverage(support({ comparablePractices: 3, eligiblePractices: 5 }))).toBe(
-			"3 of 5 practices in this area had comparable evidence.",
+			"3 of 5 practices in this group had comparable evidence.",
 		);
 		expect(formatTrendCoverage(support({ comparablePractices: 1, eligiblePractices: 1 }))).toBe(
-			"1 of 1 practice in this area had comparable evidence.",
+			"1 of 1 practice in this group had comparable evidence.",
 		);
 		expect(formatTrendCoverage(support())).toBeUndefined();
 	});

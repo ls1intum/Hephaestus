@@ -20,8 +20,8 @@ describe("observation outcome contract", () => {
 
 	it("presents every outcome, including the one the outcome vector does not count", () => {
 		// The first five mirror the server's OutcomeVector 1:1. INCONCLUSIVE is display-only — it is shown
-		// to the learner but contributes no cell to the trend, which is why it carries no polarity.
-		expect(Object.keys(OBSERVATION_OUTCOME_PRESENTATION)).toEqual([
+		// to the developer but contributes no cell to the trend, which is why it carries no polarity.
+		expect(Object.keys(OBSERVATION_OUTCOME_PRESENTATION)).toStrictEqual([
 			"PRESENT_GOOD",
 			"ABSENT_GOOD",
 			"PRESENT_BAD",

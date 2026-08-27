@@ -5,8 +5,8 @@ import { PracticeTrendPanel } from "./PracticeTrendPanel";
 const opportunities: TrendOpportunity[] = Array.from({ length: 8 }, (_, index) => ({
 	index,
 	occurredAt: new Date(`2026-08-${String(index + 1).padStart(2, "0")}T09:00:00Z`),
-	artifactKind: "PULL_REQUEST",
-	artifactId: index + 1,
+	workKind: "PULL_REQUEST",
+	reviewedWorkId: index + 1,
 	bundle: index < 4 ? "PREVIOUS" : "CURRENT",
 	outcomes:
 		index < 4
@@ -28,7 +28,7 @@ const opportunities: TrendOpportunity[] = Array.from({ length: 8 }, (_, index) =
 
 const base: PracticeTrend = {
 	slug: "maintainable-code",
-	scope: "AREA",
+	scope: "GROUP",
 	direction: "IMPROVING",
 	support: {
 		currentOpportunities: 4,

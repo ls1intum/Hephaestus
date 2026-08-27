@@ -8,7 +8,7 @@ export interface PracticeNextStepCalloutProps {
 	className?: string;
 }
 
-/** Shared learner-facing treatment for area-level and practice-level next steps. */
+/** Shared developer-facing treatment for group-level and practice-level next steps. */
 export function PracticeNextStepCallout({
 	label,
 	children,

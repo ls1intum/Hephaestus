@@ -16,7 +16,7 @@ interface TrendPresentation {
 	tone: TrendTone;
 }
 
-/** Exhaustive learner-facing vocabulary for the opportunity-indexed direction. */
+/** Exhaustive developer-facing vocabulary for the opportunity-indexed direction. */
 export const PRACTICE_TREND_PRESENTATION = {
 	IMPROVING: {
 		label: "More positive recently",
@@ -46,8 +46,8 @@ function reviewedItems(count: number): string {
 
 /** Formats visible provenance from the returned evidence support, never from an assumed time bin. */
 export function formatTrendProvenance(support: TrendSupport): string {
-	const current = support.currentOpportunities ?? 0;
-	const previous = support.previousOpportunities ?? 0;
+	const current = support.currentOpportunities;
+	const previous = support.previousOpportunities;
 	const total = current + previous;
 	if (total === 0) return "No reviewed work items are available yet.";
 
@@ -63,16 +63,16 @@ export function formatTrendProvenance(support: TrendSupport): string {
 
 /** Formats the unmet evidence precondition as a concrete next milestone. */
 export function formatTrendGap(support: TrendSupport): string {
-	const missing = support.opportunitiesUntilComparable ?? 0;
+	const missing = support.opportunitiesUntilComparable;
 	if (missing === 0) return "A comparison is available.";
 	return `${missing} more reviewed ${missing === 1 ? "work item" : "work items"} will make a comparison possible.`;
 }
 
-/** Formats area coverage; practice-scoped support has no coverage sentence. */
+/** Formats group coverage; practice-scoped support has no coverage sentence. */
 export function formatTrendCoverage(support: TrendSupport): string | undefined {
 	const comparable = support.comparablePractices;
 	const eligible = support.eligiblePractices;
 	if (comparable === undefined || eligible === undefined) return undefined;
-	if (eligible === 0) return "No practices are eligible for comparison in this area.";
-	return `${comparable} of ${eligible} ${eligible === 1 ? "practice" : "practices"} in this area had comparable evidence.`;
+	if (eligible === 0) return "No practices are eligible for comparison in this group.";
+	return `${comparable} of ${eligible} ${eligible === 1 ? "practice" : "practices"} in this group had comparable evidence.`;
 }

@@ -5,7 +5,7 @@ import { PracticeTrendPanel } from "./PracticeTrendPanel";
 
 const trend = (overrides: Partial<PracticeTrend> = {}): PracticeTrend => ({
 	slug: "maintainable-code",
-	scope: "AREA",
+	scope: "GROUP",
 	direction: "IMPROVING",
 	support: {
 		currentOpportunities: 4,
@@ -36,8 +36,8 @@ const trend = (overrides: Partial<PracticeTrend> = {}): PracticeTrend => ({
 		{
 			index: 0,
 			occurredAt: new Date("2026-08-01T09:00:00Z"),
-			artifactKind: "PULL_REQUEST",
-			artifactId: 1,
+			workKind: "PULL_REQUEST",
+			reviewedWorkId: 1,
 			bundle: "PREVIOUS",
 			outcomes: {
 				demonstratedStrengths: 1,
@@ -50,8 +50,8 @@ const trend = (overrides: Partial<PracticeTrend> = {}): PracticeTrend => ({
 		{
 			index: 1,
 			occurredAt: new Date("2026-08-09T09:00:00Z"),
-			artifactKind: "PULL_REQUEST",
-			artifactId: 2,
+			workKind: "PULL_REQUEST",
+			reviewedWorkId: 2,
 			bundle: "CURRENT",
 			outcomes: {
 				demonstratedStrengths: 1,
@@ -77,7 +77,7 @@ describe("PracticeTrendPanel", () => {
 		screen.getByText(
 			"Compared your latest 4 reviewed work items with the 4 before them, spanning 9 days.",
 		);
-		screen.getByText("3 of 5 practices in this area had comparable evidence.");
+		screen.getByText("3 of 5 practices in this group had comparable evidence.");
 		screen.getByText("This describes recent evidence, not your overall ability.");
 	});
 
