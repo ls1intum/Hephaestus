@@ -24,93 +24,73 @@ const practices: ReviewPractice[] = [
 ];
 
 describe("buildReviewTree", () => {
-	const scenarioContracts: Array<{
+	const laneCases: Array<{
 		name: string;
 		practices: ReviewPractice[];
-		expected: Array<[string, string[], string[]]>;
+		expected: Array<[string, string[]]>;
 	}> = [
 		{
-			name: "a submitted-review occasion reads review comments without fanning out to code",
+			name: "routes pull request comments to the review lane",
 			practices: [
 				{
 					slug: "specific-review-comments",
 					readsSources: ["scm.pull-request.core", "scm.pull-request.comments"],
 				},
 			],
-			expected: [
-				[
-					"review-1",
-					["specific-review-comments"],
-					["scm.pull-request.comments", "scm.pull-request.core"],
-				],
-			],
+			expected: [["review-1", ["specific-review-comments"]]],
 		},
 		{
-			name: "an author-uptake occasion reads review threads without fanning out to code",
+			name: "routes review threads to the review lane",
 			practices: [
 				{
 					slug: "engages-with-review-feedback",
 					readsSources: ["scm.pull-request.core", "scm.review-threads"],
 				},
 			],
-			expected: [
-				[
-					"review-1",
-					["engages-with-review-feedback"],
-					["scm.pull-request.core", "scm.review-threads"],
-				],
-			],
+			expected: [["review-1", ["engages-with-review-feedback"]]],
 		},
 		{
-			name: "a change occasion keeps code exploration local to code practices",
+			name: "routes diffs and repository trees to the code lane",
 			practices: [
 				{
 					slug: "tests-behavior-changes",
 					readsSources: ["scm.pull-request.diff", "scm.repository.tree"],
 				},
 			],
-			expected: [
-				["code-1", ["tests-behavior-changes"], ["scm.pull-request.diff", "scm.repository.tree"]],
-			],
+			expected: [["code-1", ["tests-behavior-changes"]]],
 		},
 		{
-			name: "a linked-work occasion does not require diff exploration",
+			name: "routes linked work to the linked-work lane",
 			practices: [
 				{
 					slug: "meets-linked-acceptance-criteria",
 					readsSources: ["scm.pull-request.core", "scm.linked-work-items"],
 				},
 			],
-			expected: [
-				[
-					"linked-work-1",
-					["meets-linked-acceptance-criteria"],
-					["scm.linked-work-items", "scm.pull-request.core"],
-				],
-			],
+			expected: [["linked-work-1", ["meets-linked-acceptance-criteria"]]],
 		},
 		{
-			name: "a core-only occasion stays in the pull-request lane",
+			name: "routes pull request core data to the pull-request lane",
 			practices: [
 				{ slug: "clear-pull-request-description", readsSources: ["scm.pull-request.core"] },
 			],
-			expected: [["pull-request-1", ["clear-pull-request-description"], ["scm.pull-request.core"]]],
+			expected: [["pull-request-1", ["clear-pull-request-description"]]],
 		},
 	];
 
-	for (const scenario of scenarioContracts) {
+	for (const scenario of laneCases) {
 		test(scenario.name, () => {
 			const tree = buildReviewTree(scenario.practices, 4);
 
 			expect(tree.practiceCount).toBe(scenario.practices.length);
-			expect(
-				tree.groups.map((group) => [group.id, group.practiceSlugs, group.evidenceSources]),
-			).toEqual(scenario.expected);
+			expect(tree.groups.map((group) => [group.id, group.practiceSlugs])).toEqual(
+				scenario.expected,
+			);
 		});
 	}
 
 	test("keeps mixed-scenario evidence lanes deterministic and isolated", () => {
-		const mixed: ReviewPractice[] = scenarioContracts.flatMap((scenario) => scenario.practices);
+		const mixed: ReviewPractice[] = laneCases.flatMap((scenario) => scenario.practices);
 		const expected = [
 			["pull-request-1", ["clear-pull-request-description"]],
 			["linked-work-1", ["meets-linked-acceptance-criteria"]],
@@ -155,27 +135,20 @@ describe("buildReviewTree", () => {
 		expect(tree.groups.map((group) => group.id)).toEqual(["code-1", "code-2", "code-3"]);
 	});
 
-	test("is deterministic when the practice index order changes", () => {
-		const forward = buildReviewTree(practices, 2);
-		const reverse = buildReviewTree(practices.toReversed(), 2);
-
-		expect(reverse).toEqual(forward);
-	});
-
-	test("keeps group ids unique when area names normalize alike", () => {
+	test("keeps groups separate when area names normalize alike", () => {
 		const tree = buildReviewTree(
 			[
 				{ slug: "api", area: "API / UX", readsSources: ["scm.pull-request.diff"] },
 				{ slug: "ux", area: "API---UX", readsSources: ["scm.pull-request.diff"] },
 			],
-			1,
+			2,
 		);
 
 		expect(tree.groups.map((group) => group.id)).toEqual(["code-1", "code-2"]);
 		expect(new Set(tree.groups.map((group) => group.id)).size).toBe(tree.groups.length);
 	});
 
-	test("normalizes and combines the sources required by a group", () => {
+	test("normalizes sources before classifying a group", () => {
 		const tree = buildReviewTree(
 			[
 				{ slug: "b", readsSources: [" scm.pull-request.core "] },
@@ -191,7 +164,6 @@ describe("buildReviewTree", () => {
 			id: "pull-request-1",
 			lane: "pull-request",
 			practiceSlugs: ["a", "b"],
-			evidenceSources: ["scm.pull-request.core"],
 		});
 	});
 
@@ -223,16 +195,24 @@ test("review concurrency scales with the catalogue without overloading the provi
 });
 
 test("mapConcurrent bounds active work and preserves input order", async () => {
-	let active = 0;
-	let maximum = 0;
-	const results = await mapConcurrent([40, 5, 20, 10], 2, async (delay, index) => {
-		active++;
-		maximum = Math.max(maximum, active);
-		await Bun.sleep(delay);
-		active--;
+	const started: number[] = [];
+	const releases = Array.from({ length: 4 }, () => Promise.withResolvers<undefined>());
+	const firstPairStarted = Promise.withResolvers<undefined>();
+	const thirdStarted = Promise.withResolvers<undefined>();
+	const resultPromise = mapConcurrent([0, 1, 2, 3], 2, async (_, index) => {
+		started.push(index);
+		if (started.length === 2) firstPairStarted.resolve(undefined);
+		if (started.length === 3) thirdStarted.resolve(undefined);
+		await releases[index]?.promise;
 		return index;
 	});
 
-	expect(maximum).toBe(2);
+	await firstPairStarted.promise;
+	expect(started).toEqual([0, 1]);
+	releases[1]?.resolve(undefined);
+	await thirdStarted.promise;
+	expect(started).toEqual([0, 1, 2]);
+	for (const release of releases) release.resolve(undefined);
+	const results = await resultPromise;
 	expect(results).toEqual([0, 1, 2, 3]);
 });

@@ -320,7 +320,7 @@ public class PracticeDetectionDeliveryService {
                 workspaceId,
                 artifactKind,
                 artifactId,
-                aboutUserId, // the event's developerId field == aboutUserId (author-side subject)
+                aboutUserId,
                 inserted,
                 discardedDuplicate,
                 hasNegative
@@ -330,20 +330,6 @@ public class PracticeDetectionDeliveryService {
         return new DeliveryResult(inserted, discardedDuplicate, hasNegative, deliveredObservations);
     }
 
-    /**
-     * Refuses an observation whose practice is about somebody this job cannot name.
-     *
-     * <p>{@link #resolveTarget} resolves exactly one person, and it is the artifact's author (or the
-     * subject a repo-less job carries). A practice whose occasion declares a non-AUTHOR
-     * {@link ActorRole} — a practice about how somebody <em>reviews</em> — has no resolvable subject
-     * here: the run knows the pull request, not which of its reviewers each observation is about.
-     * Persisting it would file a judgement of one person's conduct under another person's name, which is
-     * both wrong feedback and a record about a data subject that is simply false.
-     *
-     * <p>{@code PracticeCatalogInjector} already withholds these practices at preparation, so this
-     * refuses only a job prepared before that filter existed. Loud rather than silent: the alternative is
-     * dropping an observation a review was paid for with nothing saying so.
-     */
     private void enforceAttribution(ValidatedObservation observation, PracticeRevision revision, AgentJob job) {
         ActorRole subject = PracticeBinding.subjectRoleOf(
             revision.getBindings(),

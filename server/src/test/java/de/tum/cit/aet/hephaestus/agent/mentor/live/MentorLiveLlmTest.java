@@ -128,9 +128,6 @@ class MentorLiveLlmTest {
                 throw new IllegalStateException("npm install for Pi SDK failed; see stderr above");
             }
             Files.writeString(marker, "ok\n");
-            // Suppress the unused-variable warning for `lock`; we hold it for the try-with-resources.
-            //noinspection ResultOfMethodCallIgnored
-            lock.isValid();
         }
     }
 

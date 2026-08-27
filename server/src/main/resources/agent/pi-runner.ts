@@ -468,18 +468,9 @@ function persistReviewState() {
 	);
 }
 
-/** The outcome words the tool offers, read off the schema so there is only one list of them. */
 const OUTCOME_VALUES = observationSchema.properties.outcome.enum;
 
-/**
- * Whether this looks like an observation the model wrote — the shape the tool schema asks for, with an
- * `outcome` word, not the shape this runner normalises it into.
- *
- * <p>That distinction is the whole point. Everything reaching here is model-authored JSON on its way to
- * {@link normalizeObservation}, which accepts `outcome` and rejects `presence` as an unknown field. This
- * check used to require `presence`, so an agent-written result.json was refused for being current and a
- * runner-written one was accepted and then thrown out one line later by the normaliser.
- */
+/** Validates the model-authored wire shape before normalization. */
 function isValidObservation(candidate: unknown): boolean {
 	if (!isRecord(candidate)) return false;
 	if (typeof candidate.practiceSlug !== "string" || !candidate.practiceSlug.trim()) return false;
@@ -501,10 +492,6 @@ function isValidObservationsPayload(payload: unknown): payload is ObservationsPa
 	);
 }
 
-/**
- * The three control characters a model does put inside a JSON string, and what JSON says they are.
- * Every other one is dropped: none of them carries text, and none was legal where it appeared.
- */
 const CONTROL_CHARACTER_ESCAPES = new Map([
 	["\n", "\\n"],
 	["\r", "\\r"],
@@ -513,12 +500,11 @@ const CONTROL_CHARACTER_ESCAPES = new Map([
 const LAST_CONTROL_CODE_POINT = 0x1f;
 const DELETE_CODE_POINT = 0x7f;
 
-/** Parse text a model wrote, repairing the raw control characters it embedded in a string. */
 function lenientJsonParse(text: string): unknown {
 	try {
 		return parseJson(text);
 	} catch {
-		// Unparseable as-is; the repair pass below is the point of this function.
+		// Retry after escaping raw control characters.
 	}
 	let cleaned = "";
 	for (const character of text) {
@@ -532,13 +518,6 @@ function lenientJsonParse(text: string): unknown {
 	return parseJson(cleaned);
 }
 
-/**
- * Whether the agent wrote a usable result.json itself, normalising it in place if so.
- *
- * <p>Reads model-authored observations only. Observations this runner persisted through the tool have
- * already been normalised and validated on the way in, and are not re-read here — normalising a
- * normalised observation throws, because `presence` is not a field the wire shape has.
- */
 function checkResultFile(): boolean {
 	if (!existsSync(RESULT_PATH)) return false;
 	try {
@@ -570,13 +549,6 @@ function hasPersistedReviewState(): boolean {
 	return reviewState.observations.length > 0;
 }
 
-/**
- * Where this run's result.json came from, or null if there is nothing to report.
- *
- * <p>The tool-state branch does not re-validate what it just wrote. Every observation in it went through
- * {@link normalizeAndValidateObservation} when the tool accepted it, so a second pass could only ever
- * reject a measurement this runner had already admitted — which is exactly what it did.
- */
 function resolveResultFile(): "agent" | "tool-state" | null {
 	if (checkResultFile()) return "agent";
 	if (maybeWriteResultFile()) return "tool-state";
@@ -636,11 +608,6 @@ function normalizeAndValidateObservation(rawObservation: unknown): NormalizedObs
 
 let measurementClosed = false;
 
-/**
- * What report_observation reports back about a call. The two outcomes carry different halves of it —
- * a refusal has nothing to say about duplicates — so the fields the other branch omits are optional
- * here rather than filled in with zeroes the caller would have to tell apart from real ones.
- */
 interface ReportObservationDetails {
 	inserted: number;
 	duplicates?: number;

@@ -18,7 +18,6 @@ export interface ReviewGroup {
 	id: string;
 	lane: EvidenceLane;
 	practiceSlugs: string[];
-	evidenceSources: string[];
 }
 
 export interface ReviewTree {
@@ -121,7 +120,6 @@ export function buildReviewTree(
 					id: `${lane}-${laneGroupIndex}`,
 					lane,
 					practiceSlugs: chunk.map((entry) => entry.slug),
-					evidenceSources: [...new Set(chunk.flatMap((entry) => entry.sources))].toSorted(),
 				});
 			}
 		}
