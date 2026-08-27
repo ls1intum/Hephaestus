@@ -151,8 +151,6 @@ describe("catalog adoption over practice setup", () => {
 		await screen.findByRole("heading", { name: "Instance catalog" }, ROUTE_RENDER_WAIT);
 		expect(screen.queryByText("Available")).toBeNull();
 		await screen.findByText("Name unavailable");
-		// The row's accessible name is its own visible text plus the registry's action phrase, not an
-		// `aria-label` that would have replaced the work type and group for a screen reader.
 		screen.getByRole("link", { name: /Describe what changed and why/ });
 		screen.getByRole("link", {
 			name: /Include enough issue context, see why it cannot be added/,

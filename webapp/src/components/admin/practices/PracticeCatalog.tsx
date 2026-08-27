@@ -566,7 +566,6 @@ function PracticeRowDetails({
 	practice: Practice;
 	title: ReactNode;
 	supportedModes: readonly Practice["automatedReviewPolicy"]["automatedReview"]["mode"][];
-	/** The group's name, never its slug; null when this list cannot name it. */
 	inheritedFrom: string | null;
 }) {
 	const unavailableLabel = automatedReviewUnavailableLabel(

@@ -66,38 +66,19 @@ public class PracticeGroup {
     @Column(name = "name", nullable = false, length = 128)
     private String name;
 
-    /** Optional blurb shown on the group card. */
     @Column(name = "description", columnDefinition = "TEXT")
     private @Nullable String description;
 
-    /**
-     * Optional lucide icon name (PascalCase, e.g. {@code "ShieldAlert"}) giving the group a glanceable
-     * identity on the dashboards. The webapp resolves the name to a component and falls back gracefully
-     * when unset or unknown, so this is presentation-only and never load-bearing.
-     */
     @Column(name = "icon", length = 64)
     private @Nullable String icon;
 
-    /**
-     * Optional colour key (a palette family, e.g. {@code "rose"}) for the group's chip. Paired with the
-     * {@link #icon} and {@link #name} so colour is a redundant cue, never the only signal. The webapp
-     * maps the key to accessible classes and falls back when unset.
-     */
     @Column(name = "color", length = 32)
     private @Nullable String color;
 
     @Column(name = "visible_in_practice_dashboards", nullable = false)
     private boolean visibleInPracticeDashboards = true;
 
-    /**
-     * How much autonomy the system has over every practice in this group that holds no opinion of its own, or
-     * {@code null} to inherit the workspace's default.
-     *
-     * <p>The middle level of the chain, and the one that makes the whole thing worth having: a group is the
-     * grain a team actually reasons in ("we are not ready for the system to comment on our test practices
-     * yet"), so one decision here covers the practices under it without touching any of them. Resolve with
-     * {@link de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver}.
-     */
+    /** Null inherits the workspace default; practice-level autonomy takes precedence. */
     @Column(name = "autonomy", length = PracticeAutonomy.MAX_LENGTH)
     @Enumerated(EnumType.STRING)
     @Nullable

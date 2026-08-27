@@ -62,18 +62,12 @@ export function hasObservationFilter(search: ObservationsSearch): boolean {
 	);
 }
 
-/**
- * Typed by what the derivation reads rather than by the whole record: a group's autonomy and dashboard
- * visibility are nothing to a facet, and asking for them would make a caller hand over fields it has
- * no reason to hold.
- */
 type NamedGroup = { slug: string; name: string };
 
 export function groupFacetOptions(groups: readonly NamedGroup[] | undefined): FacetOption[] {
 	return (groups ?? []).map((group) => ({ value: group.slug, label: group.name }));
 }
 
-/** The group name rides along as each practice's description, which is how the facet groups them. */
 export function practiceFacetOptions(
 	practices: readonly { slug: string; name: string; groupSlug?: string }[] | undefined,
 	groups: readonly NamedGroup[] | undefined,

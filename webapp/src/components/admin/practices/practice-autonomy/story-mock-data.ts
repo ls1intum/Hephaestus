@@ -13,26 +13,17 @@ import {
 	mockPullRequestPolicy,
 } from "@/mocks/fixtures/practice";
 
-/**
- * Fixtures that resolve the inheritance chain the way the server does, so a fixture is either a state
- * the server can reach or a compile error. Hand-written rows drift: a practice at Review before sending under an
- * group at Off, counted by the rollup as Send automatically, looks plausible and cannot happen.
- */
+/** Builds internally consistent settings, rollup, and practice fixtures from the inheritance inputs. */
 
 export interface PracticeSpec {
 	name: string;
-	/** The autonomy held on the practice itself; absent means it inherits. */
 	override?: PracticeAutonomy;
-	/** False for a practice that cannot be reviewed automatically — the server pins those to Off. */
 	reviewable?: boolean;
-	/** Optional on the API: a locally written practice carries none, and the row has to read without it. */
 	whyItMatters?: string;
-	/** Defaults to a pull request. */
 	artifactKind?: string;
 }
 
 export interface GroupSpec {
-	/** Null is the group of practices that belong to no group; it holds no autonomy of its own. */
 	slug: string | null;
 	name: string | null;
 	override?: PracticeAutonomy;
@@ -56,8 +47,6 @@ function assignment(
 	effective: PracticeAutonomy,
 	source: AutonomyAssignment["source"],
 ): AutonomyAssignment {
-	// `inherited` follows the override, never the source: a group that chose its own autonomy reports
-	// source GROUP and inherited false.
 	return { effective, override, source, inherited: override == null };
 }
 

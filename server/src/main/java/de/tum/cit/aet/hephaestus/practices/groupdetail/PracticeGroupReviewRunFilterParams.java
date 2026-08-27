@@ -33,10 +33,9 @@ public record PracticeGroupReviewRunFilterParams(
     Integer size
 ) {
     private static final int DEFAULT_PAGE_SIZE = 10;
-    private static final int MAX_PAGE_SIZE = 50;
 
     public Pageable pageable() {
-        return QueryFilterSupport.pageable(page, size, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+        return QueryFilterSupport.pageable(page, size, DEFAULT_PAGE_SIZE);
     }
 
     public @Nullable List<ArtifactKind> kinds() {

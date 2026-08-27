@@ -67,11 +67,6 @@ const ready = (
 	action: "idle" | "adding" | "stale" = "idle",
 ) => ({ status: "ready", preview: { ...preview, ...over }, action }) as const;
 
-/**
- * A group states each practice's outcome on the practice's own row, so the panel needs no prose
- * explaining which of four lists a name ended up in — and no embedded copy of the definition, which
- * opens as its own level on top instead.
- */
 const meta = {
 	title: "Workspace admin/Practice adoption/Group panel",
 	component: GroupAdoptionPanel,
@@ -149,7 +144,6 @@ export const Loading: Story = {
 	play: async () => {
 		const panel = await settledDrawerPanel();
 		await expect(panel.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0);
-		// The header cannot invent a group colour for a slug that has not loaded.
 		await expect(screen.getByRole("heading", { name: "Practice group" })).toBeVisible();
 	},
 };

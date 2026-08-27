@@ -62,7 +62,6 @@ public record ObservationFeedFilterParams(
     Integer size
 ) {
     private static final int DEFAULT_PAGE_SIZE = 20;
-    private static final int MAX_PAGE_SIZE = 100;
 
     public ObservationFeedFilterParams {
         displayableOnly = displayableOnly != null && displayableOnly;
@@ -77,7 +76,7 @@ public record ObservationFeedFilterParams(
      * would have the database order by two different keys.
      */
     public Pageable pageable() {
-        Pageable page = QueryFilterSupport.pageable(this.page, size, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+        Pageable page = QueryFilterSupport.pageable(this.page, size, DEFAULT_PAGE_SIZE);
         return sort() == ObservationService.ObservationSort.SEVERITY
             ? page
             : PageRequest.of(

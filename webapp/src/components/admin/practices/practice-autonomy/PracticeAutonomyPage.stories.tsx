@@ -204,7 +204,6 @@ export const GroupOverride: Story = {
 		await userEvent.click(within(testing).getByRole("radio", { name: "Send automatically" }));
 		await expect(args.onSetGroupAutonomy).toHaveBeenCalledWith("testing", "AUTOMATIC");
 
-		// The bucket for practices in no group holds no autonomy of its own — it is not a row anywhere.
 		const unassigned = canvas.getByText("Unassigned").closest('[data-slot="accordion-item"]');
 		if (!(unassigned instanceof HTMLElement)) throw new Error("No-group group not rendered");
 		await expect(within(unassigned).getByText("Follows the workspace default")).toBeVisible();
@@ -301,7 +300,6 @@ export const PracticeDetailOnKeyboardFocus: Story = {
 	},
 };
 
-/** A group whose own autonomy was set survives the filter even though none of its practices were. */
 export const OverridesOnly: Story = {
 	args: { overridesOnly: true },
 	play: async ({ canvas }) => {
@@ -368,11 +366,6 @@ export const BulkInFlight: Story = {
 	},
 };
 
-/**
- * The summary comes from the server's rollup, not from counting the rendered rows, so it stays
- * correct when a shut group renders none of its practices — which is what the radiogroup count below
- * pins.
- */
 export const AtScale: Story = {
 	args: from(atScale),
 	play: async ({ canvas }) => {
@@ -381,8 +374,6 @@ export const AtScale: Story = {
 				/^100 practices: 6 off, 89 review before sending and 5 send automatically\. \d+ practices and \d+ groups set by hand\.$/,
 			),
 		).toBeVisible();
-		// One ladder for the workspace and one per group, and nothing else on the screen is a
-		// radiogroup: every group is shut, so no practice ladder is rendered.
 		await expect(canvas.getAllByRole("radiogroup")).toHaveLength(26);
 		await expect(canvas.queryByRole("checkbox", { name: /^Select / })).not.toBeInTheDocument();
 		await expectNoPageOverflow();

@@ -124,7 +124,6 @@ public class PracticeGroupReviewRunService {
             workspaceId,
             groupSlug
         );
-        // Use the same delivery-visibility policy as practice standings.
         Set<UUID> visible = visibilityPolicy.permitsAll(
             workspaceId,
             found,

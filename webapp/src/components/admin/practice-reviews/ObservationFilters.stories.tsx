@@ -36,11 +36,6 @@ const PRACTICES: FacetSource = {
 	isError: false,
 };
 
-/**
- * The Observations list's toolbar, on its own. Group and Practice are the workspace's own catalogue
- * rather than a fixed registry, so both can be empty for two different reasons and each has to say
- * which — the two states no page-level story reaches without breaking the whole screen.
- */
 const meta = {
 	title: "Workspace admin/Practice reviews/Building blocks/Observation filters",
 	component: ObservationFilters,
@@ -148,10 +143,6 @@ export const WhileTheCatalogueLoads: Story = {
 	},
 };
 
-/**
- * A catalogue that failed to load is not a workspace with no groups in it, and a facet that said "No
- * groups available" after a 500 would send the reader looking for a catalogue problem.
- */
 export const TheCatalogueCouldNotBeLoaded: Story = {
 	args: {
 		groups: { options: [], isLoading: false, isError: true },

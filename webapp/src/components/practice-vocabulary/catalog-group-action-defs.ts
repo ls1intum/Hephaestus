@@ -4,10 +4,6 @@ import type { StatusDefs } from "./status-def";
 
 export type CatalogGroupAction = CatalogGroupPracticeAction["action"];
 
-/**
- * What adding a group does to each practice in it. Every row states its own outcome from here, so
- * the panel needs no prose explaining which of four lists a name ended up in.
- */
 export const CATALOG_GROUP_ACTION_DEFS: StatusDefs<CatalogGroupAction> = {
 	ADD: {
 		label: "Adds",

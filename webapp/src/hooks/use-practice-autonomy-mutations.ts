@@ -76,14 +76,6 @@ export function usePracticeAutonomyMutations(workspaceSlug: string) {
 		},
 	});
 
-	/**
-	 * One request per practice, in order: there is no bulk endpoint, and each write takes the same
-	 * workspace lock, so firing them in parallel queues on the server anyway while making the failures
-	 * arrive interleaved and unattributable.
-	 *
-	 * Partial failure is reported, not rolled back — the practices that did change stay changed, which
-	 * is what a refetch will show either way.
-	 */
 	const setManyPracticeAutonomies = async (
 		practiceSlugs: readonly string[],
 		autonomy: PracticeAutonomy | null,
@@ -92,25 +84,20 @@ export function usePracticeAutonomyMutations(workspaceSlug: string) {
 		let failed = 0;
 		bulkRunning.current = true;
 		setBulk({ done: 0, total: practiceSlugs.length });
-		try {
-			for (const [index, practiceSlug] of practiceSlugs.entries()) {
-				try {
-					await setPracticeAutonomy.mutateAsync({
-						path: { workspaceSlug, practiceSlug },
-						// Omitted, not null: the generated request types the field as optional, and the server
-						// reads an absent field as "hold no autonomy here and inherit".
-						body: autonomy === null ? {} : { autonomy: autonomy },
-					});
-				} catch {
-					failed += 1;
-				}
-				setBulk({ done: index + 1, total: practiceSlugs.length });
+		for (const [index, practiceSlug] of practiceSlugs.entries()) {
+			try {
+				await setPracticeAutonomy.mutateAsync({
+					path: { workspaceSlug, practiceSlug },
+					body: autonomy === null ? {} : { autonomy },
+				});
+			} catch {
+				failed += 1;
 			}
-		} finally {
-			bulkRunning.current = false;
-			setBulk(null);
-			invalidateResolved();
+			setBulk({ done: index + 1, total: practiceSlugs.length });
 		}
+		bulkRunning.current = false;
+		setBulk(null);
+		invalidateResolved();
 
 		const changed = practiceSlugs.length - failed;
 		if (failed === 0) {

@@ -255,7 +255,6 @@ export const InstanceCatalogLoading: Story = {
 	},
 };
 
-/** Filtering to zero must offer the control that clears the filter. */
 export const FilteredToNothing: Story = {
 	args: { focusFilter: "docs.document" },
 	play: async ({ args, canvas, userEvent }) => {
@@ -265,10 +264,6 @@ export const FilteredToNothing: Story = {
 	},
 };
 
-/**
- * The move menu lists every group in the workspace, so it is the one control whose height grows with
- * the catalogue rather than with the row it belongs to.
- */
 export const AtScale: Story = {
 	args: { groups: scaleGroups, practices: scalePractices },
 	parameters: { chromatic: { viewports: [320, 1440] } },
@@ -647,9 +642,6 @@ export const AutonomyIsReadOnlyHere: Story = {
 	},
 	parameters: {
 		chromatic: { disableSnapshot: true },
-		// The actions menu holds every group in the workspace, so on a short viewport Base UI caps it at
-		// the available height and the a11y check rejects the scrollable region that makes — a property
-		// of the menu, not of the link this story is about.
 		viewport: { defaultViewport: "desktop" },
 	},
 	play: async ({ canvas, userEvent }) => {
@@ -659,8 +651,6 @@ export const AutonomyIsReadOnlyHere: Story = {
 			"href",
 			"/w/demo/admin/practices/review",
 		);
-		// The menuitemradios in this menu are the "Move to" group picker. Autonomy is set on Review,
-		// so none of its levels may appear as a choice here.
 		for (const { label } of Object.values(AUTONOMY_DEFS)) {
 			await expect(menu.queryByRole("menuitemradio", { name: label })).not.toBeInTheDocument();
 			await expect(menu.queryByRole("menuitem", { name: label })).not.toBeInTheDocument();
