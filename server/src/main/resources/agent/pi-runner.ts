@@ -261,6 +261,8 @@ function readPracticeIndex(): PracticeIndexEntry[] {
 }
 
 const { availableSourceKinds, artifactSources } = readManifest();
+const availableSourceKindValues = [...availableSourceKinds].toSorted();
+const stagedArtifactPaths = [...artifactSources.keys()].toSorted();
 const practiceIndex = readPracticeIndex();
 const admittedPractices = new Set(practiceIndex.map((practice) => practice.slug));
 // ABSENT is sound only over sources the practice declares exhaustive.
@@ -318,7 +320,7 @@ const searchSchema = {
 		consulted: {
 			type: "array",
 			minItems: 1,
-			items: { type: "string", minLength: 1 },
+			items: { type: "string", enum: availableSourceKindValues },
 			description: "Evidence source kinds you actually searched, e.g. scm.review-threads.",
 		},
 		lookedFor: {
@@ -342,7 +344,7 @@ const inapplicabilitySchema = {
 		consulted: {
 			type: "array",
 			minItems: 1,
-			items: { type: "string", minLength: 1 },
+			items: { type: "string", enum: availableSourceKindValues },
 			description:
 				"Evidence source kinds you read to reach this conclusion, e.g. scm.pull-request.diff.",
 		},
@@ -398,8 +400,8 @@ const evidenceSchema = {
 				additionalProperties: false,
 				required: ["sourceKind", "artifactPath", "path", "startLine", "quote"],
 				properties: {
-					sourceKind: { type: "string", minLength: 1 },
-					artifactPath: { type: "string", minLength: 1 },
+					sourceKind: { type: "string", enum: availableSourceKindValues },
+					artifactPath: { type: "string", enum: stagedArtifactPaths },
 					path: { type: "string", minLength: 1 },
 					side: { type: "string", enum: ["OLD", "NEW"] },
 					startLine: { type: "integer", minimum: 1 },
