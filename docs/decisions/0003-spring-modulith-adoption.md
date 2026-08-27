@@ -67,7 +67,7 @@ keep the default (CLOSED) and expose the narrow sub-package APIs via
 - `integrations` — `integrations::posthog`
 
 Wire `ModulithVerificationTest` into the architecture surefire group; generate
-diagrams under `server/target/modulith-docs/` as CI artifacts (not committed to git —
+diagrams under `server/application/target/modulith-docs/` as CI artifacts (not committed to git —
 avoids review churn).
 
 ## Consequences

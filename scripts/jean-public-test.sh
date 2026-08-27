@@ -80,7 +80,8 @@ if [ -z "\${GITLAB_DEFAULT_SERVER_URL:-}" ] && [ -n "\${GITLAB_SERVER_URL:-}" ];
 fi
 export LEADERBOARD_NOTIFICATION_ENABLED="\${LEADERBOARD_NOTIFICATION_ENABLED:-false}"
 export POSTHOG_ENABLED="\${POSTHOG_ENABLED:-false}"
-./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+./mvnw -pl generated-clients -am install -DskipTests --batch-mode
+./mvnw -f application/pom.xml spring-boot:run -Dspring-boot.run.profiles=local
 EOF
 	chmod +x "$SERVER_SCRIPT"
 }

@@ -27,9 +27,9 @@ if (packagePiVersion !== piVersion) {
 
 const javaPin = /private static final String PI_SDK_VERSION = "([^"]+)";/;
 for (const path of [
-	"server/src/test/java/de/tum/cit/aet/hephaestus/agent/mentor/live/MentorLiveLlmTest.java",
-	"server/src/test/java/de/tum/cit/aet/hephaestus/agent/mentor/live/MentorSandboxStressTest.java",
-	"server/src/test/java/de/tum/cit/aet/hephaestus/agent/practice/live/PracticeRunnerLiveLlmTest.java",
+	"server/application/src/test/java/de/tum/cit/aet/hephaestus/agent/mentor/live/MentorLiveLlmTest.java",
+	"server/application/src/test/java/de/tum/cit/aet/hephaestus/agent/mentor/live/MentorSandboxStressTest.java",
+	"server/application/src/test/java/de/tum/cit/aet/hephaestus/agent/practice/live/PracticeRunnerLiveLlmTest.java",
 ]) {
 	const testVersion = javaPin.exec(readFileSync(path, "utf8"))?.[1];
 	if (testVersion !== piVersion) {

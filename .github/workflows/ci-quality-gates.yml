@@ -120,7 +120,7 @@ jobs:
           pnpm run format:java:check || { FMT_OK=false; ISSUES_FOUND+=("Java formatting failed. Run: pnpm run format:java"); }
           pnpm run lint:java || { PMD_OK=false; ISSUES_FOUND+=("PMD found violations. Run: pnpm run lint:java:report"); }
           if [ "$PMD_OK" = "true" ] && [ "${{ inputs.pmd_canary }}" = "true" ]; then
-            PMD_CANARY=server/src/main/java/de/tum/cit/aet/hephaestus/Application.java
+            PMD_CANARY=server/application/src/main/java/de/tum/cit/aet/hephaestus/Application.java
             cp "$PMD_CANARY" "$RUNNER_TEMP/Application.java"
             trap 'cp "$RUNNER_TEMP/Application.java" "$PMD_CANARY"' EXIT
             sed -i '/public class Application {/a\    private int deliberatelyUnusedPmdCanary;' "$PMD_CANARY"
@@ -300,7 +300,7 @@ jobs:
           export SPRING_DATASOURCE_USERNAME="root"
           export SPRING_DATASOURCE_PASSWORD="root"
 
-          if ! (cd server && ./mvnw test -P'!quick' -Dsurefire.includedGroups=database -Dmaven.test.skip=false -DskipCoverage=true --quiet); then
+          if ! (cd server && ./mvnw test -pl application -am -Dsurefire.includedGroups=database -DskipCoverage=true --quiet); then
             echo "::error::Maven compilation or database contract tests failed. Fix the reported error before continuing."
             echo "### Database Validation" >> $GITHUB_STEP_SUMMARY
             echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
@@ -315,9 +315,9 @@ jobs:
           # liquibase:update — so this step is ALSO the empty→head migration-chain replay gate (a
           # changelog that doesn't apply fails here). Keep that apply intact.
           scripts/db-utils.sh draft-changelog || ISSUES_FOUND+=("Schema check / migration-chain apply failed. Run: pnpm run db:draft-changelog")
-          if [ -f "server/src/main/resources/db/changelog_new.xml" ]; then
+          if [ -f "server/application/src/main/resources/db/changelog_new.xml" ]; then
             echo "::error::Schema drift detected. Run: pnpm run db:draft-changelog"
-            cat server/src/main/resources/db/changelog_new.xml
+            cat server/application/src/main/resources/db/changelog_new.xml
             ISSUES_FOUND+=("Schema drift detected")
           fi
 

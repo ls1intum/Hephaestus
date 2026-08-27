@@ -50,7 +50,7 @@ jobs:
         continue-on-error: true
         run: >-
           pnpm run summarize:test-results "Server Integration Profile"
-          server/target/surefire-reports ci-metrics/server-integration-profile.json
+          server/application/target/surefire-reports ci-metrics/server-integration-profile.json
           ci-metrics/server-integration.log ci-metrics/server-integration-resource.txt
 
       - name: Enforce performance budgets
@@ -65,7 +65,7 @@ jobs:
         continue-on-error: true
         run: >-
           jfr print --events hephaestus.test.DatabaseCleanup
-          server/target/integration-profile.jfr
+          server/application/target/integration-profile.jfr
           > ci-metrics/database-cleanup.jfr.txt
 
       - name: Upload profile
@@ -74,8 +74,8 @@ jobs:
         with:
           name: server-integration-profile-${{ github.run_id }}
           path: |
-            server/target/integration-profile.jfr
-            server/target/surefire-reports
+            server/application/target/integration-profile.jfr
+            server/application/target/surefire-reports
             ci-metrics/server-integration-profile.json
             ci-metrics/server-integration.log
             ci-metrics/server-integration-resource.txt

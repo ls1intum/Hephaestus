@@ -79,12 +79,10 @@ pnpm run check
 `check` runs every leg CI runs except those needing Docker or a live credential — `docs:lint`
 included. If `check` is green and CI is not, the difference is one of those.
 
-Server tests need `-P'!quick'`. The `quick` profile is activated by the presence of generated GraphQL
-sources and sets `maven.test.skip=true`, so a plain `./mvnw test` prints BUILD SUCCESS having run
-nothing:
+The server reactor builds generated clients before the application. Run the unit tier with:
 
 ```bash
-cd server && ./mvnw test -P'!quick' -Dsurefire.includedGroups=unit -T 2C --batch-mode -q
+cd server && ./mvnw -pl application -am test -Dsurefire.includedGroups=unit -T 2C --batch-mode -q
 ```
 
 `-Dgroups` is ignored: the POM binds `${surefire.includedGroups}`, and a POM element beats the

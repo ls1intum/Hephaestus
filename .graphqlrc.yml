@@ -1,21 +1,11 @@
-# GraphQL Configuration for Hephaestus
-# Enables VSCode IntelliSense for GraphQL operations against GitHub and GitLab APIs
-# Extension: GraphQL.vscode-graphql
-# Docs: https://the-guild.dev/graphql/config
-
 projects:
   github:
-    # GitHub GraphQL API schema (downloaded from docs.github.com)
-    schema: "server/src/main/resources/graphql/github/schema.github.graphql"
-
-    # GraphQL operations (queries, mutations, fragments)
+    schema: "server/generated-clients/src/main/resources/graphql/github/schema.github.graphql"
     documents:
-      - "server/src/main/resources/graphql/github/operations/**/*.graphql"
-      - "server/src/main/resources/graphql/github/fragments/**/*.graphql"
-
-    # Restrict this project to GitHub files only (prevents cross-schema validation)
+      - "server/generated-clients/src/main/resources/graphql/github/operations/**/*.graphql"
+      - "server/generated-clients/src/main/resources/graphql/github/fragments/**/*.graphql"
     include:
-      - "server/src/main/resources/graphql/github/**"
+      - "server/generated-clients/src/main/resources/graphql/github/**"
 
     extensions:
       languageService:
@@ -24,15 +14,10 @@ projects:
         enableValidation: true
 
   gitlab:
-    # GitLab GraphQL API schema
-    schema: "server/src/main/resources/graphql/gitlab/schema.gitlab.graphql"
-
-    # GitLab GraphQL operations
-    documents: "server/src/main/resources/graphql/gitlab/operations/**/*.graphql"
-
-    # Restrict this project to GitLab files only (prevents cross-schema validation)
+    schema: "server/generated-clients/src/main/resources/graphql/gitlab/schema.gitlab.graphql"
+    documents: "server/generated-clients/src/main/resources/graphql/gitlab/operations/**/*.graphql"
     include:
-      - "server/src/main/resources/graphql/gitlab/**"
+      - "server/generated-clients/src/main/resources/graphql/gitlab/**"
 
     extensions:
       languageService:

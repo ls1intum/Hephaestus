@@ -7,7 +7,7 @@ import { join, resolve } from "node:path";
  * that the feature extraction is meaningful.
  *
  * Usage: bun run validate.ts --repo <clone> [--diff <patch>] [--scripts <dir>] [--metadata <json>]
- *   --scripts defaults to ../../../server/src/main/resources/practices/precompute (the version-controlled home)
+ *   --scripts defaults to ../../../server/application/src/main/resources/practices/precompute (the version-controlled home)
  */
 import { parseArgs } from "node:util";
 import { parsePracticeResult } from "./lib/practice-contract";
@@ -15,7 +15,7 @@ import type { PracticeResult } from "./lib/types";
 
 const DEFAULT_SCRIPTS_DIR = resolve(
 	import.meta.dir,
-	"../../../server/src/main/resources/practices/precompute",
+	"../../../server/application/src/main/resources/practices/precompute",
 );
 
 const { values } = parseArgs({

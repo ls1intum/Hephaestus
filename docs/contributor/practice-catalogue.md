@@ -249,7 +249,7 @@ standard as an experiment or a convention as a proven outcome.
 4. Confirm every source applies to the binding's artifact kind and that its governance decision permits
    the product purpose, audience, processor egress, and retention. A new source follows the
    [artifact-source governance gate](../admin/dsms/artifact-source-governance).
-5. Update `server/src/main/resources/practices/default-catalog.json`; its adjacent JSON Schema provides
+5. Update `server/application/src/main/resources/practices/default-catalog.json`; its adjacent JSON Schema provides
    editor completion and CI validation, and Git history is the bundled version history. Declare the one
    occasion as `on` — a bare signal name is shorthand for a binding on that signal reading the
    artifact kind's default evidence. Reference any precompute script explicitly; a script must be named

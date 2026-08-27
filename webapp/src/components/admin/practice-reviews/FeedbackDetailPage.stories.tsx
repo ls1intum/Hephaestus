@@ -63,7 +63,7 @@ export const Delivered: Story = {
 		// because reaching the developer is the ordinary case.
 		await expect(await canvas.findAllByText("Delivered")).toHaveLength(1);
 		canvas.getByText(/As an inline note on the work/);
-		canvas.getByText("server/src/main/resources/application.yml:118–120");
+		canvas.getByText("server/application/src/main/resources/application.yml:118–120");
 	},
 };
 

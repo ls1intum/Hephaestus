@@ -14,77 +14,37 @@ Testing keeps regression risk low across services. The application server uses M
 
    ```bash
    # Unit tests only (fast)
-   ./mvnw test -P'!quick'
+   cd server && ./mvnw test
 
-   # Full suite including integration tests
-   ./mvnw verify -P'!quick'
+   # Unit and integration tests
+   cd server && ./mvnw verify
    ```
 
-   :::danger Always deactivate `quick`
-   The `quick` profile activates itself as soon as GraphQL codegen has produced its sources — that
-   is, on every machine that has built the server once. It sets `maven.test.skip=true`, so a bare
-   `./mvnw test` prints **BUILD SUCCESS having run zero tests**, and `./mvnw test-compile` reports
-   success while test sources fail to compile. Pass `-P'!quick'` on every test run — including
-   alongside another profile (`-P'!quick,live-tests'`), because no other profile deactivates it.
-   :::
+   Generated clients have their own module, and the reactor restores their compiled artifact from
+   Maven Build Cache when its inputs are unchanged. After one reactor build, repeated application or
+   test edits can use the application-only recipes below without touching generated clients.
 
 3. Extend the correct base class:
 
-   ```java
-   // Unit test
-   class UserServiceTest extends BaseUnitTest { }
-
-   // Integration test
-   class UserServiceIntegrationTest extends BaseIntegrationTest { }
-   ```
+   Unit tests extend `BaseUnitTest`; Spring-backed tests extend `BaseIntegrationTest` or a
+   feature-specific subclass.
 
 :::warning Naming matters
-Use `*Test.java` for unit tests and `*IntegrationTest.java` for integration tests. Maven's surefire and failsafe plugins use these patterns.
+Use `*Test.java` for unit tests and `*IntegrationTest.java` or `*LiquibaseTest.java` for integration
+tests. Maven's Surefire and Failsafe plugins use these patterns.
 :::
-
-## Why testing?
-
-Tests catch regressions before they hit production, document expected behaviour, and unlock safe refactors. Our setup keeps the feedback loop fast – unit tests finish in under a second, while the shared Testcontainers environment limits the cost of integration suites.
 
 ## Unit tests
 
 - Extend `BaseUnitTest` for isolated component tests.
 - Use Mockito (`@Mock`, `@InjectMocks`) for dependencies.
-- Expect sub-second runtime – no Spring context is loaded.
-
-```java
-class UserServiceTest extends BaseUnitTest {
-    @Mock private UserRepository repository;
-    @InjectMocks private UserService service;
-
-    @Test
-    @DisplayName("Should validate email format")
-    void shouldValidateEmailFormat() {
-        // Fast isolated test
-    }
-}
-```
+- Keep unit tests independent of Spring contexts and Testcontainers.
 
 ## Integration tests
 
 - Extend `BaseIntegrationTest` for cross-component behaviour.
 - Relies on a shared PostgreSQL Testcontainers instance (significantly faster than per-test containers).
 - Reads recorded webhook payloads from the fixture folder and deserialises them into the handler's event DTO.
-
-Example:
-
-```java
-class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
-    @Test
-    @DisplayName("Should persist label from webhook")
-    void shouldPersistLabel() throws IOException {
-        var payload = objectMapper.readValue(
-            new ClassPathResource("github/label.created.json").getContentAsString(UTF_8),
-            GitHubLabelEventDTO.class);
-        // Test with real webhook data
-    }
-}
-```
 
 ## Controller integration tests
 
@@ -124,8 +84,6 @@ class FooControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 }
 ```
 
-Documenting each new controller integration test in this format keeps future work predictable and minimises copy/paste.
-
 ## Cross-tenant isolation tests
 
 Tenancy bugs are silent data leaks: the endpoint answers `200` with plausible data, so nothing fails loudly. Every **new workspace-scoped read path** gets an isolation case in `CrossTenantIsolationIntegrationTest` (in `workspace/`), whose fixture and rationale are documented in its class Javadoc — two workspaces sharing an `account_login`, one overlapping member.
@@ -141,7 +99,7 @@ The `hephaestus.tenancy.enforcement: throw` setting in `application-test.yml` fa
 
 ## Webhook fixtures and tooling
 
-Reusable webhook JSON lives in `src/test/resources/github`, named after the event it records. Load one with a `ClassPathResource`, or extract new samples with:
+Reusable webhook JSON lives in `server/application/src/test/resources/github`, named after the event it records. Load one with a `ClassPathResource`, or extract new samples with:
 
 ```bash
 pnpm run nats:extract-examples
@@ -151,13 +109,19 @@ Available examples include `label.created`, `repository.created`, `create`, `pus
 
 ## Maven recipes
 
+From `server/`:
+
 ```bash
-./mvnw test -P'!quick'                        # Unit tests
-./mvnw test -P'!quick,architecture-tests'     # ArchUnit + Modulith verification
-./mvnw verify -P'!quick'                      # Full suite + packaging
-./mvnw test -P'!quick' -Dtest=SomeTest        # Single test class
-./mvnw test -P'!quick' -Dtest=SomeTest#method # Single test method
+./mvnw test                         # Unit tests
+./mvnw test -Parchitecture-tests     # ArchUnit + Modulith verification
+./mvnw verify                       # Unit + integration tests and packaging
+./mvnw -f application/pom.xml test -Dtest=SomeTest         # Single test class
+./mvnw -f application/pom.xml test -Dtest=SomeTest#method  # Single test method
 ```
+
+Run a reactor command first after a fresh checkout or after changing a schema, generator, generated-client
+dependency, or `generated-clients/pom.xml`. The application-only commands then preserve Maven's
+incremental compilation; they fail immediately if the generated-client artifact has not been installed.
 
 The tag filter is a property, not the `-Dgroups` user property: surefire is configured with
 `<groups>${surefire.includedGroups}</groups>`, which an explicitly-configured plugin parameter wins
@@ -166,7 +130,7 @@ tag set directly, or the profiles above, which set it for you.
 
 ## Live external-service tests
 
-Some regressions can only be validated against real systems — the GitHub API, a real LLM endpoint, a Docker daemon. Live tests are tagged `@Tag("live")` and **excluded from every other tier**; they only run under `./mvnw test -P'!quick,live-tests'`. The profile flips Surefire's group filter and adds `failIfNoSpecifiedTests=false` so single-test invocations don't fail when the gating env var is unset. It does not deactivate `quick`, so `!quick` has to ride along or the run executes nothing.
+Some regressions can only be validated against real systems — the GitHub API, a real LLM endpoint, a Docker daemon. Live tests are tagged `@Tag("live")` and **excluded from every other tier**; they only run under `cd server && ./mvnw test -Plive-tests`. The profile flips Surefire's group filter and adds `failIfNoSpecifiedTests=false` so single-test invocations don't fail when the gating env var is unset.
 
 ### Meta-annotation cheat sheet
 
@@ -184,7 +148,7 @@ Each annotation pins JUnit to `Execution(SAME_THREAD)` so two live tests in the 
 ### Authoring a new live test
 
 1. Pick the right meta-annotation. If the env var doesn't exist yet, add a new annotation alongside the existing four — don't reuse one with a misleading name.
-2. Put the test under `src/test/java/.../live/`. The directory marker keeps live and non-live tests in different code-review buckets.
+2. Put the test under `server/application/src/test/java/.../live/`. The directory marker keeps live and non-live tests in different code-review buckets.
 3. Read credentials from `LiveLlmCredentials.fromEnv()` (or the GitHub helpers); never inline values. Secrets stay in env vars only.
 4. Per-test wall-clock timeouts: 90s is reasonable for a single mentor turn; 5 minutes for a full practice run.
 
@@ -202,7 +166,7 @@ We ship a focused suite that exercises the live GitHub App installation and veri
 3. **Local config file** – copy the template that lives alongside the tests:
 
     ```bash
-    cd server/src/test/resources
+    cd server/application/src/test/resources
     cp application-live-local.example.yml application-live-local.yml
     ```
 
@@ -225,7 +189,7 @@ We ship a focused suite that exercises the live GitHub App installation and veri
 From `server/` run:
 
 ```bash
-./mvnw test -P'!quick,live-tests'
+./mvnw test -Plive-tests
 ```
 
 The `live-tests` profile tells Maven to run only tests tagged with `@Tag("live")`. This is the **single guard** for live tests – if you don't pass the profile, the tests simply won't run.
@@ -239,7 +203,7 @@ The run takes roughly two minutes and prints the GitHub artefacts it provisions.
 1. Extend `AbstractGitHubLiveSyncIntegrationTest` (or fall back to `BaseGitHubLiveIntegrationTest` when repositories are not needed). These bases set up credential checks, provide the `workspaceRepository`, and expose helpers such as `createEphemeralRepository`, `registerRepositoryToMonitor`, `createEphemeralTeam`, and `seedOrganizationMembers`.
 2. Use the supplied helpers to create and track temporary GitHub artefacts. They automatically register clean-up handlers via `@AfterEach`, so add new resources to the provided lists instead of implementing manual deletion logic.
 3. Keep tests deterministic: rely on `databaseTestUtils.cleanDatabase()` in `@BeforeEach` (already invoked by the base), and generate unique slugs via `nextEphemeralSlug("suffix")` when naming repositories, branches, or teams.
-4. If a scenario needs extra Spring configuration, extend `application-live-local.yml` in `server/src/test/resources/`. The checked-in `.example` file documents every property; copy it on demand and keep secrets out of version control.
+4. If a scenario needs extra Spring configuration, extend `application-live-local.yml` in `server/application/src/test/resources/`. The checked-in `.example` file documents every property; copy it on demand and keep secrets out of version control.
 
 ### Troubleshooting
 

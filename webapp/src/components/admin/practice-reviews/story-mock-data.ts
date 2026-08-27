@@ -412,7 +412,7 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 				observedAt: "2026-07-28T13:40:00Z",
 				evidence: [
 					diff(
-						"server/src/main/java/de/tum/cit/aet/hephaestus/practices/reviewoutput/ReviewQueryController.java",
+						"server/application/src/main/java/de/tum/cit/aet/hephaestus/practices/reviewoutput/ReviewQueryController.java",
 						61,
 						64,
 						"var page = reviewQueryService.observations(workspaceSlug, filter, pageable);\nreturn ResponseEntity.ok(page.map(ReviewObservationDTO::from));",
@@ -432,14 +432,14 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 				observedAt: "2026-07-28T13:39:00Z",
 				evidence: [
 					diff(
-						"server/src/main/java/de/tum/cit/aet/hephaestus/practices/reviewoutput/ReviewQueryService.java",
+						"server/application/src/main/java/de/tum/cit/aet/hephaestus/practices/reviewoutput/ReviewQueryService.java",
 						116,
 						119,
 						"return repository.findVisible(workspaceId, id)\n    .orElseThrow(() -> new NotFoundException());",
 					),
 					cited(
 						"scm.repository.tree",
-						"server/src/main/java/de/tum/cit/aet/hephaestus/core/security/WorkspaceGuard.java",
+						"server/application/src/main/java/de/tum/cit/aet/hephaestus/core/security/WorkspaceGuard.java",
 						'throw new ForbiddenException("No grant on workspace " + slug);',
 						88,
 					),
@@ -463,7 +463,7 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 				observedAt: "2026-07-28T13:38:00Z",
 				evidence: [
 					diff(
-						"server/src/test/java/de/tum/cit/aet/hephaestus/practices/reviewoutput/ReviewQueryServiceTest.java",
+						"server/application/src/test/java/de/tum/cit/aet/hephaestus/practices/reviewoutput/ReviewQueryServiceTest.java",
 						44,
 						46,
 						"@Test\nvoid testCache1() {",
@@ -735,7 +735,7 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 				observedAt: "2026-07-29T08:12:00Z",
 				evidence: [
 					diff(
-						"server/src/main/java/de/tum/cit/aet/hephaestus/integration/core/webhook/WebhookRetryPolicy.java",
+						"server/application/src/main/java/de/tum/cit/aet/hephaestus/integration/core/webhook/WebhookRetryPolicy.java",
 						74,
 						75,
 						'log.debug("giving up on {} after {} attempts", subject, attempts);\nreturn;',
@@ -759,7 +759,7 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 				observedAt: "2026-07-29T08:11:00Z",
 				evidence: [
 					diff(
-						"server/src/test/java/de/tum/cit/aet/hephaestus/integration/core/webhook/WebhookRetryPolicyTest.java",
+						"server/application/src/test/java/de/tum/cit/aet/hephaestus/integration/core/webhook/WebhookRetryPolicyTest.java",
 						31,
 						32,
 						"@Test\nvoid doublesTheDelayUntilItReachesTheCeiling() {",
@@ -779,7 +779,7 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 				observedAt: "2026-07-29T08:10:00Z",
 				evidence: [
 					diff(
-						"server/src/main/resources/application.yml",
+						"server/application/src/main/resources/application.yml",
 						118,
 						118,
 						"retry-buffer:\n  capacity: 5000",
@@ -817,7 +817,7 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 				composedAt: "2026-07-29T08:18:00Z",
 				deliveredAt: "2026-07-29T08:18:40Z",
 				anchoredAt: {
-					path: "server/src/main/resources/application.yml",
+					path: "server/application/src/main/resources/application.yml",
 					startLine: 118,
 					endLine: 120,
 				},

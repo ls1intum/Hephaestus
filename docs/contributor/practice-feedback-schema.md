@@ -6,9 +6,9 @@ does not maintain exhaustive implementation inventories.
 Use the executable sources for exact details:
 
 - [generated database schema](./database-schema.mdx) for tables, columns, keys, and relationships;
-- [the `practices` module](https://github.com/ls1intum/Hephaestus/tree/main/server/src/main/java/de/tum/cit/aet/hephaestus/practices)
+- [the `practices` module](https://github.com/ls1intum/Hephaestus/tree/main/server/application/src/main/java/de/tum/cit/aet/hephaestus/practices)
   for the domain model;
-- [Liquibase changelogs](https://github.com/ls1intum/Hephaestus/tree/main/server/src/main/resources/db/changelog)
+- [Liquibase changelogs](https://github.com/ls1intum/Hephaestus/tree/main/server/application/src/main/resources/db/changelog)
   for persisted constraints and indexes;
 - [`openapi.yaml`](https://github.com/ls1intum/Hephaestus/blob/main/server/openapi.yaml) for HTTP projections;
 - [ADR 0021](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0021-observations-feedback-synthesis-seam.md)

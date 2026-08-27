@@ -3,9 +3,9 @@
 	// Root of the Biome monorepo graph. `webapp/biome.jsonc` is the one nested config; it declares
 	// `"root": false` and keeps its own formatter settings.
 	// This file formats the TypeScript and JavaScript outside the webapp and the docs site:
-	//   - the Bun agent runtime          server/src/main/resources/agent/**
-	//   - its runner specs               server/src/test/resources/agent/**
-	//   - the shipped precompute scripts server/src/main/resources/practices/precompute/**
+	//   - the Bun agent runtime          server/application/src/main/resources/agent/**
+	//   - its runner specs               server/application/src/test/resources/agent/**
+	//   - the shipped precompute scripts server/application/src/main/resources/practices/precompute/**
 	//   - the precompute harness         docker/agents/precompute/**
 	//   - the repo tooling scripts       scripts/**
 	// `tsconfig.agents.json` and `scripts/tsconfig.json` type-check that set; `docs/` is a third
@@ -21,9 +21,9 @@
 		// .gitignore already prunes node_modules/ and target/, so no negations are needed here.
 		"ignoreUnknown": true,
 		"includes": [
-			"server/src/main/resources/agent/**/*.ts",
-			"server/src/test/resources/agent/**/*.ts",
-			"server/src/main/resources/practices/precompute/**/*.ts",
+			"server/application/src/main/resources/agent/**/*.ts",
+			"server/application/src/test/resources/agent/**/*.ts",
+			"server/application/src/main/resources/practices/precompute/**/*.ts",
 			"docker/agents/precompute/**/*.ts",
 			"scripts/**/*.ts"
 		]

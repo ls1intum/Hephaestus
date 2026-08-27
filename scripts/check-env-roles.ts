@@ -37,7 +37,7 @@ import { join, resolve } from "node:path";
 
 /** Resolved from this file, so the gate answers the same whatever the working directory is. */
 const REPO_ROOT = resolve(import.meta.dirname, "..");
-const APPLICATION_YML = "server/src/main/resources/application.yml";
+const APPLICATION_YML = "server/application/src/main/resources/application.yml";
 /** The production topology. Both files together are one deployment, split by role. */
 const COMPOSE_FILES = ["docker/compose.app.yaml", "docker/compose.core.yaml"];
 
@@ -92,7 +92,7 @@ const ROLE_FLAGS: Record<Role, string> = {
 
 /** `application-<profile>.yml` turns roles off too, so a service's profiles decide as much as its env. */
 const PROFILE_YML = (profile: string): string =>
-	`server/src/main/resources/application-${profile}.yml`;
+	`server/application/src/main/resources/application-${profile}.yml`;
 const PROFILES = ["prod", "worker", "webhook", "local", "e2e"];
 
 /**

@@ -34,13 +34,11 @@ else
   }
 
   echo "Copying local config files..."
-  copy_first_hit "server/src/main/resources/application-local.yml" \
-    "server/src/main/resources/application-local.yml" \
-    "server/application-server/src/main/resources/application-local.yml"
-  copy_first_hit "server/src/test/resources/application-live-local.yml" \
-    "server/src/test/resources/application-live-local.yml" \
-    "server/application-server/src/test/resources/application-live-local.yml"
-  copy_first_hit "server/.env" "server/.env" "server/application-server/.env"
+  copy_first_hit "server/application/src/main/resources/application-local.yml" \
+    "server/application/src/main/resources/application-local.yml"
+  copy_first_hit "server/application/src/test/resources/application-live-local.yml" \
+    "server/application/src/test/resources/application-live-local.yml"
+  copy_first_hit "server/.env" "server/.env"
   copy_first_hit "docker/.env" "docker/.env"
   copy_first_hit ".claude/settings.local.json" ".claude/settings.local.json"
 fi

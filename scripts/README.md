@@ -29,7 +29,7 @@ pnpm run db:draft-changelog                       # Generate Liquibase changelog
 
 ### Achievement Formatting
 
-Rewrite `server/src/main/resources/achievements/achievements.yml` into the property order
+Rewrite `server/application/src/main/resources/achievements/achievements.yml` into the property order
 `PREFERRED_ORDER` defines. The fields themselves are documented in
 [Achievements](../docs/contributor/achievements.mdx).
 
