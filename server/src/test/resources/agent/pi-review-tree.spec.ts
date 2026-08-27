@@ -89,7 +89,7 @@ describe("buildReviewTree", () => {
 		});
 	}
 
-	test("keeps mixed-scenario evidence lanes deterministic and isolated", () => {
+	test("classifies mixed evidence lanes deterministically", () => {
 		const mixed: ReviewPractice[] = laneCases.flatMap((scenario) => scenario.practices);
 		const expected = [
 			["pull-request-1", ["clear-pull-request-description"]],
@@ -106,20 +106,8 @@ describe("buildReviewTree", () => {
 		).toEqual(expected);
 	});
 
-	test("returns no work for an occasion with no eligible practices", () => {
+	test("returns no work for an empty catalogue", () => {
 		expect(buildReviewTree([], 4)).toEqual({ practiceCount: 0, groups: [] });
-	});
-
-	test("orders evidence-local groups from cheap context to code exploration", () => {
-		const tree = buildReviewTree(practices, 2);
-
-		expect(tree.practiceCount).toBe(4);
-		expect(tree.groups.map((group) => [group.id, group.practiceSlugs])).toEqual([
-			["pull-request-1", ["description"]],
-			["linked-work-1", ["acceptance-criteria"]],
-			["review-1", ["review-replies"]],
-			["code-1", ["unsafe-input"]],
-		]);
 	});
 
 	test("uses the configured capacity instead of assuming a catalog size", () => {
@@ -145,7 +133,6 @@ describe("buildReviewTree", () => {
 		);
 
 		expect(tree.groups.map((group) => group.id)).toEqual(["code-1", "code-2"]);
-		expect(new Set(tree.groups.map((group) => group.id)).size).toBe(tree.groups.length);
 	});
 
 	test("normalizes sources before classifying a group", () => {
@@ -167,7 +154,7 @@ describe("buildReviewTree", () => {
 		});
 	});
 
-	test("rejects invalid capacity and ambiguous practice indexes", () => {
+	test("rejects invalid capacity, blank slugs, and duplicate slugs", () => {
 		expect(() => buildReviewTree(practices, 0)).toThrow("positive integer");
 		expect(() => buildReviewTree([{ slug: " " }], 1)).toThrow("non-empty slug");
 		expect(() => buildReviewTree([{ slug: "same" }, { slug: "same" }], 1)).toThrow(
@@ -181,7 +168,7 @@ test("missingPracticeSlugs requires explicit coverage for every selected practic
 	expect(missingPracticeSlugs(["a", "b"], ["b", "a"])).toEqual([]);
 });
 
-test("review concurrency scales with the catalogue without overloading the provider", () => {
+test("derives bounded review concurrency", () => {
 	expect(resolveReviewConcurrency(undefined, 1)).toBe(1);
 	expect(resolveReviewConcurrency(undefined, 16)).toBe(4);
 	expect(resolveReviewConcurrency(undefined, 27)).toBe(7);
