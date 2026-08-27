@@ -43,7 +43,6 @@ public class ObservationService {
     private final ObservationRepository observationRepository;
     private final FeedbackObservationRepository feedbackObservationRepository;
     private final UserRepository userRepository;
-    private final ObservationVisibilityPolicy visibilityPolicy;
     private final ReviewRunTargetLookup reviewRunTargetLookup;
 
     /** Feed ordering: by observation time or by severity (direction applies to both). */

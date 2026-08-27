@@ -57,6 +57,14 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
         service = new FeedbackResponseService(reactionRepository, feedbackRepository, currentDeveloperLookup);
         workspaceContext = new WorkspaceContext(WORKSPACE_ID, "test-ws", "Test WS", null, null, false, false, Set.of());
         appended.clear();
+        // Both shapes of the port: a write demands an id, a read accepts its absence. Lenient because most
+        // tests exercise only one of the two paths.
+        org.mockito.Mockito.lenient()
+            .when(currentDeveloperLookup.currentDeveloperIdElseThrow())
+            .thenReturn(CONTRIBUTOR_ID);
+        org.mockito.Mockito.lenient()
+            .when(currentDeveloperLookup.currentDeveloperId())
+            .thenReturn(Optional.of(CONTRIBUTOR_ID));
         org.mockito.Mockito.lenient()
             .when(reactionRepository.save(any(Reaction.class)))
             .thenAnswer(invocation -> {
@@ -130,7 +138,6 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
             when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(
                 Optional.of(feedback)
             );
-            when(currentDeveloperLookup.currentDeveloperIdElseThrow()).thenReturn(CONTRIBUTOR_ID);
             var request = new FeedbackResponseRequestDTO(
                 FeedbackUsefulness.HELPFUL,
                 FeedbackResolution.ADDRESSED,
@@ -154,7 +161,6 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
             when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(
                 Optional.of(feedback)
             );
-            when(currentDeveloperLookup.currentDeveloperIdElseThrow()).thenReturn(CONTRIBUTOR_ID);
 
             assertThatThrownBy(() ->
                 service.submitResponse(
@@ -173,7 +179,6 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
             when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(
                 Optional.of(feedback)
             );
-            when(currentDeveloperLookup.currentDeveloperIdElseThrow()).thenReturn(CONTRIBUTOR_ID);
             when(feedbackRepository.findHeadlineRecurrenceKey(FEEDBACK_ID)).thenReturn(Optional.of("ck-abc123"));
 
             var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.ADDRESSED, null, null);
@@ -215,7 +220,6 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
             when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(
                 Optional.of(feedback)
             );
-            when(currentDeveloperLookup.currentDeveloperIdElseThrow()).thenReturn(CONTRIBUTOR_ID);
 
             var request = new FeedbackResponseRequestDTO(
                 null,
@@ -235,7 +239,6 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
             when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(
                 Optional.of(feedback)
             );
-            when(currentDeveloperLookup.currentDeveloperIdElseThrow()).thenReturn(CONTRIBUTOR_ID);
 
             var request = new FeedbackResponseRequestDTO(
                 null,
@@ -254,7 +257,6 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
             when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(
                 Optional.of(feedback)
             );
-            when(currentDeveloperLookup.currentDeveloperIdElseThrow()).thenReturn(CONTRIBUTOR_ID);
 
             var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, null, null);
             assertThatThrownBy(() -> service.submitResponse(workspaceContext, FEEDBACK_ID, request))
@@ -268,7 +270,6 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
             when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(
                 Optional.of(feedback)
             );
-            when(currentDeveloperLookup.currentDeveloperIdElseThrow()).thenReturn(CONTRIBUTOR_ID);
 
             var request = new FeedbackResponseRequestDTO(null, FeedbackResolution.DISPUTED, "   ", null);
             assertThatThrownBy(() -> service.submitResponse(workspaceContext, FEEDBACK_ID, request))
@@ -310,7 +311,6 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
             when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(
                 Optional.of(feedback)
             );
-            when(currentDeveloperLookup.currentDeveloperIdElseThrow()).thenReturn(CONTRIBUTOR_ID);
 
             appended.add(
                 Reaction.builder()
@@ -336,11 +336,23 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
             when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(
                 Optional.of(feedback)
             );
-            when(currentDeveloperLookup.currentDeveloperIdElseThrow()).thenReturn(CONTRIBUTOR_ID);
 
             Optional<FeedbackResponseDTO> result = service.getLatestResponse(workspaceContext, FEEDBACK_ID);
 
             assertThat(result).isEmpty();
+        }
+
+        @Test
+        @DisplayName("answers a signed-in non-developer with nothing rather than an error")
+        void returnsEmptyForACallerWhoIsNotASyncedDeveloper() {
+            // A read answers absence with absence — the contract CurrentDeveloperLookup states, and the one
+            // the reflection and review-history surfaces already keep.
+            when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(
+                Optional.of(createFeedback(CONTRIBUTOR_ID))
+            );
+            when(currentDeveloperLookup.currentDeveloperId()).thenReturn(Optional.empty());
+
+            assertThat(service.getLatestResponse(workspaceContext, FEEDBACK_ID)).isEmpty();
         }
 
         @Test
@@ -357,9 +369,19 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
     class GetEngagement {
 
         @Test
-        void returnsCorrectCounts() {
-            when(currentDeveloperLookup.currentDeveloperIdElseThrow()).thenReturn(CONTRIBUTOR_ID);
+        @DisplayName("counts zero for a signed-in non-developer instead of failing")
+        void returnsZeroesForACallerWhoIsNotASyncedDeveloper() {
+            when(currentDeveloperLookup.currentDeveloperId()).thenReturn(Optional.empty());
 
+            FeedbackEngagementDTO result = service.getEngagement(workspaceContext);
+
+            assertThat(result.addressed()).isZero();
+            assertThat(result.disputed()).isZero();
+            assertThat(result.notApplicable()).isZero();
+        }
+
+        @Test
+        void returnsCorrectCounts() {
             var addressedProjection = new ReactionRepository.ActionCountProjection() {
                 @Override
                 public String getAction() {
@@ -397,7 +419,6 @@ class FeedbackResponseServiceTest extends BaseUnitTest {
         @Test
         @DisplayName("returns all zeros when no reaction exists")
         void returnsZerosWhenEmpty() {
-            when(currentDeveloperLookup.currentDeveloperIdElseThrow()).thenReturn(CONTRIBUTOR_ID);
             when(reactionRepository.countByReactorAndWorkspaceGroupByAction(CONTRIBUTOR_ID, WORKSPACE_ID)).thenReturn(
                 List.of()
             );

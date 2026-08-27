@@ -77,18 +77,32 @@ public class FeedbackResponseService {
         return currentResponse(feedbackId, recipientId).orElseGet(() -> FeedbackResponseDTO.none(feedbackId));
     }
 
-    /** The recipient's answer as it currently stands, or empty when they have said nothing that still holds. */
+    /**
+     * The recipient's answer as it currently stands, or empty when they have said nothing that still holds.
+     *
+     * <p>Empty also covers a caller who is signed in but not a synced developer: a read answers them with
+     * nothing rather than an error, which is the contract {@link CurrentDeveloperLookup} states.
+     */
     @Transactional(readOnly = true)
     public Optional<FeedbackResponseDTO> getLatestResponse(WorkspaceContext workspaceContext, UUID feedbackId) {
         Feedback feedback = requireDeliveredFeedback(workspaceContext.id(), feedbackId);
-        long recipientId = currentDeveloperLookup.currentDeveloperIdElseThrow();
+        Optional<Long> recipient = currentDeveloperLookup.currentDeveloperId();
+        if (recipient.isEmpty()) {
+            return Optional.empty();
+        }
+        long recipientId = recipient.get();
         requireRecipient(feedback, recipientId);
         return currentResponse(feedbackId, recipientId);
     }
 
+    /** Zeroes for a caller who is not a synced developer, for the same reason as {@link #getLatestResponse}. */
     @Transactional(readOnly = true)
     public FeedbackEngagementDTO getEngagement(WorkspaceContext workspaceContext) {
-        long recipientId = currentDeveloperLookup.currentDeveloperIdElseThrow();
+        Optional<Long> recipient = currentDeveloperLookup.currentDeveloperId();
+        if (recipient.isEmpty()) {
+            return new FeedbackEngagementDTO(0L, 0L, 0L);
+        }
+        long recipientId = recipient.get();
         Map<FeedbackResolution, Long> counts = new EnumMap<>(FeedbackResolution.class);
         reactionRepository
             .countByReactorAndWorkspaceGroupByAction(recipientId, workspaceContext.id())
