@@ -15,15 +15,20 @@ interface Service {
 	cap_add?: string[];
 	build?: { context: string; dockerfile?: string };
 	deploy?: { resources: { limits: { memory: string } } };
-	volumes?: { source: string }[];
+	volumes?: { source: string; read_only?: boolean }[];
 	privileged?: boolean;
 	network_mode?: string;
 	ports?: { published: string }[];
 }
 
 interface Stack {
-	services: { appserver: Service; postgres: Service; webapp?: Service };
-	networks: { backend: { internal?: boolean } };
+	services: {
+		appserver: Service;
+		postgres: Service;
+		webapp?: Service;
+		"seed-loader"?: Service;
+	};
+	networks: Record<string, { internal?: boolean; external?: boolean; name?: string }>;
 }
 
 const sandboxed: Stack = {
@@ -47,7 +52,7 @@ const sandboxed: Stack = {
 			cap_add: ["CHOWN", "DAC_OVERRIDE", "FOWNER", "SETGID", "SETUID"],
 		},
 	},
-	networks: { backend: { internal: true } },
+	networks: {},
 };
 
 /** Clones the good stack, then lets a test break exactly one thing. */
@@ -65,9 +70,9 @@ void describe("preview stack sandbox", () => {
 	void test("rejects every documented way out of the sandbox", () => {
 		const escapes: [string, (stack: Stack) => void, RegExp][] = [
 			[
-				"docker socket",
+				"docker socket, which a read-only mount does not make safe",
 				(s) => {
-					s.services.postgres.volumes = [{ source: "/var/run/docker.sock" }];
+					s.services.postgres.volumes = [{ source: "/var/run/docker.sock", read_only: true }];
 				},
 				/Docker socket/,
 			],
@@ -107,11 +112,11 @@ void describe("preview stack sandbox", () => {
 				/no memory limit/,
 			],
 			[
-				"routable backend",
+				"a project-scoped network every preview would share",
 				(s) => {
-					s.networks.backend.internal = false;
+					s.networks.backend = { internal: true };
 				},
-				/no longer internal/,
+				/every preview would share/,
 			],
 		];
 
@@ -157,6 +162,16 @@ void describe("preview stack sandbox", () => {
 		}
 	});
 
+	void test("accepts an external network, which names one that already exists", () => {
+		const violations = findViolations(
+			mutated((s) => {
+				s.networks["staging-shared"] = { external: true, name: "shared-network" };
+			}),
+		);
+
+		assert.deepEqual(violations, []);
+	});
+
 	void test("catches a flipped integration switch", () => {
 		const violations = findViolations(
 			mutated((s) => {
@@ -194,7 +209,6 @@ void describe("preview stack sandbox", () => {
 		assert.deepEqual(findViolations({}), [
 			"the rendered stack declares no services",
 			"the rendered stack has no appserver service, so no switch was checked",
-			"the backend network is gone",
 		]);
 	});
 });

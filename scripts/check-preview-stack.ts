@@ -162,6 +162,9 @@ export function findViolations(stack: unknown): string[] {
 		const mounts = Array.isArray(service.volumes) ? service.volumes : [];
 		for (const mount of mounts) {
 			const source = isRecord(mount) && typeof mount.source === "string" ? mount.source : "";
+			// A `:ro` socket mount restricts the file, not the API: a container holding it can still
+			// create containers, and from there mount the host. There is no scoped way to hold this, so
+			// no service in this stack holds it — the seed loader reads staging over the network.
 			if (source.includes("docker.sock")) violations.push(`${name} mounts the Docker socket`);
 		}
 		// A preview runs the artifact CI published, not one built here: a build stage would make it a
@@ -226,10 +229,20 @@ export function findViolations(stack: unknown): string[] {
 	if (!services.some(([name]) => name === "appserver")) {
 		violations.push("the rendered stack has no appserver service, so no switch was checked");
 	}
-	const backend = records(stack.networks).find(([name]) => name === "backend");
-	if (!backend) violations.push("the backend network is gone");
-	else if (backend[1].internal !== true)
-		violations.push("the backend network is no longer internal");
+	// Coolify runs every preview of this application under one Compose project, named after the
+	// application UUID with no pull request in it. A network defined here is therefore `<uuid>_<name>`
+	// for all of them at once, and one preview reaches another's database over it — a shared network
+	// that reads as private. An external one is the opposite: it names a network that already exists,
+	// so joining it is a decision someone made rather than a side effect of the project name.
+	// `default` is Compose's own and carries the project name too, but nothing joins it once no
+	// service names a network.
+	for (const [name, network] of records(stack.networks)) {
+		if (name === "default") continue;
+		if (network.external === true && typeof network.name === "string" && network.name !== "") {
+			continue;
+		}
+		violations.push(`the stack defines the ${name} network, which every preview would share`);
+	}
 
 	return violations;
 }

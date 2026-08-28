@@ -25,15 +25,34 @@ hold, each enforced before Coolify is asked to deploy:
   attestation naming this repository's `reusable-docker-build.yml` as signer, checked before Coolify
   is asked to pull it. Nothing is built on the deployment host, so a preview cannot pass on a
   lookalike of the shipped image.
-- The stack has a fresh PostgreSQL database and private NATS server. It has no staging network,
-  staging database copy, staging encryption key, integration credentials, or Docker socket.
-- Agent execution, repository checkout, inbound webhooks, recurring sync, and external integrations
-  are disabled. The stack has normal outbound internet access, but no staging credential, Docker
-  network membership, or host control socket.
+- The database is this preview's own, seeded from staging so it starts with real data. The clone is
+  taken with `pg_dump` — staging's data volume is never mounted — and the preview policy runs before
+  the application server is allowed to boot: every review trigger, agent binding and sweep schedule
+  is disabled, queued jobs are cancelled, pending deliveries are failed, and the instance identity
+  (`login_provider`, `jwt_signing_key`, `issued_jwt`) is dropped so the preview signs its own tokens.
+  The seed loader verifies that against the database and refuses to mark the preview seeded
+  otherwise, so a policy that silently did not apply leaves the preview un-booted rather than live.
+- The application server reads staging's JetStream, so a preview sees the events a shared GitHub App
+  delivers there. Its durable is named per deploy, so previews never compete for one consumer, and
+  it expires 72h after the preview stops reading — a preview is deleted, not shut down, so it never
+  removes its own.
+- Agent execution, repository checkout, inbound webhooks and recurring sync stay disabled, which is
+  what keeps a stack holding real data from acting on it.
 
-The application server runs without Linux capabilities and with `no-new-privileges`. PostgreSQL and
-NATS data live in PR-specific volumes. Coolify's proxy reaches the webapp and API on the frontend
-network; the database and NATS broker also use an internal backend network.
+No container here holds the Docker socket. A `:ro` socket mount restricts the file and not the API —
+a container holding one can still create containers, and from there mount the host — so there is no
+scoped way to hold it and nothing does. The seed loader reads staging over the network instead, as a
+role that can only read.
+
+Only the seed loader and the application server join staging's network, the first to reach its
+database and the second its broker. The preview's own database and the SPA stay on Coolify's
+per-preview network — the one it creates and attaches its proxy to. This file defines no network of its own:
+Coolify runs every preview of this application under one Compose project named after the application
+UUID, so a network defined here would be `<uuid>_backend` for all of them at once, private-looking
+and shared. `staging-shared` is joined by name, which makes it a decision rather than a side effect.
+
+The application server runs without Linux capabilities and with `no-new-privileges`. PostgreSQL
+keeps a PR-specific volume.
 
 Deployment authority is deliberately the same as push authority;
 [ADR 0035](../../docs/decisions/0035-pull-request-previews-are-label-gated.md) records why, and what
@@ -47,15 +66,15 @@ pull request's own copy of it defines that pull request's stack. Two rules hold 
 works alone: the controller refuses to deploy a head that introduces changes anywhere under
 `docker/preview/` — compared against the default branch, so a stacked layer cannot inherit an edit
 from the layer below — and `ci-compose-validate.yml` renders the file on every pull request and fails if
-the stack gains a way out of its sandbox — a socket, a build stage, a published port, an external
-network, an unbounded memory limit, a non-internal backend, or a flipped integration switch.
+the stack gains a way out of its sandbox — a socket, a build stage, a published port, an unbounded
+memory limit, a network every preview would share, or a flipped integration switch.
 `scripts/check-preview-stack.ts` is the authoritative list; this paragraph is not.
 
 ## Host capacity
 
-Each stack is capped at about 3 GiB (2 GiB application server, 512 MiB PostgreSQL, 256 MiB each for
-NATS and the webapp). Its CPU ceilings total 2.0 across the four services, so several previews
-oversubscribe a small host on paper. That is intended: a preview is idle almost all the time, and a
+Each stack is capped at about 2.8 GiB once running (2 GiB application server, 512 MiB PostgreSQL,
+256 MiB webapp); the seed loader adds 512 MiB while it runs and then exits. Its CPU ceilings total
+2.75 across the four services, so several previews oversubscribe a small host on paper. That is intended: a preview is idle almost all the time, and a
 ceiling stops one stack from taking the box rather than reserving capacity for it.
 
 `PREVIEW_MAX_ACTIVE` caps concurrent previews and defaults to 3. It has to leave roughly 3 GiB of
@@ -86,7 +105,24 @@ Create one Docker Compose application for `ls1intum/Hephaestus` on branch `main`
 5. Leave `SOURCE_COMMIT`, `COOLIFY_BRANCH`, and the `SERVICE_*` variables to Coolify. Define nothing
    on this application beyond `.env.example`; anything else does not belong here.
 6. Disable **Connect to predefined network**. Coolify attaches its proxy to each generated preview
-   network; the services do not need the shared `coolify` network.
+   network; the services do not need the shared `coolify` network. The one network this stack joins,
+   staging's `shared-network`, it names itself.
+7. Deploy onto the host running staging: the stack reaches staging's database and broker over its
+   `shared-network`, which is local to that host. A seed source that is unreachable fails the
+   preview rather than quietly starting it on an empty database.
+8. Create the seeding role once, on staging's PostgreSQL, and put its password in
+   `PREVIEW_SEED_SOURCE_PASSWORD`. `pg_read_all_data` is the whole grant — the role can read every
+   table `pg_dump` needs and write nothing:
+
+   ```sql
+   CREATE ROLE preview_seed LOGIN PASSWORD '<generated>';
+   ALTER ROLE preview_seed WITH NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION CONNECTION LIMIT 4;
+   GRANT pg_read_all_data TO preview_seed;
+   GRANT CONNECT ON DATABASE hephaestus TO preview_seed;
+   ```
+
+   Rotating it is one `ALTER ROLE … PASSWORD` and one Coolify variable. Between the two, seeding
+   fails and previews stay down rather than coming up on an empty database.
 
 ## GitHub configuration
 
