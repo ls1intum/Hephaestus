@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Runs `server/mvnw` from anywhere, under either wrapper name. A package script cannot pick the
  * right one, and `./mvnw` on Windows is a filename that does not exist.

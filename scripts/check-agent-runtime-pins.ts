@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import { readFileSync } from "node:fs";
 
 import { asRecord, isRecord, parseJson } from "./lib/json.ts";

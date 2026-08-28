@@ -10,15 +10,15 @@ are not here: write code that reads like the file you are editing.
 
 ## Local development loop
 
-`pnpm dev` from the repo root launches `mprocs` with server and webapp in separate panes and brings up
-the Postgres container. For plain terminals: `pnpm dev:server` and `pnpm dev:webapp`.
+`bun run dev` from the repo root launches `mprocs` with server and webapp in separate panes and brings up
+the Postgres container. For plain terminals: `bun run dev:server` and `bun run dev:webapp`.
 
 - **No devtools.** Hot reload is JVM HotSwap via the IDE — IntelliJ's Spring Boot run config with
   *Update Classes and Resources* on save. Method-body edits reload; signature changes, new methods and
   `@Configuration` edits need a full restart
   ([ref](https://docs.spring.io/spring-boot/how-to/hotswapping.html)).
 - **`ddl-auto: validate`** locally — Liquibase owns DDL. If the validator fails on boot your DB has
-  drifted: `pnpm dev:reset`. The Postgres folder is **bind-mounted**, so `docker compose down -v` alone
+  drifted: `bun run dev:reset`. The Postgres folder is **bind-mounted**, so `docker compose down -v` alone
   does not clear it.
 - **`BufferingApplicationStartup`** is wired in `Application.main()`. With `app.profiles=local`,
   `GET /actuator/startup` returns the timeline; `StartupBudgetIntegrationTest` catches per-step
@@ -56,8 +56,8 @@ Each of these can leave you with the wrong result.
 spec if Maven does not produce a new one. Never stop another service to free a port; override:
 
 ```bash
-MANAGEMENT_PORT=0 pnpm run generate:api:application-server:specs -- -Dopenapi.server.port=38111 -Dopenapi.jmx.port=9031
-pnpm run generate:api:application-server:client
+MANAGEMENT_PORT=0 bun run generate:api:application-server:specs -- -Dopenapi.server.port=38111 -Dopenapi.jmx.port=9031
+bun run generate:api:application-server:client
 ```
 
 ## Boundaries
@@ -120,7 +120,7 @@ or on "the only" result, and never write cleanup that another test depends on ha
   obsolete). Never delete one whose effect is not enforced elsewhere. Released changelogs are otherwise
   immutable and CI-enforced — root `AGENTS.md` § Database changes.
 - **The changelog is untested by the suite.** Tests run against `ddl-auto: create`, so a broken
-  changelog passes every tier. Use `pnpm run db:draft-changelog` to validate the migration history
+  changelog passes every tier. Use `bun run db:draft-changelog` to validate the migration history
   against the repository-managed PostgreSQL container; discard the draft when no schema change is
   intended.
 - **A native `@Query` may not contain an apostrophe inside a `--` comment.** Hibernate reads it as the
@@ -163,11 +163,11 @@ or on "the only" result, and never write cleanup that another test depends on ha
 ## Schema changes
 
 1. Modify the JPA entities.
-2. `pnpm run db:draft-changelog`, then prune the diff to the real deltas.
+2. `bun run db:draft-changelog`, then prune the diff to the real deltas.
 3. Rename to `<epoch-ms-timestamp>_changelog.xml`; `changeSet` ids are `<timestamp>-1`, `-2`, …
    One consolidated changelog per branch. Full rules in root `AGENTS.md` § Database changes.
-4. `pnpm run db:generate-erd-docs`.
-5. `pnpm changeset` — a user-facing summary. Touching `db/changelog/` without touching `.changeset/`
+4. `bun run db:generate-erd-docs`.
+5. `bun changeset` — a user-facing summary. Touching `db/changelog/` without touching `.changeset/`
    is always wrong. These are two unrelated things both called "changeset".
 
 ## Webhook receiver

@@ -8,28 +8,19 @@
 	],
 	"labels": ["dependencies"],
 	"assigneesFromCodeOwners": true,
-
 	"timezone": "Europe/Berlin",
 	"schedule": ["before 7am on monday"],
 	"minimumReleaseAge": "3 days",
-
 	"platformAutomerge": true,
 	"automergeStrategy": "squash",
 	"semanticCommitScope": "deps",
-
 	"dependencyDashboard": true,
 	"dependencyDashboardTitle": "Dependency Dashboard",
-
-	"postUpdateOptions": ["pnpmDedupe"],
-
 	"lockFileMaintenance": {
 		"enabled": true,
-		"schedule": ["before 7am on monday"],
-		"postUpdateOptions": ["pnpmDedupe"]
+		"schedule": ["before 7am on monday"]
 	},
-
 	"rangeStrategy": "replace",
-
 	"packageRules": [
 		{
 			"description": "Group Java/Spring",
@@ -81,7 +72,6 @@
 			"labels": ["dependencies", "infrastructure"]
 		}
 	],
-
 	"customManagers": [
 		{
 			"description": "Track ARG <PKG>_VERSION pins in Dockerfiles via a `# renovate:` magic comment, so Renovate handles bumps for tools installed inside the image (e.g. agent-pi's @earendil-works/pi-coding-agent).",
@@ -93,7 +83,6 @@
 			"versioningTemplate": "{{#if versioning}}{{versioning}}{{else}}semver{{/if}}"
 		}
 	],
-
 	"vulnerabilityAlerts": {
 		"labels": ["security", "dependencies"],
 		"schedule": ["at any time"],
@@ -103,6 +92,5 @@
 		"automerge": true,
 		"groupName": null
 	},
-
 	"ignorePaths": ["**/node_modules/**", "**/target/**", "**/dist/**", "**/build/**"]
 }

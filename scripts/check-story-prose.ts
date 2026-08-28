@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Storybook publishes the comment above `meta` and above each exported story as that component's Docs
  * page, rendering it through `markdown-to-jsx`. A Java-style `<p>` opens a paragraph the renderer has

@@ -19,8 +19,8 @@ jobs:
           token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      - name: Setup pnpm + Node.js
-        uses: ./.github/actions/setup-pnpm-node
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
 
       - name: Setup caches
         uses: ./.github/actions/setup-caches
@@ -28,11 +28,11 @@ jobs:
           cache-type: openapi-validation
           os: ${{ runner.os }}
 
-      - name: Install Node.js dependencies
-        run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
 
       - name: Generate OpenAPI specs and clients
-        run: pnpm run generate:api
+        run: bun run generate:api
 
       - name: Check for changes in the API
         id: check_changes

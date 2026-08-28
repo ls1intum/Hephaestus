@@ -14,14 +14,14 @@ TITLE FORMAT (required):
   ✗ Bad:  Added weekly ranking filter to leaderboard
 
 BEFORE PUSHING:
-  pnpm run format && pnpm run check     # Format + lint + typecheck all services
+  bun run format && bun run check     # Format + lint + typecheck all services
 
 AFTER API CHANGES:
-  pnpm run generate:api                # Regenerate all OpenAPI clients
+  bun run generate:api                # Regenerate all OpenAPI clients
 
 AFTER DATABASE/ENTITY CHANGES:
-  pnpm run db:draft-changelog          # Generate Liquibase migration
-  pnpm run db:generate-erd-docs        # Update ERD documentation
+  bun run db:draft-changelog          # Generate Liquibase migration
+  bun run db:generate-erd-docs        # Update ERD documentation
 -->
 
 ## Description

@@ -1,12 +1,12 @@
-Welcome to your new TanStack app! 
+Welcome to your new TanStack app!
 
 # Getting Started
 
 To run this application:
 
 ```bash
-pnpm install
-pnpm run start  
+bun install
+bun run start
 ```
 
 # Building For Production
@@ -14,7 +14,7 @@ pnpm run start
 To build this application for production:
 
 ```bash
-pnpm run build
+bun run build
 ```
 
 ## Testing
@@ -22,7 +22,7 @@ pnpm run build
 This project uses [Vitest](https://vitest.dev/) for testing. You can run the tests with:
 
 ```bash
-pnpm run test
+bun run test
 ```
 
 ## Styling
@@ -36,19 +36,19 @@ This project uses [oxlint](https://oxc.rs/docs/guide/usage/linter) for linting a
 
 ```bash
 # Formatting and import order
-pnpm run format          # Apply
-pnpm run format:check    # Verify, read-only
+bun run format          # Apply
+bun run format:check    # Verify, read-only
 
 # Linting
-pnpm run lint            # Verify
-pnpm run lint:fix        # Apply the safe fixes
+bun run lint            # Verify
+bun run lint:fix        # Apply the safe fixes
 
 # Both, and what CI runs. Neither leg short-circuits the other.
-pnpm run check
-pnpm run check:fix
+bun run check
+bun run check:fix
 
 # Type checking
-pnpm run typecheck
+bun run typecheck
 ```
 
 ## Shadcn
@@ -56,7 +56,7 @@ pnpm run typecheck
 Add components using the latest version of [Shadcn](https://ui.shadcn.com/).
 
 ```bash
-pnpm exec shadcn@latest add button
+bun x shadcn@latest add button
 ```
 
 
@@ -163,7 +163,7 @@ React-Query is an excellent addition or alternative to route loading and integra
 First add your dependencies:
 
 ```bash
-pnpm install @tanstack/react-query @tanstack/react-query-devtools
+bun install @tanstack/react-query @tanstack/react-query-devtools
 ```
 
 Next we'll need to create a query client and provider. We recommend putting those in `main.tsx`.

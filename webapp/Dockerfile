@@ -1,54 +1,37 @@
-# syntax=docker/dockerfile:1.4
-
-# Stage 1: Build
-FROM node:24-alpine AS build
-ENV PNPM_HOME=/pnpm
-ENV PATH=$PNPM_HOME:$PATH
+# syntax=docker/dockerfile:1.7
+FROM alpine:3.23.3 AS build
+ARG TARGETARCH
+ARG BUN_VERSION=1.4.0
 WORKDIR /repo
-
-# Copy the workspace manifests first to maximize layer caching
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc /repo/
+# SHA-256 values are from the pinned Bun release's SHASUMS256.txt.
+RUN apk add --no-cache curl unzip libstdc++ && \
+    case "${TARGETARCH}" in \
+      amd64) bun_arch="x64"; bun_sha256="83b5f12fd258dd8d4fdcaea65ede954366aa717dab399e20093ecab280d54e7a" ;; \
+      arm64) bun_arch="aarch64"; bun_sha256="576300ce33ff16ffcd455bf178c2f095f9df845c6cc3d0284ba1c96ca0e80473" ;; \
+      *) echo "Unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac && \
+    curl --fail --show-error --silent --location --retry 3 \
+      "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-${bun_arch}-musl.zip" -o /tmp/bun.zip && \
+    echo "${bun_sha256}  /tmp/bun.zip" | sha256sum -c - && \
+    unzip /tmp/bun.zip -d /tmp && mv "/tmp/bun-linux-${bun_arch}-musl/bun" /usr/local/bin/bun && \
+    bun --version | grep -Fx "${BUN_VERSION}"
+COPY bun.lock bunfig.toml package.json /repo/
+COPY patches/ /repo/patches/
 COPY webapp/package.json /repo/webapp/
 COPY docs/package.json /repo/docs/
-
-# Bake the pnpm named by package.json#packageManager into the image, so the first
-# `pnpm install` needs no network access to resolve it. Reading the manifest rather than
-# naming a version here is what stops the image drifting from the repo.
-RUN corepack enable && corepack prepare --activate
-
-# Install webapp deps (no internal workspace deps, so no `...` needed)
-RUN --mount=type=cache,target=/pnpm/store,sharing=locked \
-    pnpm install --frozen-lockfile --filter webapp
-
-# Copy the webapp application code
+RUN --mount=type=cache,target=/root/.bun/install/cache,sharing=locked bun install --frozen-lockfile --filter webapp
 COPY webapp/ /repo/webapp/
-
-# Build the React application
 WORKDIR /repo/webapp
-RUN pnpm run build
-
-# Stage 2: Serve
+RUN bun run build
 FROM nginx:stable-alpine
-
-# Bake git metadata into the image using build arguments provided by Coolify
 ARG COOLIFY_BRANCH
 ARG SOURCE_COMMIT
-# Use distinct names to avoid runtime overrides by Coolify
-ENV BUILD_GIT_BRANCH=$COOLIFY_BRANCH
-ENV BUILD_GIT_COMMIT=$SOURCE_COMMIT
-
-RUN apk update && apk upgrade && \
-    apk add --no-cache bash sed grep curl && \
-    rm -rf /var/cache/apk/*
-
+ENV BUILD_GIT_BRANCH=$COOLIFY_BRANCH BUILD_GIT_COMMIT=$SOURCE_COMMIT
+RUN apk update && apk upgrade && apk add --no-cache bash sed grep curl && rm -rf /var/cache/apk/*
 COPY --from=build /repo/webapp/dist /usr/share/nginx/html
 COPY webapp/docker/entrypoint.sh /entrypoint.sh
 COPY webapp/docker/nginx.conf /etc/nginx/conf.d/default.conf
-
-# Copy TypeScript source for entrypoint.sh to extract env var names (single source of truth)
 COPY webapp/src/environment/index.ts /app/src/environment/index.ts
-
 RUN chmod +x /entrypoint.sh
-
 EXPOSE 80
 ENTRYPOINT ["/bin/bash", "-c", "/entrypoint.sh && exec nginx -g 'daemon off;'"]

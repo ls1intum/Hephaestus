@@ -66,7 +66,7 @@ if [ -f "server/.env" ] && grep -Eq '^GITLAB_PAT=.' "server/.env" && grep -Eq '^
   echo "  enabled GitLab default workspace bootstrap from local server/.env"
 fi
 
-echo "Installing npm dependencies..."
-pnpm install --frozen-lockfile
+echo "Installing dependencies..."
+bun install --frozen-lockfile
 
 echo "✅ Jean worktree setup complete."

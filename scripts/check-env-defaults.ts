@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Every variable a Compose file forwards must carry the same fallback the application does.
  *

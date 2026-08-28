@@ -1,5 +1,5 @@
 name: "Setup CI caches"
-description: "Caches Maven dependencies, generated-client build outputs, and Playwright browsers. Node/pnpm setup happens in the calling workflow."
+description: "Caches Maven dependencies, generated-client build outputs, and Playwright browsers."
 inputs:
   cache-type:
     description: "Type of cache to setup"
@@ -57,6 +57,6 @@ runs:
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/ms-playwright
-        key: ${{ inputs.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+        key: ${{ inputs.os }}-playwright-${{ hashFiles('bun.lock') }}
         restore-keys: |
           ${{ inputs.os }}-playwright-

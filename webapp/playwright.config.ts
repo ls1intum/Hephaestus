@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:4200";
+import { E2E_BASE_URL, E2E_PORT } from "./e2e/urls.ts";
 
 export default defineConfig({
 	testDir: "./e2e",
@@ -14,14 +14,14 @@ export default defineConfig({
 	timeout: 60_000,
 	reporter: process.env.CI ? [["github"]] : [["list"]],
 	use: {
-		baseURL: BASE_URL,
+		baseURL: E2E_BASE_URL,
 		trace: "on-first-retry",
 		screenshot: "only-on-failure",
 	},
 	projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
 	webServer: {
-		command: "pnpm run dev",
-		url: BASE_URL,
+		command: `bun run build && bun --bun vite preview --host 127.0.0.1 --port ${E2E_PORT}`,
+		url: E2E_BASE_URL,
 		reuseExistingServer: !process.env.CI,
 		timeout: 120_000,
 	},

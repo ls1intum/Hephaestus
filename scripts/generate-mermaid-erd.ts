@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
@@ -481,7 +480,7 @@ class MermaidErdGenerator {
 			"erDiagram",
 			"    %% Generated automatically from PostgreSQL database schema",
 			"    %% using scripts/generate-mermaid-erd.ts",
-			"    %% To regenerate: pnpm run db:generate-erd-docs",
+			"    %% To regenerate: bun run db:generate-erd-docs",
 			"",
 			"    direction LR",
 			"",
