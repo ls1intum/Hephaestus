@@ -1,10 +1,9 @@
 package de.tum.cit.aet.hephaestus.architecture;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
-import static de.tum.cit.aet.hephaestus.architecture.ArchitectureTestConstants.BASE_PACKAGE;
 
+import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
-import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.lang.ArchRule;
 import org.junit.jupiter.api.Test;
 
@@ -19,6 +18,9 @@ import org.junit.jupiter.api.Test;
  * vendor's wire shape can never leak past the extract/load seam even though it is now spec-generated.
  */
 class OutlineApiDtoIsolationTest extends HephaestusArchitectureTest {
+
+    private static final JavaClasses OUTLINE_CLASSES =
+            new ClassFileImporter().importPackages("de.tum.cit.aet.hephaestus.integration.outline");
 
     @Test
     void outlineWireModelsStayOnTheExtractSeam() {
@@ -39,8 +41,6 @@ class OutlineApiDtoIsolationTest extends HephaestusArchitectureTest {
                                 + "lifecycle-registrar, and webhook consumers on the extract seam; they must not leak into the "
                                 + "agent read path or any other module")
                 .allowEmptyShould(false);
-        rule.check(new ClassFileImporter()
-                .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-                .importPackages(BASE_PACKAGE));
+        rule.check(OUTLINE_CLASSES);
     }
 }

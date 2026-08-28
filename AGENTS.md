@@ -55,10 +55,9 @@ Naming: `format` applies, `format:check` verifies read-only for CI, `lint` lints
 comprehensive local quality gate. A `:webapp`, `:server` or `:agents` suffix scopes any of them; `:java`
 scopes `format` and `lint` only — the Java leg of `check` is `check:server`.
 
-**Every leg of `check` also runs in CI.** CI additionally runs the Vite build and generated route-tree
-comparison, webapp tests, server test tiers, image and security checks, and other workflow-specific
-gates. It cannot run anything needing a live credential. Run `check` before pushing because it is the
-fastest complete local quality gate, then run the affected test or build commands above.
+`pnpm run check` is the complete local quality gate. CI distributes its legs across required jobs,
+using path filters where appropriate, and adds builds, generated-file checks, broader tests, image
+checks, and security scans. Run `check` before pushing, then run the affected tests or builds.
 
 ### Lint and format scopes
 
