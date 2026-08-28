@@ -110,10 +110,24 @@ services:
           exit 0
         fi
 
+        # Large objects are read per object, which is exactly what a role holding only
+        # pg_read_all_data cannot do — so the dump skips them. Nothing maps to one today. If
+        # something starts to, this stops rather than handing over a preview quietly missing data.
+        export PGPASSWORD="$$PREVIEW_SEED_SOURCE_PASSWORD"
+        OID_COLUMNS=$$(psql -h "$$SOURCE" -U "$$PREVIEW_SEED_SOURCE_USERNAME" \
+          -d "$$PREVIEW_SEED_SOURCE_DATABASE" -tAX -v ON_ERROR_STOP=1 \
+          -c "SELECT count(*) FROM information_schema.columns
+               WHERE table_schema = 'public' AND data_type = 'oid'")
+        if [ "$$OID_COLUMNS" != "0" ]; then
+          echo "The source schema has $$OID_COLUMNS large-object columns, which this dump cannot read."
+          echo "Grant the seed role access to them, or stop mapping columns to large objects."
+          exit 1
+        fi
+
         echo "Dumping staging data from $$SOURCE"
-        PGPASSWORD="$$PREVIEW_SEED_SOURCE_PASSWORD" pg_dump \
-          -h "$$SOURCE" -U "$$PREVIEW_SEED_SOURCE_USERNAME" -d "$$PREVIEW_SEED_SOURCE_DATABASE" \
-          --format=custom --no-owner --no-privileges > /tmp/seed.dump
+        pg_dump -h "$$SOURCE" -U "$$PREVIEW_SEED_SOURCE_USERNAME" \
+          -d "$$PREVIEW_SEED_SOURCE_DATABASE" \
+          --format=custom --no-owner --no-privileges --no-large-objects > /tmp/seed.dump
         test -s /tmp/seed.dump
 
         export PGPASSWORD="$$POSTGRES_PASSWORD"
