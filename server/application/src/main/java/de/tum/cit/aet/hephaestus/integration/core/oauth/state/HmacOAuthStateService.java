@@ -229,9 +229,6 @@ public class HmacOAuthStateService implements OAuthStateService {
         try {
             return new String(Base64.getUrlDecoder().decode(actorSegment), StandardCharsets.UTF_8);
         } catch (IllegalArgumentException e) {
-            // Defensive: a tampered actor segment with intact outer HMAC shouldn't be
-            // reachable (the segment is signed), but if base64 ever rejects we'd rather
-            // null out than throw — the audit row falls back to a sentinel.
             return null;
         }
     }

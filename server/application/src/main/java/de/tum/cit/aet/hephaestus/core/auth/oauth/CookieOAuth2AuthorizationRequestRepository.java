@@ -109,7 +109,9 @@ public class CookieOAuth2AuthorizationRequestRepository
 
     @Override
     public void saveAuthorizationRequest(
-            OAuth2AuthorizationRequest authorizationRequest, HttpServletRequest request, HttpServletResponse response) {
+            @Nullable OAuth2AuthorizationRequest authorizationRequest,
+            HttpServletRequest request,
+            HttpServletResponse response) {
         if (authorizationRequest == null) {
             clear(response);
             return;
