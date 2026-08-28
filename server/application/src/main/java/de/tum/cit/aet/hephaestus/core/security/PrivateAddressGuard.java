@@ -2,25 +2,12 @@ package de.tum.cit.aet.hephaestus.core.security;
 
 import java.net.InetAddress;
 
-/**
- * Single source of truth for "is this resolved IP an SSRF-unsafe target?" — i.e. an address that is
- * loopback/link-local/private or an IANA special-purpose range that routinely fronts internal services.
- *
- * <p>Used both by {@code integration.identity.connect.IssuerDiscoveryProbe} (registration-time issuer
- * probe) and by {@code core.SsrfGuardedResolverGroup} (the HTTP-client DNS layer that closes the
- * rebind/TOCTOU window for outbound calls to user-supplied hosts). Keeping the predicate here — pure,
- * dependency-free, operating on already-resolved {@link InetAddress} bytes — means the two enforcement
- * points can never disagree on what counts as private.
- *
- * <p>Per the OWASP SSRF Prevention Cheat Sheet this covers the SSRF-relevant special-purpose ranges
- * (those that can front internal or loopback-reachable services), not every IANA assignment: purely
- * non-SSRF allocations (6to4-relay anycast, AS112, AMT) are intentionally not blocked.
- */
+/** Classifies resolved addresses before outbound connections to user-supplied hosts. */
 public final class PrivateAddressGuard {
 
     private PrivateAddressGuard() {}
 
-    /** True if {@code addr} must NOT be used as an outbound target (SSRF-unsafe). */
+    /** Returns whether {@code addr} is private, local, or in an SSRF-relevant special-purpose range. */
     public static boolean isNonPublic(InetAddress addr) {
         return (addr.isLoopbackAddress()
                 || addr.isLinkLocalAddress()

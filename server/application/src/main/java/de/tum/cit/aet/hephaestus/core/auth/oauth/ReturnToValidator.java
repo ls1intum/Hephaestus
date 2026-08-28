@@ -56,15 +56,14 @@ public final class ReturnToValidator {
             try {
                 next = URLDecoder.decode(current, StandardCharsets.UTF_8);
             } catch (RuntimeException e) {
-                // Malformed escape sequence → treat as unsafe by returning an obviously-rejected value.
-                return "\0";
+                return "";
             }
             if (next.equals(current)) {
                 return current;
             }
             current = next;
         }
-        return current;
+        return "";
     }
 
     private static boolean isSafe(String candidate) {

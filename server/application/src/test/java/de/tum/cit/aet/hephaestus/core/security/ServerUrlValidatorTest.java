@@ -174,6 +174,12 @@ class ServerUrlValidatorTest extends BaseUnitTest {
         }
 
         @Test
+        void stillAcceptsCanonicalPublicIpv4WithMaximumOctet() {
+            assertThatCode(() -> ServerUrlValidator.validate("https://8.8.8.255"))
+                    .doesNotThrowAnyException();
+        }
+
+        @Test
         void stillAcceptsPublicIpv6() {
             assertThatCode(() -> ServerUrlValidator.validate("https://[2001:db8::1]"))
                     .doesNotThrowAnyException();

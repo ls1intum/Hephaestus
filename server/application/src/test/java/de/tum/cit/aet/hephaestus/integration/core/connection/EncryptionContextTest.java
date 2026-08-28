@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,15 @@ class EncryptionContextTest extends BaseUnitTest {
     private static byte[] aad(
             long ws, IntegrationKind kind, @org.jspecify.annotations.Nullable String instanceKey, String column) {
         return new EncryptionContext(ws, kind, instanceKey, column).toAad();
+    }
+
+    @Test
+    void shouldUseVersionedLengthPrefixedFraming() {
+        byte[] actual = aad(1L, IntegrationKind.GITHUB, "a", "bc");
+
+        assertThat(HexFormat.of().formatHex(actual))
+                .isEqualTo("686570686165737475732d63726564656e7469616c2d62756e646c651f02"
+                        + "000131000647495448554200016100026263");
     }
 
     @Test
@@ -76,5 +86,17 @@ class EncryptionContextTest extends BaseUnitTest {
         assertThatThrownBy(oversized::toAad)
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("u16 length limit");
+    }
+
+    @Test
+    void shouldAcceptMaximumU16FieldLength() {
+        String maximumColumn = "c".repeat(0xFFFF);
+        byte[] actual = aad(1L, IntegrationKind.GITHUB, "inst", maximumColumn);
+
+        int columnLengthOffset = actual.length - 0xFFFF - 2;
+        assertThat(actual[columnLengthOffset]).isEqualTo((byte) 0xFF);
+        assertThat(actual[columnLengthOffset + 1]).isEqualTo((byte) 0xFF);
+        assertThat(actual[columnLengthOffset + 2]).isEqualTo((byte) 'c');
+        assertThat(actual[actual.length - 1]).isEqualTo((byte) 'c');
     }
 }

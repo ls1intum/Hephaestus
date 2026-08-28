@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFile } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { promisify } from "node:util";
 
@@ -33,7 +33,18 @@ export async function discoverJavaSourcePaths(
 			},
 		},
 	);
-	const paths = stdout.split("\0").filter(isHandwrittenJavaSource);
+	const candidates = stdout.split("\0").filter(isHandwrittenJavaSource);
+	const present = await Promise.all(
+		candidates.map(async (path) => {
+			try {
+				await access(resolve(root, path));
+				return path;
+			} catch {
+				return undefined;
+			}
+		}),
+	);
+	const paths = present.filter((path): path is string => path !== undefined);
 	if (paths.length === 0) {
 		throw new Error(
 			"No handwritten Java sources found under server/application/src/{main,test}/java; refusing to pass without checking anything.",

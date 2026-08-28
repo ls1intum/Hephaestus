@@ -3,7 +3,9 @@ package de.tum.cit.aet.hephaestus.integration.core.oauth.state;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
 import de.tum.cit.aet.hephaestus.integration.core.oauth.state.OAuthStateService.StateBinding;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -13,10 +15,62 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.env.Environment;
 
 class HmacOAuthStateServiceTest extends BaseUnitTest {
 
     private static final String SECRET = "unit-test-secret-with-enough-entropy-32b";
+
+    private static HmacOAuthStateService configuredService(
+            @Nullable String oauthSecret, @Nullable String webhookSecret, boolean production) {
+        OAuthStateProperties properties =
+                new OAuthStateProperties(oauthSecret, Duration.ofMinutes(10), Duration.ofDays(7));
+        WebhookProperties webhookProperties = mock(WebhookProperties.class);
+        Environment environment = mock(Environment.class);
+        if (oauthSecret == null || oauthSecret.isBlank()) {
+            when(webhookProperties.secret()).thenReturn(webhookSecret);
+            if (webhookSecret == null || webhookSecret.isBlank()) {
+                when(environment.matchesProfiles("prod")).thenReturn(production);
+            }
+        }
+        return new HmacOAuthStateService(properties, webhookProperties, environment, null);
+    }
+
+    @Test
+    void shouldPreferDedicatedSecretOverWebhookFallback() {
+        HmacOAuthStateService issuer = configuredService(SECRET, "different-webhook-secret-of-32b", false);
+        HmacOAuthStateService verifier = HmacOAuthStateService.withoutNonceStore(SECRET, Duration.ofMinutes(10));
+
+        assertThat(verifier.consume(issuer.issue(42L, IntegrationKind.GITHUB)).workspaceId())
+                .isEqualTo(42L);
+    }
+
+    @Test
+    void shouldUseWebhookSecretAsFallback() {
+        HmacOAuthStateService issuer = configuredService(null, SECRET, false);
+        HmacOAuthStateService verifier = HmacOAuthStateService.withoutNonceStore(SECRET, Duration.ofMinutes(10));
+
+        assertThat(verifier.consume(issuer.issue(42L, IntegrationKind.GITHUB)).workspaceId())
+                .isEqualTo(42L);
+    }
+
+    @Test
+    void shouldRejectMissingProductionSecret() {
+        assertThatThrownBy(() -> configuredService(null, null, true))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("required for OAuth state HMAC");
+    }
+
+    @Test
+    void shouldGenerateIndependentEphemeralSecretsOutsideProduction() {
+        HmacOAuthStateService first = configuredService(null, null, false);
+        HmacOAuthStateService second = configuredService(null, null, false);
+        String state = first.issue(42L, IntegrationKind.GITHUB);
+
+        assertThatThrownBy(() -> second.consume(state))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("signature mismatch");
+    }
 
     @Test
     void issuedStateRoundTrips() {
