@@ -31,10 +31,9 @@ class HephaestusAuthFailureHandlerTest extends BaseUnitTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         handler.onAuthenticationFailure(
-            new MockHttpServletRequest(),
-            response,
-            new BadCredentialsException("a secret value in the message that must NOT be audited")
-        );
+                new MockHttpServletRequest(),
+                response,
+                new BadCredentialsException("a secret value in the message that must NOT be audited"));
 
         ArgumentCaptor<AuthEventData> event = ArgumentCaptor.forClass(AuthEventData.class);
         verify(writer).write(event.capture());

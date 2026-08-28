@@ -9,13 +9,12 @@ package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
  * {@code Long}s are guaranteed non-null; the accessors unbox safely without an NPE risk.
  */
 public record MentorUserCounts(
-    Long openPRs,
-    Long mergedThisWeek,
-    Long mergedLastWeek,
-    Long openIssues,
-    Long reviewsGivenThisWeek,
-    Long reviewsGivenLastWeek,
-    Long reviewsReceivedThisWeek,
-    Long pendingReviewRequests,
-    Long unresolvedThreads
-) {}
+        Long openPRs,
+        Long mergedThisWeek,
+        Long mergedLastWeek,
+        Long openIssues,
+        Long reviewsGivenThisWeek,
+        Long reviewsGivenLastWeek,
+        Long reviewsReceivedThisWeek,
+        Long pendingReviewRequests,
+        Long unresolvedThreads) {}

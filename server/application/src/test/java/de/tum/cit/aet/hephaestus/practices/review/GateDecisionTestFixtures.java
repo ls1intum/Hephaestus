@@ -10,10 +10,6 @@ public final class GateDecisionTestFixtures {
 
     public static GateDecision.Detect automaticDetection(Workspace workspace, List<Practice> practices) {
         return new GateDecision.Detect(
-            workspace,
-            practices,
-            workspace.getReviewSettings().getRolloutRevision(),
-            TriggerMode.AUTO
-        );
+                workspace, practices, workspace.getReviewSettings().getRolloutRevision(), TriggerMode.AUTO);
     }
 }

@@ -14,10 +14,10 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.posthog")
 public record PosthogProperties(
-    @Nullable
-    @URL(message = "PostHog API host must be a valid URL if provided")
-    @DefaultValue("https://app.posthog.com")
-    String apiHost,
-    @Nullable String projectId,
-    @Nullable String personalApiKey
-) {}
+        @Nullable
+        @URL(message = "PostHog API host must be a valid URL if provided")
+        @DefaultValue("https://app.posthog.com")
+        String apiHost,
+
+        @Nullable String projectId,
+        @Nullable String personalApiKey) {}

@@ -44,13 +44,12 @@ public class GitlabConnectionSyncStateProvider implements ConnectionSyncStatePro
     private final ScmResourceCountReader countReader;
 
     public GitlabConnectionSyncStateProvider(
-        ConnectionService connectionService,
-        ObjectProvider<GitLabRateLimitTracker> rateLimitTrackerProvider,
-        SyncSchedulerProperties syncSchedulerProperties,
-        RepositoryToMonitorRepository repositoryToMonitorRepository,
-        RepositoryRepository repositoryRepository,
-        ScmResourceCountReader countReader
-    ) {
+            ConnectionService connectionService,
+            ObjectProvider<GitLabRateLimitTracker> rateLimitTrackerProvider,
+            SyncSchedulerProperties syncSchedulerProperties,
+            RepositoryToMonitorRepository repositoryToMonitorRepository,
+            RepositoryRepository repositoryRepository,
+            ScmResourceCountReader countReader) {
         this.connectionService = connectionService;
         this.rateLimitTrackerProvider = rateLimitTrackerProvider;
         this.syncSchedulerProperties = syncSchedulerProperties;
@@ -78,22 +77,18 @@ public class GitlabConnectionSyncStateProvider implements ConnectionSyncStatePro
         // hephaestus.sync.backfill.enabled flag, and its runner reports supportsBackfill()=true, so the
         // rollup is computed identically via the shared helper.
         BackfillSummary backfill = ScmBackfillRollup.summarize(
-            syncSchedulerProperties.backfill().enabled(),
-            repositoryToMonitorRepository
-                .findByWorkspaceId(workspaceId)
-                .stream()
-                .map(GitlabConnectionSyncStateProvider::toBackfillProgress)
-                .toList()
-        );
+                syncSchedulerProperties.backfill().enabled(),
+                repositoryToMonitorRepository.findByWorkspaceId(workspaceId).stream()
+                        .map(GitlabConnectionSyncStateProvider::toBackfillProgress)
+                        .toList());
 
         return new ConnectionSyncDetails(
-            webhookRegistered,
-            CronSchedules.nextRun(syncSchedulerProperties.cron()),
-            CronSchedules.interval(syncSchedulerProperties.cron()),
-            rateLimit,
-            backfill,
-            false
-        );
+                webhookRegistered,
+                CronSchedules.nextRun(syncSchedulerProperties.cron()),
+                CronSchedules.interval(syncSchedulerProperties.cron()),
+                rateLimit,
+                backfill,
+                false);
     }
 
     @Override
@@ -104,28 +99,26 @@ public class GitlabConnectionSyncStateProvider implements ConnectionSyncStatePro
             return List.of();
         }
 
-        Map<String, Repository> reposByNameWithOwner = repositoryRepository
-            .findAllByWorkspaceMonitors(workspaceId)
-            .stream()
-            .collect(Collectors.toMap(Repository::getNameWithOwner, r -> r, (a, b) -> a));
+        Map<String, Repository> reposByNameWithOwner =
+                repositoryRepository.findAllByWorkspaceMonitors(workspaceId).stream()
+                        .collect(Collectors.toMap(Repository::getNameWithOwner, r -> r, (a, b) -> a));
 
-        List<Long> repositoryIds = reposByNameWithOwner.values().stream().map(Repository::getId).toList();
+        List<Long> repositoryIds =
+                reposByNameWithOwner.values().stream().map(Repository::getId).toList();
         Map<Long, ScmResourceCounts> countsByRepositoryId = countReader.countsByRepositoryId(repositoryIds);
 
-        return monitors
-            .stream()
-            .map(monitor -> toResourceState(monitor, reposByNameWithOwner, countsByRepositoryId))
-            .toList();
+        return monitors.stream()
+                .map(monitor -> toResourceState(monitor, reposByNameWithOwner, countsByRepositoryId))
+                .toList();
     }
 
     private SyncResourceState toResourceState(
-        RepositoryToMonitor monitor,
-        Map<String, Repository> reposByNameWithOwner,
-        Map<Long, ScmResourceCounts> countsByRepositoryId
-    ) {
+            RepositoryToMonitor monitor,
+            Map<String, Repository> reposByNameWithOwner,
+            Map<Long, ScmResourceCounts> countsByRepositoryId) {
         Repository repo = reposByNameWithOwner.get(monitor.getNameWithOwner());
         ScmResourceCounts counts =
-            repo == null ? null : countsByRepositoryId.getOrDefault(repo.getId(), ScmResourceCounts.empty());
+                repo == null ? null : countsByRepositoryId.getOrDefault(repo.getId(), ScmResourceCounts.empty());
         Long itemCount = counts == null ? null : counts.headlineItemCount();
 
         // GitlabDataSyncScheduler.updateSyncTimestamp persists per-class watermarks on
@@ -134,31 +127,29 @@ public class GitlabConnectionSyncStateProvider implements ConnectionSyncStatePro
         Instant issuesSyncedAt = monitor.getIssuesSyncedAt();
         Instant pullRequestsSyncedAt = monitor.getPullRequestsSyncedAt();
         Instant lastSyncedAt = latestNonNull(
-            issuesSyncedAt,
-            pullRequestsSyncedAt,
-            monitor.getRepositorySyncedAt(),
-            repo == null ? null : repo.getLastSyncAt()
-        );
+                issuesSyncedAt,
+                pullRequestsSyncedAt,
+                monitor.getRepositorySyncedAt(),
+                repo == null ? null : repo.getLastSyncAt());
         String state = lastSyncedAt != null ? SyncResourceState.STATE_SYNCED : SyncResourceState.STATE_PENDING;
 
         return new SyncResourceState(
-            monitor.getId(),
-            monitor.getNameWithOwner(),
-            monitor.getNameWithOwner(),
-            SyncResourceState.Type.REPOSITORY,
-            state,
-            lastSyncedAt,
-            itemCount,
-            // Per-class breakdown, each class carrying its own persisted watermark. Issues and pull
-            // requests are reported per class rather than collapsed via latestNonNull above, so
-            // "pull requests are fresh but issues stalled" stays visible instead of the newest sibling
-            // masking the older one.
-            counts == null ? List.of() : counts.toSyncResourceCounts(issuesSyncedAt, pullRequestsSyncedAt),
-            null,
-            null,
-            null,
-            null
-        );
+                monitor.getId(),
+                monitor.getNameWithOwner(),
+                monitor.getNameWithOwner(),
+                SyncResourceState.Type.REPOSITORY,
+                state,
+                lastSyncedAt,
+                itemCount,
+                // Per-class breakdown, each class carrying its own persisted watermark. Issues and pull
+                // requests are reported per class rather than collapsed via latestNonNull above, so
+                // "pull requests are fresh but issues stalled" stays visible instead of the newest sibling
+                // masking the older one.
+                counts == null ? List.of() : counts.toSyncResourceCounts(issuesSyncedAt, pullRequestsSyncedAt),
+                null,
+                null,
+                null,
+                null);
     }
 
     /** Most recent of the non-null instants, or null if all are null. */
@@ -175,11 +166,10 @@ public class GitlabConnectionSyncStateProvider implements ConnectionSyncStatePro
     /** Projects a monitored-repository row into the vendor-neutral rollup input for {@link ScmBackfillRollup}. */
     private static RepoBackfillProgress toBackfillProgress(RepositoryToMonitor monitor) {
         return new RepoBackfillProgress(
-            monitor.isBackfillInitialized(),
-            monitor.isBackfillComplete(),
-            monitor.getIssueBackfillHighWaterMark(),
-            monitor.getPullRequestBackfillHighWaterMark(),
-            monitor.getBackfillRemaining()
-        );
+                monitor.isBackfillInitialized(),
+                monitor.isBackfillComplete(),
+                monitor.getIssueBackfillHighWaterMark(),
+                monitor.getPullRequestBackfillHighWaterMark(),
+                monitor.getBackfillRemaining());
     }
 }

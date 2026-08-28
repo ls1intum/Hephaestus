@@ -85,15 +85,14 @@ public class ConnectionAudit {
     protected ConnectionAudit() {}
 
     public ConnectionAudit(
-        Connection connection,
-        String eventType,
-        @Nullable IntegrationState fromState,
-        @Nullable IntegrationState toState,
-        String actorKind,
-        @Nullable String actorRef,
-        @Nullable String correlationId,
-        @Nullable String detail
-    ) {
+            Connection connection,
+            String eventType,
+            @Nullable IntegrationState fromState,
+            @Nullable IntegrationState toState,
+            String actorKind,
+            @Nullable String actorRef,
+            @Nullable String correlationId,
+            @Nullable String detail) {
         this.connection = connection;
         this.eventType = eventType;
         this.fromState = fromState;

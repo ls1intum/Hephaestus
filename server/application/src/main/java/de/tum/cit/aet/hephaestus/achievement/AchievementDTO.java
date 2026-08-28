@@ -21,31 +21,33 @@ import org.jspecify.annotations.Nullable;
  */
 @Schema(description = "Achievement with user-specific progress information")
 public record AchievementDTO(
-    @NonNull
-    @Schema(
-        description = "Unique identifier for the achievement",
-        example = "pr.merged.common.1",
-        ref = "AchievementId"
-    )
-    String id,
-    @NonNull
-    @Schema(description = "Category for grouping achievements", example = "pull_requests")
-    AchievementCategory category,
-    @NonNull
-    @Schema(description = "Visual level tier/rarity for badge styling", example = "common")
-    AchievementRarity rarity,
-    @Nullable @Schema(description = "Parent achievement in progression chain", example = "first_pull") String parent,
-    @NonNull
-    @Schema(description = "Current status of the achievement for this user", example = "unlocked")
-    AchievementStatus status,
-    @NonNull
-    @Schema(description = "The structured progress data based on the achievements evaluator")
-    AchievementProgress progressData,
-    @Nullable
-    @Schema(description = "When the achievement was unlocked, absent while it is still locked")
-    Instant unlockedAt,
-    @Schema(description = "Whether the achievement should be hidden until unlocked") boolean isHidden
-) {
+        @NonNull
+        @Schema(
+                description = "Unique identifier for the achievement",
+                example = "pr.merged.common.1",
+                ref = "AchievementId")
+        String id,
+
+        @NonNull @Schema(description = "Category for grouping achievements", example = "pull_requests")
+        AchievementCategory category,
+
+        @NonNull @Schema(description = "Visual level tier/rarity for badge styling", example = "common")
+        AchievementRarity rarity,
+
+        @Nullable @Schema(description = "Parent achievement in progression chain", example = "first_pull")
+        String parent,
+
+        @NonNull @Schema(description = "Current status of the achievement for this user", example = "unlocked")
+        AchievementStatus status,
+
+        @NonNull @Schema(description = "The structured progress data based on the achievements evaluator")
+        AchievementProgress progressData,
+
+        @Nullable @Schema(description = "When the achievement was unlocked, absent while it is still locked")
+        Instant unlockedAt,
+
+        @Schema(description = "Whether the achievement should be hidden until unlocked")
+        boolean isHidden) {
     /**
      * Creates an AchievementDTO from an AchievementDefinition with progress information.
      *
@@ -56,20 +58,18 @@ public record AchievementDTO(
      * @return populated DTO
      */
     public static AchievementDTO fromDefinition(
-        AchievementDefinition definition,
-        AchievementStatus status,
-        AchievementProgress progressData,
-        @Nullable Instant unlockedAt
-    ) {
+            AchievementDefinition definition,
+            AchievementStatus status,
+            AchievementProgress progressData,
+            @Nullable Instant unlockedAt) {
         return new AchievementDTO(
-            definition.id(),
-            definition.category(),
-            definition.rarity(),
-            definition.parent(),
-            status,
-            progressData,
-            unlockedAt,
-            definition.isHidden()
-        );
+                definition.id(),
+                definition.category(),
+                definition.rarity(),
+                definition.parent(),
+                status,
+                progressData,
+                unlockedAt,
+                definition.isHidden());
     }
 }

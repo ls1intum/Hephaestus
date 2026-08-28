@@ -28,17 +28,15 @@ public class GitHubTeamRepositoryMessageHandler extends AbstractIntegrationMessa
     private final GitHubTeamMessageHandler delegate;
 
     GitHubTeamRepositoryMessageHandler(
-        GitHubTeamMessageHandler delegate,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            GitHubTeamMessageHandler delegate,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITHUB,
-            "repository." + GitHubEventType.TEAM.getValue(),
-            GitHubTeamEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITHUB,
+                "repository." + GitHubEventType.TEAM.getValue(),
+                GitHubTeamEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.delegate = delegate;
     }
 

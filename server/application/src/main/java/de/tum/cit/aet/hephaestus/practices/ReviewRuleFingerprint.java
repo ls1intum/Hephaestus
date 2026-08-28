@@ -17,25 +17,21 @@ public final class ReviewRuleFingerprint {
     private ReviewRuleFingerprint() {}
 
     public static String of(
-        String slug,
-        String name,
-        List<PracticeBinding> bindings,
-        String criteria,
-        @Nullable String precomputeScript,
-        PracticeAutomatedReviewPolicy automatedReviewPolicy,
-        @Nullable String groupSlug
-    ) {
+            String slug,
+            String name,
+            List<PracticeBinding> bindings,
+            String criteria,
+            @Nullable String precomputeScript,
+            PracticeAutomatedReviewPolicy automatedReviewPolicy,
+            @Nullable String groupSlug) {
         CanonicalDigest digest = new CanonicalDigest().add(slug).add(name);
         addBindings(digest, bindings);
-        return (
-            SCHEME +
-            digest
-                .add(criteria)
-                .addNullable(precomputeScript)
-                .add(PracticeAutomatedReviewPolicyDigest.digest(automatedReviewPolicy))
-                .addNullable(groupSlug)
-                .hex()
-        );
+        return (SCHEME
+                + digest.add(criteria)
+                        .addNullable(precomputeScript)
+                        .add(PracticeAutomatedReviewPolicyDigest.digest(automatedReviewPolicy))
+                        .addNullable(groupSlug)
+                        .hex());
     }
 
     /** Actor attribution is excluded because it does not change evidence or evaluation rules. */
@@ -46,7 +42,9 @@ public final class ReviewRuleFingerprint {
             binding.signals().forEach(signal -> digest.add(signal.value()));
             digest.add(String.valueOf(binding.onDrafts()));
             digest.addInt(binding.needs().size());
-            binding.needs().forEach(need -> digest.add(need.sourceKind().value()).add(need.stance().name()));
+            binding.needs()
+                    .forEach(need -> digest.add(need.sourceKind().value())
+                            .add(need.stance().name()));
             addAppliesWhen(digest, binding.appliesWhen());
         }
     }
@@ -55,7 +53,9 @@ public final class ReviewRuleFingerprint {
         if (subject == null) {
             return;
         }
-        digest.add("appliesWhen").add(subject.absentSays()).addInt(subject.anyOf().size());
+        digest.add("appliesWhen")
+                .add(subject.absentSays())
+                .addInt(subject.anyOf().size());
         for (PracticeSubjectClause clause : subject.anyOf()) {
             digest.add(clause.aspect().name()).add(clause.describe());
         }

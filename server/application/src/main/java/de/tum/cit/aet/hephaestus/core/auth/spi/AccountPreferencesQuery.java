@@ -9,8 +9,8 @@ public interface AccountPreferencesQuery {
 
     default boolean practiceFeedbackDeliveryEnabled(long userId) {
         return preferencesForUserId(userId)
-            .map(PreferencesView::practiceFeedbackDeliveryEnabled)
-            .orElse(PreferencesView.PRACTICE_FEEDBACK_DELIVERY_ENABLED_BY_DEFAULT);
+                .map(PreferencesView::practiceFeedbackDeliveryEnabled)
+                .orElse(PreferencesView.PRACTICE_FEEDBACK_DELIVERY_ENABLED_BY_DEFAULT);
     }
 
     record PreferencesView(boolean participateInResearch, boolean practiceFeedbackDeliveryEnabled) {

@@ -10,32 +10,31 @@
  * GitLab through the SPI rather than direct calls.
  */
 @org.springframework.modulith.ApplicationModule(
-    displayName = "Integration · SCM · GitLab",
-    type = org.springframework.modulith.ApplicationModule.Type.OPEN,
-    allowedDependencies = {
-        "integration.core",
-        "integration.core::events",
-        "integration.core::spi",
-        "integration.core::handler",
-        "integration.core::oauth",
-        "integration.core::consumer",
-        "integration.core::webhook",
-        "integration.scm",
-        "core",
-        // Runtime-role gate (@ConditionalOnServerRole) on the connection-OAuth strategy.
-        "core::runtime",
-        // GitLabWebhookService uses WebhookProperties; GitLabPreflightService validates URLs.
-        "core::webhook",
-        "core::security",
-        "workspace",
-        // GitLab workspace flows depend on the workspace named sub-surfaces.
-        "workspace::context",
-        "workspace::spi",
-        "workspace::events",
-        "workspace::dto",
-        // Provider availability gated by FeatureFlagService.
-        "feature",
-    }
-)
+        displayName = "Integration · SCM · GitLab",
+        type = org.springframework.modulith.ApplicationModule.Type.OPEN,
+        allowedDependencies = {
+            "integration.core",
+            "integration.core::events",
+            "integration.core::spi",
+            "integration.core::handler",
+            "integration.core::oauth",
+            "integration.core::consumer",
+            "integration.core::webhook",
+            "integration.scm",
+            "core",
+            // Runtime-role gate (@ConditionalOnServerRole) on the connection-OAuth strategy.
+            "core::runtime",
+            // GitLabWebhookService uses WebhookProperties; GitLabPreflightService validates URLs.
+            "core::webhook",
+            "core::security",
+            "workspace",
+            // GitLab workspace flows depend on the workspace named sub-surfaces.
+            "workspace::context",
+            "workspace::spi",
+            "workspace::events",
+            "workspace::dto",
+            // Provider availability gated by FeatureFlagService.
+            "feature",
+        })
 @org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab;

@@ -29,12 +29,11 @@ public class WorkspaceNatsSubscriptionProvider implements NatsSubscriptionProvid
     private final boolean slackEnabled;
 
     public WorkspaceNatsSubscriptionProvider(
-        WorkspaceRepository workspaceRepository,
-        WorkspaceScopeFilter workspaceScopeFilter,
-        ConnectionService connectionService,
-        @Value("${hephaestus.integration.outline.enabled:false}") boolean outlineEnabled,
-        @Value("${hephaestus.integration.slack.enabled:false}") boolean slackEnabled
-    ) {
+            WorkspaceRepository workspaceRepository,
+            WorkspaceScopeFilter workspaceScopeFilter,
+            ConnectionService connectionService,
+            @Value("${hephaestus.integration.outline.enabled:false}") boolean outlineEnabled,
+            @Value("${hephaestus.integration.slack.enabled:false}") boolean slackEnabled) {
         this.workspaceRepository = workspaceRepository;
         this.workspaceScopeFilter = workspaceScopeFilter;
         this.connectionService = connectionService;
@@ -66,17 +65,14 @@ public class WorkspaceNatsSubscriptionProvider implements NatsSubscriptionProvid
         if (scmKind.isEmpty()) {
             return;
         }
-        String streamName = ConsumerSubjectMath.streamNameFor(scmKind.get()).orElseThrow(() ->
-            new IllegalStateException("No NATS stream for SCM kind=" + scmKind.get())
-        );
+        String streamName = ConsumerSubjectMath.streamNameFor(scmKind.get())
+                .orElseThrow(() -> new IllegalStateException("No NATS stream for SCM kind=" + scmKind.get()));
 
         Set<String> subjects = new HashSet<>();
-        Set<String> repositoryNames = workspace
-            .getRepositoriesToMonitor()
-            .stream()
-            .map(RepositoryToMonitor::getNameWithOwner)
-            .filter(workspaceScopeFilter::isRepositoryAllowed)
-            .collect(Collectors.toSet());
+        Set<String> repositoryNames = workspace.getRepositoriesToMonitor().stream()
+                .map(RepositoryToMonitor::getNameWithOwner)
+                .filter(workspaceScopeFilter::isRepositoryAllowed)
+                .collect(Collectors.toSet());
         for (String nameWithOwner : repositoryNames) {
             subjects.add(ConsumerSubjectMath.repositoryFilter(streamName, nameWithOwner));
         }
@@ -103,17 +99,11 @@ public class WorkspaceNatsSubscriptionProvider implements NatsSubscriptionProvid
             return;
         }
         connectionService
-            .findActiveOutlineConfig(workspace.getId())
-            .map(ConnectionConfig.OutlineConfig::webhookSubscriptionId)
-            .filter(subscriptionId -> subscriptionId != null && !subscriptionId.isBlank())
-            .ifPresent(subscriptionId ->
-                out.add(
-                    new StreamSubscription(
-                        "outline",
-                        Set.of(ConsumerSubjectMath.subscriptionFilter("outline", subscriptionId))
-                    )
-                )
-            );
+                .findActiveOutlineConfig(workspace.getId())
+                .map(ConnectionConfig.OutlineConfig::webhookSubscriptionId)
+                .filter(subscriptionId -> subscriptionId != null && !subscriptionId.isBlank())
+                .ifPresent(subscriptionId -> out.add(new StreamSubscription(
+                        "outline", Set.of(ConsumerSubjectMath.subscriptionFilter("outline", subscriptionId)))));
     }
 
     /**
@@ -130,11 +120,10 @@ public class WorkspaceNatsSubscriptionProvider implements NatsSubscriptionProvid
             return;
         }
         connectionService
-            .findSlackNotificationConfig(workspace.getId())
-            .map(ConnectionConfig.SlackConfig::teamId)
-            .filter(teamId -> teamId != null && !teamId.isBlank())
-            .ifPresent(teamId ->
-                out.add(new StreamSubscription("slack", Set.of(ConsumerSubjectMath.teamFilter("slack", teamId))))
-            );
+                .findSlackNotificationConfig(workspace.getId())
+                .map(ConnectionConfig.SlackConfig::teamId)
+                .filter(teamId -> teamId != null && !teamId.isBlank())
+                .ifPresent(teamId -> out.add(
+                        new StreamSubscription("slack", Set.of(ConsumerSubjectMath.teamFilter("slack", teamId)))));
     }
 }

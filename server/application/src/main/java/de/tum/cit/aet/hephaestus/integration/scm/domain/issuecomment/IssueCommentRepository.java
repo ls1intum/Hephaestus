@@ -33,29 +33,24 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
      * <p>The predicate rides the {@code c.issue} join that the grouping already needs, so this stays one
      * grouped query for the whole connection.
      */
-    @Query(
-        "SELECT c.issue.repository.id AS repositoryId, COUNT(c) AS itemCount FROM IssueComment c " +
-            "WHERE c.issue.repository.id IN :repositoryIds AND c.issue.deletedAt IS NULL " +
-            "GROUP BY c.issue.repository.id"
-    )
+    @Query("SELECT c.issue.repository.id AS repositoryId, COUNT(c) AS itemCount FROM IssueComment c "
+            + "WHERE c.issue.repository.id IN :repositoryIds AND c.issue.deletedAt IS NULL "
+            + "GROUP BY c.issue.repository.id")
     List<RepositoryItemCountProjection> countGroupedByRepositoryIds(
-        @Param("repositoryIds") Collection<Long> repositoryIds
-    );
+            @Param("repositoryIds") Collection<Long> repositoryIds);
 
     /**
      * Batch fetch comments by id with author, issue and repository eagerly loaded (one query, no N+1).
      * Used by the profile module to hydrate ActivityEvent target entities.
      */
-    @Query(
-        """
+    @Query("""
         SELECT ic
         FROM IssueComment ic
         LEFT JOIN FETCH ic.author
         LEFT JOIN FETCH ic.issue i
         LEFT JOIN FETCH i.repository
         WHERE ic.id IN :ids
-        """
-    )
+        """)
     List<IssueComment> findAllByIdWithRelations(@Param("ids") Collection<Long> ids);
 
     /**
@@ -71,8 +66,7 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
      * @param workspaceId the workspace to scope the query to
      * @return comments with related entities eagerly loaded, ordered by createdAt descending
      */
-    @Query(
-        """
+    @Query("""
         SELECT ic
         FROM IssueComment ic
         LEFT JOIN FETCH ic.author
@@ -86,27 +80,23 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
             AND rtm.workspace.id = :workspaceId
             AND (:onlyFromPullRequests = false OR TYPE(i) = PullRequest)
         ORDER BY ic.createdAt DESC
-        """
-    )
+        """)
     List<IssueComment> findAllByAuthorLoginInTimeframe(
-        @Param("authorLogin") String authorLogin,
-        @Param("after") Instant after,
-        @Param("before") Instant before,
-        @Param("onlyFromPullRequests") boolean onlyFromPullRequests,
-        @Param("workspaceId") Long workspaceId
-    );
+            @Param("authorLogin") String authorLogin,
+            @Param("after") Instant after,
+            @Param("before") Instant before,
+            @Param("onlyFromPullRequests") boolean onlyFromPullRequests,
+            @Param("workspaceId") Long workspaceId);
 
     /**
      * Count distinct comment authors on an issue.
      * Used by HiveMind achievement evaluator.
      */
-    @Query(
-        """
+    @Query("""
         SELECT COUNT(DISTINCT ic.author.id)
         FROM IssueComment ic
         WHERE ic.issue.id = :issueId
-        """
-    )
+        """)
     long countDistinctAuthorIdsByIssueId(@Param("issueId") Long issueId);
 
     /**
@@ -114,47 +104,35 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
      * Uses UNION to deduplicate when the issue author also commented.
      * Used by HiveMind achievement evaluator.
      */
-    @Query(
-        value = """
+    @Query(value = """
         SELECT COUNT(*) FROM (
             SELECT DISTINCT author_id FROM issue_comment WHERE issue_id = :issueId AND author_id IS NOT NULL
             UNION
             SELECT author_id FROM issue WHERE id = :issueId AND author_id IS NOT NULL
         ) AS participants
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     long countDistinctParticipantsByIssueId(@Param("issueId") Long issueId);
 
     /**
      * Count comments on an issue NOT authored by a specific user.
      * Used by Necromancer achievement evaluator.
      */
-    @Query(
-        """
+    @Query("""
         SELECT COUNT(ic)
         FROM IssueComment ic
         WHERE ic.issue.id = :issueId
         AND ic.author.id <> :authorId
-        """
-    )
+        """)
     long countByIssueIdAndAuthorIdNot(@Param("issueId") Long issueId, @Param("authorId") Long authorId);
 
-    @Query(
-        "SELECT ic FROM IssueComment ic LEFT JOIN FETCH ic.author " +
-            "WHERE ic.issue.id = :issueId ORDER BY ic.createdAt DESC, ic.id DESC"
-    )
+    @Query("SELECT ic FROM IssueComment ic LEFT JOIN FETCH ic.author "
+            + "WHERE ic.issue.id = :issueId ORDER BY ic.createdAt DESC, ic.id DESC")
     List<IssueComment> findRecentByIssueIdWithAuthor(@Param("issueId") Long issueId, Pageable pageable);
 
-    @Query(
-        "SELECT ic FROM IssueComment ic LEFT JOIN FETCH ic.author " +
-            "WHERE ic.issue.id = :issueId AND ic.body IS NOT NULL AND TRIM(ic.body) <> '' " +
-            "AND ic.body NOT LIKE CONCAT('%', :excludedMarker, '%') " +
-            "ORDER BY ic.createdAt DESC, ic.id DESC"
-    )
+    @Query("SELECT ic FROM IssueComment ic LEFT JOIN FETCH ic.author "
+            + "WHERE ic.issue.id = :issueId AND ic.body IS NOT NULL AND TRIM(ic.body) <> '' "
+            + "AND ic.body NOT LIKE CONCAT('%', :excludedMarker, '%') "
+            + "ORDER BY ic.createdAt DESC, ic.id DESC")
     List<IssueComment> findRecentHumanByIssueIdWithAuthor(
-        @Param("issueId") Long issueId,
-        @Param("excludedMarker") String excludedMarker,
-        Pageable pageable
-    );
+            @Param("issueId") Long issueId, @Param("excludedMarker") String excludedMarker, Pageable pageable);
 }

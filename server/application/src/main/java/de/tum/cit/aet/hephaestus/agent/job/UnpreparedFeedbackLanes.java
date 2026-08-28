@@ -11,11 +11,10 @@ import org.jspecify.annotations.Nullable;
  * @param inAppPreparedAt when the in-app lane finished, or {@code null} if it never did
  */
 public record UnpreparedFeedbackLanes(
-    UUID agentJobId,
-    Long workspaceId,
-    @Nullable Instant inChatPreparedAt,
-    @Nullable Instant inAppPreparedAt
-) {
+        UUID agentJobId,
+        Long workspaceId,
+        @Nullable Instant inChatPreparedAt,
+        @Nullable Instant inAppPreparedAt) {
     public boolean inChatPending() {
         return inChatPreparedAt == null;
     }

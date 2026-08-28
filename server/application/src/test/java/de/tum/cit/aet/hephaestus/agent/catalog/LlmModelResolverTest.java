@@ -115,8 +115,8 @@ class LlmModelResolverTest extends BaseUnitTest {
         binding.setInstanceModel(model);
 
         assertThatThrownBy(() -> resolver.resolve(binding))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("not available");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("not available");
     }
 
     @Test
@@ -155,8 +155,8 @@ class LlmModelResolverTest extends BaseUnitTest {
         WorkspaceAgentBinding binding = binding(); // neither instance nor workspace model set
 
         assertThatThrownBy(() -> resolver.resolve(binding))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("bind");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("bind");
     }
 
     @Test
@@ -168,6 +168,7 @@ class LlmModelResolverTest extends BaseUnitTest {
 
     @Test
     void shouldNotResolveLegacyProxyCredential() {
-        assertThat(resolver.resolveProxyCredential(LlmModelResolver.ConnectionRef.NONE)).isNull();
+        assertThat(resolver.resolveProxyCredential(LlmModelResolver.ConnectionRef.NONE))
+                .isNull();
     }
 }

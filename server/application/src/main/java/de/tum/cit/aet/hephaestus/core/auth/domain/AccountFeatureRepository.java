@@ -26,8 +26,7 @@ public interface AccountFeatureRepository extends JpaRepository<AccountFeature, 
      * {@code userNameAttributeName=id}), so a user renaming on the provider does not silently drop the flag.
      * Only active (non-disabled) links count.
      */
-    @Query(
-        """
+    @Query("""
         SELECT CASE WHEN COUNT(f) > 0 THEN true ELSE false END
           FROM AccountFeature f, IdentityLink il
          WHERE il.account.id = f.id.accountId
@@ -35,11 +34,7 @@ public interface AccountFeatureRepository extends JpaRepository<AccountFeature, 
            AND il.providerId = :gitProviderId
            AND il.subject = :subject
            AND f.id.flag = :flag
-        """
-    )
+        """)
     boolean existsActiveFeatureForProviderSubject(
-        @Param("gitProviderId") Long gitProviderId,
-        @Param("subject") String subject,
-        @Param("flag") String flag
-    );
+            @Param("gitProviderId") Long gitProviderId, @Param("subject") String subject, @Param("flag") String flag);
 }

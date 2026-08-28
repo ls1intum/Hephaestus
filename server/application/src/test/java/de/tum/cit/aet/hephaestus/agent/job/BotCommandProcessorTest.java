@@ -63,28 +63,26 @@ class BotCommandProcessorTest extends BaseUnitTest {
     void setUp() {
         silentModeEngaged = false;
         processor = new BotCommandProcessor(
-            manualReviewRequests,
-            pullRequestRepository,
-            userRepository,
-            workspaceResolver,
-            List.of(),
-            () -> silentModeEngaged
-        );
+                manualReviewRequests,
+                pullRequestRepository,
+                userRepository,
+                workspaceResolver,
+                List.of(),
+                () -> silentModeEngaged);
     }
 
     @Nested
     class CommandMatching {
 
         @ParameterizedTest(name = "{0} triggers a review")
-        @ValueSource(strings = { "/hephaestus review", "/hephaestus review please", "/Hephaestus Review" })
+        @ValueSource(strings = {"/hephaestus review", "/hephaestus review please", "/Hephaestus Review"})
         void anAcceptedReviewCommand_asksForAReviewOfThatMergeRequest(String command) {
             PullRequest pr = createOpenPr();
             mockPrLookup(pr);
             Workspace workspace = mockWorkspace();
             User commenter = mockCommenter();
-            when(manualReviewRequests.requestPullRequestReview(any(), any(), any())).thenReturn(
-                ManualReviewOutcome.submitted(UUID.randomUUID())
-            );
+            when(manualReviewRequests.requestPullRequestReview(any(), any(), any()))
+                    .thenReturn(ManualReviewOutcome.submitted(UUID.randomUUID()));
 
             processor.onBotCommandReceived(event(command));
 
@@ -92,7 +90,7 @@ class BotCommandProcessorTest extends BaseUnitTest {
         }
 
         @ParameterizedTest(name = "{0} is ignored")
-        @ValueSource(strings = { "/hephaestus review-all", "/hephaestus reviewcode", "/hephaestus deploy" })
+        @ValueSource(strings = {"/hephaestus review-all", "/hephaestus reviewcode", "/hephaestus deploy"})
         void aCommandThatIsNotReview_isSilentlyIgnored(String command) {
             processor.onBotCommandReceived(event(command));
 
@@ -111,9 +109,8 @@ class BotCommandProcessorTest extends BaseUnitTest {
             mockPrLookup(pr);
             mockWorkspace();
             User commenter = mockCommenter();
-            when(manualReviewRequests.requestPullRequestReview(any(), any(), any())).thenReturn(
-                ManualReviewOutcome.submitted(UUID.randomUUID())
-            );
+            when(manualReviewRequests.requestPullRequestReview(any(), any(), any()))
+                    .thenReturn(ManualReviewOutcome.submitted(UUID.randomUUID()));
 
             processor.onBotCommandReceived(event("/hephaestus review"));
 
@@ -130,12 +127,10 @@ class BotCommandProcessorTest extends BaseUnitTest {
             PullRequest pr = createOpenPr();
             mockPrLookup(pr);
             mockWorkspace();
-            when(userRepository.findByNativeIdAndProviderId(AUTHOR_NATIVE_ID, PROVIDER_ID)).thenReturn(
-                Optional.empty()
-            );
-            when(manualReviewRequests.requestPullRequestReview(any(), any(), any())).thenReturn(
-                ManualReviewOutcome.forbidden()
-            );
+            when(userRepository.findByNativeIdAndProviderId(AUTHOR_NATIVE_ID, PROVIDER_ID))
+                    .thenReturn(Optional.empty());
+            when(manualReviewRequests.requestPullRequestReview(any(), any(), any()))
+                    .thenReturn(ManualReviewOutcome.forbidden());
 
             processor.onBotCommandReceived(event("/hephaestus review"));
 
@@ -159,7 +154,8 @@ class BotCommandProcessorTest extends BaseUnitTest {
 
         @Test
         void prNotFound_skipsProcessing() {
-            when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_NUMBER)).thenReturn(Optional.empty());
+            when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_NUMBER))
+                    .thenReturn(Optional.empty());
 
             processor.onBotCommandReceived(event("/hephaestus review"));
 
@@ -201,9 +197,8 @@ class BotCommandProcessorTest extends BaseUnitTest {
 
         @Test
         void exceptionDuringProcessing_doesNotPropagate() {
-            when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_NUMBER)).thenThrow(
-                new RuntimeException("DB connection failed")
-            );
+            when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_NUMBER))
+                    .thenThrow(new RuntimeException("DB connection failed"));
 
             processor.onBotCommandReceived(event("/hephaestus review"));
 
@@ -219,13 +214,12 @@ class BotCommandProcessorTest extends BaseUnitTest {
         private BotCommandProcessor processorWithSink() {
             when(sink.kind()).thenReturn(IntegrationKind.GITLAB);
             return new BotCommandProcessor(
-                manualReviewRequests,
-                pullRequestRepository,
-                userRepository,
-                workspaceResolver,
-                List.of(sink),
-                () -> silentModeEngaged
-            );
+                    manualReviewRequests,
+                    pullRequestRepository,
+                    userRepository,
+                    workspaceResolver,
+                    List.of(sink),
+                    () -> silentModeEngaged);
         }
 
         @Test
@@ -244,16 +238,15 @@ class BotCommandProcessorTest extends BaseUnitTest {
         private BotCommandReceivedEvent eventWithReactionTarget(String noteBody) {
             // commentId = 7, scopeId = 9; react() takes (scopeId, commentNativeId, name).
             return new BotCommandReceivedEvent(
-                IntegrationKind.GITLAB,
-                REPO_ID,
-                MR_NUMBER,
-                noteBody,
-                AUTHOR,
-                PROVIDER_ID,
-                AUTHOR_NATIVE_ID,
-                7L,
-                9L
-            );
+                    IntegrationKind.GITLAB,
+                    REPO_ID,
+                    MR_NUMBER,
+                    noteBody,
+                    AUTHOR,
+                    PROVIDER_ID,
+                    AUTHOR_NATIVE_ID,
+                    7L,
+                    9L);
         }
     }
 
@@ -261,16 +254,15 @@ class BotCommandProcessorTest extends BaseUnitTest {
 
     private BotCommandReceivedEvent event(String noteBody) {
         return new BotCommandReceivedEvent(
-            IntegrationKind.GITLAB,
-            REPO_ID,
-            MR_NUMBER,
-            noteBody,
-            AUTHOR,
-            PROVIDER_ID,
-            AUTHOR_NATIVE_ID,
-            null,
-            null
-        );
+                IntegrationKind.GITLAB,
+                REPO_ID,
+                MR_NUMBER,
+                noteBody,
+                AUTHOR,
+                PROVIDER_ID,
+                AUTHOR_NATIVE_ID,
+                null,
+                null);
     }
 
     private PullRequest createOpenPr() {
@@ -297,7 +289,8 @@ class BotCommandProcessorTest extends BaseUnitTest {
     }
 
     private void mockPrLookup(PullRequest pr) {
-        when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_NUMBER)).thenReturn(Optional.of(pr));
+        when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_NUMBER))
+                .thenReturn(Optional.of(pr));
         when(pullRequestRepository.findByIdWithAllForGate(pr.getId())).thenReturn(Optional.of(pr));
     }
 
@@ -312,9 +305,8 @@ class BotCommandProcessorTest extends BaseUnitTest {
         User commenter = new User();
         commenter.setId(4242L);
         commenter.setLogin(AUTHOR);
-        when(userRepository.findByNativeIdAndProviderId(AUTHOR_NATIVE_ID, PROVIDER_ID)).thenReturn(
-            Optional.of(commenter)
-        );
+        when(userRepository.findByNativeIdAndProviderId(AUTHOR_NATIVE_ID, PROVIDER_ID))
+                .thenReturn(Optional.of(commenter));
         return commenter;
     }
 }

@@ -35,11 +35,7 @@ public class BruteForceEvaluator implements AchievementEvaluator {
         Instant windowEnd = event.occurredAt(); // inclusive of current event (handled by repository query semantics)
 
         long count = activityEventRepository.countByActorIdAndEventTypeInWindow(
-            actorId,
-            ActivityEventType.COMMIT_CREATED.name(),
-            windowStart,
-            windowEnd
-        );
+                actorId, ActivityEventType.COMMIT_CREATED.name(), windowStart, windowEnd);
 
         if (count >= REQUIRED_COMMITS) {
             userAchievement.setProgressData(new BinaryAchievementProgress(true));

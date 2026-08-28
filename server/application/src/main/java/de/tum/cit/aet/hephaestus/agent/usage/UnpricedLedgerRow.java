@@ -12,14 +12,13 @@ import org.jspecify.annotations.Nullable;
  * managed entity in a repricing loop is one careless setter away from breaking that.
  */
 public record UnpricedLedgerRow(
-    UUID id,
-    Long workspaceId,
-    @Nullable String model,
-    FundingSource fundingSource,
-    long inputTokens,
-    long outputTokens,
-    long cacheReadTokens,
-    long cacheWriteTokens,
-    @Nullable Long appliedPriceId,
-    @Nullable Long appliedWorkspaceModelId
-) {}
+        UUID id,
+        Long workspaceId,
+        @Nullable String model,
+        FundingSource fundingSource,
+        long inputTokens,
+        long outputTokens,
+        long cacheReadTokens,
+        long cacheWriteTokens,
+        @Nullable Long appliedPriceId,
+        @Nullable Long appliedWorkspaceModelId) {}

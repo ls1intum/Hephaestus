@@ -12,30 +12,27 @@ import org.jspecify.annotations.Nullable;
  * an override is a real change and must show in the diff rather than look like an absent key.
  */
 record PracticeReviewSnapshot(
-    @Nullable Boolean deliverToMerged,
-    @Nullable Integer cooldownMinutes,
-    @Nullable WorkspaceReviewScope reviewScope,
-    String deliveryStatus,
-    long revision,
-    @Nullable String defaultAutonomy
-) implements ConfigAuditSnapshot {
+        @Nullable Boolean deliverToMerged,
+        @Nullable Integer cooldownMinutes,
+        @Nullable WorkspaceReviewScope reviewScope,
+        String deliveryStatus,
+        long revision,
+        @Nullable String defaultAutonomy)
+        implements ConfigAuditSnapshot {
     boolean sameRolloutPolicyAs(PracticeReviewSnapshot other) {
-        return (
-            java.util.Objects.equals(deliverToMerged, other.deliverToMerged) &&
-            java.util.Objects.equals(reviewScope, other.reviewScope) &&
-            java.util.Objects.equals(deliveryStatus, other.deliveryStatus) &&
-            java.util.Objects.equals(defaultAutonomy, other.defaultAutonomy)
-        );
+        return (java.util.Objects.equals(deliverToMerged, other.deliverToMerged)
+                && java.util.Objects.equals(reviewScope, other.reviewScope)
+                && java.util.Objects.equals(deliveryStatus, other.deliveryStatus)
+                && java.util.Objects.equals(defaultAutonomy, other.defaultAutonomy));
     }
 
     static PracticeReviewSnapshot of(PracticeReviewSettings s, WorkspaceReviewScope scope) {
         return new PracticeReviewSnapshot(
-            s.getDeliverToMerged(),
-            s.getCooldownMinutes(),
-            scope,
-            s.getDeliveryStatus().name(),
-            s.getRolloutRevision(),
-            s.getDefaultAutonomy()
-        );
+                s.getDeliverToMerged(),
+                s.getCooldownMinutes(),
+                scope,
+                s.getDeliveryStatus().name(),
+                s.getRolloutRevision(),
+                s.getDefaultAutonomy());
     }
 }

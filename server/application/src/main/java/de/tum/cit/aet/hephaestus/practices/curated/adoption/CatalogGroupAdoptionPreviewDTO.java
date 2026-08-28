@@ -5,10 +5,9 @@ import java.util.List;
 import org.jspecify.annotations.NonNull;
 
 public record CatalogGroupAdoptionPreviewDTO(
-    @NonNull String slug,
-    @NonNull CuratedGroupRequestDTO definition,
-    @NonNull CatalogGroupDisposition disposition,
-    @NonNull List<CatalogPracticePreviewDTO> practices,
-    @NonNull List<CatalogGroupPracticeActionDTO> actions,
-    @NonNull String etag
-) {}
+        @NonNull String slug,
+        @NonNull CuratedGroupRequestDTO definition,
+        @NonNull CatalogGroupDisposition disposition,
+        @NonNull List<CatalogPracticePreviewDTO> practices,
+        @NonNull List<CatalogGroupPracticeActionDTO> actions,
+        @NonNull String etag) {}

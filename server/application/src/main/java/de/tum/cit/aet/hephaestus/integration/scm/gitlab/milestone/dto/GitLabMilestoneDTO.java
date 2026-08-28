@@ -25,20 +25,19 @@ import org.jspecify.annotations.Nullable;
  * @param updatedAt          ISO-8601 or webhook timestamp
  */
 public record GitLabMilestoneDTO(
-    long nativeId,
-    int iid,
-    String title,
-    @Nullable String description,
-    @Nullable String state,
-    @Nullable String dueDate,
-    @Nullable String webPath,
-    @Nullable String projectWebUrl,
-    boolean groupMilestone,
-    @Nullable Integer closedIssuesCount,
-    @Nullable Integer totalIssuesCount,
-    @Nullable String createdAt,
-    @Nullable String updatedAt
-) {
+        long nativeId,
+        int iid,
+        String title,
+        @Nullable String description,
+        @Nullable String state,
+        @Nullable String dueDate,
+        @Nullable String webPath,
+        @Nullable String projectWebUrl,
+        boolean groupMilestone,
+        @Nullable Integer closedIssuesCount,
+        @Nullable Integer totalIssuesCount,
+        @Nullable String createdAt,
+        @Nullable String updatedAt) {
     /**
      * Creates a DTO from a GraphQL response node map.
      *
@@ -97,20 +96,19 @@ public record GitLabMilestoneDTO(
         }
 
         return new GitLabMilestoneDTO(
-            nativeId,
-            iid,
-            title,
-            (String) node.get("description"),
-            state,
-            node.get("dueDate") != null ? node.get("dueDate").toString() : null,
-            (String) node.get("webPath"),
-            null, // projectWebUrl not available from GraphQL
-            groupMilestone,
-            closedIssuesCount,
-            totalIssuesCount,
-            node.get("createdAt") != null ? node.get("createdAt").toString() : null,
-            node.get("updatedAt") != null ? node.get("updatedAt").toString() : null
-        );
+                nativeId,
+                iid,
+                title,
+                (String) node.get("description"),
+                state,
+                node.get("dueDate") != null ? node.get("dueDate").toString() : null,
+                (String) node.get("webPath"),
+                null, // projectWebUrl not available from GraphQL
+                groupMilestone,
+                closedIssuesCount,
+                totalIssuesCount,
+                node.get("createdAt") != null ? node.get("createdAt").toString() : null,
+                node.get("updatedAt") != null ? node.get("updatedAt").toString() : null);
     }
 
     /**
@@ -136,19 +134,18 @@ public record GitLabMilestoneDTO(
         String projectWebUrl = event.project() != null ? event.project().webUrl() : null;
 
         return new GitLabMilestoneDTO(
-            attrs.id(),
-            attrs.iid(),
-            attrs.title(),
-            attrs.description(),
-            attrs.state() != null ? attrs.state() : "active",
-            attrs.dueDate(),
-            null, // webPath not available from webhook
-            projectWebUrl,
-            isGroupMilestone,
-            null, // counts not available from webhook
-            null,
-            attrs.createdAt(),
-            attrs.updatedAt()
-        );
+                attrs.id(),
+                attrs.iid(),
+                attrs.title(),
+                attrs.description(),
+                attrs.state() != null ? attrs.state() : "active",
+                attrs.dueDate(),
+                null, // webPath not available from webhook
+                projectWebUrl,
+                isGroupMilestone,
+                null, // counts not available from webhook
+                null,
+                attrs.createdAt(),
+                attrs.updatedAt());
     }
 }

@@ -49,9 +49,8 @@ public class OAuthStateNonceStore {
             // SecureRandom 12-byte nonce: collision ~1 in 2^96. Fail-safe no-op rather than overwriting
             // a live nonce.
             log.warn(
-                "OAuth state nonce collision (existing row reused): nonce-prefix={}",
-                nonce.substring(0, Math.min(4, nonce.length()))
-            );
+                    "OAuth state nonce collision (existing row reused): nonce-prefix={}",
+                    nonce.substring(0, Math.min(4, nonce.length())));
             return;
         }
         repository.save(new OAuthStateNonce(nonce, workspaceId, kind.name(), issuedAt));

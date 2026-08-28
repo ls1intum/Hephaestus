@@ -21,10 +21,9 @@ public class SlackPersonErasureService {
     private final ConversationFeedbackErasure conversationFeedbackErasure;
 
     public SlackPersonErasureService(
-        SlackMessageRepository messageRepository,
-        SlackThreadRepository threadRepository,
-        ConversationFeedbackErasure conversationFeedbackErasure
-    ) {
+            SlackMessageRepository messageRepository,
+            SlackThreadRepository threadRepository,
+            ConversationFeedbackErasure conversationFeedbackErasure) {
         this.messageRepository = messageRepository;
         this.threadRepository = threadRepository;
         this.conversationFeedbackErasure = conversationFeedbackErasure;
@@ -50,21 +49,19 @@ public class SlackPersonErasureService {
             messagesBySlackId = messageRepository.deleteByWorkspaceIdAndAuthorSlackUserId(workspaceId, slackUserId);
         }
         int messagesByMemberId =
-            memberId == null ? 0 : messageRepository.deleteByWorkspaceIdAndAuthorMemberId(workspaceId, memberId);
+                memberId == null ? 0 : messageRepository.deleteByWorkspaceIdAndAuthorMemberId(workspaceId, memberId);
         int threadsPruned = memberId == null ? 0 : threadRepository.pruneParticipant(workspaceId, memberId);
-        int derived =
-            memberId == null
+        int derived = memberId == null
                 ? 0
                 : conversationFeedbackErasure.eraseConversationFeedbackAboutUser(workspaceId, memberId);
         int messages = messagesBySlackId + messagesByMemberId;
         log.info(
-            "Slack person erasure: workspace={} member={} slackUser={} → messages={} threadsPruned={} derivedRows={}",
-            workspaceId,
-            memberId,
-            slackUserId,
-            messages,
-            threadsPruned,
-            derived
-        );
+                "Slack person erasure: workspace={} member={} slackUser={} → messages={} threadsPruned={} derivedRows={}",
+                workspaceId,
+                memberId,
+                slackUserId,
+                messages,
+                threadsPruned,
+                derived);
     }
 }

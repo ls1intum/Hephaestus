@@ -63,15 +63,15 @@ class DocumentContentSourceTest extends BaseUnitTest {
     @DisplayName("declares the same kind the domain module owns, so the restated literal cannot drift")
     void declaresTheKindTheDomainOwns() {
         assertThat(source.artifactKind()).isEqualTo(DocsSignals.DOCUMENT);
-        assertThat(source.sourceKinds())
-            .extracting(kind -> kind.value())
-            .containsExactly("docs.document.core");
+        assertThat(source.sourceKinds()).extracting(kind -> kind.value()).containsExactly("docs.document.core");
     }
 
     @Test
     void buildsOnlyForADocumentReview() {
-        assertThat(source.supports(new ContextRequest.DocumentReviewRequest(job()))).isTrue();
-        assertThat(source.supports(new ContextRequest.PracticeReviewRequest(job()))).isFalse();
+        assertThat(source.supports(new ContextRequest.DocumentReviewRequest(job())))
+                .isTrue();
+        assertThat(source.supports(new ContextRequest.PracticeReviewRequest(job())))
+                .isFalse();
     }
 
     @Test
@@ -136,10 +136,8 @@ class DocumentContentSourceTest extends BaseUnitTest {
         // document as one that said nothing.
         assertThat(captured.completeness()).isEmpty();
         assertThat(captured.files()).isEmpty();
-        assertThat(captured.stateOverrides()).containsEntry(
-            SOURCE_KIND,
-            new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND)
-        );
+        assertThat(captured.stateOverrides())
+                .containsEntry(SOURCE_KIND, new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND));
     }
 
     @Test
@@ -149,18 +147,14 @@ class DocumentContentSourceTest extends BaseUnitTest {
 
         var captured = source.capture(new ContextRequest.DocumentReviewRequest(job()), Set.of(SOURCE_KIND));
 
-        assertThat(captured.stateOverrides()).containsEntry(
-            SOURCE_KIND,
-            new SourceCaptureState.Unavailable(SourceAbsenceReason.CONTENT_EVICTED)
-        );
+        assertThat(captured.stateOverrides())
+                .containsEntry(SOURCE_KIND, new SourceCaptureState.Unavailable(SourceAbsenceReason.CONTENT_EVICTED));
     }
 
     @Test
     void capturesNothingWhenItsSourceWasNotSelected() {
         var captured = source.capture(
-            new ContextRequest.DocumentReviewRequest(job()),
-            Set.of(new SourceKind("scm.pull-request.diff"))
-        );
+                new ContextRequest.DocumentReviewRequest(job()), Set.of(new SourceKind("scm.pull-request.diff")));
 
         assertThat(captured.files()).isEmpty();
         assertThat(captured.stateOverrides()).isEmpty();
@@ -172,9 +166,9 @@ class DocumentContentSourceTest extends BaseUnitTest {
         AgentJob job = job();
         job.setMetadata(objectMapper.createObjectNode());
 
-        assertThatThrownBy(() ->
-            source.contribute(new ContextRequest.DocumentReviewRequest(job), new LinkedHashMap<>())
-        ).isInstanceOf(JobPreparationException.class);
+        assertThatThrownBy(
+                        () -> source.contribute(new ContextRequest.DocumentReviewRequest(job), new LinkedHashMap<>()))
+                .isInstanceOf(JobPreparationException.class);
     }
 
     private AgentJob job() {
@@ -190,22 +184,21 @@ class DocumentContentSourceTest extends BaseUnitTest {
 
     private static ProjectedDocument document(@Nullable String body) {
         return new ProjectedDocument(
-            "engineering",
-            "architecture-decision",
-            "Architecture decision",
-            body,
-            false,
-            Instant.parse("2026-08-01T00:00:00Z"),
-            Instant.parse("2026-08-05T00:00:00Z"),
-            "Ada Lovelace",
-            "outline|ada",
-            null,
-            "Ada Lovelace",
-            "outline|ada",
-            null,
-            List.of(),
-            false,
-            "Engineering"
-        );
+                "engineering",
+                "architecture-decision",
+                "Architecture decision",
+                body,
+                false,
+                Instant.parse("2026-08-01T00:00:00Z"),
+                Instant.parse("2026-08-05T00:00:00Z"),
+                "Ada Lovelace",
+                "outline|ada",
+                null,
+                "Ada Lovelace",
+                "outline|ada",
+                null,
+                List.of(),
+                false,
+                "Engineering");
     }
 }

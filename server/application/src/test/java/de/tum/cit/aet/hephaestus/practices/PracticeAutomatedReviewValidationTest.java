@@ -19,15 +19,13 @@ class PracticeAutomatedReviewValidationTest extends BaseUnitTest {
         PracticeDefinition declared = definition(requirements());
         PracticeDefinition limited = definition(limitedRequirements());
 
-        PracticeAutomatedReviewValidation validation = PracticeAutomatedReviewValidation.authorDeclared(
-            "focused-review",
-            declared
-        );
+        PracticeAutomatedReviewValidation validation =
+                PracticeAutomatedReviewValidation.authorDeclared("focused-review", declared);
 
         assertThat(validation.status()).isEqualTo(PracticeAutomatedReviewValidationStatus.AUTHOR_DECLARED);
-        assertThat(validation.policyDigest()).isNotEqualTo(
-            PracticeAutomatedReviewValidation.authorDeclared("focused-review", limited).policyDigest()
-        );
+        assertThat(validation.policyDigest())
+                .isNotEqualTo(PracticeAutomatedReviewValidation.authorDeclared("focused-review", limited)
+                        .policyDigest());
         assertThat(validation.reviewRuleFingerprint()).isEqualTo(declared.provenanceFingerprint("focused-review"));
     }
 
@@ -35,19 +33,17 @@ class PracticeAutomatedReviewValidationTest extends BaseUnitTest {
     void shouldIgnoreDeveloperCopyWhenFingerprintingReviewRules() {
         PracticeDefinition original = definition(requirements());
         PracticeDefinition revised = new PracticeDefinition(
-            original.name(),
-            original.bindings(),
-            original.criteria(),
-            original.precomputeScript(),
-            original.automatedReviewPolicy(),
-            "Reviews reduce integration risk.",
-            original.whatGoodLooksLike(),
-            original.groupSlug()
-        );
+                original.name(),
+                original.bindings(),
+                original.criteria(),
+                original.precomputeScript(),
+                original.automatedReviewPolicy(),
+                "Reviews reduce integration risk.",
+                original.whatGoodLooksLike(),
+                original.groupSlug());
 
-        assertThat(revised.provenanceFingerprint("focused-review")).isEqualTo(
-            original.provenanceFingerprint("focused-review")
-        );
+        assertThat(revised.provenanceFingerprint("focused-review"))
+                .isEqualTo(original.provenanceFingerprint("focused-review"));
     }
 
     private static PracticeAutomatedReviewPolicy requirements() {
@@ -56,33 +52,29 @@ class PracticeAutomatedReviewValidationTest extends BaseUnitTest {
 
     private static PracticeAutomatedReviewPolicy limitedRequirements() {
         return requirements(
-            List.of(new PracticeEvidenceLimitation("RUNTIME_NOT_OBSERVED", "Runtime is out of scope."))
-        );
+                List.of(new PracticeEvidenceLimitation("RUNTIME_NOT_OBSERVED", "Runtime is out of scope.")));
     }
 
     private static PracticeAutomatedReviewPolicy requirements(List<PracticeEvidenceLimitation> knownLimitations) {
         return new PracticeAutomatedReviewPolicy(
-            new SourceContractVersion("1.0.0"),
-            new PracticeAutomatedReview(
-                PracticeAutomatedReviewMode.LANGUAGE_MODEL,
-                PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
-            ),
-            PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
-            knownLimitations,
-            null
-        );
+                new SourceContractVersion("1.0.0"),
+                new PracticeAutomatedReview(
+                        PracticeAutomatedReviewMode.LANGUAGE_MODEL,
+                        PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET),
+                PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
+                knownLimitations,
+                null);
     }
 
     private static PracticeDefinition definition(PracticeAutomatedReviewPolicy requirements) {
         return new PracticeDefinition(
-            "Focused review",
-            PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
-            "Assess whether the change stays focused.",
-            null,
-            requirements,
-            null,
-            null,
-            null
-        );
+                "Focused review",
+                PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
+                "Assess whether the change stays focused.",
+                null,
+                requirements,
+                null,
+                null,
+                null);
     }
 }

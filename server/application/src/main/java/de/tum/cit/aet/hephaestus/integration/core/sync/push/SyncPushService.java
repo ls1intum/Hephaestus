@@ -58,11 +58,10 @@ public class SyncPushService {
     private volatile @Nullable Dispatcher dispatcher;
 
     public SyncPushService(
-        SyncEventHub hub,
-        ObjectMapper objectMapper,
-        @Qualifier("natsConnection") ObjectProvider<Connection> natsConnectionProvider,
-        MeterRegistry meterRegistry
-    ) {
+            SyncEventHub hub,
+            ObjectMapper objectMapper,
+            @Qualifier("natsConnection") ObjectProvider<Connection> natsConnectionProvider,
+            MeterRegistry meterRegistry) {
         this.hub = hub;
         this.objectMapper = objectMapper;
         this.natsConnectionProvider = natsConnectionProvider;
@@ -101,18 +100,16 @@ public class SyncPushService {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onConnectionActivated(ConnectionLifecycleEvent.Activated event) {
         deliver(
-            event.workspaceId(),
-            new SyncEventHint(SyncStateChangedEvent.Scope.CONNECTION.wireValue(), event.connectionId())
-        );
+                event.workspaceId(),
+                new SyncEventHint(SyncStateChangedEvent.Scope.CONNECTION.wireValue(), event.connectionId()));
     }
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onConnectionDeactivated(ConnectionLifecycleEvent.Deactivated event) {
         deliver(
-            event.workspaceId(),
-            new SyncEventHint(SyncStateChangedEvent.Scope.CONNECTION.wireValue(), event.connectionId())
-        );
+                event.workspaceId(),
+                new SyncEventHint(SyncStateChangedEvent.Scope.CONNECTION.wireValue(), event.connectionId()));
     }
 
     private void deliver(long workspaceId, SyncEventHint hint) {
@@ -159,10 +156,10 @@ public class SyncPushService {
 
     private static Counter counter(MeterRegistry meterRegistry, String transport, String outcome) {
         return Counter.builder("integration.sync.push.messages")
-            .description("Sync invalidation messages by transport boundary and outcome")
-            .tag("transport", transport)
-            .tag("outcome", outcome)
-            .register(meterRegistry);
+                .description("Sync invalidation messages by transport boundary and outcome")
+                .tag("transport", transport)
+                .tag("outcome", outcome)
+                .register(meterRegistry);
     }
 
     private static long parseWorkspaceId(String subject) {

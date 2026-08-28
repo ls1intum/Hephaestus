@@ -40,9 +40,8 @@ public class DocumentIdentityResolver implements ArtifactIdentityResolver {
         for (var label : documents.findLabels(workspaceId, artifactIds)) {
             String title = label.getTitle() == null || label.getTitle().isBlank() ? "Document" : label.getTitle();
             resolved.put(
-                label.getId(),
-                new ArtifactIdentity(kind(), label.getId(), null, title, label.getCollectionSlug(), null)
-            );
+                    label.getId(),
+                    new ArtifactIdentity(kind(), label.getId(), null, title, label.getCollectionSlug(), null));
         }
         return Map.copyOf(resolved);
     }

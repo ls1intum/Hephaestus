@@ -33,8 +33,6 @@ public class SlackParticipantConsentGate {
     @Transactional(readOnly = true)
     public boolean ingestionAllowed(long workspaceId, String slackUserId) {
         return !participantConsentRepository.existsByWorkspaceIdAndSlackUserIdAndIngestionOptedOutTrue(
-            workspaceId,
-            slackUserId
-        );
+                workspaceId, slackUserId);
     }
 }

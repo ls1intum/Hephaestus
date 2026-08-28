@@ -85,85 +85,72 @@ class ArtifactTraceQueryService {
             throw new EntityNotFoundException("Traced artifact", artifactKind.value() + "/" + artifactId);
         }
         Map<SignalName, String> labels = signalLabels(artifactKind);
-        List<TracedSignalDTO> tracedSignals = recorded
-            .stream()
-            .map(signal -> TracedSignalDTO.from(signal, labels.get(SignalName.of(signal.getSignalName()))))
-            .toList();
+        List<TracedSignalDTO> tracedSignals = recorded.stream()
+                .map(signal -> TracedSignalDTO.from(signal, labels.get(SignalName.of(signal.getSignalName()))))
+                .toList();
 
-        Set<UUID> reviewIds = recorded
-            .stream()
-            .map(ArtifactSignal::getJobId)
-            .filter(Objects::nonNull)
-            .collect(Collectors.toCollection(LinkedHashSet::new));
+        Set<UUID> reviewIds = recorded.stream()
+                .map(ArtifactSignal::getJobId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
         Map<UUID, ReviewOutcome> outcomes = reviews.findByIds(workspaceId, reviewIds);
 
         List<PracticeTraceEntryDTO> entries = PracticeTraceDeriver.derive(
-            tracedPractices(workspaceId, artifactKind),
-            recorded
-                .stream()
-                .map(signal ->
-                    new SignalOccurrence(
-                        signal.getId(),
-                        SignalName.of(signal.getSignalName()),
-                        signal.getOccurredAt(),
-                        signal.getState(),
-                        signal.getStateReason(),
-                        signal.getJobId()
-                    )
-                )
-                .toList(),
-            outcomes,
-            outputs(workspaceId, artifactKind, artifactId)
-        );
+                tracedPractices(workspaceId, artifactKind),
+                recorded.stream()
+                        .map(signal -> new SignalOccurrence(
+                                signal.getId(),
+                                SignalName.of(signal.getSignalName()),
+                                signal.getOccurredAt(),
+                                signal.getState(),
+                                signal.getStateReason(),
+                                signal.getJobId()))
+                        .toList(),
+                outcomes,
+                outputs(workspaceId, artifactKind, artifactId));
 
-        ArtifactIdentity identity = Objects.requireNonNull(
-            identities.resolve(workspaceId, artifactKind, List.of(artifactId)).get(artifactId)
-        );
+        ArtifactIdentity identity = Objects.requireNonNull(identities
+                .resolve(workspaceId, artifactKind, List.of(artifactId))
+                .get(artifactId));
         return new ArtifactTraceDTO(
-            artifactKind,
-            artifactId,
-            identity.title(),
-            identity.number(),
-            identity.container(),
-            identity.url(),
-            tracedSignals,
-            entries
-        );
+                artifactKind,
+                artifactId,
+                identity.title(),
+                identity.number(),
+                identity.container(),
+                identity.url(),
+                tracedSignals,
+                entries);
     }
 
     @Transactional(readOnly = true)
     public Page<TracedArtifactDTO> list(Long workspaceId, @Nullable ArtifactKind artifactKind, Pageable pageable) {
         Page<SignalledArtifactRow> page = signals.findSignalledArtifacts(
-            workspaceId,
-            artifactKind == null ? null : artifactKind.value(),
-            pageable
-        );
+                workspaceId, artifactKind == null ? null : artifactKind.value(), pageable);
         // One resolve call per kind on the page, not per row: a mixed page is at most as many round
         // trips as there are kinds, and a single-kind page is one.
         Map<ArtifactKind, List<Long>> idsByKind = new HashMap<>();
         for (SignalledArtifactRow row : page) {
             idsByKind
-                .computeIfAbsent(ArtifactKind.of(row.getArtifactKind()), kind -> new ArrayList<>())
-                .add(row.getArtifactId());
+                    .computeIfAbsent(ArtifactKind.of(row.getArtifactKind()), kind -> new ArrayList<>())
+                    .add(row.getArtifactId());
         }
         Map<ArtifactKind, Map<Long, ArtifactIdentity>> resolved = new HashMap<>();
         idsByKind.forEach((kind, ids) -> resolved.put(kind, identities.resolve(workspaceId, kind, ids)));
         return page.map(row -> {
             ArtifactKind kind = ArtifactKind.of(row.getArtifactKind());
             ArtifactIdentity identity = Objects.requireNonNull(
-                Objects.requireNonNull(resolved.get(kind)).get(row.getArtifactId())
-            );
+                    Objects.requireNonNull(resolved.get(kind)).get(row.getArtifactId()));
             return new TracedArtifactDTO(
-                kind,
-                row.getArtifactId(),
-                identity.title(),
-                identity.number(),
-                identity.container(),
-                identity.url(),
-                row.getLastSignalAt(),
-                Math.toIntExact(row.getSignalCount()),
-                Math.toIntExact(row.getReviewedSignalCount())
-            );
+                    kind,
+                    row.getArtifactId(),
+                    identity.title(),
+                    identity.number(),
+                    identity.container(),
+                    identity.url(),
+                    row.getLastSignalAt(),
+                    Math.toIntExact(row.getSignalCount()),
+                    Math.toIntExact(row.getReviewedSignalCount()));
         });
     }
 
@@ -177,22 +164,18 @@ class ArtifactTraceQueryService {
         Map<Long, String> dormancy = dormancyContradictedByTheLedger(workspaceId, artifactKind);
         // The autonomy the trace shows is the EFFECTIVE one. A reader asking why a practice said nothing is
         // asking what is in force here, not which of the three levels happens to hold the row.
-        PracticeAutonomy workspaceDefault = workspaceDefaults.forWorkspace(workspaceId).defaultAutonomy();
-        return practices
-            .findByWorkspaceId(workspaceId)
-            .stream()
-            .filter(practice -> artifactKind.equals(practice.getArtifactKind()))
-            .map(practice ->
-                new TracedPractice(
-                    practice.getId(),
-                    practice.getSlug(),
-                    practice.getName(),
-                    AutonomyResolver.effectiveAutonomyOf(practice, workspaceDefault),
-                    watches(practice),
-                    dormancy.get(practice.getId())
-                )
-            )
-            .toList();
+        PracticeAutonomy workspaceDefault =
+                workspaceDefaults.forWorkspace(workspaceId).defaultAutonomy();
+        return practices.findByWorkspaceId(workspaceId).stream()
+                .filter(practice -> artifactKind.equals(practice.getArtifactKind()))
+                .map(practice -> new TracedPractice(
+                        practice.getId(),
+                        practice.getSlug(),
+                        practice.getName(),
+                        AutonomyResolver.effectiveAutonomyOf(practice, workspaceDefault),
+                        watches(practice),
+                        dormancy.get(practice.getId())))
+                .toList();
     }
 
     /**
@@ -210,15 +193,12 @@ class ArtifactTraceQueryService {
         if (dormant.isEmpty()) {
             return Map.of();
         }
-        Set<SignalName> everRecorded = signals
-            .findRecordedSignalNames(workspaceId, artifactKind.value())
-            .stream()
-            .map(SignalName::of)
-            .collect(Collectors.toUnmodifiableSet());
-        return dormant
-            .stream()
-            .filter(binding -> binding.signals().stream().noneMatch(everRecorded::contains))
-            .collect(Collectors.toMap(DormantBinding::practiceId, DormantBinding::reason, (a, b) -> a));
+        Set<SignalName> everRecorded = signals.findRecordedSignalNames(workspaceId, artifactKind.value()).stream()
+                .map(SignalName::of)
+                .collect(Collectors.toUnmodifiableSet());
+        return dormant.stream()
+                .filter(binding -> binding.signals().stream().noneMatch(everRecorded::contains))
+                .collect(Collectors.toMap(DormantBinding::practiceId, DormantBinding::reason, (a, b) -> a));
     }
 
     private static List<SignalName> watches(Practice practice) {
@@ -245,9 +225,8 @@ class ArtifactTraceQueryService {
             if (row.getDeliveryState() == FeedbackDeliveryState.DELIVERED) {
                 delivered.merge(row.getPracticeId(), Math.toIntExact(row.getUnits()), Integer::sum);
             } else if (row.getSuppressionReason() != null) {
-                withheld
-                    .computeIfAbsent(row.getPracticeId(), practiceId -> new LinkedHashSet<>())
-                    .add(row.getSuppressionReason());
+                withheld.computeIfAbsent(row.getPracticeId(), practiceId -> new LinkedHashSet<>())
+                        .add(row.getSuppressionReason());
             }
         }
         Set<Long> practiceIds = new LinkedHashSet<>(counts.keySet());
@@ -256,25 +235,19 @@ class ArtifactTraceQueryService {
         Map<Long, PracticeOutput> outputs = new HashMap<>();
         for (Long practiceId : practiceIds) {
             outputs.put(
-                practiceId,
-                new PracticeOutput(
-                    counts.getOrDefault(practiceId, 0),
-                    delivered.getOrDefault(practiceId, 0),
-                    List.copyOf(withheld.getOrDefault(practiceId, List.of())),
-                    latestReview.get(practiceId),
-                    latestObserved.get(practiceId)
-                )
-            );
+                    practiceId,
+                    new PracticeOutput(
+                            counts.getOrDefault(practiceId, 0),
+                            delivered.getOrDefault(practiceId, 0),
+                            List.copyOf(withheld.getOrDefault(practiceId, List.of())),
+                            latestReview.get(practiceId),
+                            latestObserved.get(practiceId)));
         }
         return outputs;
     }
 
     private Map<SignalName, String> signalLabels(ArtifactKind artifactKind) {
-        return artifacts
-            .descriptorFor(artifactKind)
-            .map(ArtifactDescriptor::signals)
-            .orElseGet(List::of)
-            .stream()
-            .collect(Collectors.toMap(Signal::name, Signal::displayName, (a, b) -> a));
+        return artifacts.descriptorFor(artifactKind).map(ArtifactDescriptor::signals).orElseGet(List::of).stream()
+                .collect(Collectors.toMap(Signal::name, Signal::displayName, (a, b) -> a));
     }
 }

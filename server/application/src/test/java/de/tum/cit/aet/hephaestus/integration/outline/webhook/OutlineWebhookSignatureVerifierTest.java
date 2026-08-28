@@ -76,9 +76,8 @@ class OutlineWebhookSignatureVerifierTest extends BaseUnitTest {
         long ts = NOW.toEpochMilli();
         String header = "t=" + ts + ",s=" + sign(ts, body, SECRET);
 
-        assertThat(verifier(Optional.of(SECRET)).verify(request(header, body))).isInstanceOf(
-            VerificationResult.Verified.class
-        );
+        assertThat(verifier(Optional.of(SECRET)).verify(request(header, body)))
+                .isInstanceOf(VerificationResult.Verified.class);
     }
 
     @Test
@@ -88,9 +87,8 @@ class OutlineWebhookSignatureVerifierTest extends BaseUnitTest {
         long ts = NOW.toEpochMilli();
         String header = "t=" + ts + ",s=" + sign(ts, signedBody, SECRET);
 
-        assertThat(verifier(Optional.of(SECRET)).verify(request(header, tamperedBody))).isInstanceOf(
-            VerificationResult.Invalid.class
-        );
+        assertThat(verifier(Optional.of(SECRET)).verify(request(header, tamperedBody)))
+                .isInstanceOf(VerificationResult.Invalid.class);
     }
 
     @Test
@@ -107,9 +105,8 @@ class OutlineWebhookSignatureVerifierTest extends BaseUnitTest {
     @Test
     void verify_missingHeaderIsMissingSignature() {
         byte[] body = "{}".getBytes(StandardCharsets.UTF_8);
-        assertThat(verifier(Optional.of(SECRET)).verify(request(null, body))).isInstanceOf(
-            VerificationResult.MissingSignature.class
-        );
+        assertThat(verifier(Optional.of(SECRET)).verify(request(null, body)))
+                .isInstanceOf(VerificationResult.MissingSignature.class);
     }
 
     @Test
@@ -118,9 +115,8 @@ class OutlineWebhookSignatureVerifierTest extends BaseUnitTest {
         long ts = NOW.toEpochMilli();
         String header = "t=" + ts + ",s=" + sign(ts, body, SECRET);
 
-        assertThat(verifier(Optional.empty()).verify(request(header, body))).isInstanceOf(
-            VerificationResult.Invalid.class
-        );
+        assertThat(verifier(Optional.empty()).verify(request(header, body)))
+                .isInstanceOf(VerificationResult.Invalid.class);
     }
 
     @Test

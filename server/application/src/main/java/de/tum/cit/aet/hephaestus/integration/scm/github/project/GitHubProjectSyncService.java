@@ -193,17 +193,15 @@ public class GitHubProjectSyncService {
         String safeOrgLogin = Objects.requireNonNullElse(sanitizeForLog(organizationLogin), "null");
 
         // Resolve organization outside transaction to avoid holding locks
-        Optional<Organization> organizationResult = Objects.requireNonNull(
-            transactionTemplate.execute(status -> {
-                Organization org = organizationRepository
+        Optional<Organization> organizationResult = Objects.requireNonNull(transactionTemplate.execute(status -> {
+            Organization org = organizationRepository
                     .findByLoginIgnoreCaseAndProvider_Type(organizationLogin, IdentityProviderType.GITHUB)
                     .orElse(null);
-                if (org != null) {
-                    org.getProvider().getId();
-                }
-                return Optional.ofNullable(org);
-            })
-        );
+            if (org != null) {
+                org.getProvider().getId();
+            }
+            return Optional.ofNullable(org);
+        }));
         Organization organization = organizationResult.orElse(null);
 
         if (organization == null) {
@@ -231,10 +229,9 @@ public class GitHubProjectSyncService {
             pageCount++;
             if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
-                    "Reached maximum pagination limit for projects: orgLogin={}, limit={}",
-                    safeOrgLogin,
-                    MAX_PAGINATION_PAGES
-                );
+                        "Reached maximum pagination limit for projects: orgLogin={}, limit={}",
+                        safeOrgLogin,
+                        MAX_PAGINATION_PAGES);
                 break;
             }
 
@@ -243,41 +240,33 @@ public class GitHubProjectSyncService {
                 final String currentCursor = cursor;
                 final int currentPage = pageCount;
 
-                ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
-                    client
-                        .documentName(GET_ORGANIZATION_PROJECTS_DOCUMENT)
-                        .variable("login", organizationLogin)
-                        .variable(
-                            "first",
-                            adaptPageSize(LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
-                        )
-                        .variable("after", currentCursor)
-                        .execute()
-                )
-                    .retryWhen(
-                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                            .jitter(JITTER_FACTOR)
-                            .filter(ScmTransportErrors::isTransportError)
-                            .doBeforeRetry(signal ->
-                                log.warn(
-                                    "Retrying project sync after transport error: orgLogin={}, page={}, attempt={}, error={}",
-                                    safeOrgLogin,
-                                    currentPage,
-                                    signal.totalRetries() + 1,
-                                    signal.failure().getMessage()
-                                )
-                            )
-                    )
-                    .block(timeout);
+                ClientGraphQlResponse graphQlResponse = Mono.defer(() -> client.documentName(
+                                        GET_ORGANIZATION_PROJECTS_DOCUMENT)
+                                .variable("login", organizationLogin)
+                                .variable(
+                                        "first",
+                                        adaptPageSize(
+                                                LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId)))
+                                .variable("after", currentCursor)
+                                .execute())
+                        .retryWhen(Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                                .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                                .jitter(JITTER_FACTOR)
+                                .filter(ScmTransportErrors::isTransportError)
+                                .doBeforeRetry(signal -> log.warn(
+                                        "Retrying project sync after transport error: orgLogin={}, page={}, attempt={}, error={}",
+                                        safeOrgLogin,
+                                        currentPage,
+                                        signal.totalRetries() + 1,
+                                        signal.failure().getMessage())))
+                        .block(timeout);
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
                     ClassificationResult classification = exceptionClassifier.classifyGraphQlResponse(graphQlResponse);
                     if (classification != null && classification.category() == Category.NOT_FOUND) {
                         log.info(
-                            "Organization not found via GraphQL (may have been renamed/deleted): orgLogin={}",
-                            safeOrgLogin
-                        );
+                                "Organization not found via GraphQL (may have been renamed/deleted): orgLogin={}",
+                                safeOrgLogin);
                         abortReason = SyncResult.Status.ABORTED_ERROR;
                         break;
                     }
@@ -287,10 +276,9 @@ public class GitHubProjectSyncService {
                         break;
                     }
                     log.warn(
-                        "Received invalid GraphQL response: orgLogin={}, errors={}",
-                        safeOrgLogin,
-                        graphQlResponse != null ? graphQlResponse.getErrors() : "null"
-                    );
+                            "Received invalid GraphQL response: orgLogin={}, errors={}",
+                            safeOrgLogin,
+                            graphQlResponse != null ? graphQlResponse.getErrors() : "null");
                     abortReason = SyncResult.Status.ABORTED_ERROR;
                     break;
                 }
@@ -306,11 +294,12 @@ public class GitHubProjectSyncService {
                     }
                 }
 
-                GHProjectV2Connection response = graphQlResponse
-                    .field("organization.projectsV2")
-                    .toEntity(GHProjectV2Connection.class);
+                GHProjectV2Connection response =
+                        graphQlResponse.field("organization.projectsV2").toEntity(GHProjectV2Connection.class);
 
-                if (response == null || response.getNodes() == null || response.getNodes().isEmpty()) {
+                if (response == null
+                        || response.getNodes() == null
+                        || response.getNodes().isEmpty()) {
                     break;
                 }
 
@@ -324,9 +313,8 @@ public class GitHubProjectSyncService {
                 // Respect filter: only sync projects in allowed-projects list (empty = all)
                 final Long orgId = organizationId;
                 final String orgLogin = organizationLogin;
-                final Instant cooldownThreshold = Instant.now().minusSeconds(
-                    syncSchedulerProperties.cooldownMinutes() * 60L
-                );
+                final Instant cooldownThreshold =
+                        Instant.now().minusSeconds(syncSchedulerProperties.cooldownMinutes() * 60L);
                 final var filters = syncSchedulerProperties.filters();
                 PageResult pageResult = transactionTemplate.execute(status -> {
                     ProcessingContext context = ProcessingContext.forSync(scopeId, provider);
@@ -349,16 +337,15 @@ public class GitHubProjectSyncService {
                         // Check if project exists and was recently synced
                         Long databaseId = dto.getDatabaseId();
                         if (databaseId != null) {
-                            Project existing = projectRepository.findById(databaseId).orElse(null);
+                            Project existing =
+                                    projectRepository.findById(databaseId).orElse(null);
                             if (existing != null) {
                                 // Track for stale removal regardless of cooldown
                                 syncedProjectIds.add(existing.getId());
 
                                 // Skip if within cooldown
-                                if (
-                                    existing.getLastSyncAt() != null &&
-                                    existing.getLastSyncAt().isAfter(cooldownThreshold)
-                                ) {
+                                if (existing.getLastSyncAt() != null
+                                        && existing.getLastSyncAt().isAfter(cooldownThreshold)) {
                                     projectsSkipped++;
                                     continue;
                                 }
@@ -378,12 +365,11 @@ public class GitHubProjectSyncService {
 
                     if (projectsSkipped > 0 || projectsFiltered > 0) {
                         log.debug(
-                            "Project sync page: orgId={}, processed={}, skippedCooldown={}, filteredOut={}",
-                            orgId,
-                            projectsProcessed,
-                            projectsSkipped,
-                            projectsFiltered
-                        );
+                                "Project sync page: orgId={}, processed={}, skippedCooldown={}, filteredOut={}",
+                                orgId,
+                                projectsProcessed,
+                                projectsSkipped,
+                                projectsFiltered);
                     }
 
                     return new PageResult(projectsProcessed, projectsSkipped);
@@ -423,11 +409,10 @@ public class GitHubProjectSyncService {
                         if (retryAttempt < MAX_RETRY_ATTEMPTS) {
                             retryAttempt++;
                             log.warn(
-                                "Retrying project sync after transient error: orgLogin={}, attempt={}, error={}",
-                                safeOrgLogin,
-                                retryAttempt,
-                                classification.message()
-                            );
+                                    "Retrying project sync after transient error: orgLogin={}, attempt={}, error={}",
+                                    safeOrgLogin,
+                                    retryAttempt,
+                                    classification.message());
                             try {
                                 ExponentialBackoff.sleep(retryAttempt);
                             } catch (InterruptedException ie) {
@@ -439,11 +424,10 @@ public class GitHubProjectSyncService {
                             continue;
                         }
                         log.error(
-                            "Failed to sync projects after {} retries: orgLogin={}, error={}",
-                            MAX_RETRY_ATTEMPTS,
-                            safeOrgLogin,
-                            classification.message()
-                        );
+                                "Failed to sync projects after {} retries: orgLogin={}, error={}",
+                                MAX_RETRY_ATTEMPTS,
+                                safeOrgLogin,
+                                classification.message());
                         abortReason = SyncResult.Status.ABORTED_ERROR;
                         break;
                     }
@@ -451,15 +435,13 @@ public class GitHubProjectSyncService {
                         if (retryAttempt < MAX_RETRY_ATTEMPTS && classification.suggestedWait() != null) {
                             retryAttempt++;
                             long waitMs = Math.min(
-                                classification.suggestedWait().toMillis(),
-                                300_000 // Cap at 5 minutes
-                            );
+                                    classification.suggestedWait().toMillis(), 300_000 // Cap at 5 minutes
+                                    );
                             log.warn(
-                                "Rate limited during project sync, waiting: orgLogin={}, waitMs={}, attempt={}",
-                                safeOrgLogin,
-                                waitMs,
-                                retryAttempt
-                            );
+                                    "Rate limited during project sync, waiting: orgLogin={}, waitMs={}, attempt={}",
+                                    safeOrgLogin,
+                                    waitMs,
+                                    retryAttempt);
                             try {
                                 Thread.sleep(waitMs);
                             } catch (InterruptedException ie) {
@@ -471,47 +453,42 @@ public class GitHubProjectSyncService {
                             continue;
                         }
                         log.error(
-                            "Aborting project sync due to rate limiting: orgLogin={}, error={}",
-                            safeOrgLogin,
-                            classification.message()
-                        );
+                                "Aborting project sync due to rate limiting: orgLogin={}, error={}",
+                                safeOrgLogin,
+                                classification.message());
                         abortReason = SyncResult.Status.ABORTED_RATE_LIMIT;
                         break;
                     }
                     case NOT_FOUND -> {
                         log.warn(
-                            "Resource not found during project sync, skipping: orgLogin={}, error={}",
-                            safeOrgLogin,
-                            classification.message()
-                        );
+                                "Resource not found during project sync, skipping: orgLogin={}, error={}",
+                                safeOrgLogin,
+                                classification.message());
                         abortReason = SyncResult.Status.ABORTED_ERROR;
                         break;
                     }
                     case AUTH_ERROR -> {
                         log.error(
-                            "Authentication error during project sync: orgLogin={}, error={}",
-                            safeOrgLogin,
-                            classification.message()
-                        );
+                                "Authentication error during project sync: orgLogin={}, error={}",
+                                safeOrgLogin,
+                                classification.message());
                         throw e;
                     }
                     case CLIENT_ERROR -> {
                         log.error(
-                            "Aborting project sync due to client error: orgLogin={}, error={}",
-                            safeOrgLogin,
-                            classification.message()
-                        );
+                                "Aborting project sync due to client error: orgLogin={}, error={}",
+                                safeOrgLogin,
+                                classification.message());
                         abortReason = SyncResult.Status.ABORTED_ERROR;
                         break;
                     }
                     default -> {
                         log.error(
-                            "Aborting project sync due to error: orgLogin={}, category={}, error={}",
-                            safeOrgLogin,
-                            category,
-                            classification.message(),
-                            e
-                        );
+                                "Aborting project sync due to error: orgLogin={}, category={}, error={}",
+                                safeOrgLogin,
+                                category,
+                                classification.message(),
+                                e);
                         abortReason = SyncResult.Status.ABORTED_ERROR;
                         break;
                     }
@@ -523,12 +500,11 @@ public class GitHubProjectSyncService {
         // Raw nodes received vs projectsV2.totalCount (totalSynced is post-process).
         if (reportedTotalCount >= 0) {
             GraphQlConnectionOverflowDetector.checkPaginated(
-                "projects",
-                projectsReceived,
-                reportedTotalCount,
-                hasMore || abortReason != null,
-                "orgLogin=" + safeOrgLogin
-            );
+                    "projects",
+                    projectsReceived,
+                    reportedTotalCount,
+                    hasMore || abortReason != null,
+                    "orgLogin=" + safeOrgLogin);
         }
 
         // Only remove stale projects if sync completed without abort
@@ -537,22 +513,20 @@ public class GitHubProjectSyncService {
             removeDeletedProjects(organizationId, syncedProjectIds, scopeId, provider);
         } else if (!syncCompletedNormally && abortReason != null) {
             log.warn(
-                "Skipped stale project removal: reason=incompleteSync, orgLogin={}, pagesProcessed={}",
-                safeOrgLogin,
-                pageCount
-            );
+                    "Skipped stale project removal: reason=incompleteSync, orgLogin={}, pagesProcessed={}",
+                    safeOrgLogin,
+                    pageCount);
         }
 
         SyncResult.Status finalStatus = abortReason != null ? abortReason : SyncResult.Status.COMPLETED;
 
         log.info(
-            "Completed project list sync: orgLogin={}, synced={}, skippedCooldown={}, status={}, scopeId={}",
-            safeOrgLogin,
-            totalSynced,
-            totalSkipped,
-            finalStatus,
-            scopeId
-        );
+                "Completed project list sync: orgLogin={}, synced={}, skippedCooldown={}, status={}, scopeId={}",
+                safeOrgLogin,
+                totalSynced,
+                totalSkipped,
+                finalStatus,
+                scopeId);
 
         return new SyncResult(finalStatus, totalSynced);
     }
@@ -601,7 +575,8 @@ public class GitHubProjectSyncService {
         Long projectId = project.getId();
 
         IdentityProvider provider = transactionTemplate.execute(status -> {
-            IdentityProvider result = projectRepository.findById(projectId).orElseThrow().getProvider();
+            IdentityProvider result =
+                    projectRepository.findById(projectId).orElseThrow().getProvider();
             Hibernate.initialize(result);
             return result;
         });
@@ -615,15 +590,14 @@ public class GitHubProjectSyncService {
         Instant cooldownThreshold = Instant.now().minusSeconds(syncSchedulerProperties.cooldownMinutes() * 60L);
 
         // Phase 1: Sync fields (with cooldown — field definitions rarely change)
-        boolean fieldsCooldownActive =
-            project.getFieldsSyncedAt() != null && project.getFieldsSyncedAt().isAfter(cooldownThreshold);
+        boolean fieldsCooldownActive = project.getFieldsSyncedAt() != null
+                && project.getFieldsSyncedAt().isAfter(cooldownThreshold);
         PhaseResult fieldsResult;
         if (fieldsCooldownActive) {
             log.debug(
-                "Skipped project fields sync: reason=cooldownActive, projectId={}, lastSyncedAt={}",
-                projectId,
-                project.getFieldsSyncedAt()
-            );
+                    "Skipped project fields sync: reason=cooldownActive, projectId={}, lastSyncedAt={}",
+                    projectId,
+                    project.getFieldsSyncedAt());
             fieldsResult = PhaseResult.SUCCESS;
         } else {
             fieldsResult = syncProjectFields(client, project, scopeId);
@@ -632,10 +606,9 @@ public class GitHubProjectSyncService {
         // If the project was deleted from GitHub, clean it up and return immediately
         if (fieldsResult == PhaseResult.PROJECT_NOT_FOUND) {
             log.warn(
-                "Deleting phantom project: projectId={}, nodeId={} — project no longer exists on GitHub",
-                projectId,
-                projectNodeId
-            );
+                    "Deleting phantom project: projectId={}, nodeId={} — project no longer exists on GitHub",
+                    projectId,
+                    projectNodeId);
             transactionTemplate.executeWithoutResult(status -> {
                 ProcessingContext context = ProcessingContext.forSync(scopeId, provider);
                 projectProcessor.delete(projectId, context);
@@ -645,22 +618,22 @@ public class GitHubProjectSyncService {
         boolean fieldsSynced = fieldsResult == PhaseResult.SUCCESS;
 
         // Phase 2: Sync status updates (with cooldown — status updates change infrequently)
-        boolean statusUpdatesCooldownActive =
-            project.getStatusUpdatesSyncedAt() != null && project.getStatusUpdatesSyncedAt().isAfter(cooldownThreshold);
+        boolean statusUpdatesCooldownActive = project.getStatusUpdatesSyncedAt() != null
+                && project.getStatusUpdatesSyncedAt().isAfter(cooldownThreshold);
         boolean statusUpdatesSynced;
         if (statusUpdatesCooldownActive) {
             log.debug(
-                "Skipped project status updates sync: reason=cooldownActive, projectId={}, lastSyncedAt={}",
-                projectId,
-                project.getStatusUpdatesSyncedAt()
-            );
+                    "Skipped project status updates sync: reason=cooldownActive, projectId={}, lastSyncedAt={}",
+                    projectId,
+                    project.getStatusUpdatesSyncedAt());
             statusUpdatesSynced = true;
         } else {
             statusUpdatesSynced = syncProjectStatusUpdates(client, project, scopeId, provider);
         }
 
         // Resume from cursor if present (via SPI for consistency)
-        String cursor = backfillStateProvider.getProjectItemSyncCursor(projectId).orElse(null);
+        String cursor =
+                backfillStateProvider.getProjectItemSyncCursor(projectId).orElse(null);
         boolean resuming = cursor != null;
 
         // Determine incremental sync threshold (client-side filtering)
@@ -674,7 +647,8 @@ public class GitHubProjectSyncService {
             // 1. Incremental sync is enabled in config
             // 2. We're not resuming from a cursor (resuming means we're mid-sync, need full processing)
             // 3. We have a previous sync timestamp
-            Instant lastSyncedAt = backfillStateProvider.getProjectItemsSyncedAt(projectId).orElse(null);
+            Instant lastSyncedAt =
+                    backfillStateProvider.getProjectItemsSyncedAt(projectId).orElse(null);
             if (lastSyncedAt != null) {
                 // Apply safety buffer to handle clock skew
                 incrementalSyncThreshold = lastSyncedAt.minus(syncProperties.incrementalSyncBuffer());
@@ -684,19 +658,18 @@ public class GitHubProjectSyncService {
                 // The "updated:>YYYY-MM-DD" filter uses day-level granularity, so we subtract
                 // an additional 2 days from lastSyncedAt as a safety buffer beyond the client-side buffer
                 LocalDate filterDate = lastSyncedAt
-                    .minus(syncProperties.incrementalSyncBuffer())
-                    .atZone(ZoneOffset.UTC)
-                    .toLocalDate()
-                    .minusDays(2);
+                        .minus(syncProperties.incrementalSyncBuffer())
+                        .atZone(ZoneOffset.UTC)
+                        .toLocalDate()
+                        .minusDays(2);
                 serverFilterQuery = "updated:>" + filterDate;
 
                 log.info(
-                    "Starting incremental project item sync: projectId={}, threshold={}, buffer={}, filterQuery={}",
-                    projectId,
-                    incrementalSyncThreshold,
-                    syncProperties.incrementalSyncBuffer(),
-                    serverFilterQuery
-                );
+                        "Starting incremental project item sync: projectId={}, threshold={}, buffer={}, filterQuery={}",
+                        projectId,
+                        incrementalSyncThreshold,
+                        syncProperties.incrementalSyncBuffer(),
+                        serverFilterQuery);
             } else {
                 log.info("Starting full project item sync (first sync): projectId={}", projectId);
             }
@@ -704,11 +677,15 @@ public class GitHubProjectSyncService {
 
         if (resuming) {
             log.info(
-                "Resuming project item sync from checkpoint: projectId={}, cursor={}",
-                projectId,
-                Objects.requireNonNull(cursor).substring(0, Math.min(20, Objects.requireNonNull(cursor).length())) +
-                    "..."
-            );
+                    "Resuming project item sync from checkpoint: projectId={}, cursor={}",
+                    projectId,
+                    Objects.requireNonNull(cursor)
+                                    .substring(
+                                            0,
+                                            Math.min(
+                                                    20,
+                                                    Objects.requireNonNull(cursor)
+                                                            .length())) + "...");
         }
 
         List<String> syncedItemNodeIds = new ArrayList<>();
@@ -733,10 +710,9 @@ public class GitHubProjectSyncService {
             pageCount++;
             if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
-                    "Reached maximum pagination limit for project items: projectId={}, limit={}",
-                    projectId,
-                    MAX_PAGINATION_PAGES
-                );
+                        "Reached maximum pagination limit for project items: projectId={}, limit={}",
+                        projectId,
+                        MAX_PAGINATION_PAGES);
                 abortReason = SyncResult.Status.ABORTED_ERROR;
                 break;
             }
@@ -748,34 +724,27 @@ public class GitHubProjectSyncService {
                 // Uses PROJECT_ITEM_PAGE_SIZE (50) instead of LARGE_PAGE_SIZE (100)
                 // due to nested field values that multiply API cost.
                 // See GitHubSyncConstants for detailed cost calculation.
-                ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
-                    client
-                        .documentName(GET_PROJECT_ITEMS_DOCUMENT)
-                        .variable("nodeId", projectNodeId)
-                        .variable(
-                            "first",
-                            adaptPageSize(PROJECT_ITEM_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
-                        )
-                        .variable("after", currentCursor)
-                        .variable("filterQuery", filterQuery)
-                        .execute()
-                )
-                    .retryWhen(
-                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                            .jitter(JITTER_FACTOR)
-                            .filter(ScmTransportErrors::isTransportError)
-                            .doBeforeRetry(signal ->
-                                log.warn(
-                                    "Retrying project item sync after transport error: projectId={}, page={}, attempt={}, error={}",
-                                    projectId,
-                                    currentPage,
-                                    signal.totalRetries() + 1,
-                                    signal.failure().getMessage()
-                                )
-                            )
-                    )
-                    .block(timeout);
+                ClientGraphQlResponse graphQlResponse = Mono.defer(() -> client.documentName(GET_PROJECT_ITEMS_DOCUMENT)
+                                .variable("nodeId", projectNodeId)
+                                .variable(
+                                        "first",
+                                        adaptPageSize(
+                                                PROJECT_ITEM_PAGE_SIZE,
+                                                graphQlClientProvider.getRateLimitRemaining(scopeId)))
+                                .variable("after", currentCursor)
+                                .variable("filterQuery", filterQuery)
+                                .execute())
+                        .retryWhen(Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                                .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                                .jitter(JITTER_FACTOR)
+                                .filter(ScmTransportErrors::isTransportError)
+                                .doBeforeRetry(signal -> log.warn(
+                                        "Retrying project item sync after transport error: projectId={}, page={}, attempt={}, error={}",
+                                        projectId,
+                                        currentPage,
+                                        signal.totalRetries() + 1,
+                                        signal.failure().getMessage())))
+                        .block(timeout);
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
                     ClassificationResult classification = exceptionClassifier.classifyGraphQlResponse(graphQlResponse);
@@ -790,10 +759,9 @@ public class GitHubProjectSyncService {
                         break;
                     }
                     log.warn(
-                        "Received invalid GraphQL response for project items: projectId={}, errors={}",
-                        projectId,
-                        graphQlResponse != null ? graphQlResponse.getErrors() : "null"
-                    );
+                            "Received invalid GraphQL response for project items: projectId={}, errors={}",
+                            projectId,
+                            graphQlResponse != null ? graphQlResponse.getErrors() : "null");
                     abortReason = SyncResult.Status.ABORTED_ERROR;
                     break;
                 }
@@ -807,24 +775,20 @@ public class GitHubProjectSyncService {
                     }
                 }
 
-                GHProjectV2ItemConnection itemsConnection = graphQlResponse
-                    .field("node.items")
-                    .toEntity(GHProjectV2ItemConnection.class);
+                GHProjectV2ItemConnection itemsConnection =
+                        graphQlResponse.field("node.items").toEntity(GHProjectV2ItemConnection.class);
 
-                if (
-                    itemsConnection == null ||
-                    itemsConnection.getNodes() == null ||
-                    itemsConnection.getNodes().isEmpty()
-                ) {
+                if (itemsConnection == null
+                        || itemsConnection.getNodes() == null
+                        || itemsConnection.getNodes().isEmpty()) {
                     // Safety net: detect deleted project in items phase too.
                     // Normally caught by syncProjectFields, but handles edge cases
                     // (e.g., project deleted between phases).
                     if (pageCount == 1 && graphQlResponse.field("node").getValue() == null) {
                         log.warn(
-                            "Deleting phantom project detected in items phase: projectId={}, nodeId={}",
-                            projectId,
-                            projectNodeId
-                        );
+                                "Deleting phantom project detected in items phase: projectId={}, nodeId={}",
+                                projectId,
+                                projectNodeId);
                         transactionTemplate.executeWithoutResult(status -> {
                             ProcessingContext ctx = ProcessingContext.forSync(scopeId, provider);
                             projectProcessor.delete(projectId, ctx);
@@ -884,32 +848,27 @@ public class GitHubProjectSyncService {
 
                             // Process inline field values for this item
                             boolean fieldValuesTruncated =
-                                itemDto.fieldValuesTruncated() && itemDto.fieldValuesEndCursor() != null;
+                                    itemDto.fieldValuesTruncated() && itemDto.fieldValuesEndCursor() != null;
                             List<String> initialFieldIds = processFieldValues(
-                                processedItem.getId(),
-                                itemDto.fieldValues(),
-                                fieldValuesTruncated
-                            );
+                                    processedItem.getId(), itemDto.fieldValues(), fieldValuesTruncated);
 
                             // Track items needing follow-up pagination for field values
                             // This follows the IssueWithCommentCursor pattern from GitHubIssueSyncService
                             if (fieldValuesTruncated) {
-                                itemsNeedingFieldValuePagination.add(
-                                    new ItemWithFieldValueCursor(
+                                itemsNeedingFieldValuePagination.add(new ItemWithFieldValueCursor(
                                         processedItem.getId(),
                                         itemDto.nodeId(),
                                         Objects.requireNonNull(itemDto.fieldValuesEndCursor()),
-                                        initialFieldIds
-                                    )
-                                );
+                                        initialFieldIds));
                                 log.debug(
-                                    "Item queued for field value pagination: itemNodeId={}, projectId={}, type={}, fetched={}, total={}",
-                                    itemDto.nodeId(),
-                                    projId,
-                                    contentType,
-                                    itemDto.fieldValues() != null ? itemDto.fieldValues().size() : 0,
-                                    itemDto.fieldValuesTotalCount()
-                                );
+                                        "Item queued for field value pagination: itemNodeId={}, projectId={}, type={}, fetched={}, total={}",
+                                        itemDto.nodeId(),
+                                        projId,
+                                        contentType,
+                                        itemDto.fieldValues() != null
+                                                ? itemDto.fieldValues().size()
+                                                : 0,
+                                        itemDto.fieldValuesTotalCount());
                             }
                         }
                     }
@@ -955,11 +914,10 @@ public class GitHubProjectSyncService {
                         if (retryAttempt < MAX_RETRY_ATTEMPTS) {
                             retryAttempt++;
                             log.warn(
-                                "Retrying project item sync after transient error: projectId={}, attempt={}, error={}",
-                                projectId,
-                                retryAttempt,
-                                classification.message()
-                            );
+                                    "Retrying project item sync after transient error: projectId={}, attempt={}, error={}",
+                                    projectId,
+                                    retryAttempt,
+                                    classification.message());
                             try {
                                 ExponentialBackoff.sleep(retryAttempt);
                             } catch (InterruptedException ie) {
@@ -970,23 +928,22 @@ public class GitHubProjectSyncService {
                             continue;
                         }
                         log.error(
-                            "Failed to sync project items after {} retries: projectId={}, error={}",
-                            MAX_RETRY_ATTEMPTS,
-                            projectId,
-                            classification.message()
-                        );
+                                "Failed to sync project items after {} retries: projectId={}, error={}",
+                                MAX_RETRY_ATTEMPTS,
+                                projectId,
+                                classification.message());
                         abortReason = SyncResult.Status.ABORTED_ERROR;
                         break;
                     }
                     case RATE_LIMITED -> {
                         if (retryAttempt < MAX_RETRY_ATTEMPTS && classification.suggestedWait() != null) {
                             retryAttempt++;
-                            long waitMs = Math.min(classification.suggestedWait().toMillis(), 300_000);
+                            long waitMs =
+                                    Math.min(classification.suggestedWait().toMillis(), 300_000);
                             log.warn(
-                                "Rate limited during project item sync, waiting: projectId={}, waitMs={}",
-                                projectId,
-                                waitMs
-                            );
+                                    "Rate limited during project item sync, waiting: projectId={}, waitMs={}",
+                                    projectId,
+                                    waitMs);
                             try {
                                 Thread.sleep(waitMs);
                             } catch (InterruptedException ie) {
@@ -1002,31 +959,28 @@ public class GitHubProjectSyncService {
                     }
                     case NOT_FOUND -> {
                         log.warn(
-                            "Resource not found during project item sync, skipping: projectId={}, error={}",
-                            projectId,
-                            classification.message()
-                        );
+                                "Resource not found during project item sync, skipping: projectId={}, error={}",
+                                projectId,
+                                classification.message());
                         abortReason = SyncResult.Status.ABORTED_ERROR;
                         break;
                     }
                     case AUTH_ERROR -> throw e;
                     case CLIENT_ERROR -> {
                         log.error(
-                            "Aborting project item sync due to client error: projectId={}, error={}",
-                            projectId,
-                            classification.message()
-                        );
+                                "Aborting project item sync due to client error: projectId={}, error={}",
+                                projectId,
+                                classification.message());
                         abortReason = SyncResult.Status.ABORTED_ERROR;
                         break;
                     }
                     default -> {
                         log.error(
-                            "Aborting project item sync due to error: projectId={}, category={}, error={}",
-                            projectId,
-                            category,
-                            classification.message(),
-                            e
-                        );
+                                "Aborting project item sync due to error: projectId={}, category={}, error={}",
+                                projectId,
+                                category,
+                                classification.message(),
+                                e);
                         abortReason = SyncResult.Status.ABORTED_ERROR;
                         break;
                     }
@@ -1038,12 +992,11 @@ public class GitHubProjectSyncService {
         // Raw nodes received vs items.totalCount (totalSynced is post-process).
         if (reportedTotalCount >= 0) {
             GraphQlConnectionOverflowDetector.checkPaginated(
-                "projectItems",
-                itemsReceived,
-                reportedTotalCount,
-                hasMore || abortReason != null,
-                "projectId=" + projectId
-            );
+                    "projectItems",
+                    itemsReceived,
+                    reportedTotalCount,
+                    hasMore || abortReason != null,
+                    "projectId=" + projectId);
         }
 
         // Process remaining field values for Draft Issues that had truncated inline data
@@ -1051,10 +1004,9 @@ public class GitHubProjectSyncService {
         // and GitHubPullRequestSyncService (review threads)
         if (!itemsNeedingFieldValuePagination.isEmpty()) {
             log.info(
-                "Processing remaining field values for {} Draft Issues: projectId={}",
-                itemsNeedingFieldValuePagination.size(),
-                projectId
-            );
+                    "Processing remaining field values for {} Draft Issues: projectId={}",
+                    itemsNeedingFieldValuePagination.size(),
+                    projectId);
             for (ItemWithFieldValueCursor itemWithCursor : itemsNeedingFieldValuePagination) {
                 // Abort if we hit rate limit during follow-up pagination
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
@@ -1090,19 +1042,17 @@ public class GitHubProjectSyncService {
                 }
             } else {
                 log.debug(
-                    "Skipped stale item removal: reason={}, projectId={}, trackedDraftNodeIds={}, trackedIssuePrNodeIds={}",
-                    resuming ? "resumedSync" : "serverSideFiltered",
-                    projectId,
-                    syncedItemNodeIds.size(),
-                    syncedIssuePrNodeIds.size()
-                );
+                        "Skipped stale item removal: reason={}, projectId={}, trackedDraftNodeIds={}, trackedIssuePrNodeIds={}",
+                        resuming ? "resumedSync" : "serverSideFiltered",
+                        projectId,
+                        syncedItemNodeIds.size(),
+                        syncedIssuePrNodeIds.size());
             }
         } else {
             log.warn(
-                "Skipped stale Draft Issue removal: reason=incompleteSync, projectId={}, pagesProcessed={}",
-                projectId,
-                pageCount
-            );
+                    "Skipped stale Draft Issue removal: reason=incompleteSync, projectId={}, pagesProcessed={}",
+                    projectId,
+                    pageCount);
         }
 
         // Determine final status based on item sync success and phase results
@@ -1121,21 +1071,20 @@ public class GitHubProjectSyncService {
         }
 
         log.info(
-            "Completed Draft Issue sync: projectId={}, draftIssuesProcessed={}, skipped={}, fieldValuePaginations={}, " +
-                "resumed={}, incremental={}, serverFiltered={}, filterQuery={}, status={}, phases=[fields={}, statusUpdates={}, draftIssues={}]",
-            projectId,
-            totalSynced,
-            totalSkipped,
-            itemsNeedingFieldValuePagination.size(),
-            resuming,
-            incrementalSync,
-            serverSideFiltered,
-            filterQuery,
-            finalStatus,
-            fieldsSynced,
-            statusUpdatesSynced,
-            itemsSynced
-        );
+                "Completed Draft Issue sync: projectId={}, draftIssuesProcessed={}, skipped={}, fieldValuePaginations={}, "
+                        + "resumed={}, incremental={}, serverFiltered={}, filterQuery={}, status={}, phases=[fields={}, statusUpdates={}, draftIssues={}]",
+                projectId,
+                totalSynced,
+                totalSkipped,
+                itemsNeedingFieldValuePagination.size(),
+                resuming,
+                incrementalSync,
+                serverSideFiltered,
+                filterQuery,
+                finalStatus,
+                fieldsSynced,
+                statusUpdatesSynced,
+                itemsSynced);
 
         // The per-phase booleans drive finalStatus (and the log line above); the SyncResult itself
         // only carries the resolved status + count.
@@ -1176,10 +1125,9 @@ public class GitHubProjectSyncService {
                 pageCount++;
                 if (pageCount >= MAX_PAGINATION_PAGES) {
                     log.warn(
-                        "Reached maximum pagination limit for project fields: projectId={}, limit={}",
-                        projectId,
-                        MAX_PAGINATION_PAGES
-                    );
+                            "Reached maximum pagination limit for project fields: projectId={}, limit={}",
+                            projectId,
+                            MAX_PAGINATION_PAGES);
                     break;
                 }
 
@@ -1188,37 +1136,29 @@ public class GitHubProjectSyncService {
                 // Use Mono.defer() for transport error retry
                 // Uses PROJECT_FIELD_PAGE_SIZE (50) - fields have minimal nesting,
                 // but 50 is sufficient for most projects and reduces response size.
-                ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
-                    client
-                        .documentName(GET_PROJECT_WITH_FIELDS_DOCUMENT)
-                        .variable("nodeId", projectNodeId)
-                        .variable("fieldsFirst", PROJECT_FIELD_PAGE_SIZE)
-                        .variable("fieldsAfter", currentCursor)
-                        .execute()
-                )
-                    .retryWhen(
-                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                            .jitter(JITTER_FACTOR)
-                            .filter(ScmTransportErrors::isTransportError)
-                            .doBeforeRetry(signal ->
-                                log.warn(
-                                    "Retrying project fields sync after transport error: projectId={}, attempt={}, error={}",
-                                    projectId,
-                                    signal.totalRetries() + 1,
-                                    signal.failure().getMessage()
-                                )
-                            )
-                    )
-                    .block(syncProperties.graphqlTimeout());
+                ClientGraphQlResponse graphQlResponse = Mono.defer(
+                                () -> client.documentName(GET_PROJECT_WITH_FIELDS_DOCUMENT)
+                                        .variable("nodeId", projectNodeId)
+                                        .variable("fieldsFirst", PROJECT_FIELD_PAGE_SIZE)
+                                        .variable("fieldsAfter", currentCursor)
+                                        .execute())
+                        .retryWhen(Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                                .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                                .jitter(JITTER_FACTOR)
+                                .filter(ScmTransportErrors::isTransportError)
+                                .doBeforeRetry(signal -> log.warn(
+                                        "Retrying project fields sync after transport error: projectId={}, attempt={}, error={}",
+                                        projectId,
+                                        signal.totalRetries() + 1,
+                                        signal.failure().getMessage())))
+                        .block(syncProperties.graphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
                     ClassificationResult classification = exceptionClassifier.classifyGraphQlResponse(graphQlResponse);
                     if (classification != null && classification.category() == Category.NOT_FOUND) {
                         log.info(
-                            "Project not found via GraphQL for fields sync (may have been deleted): projectId={}",
-                            projectId
-                        );
+                                "Project not found via GraphQL for fields sync (may have been deleted): projectId={}",
+                                projectId);
                         return PhaseResult.FAILED;
                     }
                     if (classification != null && classification.category() == Category.RATE_LIMITED) {
@@ -1226,10 +1166,9 @@ public class GitHubProjectSyncService {
                         return PhaseResult.FAILED;
                     }
                     log.warn(
-                        "Received invalid GraphQL response for project fields: projectId={}, errors={}",
-                        projectId,
-                        graphQlResponse != null ? graphQlResponse.getErrors() : "null"
-                    );
+                            "Received invalid GraphQL response for project fields: projectId={}, errors={}",
+                            projectId,
+                            graphQlResponse != null ? graphQlResponse.getErrors() : "null");
                     return PhaseResult.FAILED;
                 }
 
@@ -1241,23 +1180,19 @@ public class GitHubProjectSyncService {
                     }
                 }
 
-                GHProjectV2FieldConfigurationConnection fieldsConnection = graphQlResponse
-                    .field("node.fields")
-                    .toEntity(GHProjectV2FieldConfigurationConnection.class);
+                GHProjectV2FieldConfigurationConnection fieldsConnection =
+                        graphQlResponse.field("node.fields").toEntity(GHProjectV2FieldConfigurationConnection.class);
 
-                if (
-                    fieldsConnection == null ||
-                    fieldsConnection.getNodes() == null ||
-                    fieldsConnection.getNodes().isEmpty()
-                ) {
+                if (fieldsConnection == null
+                        || fieldsConnection.getNodes() == null
+                        || fieldsConnection.getNodes().isEmpty()) {
                     // On the first page, distinguish "empty project" from "deleted project":
                     // If `node` itself is null, the project was deleted from GitHub.
                     if (pageCount == 1 && graphQlResponse.field("node").getValue() == null) {
                         log.warn(
-                            "Project not found on GitHub (node is null), marking for deletion: projectId={}, nodeId={}",
-                            projectId,
-                            projectNodeId
-                        );
+                                "Project not found on GitHub (node is null), marking for deletion: projectId={}, nodeId={}",
+                                projectId,
+                                projectNodeId);
                         return PhaseResult.PROJECT_NOT_FOUND;
                     }
                     completedNormally = true;
@@ -1271,7 +1206,8 @@ public class GitHubProjectSyncService {
 
                 // Process this page of fields in a transaction
                 transactionTemplate.executeWithoutResult(status -> {
-                    Project managedProject = projectRepository.findById(projectId).orElse(null);
+                    Project managedProject =
+                            projectRepository.findById(projectId).orElse(null);
                     if (managedProject == null) {
                         return;
                     }
@@ -1311,12 +1247,11 @@ public class GitHubProjectSyncService {
             // Raw nodes received vs fields.totalCount (allSyncedFieldIds is post-filter).
             if (reportedTotalCount >= 0) {
                 GraphQlConnectionOverflowDetector.checkPaginated(
-                    "projectFields",
-                    fieldsReceived,
-                    reportedTotalCount,
-                    !completedNormally,
-                    "projectId=" + project.getId()
-                );
+                        "projectFields",
+                        fieldsReceived,
+                        reportedTotalCount,
+                        !completedNormally,
+                        "projectId=" + project.getId());
             }
 
             // On successful completion, handle cleanup and update timestamp
@@ -1336,11 +1271,10 @@ public class GitHubProjectSyncService {
             }
 
             log.debug(
-                "Synced project fields: projectId={}, fieldCount={}, success={}",
-                projectId,
-                allSyncedFieldIds.size(),
-                completedNormally
-            );
+                    "Synced project fields: projectId={}, fieldCount={}, success={}",
+                    projectId,
+                    allSyncedFieldIds.size(),
+                    completedNormally);
             return completedNormally ? PhaseResult.SUCCESS : PhaseResult.FAILED;
         } catch (Exception e) {
             log.warn("Failed to sync project fields: projectId={}, error={}", projectId, e.getMessage(), e);
@@ -1354,9 +1288,8 @@ public class GitHubProjectSyncService {
      * Clears the cursor and sets the fieldsSyncedAt timestamp.
      */
     private void updateFieldsSyncCompleted(Long projectId, Instant syncedAt) {
-        TransactionTemplate requiresNewTemplate = new TransactionTemplate(
-            Objects.requireNonNull(transactionTemplate.getTransactionManager())
-        );
+        TransactionTemplate requiresNewTemplate =
+                new TransactionTemplate(Objects.requireNonNull(transactionTemplate.getTransactionManager()));
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
             projectRepository.updateFieldsSyncedAt(projectId, syncedAt);
@@ -1377,11 +1310,7 @@ public class GitHubProjectSyncService {
      * @return true if status update sync completed successfully, false if aborted or failed
      */
     private boolean syncProjectStatusUpdates(
-        HttpGraphQlClient client,
-        Project project,
-        Long scopeId,
-        IdentityProvider provider
-    ) {
+            HttpGraphQlClient client, Project project, Long scopeId, IdentityProvider provider) {
         String projectNodeId = project.getNodeId();
         if (projectNodeId == null) {
             return true; // Nothing to sync, consider it success
@@ -1402,10 +1331,9 @@ public class GitHubProjectSyncService {
                 pageCount++;
                 if (pageCount >= MAX_PAGINATION_PAGES) {
                     log.warn(
-                        "Reached maximum pagination limit for status updates: projectId={}, limit={}",
-                        projectId,
-                        MAX_PAGINATION_PAGES
-                    );
+                            "Reached maximum pagination limit for status updates: projectId={}, limit={}",
+                            projectId,
+                            MAX_PAGINATION_PAGES);
                     break;
                 }
 
@@ -1413,40 +1341,33 @@ public class GitHubProjectSyncService {
 
                 // Uses STATUS_UPDATE_PAGE_SIZE (100) - status updates have minimal nesting
                 // (only creator field), so full page size is cost-efficient.
-                ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
-                    client
-                        .documentName(GET_PROJECT_STATUS_UPDATES_DOCUMENT)
-                        .variable("nodeId", projectNodeId)
-                        .variable(
-                            "first",
-                            adaptPageSize(STATUS_UPDATE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
-                        )
-                        .variable("after", currentCursor)
-                        .execute()
-                )
-                    .retryWhen(
-                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                            .jitter(JITTER_FACTOR)
-                            .filter(ScmTransportErrors::isTransportError)
-                            .doBeforeRetry(signal ->
-                                log.warn(
-                                    "Retrying status updates sync after transport error: projectId={}, attempt={}, error={}",
-                                    projectId,
-                                    signal.totalRetries() + 1,
-                                    signal.failure().getMessage()
-                                )
-                            )
-                    )
-                    .block(syncProperties.graphqlTimeout());
+                ClientGraphQlResponse graphQlResponse = Mono.defer(
+                                () -> client.documentName(GET_PROJECT_STATUS_UPDATES_DOCUMENT)
+                                        .variable("nodeId", projectNodeId)
+                                        .variable(
+                                                "first",
+                                                adaptPageSize(
+                                                        STATUS_UPDATE_PAGE_SIZE,
+                                                        graphQlClientProvider.getRateLimitRemaining(scopeId)))
+                                        .variable("after", currentCursor)
+                                        .execute())
+                        .retryWhen(Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                                .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                                .jitter(JITTER_FACTOR)
+                                .filter(ScmTransportErrors::isTransportError)
+                                .doBeforeRetry(signal -> log.warn(
+                                        "Retrying status updates sync after transport error: projectId={}, attempt={}, error={}",
+                                        projectId,
+                                        signal.totalRetries() + 1,
+                                        signal.failure().getMessage())))
+                        .block(syncProperties.graphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
                     ClassificationResult classification = exceptionClassifier.classifyGraphQlResponse(graphQlResponse);
                     if (classification != null && classification.category() == Category.NOT_FOUND) {
                         log.info(
-                            "Project not found via GraphQL for status updates (may have been deleted): projectId={}",
-                            projectId
-                        );
+                                "Project not found via GraphQL for status updates (may have been deleted): projectId={}",
+                                projectId);
                         return false;
                     }
                     if (classification != null && classification.category() == Category.RATE_LIMITED) {
@@ -1454,10 +1375,9 @@ public class GitHubProjectSyncService {
                         return false;
                     }
                     log.warn(
-                        "Received invalid GraphQL response for status updates: projectId={}, errors={}",
-                        projectId,
-                        graphQlResponse != null ? graphQlResponse.getErrors() : "null"
-                    );
+                            "Received invalid GraphQL response for status updates: projectId={}, errors={}",
+                            projectId,
+                            graphQlResponse != null ? graphQlResponse.getErrors() : "null");
                     return false;
                 }
 
@@ -1469,15 +1389,12 @@ public class GitHubProjectSyncService {
                     }
                 }
 
-                GHProjectV2StatusUpdateConnection statusUpdatesConnection = graphQlResponse
-                    .field("node.statusUpdates")
-                    .toEntity(GHProjectV2StatusUpdateConnection.class);
+                GHProjectV2StatusUpdateConnection statusUpdatesConnection =
+                        graphQlResponse.field("node.statusUpdates").toEntity(GHProjectV2StatusUpdateConnection.class);
 
-                if (
-                    statusUpdatesConnection == null ||
-                    statusUpdatesConnection.getNodes() == null ||
-                    statusUpdatesConnection.getNodes().isEmpty()
-                ) {
+                if (statusUpdatesConnection == null
+                        || statusUpdatesConnection.getNodes() == null
+                        || statusUpdatesConnection.getNodes().isEmpty()) {
                     completedNormally = true;
                     break;
                 }
@@ -1489,7 +1406,8 @@ public class GitHubProjectSyncService {
 
                 // Process this page of status updates in a transaction
                 transactionTemplate.executeWithoutResult(status -> {
-                    Project managedProject = projectRepository.findById(projectId).orElse(null);
+                    Project managedProject =
+                            projectRepository.findById(projectId).orElse(null);
                     if (managedProject == null) {
                         return;
                     }
@@ -1497,9 +1415,8 @@ public class GitHubProjectSyncService {
                     ProcessingContext context = ProcessingContext.forSync(scopeId, provider);
 
                     for (GHProjectV2StatusUpdate graphQlStatusUpdate : statusUpdatesConnection.getNodes()) {
-                        GitHubProjectStatusUpdateDTO dto = GitHubProjectStatusUpdateDTO.fromStatusUpdate(
-                            graphQlStatusUpdate
-                        );
+                        GitHubProjectStatusUpdateDTO dto =
+                                GitHubProjectStatusUpdateDTO.fromStatusUpdate(graphQlStatusUpdate);
                         if (dto == null || dto.nodeId() == null) {
                             continue;
                         }
@@ -1532,12 +1449,11 @@ public class GitHubProjectSyncService {
             // Raw nodes received vs statusUpdates.totalCount (syncedStatusUpdateNodeIds is post-filter).
             if (reportedTotalCount >= 0) {
                 GraphQlConnectionOverflowDetector.checkPaginated(
-                    "statusUpdates",
-                    statusUpdatesReceived,
-                    reportedTotalCount,
-                    !completedNormally,
-                    "projectId=" + project.getId()
-                );
+                        "statusUpdates",
+                        statusUpdatesReceived,
+                        reportedTotalCount,
+                        !completedNormally,
+                        "projectId=" + project.getId());
             }
 
             // On successful completion, handle cleanup and update timestamp
@@ -1547,10 +1463,7 @@ public class GitHubProjectSyncService {
                     transactionTemplate.executeWithoutResult(status -> {
                         ProcessingContext context = ProcessingContext.forSync(scopeId, provider);
                         int removed = statusUpdateProcessor.removeStaleStatusUpdates(
-                            projectId,
-                            syncedStatusUpdateNodeIds,
-                            context
-                        );
+                                projectId, syncedStatusUpdateNodeIds, context);
                         if (removed > 0) {
                             log.debug("Removed stale status updates: projectId={}, count={}", projectId, removed);
                         }
@@ -1562,11 +1475,10 @@ public class GitHubProjectSyncService {
             }
 
             log.debug(
-                "Synced project status updates: projectId={}, count={}, success={}",
-                projectId,
-                syncedStatusUpdateNodeIds.size(),
-                completedNormally
-            );
+                    "Synced project status updates: projectId={}, count={}, success={}",
+                    projectId,
+                    syncedStatusUpdateNodeIds.size(),
+                    completedNormally);
             return completedNormally;
         } catch (Exception e) {
             log.warn("Failed to sync project status updates: projectId={}, error={}", projectId, e.getMessage(), e);
@@ -1580,9 +1492,8 @@ public class GitHubProjectSyncService {
      * Clears the cursor and sets the statusUpdatesSyncedAt timestamp.
      */
     private void updateStatusUpdatesSyncCompleted(Long projectId, Instant syncedAt) {
-        TransactionTemplate requiresNewTemplate = new TransactionTemplate(
-            Objects.requireNonNull(transactionTemplate.getTransactionManager())
-        );
+        TransactionTemplate requiresNewTemplate =
+                new TransactionTemplate(Objects.requireNonNull(transactionTemplate.getTransactionManager()));
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
             projectRepository.updateStatusUpdatesSyncedAt(projectId, syncedAt);
@@ -1594,16 +1505,10 @@ public class GitHubProjectSyncService {
      * Removes projects that no longer exist in the organization.
      */
     private void removeDeletedProjects(
-        Long organizationId,
-        Set<Long> syncedProjectIds,
-        Long scopeId,
-        IdentityProvider provider
-    ) {
+            Long organizationId, Set<Long> syncedProjectIds, Long scopeId, IdentityProvider provider) {
         transactionTemplate.executeWithoutResult(status -> {
-            List<Project> existingProjects = projectRepository.findAllByOwnerTypeAndOwnerId(
-                Project.OwnerType.ORGANIZATION,
-                organizationId
-            );
+            List<Project> existingProjects =
+                    projectRepository.findAllByOwnerTypeAndOwnerId(Project.OwnerType.ORGANIZATION, organizationId);
 
             ProcessingContext context = ProcessingContext.forSync(scopeId, provider);
             int removed = 0;
@@ -1629,9 +1534,8 @@ public class GitHubProjectSyncService {
      * for consistent cursor persistence across all sync services.
      */
     private void persistItemSyncCursor(Long projectId, String cursor) {
-        TransactionTemplate requiresNewTemplate = new TransactionTemplate(
-            Objects.requireNonNull(transactionTemplate.getTransactionManager())
-        );
+        TransactionTemplate requiresNewTemplate =
+                new TransactionTemplate(Objects.requireNonNull(transactionTemplate.getTransactionManager()));
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
             backfillStateProvider.updateProjectItemSyncCursor(projectId, cursor);
@@ -1647,9 +1551,8 @@ public class GitHubProjectSyncService {
      * across all sync services.
      */
     private void updateItemsSyncCompleted(Long projectId, Instant syncedAt) {
-        TransactionTemplate requiresNewTemplate = new TransactionTemplate(
-            Objects.requireNonNull(transactionTemplate.getTransactionManager())
-        );
+        TransactionTemplate requiresNewTemplate =
+                new TransactionTemplate(Objects.requireNonNull(transactionTemplate.getTransactionManager()));
         requiresNewTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         requiresNewTemplate.executeWithoutResult(status -> {
             backfillStateProvider.updateProjectItemsSyncedAt(projectId, syncedAt);
@@ -1671,10 +1574,7 @@ public class GitHubProjectSyncService {
     public List<Project> getProjectsNeedingItemSync(Long organizationId) {
         Instant cooldownThreshold = Instant.now().minusSeconds(syncSchedulerProperties.cooldownMinutes() * 60L);
         return projectRepository.findProjectsNeedingItemSync(
-            Project.OwnerType.ORGANIZATION,
-            organizationId,
-            cooldownThreshold
-        );
+                Project.OwnerType.ORGANIZATION, organizationId, cooldownThreshold);
     }
 
     /**
@@ -1691,10 +1591,7 @@ public class GitHubProjectSyncService {
      * @return list of processed field IDs (for tracking across pagination phases)
      */
     private List<String> processFieldValues(
-        Long itemId,
-        List<GitHubProjectFieldValueDTO> fieldValues,
-        boolean truncated
-    ) {
+            Long itemId, List<GitHubProjectFieldValueDTO> fieldValues, boolean truncated) {
         return fieldValueSyncService.processFieldValues(itemId, fieldValues, truncated, null);
     }
 
@@ -1721,12 +1618,11 @@ public class GitHubProjectSyncService {
      */
     private void syncRemainingFieldValues(Long scopeId, ItemWithFieldValueCursor itemWithCursor) {
         fieldValueSyncService.syncRemainingFieldValues(
-            scopeId,
-            itemWithCursor.itemNodeId(),
-            itemWithCursor.itemId(),
-            itemWithCursor.fieldValueCursor(),
-            itemWithCursor.initialFieldIds()
-        );
+                scopeId,
+                itemWithCursor.itemNodeId(),
+                itemWithCursor.itemId(),
+                itemWithCursor.fieldValueCursor(),
+                itemWithCursor.initialFieldIds());
     }
 
     private boolean waitForRateLimitIfNeeded(Long scopeId, String phase, String scopeLabel, Object scopeValue) {
@@ -1767,9 +1663,5 @@ public class GitHubProjectSyncService {
      * @param initialFieldIds  field IDs already processed from the inline data (for stale removal)
      */
     private record ItemWithFieldValueCursor(
-        Long itemId,
-        String itemNodeId,
-        String fieldValueCursor,
-        List<String> initialFieldIds
-    ) {}
+            Long itemId, String itemNodeId, String fieldValueCursor, List<String> initialFieldIds) {}
 }

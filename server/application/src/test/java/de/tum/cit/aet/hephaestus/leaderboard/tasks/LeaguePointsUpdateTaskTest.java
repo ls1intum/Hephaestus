@@ -64,16 +64,15 @@ class LeaguePointsUpdateTaskTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         task = new LeaguePointsUpdateTask(
-            userRepository,
-            leaderboardService,
-            leaguePointsService,
-            workspaceMembershipService,
-            scheduleResolver,
-            workspaceRepository
-        );
+                userRepository,
+                leaderboardService,
+                leaguePointsService,
+                workspaceMembershipService,
+                scheduleResolver,
+                workspaceRepository);
         Mockito.lenient()
-            .when(scheduleResolver.previousCycleWindow(any(Workspace.class)))
-            .thenReturn(new LeaderboardScheduleResolver.CycleWindow(CYCLE_AFTER, CYCLE_BEFORE));
+                .when(scheduleResolver.previousCycleWindow(any(Workspace.class)))
+                .thenReturn(new LeaderboardScheduleResolver.CycleWindow(CYCLE_AFTER, CYCLE_BEFORE));
     }
 
     @Test
@@ -124,16 +123,14 @@ class LeaguePointsUpdateTaskTest extends BaseUnitTest {
     }
 
     private void stubLeaderboardWith(String login) {
-        when(
-            leaderboardService.createLeaderboard(
-                any(Workspace.class),
-                eq(CYCLE_AFTER),
-                eq(CYCLE_BEFORE),
-                eq("all"),
-                eq(LeaderboardSortType.SCORE),
-                eq(LeaderboardMode.INDIVIDUAL)
-            )
-        ).thenReturn(List.of(entry(login)));
+        when(leaderboardService.createLeaderboard(
+                        any(Workspace.class),
+                        eq(CYCLE_AFTER),
+                        eq(CYCLE_BEFORE),
+                        eq("all"),
+                        eq(LeaderboardSortType.SCORE),
+                        eq(LeaderboardMode.INDIVIDUAL)))
+                .thenReturn(List.of(entry(login)));
     }
 
     private User stubUser(String login) {
@@ -151,14 +148,13 @@ class LeaguePointsUpdateTaskTest extends BaseUnitTest {
 
     private static LeaderboardEntryDTO entry(String login) {
         UserInfoDTO user = new UserInfoDTO(
-            1L,
-            login,
-            login + "@example.com",
-            "https://example.com/a.png",
-            login,
-            "https://example.com/" + login,
-            0
-        );
+                1L,
+                login,
+                login + "@example.com",
+                "https://example.com/a.png",
+                login,
+                "https://example.com/" + login,
+                0);
         return new LeaderboardEntryDTO(1, 10, user, null, List.of(), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     }
 }

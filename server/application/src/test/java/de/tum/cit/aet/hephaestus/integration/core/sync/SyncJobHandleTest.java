@@ -34,11 +34,10 @@ class SyncJobHandleTest extends BaseUnitTest {
 
         @Override
         public void writeProgress(
-            long jobId,
-            @Nullable Integer itemsProcessed,
-            @Nullable Integer itemsTotal,
-            Map<String, Object> progressDetail
-        ) {
+                long jobId,
+                @Nullable Integer itemsProcessed,
+                @Nullable Integer itemsTotal,
+                Map<String, Object> progressDetail) {
             processed.add(itemsProcessed);
             writes.add(progressDetail);
         }
@@ -125,10 +124,8 @@ class SyncJobHandleTest extends BaseUnitTest {
         assertThat(handle.flushIfDue()).isTrue();
         assertThat(writer.writeCount()).isEqualTo(2);
         assertThat(writer.processed.get(1)).isEqualTo(2);
-        assertThat(writer.writes.get(1)).containsEntry(
-            SyncProgress.KEY_CURRENT_STEP,
-            "suppressed — the last word before a quiet period"
-        );
+        assertThat(writer.writes.get(1))
+                .containsEntry(SyncProgress.KEY_CURRENT_STEP, "suppressed — the last word before a quiet period");
     }
 
     @Test
@@ -167,12 +164,12 @@ class SyncJobHandleTest extends BaseUnitTest {
 
         handle.progress(3, 7, SyncProgress.ofResource(SyncPhase.PULL_REQUESTS, "step text", "owner/repo", 3, 7));
 
-        assertThat(writer.writes.getFirst()).containsOnly(
-            Map.entry(SyncProgress.KEY_PHASE, "pullRequests"),
-            Map.entry(SyncProgress.KEY_CURRENT_STEP, "step text"),
-            Map.entry(SyncProgress.KEY_CURRENT_REPOSITORY, "owner/repo"),
-            Map.entry(SyncProgress.KEY_UNITS_COMPLETED, 3),
-            Map.entry(SyncProgress.KEY_UNITS_TOTAL, 7)
-        );
+        assertThat(writer.writes.getFirst())
+                .containsOnly(
+                        Map.entry(SyncProgress.KEY_PHASE, "pullRequests"),
+                        Map.entry(SyncProgress.KEY_CURRENT_STEP, "step text"),
+                        Map.entry(SyncProgress.KEY_CURRENT_REPOSITORY, "owner/repo"),
+                        Map.entry(SyncProgress.KEY_UNITS_COMPLETED, 3),
+                        Map.entry(SyncProgress.KEY_UNITS_TOTAL, 7));
     }
 }

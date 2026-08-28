@@ -45,10 +45,9 @@ public class GitLabWebhookClient {
     private final WebClient webClient;
 
     public GitLabWebhookClient(
-        GitLabGraphQlClientProvider graphQlClientProvider,
-        GitLabTokenService tokenService,
-        WebClient.Builder webClientBuilder
-    ) {
+            GitLabGraphQlClientProvider graphQlClientProvider,
+            GitLabTokenService tokenService,
+            WebClient.Builder webClientBuilder) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.tokenService = tokenService;
         this.webClient = webClientBuilder.build();
@@ -77,12 +76,12 @@ public class GitLabWebhookClient {
      */
     public GroupInfo lookupGroup(Long scopeId, String groupPath) {
         GitLabGroupResponse group = graphQlClientProvider
-            .forScope(scopeId)
-            .documentName("GetGroup")
-            .variable("fullPath", groupPath)
-            .retrieve("group")
-            .toEntity(GitLabGroupResponse.class)
-            .block(REQUEST_TIMEOUT);
+                .forScope(scopeId)
+                .documentName("GetGroup")
+                .variable("fullPath", groupPath)
+                .retrieve("group")
+                .toEntity(GitLabGroupResponse.class)
+                .block(REQUEST_TIMEOUT);
 
         if (group == null) {
             throw new IllegalStateException("GitLab group not found: path=" + groupPath + ", scopeId=" + scopeId);
@@ -112,26 +111,24 @@ public class GitLabWebhookClient {
         ScopeCredentials credentials = resolveCredentials(scopeId);
 
         Map<String, Object> response = webClient
-            .post()
-            .uri(credentials.serverUrl() + "/api/v4/groups/{groupId}/hooks", groupId)
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + credentials.token())
-            .bodyValue(config.toPayload())
-            .retrieve()
-            .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
-            .block(REQUEST_TIMEOUT);
+                .post()
+                .uri(credentials.serverUrl() + "/api/v4/groups/{groupId}/hooks", groupId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + credentials.token())
+                .bodyValue(config.toPayload())
+                .retrieve()
+                .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+                .block(REQUEST_TIMEOUT);
 
         if (response == null) {
             throw new IllegalStateException(
-                "Null response from GitLab when registering webhook: scopeId=" + scopeId + ", groupId=" + groupId
-            );
+                    "Null response from GitLab when registering webhook: scopeId=" + scopeId + ", groupId=" + groupId);
         }
 
         Map<String, Object> responseBody = Objects.requireNonNull(response);
         Number idValue = (Number) responseBody.get("id");
         if (idValue == null) {
             throw new IllegalStateException(
-                "GitLab webhook response missing 'id' field: scopeId=" + scopeId + ", groupId=" + groupId
-            );
+                    "GitLab webhook response missing 'id' field: scopeId=" + scopeId + ", groupId=" + groupId);
         }
         long webhookId = idValue.longValue();
         String url = (String) responseBody.get("url");
@@ -155,34 +152,28 @@ public class GitLabWebhookClient {
     }
 
     private void deregisterGroupWebhook(
-        ScopeCredentials credentials,
-        @Nullable Long scopeId,
-        long groupId,
-        long webhookId
-    ) {
+            ScopeCredentials credentials, @Nullable Long scopeId, long groupId, long webhookId) {
         try {
             webClient
-                .delete()
-                .uri(credentials.serverUrl() + "/api/v4/groups/{groupId}/hooks/{hookId}", groupId, webhookId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + credentials.token())
-                .retrieve()
-                .toBodilessEntity()
-                .block(REQUEST_TIMEOUT);
+                    .delete()
+                    .uri(credentials.serverUrl() + "/api/v4/groups/{groupId}/hooks/{hookId}", groupId, webhookId)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + credentials.token())
+                    .retrieve()
+                    .toBodilessEntity()
+                    .block(REQUEST_TIMEOUT);
 
             log.info(
-                "Deregistered GitLab group webhook: scopeId={}, groupId={}, webhookId={}",
-                scopeId,
-                groupId,
-                webhookId
-            );
+                    "Deregistered GitLab group webhook: scopeId={}, groupId={}, webhookId={}",
+                    scopeId,
+                    groupId,
+                    webhookId);
         } catch (WebClientResponseException e) {
             if (e.getStatusCode().value() == 404) {
                 log.info(
-                    "GitLab webhook already deleted: scopeId={}, groupId={}, webhookId={}",
-                    scopeId,
-                    groupId,
-                    webhookId
-                );
+                        "GitLab webhook already deleted: scopeId={}, groupId={}, webhookId={}",
+                        scopeId,
+                        groupId,
+                        webhookId);
             } else {
                 throw e;
             }
@@ -202,12 +193,12 @@ public class GitLabWebhookClient {
 
         try {
             Map<String, Object> response = webClient
-                .get()
-                .uri(credentials.serverUrl() + "/api/v4/groups/{groupId}/hooks/{hookId}", groupId, webhookId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + credentials.token())
-                .retrieve()
-                .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
-                .block(REQUEST_TIMEOUT);
+                    .get()
+                    .uri(credentials.serverUrl() + "/api/v4/groups/{groupId}/hooks/{hookId}", groupId, webhookId)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + credentials.token())
+                    .retrieve()
+                    .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
+                    .block(REQUEST_TIMEOUT);
 
             if (response == null) {
                 return Optional.empty();
@@ -221,8 +212,7 @@ public class GitLabWebhookClient {
             long id = idValue.longValue();
             String url = (String) responseBody.get("url");
             return Optional.of(
-                new WebhookInfo(id, Objects.requireNonNull(url), (String) responseBody.get("alert_status"))
-            );
+                    new WebhookInfo(id, Objects.requireNonNull(url), (String) responseBody.get("alert_status")));
         } catch (WebClientResponseException e) {
             if (e.getStatusCode().value() == 404) {
                 return Optional.empty();
@@ -242,28 +232,24 @@ public class GitLabWebhookClient {
         ScopeCredentials credentials = resolveCredentials(scopeId);
 
         List<Map<String, Object>> response = webClient
-            .get()
-            .uri(credentials.serverUrl() + "/api/v4/groups/{groupId}/hooks?per_page=100", groupId)
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + credentials.token())
-            .retrieve()
-            .bodyToMono(new ParameterizedTypeReference<List<Map<String, Object>>>() {})
-            .block(REQUEST_TIMEOUT);
+                .get()
+                .uri(credentials.serverUrl() + "/api/v4/groups/{groupId}/hooks?per_page=100", groupId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + credentials.token())
+                .retrieve()
+                .bodyToMono(new ParameterizedTypeReference<List<Map<String, Object>>>() {})
+                .block(REQUEST_TIMEOUT);
 
         if (response == null) {
             return List.of();
         }
 
-        return Objects.requireNonNull(response)
-            .stream()
-            .filter(hook -> hook.get("id") != null)
-            .map(hook ->
-                new WebhookInfo(
-                    ((Number) hook.get("id")).longValue(),
-                    Objects.requireNonNull((String) hook.get("url")),
-                    (String) hook.get("alert_status")
-                )
-            )
-            .toList();
+        return Objects.requireNonNull(response).stream()
+                .filter(hook -> hook.get("id") != null)
+                .map(hook -> new WebhookInfo(
+                        ((Number) hook.get("id")).longValue(),
+                        Objects.requireNonNull((String) hook.get("url")),
+                        (String) hook.get("alert_status")))
+                .toList();
     }
 
     /**
@@ -316,41 +302,39 @@ public class GitLabWebhookClient {
      * @see <a href="https://docs.gitlab.com/ee/api/group_level_webhooks.html#add-a-group-hook">Add Group Hook</a>
      */
     public record WebhookConfig(
-        String url,
-        String token,
-        boolean mergeRequestsEvents,
-        boolean issuesEvents,
-        boolean confidentialIssuesEvents,
-        boolean noteEvents,
-        boolean confidentialNoteEvents,
-        boolean pushEvents,
-        boolean tagPushEvents,
-        boolean pipelineEvents,
-        boolean milestoneEvents,
-        boolean memberEvents,
-        boolean subgroupEvents,
-        boolean projectEvents,
-        boolean enableSslVerification
-    ) {
+            String url,
+            String token,
+            boolean mergeRequestsEvents,
+            boolean issuesEvents,
+            boolean confidentialIssuesEvents,
+            boolean noteEvents,
+            boolean confidentialNoteEvents,
+            boolean pushEvents,
+            boolean tagPushEvents,
+            boolean pipelineEvents,
+            boolean milestoneEvents,
+            boolean memberEvents,
+            boolean subgroupEvents,
+            boolean projectEvents,
+            boolean enableSslVerification) {
         public Map<String, Object> toPayload() {
             // Map.ofEntries used because Map.of supports at most 10 entries
             return Map.ofEntries(
-                Map.entry("url", url),
-                Map.entry("token", token),
-                Map.entry("merge_requests_events", mergeRequestsEvents),
-                Map.entry("issues_events", issuesEvents),
-                Map.entry("confidential_issues_events", confidentialIssuesEvents),
-                Map.entry("note_events", noteEvents),
-                Map.entry("confidential_note_events", confidentialNoteEvents),
-                Map.entry("push_events", pushEvents),
-                Map.entry("tag_push_events", tagPushEvents),
-                Map.entry("pipeline_events", pipelineEvents),
-                Map.entry("milestone_events", milestoneEvents),
-                Map.entry("member_events", memberEvents),
-                Map.entry("subgroup_events", subgroupEvents),
-                Map.entry("project_events", projectEvents),
-                Map.entry("enable_ssl_verification", enableSslVerification)
-            );
+                    Map.entry("url", url),
+                    Map.entry("token", token),
+                    Map.entry("merge_requests_events", mergeRequestsEvents),
+                    Map.entry("issues_events", issuesEvents),
+                    Map.entry("confidential_issues_events", confidentialIssuesEvents),
+                    Map.entry("note_events", noteEvents),
+                    Map.entry("confidential_note_events", confidentialNoteEvents),
+                    Map.entry("push_events", pushEvents),
+                    Map.entry("tag_push_events", tagPushEvents),
+                    Map.entry("pipeline_events", pipelineEvents),
+                    Map.entry("milestone_events", milestoneEvents),
+                    Map.entry("member_events", memberEvents),
+                    Map.entry("subgroup_events", subgroupEvents),
+                    Map.entry("project_events", projectEvents),
+                    Map.entry("enable_ssl_verification", enableSslVerification));
         }
     }
 }

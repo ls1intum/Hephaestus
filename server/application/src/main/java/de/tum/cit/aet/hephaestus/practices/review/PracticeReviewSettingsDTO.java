@@ -15,34 +15,39 @@ import org.jspecify.annotations.Nullable;
  */
 @Schema(description = "A workspace's practice-review policy: effective values plus raw overrides")
 public record PracticeReviewSettingsDTO(
-    @NonNull @Schema(description = "Strong entity tag to send in If-Match when updating this rollout") String etag,
-    @NonNull
-    @Schema(description = "Monotonic rollout revision carried by automatically admitted review jobs")
-    Long revision,
-    @NonNull @Schema(description = "Effective: deliver feedback to merged PRs/MRs") Boolean deliverToMerged,
-    @NonNull
-    @Schema(description = "Effective: minimum minutes between reviews for the same PR")
-    Integer cooldownMinutes,
-    @Schema(description = "Raw override; null = inheriting the fleet default")
-    @Nullable
-    Boolean deliverToMergedOverride,
-    @Schema(description = "Raw override; null = inheriting the fleet default")
-    @Nullable
-    Integer cooldownMinutesOverride,
-    @NonNull
-    @Schema(description = "Explicit all-or-selected repository and person coverage. Selected-empty means nobody.")
-    WorkspaceReviewScope reviewScope,
-    @NonNull
-    @Schema(description = "Whether new external practice feedback may be sent")
-    PracticeDeliveryStatus deliveryStatus,
-    @NonNull PracticeReviewCoverageSummaryDTO coverageSummary,
-    @NonNull
-    @Schema(
-        description = "Effective: how much autonomy the system has over practices and groups that hold no " +
-            "autonomy of their own — the bottom of the practice → group → workspace chain"
-    )
-    PracticeAutonomy defaultAutonomy,
-    @Schema(description = "Raw override; null = this workspace has never chosen, so HUMAN_APPROVAL applies")
-    @Nullable
-    PracticeAutonomy defaultAutonomyOverride
-) {}
+        @NonNull @Schema(description = "Strong entity tag to send in If-Match when updating this rollout")
+        String etag,
+
+        @NonNull @Schema(description = "Monotonic rollout revision carried by automatically admitted review jobs")
+        Long revision,
+
+        @NonNull @Schema(description = "Effective: deliver feedback to merged PRs/MRs")
+        Boolean deliverToMerged,
+
+        @NonNull @Schema(description = "Effective: minimum minutes between reviews for the same PR")
+        Integer cooldownMinutes,
+
+        @Schema(description = "Raw override; null = inheriting the fleet default") @Nullable
+        Boolean deliverToMergedOverride,
+
+        @Schema(description = "Raw override; null = inheriting the fleet default") @Nullable
+        Integer cooldownMinutesOverride,
+
+        @NonNull
+        @Schema(description = "Explicit all-or-selected repository and person coverage. Selected-empty means nobody.")
+        WorkspaceReviewScope reviewScope,
+
+        @NonNull @Schema(description = "Whether new external practice feedback may be sent")
+        PracticeDeliveryStatus deliveryStatus,
+
+        @NonNull PracticeReviewCoverageSummaryDTO coverageSummary,
+
+        @NonNull
+        @Schema(
+                description = "Effective: how much autonomy the system has over practices and groups that hold no "
+                        + "autonomy of their own — the bottom of the practice → group → workspace chain")
+        PracticeAutonomy defaultAutonomy,
+
+        @Schema(description = "Raw override; null = this workspace has never chosen, so HUMAN_APPROVAL applies")
+        @Nullable
+        PracticeAutonomy defaultAutonomyOverride) {}

@@ -93,10 +93,7 @@ public class GitHubProjectItemSyncService {
      */
     @Transactional
     public int processEmbeddedItems(
-        @Nullable EmbeddedProjectItemsDTO embeddedItems,
-        ProcessingContext context,
-        Long parentIssueId
-    ) {
+            @Nullable EmbeddedProjectItemsDTO embeddedItems, ProcessingContext context, Long parentIssueId) {
         if (!syncSchedulerProperties.projects().enabled()) {
             return 0;
         }
@@ -129,13 +126,12 @@ public class GitHubProjectItemSyncService {
      * @return number of additional items synced
      */
     public int syncRemainingProjectItems(
-        Long scopeId,
-        @Nullable String issueNodeId,
-        boolean isPullRequest,
-        Repository repository,
-        String startCursor,
-        Long parentIssueId
-    ) {
+            Long scopeId,
+            @Nullable String issueNodeId,
+            boolean isPullRequest,
+            Repository repository,
+            String startCursor,
+            Long parentIssueId) {
         if (!syncSchedulerProperties.projects().enabled()) {
             return 0;
         }
@@ -159,20 +155,18 @@ public class GitHubProjectItemSyncService {
         String variableName = isPullRequest ? "pullRequestId" : "issueId";
 
         log.debug(
-            "Starting project item pagination: nodeId={}, isPR={}, startCursor={}...",
-            issueNodeId,
-            isPullRequest,
-            startCursor != null ? startCursor.substring(0, Math.min(20, startCursor.length())) : "null"
-        );
+                "Starting project item pagination: nodeId={}, isPR={}, startCursor={}...",
+                issueNodeId,
+                isPullRequest,
+                startCursor != null ? startCursor.substring(0, Math.min(20, startCursor.length())) : "null");
 
         while (hasMore) {
             pageCount++;
             if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
-                    "Reached maximum pagination limit for project items: nodeId={}, limit={}",
-                    issueNodeId,
-                    MAX_PAGINATION_PAGES
-                );
+                        "Reached maximum pagination limit for project items: nodeId={}, limit={}",
+                        issueNodeId,
+                        MAX_PAGINATION_PAGES);
                 break;
             }
 
@@ -180,46 +174,32 @@ public class GitHubProjectItemSyncService {
                 final String currentCursor = cursor;
                 final int currentPage = pageCount;
 
-                ClientGraphQlResponse response = Mono.defer(() ->
-                    client
-                        .documentName(queryDocument)
-                        .variable(variableName, issueNodeId)
-                        .variable(
-                            "first",
-                            adaptPageSize(DEFAULT_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
-                        )
-                        .variable("after", currentCursor)
-                        .execute()
-                )
-                    .retryWhen(
-                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                            .jitter(JITTER_FACTOR)
-                            .filter(ScmTransportErrors::isTransportError)
-                            .doBeforeRetry(signal ->
-                                log.warn(
-                                    "Retrying project item pagination after transport error: nodeId={}, page={}, attempt={}, error={}",
-                                    issueNodeId,
-                                    currentPage,
-                                    signal.totalRetries() + 1,
-                                    signal.failure().getMessage()
-                                )
-                            )
-                    )
-                    .block(syncProperties.graphqlTimeout());
+                ClientGraphQlResponse response = Mono.defer(() -> client.documentName(queryDocument)
+                                .variable(variableName, issueNodeId)
+                                .variable(
+                                        "first",
+                                        adaptPageSize(
+                                                DEFAULT_PAGE_SIZE,
+                                                graphQlClientProvider.getRateLimitRemaining(scopeId)))
+                                .variable("after", currentCursor)
+                                .execute())
+                        .retryWhen(Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                                .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                                .jitter(JITTER_FACTOR)
+                                .filter(ScmTransportErrors::isTransportError)
+                                .doBeforeRetry(signal -> log.warn(
+                                        "Retrying project item pagination after transport error: nodeId={}, page={}, attempt={}, error={}",
+                                        issueNodeId,
+                                        currentPage,
+                                        signal.totalRetries() + 1,
+                                        signal.failure().getMessage())))
+                        .block(syncProperties.graphqlTimeout());
 
                 if (response == null || !response.isValid()) {
                     ClassificationResult classification = classifyGraphQlErrors(response);
                     if (classification != null) {
-                        if (
-                            handleClassification(
-                                classification,
-                                "project item pagination",
-                                "nodeId",
-                                issueNodeId,
-                                retryAttempt
-                            )
-                        ) {
+                        if (handleClassification(
+                                classification, "project item pagination", "nodeId", issueNodeId, retryAttempt)) {
                             retryAttempt++;
                             continue;
                         }
@@ -237,11 +217,12 @@ public class GitHubProjectItemSyncService {
                     }
                 }
 
-                GHProjectV2ItemConnection connection = response
-                    .field("node.projectItems")
-                    .toEntity(GHProjectV2ItemConnection.class);
+                GHProjectV2ItemConnection connection =
+                        response.field("node.projectItems").toEntity(GHProjectV2ItemConnection.class);
 
-                if (connection == null || connection.getNodes() == null || connection.getNodes().isEmpty()) {
+                if (connection == null
+                        || connection.getNodes() == null
+                        || connection.getNodes().isEmpty()) {
                     break;
                 }
 
@@ -275,15 +256,8 @@ public class GitHubProjectItemSyncService {
                 throw e;
             } catch (Exception e) {
                 ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
-                if (
-                    !handleClassification(
-                        classification,
-                        "project item pagination",
-                        "nodeId",
-                        issueNodeId,
-                        retryAttempt
-                    )
-                ) {
+                if (!handleClassification(
+                        classification, "project item pagination", "nodeId", issueNodeId, retryAttempt)) {
                     break;
                 }
                 retryAttempt++;
@@ -293,12 +267,7 @@ public class GitHubProjectItemSyncService {
         // Raw nodes received vs items.totalCount (totalSynced is post-process).
         if (reportedTotalCount >= 0) {
             GraphQlConnectionOverflowDetector.checkPaginated(
-                "projectItems",
-                itemsReceived,
-                reportedTotalCount,
-                hasMore,
-                "itemNodeId=" + issueNodeId
-            );
+                    "projectItems", itemsReceived, reportedTotalCount, hasMore, "itemNodeId=" + issueNodeId);
         }
 
         log.debug("Completed project item pagination: nodeId={}, additionalItems={}", issueNodeId, totalSynced);
@@ -319,10 +288,7 @@ public class GitHubProjectItemSyncService {
      * @return true if the item was successfully processed
      */
     private boolean processEmbeddedItem(
-        EmbeddedProjectItem embeddedItem,
-        ProcessingContext context,
-        Long parentIssueId
-    ) {
+            EmbeddedProjectItem embeddedItem, ProcessingContext context, Long parentIssueId) {
         if (embeddedItem == null || embeddedItem.item() == null) {
             return false;
         }
@@ -330,10 +296,9 @@ public class GitHubProjectItemSyncService {
         Project project = resolveProject(embeddedItem.project());
         if (project == null) {
             log.debug(
-                "Skipped project item: reason=projectNotSynced, projectNodeId={}, itemNodeId={}",
-                embeddedItem.project() != null ? embeddedItem.project().nodeId() : "null",
-                embeddedItem.item().nodeId()
-            );
+                    "Skipped project item: reason=projectNotSynced, projectNodeId={}, itemNodeId={}",
+                    embeddedItem.project() != null ? embeddedItem.project().nodeId() : "null",
+                    embeddedItem.item().nodeId());
             return false;
         }
 
@@ -346,21 +311,19 @@ public class GitHubProjectItemSyncService {
 
             // Process inline field values for this item
             fieldValueSyncService.processFieldValues(
-                result.getId(),
-                itemDto.fieldValues(),
-                itemDto.fieldValuesTruncated(),
-                itemDto.fieldValuesEndCursor()
-            );
+                    result.getId(),
+                    itemDto.fieldValues(),
+                    itemDto.fieldValuesTruncated(),
+                    itemDto.fieldValuesEndCursor());
 
             return true;
         } catch (Exception e) {
             log.warn(
-                "Failed to process embedded project item: projectId={}, itemNodeId={}, error={}",
-                project.getId(),
-                embeddedItem.item().nodeId(),
-                e.getMessage(),
-                e
-            );
+                    "Failed to process embedded project item: projectId={}, itemNodeId={}, error={}",
+                    project.getId(),
+                    embeddedItem.item().nodeId(),
+                    e.getMessage(),
+                    e);
             return false;
         }
     }
@@ -395,41 +358,30 @@ public class GitHubProjectItemSyncService {
         }
 
         return switch (transientError.type()) {
-            case RATE_LIMIT -> ClassificationResult.rateLimited(
-                transientError.getRecommendedWait(),
-                "GraphQL rate limit: " + transientError.message()
-            );
-            case TIMEOUT, SERVER_ERROR -> ClassificationResult.of(
-                Category.RETRYABLE,
-                "GraphQL transient error: " + transientError.message()
-            );
-            case RESOURCE_LIMIT -> ClassificationResult.of(
-                Category.CLIENT_ERROR,
-                "GraphQL resource limit: " + transientError.message()
-            );
+            case RATE_LIMIT ->
+                ClassificationResult.rateLimited(
+                        transientError.getRecommendedWait(), "GraphQL rate limit: " + transientError.message());
+            case TIMEOUT, SERVER_ERROR ->
+                ClassificationResult.of(Category.RETRYABLE, "GraphQL transient error: " + transientError.message());
+            case RESOURCE_LIMIT ->
+                ClassificationResult.of(Category.CLIENT_ERROR, "GraphQL resource limit: " + transientError.message());
         };
     }
 
     private boolean handleClassification(
-        ClassificationResult classification,
-        String phase,
-        String scopeLabel,
-        Object scopeValue,
-        int retryAttempt
-    ) {
+            ClassificationResult classification, String phase, String scopeLabel, Object scopeValue, int retryAttempt) {
         Category category = classification.category();
 
         switch (category) {
             case RETRYABLE -> {
                 if (retryAttempt < MAX_RETRY_ATTEMPTS) {
                     log.warn(
-                        "Retrying {} after transient error: {}={}, attempt={}, error={}",
-                        phase,
-                        scopeLabel,
-                        scopeValue,
-                        retryAttempt + 1,
-                        classification.message()
-                    );
+                            "Retrying {} after transient error: {}={}, attempt={}, error={}",
+                            phase,
+                            scopeLabel,
+                            scopeValue,
+                            retryAttempt + 1,
+                            classification.message());
                     try {
                         ExponentialBackoff.sleep(retryAttempt + 1);
                     } catch (InterruptedException ie) {
@@ -439,25 +391,19 @@ public class GitHubProjectItemSyncService {
                     return true;
                 }
                 log.warn(
-                    "Aborting {} after {} retries: {}={}, error={}",
-                    phase,
-                    MAX_RETRY_ATTEMPTS,
-                    scopeLabel,
-                    scopeValue,
-                    classification.message()
-                );
+                        "Aborting {} after {} retries: {}={}, error={}",
+                        phase,
+                        MAX_RETRY_ATTEMPTS,
+                        scopeLabel,
+                        scopeValue,
+                        classification.message());
                 return false;
             }
             case RATE_LIMITED -> {
                 if (retryAttempt < MAX_RETRY_ATTEMPTS && classification.suggestedWait() != null) {
                     long waitMs = Math.min(classification.suggestedWait().toMillis(), 300_000);
                     log.warn(
-                        "Rate limited during {}, waiting: {}={}, waitMs={}",
-                        phase,
-                        scopeLabel,
-                        scopeValue,
-                        waitMs
-                    );
+                            "Rate limited during {}, waiting: {}={}, waitMs={}", phase, scopeLabel, scopeValue, waitMs);
                     try {
                         Thread.sleep(waitMs);
                     } catch (InterruptedException ie) {
@@ -467,53 +413,48 @@ public class GitHubProjectItemSyncService {
                     return true;
                 }
                 log.warn(
-                    "Aborting {} due to rate limit: {}={}, error={}",
-                    phase,
-                    scopeLabel,
-                    scopeValue,
-                    classification.message()
-                );
+                        "Aborting {} due to rate limit: {}={}, error={}",
+                        phase,
+                        scopeLabel,
+                        scopeValue,
+                        classification.message());
                 return false;
             }
             case NOT_FOUND -> {
                 log.warn(
-                    "Resource not found during {}: {}={}, error={}",
-                    phase,
-                    scopeLabel,
-                    scopeValue,
-                    classification.message()
-                );
+                        "Resource not found during {}: {}={}, error={}",
+                        phase,
+                        scopeLabel,
+                        scopeValue,
+                        classification.message());
                 return false;
             }
             case AUTH_ERROR -> {
                 log.warn(
-                    "Authentication error during {}: {}={}, error={}",
-                    phase,
-                    scopeLabel,
-                    scopeValue,
-                    classification.message()
-                );
+                        "Authentication error during {}: {}={}, error={}",
+                        phase,
+                        scopeLabel,
+                        scopeValue,
+                        classification.message());
                 return false;
             }
             case CLIENT_ERROR -> {
                 log.warn(
-                    "Client error during {}: {}={}, error={}",
-                    phase,
-                    scopeLabel,
-                    scopeValue,
-                    classification.message()
-                );
+                        "Client error during {}: {}={}, error={}",
+                        phase,
+                        scopeLabel,
+                        scopeValue,
+                        classification.message());
                 return false;
             }
             default -> {
                 log.warn(
-                    "Aborting {} due to error: {}={}, category={}, error={}",
-                    phase,
-                    scopeLabel,
-                    scopeValue,
-                    category,
-                    classification.message()
-                );
+                        "Aborting {} due to error: {}={}, category={}, error={}",
+                        phase,
+                        scopeLabel,
+                        scopeValue,
+                        category,
+                        classification.message());
                 return false;
             }
         }

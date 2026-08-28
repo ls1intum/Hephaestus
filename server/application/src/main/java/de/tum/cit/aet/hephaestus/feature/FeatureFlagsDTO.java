@@ -22,14 +22,18 @@ import io.swagger.v3.oas.annotations.media.Schema;
  */
 @Schema(description = "Feature flags evaluated for the current user")
 public record FeatureFlagsDTO(
-    // ── Authorization flags (account_feature role flags) ──────────────────────
-    @Schema(description = "User has access to the AI Mentor feature") boolean MENTOR_ACCESS,
-    @Schema(description = "User can receive notifications") boolean NOTIFICATION_ACCESS,
-    @Schema(description = "User has admin privileges") boolean ADMIN,
+        // ── Authorization flags (account_feature role flags) ──────────────────────
+        @Schema(description = "User has access to the AI Mentor feature")
+        boolean MENTOR_ACCESS,
 
-    // Operational/development flags (Spring Boot config)
-    @Schema(description = "GitLab workspace creation feature is enabled") boolean GITLAB_WORKSPACE_CREATION
-) {
+        @Schema(description = "User can receive notifications")
+        boolean NOTIFICATION_ACCESS,
+
+        @Schema(description = "User has admin privileges") boolean ADMIN,
+
+        // Operational/development flags (Spring Boot config)
+        @Schema(description = "GitLab workspace creation feature is enabled")
+        boolean GITLAB_WORKSPACE_CREATION) {
     /**
      * Evaluate all feature flags against the given service and build the DTO.
      *
@@ -38,10 +42,9 @@ public record FeatureFlagsDTO(
      */
     public static FeatureFlagsDTO from(FeatureFlagService service) {
         return new FeatureFlagsDTO(
-            service.isEnabled(FeatureFlag.MENTOR_ACCESS),
-            service.isEnabled(FeatureFlag.NOTIFICATION_ACCESS),
-            service.isEnabled(FeatureFlag.ADMIN),
-            service.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION)
-        );
+                service.isEnabled(FeatureFlag.MENTOR_ACCESS),
+                service.isEnabled(FeatureFlag.NOTIFICATION_ACCESS),
+                service.isEnabled(FeatureFlag.ADMIN),
+                service.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION));
     }
 }

@@ -56,8 +56,7 @@ class LedgerSignalRecorderConcurrencyIntegrationTest extends BaseIntegrationTest
         // A workspace of its own per test: every read below is workspace-scoped, so rows another test
         // left behind are invisible and no instance-wide clean is needed.
         workspace = workspaces.save(
-            WorkspaceTestFixtures.activeWorkspace("ledger-race-" + SLUG_SEQUENCE.incrementAndGet())
-        );
+                WorkspaceTestFixtures.activeWorkspace("ledger-race-" + SLUG_SEQUENCE.incrementAndGet()));
     }
 
     @Test
@@ -90,8 +89,8 @@ class LedgerSignalRecorderConcurrencyIntegrationTest extends BaseIntegrationTest
 
         assertThat(winners).isEqualTo(1);
         assertThat(recorded(key))
-            .singleElement()
-            .satisfies(signal -> assertThat(signal.getState()).isEqualTo(SignalState.TRIGGERED));
+                .singleElement()
+                .satisfies(signal -> assertThat(signal.getState()).isEqualTo(SignalState.TRIGGERED));
     }
 
     /**
@@ -109,8 +108,8 @@ class LedgerSignalRecorderConcurrencyIntegrationTest extends BaseIntegrationTest
 
         assertThat(claimed).isTrue();
         assertThat(recorded(key))
-            .singleElement()
-            .satisfies(signal -> assertThat(signal.getDiscoveredVia()).isEqualTo(DiscoveredVia.EVENT));
+                .singleElement()
+                .satisfies(signal -> assertThat(signal.getDiscoveredVia()).isEqualTo(DiscoveredVia.EVENT));
     }
 
     /**
@@ -118,18 +117,16 @@ class LedgerSignalRecorderConcurrencyIntegrationTest extends BaseIntegrationTest
      * production caller has, and the reason the loser has nothing left to take over.
      */
     private boolean claimAndSettle(SignalKey key, CountDownLatch atTheLine, CountDownLatch go)
-        throws InterruptedException {
+            throws InterruptedException {
         atTheLine.countDown();
         go.await();
-        return Boolean.TRUE.equals(
-            transactionTemplate.execute(status -> {
-                boolean won = recorder.record(key, OCCURRED_AT, DiscoveredVia.EVENT);
-                if (won) {
-                    recorder.markTriggered(key, UUID.randomUUID());
-                }
-                return won;
-            })
-        );
+        return Boolean.TRUE.equals(transactionTemplate.execute(status -> {
+            boolean won = recorder.record(key, OCCURRED_AT, DiscoveredVia.EVENT);
+            if (won) {
+                recorder.markTriggered(key, UUID.randomUUID());
+            }
+            return won;
+        }));
     }
 
     private List<ArtifactSignal> recorded(SignalKey key) {
@@ -138,10 +135,6 @@ class LedgerSignalRecorderConcurrencyIntegrationTest extends BaseIntegrationTest
 
     private SignalKey key(long artifactId) {
         return new SignalKey(
-            workspace.getId(),
-            artifactId,
-            ScmSignals.PULL_REQUEST_READY,
-            new SignalRevision("sha~" + artifactId)
-        );
+                workspace.getId(), artifactId, ScmSignals.PULL_REQUEST_READY, new SignalRevision("sha~" + artifactId));
     }
 }

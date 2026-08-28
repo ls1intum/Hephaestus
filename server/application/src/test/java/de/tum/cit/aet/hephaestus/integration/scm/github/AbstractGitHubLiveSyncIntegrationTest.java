@@ -75,11 +75,15 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
     @BeforeAll
     void setUpFixtureService() {
         assumeGitHubCredentialsConfigured();
-        String token = gitHubAppTokenService.getInstallationTokenDetails(githubInstallationId()).token();
+        String token = gitHubAppTokenService
+                .getInstallationTokenDetails(githubInstallationId())
+                .token();
         fixtureService = new GitHubTestFixtureService(
-            gitHubGraphQlClient.mutate().header("Authorization", "Bearer " + token).build(),
-            token
-        );
+                gitHubGraphQlClient
+                        .mutate()
+                        .header("Authorization", "Bearer " + token)
+                        .build(),
+                token);
     }
 
     @BeforeEach
@@ -88,10 +92,9 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
         repositoriesToDelete.clear();
         teamsToDelete.clear();
         githubProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
         workspace = createWorkspace();
     }
 
@@ -120,9 +123,8 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
 
         if (!allRepositoriesCreated.isEmpty()) {
             logger.warn(
-                "Safety net cleanup: {} repositories were not cleaned up by @AfterEach",
-                allRepositoriesCreated.size()
-            );
+                    "Safety net cleanup: {} repositories were not cleaned up by @AfterEach",
+                    allRepositoriesCreated.size());
             for (String fullName : allRepositoriesCreated) {
                 logger.info("Safety net: Deleting orphaned repository {}", fullName);
                 fixtureService.deleteRepository(fullName);
@@ -153,17 +155,9 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
         // not on the Workspace entity. Persist the matching ACTIVE GitHub Connection
         // so downstream components (token resolution, NATS routing, …) can find it.
         ConnectionConfig.GitHubAppConfig cfg = new ConnectionConfig.GitHubAppConfig(
-            githubInstallationId(),
-            saved.getAccountLogin(),
-            /* serverUrl */ null,
-            Set.of()
-        );
-        Connection connection = new Connection(
-            saved,
-            IntegrationKind.GITHUB,
-            Long.toString(githubInstallationId()),
-            cfg
-        );
+                githubInstallationId(), saved.getAccountLogin(), /* serverUrl */ null, Set.of());
+        Connection connection =
+                new Connection(saved, IntegrationKind.GITHUB, Long.toString(githubInstallationId()), cfg);
         connection.setDisplayName(saved.getAccountLogin());
         ReflectionTestUtils.setField(connection, "state", IntegrationState.ACTIVE);
         connectionRepository.save(connection);
@@ -184,13 +178,10 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
     }
 
     protected GitHubTestFixtureService.CreatedRepository createEphemeralRepository(String suffix)
-        throws InterruptedException {
+            throws InterruptedException {
         String repositoryName = nextEphemeralSlug(suffix);
-        GitHubTestFixtureService.CreatedRepository repository = fixtureService.createRepository(
-            githubOrganization(),
-            repositoryName,
-            true
-        );
+        GitHubTestFixtureService.CreatedRepository repository =
+                fixtureService.createRepository(githubOrganization(), repositoryName, true);
         repositoriesToDelete.add(repository.fullName());
         allRepositoriesCreated.add(repository.fullName()); // Track in safety net
         return repository;
@@ -215,31 +206,21 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
     }
 
     protected GitHubTestFixtureService.CreatedLabel createRepositoryLabel(
-        String repositoryNodeId,
-        String prefix,
-        String color,
-        String description
-    ) {
+            String repositoryNodeId, String prefix, String color, String description) {
         String uniqueSuffix = Long.toString(Instant.now().toEpochMilli(), 36);
         String labelName = (prefix + "-" + uniqueSuffix).toLowerCase();
         return fixtureService.createLabel(repositoryNodeId, labelName, color, description);
     }
 
     protected GitHubTestFixtureService.CreatedMilestone createRepositoryMilestone(
-        String fullName,
-        String prefix,
-        String description
-    ) {
+            String fullName, String prefix, String description) {
         String uniqueSuffix = Long.toString(Instant.now().toEpochMilli(), 36);
         String milestoneTitle = prefix + " " + uniqueSuffix;
         return fixtureService.createMilestone(fullName, milestoneTitle, description);
     }
 
     protected CreatedTeam createEphemeralTeam(
-        GitHubTestFixtureService.CreatedRepository repository,
-        String maintainerLogin,
-        String permission
-    ) {
+            GitHubTestFixtureService.CreatedRepository repository, String maintainerLogin, String permission) {
         String teamName = "it-team-" + nextEphemeralSlug("team");
         GitHubTestFixtureService.CreatedTeam team = fixtureService.createTeam(githubOrganization(), teamName);
         TeamToDelete teamToDelete = new TeamToDelete(githubOrganization(), team.slug());
@@ -253,37 +234,26 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
     }
 
     protected CreatedIssue createIssueWithComment(GitHubTestFixtureService.CreatedRepository repository)
-        throws InterruptedException {
+            throws InterruptedException {
         String issueTitle = "IT issue " + nextEphemeralSlug("issue");
         String issueBody = "Live integration issue created at " + Instant.now();
 
         // Get repository info for node ID
         GitHubTestFixtureService.RepositoryInfo repoInfo = fixtureService.getRepositoryInfo(repository.fullName());
 
-        GitHubTestFixtureService.CreatedIssue issue = fixtureService.createIssue(
-            repoInfo.nodeId(),
-            issueTitle,
-            issueBody
-        );
+        GitHubTestFixtureService.CreatedIssue issue =
+                fixtureService.createIssue(repoInfo.nodeId(), issueTitle, issueBody);
 
         String commentBody = "Issue comment seed " + Instant.now();
-        GitHubTestFixtureService.CreatedIssueComment comment = fixtureService.addIssueComment(
-            issue.nodeId(),
-            commentBody
-        );
+        GitHubTestFixtureService.CreatedIssueComment comment =
+                fixtureService.addIssueComment(issue.nodeId(), commentBody);
 
         return new CreatedIssue(
-            issue.databaseId(),
-            issue.number(),
-            issueTitle,
-            issueBody,
-            comment.databaseId(),
-            commentBody
-        );
+                issue.databaseId(), issue.number(), issueTitle, issueBody, comment.databaseId(), commentBody);
     }
 
     protected PullRequestArtifacts createPullRequestWithReview(GitHubTestFixtureService.CreatedRepository repository)
-        throws Exception {
+            throws Exception {
         String branchSuffix = nextEphemeralSlug("branch");
         String branchName = "feature-" + branchSuffix;
 
@@ -301,47 +271,35 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
         String filePath = "integration/test-" + branchSuffix + ".txt";
         String fileContent = "Integration content generated at " + Instant.now();
         String commitSha = fixtureService.createCommitOnBranch(
-            repository.fullName(),
-            branchName,
-            "Add " + filePath,
-            filePath,
-            fileContent
-        );
+                repository.fullName(), branchName, "Add " + filePath, filePath, fileContent);
 
         // Create pull request
         String prTitle = "IT pull request " + nextEphemeralSlug("pr");
         GitHubTestFixtureService.CreatedPullRequest pullRequest = fixtureService.createPullRequest(
-            repoInfo.nodeId(),
-            prTitle,
-            "Integration test PR",
-            branchName,
-            defaultBranch
-        );
+                repoInfo.nodeId(), prTitle, "Integration test PR", branchName, defaultBranch);
 
         // Add review with comment
         String reviewBody = "Initial review message " + Instant.now();
         String reviewCommentBody = "Review inline note " + Instant.now();
 
         GitHubTestFixtureService.CreatedReview review = fixtureService.addPullRequestReview(
-            pullRequest.nodeId(),
-            reviewBody,
-            "COMMENT",
-            commitSha,
-            List.of(new GitHubTestFixtureService.ReviewComment(filePath, 1, reviewCommentBody))
-        );
+                pullRequest.nodeId(),
+                reviewBody,
+                "COMMENT",
+                commitSha,
+                List.of(new GitHubTestFixtureService.ReviewComment(filePath, 1, reviewCommentBody)));
 
         return new PullRequestArtifacts(
-            pullRequest.databaseId(),
-            pullRequest.number(),
-            prTitle,
-            review.databaseId(),
-            reviewBody,
-            0L, // Review comment ID - we don't get this from the mutation response
-            reviewCommentBody,
-            filePath,
-            1,
-            commitSha
-        );
+                pullRequest.databaseId(),
+                pullRequest.number(),
+                prTitle,
+                review.databaseId(),
+                reviewBody,
+                0L, // Review comment ID - we don't get this from the mutation response
+                reviewCommentBody,
+                filePath,
+                1,
+                commitSha);
     }
 
     protected void awaitCondition(String description, CheckedCondition condition) throws InterruptedException {
@@ -370,30 +328,23 @@ public abstract class AbstractGitHubLiveSyncIntegrationTest extends BaseGitHubLi
     // RECORD TYPES
 
     protected record CreatedIssue(
-        long issueId,
-        int issueNumber,
-        String issueTitle,
-        String issueBody,
-        long commentId,
-        String commentBody
-    ) {}
+            long issueId, int issueNumber, String issueTitle, String issueBody, long commentId, String commentBody) {}
 
     protected record CreatedTeam(long id, String name, String maintainerLogin) {}
 
     protected record TeamToDelete(String orgLogin, String teamSlug) {}
 
     protected record PullRequestArtifacts(
-        long pullRequestId,
-        int pullRequestNumber,
-        String pullRequestTitle,
-        long reviewId,
-        String reviewBody,
-        long reviewCommentId,
-        String reviewCommentBody,
-        String reviewCommentPath,
-        int reviewCommentLine,
-        String commitSha
-    ) {}
+            long pullRequestId,
+            int pullRequestNumber,
+            String pullRequestTitle,
+            long reviewId,
+            String reviewBody,
+            long reviewCommentId,
+            String reviewCommentBody,
+            String reviewCommentPath,
+            int reviewCommentLine,
+            String commitSha) {}
 
     @FunctionalInterface
     protected interface CheckedCondition {

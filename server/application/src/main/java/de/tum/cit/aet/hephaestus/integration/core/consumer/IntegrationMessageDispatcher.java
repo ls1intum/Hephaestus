@@ -50,28 +50,23 @@ public class IntegrationMessageDispatcher {
         for (SubjectParser parser : parsers) {
             IntegrationKind kind = parser.kind();
             if (kind == null) {
-                throw new IllegalStateException(
-                    parser.getClass().getName() + " returned null from kind() — every SubjectParser must declare a kind"
-                );
+                throw new IllegalStateException(parser.getClass().getName()
+                        + " returned null from kind() — every SubjectParser must declare a kind");
             }
             SubjectParser previous = map.putIfAbsent(kind, parser);
             if (previous != null) {
-                throw new IllegalStateException(
-                    "Duplicate SubjectParser for kind " +
-                        kind +
-                        ": " +
-                        previous.getClass().getName() +
-                        " conflicts with " +
-                        parser.getClass().getName()
-                );
+                throw new IllegalStateException("Duplicate SubjectParser for kind " + kind
+                        + ": "
+                        + previous.getClass().getName()
+                        + " conflicts with "
+                        + parser.getClass().getName());
             }
         }
         this.parsersByKind = Map.copyOf(map);
         log.info(
-            "IntegrationMessageDispatcher configured: {} subject parser(s), {} handler(s)",
-            parsersByKind.size(),
-            registry.handlerCount()
-        );
+                "IntegrationMessageDispatcher configured: {} subject parser(s), {} handler(s)",
+                parsersByKind.size(),
+                registry.handlerCount());
     }
 
     /**

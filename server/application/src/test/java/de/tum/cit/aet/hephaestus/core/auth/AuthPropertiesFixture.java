@@ -30,20 +30,19 @@ public final class AuthPropertiesFixture {
 
     private static AuthProperties build(String apiBasePath, Map<String, AuthProperties.LoginProviderSeed> providers) {
         return new AuthProperties(
-            URI.create("http://localhost:8080"),
-            apiBasePath,
-            "hephaestus-spa",
-            Duration.ofMinutes(15),
-            AuthProperties.DEFAULT_COOKIE_NAME,
-            "",
-            Duration.ofHours(48),
-            providers,
-            List.of(),
-            "",
-            Duration.ofHours(1),
-            Duration.ofHours(12),
-            false,
-            true
-        );
+                URI.create("http://localhost:8080"),
+                apiBasePath,
+                "hephaestus-spa",
+                Duration.ofMinutes(15),
+                AuthProperties.DEFAULT_COOKIE_NAME,
+                "",
+                Duration.ofHours(48),
+                providers,
+                List.of(),
+                "",
+                Duration.ofHours(1),
+                Duration.ofHours(12),
+                false,
+                true);
     }
 }

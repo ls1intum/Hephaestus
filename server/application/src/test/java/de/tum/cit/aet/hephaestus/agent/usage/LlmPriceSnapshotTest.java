@@ -14,15 +14,14 @@ class LlmPriceSnapshotTest extends BaseUnitTest {
 
     private static LlmPriceSnapshot priced(@Nullable String inputRate) {
         return new LlmPriceSnapshot(
-            FundingSource.INSTANCE,
-            PricingState.PRICED,
-            1L,
-            null,
-            inputRate == null ? null : new BigDecimal(inputRate),
-            BigDecimal.ZERO,
-            BigDecimal.ZERO,
-            BigDecimal.ZERO
-        );
+                FundingSource.INSTANCE,
+                PricingState.PRICED,
+                1L,
+                null,
+                inputRate == null ? null : new BigDecimal(inputRate),
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO);
     }
 
     @Nested
@@ -42,15 +41,7 @@ class LlmPriceSnapshotTest extends BaseUnitTest {
         @DisplayName("an unpriced model yields no cost at all, not a zero")
         void anUnpricedModelYieldsNoCostAtAllRatherThanAZero() {
             LlmPriceSnapshot unpriced = new LlmPriceSnapshot(
-                FundingSource.INSTANCE,
-                PricingState.UNPRICED,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
+                    FundingSource.INSTANCE, PricingState.UNPRICED, null, null, null, null, null, null);
 
             assertThat(unpriced.calculateCost(1_000_000, 1_000_000, 0, 0).usd()).isNull();
         }
@@ -66,15 +57,14 @@ class LlmPriceSnapshotTest extends BaseUnitTest {
         @DisplayName("a declared-free model is exactly zero even when it carries real rates, and that is not a clamp")
         void noChargeIsZeroDespiteCarryingRates() {
             LlmPriceSnapshot free = new LlmPriceSnapshot(
-                FundingSource.WORKSPACE,
-                PricingState.NO_CHARGE,
-                null,
-                9L,
-                new BigDecimal("1"),
-                new BigDecimal("2"),
-                new BigDecimal("3"),
-                new BigDecimal("4")
-            );
+                    FundingSource.WORKSPACE,
+                    PricingState.NO_CHARGE,
+                    null,
+                    9L,
+                    new BigDecimal("1"),
+                    new BigDecimal("2"),
+                    new BigDecimal("3"),
+                    new BigDecimal("4"));
 
             LlmPriceSnapshot.Cost cost = free.calculateCost(1_000_000, 2_000_000, 500_000, 250_000);
 
@@ -85,8 +75,8 @@ class LlmPriceSnapshotTest extends BaseUnitTest {
         @Test
         void aNegativeRateIsRefusedRatherThanCredited() {
             assertThatThrownBy(() -> priced("-1.00").calculateCost(1_000_000, 0, 0, 0))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("negative");
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("negative");
         }
     }
 

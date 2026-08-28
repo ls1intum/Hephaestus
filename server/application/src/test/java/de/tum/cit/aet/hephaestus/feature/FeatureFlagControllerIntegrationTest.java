@@ -23,92 +23,92 @@ class FeatureFlagControllerIntegrationTest extends BaseIntegrationTest {
         @DisplayName("returns 401 when unauthenticated")
         void requiresAuthentication() {
             webTestClient
-                .get()
-                .uri("/user/features")
-                .headers(TestAuthUtils.withCurrentUserOrNone())
-                .exchange()
-                .expectStatus()
-                .isUnauthorized();
+                    .get()
+                    .uri("/user/features")
+                    .headers(TestAuthUtils.withCurrentUserOrNone())
+                    .exchange()
+                    .expectStatus()
+                    .isUnauthorized();
         }
 
         @Test
         @WithAdminUser
         void adminUserHasAdminFlags() {
             webTestClient
-                .get()
-                .uri("/user/features")
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.ADMIN")
-                .isEqualTo(true)
-                .jsonPath("$.MENTOR_ACCESS")
-                .isEqualTo(false) // admin annotation only sets "admin" authority
-                .jsonPath("$.GITLAB_WORKSPACE_CREATION")
-                .isEqualTo(true);
+                    .get()
+                    .uri("/user/features")
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.ADMIN")
+                    .isEqualTo(true)
+                    .jsonPath("$.MENTOR_ACCESS")
+                    .isEqualTo(false) // admin annotation only sets "admin" authority
+                    .jsonPath("$.GITLAB_WORKSPACE_CREATION")
+                    .isEqualTo(true);
         }
 
         @Test
         @WithMentorUser
         void mentorUserHasMentorFlags() {
             webTestClient
-                .get()
-                .uri("/user/features")
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.MENTOR_ACCESS")
-                .isEqualTo(true)
-                .jsonPath("$.ADMIN")
-                .isEqualTo(false)
-                .jsonPath("$.NOTIFICATION_ACCESS")
-                .isEqualTo(false);
+                    .get()
+                    .uri("/user/features")
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.MENTOR_ACCESS")
+                    .isEqualTo(true)
+                    .jsonPath("$.ADMIN")
+                    .isEqualTo(false)
+                    .jsonPath("$.NOTIFICATION_ACCESS")
+                    .isEqualTo(false);
         }
 
         @Test
         @WithUser
         void regularUserHasNoRoleFlags() {
             webTestClient
-                .get()
-                .uri("/user/features")
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.MENTOR_ACCESS")
-                .isEqualTo(false)
-                .jsonPath("$.ADMIN")
-                .isEqualTo(false)
-                .jsonPath("$.NOTIFICATION_ACCESS")
-                .isEqualTo(false);
+                    .get()
+                    .uri("/user/features")
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.MENTOR_ACCESS")
+                    .isEqualTo(false)
+                    .jsonPath("$.ADMIN")
+                    .isEqualTo(false)
+                    .jsonPath("$.NOTIFICATION_ACCESS")
+                    .isEqualTo(false);
         }
 
         @Test
         @WithUser
         void responseContainsAllFlags() {
             webTestClient
-                .get()
-                .uri("/user/features")
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.length()")
-                .isEqualTo(FeatureFlag.values().length)
-                .jsonPath("$.MENTOR_ACCESS")
-                .exists()
-                .jsonPath("$.NOTIFICATION_ACCESS")
-                .exists()
-                .jsonPath("$.ADMIN")
-                .exists()
-                .jsonPath("$.GITLAB_WORKSPACE_CREATION")
-                .exists();
+                    .get()
+                    .uri("/user/features")
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.length()")
+                    .isEqualTo(FeatureFlag.values().length)
+                    .jsonPath("$.MENTOR_ACCESS")
+                    .exists()
+                    .jsonPath("$.NOTIFICATION_ACCESS")
+                    .exists()
+                    .jsonPath("$.ADMIN")
+                    .exists()
+                    .jsonPath("$.GITLAB_WORKSPACE_CREATION")
+                    .exists();
         }
     }
 }

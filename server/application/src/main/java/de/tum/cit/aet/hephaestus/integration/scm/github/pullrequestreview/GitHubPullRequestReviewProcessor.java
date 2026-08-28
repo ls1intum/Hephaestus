@@ -51,12 +51,11 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
     private final ApplicationEventPublisher eventPublisher;
 
     public GitHubPullRequestReviewProcessor(
-        PullRequestReviewRepository reviewRepository,
-        PullRequestRepository prRepository,
-        UserRepository userRepository,
-        GitHubUserProcessor gitHubUserProcessor,
-        ApplicationEventPublisher eventPublisher
-    ) {
+            PullRequestReviewRepository reviewRepository,
+            PullRequestRepository prRepository,
+            UserRepository userRepository,
+            GitHubUserProcessor gitHubUserProcessor,
+            ApplicationEventPublisher eventPublisher) {
         super(userRepository, null, null, gitHubUserProcessor);
         this.reviewRepository = reviewRepository;
         this.prRepository = prRepository;
@@ -77,10 +76,7 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public @Nullable PullRequestReview process(
-        GitHubPullRequestReviewEventDTO.GitHubReviewDTO dto,
-        Long prId,
-        @NonNull ProcessingContext context
-    ) {
+            GitHubPullRequestReviewEventDTO.GitHubReviewDTO dto, Long prId, @NonNull ProcessingContext context) {
         if (dto == null || dto.id() == null) {
             log.warn("Skipped review processing: reason=nullOrMissingId");
             return null;
@@ -119,10 +115,9 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public @Nullable PullRequestReview processWithParentCreation(
-        GitHubPullRequestReviewEventDTO.GitHubReviewDTO dto,
-        GitHubPullRequestDTO prDto,
-        @NonNull ProcessingContext context
-    ) {
+            GitHubPullRequestReviewEventDTO.GitHubReviewDTO dto,
+            GitHubPullRequestDTO prDto,
+            @NonNull ProcessingContext context) {
         if (dto == null || dto.id() == null) {
             log.warn("Skipped review processing: reason=nullOrMissingId");
             return null;
@@ -136,18 +131,17 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
         // Use repository ID + PR number for lookup - these are stable across GraphQL and webhooks.
         // Do NOT use prDto.getDatabaseId() as the ID format may differ between API sources.
         PullRequest pr = prRepository
-            .findByRepositoryIdAndNumber(context.repository().getId(), prDto.number())
-            .orElse(null);
+                .findByRepositoryIdAndNumber(context.repository().getId(), prDto.number())
+                .orElse(null);
 
         // If parent doesn't exist, create a minimal entity from webhook data
         if (pr == null) {
             pr = createMinimalPullRequest(prDto, context);
             if (pr == null) {
                 log.warn(
-                    "Skipped review processing: reason=failedToCreateParent, prNumber={}, reviewId={}",
-                    prDto.number(),
-                    dto.id()
-                );
+                        "Skipped review processing: reason=failedToCreateParent, prNumber={}, reviewId={}",
+                        prDto.number(),
+                        dto.id());
                 return null;
             }
         }
@@ -159,14 +153,12 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
      * Internal method that processes a review given a resolved parent PR.
      */
     private @Nullable PullRequestReview processReviewInternal(
-        GitHubPullRequestReviewEventDTO.GitHubReviewDTO dto,
-        PullRequest pr,
-        @NonNull ProcessingContext context
-    ) {
+            GitHubPullRequestReviewEventDTO.GitHubReviewDTO dto, PullRequest pr, @NonNull ProcessingContext context) {
         return reviewRepository
-            .findByNativeIdAndProviderId(Objects.requireNonNull(dto.id()), Objects.requireNonNull(context.providerId()))
-            .map(review -> updateReview(review, dto, context))
-            .orElseGet(() -> createReview(dto, pr, context));
+                .findByNativeIdAndProviderId(
+                        Objects.requireNonNull(dto.id()), Objects.requireNonNull(context.providerId()))
+                .map(review -> updateReview(review, dto, context))
+                .orElseGet(() -> createReview(dto, pr, context));
     }
 
     /**
@@ -178,24 +170,21 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
     @Transactional
     public void processDismissed(Long reviewNativeId, @NonNull ProcessingContext context) {
         reviewRepository
-            .findByNativeIdAndProviderId(reviewNativeId, Objects.requireNonNull(context.providerId()))
-            .ifPresent(review -> {
-                review.setDismissed(true);
-                review = reviewRepository.save(review);
-                ScmEventPayload.ReviewData.from(review).ifPresent(reviewData ->
-                    eventPublisher.publishEvent(
-                        new ScmDomainEvent.ReviewDismissed(reviewData, EventContext.from(context))
-                    )
-                );
-                log.debug("Dismissed review: nativeId={}", reviewNativeId);
-            });
+                .findByNativeIdAndProviderId(reviewNativeId, Objects.requireNonNull(context.providerId()))
+                .ifPresent(review -> {
+                    review.setDismissed(true);
+                    review = reviewRepository.save(review);
+                    ScmEventPayload.ReviewData.from(review)
+                            .ifPresent(reviewData -> eventPublisher.publishEvent(
+                                    new ScmDomainEvent.ReviewDismissed(reviewData, EventContext.from(context))));
+                    log.debug("Dismissed review: nativeId={}", reviewNativeId);
+                });
     }
 
     private PullRequestReview updateReview(
-        PullRequestReview review,
-        GitHubPullRequestReviewEventDTO.GitHubReviewDTO dto,
-        @NonNull ProcessingContext context
-    ) {
+            PullRequestReview review,
+            GitHubPullRequestReviewEventDTO.GitHubReviewDTO dto,
+            @NonNull ProcessingContext context) {
         review.setBody(dto.body());
         if (dto.state() != null) {
             PullRequestReview.State newState = mapState(Objects.requireNonNullElse(dto.state(), "COMMENTED"));
@@ -222,20 +211,15 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
             review.setAuthorCanPushToRepository(dto.authorCanPushToRepository());
         }
         PullRequestReview saved = reviewRepository.save(review);
-        ScmEventPayload.ReviewData.from(saved).ifPresent(reviewData ->
-            eventPublisher.publishEvent(
-                new ScmDomainEvent.ReviewEdited(reviewData, Set.of("body", "state"), EventContext.from(context))
-            )
-        );
+        ScmEventPayload.ReviewData.from(saved)
+                .ifPresent(reviewData -> eventPublisher.publishEvent(new ScmDomainEvent.ReviewEdited(
+                        reviewData, Set.of("body", "state"), EventContext.from(context))));
         log.debug("Updated review: reviewId={}", dto.id());
         return saved;
     }
 
     private PullRequestReview createReview(
-        GitHubPullRequestReviewEventDTO.GitHubReviewDTO dto,
-        PullRequest pr,
-        @NonNull ProcessingContext context
-    ) {
+            GitHubPullRequestReviewEventDTO.GitHubReviewDTO dto, PullRequest pr, @NonNull ProcessingContext context) {
         PullRequestReview review = new PullRequestReview();
         review.setNativeId(Objects.requireNonNull(dto.id()));
         review.setProvider(Objects.requireNonNull(context.provider()));
@@ -252,8 +236,9 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
         }
         // Use submittedAt from DTO, fallback to PR createdAt (review can't predate PR)
         review.setSubmittedAt(
-            dto.submittedAt() != null ? dto.submittedAt() : Objects.requireNonNullElse(pr.getCreatedAt(), Instant.now())
-        );
+                dto.submittedAt() != null
+                        ? dto.submittedAt()
+                        : Objects.requireNonNullElse(pr.getCreatedAt(), Instant.now()));
         review.setHtmlUrl(dto.htmlUrl() != null ? dto.htmlUrl() : "");
         review.setPullRequest(pr);
         review.setCommitId(dto.commitId());
@@ -273,21 +258,19 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
         if (reviewDataOpt.isPresent()) {
             var reviewData = reviewDataOpt.get();
             log.debug(
-                "Publishing ReviewSubmitted event: reviewId={}, state={}, scopeId={}, authorId={}, repositoryId={}",
-                reviewData.id(),
-                reviewData.state(),
-                context.scopeId(),
-                reviewData.authorId(),
-                reviewData.repositoryId()
-            );
+                    "Publishing ReviewSubmitted event: reviewId={}, state={}, scopeId={}, authorId={}, repositoryId={}",
+                    reviewData.id(),
+                    reviewData.state(),
+                    context.scopeId(),
+                    reviewData.authorId(),
+                    reviewData.repositoryId());
             eventPublisher.publishEvent(new ScmDomainEvent.ReviewSubmitted(reviewData, EventContext.from(context)));
         } else {
             log.warn(
-                "ReviewData.from() returned empty - no event published: reviewId={}, prId={}, prIsNull={}",
-                saved.getId(),
-                saved.getPullRequest() != null ? saved.getPullRequest().getId() : "null",
-                saved.getPullRequest() == null
-            );
+                    "ReviewData.from() returned empty - no event published: reviewId={}, prId={}, prIsNull={}",
+                    saved.getId(),
+                    saved.getPullRequest() != null ? saved.getPullRequest().getId() : "null",
+                    saved.getPullRequest() == null);
         }
         log.debug("Created review: reviewId={}", dto.id());
         return saved;
@@ -296,8 +279,7 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
     private PullRequestReview.State mapState(String state) {
         if (state == null) {
             log.warn(
-                "Review state is null, using UNKNOWN. This may indicate missing data in webhook or GraphQL response."
-            );
+                    "Review state is null, using UNKNOWN. This may indicate missing data in webhook or GraphQL response.");
             return PullRequestReview.State.UNKNOWN;
         }
         return switch (state.toUpperCase()) {
@@ -386,12 +368,11 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
 
         PullRequest saved = prRepository.save(pr);
         log.info(
-            "Created stub PullRequest from review webhook (will be hydrated by PR webhook or sync): " +
-                "prId={}, prNumber={}, repoName={}",
-            saved.getId(),
-            saved.getNumber(),
-            repository.getNameWithOwner()
-        );
+                "Created stub PullRequest from review webhook (will be hydrated by PR webhook or sync): "
+                        + "prId={}, prNumber={}, repoName={}",
+                saved.getId(),
+                saved.getNumber(),
+                repository.getNameWithOwner());
         return saved;
     }
 
@@ -400,10 +381,8 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
      */
     private Issue.State convertState(String state) {
         if (state == null) {
-            log.warn(
-                "PR state is null when creating stub from review webhook, defaulting to OPEN. " +
-                    "This may indicate missing data in webhook payload."
-            );
+            log.warn("PR state is null when creating stub from review webhook, defaulting to OPEN. "
+                    + "This may indicate missing data in webhook payload.");
             return Issue.State.OPEN;
         }
         return switch (state.toUpperCase()) {

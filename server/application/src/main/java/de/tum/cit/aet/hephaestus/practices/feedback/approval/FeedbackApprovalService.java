@@ -27,14 +27,10 @@ public class FeedbackApprovalService {
 
     @Transactional(noRollbackFor = ResponseStatusException.class)
     public FeedbackApproval decide(
-        Long workspaceId,
-        UUID feedbackId,
-        Long actorAccountId,
-        DecideFeedbackProposalRequestDTO request
-    ) {
+            Long workspaceId, UUID feedbackId, Long actorAccountId, DecideFeedbackProposalRequestDTO request) {
         Feedback feedback = feedbackRepository
-            .findByIdAndWorkspaceId(feedbackId, workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("Feedback", feedbackId.toString()));
+                .findByIdAndWorkspaceId(feedbackId, workspaceId)
+                .orElseThrow(() -> new EntityNotFoundException("Feedback", feedbackId.toString()));
         validate(request);
         if (feedback.getChannel() != FeedbackChannel.IN_CONTEXT) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only in-context feedback can be approved");
@@ -43,32 +39,26 @@ public class FeedbackApprovalService {
             FeedbackSuppressionReason brake = eligibility.brakeOnDelivery(workspaceId);
             if (brake != null) {
                 throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    brake == FeedbackSuppressionReason.INSTANCE_SILENCED
-                        ? "Silent Mode is engaged for this instance, so approving would not send anything"
-                        : "Sending is paused for this workspace, so approving would not send anything"
-                );
+                        HttpStatus.CONFLICT,
+                        brake == FeedbackSuppressionReason.INSTANCE_SILENCED
+                                ? "Silent Mode is engaged for this instance, so approving would not send anything"
+                                : "Sending is paused for this workspace, so approving would not send anything");
             }
         }
-        if (
-            request.decision() == FeedbackApprovalDecision.APPROVED && !eligibility.isEligible(workspaceId, feedbackId)
-        ) {
+        if (request.decision() == FeedbackApprovalDecision.APPROVED
+                && !eligibility.isEligible(workspaceId, feedbackId)) {
             feedbackRepository.suppressProposal(
-                workspaceId,
-                feedbackId,
-                FeedbackSuppressionReason.APPROVAL_NO_LONGER_ELIGIBLE.name()
-            );
+                    workspaceId, feedbackId, FeedbackSuppressionReason.APPROVAL_NO_LONGER_ELIGIBLE.name());
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This proposal is no longer eligible for approval");
         }
         FeedbackApproval existing = approvalRepository
-            .findByFeedbackIdAndWorkspaceId(feedbackId, workspaceId)
-            .orElse(null);
+                .findByFeedbackIdAndWorkspaceId(feedbackId, workspaceId)
+                .orElse(null);
         if (existing != null) {
-            if (
-                existing.getDecision() != request.decision() ||
-                existing.getRejectionReason() != request.rejectionReason() ||
-                !java.util.Objects.equals(existing.getRejectionNote(), normalizedNote(request.rejectionNote()))
-            ) {
+            if (existing.getDecision() != request.decision()
+                    || existing.getRejectionReason() != request.rejectionReason()
+                    || !java.util.Objects.equals(
+                            existing.getRejectionNote(), normalizedNote(request.rejectionNote()))) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "This proposal has already been decided");
             }
             if (existing.getDecision() == FeedbackApprovalDecision.APPROVED) {
@@ -77,16 +67,14 @@ public class FeedbackApprovalService {
             return existing;
         }
 
-        FeedbackDeliveryState target =
-            request.decision() == FeedbackApprovalDecision.APPROVED
+        FeedbackDeliveryState target = request.decision() == FeedbackApprovalDecision.APPROVED
                 ? FeedbackDeliveryState.PREPARED
                 : FeedbackDeliveryState.DISCARDED;
         if (feedbackRepository.decideProposal(workspaceId, feedbackId, target.name()) != 1) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This proposal has already been decided");
         }
 
-        FeedbackApproval approval = approvalRepository.save(
-            FeedbackApproval.builder()
+        FeedbackApproval approval = approvalRepository.save(FeedbackApproval.builder()
                 .feedbackId(feedbackId)
                 .workspaceId(workspaceId)
                 .actorAccountId(actorAccountId)
@@ -94,8 +82,7 @@ public class FeedbackApprovalService {
                 .rejectionReason(request.rejectionReason())
                 .rejectionNote(normalizedNote(request.rejectionNote()))
                 .contentDigest(FeedbackApprovalDigest.of(feedback))
-                .build()
-        );
+                .build());
         if (request.decision() == FeedbackApprovalDecision.APPROVED) {
             eventPublisher.publishEvent(new ApprovedFeedbackReadyEvent(workspaceId, feedbackId));
         }
@@ -105,8 +92,8 @@ public class FeedbackApprovalService {
     @Transactional(readOnly = true)
     public FeedbackApproval get(Long workspaceId, UUID feedbackId) {
         return approvalRepository
-            .findByFeedbackIdAndWorkspaceId(feedbackId, workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("Feedback approval", feedbackId.toString()));
+                .findByFeedbackIdAndWorkspaceId(feedbackId, workspaceId)
+                .orElseThrow(() -> new EntityNotFoundException("Feedback approval", feedbackId.toString()));
     }
 
     private static void validate(DecideFeedbackProposalRequestDTO request) {
@@ -116,9 +103,8 @@ public class FeedbackApprovalService {
         if (request.decision() == FeedbackApprovalDecision.APPROVED && request.rejectionReason() != null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "An approval cannot have a rejection reason");
         }
-        if (
-            request.decision() == FeedbackApprovalDecision.APPROVED && normalizedNote(request.rejectionNote()) != null
-        ) {
+        if (request.decision() == FeedbackApprovalDecision.APPROVED
+                && normalizedNote(request.rejectionNote()) != null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "An approval cannot have a rejection note");
         }
     }

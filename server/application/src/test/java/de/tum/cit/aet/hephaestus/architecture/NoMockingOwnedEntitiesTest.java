@@ -36,31 +36,27 @@ class NoMockingOwnedEntitiesTest {
      * These all have {@code @NoArgsConstructor + @Setter}; build the real object instead.
      */
     private static final List<String> GUARDED_ENTITIES = List.of(
-        "Repository",
-        "Workspace",
-        "PullRequest",
-        "AgentJob",
-        "Commit",
-        "Organization",
-        "IdentityProvider",
-        "User",
-        "IdentityLink"
-    );
+            "Repository",
+            "Workspace",
+            "PullRequest",
+            "AgentJob",
+            "Commit",
+            "Organization",
+            "IdentityProvider",
+            "User",
+            "IdentityLink");
 
     /** {@code mock(Entity.class)} or {@code Mockito.mock(Entity.class)}, with optional settings arg. */
-    private static final Pattern MOCK_CALL = Pattern.compile(
-        "\\bmock\\s*\\(\\s*(" + String.join("|", GUARDED_ENTITIES) + ")\\.class\\b"
-    );
+    private static final Pattern MOCK_CALL =
+            Pattern.compile("\\bmock\\s*\\(\\s*(" + String.join("|", GUARDED_ENTITIES) + ")\\.class\\b");
 
     /** {@code spy(Entity.class)} / {@code spy(new Entity())} / {@code Mockito.spy(...)}. */
-    private static final Pattern SPY_CALL = Pattern.compile(
-        "\\bspy\\s*\\(\\s*(?:new\\s+)?(" + String.join("|", GUARDED_ENTITIES) + ")\\b"
-    );
+    private static final Pattern SPY_CALL =
+            Pattern.compile("\\bspy\\s*\\(\\s*(?:new\\s+)?(" + String.join("|", GUARDED_ENTITIES) + ")\\b");
 
     /** {@code @Mock [modifiers] Entity field;} — the field-injection form. */
-    private static final Pattern MOCK_FIELD = Pattern.compile(
-        "@Mock\\b[^;\\n]*?\\b(" + String.join("|", GUARDED_ENTITIES) + ")\\s+\\w+\\s*;"
-    );
+    private static final Pattern MOCK_FIELD =
+            Pattern.compile("@Mock\\b[^;\\n]*?\\b(" + String.join("|", GUARDED_ENTITIES) + ")\\s+\\w+\\s*;");
 
     @Test
     void noTestMocksAnOwnedEntity() {
@@ -68,29 +64,26 @@ class NoMockingOwnedEntitiesTest {
         List<String> violations = new ArrayList<>();
 
         try (Stream<Path> sources = Files.walk(testRoot)) {
-            sources
-                .filter(Files::isRegularFile)
-                .filter(p -> p.toString().endsWith(".java"))
-                // Don't flag this guard itself, nor the object-mother that names the entities.
-                .filter(p -> !p.getFileName().toString().equals("NoMockingOwnedEntitiesTest.java"))
-                .filter(p -> !p.getFileName().toString().equals("TestEntities.java"))
-                .forEach(p -> scanFile(p, violations));
+            sources.filter(Files::isRegularFile)
+                    .filter(p -> p.toString().endsWith(".java"))
+                    // Don't flag this guard itself, nor the object-mother that names the entities.
+                    .filter(p -> !p.getFileName().toString().equals("NoMockingOwnedEntitiesTest.java"))
+                    .filter(p -> !p.getFileName().toString().equals("TestEntities.java"))
+                    .forEach(p -> scanFile(p, violations));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
 
         assertThat(violations)
-            .as(
-                "Owned JPA @Entity classes must NOT be Mockito-mocked in tests — mocking them and " +
-                    "stubbing getters is tautological (tests the stub, not the SUT) and couples tests to " +
-                    "getter names instead of real entity wiring. Build the real object via " +
-                    "de.tum.cit.aet.hephaestus.testconfig.TestEntities (or new Entity() + setters). " +
-                    "Guarded entities: " +
-                    GUARDED_ENTITIES +
-                    ". Offending sites:\n" +
-                    String.join("\n", violations)
-            )
-            .isEmpty();
+                .as("Owned JPA @Entity classes must NOT be Mockito-mocked in tests — mocking them and "
+                        + "stubbing getters is tautological (tests the stub, not the SUT) and couples tests to "
+                        + "getter names instead of real entity wiring. Build the real object via "
+                        + "de.tum.cit.aet.hephaestus.testconfig.TestEntities (or new Entity() + setters). "
+                        + "Guarded entities: "
+                        + GUARDED_ENTITIES
+                        + ". Offending sites:\n"
+                        + String.join("\n", violations))
+                .isEmpty();
     }
 
     private static void scanFile(Path file, List<String> violations) {
@@ -116,9 +109,8 @@ class NoMockingOwnedEntitiesTest {
         String content = String.join("\n", lines);
         Matcher fieldMatcher = MOCK_FIELD.matcher(content);
         while (fieldMatcher.find()) {
-            violations.add(
-                format(file, lineOf(content, fieldMatcher.start()), "@Mock " + fieldMatcher.group(1) + " field", "")
-            );
+            violations.add(format(
+                    file, lineOf(content, fieldMatcher.start()), "@Mock " + fieldMatcher.group(1) + " field", ""));
         }
     }
 

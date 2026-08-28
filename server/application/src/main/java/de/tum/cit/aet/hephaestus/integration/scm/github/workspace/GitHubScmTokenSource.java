@@ -52,36 +52,35 @@ public class GitHubScmTokenSource implements ScmTokenSource {
                 return (token == null || token.isBlank()) ? Optional.empty() : Optional.of(token);
             } catch (Exception e) {
                 log.warn(
-                    "Failed to mint GitHub App installation token: scopeId={}, installationId={}, error={}",
-                    scopeId,
-                    appConfig.get().installationId(),
-                    e.getMessage()
-                );
+                        "Failed to mint GitHub App installation token: scopeId={}, installationId={}, error={}",
+                        scopeId,
+                        appConfig.get().installationId(),
+                        e.getMessage());
                 return Optional.empty();
             }
         }
         // PAT fallback.
         return connectionService
-            .findActiveBearerToken(scopeId, IntegrationKind.GITHUB)
-            .map(b -> b.token())
-            .filter(t -> t != null && !t.isBlank());
+                .findActiveBearerToken(scopeId, IntegrationKind.GITHUB)
+                .map(b -> b.token())
+                .filter(t -> t != null && !t.isBlank());
     }
 
     @Override
     public Optional<String> serverUrl(long scopeId) {
         return connectionService
-            .findActive(scopeId, IntegrationKind.GITHUB)
-            .map(c -> {
-                if (c.getConfig() instanceof ConnectionConfig.GitHubAppConfig app) {
-                    return app.serverUrl();
-                }
-                if (c.getConfig() instanceof ConnectionConfig.GitHubPatConfig pat) {
-                    return pat.serverUrl();
-                }
-                return null;
-            })
-            .filter(u -> u != null && !u.isBlank())
-            .or(() -> Optional.of(DEFAULT_GITHUB_URL));
+                .findActive(scopeId, IntegrationKind.GITHUB)
+                .map(c -> {
+                    if (c.getConfig() instanceof ConnectionConfig.GitHubAppConfig app) {
+                        return app.serverUrl();
+                    }
+                    if (c.getConfig() instanceof ConnectionConfig.GitHubPatConfig pat) {
+                        return pat.serverUrl();
+                    }
+                    return null;
+                })
+                .filter(u -> u != null && !u.isBlank())
+                .or(() -> Optional.of(DEFAULT_GITHUB_URL));
     }
 
     @Override

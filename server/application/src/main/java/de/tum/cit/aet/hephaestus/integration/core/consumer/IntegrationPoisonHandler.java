@@ -85,19 +85,17 @@ public class IntegrationPoisonHandler {
         // deliveredCount is 1-based — first attempt is 1, so use (count - 1) as exponent.
         int attempt = (int) Math.min(deliveredCount - 1, Integer.MAX_VALUE);
         long delayMs = exponentialBackoffMillis(
-            attempt,
-            properties.poison().baseDelay().toMillis(),
-            properties.poison().maxDelay().toMillis()
-        );
+                attempt,
+                properties.poison().baseDelay().toMillis(),
+                properties.poison().maxDelay().toMillis());
 
         nakCounter(msg).increment();
         try {
             log.debug(
-                "NAKing message with backoff: subject={}, attempt={}, delayMs={}",
-                sanitizeForLog(msg.getSubject()),
-                deliveredCount,
-                delayMs
-            );
+                    "NAKing message with backoff: subject={}, attempt={}, delayMs={}",
+                    sanitizeForLog(msg.getSubject()),
+                    deliveredCount,
+                    delayMs);
             msg.nakWithDelay(Duration.ofMillis(delayMs));
         } catch (Exception nakWithDelayFailed) {
             // Closed connection / shutdown / etc. — fall back to immediate NAK so the
@@ -137,12 +135,11 @@ public class IntegrationPoisonHandler {
         long streamSeq = readStreamSequence(msg);
         poisonCounter(msg).increment();
         log.error(
-            "Poison message detected, ACKing to break redelivery loop: subject={}, deliveredCount={}, streamSeq={}, reason={}",
-            sanitizeForLog(msg.getSubject()),
-            deliveredCount,
-            streamSeq,
-            sanitizeForLog(reason)
-        );
+                "Poison message detected, ACKing to break redelivery loop: subject={}, deliveredCount={}, streamSeq={}, reason={}",
+                sanitizeForLog(msg.getSubject()),
+                deliveredCount,
+                streamSeq,
+                sanitizeForLog(reason));
         try {
             msg.ack();
         } catch (Exception ackFailed) {
@@ -172,16 +169,14 @@ public class IntegrationPoisonHandler {
 
     private Counter nakCounter(Message msg) {
         String kindTag = kindTag(msg);
-        return nakCounters.computeIfAbsent(kindTag, k ->
-            Counter.builder(NAK_COUNTER).tag("kind", k).register(meterRegistry)
-        );
+        return nakCounters.computeIfAbsent(
+                kindTag, k -> Counter.builder(NAK_COUNTER).tag("kind", k).register(meterRegistry));
     }
 
     private Counter poisonCounter(Message msg) {
         String kindTag = kindTag(msg);
-        return poisonCounters.computeIfAbsent(kindTag, k ->
-            Counter.builder(POISON_COUNTER).tag("kind", k).register(meterRegistry)
-        );
+        return poisonCounters.computeIfAbsent(
+                kindTag, k -> Counter.builder(POISON_COUNTER).tag("kind", k).register(meterRegistry));
     }
 
     /**
@@ -209,7 +204,7 @@ public class IntegrationPoisonHandler {
         }
         String subject = msg.getSubject();
         return ConsumerSubjectMath.kindFromSubjectPrefix(subject)
-            .map(k -> k.name().toLowerCase())
-            .orElse(UNKNOWN_KIND_TAG);
+                .map(k -> k.name().toLowerCase())
+                .orElse(UNKNOWN_KIND_TAG);
     }
 }

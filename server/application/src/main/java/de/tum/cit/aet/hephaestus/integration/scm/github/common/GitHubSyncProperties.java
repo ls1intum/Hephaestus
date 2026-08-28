@@ -67,11 +67,15 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.integration.github.sync")
 public record GitHubSyncProperties(
-    @NotNull @DurationUnit(SECONDS) @DefaultValue("30s") Duration graphqlTimeout,
-    @NotNull @DurationUnit(SECONDS) @DefaultValue("60s") Duration extendedGraphqlTimeout,
-    @NotNull @DurationUnit(SECONDS) @DefaultValue("120s") Duration backfillGraphqlTimeout,
-    @NotNull @DurationUnit(MILLIS) @DefaultValue("200ms") Duration paginationThrottle,
-    @DefaultValue("true") boolean incrementalSyncEnabled,
-    @NotNull @DurationUnit(MINUTES) @DefaultValue("5m") Duration incrementalSyncBuffer,
-    @DefaultValue("10") int backfillPrPageSize
-) {}
+        @NotNull @DurationUnit(SECONDS) @DefaultValue("30s") Duration graphqlTimeout,
+        @NotNull @DurationUnit(SECONDS) @DefaultValue("60s") Duration extendedGraphqlTimeout,
+
+        @NotNull @DurationUnit(SECONDS) @DefaultValue("120s")
+        Duration backfillGraphqlTimeout,
+
+        @NotNull @DurationUnit(MILLIS) @DefaultValue("200ms")
+        Duration paginationThrottle,
+
+        @DefaultValue("true") boolean incrementalSyncEnabled,
+        @NotNull @DurationUnit(MINUTES) @DefaultValue("5m") Duration incrementalSyncBuffer,
+        @DefaultValue("10") int backfillPrPageSize) {}

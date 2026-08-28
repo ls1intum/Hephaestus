@@ -15,38 +15,32 @@ import org.jspecify.annotations.Nullable;
  * Hibernate can bind where an empty array or {@code IN ()} could not.
  */
 public record ConfigAuditFilter(
-    @Nullable List<ConfigAuditEntityType> entityTypes,
-    @Nullable String entityId,
-    @Nullable String changedKey,
-    @Nullable List<ConfigAuditAction> actions,
-    @Nullable Long actorId,
-    @Nullable Instant from,
-    @Nullable Instant to
-) {
-    public String@Nullable [] entityTypeNames() {
+        @Nullable List<ConfigAuditEntityType> entityTypes,
+        @Nullable String entityId,
+        @Nullable String changedKey,
+        @Nullable List<ConfigAuditAction> actions,
+        @Nullable Long actorId,
+        @Nullable Instant from,
+        @Nullable Instant to) {
+    public String @Nullable [] entityTypeNames() {
         if (entityTypes == null || entityTypes.isEmpty()) {
             return null;
         }
-        return entityTypes
-            .stream()
-            .flatMap(value ->
-                switch (value) {
+        return entityTypes.stream()
+                .flatMap(value -> switch (value) {
                     case PRACTICE_GROUP -> java.util.stream.Stream.of("PRACTICE_GROUP", "PRACTICE_AREA");
-                    case CURATED_PRACTICE_GROUP -> java.util.stream.Stream.of(
-                        "CURATED_PRACTICE_GROUP",
-                        "CURATED_PRACTICE_AREA"
-                    );
+                    case CURATED_PRACTICE_GROUP ->
+                        java.util.stream.Stream.of("CURATED_PRACTICE_GROUP", "CURATED_PRACTICE_AREA");
                     default -> java.util.stream.Stream.of(value.name());
-                }
-            )
-            .toArray(String[]::new);
+                })
+                .toArray(String[]::new);
     }
 
-    public String@Nullable [] actionNames() {
+    public String @Nullable [] actionNames() {
         return names(actions);
     }
 
-    private static String@Nullable [] names(@Nullable List<? extends Enum<?>> values) {
+    private static String @Nullable [] names(@Nullable List<? extends Enum<?>> values) {
         if (values == null || values.isEmpty()) {
             return null;
         }

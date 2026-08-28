@@ -54,9 +54,9 @@ public class WorkspaceMembershipController {
         User currentUser = requireCurrentUser();
         WorkspaceMembership membership = workspaceMembershipService.getMembership(context.id(), currentUser.getId());
         WorkspaceRole effectiveRole = membership.getRole();
-        if (
-            effectiveRole != WorkspaceRole.OWNER && effectiveRole != WorkspaceRole.ADMIN && SecurityUtils.isSuperAdmin()
-        ) {
+        if (effectiveRole != WorkspaceRole.OWNER
+                && effectiveRole != WorkspaceRole.ADMIN
+                && SecurityUtils.isSuperAdmin()) {
             effectiveRole = WorkspaceRole.ADMIN;
         }
         return ResponseEntity.ok(WorkspaceMembershipDTO.from(membership, effectiveRole));
@@ -74,17 +74,16 @@ public class WorkspaceMembershipController {
     @GetMapping
     @SecurityRequirements
     public ResponseEntity<List<WorkspaceMembershipDTO>> listMembers(
-        WorkspaceContext context,
-        @RequestParam(defaultValue = "0") int page,
-        @RequestParam(defaultValue = "50") int size
-    ) {
+            WorkspaceContext context,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
         int pageSize = Math.min(size, 100);
         Pageable pageable = PageRequest.of(page, pageSize, Sort.by("createdAt").ascending());
 
         List<WorkspaceMembershipDTO> memberships = workspaceMembershipService
-            .listMembers(context.id(), pageable)
-            .map(WorkspaceMembershipDTO::from)
-            .getContent();
+                .listMembers(context.id(), pageable)
+                .map(WorkspaceMembershipDTO::from)
+                .getContent();
 
         return ResponseEntity.ok(memberships);
     }
@@ -116,15 +115,10 @@ public class WorkspaceMembershipController {
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "WORKSPACE_ROLE")
     public ResponseEntity<WorkspaceMembershipDTO> assignRole(
-        WorkspaceContext context,
-        @Valid @RequestBody AssignRoleRequestDTO request
-    ) {
+            WorkspaceContext context, @Valid @RequestBody AssignRoleRequestDTO request) {
         requireCanManageRole(context, request.role());
-        WorkspaceMembership membership = workspaceMembershipService.assignRole(
-            context.id(),
-            request.userId(),
-            request.role()
-        );
+        WorkspaceMembership membership =
+                workspaceMembershipService.assignRole(context.id(), request.userId(), request.role());
         return ResponseEntity.ok(WorkspaceMembershipDTO.from(membership));
     }
 
@@ -141,15 +135,9 @@ public class WorkspaceMembershipController {
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "WORKSPACE_ROLE")
     public ResponseEntity<WorkspaceMembershipDTO> updateMemberVisibility(
-        WorkspaceContext context,
-        @PathVariable Long userId,
-        @RequestParam boolean hidden
-    ) {
-        WorkspaceMembership membership = workspaceMembershipService.updateMemberVisibility(
-            context.id(),
-            userId,
-            hidden
-        );
+            WorkspaceContext context, @PathVariable Long userId, @RequestParam boolean hidden) {
+        WorkspaceMembership membership =
+                workspaceMembershipService.updateMemberVisibility(context.id(), userId, hidden);
         return ResponseEntity.ok(WorkspaceMembershipDTO.from(membership));
     }
 
@@ -178,22 +166,20 @@ public class WorkspaceMembershipController {
 
     private User requireCurrentUser() {
         return userRepository
-            .getCurrentUser()
-            .orElseThrow(() -> new AccessForbiddenException("User not authenticated"));
+                .getCurrentUser()
+                .orElseThrow(() -> new AccessForbiddenException("User not authenticated"));
     }
 
     private WorkspaceMembership requireMembership(Long workspaceId, Long userId) {
         return workspaceMembershipService
-            .findMembership(workspaceId, userId)
-            .orElseThrow(() -> new EntityNotFoundException("WorkspaceMembership", userId));
+                .findMembership(workspaceId, userId)
+                .orElseThrow(() -> new EntityNotFoundException("WorkspaceMembership", userId));
     }
 
     private void requireCanManageRole(WorkspaceContext context, WorkspaceRole role) {
         if (!accessService.canManageRole(role)) {
             throw new InsufficientWorkspacePermissionsException(
-                context.slug(),
-                "You cannot manage the " + role + " role"
-            );
+                    context.slug(), "You cannot manage the " + role + " role");
         }
     }
 

@@ -34,20 +34,18 @@ class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
         ArtifactSourceCatalogRegistry catalogs = mock(ArtifactSourceCatalogRegistry.class);
         UUID jobId = UUID.randomUUID();
         when(jobs.findEvidenceContractVersion(jobId, 7L)).thenReturn(Optional.of("1.0.0"));
-        when(
-            catalogs.isSourceUsePermitted(
-                new SourceContractVersion("1.0.0"),
-                new SourceKind("scm.pull-request.diff"),
-                SourceUsePurpose.CONVERSATIONAL_MENTORING
-            )
-        ).thenReturn(false);
+        when(catalogs.isSourceUsePermitted(
+                        new SourceContractVersion("1.0.0"),
+                        new SourceKind("scm.pull-request.diff"),
+                        SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                .thenReturn(false);
 
-        boolean permitted = new EvidenceDeliveryAuthorization(jobs, catalogs).permits(
-            7L,
-            jobId,
-            MAPPER.readTree("{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\"}]}"),
-            SourceUsePurpose.CONVERSATIONAL_MENTORING
-        );
+        boolean permitted = new EvidenceDeliveryAuthorization(jobs, catalogs)
+                .permits(
+                        7L,
+                        jobId,
+                        MAPPER.readTree("{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\"}]}"),
+                        SourceUsePurpose.CONVERSATIONAL_MENTORING);
 
         assertThat(permitted).isFalse();
     }
@@ -58,22 +56,19 @@ class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
         ArtifactSourceCatalogRegistry catalogs = mock(ArtifactSourceCatalogRegistry.class);
         UUID jobId = UUID.randomUUID();
         when(jobs.findEvidenceContractVersion(jobId, 7L)).thenReturn(Optional.of("1.0.0"));
-        when(
-            catalogs.isSourceUsePermitted(
-                new SourceContractVersion("1.0.0"),
-                new SourceKind("scm.pull-request.diff"),
-                SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW
-            )
-        ).thenReturn(true);
+        when(catalogs.isSourceUsePermitted(
+                        new SourceContractVersion("1.0.0"),
+                        new SourceKind("scm.pull-request.diff"),
+                        SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
+                .thenReturn(true);
 
-        assertThat(
-            new EvidenceDeliveryAuthorization(jobs, catalogs).permits(
-                7L,
-                jobId,
-                MAPPER.readTree("{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\"}]}"),
-                SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW
-            )
-        ).isTrue();
+        assertThat(new EvidenceDeliveryAuthorization(jobs, catalogs)
+                        .permits(
+                                7L,
+                                jobId,
+                                MAPPER.readTree("{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\"}]}"),
+                                SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
+                .isTrue();
     }
 
     @Test
@@ -84,25 +79,20 @@ class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
         UUID malformedJobId = UUID.randomUUID();
         when(jobs.findEvidenceContractVersion(malformedJobId, 7L)).thenReturn(Optional.of("1.0.0"));
 
-        assertThat(
-            authorization.permits(7L, (UUID) null, (JsonNode) null, SourceUsePurpose.CONVERSATIONAL_MENTORING)
-        ).isFalse();
-        assertThat(
-            authorization.permits(
-                7L,
-                UUID.randomUUID(),
-                MAPPER.readTree("{\"citations\":[]}"),
-                SourceUsePurpose.CONVERSATIONAL_MENTORING
-            )
-        ).isFalse();
-        assertThat(
-            authorization.permits(
-                7L,
-                malformedJobId,
-                MAPPER.readTree("{\"citations\":[{\"sourceKind\":7}]}"),
-                SourceUsePurpose.CONVERSATIONAL_MENTORING
-            )
-        ).isFalse();
+        assertThat(authorization.permits(7L, (UUID) null, (JsonNode) null, SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                .isFalse();
+        assertThat(authorization.permits(
+                        7L,
+                        UUID.randomUUID(),
+                        MAPPER.readTree("{\"citations\":[]}"),
+                        SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                .isFalse();
+        assertThat(authorization.permits(
+                        7L,
+                        malformedJobId,
+                        MAPPER.readTree("{\"citations\":[{\"sourceKind\":7}]}"),
+                        SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                .isFalse();
     }
 
     /**
@@ -125,39 +115,34 @@ class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
         Observation snapshotless = observation("scm.pull-request.diff");
         List<Observation> observations = List.of(permittedSource, deniedSource, runMissing, snapshotless);
 
-        when(jobs.findEvidenceContractVersions(eq(7L), any())).thenReturn(
-            List.of(
-                new ContractRow(permittedSource.getAgentJobId(), "1.0.0"),
-                new ContractRow(deniedSource.getAgentJobId(), "1.0.0"),
-                new ContractRow(snapshotless.getAgentJobId(), null)
-            )
-        );
-        when(jobs.findEvidenceContractVersion(permittedSource.getAgentJobId(), 7L)).thenReturn(Optional.of("1.0.0"));
+        when(jobs.findEvidenceContractVersions(eq(7L), any()))
+                .thenReturn(List.of(
+                        new ContractRow(permittedSource.getAgentJobId(), "1.0.0"),
+                        new ContractRow(deniedSource.getAgentJobId(), "1.0.0"),
+                        new ContractRow(snapshotless.getAgentJobId(), null)));
+        when(jobs.findEvidenceContractVersion(permittedSource.getAgentJobId(), 7L))
+                .thenReturn(Optional.of("1.0.0"));
         when(jobs.findEvidenceContractVersion(deniedSource.getAgentJobId(), 7L)).thenReturn(Optional.of("1.0.0"));
         when(jobs.findEvidenceContractVersion(runMissing.getAgentJobId(), 7L)).thenReturn(Optional.empty());
         when(jobs.findEvidenceContractVersion(snapshotless.getAgentJobId(), 7L)).thenReturn(Optional.empty());
-        when(
-            catalogs.isSourceUsePermitted(
-                new SourceContractVersion("1.0.0"),
-                new SourceKind("scm.pull-request.diff"),
-                SourceUsePurpose.CONVERSATIONAL_MENTORING
-            )
-        ).thenReturn(true);
-        when(
-            catalogs.isSourceUsePermitted(
-                new SourceContractVersion("1.0.0"),
-                new SourceKind("hephaestus.observation-history"),
-                SourceUsePurpose.CONVERSATIONAL_MENTORING
-            )
-        ).thenReturn(false);
+        when(catalogs.isSourceUsePermitted(
+                        new SourceContractVersion("1.0.0"),
+                        new SourceKind("scm.pull-request.diff"),
+                        SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                .thenReturn(true);
+        when(catalogs.isSourceUsePermitted(
+                        new SourceContractVersion("1.0.0"),
+                        new SourceKind("hephaestus.observation-history"),
+                        SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                .thenReturn(false);
 
         Set<UUID> batched = authorization.permitsAll(7L, observations, SourceUsePurpose.CONVERSATIONAL_MENTORING);
 
         assertThat(batched).containsExactly(permittedSource.getId());
         for (Observation observation : observations) {
             assertThat(batched.contains(observation.getId()))
-                .as("batched verdict for job %s", observation.getAgentJobId())
-                .isEqualTo(authorization.permits(7L, observation, SourceUsePurpose.CONVERSATIONAL_MENTORING));
+                    .as("batched verdict for job %s", observation.getAgentJobId())
+                    .isEqualTo(authorization.permits(7L, observation, SourceUsePurpose.CONVERSATIONAL_MENTORING));
         }
         verify(jobs).findEvidenceContractVersions(eq(7L), any());
     }
@@ -172,32 +157,26 @@ class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
         AgentJobRepository jobs = mock(AgentJobRepository.class);
         ArtifactSourceCatalogRegistry catalogs = mock(ArtifactSourceCatalogRegistry.class);
         Observation transientObservation = Observation.builder()
-            .agentJobId(UUID.randomUUID())
-            .evidence(MAPPER.readTree("{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\"}]}"))
-            .build();
+                .agentJobId(UUID.randomUUID())
+                .evidence(MAPPER.readTree("{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\"}]}"))
+                .build();
 
-        assertThat(
-            new EvidenceDeliveryAuthorization(jobs, catalogs).permitsAll(
-                7L,
-                List.of(transientObservation),
-                SourceUsePurpose.CONVERSATIONAL_MENTORING
-            )
-        ).isEmpty();
+        assertThat(new EvidenceDeliveryAuthorization(jobs, catalogs)
+                        .permitsAll(7L, List.of(transientObservation), SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                .isEmpty();
         verifyNoInteractions(jobs);
     }
 
     private static Observation observation(String sourceKind) {
         return Observation.builder()
-            .id(UUID.randomUUID())
-            .agentJobId(UUID.randomUUID())
-            .evidence(MAPPER.readTree("{\"citations\":[{\"sourceKind\":\"" + sourceKind + "\"}]}"))
-            .build();
+                .id(UUID.randomUUID())
+                .agentJobId(UUID.randomUUID())
+                .evidence(MAPPER.readTree("{\"citations\":[{\"sourceKind\":\"" + sourceKind + "\"}]}"))
+                .build();
     }
 
-    private record ContractRow(
-        UUID id,
-        @Nullable String contractVersion
-    ) implements AgentJobRepository.EvidenceContractVersionRow {
+    private record ContractRow(UUID id, @Nullable String contractVersion)
+            implements AgentJobRepository.EvidenceContractVersionRow {
         @Override
         public UUID getId() {
             return id;

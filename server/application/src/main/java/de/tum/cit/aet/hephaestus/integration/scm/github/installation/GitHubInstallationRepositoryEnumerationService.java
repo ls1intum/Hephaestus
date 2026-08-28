@@ -45,16 +45,16 @@ public class GitHubInstallationRepositoryEnumerationService {
         this.gitHubAppTokenService = gitHubAppTokenService;
 
         ExchangeStrategies strategies = ExchangeStrategies.builder()
-            .codecs(config -> config.defaultCodecs().maxInMemorySize(MAX_BUFFER_SIZE))
-            .build();
+                .codecs(config -> config.defaultCodecs().maxInMemorySize(MAX_BUFFER_SIZE))
+                .build();
 
         this.webClient = WebClient.builder()
-            .clientConnector(WebClientConnectors.systemDns())
-            .baseUrl(GITHUB_API_BASE_URL)
-            .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
-            .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
-            .exchangeStrategies(strategies)
-            .build();
+                .clientConnector(WebClientConnectors.systemDns())
+                .baseUrl(GITHUB_API_BASE_URL)
+                .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
+                .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
+                .exchangeStrategies(strategies)
+                .build();
     }
 
     // Pattern to extract URLs from Link header: <url>; rel="next"
@@ -83,12 +83,12 @@ public class GitHubInstallationRepositoryEnumerationService {
                 final String currentUrl = nextUrl;
 
                 ResponseEntity<InstallationRepositoriesResponse> responseEntity = webClient
-                    .get()
-                    .uri(currentUrl)
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + installationToken)
-                    .retrieve()
-                    .toEntity(InstallationRepositoriesResponse.class)
-                    .block();
+                        .get()
+                        .uri(currentUrl)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + installationToken)
+                        .retrieve()
+                        .toEntity(InstallationRepositoriesResponse.class)
+                        .block();
 
                 if (responseEntity == null || responseEntity.getBody() == null) {
                     log.warn("Received empty response: installationId={}, pageNumber={}", installationId, pageCount);
@@ -109,12 +109,11 @@ public class GitHubInstallationRepositoryEnumerationService {
             }
 
             log.info(
-                "Enumerated installation repositories: installationId={}, repoCount={}, totalReported={}, pageCount={}",
-                installationId,
-                allRepositories.size(),
-                totalCount,
-                pageCount
-            );
+                    "Enumerated installation repositories: installationId={}, repoCount={}, totalReported={}, pageCount={}",
+                    installationId,
+                    allRepositories.size(),
+                    totalCount,
+                    pageCount);
 
             return allRepositories;
         } catch (Exception e) {
@@ -146,14 +145,12 @@ public class GitHubInstallationRepositoryEnumerationService {
 
     // DTOs for GitHub REST API response
     private record InstallationRepositoriesResponse(
-        @JsonProperty("total_count") int totalCount,
-        @JsonProperty("repositories") List<RepositoryDto> repositories
-    ) {}
+            @JsonProperty("total_count") int totalCount,
+            @JsonProperty("repositories") List<RepositoryDto> repositories) {}
 
     private record RepositoryDto(
-        long id,
-        String name,
-        @JsonProperty("full_name") String fullName,
-        @JsonProperty("private") boolean isPrivate
-    ) {}
+            long id,
+            String name,
+            @JsonProperty("full_name") String fullName,
+            @JsonProperty("private") boolean isPrivate) {}
 }

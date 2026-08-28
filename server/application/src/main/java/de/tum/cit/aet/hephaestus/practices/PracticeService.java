@@ -63,11 +63,11 @@ public class PracticeService {
         if (autonomy == null) {
             return all;
         }
-        PracticeAutonomy workspaceDefault = workspaceDefaults.forWorkspace(ctx.id()).defaultAutonomy();
-        return all
-            .stream()
-            .filter(p -> AutonomyResolver.effectiveAutonomyOf(p, workspaceDefault) == autonomy)
-            .toList();
+        PracticeAutonomy workspaceDefault =
+                workspaceDefaults.forWorkspace(ctx.id()).defaultAutonomy();
+        return all.stream()
+                .filter(p -> AutonomyResolver.effectiveAutonomyOf(p, workspaceDefault) == autonomy)
+                .toList();
     }
 
     /**
@@ -78,12 +78,12 @@ public class PracticeService {
      */
     @Transactional(readOnly = true)
     public List<Practice> listReviewedPractices(WorkspaceContext ctx) {
-        PracticeAutonomy workspaceDefault = workspaceDefaults.forWorkspace(ctx.id()).defaultAutonomy();
-        return practiceRepository
-            .findAllForCatalog(ctx.id())
-            .stream()
-            .filter(p -> AutonomyResolver.effectiveAutonomyOf(p, workspaceDefault).admitsReview())
-            .toList();
+        PracticeAutonomy workspaceDefault =
+                workspaceDefaults.forWorkspace(ctx.id()).defaultAutonomy();
+        return practiceRepository.findAllForCatalog(ctx.id()).stream()
+                .filter(p -> AutonomyResolver.effectiveAutonomyOf(p, workspaceDefault)
+                        .admitsReview())
+                .toList();
     }
 
     @Transactional
@@ -92,25 +92,22 @@ public class PracticeService {
             throw new IllegalArgumentException("orderedSlugs must not contain duplicate slugs");
         }
         lockWorkspace(ctx);
-        List<Practice> bucket = practiceRepository
-            .findAllForCatalog(ctx.id())
-            .stream()
-            .filter(p -> Objects.equals(groupSlug, p.getGroup() == null ? null : p.getGroup().getSlug()))
-            .toList();
+        List<Practice> bucket = practiceRepository.findAllForCatalog(ctx.id()).stream()
+                .filter(p -> Objects.equals(
+                        groupSlug, p.getGroup() == null ? null : p.getGroup().getSlug()))
+                .toList();
         Set<String> existing = bucket.stream().map(Practice::getSlug).collect(Collectors.toSet());
         Set<String> requested = new HashSet<>(orderedSlugs);
         if (!existing.equals(requested)) {
-            String unknown = requested
-                .stream()
-                .filter(s -> !existing.contains(s))
-                .findFirst()
-                .orElse(null);
+            String unknown = requested.stream()
+                    .filter(s -> !existing.contains(s))
+                    .findFirst()
+                    .orElse(null);
             if (unknown != null) {
                 throw new EntityNotFoundException("Practice", unknown);
             }
             throw new IllegalArgumentException(
-                "orderedSlugs must contain every practice in the group (a complete ordering)"
-            );
+                    "orderedSlugs must contain every practice in the group (a complete ordering)");
         }
         Map<String, Practice> bySlug = bucket.stream().collect(Collectors.toMap(Practice::getSlug, p -> p));
         int order = 0;
@@ -123,30 +120,26 @@ public class PracticeService {
 
     @Transactional
     public List<Practice> placePractice(
-        WorkspaceContext ctx,
-        String practiceSlug,
-        @Nullable String groupSlug,
-        int position
-    ) {
+            WorkspaceContext ctx, String practiceSlug, @Nullable String groupSlug, int position) {
         lockWorkspace(ctx);
         Practice practice = practiceRepository
-            .findByWorkspaceIdAndSlug(ctx.id(), practiceSlug)
-            .orElseThrow(() -> new EntityNotFoundException("Practice", practiceSlug));
+                .findByWorkspaceIdAndSlug(ctx.id(), practiceSlug)
+                .orElseThrow(() -> new EntityNotFoundException("Practice", practiceSlug));
         PracticeDefinitionSnapshot before = PracticeDefinitionSnapshot.of(practice, currentRevisionNumber(practice));
-        PracticeGroup destination =
-            groupSlug == null
+        PracticeGroup destination = groupSlug == null
                 ? null
                 : practiceGroupRepository
-                      .findByWorkspaceIdAndSlug(ctx.id(), groupSlug)
-                      .orElseThrow(() -> new EntityNotFoundException("PracticeGroup", groupSlug));
+                        .findByWorkspaceIdAndSlug(ctx.id(), groupSlug)
+                        .orElseThrow(() -> new EntityNotFoundException("PracticeGroup", groupSlug));
 
-        Long sourceGroupId = practice.getGroup() == null ? null : practice.getGroup().getId();
+        Long sourceGroupId =
+                practice.getGroup() == null ? null : practice.getGroup().getId();
         Long destinationGroupId = destination == null ? null : destination.getId();
         List<Practice> allPractices = practiceRepository.findAllForCatalog(ctx.id());
         List<Practice> source = practicesInGroup(allPractices, sourceGroupId, practice);
         List<Practice> target = Objects.equals(sourceGroupId, destinationGroupId)
-            ? source
-            : practicesInGroup(allPractices, destinationGroupId, practice);
+                ? source
+                : practicesInGroup(allPractices, destinationGroupId, practice);
 
         if (position > target.size()) {
             throw new IllegalArgumentException("position exceeds the destination size");
@@ -157,27 +150,23 @@ public class PracticeService {
         if (!Objects.equals(sourceGroupId, destinationGroupId)) {
             resequence(source);
             int revisionNumber = practiceRevisionService.append(practice).getRevisionNumber();
-            configAudit.record(
-                ConfigAuditEntry.updated(
+            configAudit.record(ConfigAuditEntry.updated(
                     ConfigAuditEntityType.PRACTICE_DEFINITION,
                     practice.getId(),
                     ctx.id(),
                     before,
-                    PracticeDefinitionSnapshot.of(practice, revisionNumber)
-                )
-            );
+                    PracticeDefinitionSnapshot.of(practice, revisionNumber)));
         }
         return allPractices;
     }
 
     private List<Practice> practicesInGroup(List<Practice> allPractices, @Nullable Long groupId, Practice excluded) {
-        return allPractices
-            .stream()
-            .filter(practice ->
-                Objects.equals(groupId, practice.getGroup() == null ? null : practice.getGroup().getId())
-            )
-            .filter(practice -> !practice.getId().equals(excluded.getId()))
-            .collect(Collectors.toCollection(ArrayList::new));
+        return allPractices.stream()
+                .filter(practice -> Objects.equals(
+                        groupId,
+                        practice.getGroup() == null ? null : practice.getGroup().getId()))
+                .filter(practice -> !practice.getId().equals(excluded.getId()))
+                .collect(Collectors.toCollection(ArrayList::new));
     }
 
     private void resequence(List<Practice> practices) {
@@ -190,8 +179,8 @@ public class PracticeService {
     @Transactional(readOnly = true)
     public Practice getPractice(WorkspaceContext ctx, String slug) {
         return practiceRepository
-            .findByWorkspaceIdAndSlug(ctx.id(), slug)
-            .orElseThrow(() -> new EntityNotFoundException("Practice", slug));
+                .findByWorkspaceIdAndSlug(ctx.id(), slug)
+                .orElseThrow(() -> new EntityNotFoundException("Practice", slug));
     }
 
     @Transactional
@@ -206,45 +195,37 @@ public class PracticeService {
 
     @Transactional
     public Practice adoptPracticeFromCatalog(
-        WorkspaceContext ctx,
-        String slug,
-        PracticeDefinition definition,
-        PracticeAutonomy initialAutonomy
-    ) {
+            WorkspaceContext ctx, String slug, PracticeDefinition definition, PracticeAutonomy initialAutonomy) {
         return createPractice(ctx, slug, definition, slug, definition.provenanceFingerprint(slug), initialAutonomy);
     }
 
     private Practice createPractice(
-        WorkspaceContext ctx,
-        String slug,
-        PracticeDefinition definition,
-        @Nullable String sourceCuratedSlug,
-        @Nullable String sourceCuratedFingerprint,
-        @Nullable PracticeAutonomy initialAutonomy
-    ) {
+            WorkspaceContext ctx,
+            String slug,
+            PracticeDefinition definition,
+            @Nullable String sourceCuratedSlug,
+            @Nullable String sourceCuratedFingerprint,
+            @Nullable PracticeAutonomy initialAutonomy) {
         if (practiceRepository.existsByWorkspaceIdAndSlug(ctx.id(), slug)) {
             throw new PracticeSlugConflictException(
-                "A practice with slug '" + slug + "' already exists in this workspace."
-            );
+                    "A practice with slug '" + slug + "' already exists in this workspace.");
         }
 
         Workspace workspace = lockWorkspace(ctx);
 
         Practice practice = new Practice();
         String groupSlug = definition.groupSlug();
-        var group =
-            groupSlug == null
+        var group = groupSlug == null
                 ? null
                 : practiceGroupRepository
-                      .findByWorkspaceIdAndSlug(ctx.id(), groupSlug)
-                      .orElseThrow(() -> new EntityNotFoundException("PracticeGroup", groupSlug));
+                        .findByWorkspaceIdAndSlug(ctx.id(), groupSlug)
+                        .orElseThrow(() -> new EntityNotFoundException("PracticeGroup", groupSlug));
         practice.setWorkspace(workspace);
         practice.setSourceCuratedSlug(sourceCuratedSlug);
         practice.setSourceCuratedFingerprint(sourceCuratedFingerprint);
         practice.setGroup(group);
         practice.setDisplayOrder(
-            practiceRepository.findMaxDisplayOrder(ctx.id(), group == null ? null : group.getId()) + 1
-        );
+                practiceRepository.findMaxDisplayOrder(ctx.id(), group == null ? null : group.getId()) + 1);
         practice.setSlug(slug);
         applyDefinition(practice, definition);
         // A new practice holds no opinion of its own and inherits its group's (and through it the
@@ -252,10 +233,9 @@ public class PracticeService {
         // expressed. Exception: a practice whose policy cannot attempt automated review is written OFF
         // explicitly, since that's a fact about the practice, not a preference to inherit over.
         practice.setAutonomy(
-            definition.automatedReviewPolicy().automatedReview().canAttemptAutomatedReview()
-                ? initialAutonomy
-                : PracticeAutonomy.OFF
-        );
+                definition.automatedReviewPolicy().automatedReview().canAttemptAutomatedReview()
+                        ? initialAutonomy
+                        : PracticeAutonomy.OFF);
         definitionValidator.validate(definition);
 
         try {
@@ -265,29 +245,21 @@ public class PracticeService {
                 throw ex;
             }
             throw new PracticeSlugConflictException(
-                "A practice with slug '" + slug + "' already exists in this workspace.",
-                ex
-            );
+                    "A practice with slug '" + slug + "' already exists in this workspace.", ex);
         }
         int revisionNumber = practiceRevisionService.append(practice).getRevisionNumber();
         workspace.getReviewSettings().incrementRolloutRevision();
-        configAudit.record(
-            ConfigAuditEntry.created(
+        configAudit.record(ConfigAuditEntry.created(
                 ConfigAuditEntityType.PRACTICE_DEFINITION,
                 practice.getId(),
                 ctx.id(),
-                PracticeDefinitionSnapshot.of(practice, revisionNumber)
-            )
-        );
+                PracticeDefinitionSnapshot.of(practice, revisionNumber)));
         if (initialAutonomy != null) {
-            configAudit.record(
-                ConfigAuditEntry.created(
+            configAudit.record(ConfigAuditEntry.created(
                     ConfigAuditEntityType.PRACTICE_USAGE,
                     practice.getId(),
                     ctx.id(),
-                    new PracticeUsageSnapshot(practice.getAutonomy())
-                )
-            );
+                    new PracticeUsageSnapshot(practice.getAutonomy())));
         }
 
         log.info("Created practice '{}' (slug={}) in workspace {}", practice.getName(), practice.getSlug(), ctx.slug());
@@ -296,16 +268,16 @@ public class PracticeService {
 
     private Workspace lockWorkspace(WorkspaceContext ctx) {
         return workspaceRepository
-            .findByIdForUpdate(ctx.id())
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", ctx.slug()));
+                .findByIdForUpdate(ctx.id())
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", ctx.slug()));
     }
 
     @Transactional
     public Practice updatePractice(WorkspaceContext ctx, String slug, UpdatePracticeRequestDTO request) {
         Workspace workspace = lockWorkspace(ctx);
         Practice practice = practiceRepository
-            .findByWorkspaceIdAndSlug(ctx.id(), slug)
-            .orElseThrow(() -> new EntityNotFoundException("Practice", slug));
+                .findByWorkspaceIdAndSlug(ctx.id(), slug)
+                .orElseThrow(() -> new EntityNotFoundException("Practice", slug));
         Integer revisionNumber = currentRevisionNumber(practice);
         PracticeDefinitionSnapshot before = PracticeDefinitionSnapshot.of(practice, revisionNumber);
         PracticeDefinition beforeDefinition = PracticeDefinition.from(practice);
@@ -316,44 +288,40 @@ public class PracticeService {
         // The kind is read off the bindings, so "the author moved this practice to another kind of
         // work" is a question about the new bindings rather than a separate field to compare.
         ArtifactKind artifactKind = PracticeBinding.artifactKindOf(bindings);
-        PracticeAutomatedReviewPolicy automatedReviewPolicy =
-            request.automatedReviewPolicy() != null
+        PracticeAutomatedReviewPolicy automatedReviewPolicy = request.automatedReviewPolicy() != null
                 ? request.automatedReviewPolicy()
                 : artifactKind.equals(beforeDefinition.artifactKind())
-                    ? beforeDefinition.automatedReviewPolicy()
-                    : evidenceDefaults.policyFor(artifactKind);
-        boolean removesAutomatedReview =
-            request.automatedReviewPolicy() != null &&
-            !automatedReviewPolicy.automatedReview().canAttemptAutomatedReview();
+                        ? beforeDefinition.automatedReviewPolicy()
+                        : evidenceDefaults.policyFor(artifactKind);
+        boolean removesAutomatedReview = request.automatedReviewPolicy() != null
+                && !automatedReviewPolicy.automatedReview().canAttemptAutomatedReview();
         if (removesAutomatedReview) {
             // A practice nobody automates still says what occasions it — that is where its kind comes
             // from — but it reads nothing, so the evidence goes with the automation that read it.
             bindings = bindings.stream().map(PracticeService::withoutEvidence).toList();
         }
         PracticeDefinition afterDefinition = new PracticeDefinition(
-            request.name() == null ? beforeDefinition.name() : request.name(),
-            bindings,
-            request.criteria() == null ? beforeDefinition.criteria() : request.criteria(),
-            removesAutomatedReview && request.precomputeScript() == null
-                ? null
-                : patch(
-                      beforeDefinition.precomputeScript(),
-                      request.precomputeScript(),
-                      fieldsToClear.contains(ClearablePracticeField.PRECOMPUTE_SCRIPT)
-                  ),
-            automatedReviewPolicy,
-            patch(
-                beforeDefinition.whyItMatters(),
-                request.whyItMatters(),
-                fieldsToClear.contains(ClearablePracticeField.WHY_IT_MATTERS)
-            ),
-            patch(
-                beforeDefinition.whatGoodLooksLike(),
-                request.whatGoodLooksLike(),
-                fieldsToClear.contains(ClearablePracticeField.WHAT_GOOD_LOOKS_LIKE)
-            ),
-            request.group() == null ? beforeDefinition.groupSlug() : request.group().groupSlug()
-        );
+                request.name() == null ? beforeDefinition.name() : request.name(),
+                bindings,
+                request.criteria() == null ? beforeDefinition.criteria() : request.criteria(),
+                removesAutomatedReview && request.precomputeScript() == null
+                        ? null
+                        : patch(
+                                beforeDefinition.precomputeScript(),
+                                request.precomputeScript(),
+                                fieldsToClear.contains(ClearablePracticeField.PRECOMPUTE_SCRIPT)),
+                automatedReviewPolicy,
+                patch(
+                        beforeDefinition.whyItMatters(),
+                        request.whyItMatters(),
+                        fieldsToClear.contains(ClearablePracticeField.WHY_IT_MATTERS)),
+                patch(
+                        beforeDefinition.whatGoodLooksLike(),
+                        request.whatGoodLooksLike(),
+                        fieldsToClear.contains(ClearablePracticeField.WHAT_GOOD_LOOKS_LIKE)),
+                request.group() == null
+                        ? beforeDefinition.groupSlug()
+                        : request.group().groupSlug());
 
         if (afterDefinition.equals(beforeDefinition)) {
             return practice;
@@ -370,25 +338,19 @@ public class PracticeService {
         validateUpdate(afterDefinition, request.bindings() != null);
         practice = practiceRepository.save(practice);
         revisionNumber = practiceRevisionService.append(practice).getRevisionNumber();
-        configAudit.record(
-            ConfigAuditEntry.updated(
+        configAudit.record(ConfigAuditEntry.updated(
                 ConfigAuditEntityType.PRACTICE_DEFINITION,
                 practice.getId(),
                 ctx.id(),
                 before,
-                PracticeDefinitionSnapshot.of(practice, revisionNumber)
-            )
-        );
+                PracticeDefinitionSnapshot.of(practice, revisionNumber)));
         if (autonomyBefore != practice.getAutonomy()) {
-            configAudit.record(
-                ConfigAuditEntry.updated(
+            configAudit.record(ConfigAuditEntry.updated(
                     ConfigAuditEntityType.PRACTICE_USAGE,
                     practice.getId(),
                     ctx.id(),
                     new PracticeUsageSnapshot(autonomyBefore),
-                    new PracticeUsageSnapshot(practice.getAutonomy())
-                )
-            );
+                    new PracticeUsageSnapshot(practice.getAutonomy())));
         }
         if (effectiveAutonomyBefore != effectiveAutonomy(practice, ctx.id())) {
             workspace.getReviewSettings().incrementRolloutRevision();
@@ -408,8 +370,8 @@ public class PracticeService {
     public Practice setAutonomy(WorkspaceContext ctx, String slug, @Nullable PracticeAutonomy autonomy) {
         Workspace workspace = lockWorkspace(ctx);
         Practice practice = practiceRepository
-            .findByWorkspaceIdAndSlug(ctx.id(), slug)
-            .orElseThrow(() -> new EntityNotFoundException("Practice", slug));
+                .findByWorkspaceIdAndSlug(ctx.id(), slug)
+                .orElseThrow(() -> new EntityNotFoundException("Practice", slug));
 
         PracticeAutonomy before = practice.getAutonomy();
         if (before == autonomy) {
@@ -420,17 +382,14 @@ public class PracticeService {
         // Asked of the autonomy that would be IN FORCE, not of the one being written: "inherit" is a request
         // for whatever the group says, and if that admits a review the practice still cannot run it.
         PracticeAutonomy effective = AutonomyResolver.resolvePractice(
-            autonomy,
-            practice.getGroup() == null ? null : practice.getGroup().getAutonomy(),
-            workspaceDefaults.forWorkspace(ctx.id()).defaultAutonomy()
-        ).autonomy();
-        if (
-            effective.admitsReview() &&
-            !practice.getAutomatedReviewPolicy().automatedReview().canAttemptAutomatedReview()
-        ) {
+                        autonomy,
+                        practice.getGroup() == null ? null : practice.getGroup().getAutonomy(),
+                        workspaceDefaults.forWorkspace(ctx.id()).defaultAutonomy())
+                .autonomy();
+        if (effective.admitsReview()
+                && !practice.getAutomatedReviewPolicy().automatedReview().canAttemptAutomatedReview()) {
             throw new IllegalArgumentException(
-                "This practice cannot be used in automated reviews with its current review settings"
-            );
+                    "This practice cannot be used in automated reviews with its current review settings");
         }
 
         practice.setAutonomy(autonomy);
@@ -438,46 +397,39 @@ public class PracticeService {
         if (effectiveBefore != effectiveAutonomy(practice, ctx.id())) {
             workspace.getReviewSettings().incrementRolloutRevision();
         }
-        configAudit.record(
-            ConfigAuditEntry.updated(
+        configAudit.record(ConfigAuditEntry.updated(
                 ConfigAuditEntityType.PRACTICE_USAGE,
                 practice.getId(),
                 ctx.id(),
                 new PracticeUsageSnapshot(before),
-                new PracticeUsageSnapshot(autonomy)
-            )
-        );
+                new PracticeUsageSnapshot(autonomy)));
         log.info(
-            "Set practice '{}' (slug={}) autonomy={} in workspace {}",
-            practice.getName(),
-            slug,
-            autonomy,
-            ctx.slug()
-        );
+                "Set practice '{}' (slug={}) autonomy={} in workspace {}",
+                practice.getName(),
+                slug,
+                autonomy,
+                ctx.slug());
         return practice;
     }
 
     private PracticeAutonomy effectiveAutonomy(Practice practice, Long workspaceId) {
         return AutonomyResolver.effectiveAutonomyOf(
-            practice,
-            workspaceDefaults.forWorkspace(workspaceId).defaultAutonomy()
-        );
+                practice, workspaceDefaults.forWorkspace(workspaceId).defaultAutonomy());
     }
 
     @Transactional
     public void deletePractice(WorkspaceContext ctx, String slug) {
         Workspace workspace = lockWorkspace(ctx);
         Practice practice = practiceRepository
-            .findByWorkspaceIdAndSlug(ctx.id(), slug)
-            .orElseThrow(() -> new EntityNotFoundException("Practice", slug));
+                .findByWorkspaceIdAndSlug(ctx.id(), slug)
+                .orElseThrow(() -> new EntityNotFoundException("Practice", slug));
 
         Long practiceId = practice.getId();
         PracticeDefinitionSnapshot before = PracticeDefinitionSnapshot.of(practice, currentRevisionNumber(practice));
         practiceRepository.delete(practice);
         workspace.getReviewSettings().incrementRolloutRevision();
         configAudit.record(
-            ConfigAuditEntry.deleted(ConfigAuditEntityType.PRACTICE_DEFINITION, practiceId, ctx.id(), before)
-        );
+                ConfigAuditEntry.deleted(ConfigAuditEntityType.PRACTICE_DEFINITION, practiceId, ctx.id(), before));
         log.info("Deleted practice '{}' (slug={}) from workspace {}", practice.getName(), slug, ctx.slug());
     }
 
@@ -489,17 +441,16 @@ public class PracticeService {
         List<PracticeBinding> bindings = required(request.bindings(), "bindings");
         ArtifactKind artifactKind = PracticeBinding.artifactKindOf(bindings);
         return new PracticeDefinition(
-            required(request.name(), "name"),
-            bindings,
-            required(request.criteria(), "criteria"),
-            request.precomputeScript(),
-            request.automatedReviewPolicy() == null
-                ? evidenceDefaults.policyFor(artifactKind)
-                : request.automatedReviewPolicy(),
-            request.whyItMatters(),
-            request.whatGoodLooksLike(),
-            request.groupSlug()
-        );
+                required(request.name(), "name"),
+                bindings,
+                required(request.criteria(), "criteria"),
+                request.precomputeScript(),
+                request.automatedReviewPolicy() == null
+                        ? evidenceDefaults.policyFor(artifactKind)
+                        : request.automatedReviewPolicy(),
+                request.whyItMatters(),
+                request.whatGoodLooksLike(),
+                request.groupSlug());
     }
 
     private static <T> T required(@Nullable T value, String field) {
@@ -537,15 +488,14 @@ public class PracticeService {
 
     private static PracticeDefinition withBindings(PracticeDefinition definition, List<PracticeBinding> bindings) {
         return new PracticeDefinition(
-            definition.name(),
-            bindings,
-            definition.criteria(),
-            definition.precomputeScript(),
-            definition.automatedReviewPolicy(),
-            definition.whyItMatters(),
-            definition.whatGoodLooksLike(),
-            definition.groupSlug()
-        );
+                definition.name(),
+                bindings,
+                definition.criteria(),
+                definition.precomputeScript(),
+                definition.automatedReviewPolicy(),
+                definition.whyItMatters(),
+                definition.whatGoodLooksLike(),
+                definition.groupSlug());
     }
 
     private static PracticeBinding withoutEvidence(PracticeBinding binding) {

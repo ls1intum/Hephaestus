@@ -87,10 +87,9 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
     private void setupTestData() {
         // Create GitHub provider
         githubProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
 
         // Create organization matching fixture data
         Organization org = new Organization();
@@ -137,14 +136,13 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
 
     private GitHubUserDTO createCreatorDto() {
         return new GitHubUserDTO(
-            FIXTURE_CREATOR_ID,
-            FIXTURE_CREATOR_ID,
-            FIXTURE_CREATOR_LOGIN,
-            "https://avatars.githubusercontent.com/u/" + FIXTURE_CREATOR_ID,
-            "https://github.com/" + FIXTURE_CREATOR_LOGIN,
-            null,
-            null
-        );
+                FIXTURE_CREATOR_ID,
+                FIXTURE_CREATOR_ID,
+                FIXTURE_CREATOR_LOGIN,
+                "https://avatars.githubusercontent.com/u/" + FIXTURE_CREATOR_ID,
+                "https://github.com/" + FIXTURE_CREATOR_LOGIN,
+                null,
+                null);
     }
 
     // Process (Create/Update) Tests
@@ -156,19 +154,19 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldCreateNewMilestoneAndPublishEvent() {
             Long milestoneId = 14028854L;
             GitHubMilestoneDTO dto = new GitHubMilestoneDTO(
-                milestoneId,
-                3,
-                "New Milestone",
-                "A new milestone for testing",
-                "open",
-                Instant.parse("2025-11-30T08:00:00Z"),
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/3",
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null // closedAt
-            );
+                    milestoneId,
+                    3,
+                    "New Milestone",
+                    "A new milestone for testing",
+                    "open",
+                    Instant.parse("2025-11-30T08:00:00Z"),
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/3",
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null // closedAt
+                    );
 
             Milestone result = processor.process(dto, testRepository, createCreatorDto(), createContext());
 
@@ -183,19 +181,21 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getRepository().getNativeId()).isEqualTo(FIXTURE_REPO_ID);
 
             // Verify persisted
-            assertThat(milestoneRepository.findByNativeIdAndProviderId(milestoneId, providerId())).isPresent();
+            assertThat(milestoneRepository.findByNativeIdAndProviderId(milestoneId, providerId()))
+                    .isPresent();
 
             // Verify MilestoneCreated event published
             assertThat(eventListener.ofType(ScmDomainEvent.MilestoneCreated.class))
-                .hasSize(1)
-                .first()
-                .satisfies(event -> {
-                    assertThat(event.milestone().id()).isEqualTo(result.getId());
-                    assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
-                    assertNotNull(event.context().repository());
-                    assertThat(event.context().repository().id()).isEqualTo(testRepository.getId());
-                });
-            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneUpdated.class)).isEmpty();
+                    .hasSize(1)
+                    .first()
+                    .satisfies(event -> {
+                        assertThat(event.milestone().id()).isEqualTo(result.getId());
+                        assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
+                        assertNotNull(event.context().repository());
+                        assertThat(event.context().repository().id()).isEqualTo(testRepository.getId());
+                    });
+            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneUpdated.class))
+                    .isEmpty();
         }
 
         @Test
@@ -216,19 +216,19 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             eventListener.clear();
 
             GitHubMilestoneDTO dto = new GitHubMilestoneDTO(
-                milestoneId,
-                3,
-                "Updated Title",
-                "Updated description",
-                "closed",
-                Instant.parse("2026-01-14T08:00:00Z"),
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/3",
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null // closedAt
-            );
+                    milestoneId,
+                    3,
+                    "Updated Title",
+                    "Updated description",
+                    "closed",
+                    Instant.parse("2026-01-14T08:00:00Z"),
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/3",
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null // closedAt
+                    );
 
             Milestone result = processor.process(dto, testRepository, createCreatorDto(), createContext());
             assertNotNull(result);
@@ -240,12 +240,13 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Verify MilestoneUpdated event published
             assertThat(eventListener.ofType(ScmDomainEvent.MilestoneUpdated.class))
-                .hasSize(1)
-                .first()
-                .satisfies(event -> {
-                    assertThat(event.milestone().title()).isEqualTo("Updated Title");
-                });
-            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneCreated.class)).isEmpty();
+                    .hasSize(1)
+                    .first()
+                    .satisfies(event -> {
+                        assertThat(event.milestone().title()).isEqualTo("Updated Title");
+                    });
+            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneCreated.class))
+                    .isEmpty();
         }
 
         @Test
@@ -253,27 +254,29 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             Milestone result = processor.process(null, testRepository, createCreatorDto(), createContext());
 
             assertThat(result).isNull();
-            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneCreated.class)).isEmpty();
-            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneUpdated.class)).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneCreated.class))
+                    .isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneUpdated.class))
+                    .isEmpty();
         }
 
         @Test
         void shouldCreateMilestoneWithGeneratedIdWhenDtoHasNullId() {
             // Given - DTO without ID (like GraphQL sync)
             GitHubMilestoneDTO dto = new GitHubMilestoneDTO(
-                null, // null ID - simulates GraphQL response
-                1,
-                "GraphQL Synced Milestone",
-                "desc",
-                "open",
-                null,
-                "https://example.com",
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null // closedAt
-            );
+                    null, // null ID - simulates GraphQL response
+                    1,
+                    "GraphQL Synced Milestone",
+                    "desc",
+                    "open",
+                    null,
+                    "https://example.com",
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null // closedAt
+                    );
 
             Milestone result = processor.process(dto, testRepository, null, createContext());
 
@@ -283,7 +286,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getNativeId()).isNegative(); // Generated IDs are negative to avoid collision
             assertThat(result.getNumber()).isEqualTo(1);
             assertThat(result.getTitle()).isEqualTo("GraphQL Synced Milestone");
-            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneCreated.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneCreated.class))
+                    .hasSize(1);
         }
 
         @Test
@@ -302,19 +306,19 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
 
             // DTO without ID (like GraphQL sync) but matching number
             GitHubMilestoneDTO dto = new GitHubMilestoneDTO(
-                null, // null ID
-                42, // same number
-                "Updated Title",
-                "new description",
-                "open",
-                null,
-                "https://example.com",
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null // closedAt
-            );
+                    null, // null ID
+                    42, // same number
+                    "Updated Title",
+                    "new description",
+                    "open",
+                    null,
+                    "https://example.com",
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null // closedAt
+                    );
 
             Milestone result = processor.process(dto, testRepository, null, createContext());
 
@@ -330,54 +334,58 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldHandleMilestoneWithNullDescription() {
             Long milestoneId = 777888999L;
             GitHubMilestoneDTO dto = new GitHubMilestoneDTO(
-                milestoneId,
-                5,
-                "No Description Milestone",
-                null, // null description
-                "open",
-                null,
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/5",
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null // closedAt
-            );
+                    milestoneId,
+                    5,
+                    "No Description Milestone",
+                    null, // null description
+                    "open",
+                    null,
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/5",
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null // closedAt
+                    );
 
             Milestone result = processor.process(dto, testRepository, null, createContext());
             assertNotNull(result);
 
             assertThat(result.getDescription()).isNull();
-            assertThat(
-                milestoneRepository.findByNativeIdAndProviderId(milestoneId, providerId()).get().getDescription()
-            ).isNull();
+            assertThat(milestoneRepository
+                            .findByNativeIdAndProviderId(milestoneId, providerId())
+                            .get()
+                            .getDescription())
+                    .isNull();
         }
 
         @Test
         void shouldHandleMilestoneWithNullDueOn() {
             Long milestoneId = 888999000L;
             GitHubMilestoneDTO dto = new GitHubMilestoneDTO(
-                milestoneId,
-                6,
-                "No Due Date Milestone",
-                "Has description but no due date",
-                "open",
-                null, // null dueOn
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/6",
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null // closedAt
-            );
+                    milestoneId,
+                    6,
+                    "No Due Date Milestone",
+                    "Has description but no due date",
+                    "open",
+                    null, // null dueOn
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/6",
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null // closedAt
+                    );
 
             Milestone result = processor.process(dto, testRepository, null, createContext());
             assertNotNull(result);
 
             assertThat(result.getDueOn()).isNull();
-            assertThat(
-                milestoneRepository.findByNativeIdAndProviderId(milestoneId, providerId()).get().getDueOn()
-            ).isNull();
+            assertThat(milestoneRepository
+                            .findByNativeIdAndProviderId(milestoneId, providerId())
+                            .get()
+                            .getDueOn())
+                    .isNull();
         }
 
         @Test
@@ -385,19 +393,19 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldBeIdempotent() {
             Long milestoneId = 123123123L;
             GitHubMilestoneDTO dto = new GitHubMilestoneDTO(
-                milestoneId,
-                7,
-                "Idempotent Milestone",
-                "Same every time",
-                "open",
-                null,
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/7",
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null // closedAt
-            );
+                    milestoneId,
+                    7,
+                    "Idempotent Milestone",
+                    "Same every time",
+                    "open",
+                    null,
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/7",
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null // closedAt
+                    );
 
             // When - process twice
             processor.process(dto, testRepository, null, createContext());
@@ -406,27 +414,29 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Then - only one milestone exists, second time emits MilestoneUpdated (not Created)
             assertThat(milestoneRepository.count()).isEqualTo(1);
-            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneUpdated.class)).hasSize(1);
-            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneCreated.class)).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneUpdated.class))
+                    .hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneCreated.class))
+                    .isEmpty();
         }
 
         @Test
         void shouldSetCreatorWhenProvided() {
             Long milestoneId = 444555666L;
             GitHubMilestoneDTO dto = new GitHubMilestoneDTO(
-                milestoneId,
-                8,
-                "Milestone With Creator",
-                "Description",
-                "open",
-                null,
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/8",
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null // closedAt
-            );
+                    milestoneId,
+                    8,
+                    "Milestone With Creator",
+                    "Description",
+                    "open",
+                    null,
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/8",
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null // closedAt
+                    );
 
             Milestone result = processor.process(dto, testRepository, createCreatorDto(), createContext());
             assertNotNull(result);
@@ -441,56 +451,57 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             Long milestoneId = 555666777L;
             Long newUserId = 999888777L;
             GitHubMilestoneDTO dto = new GitHubMilestoneDTO(
-                milestoneId,
-                9,
-                "Milestone With New Creator",
-                "Description",
-                "open",
-                null,
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/9",
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null // closedAt
-            );
+                    milestoneId,
+                    9,
+                    "Milestone With New Creator",
+                    "Description",
+                    "open",
+                    null,
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/9",
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null // closedAt
+                    );
             GitHubUserDTO newCreator = new GitHubUserDTO(
-                newUserId,
-                newUserId,
-                "new-creator",
-                "https://avatars.example.com/new",
-                "https://github.com/new-creator",
-                null,
-                null
-            );
+                    newUserId,
+                    newUserId,
+                    "new-creator",
+                    "https://avatars.example.com/new",
+                    "https://github.com/new-creator",
+                    null,
+                    null);
 
             // Verify user doesn't exist
-            assertThat(userRepository.findByNativeIdAndProviderId(newUserId, providerId())).isEmpty();
+            assertThat(userRepository.findByNativeIdAndProviderId(newUserId, providerId()))
+                    .isEmpty();
 
             Milestone result = processor.process(dto, testRepository, newCreator, createContext());
             assertNotNull(result);
 
             assertThat(result.getCreator()).isNotNull();
-            assertThat(userRepository.findByNativeIdAndProviderId(newUserId, providerId())).isPresent();
+            assertThat(userRepository.findByNativeIdAndProviderId(newUserId, providerId()))
+                    .isPresent();
         }
 
         @Test
         void shouldHandleNullCreator() {
             Long milestoneId = 666777888L;
             GitHubMilestoneDTO dto = new GitHubMilestoneDTO(
-                milestoneId,
-                10,
-                "Milestone Without Creator",
-                "Description",
-                "open",
-                null,
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/10",
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null // closedAt
-            );
+                    milestoneId,
+                    10,
+                    "Milestone Without Creator",
+                    "Description",
+                    "open",
+                    null,
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/10",
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null // closedAt
+                    );
 
             Milestone result = processor.process(dto, testRepository, null, createContext());
 
@@ -503,19 +514,19 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldParseClosedState() {
             Long milestoneId = 777888999L;
             GitHubMilestoneDTO dto = new GitHubMilestoneDTO(
-                milestoneId,
-                11,
-                "Closed Milestone",
-                "Description",
-                "closed",
-                null,
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/11",
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null // closedAt
-            );
+                    milestoneId,
+                    11,
+                    "Closed Milestone",
+                    "Description",
+                    "closed",
+                    null,
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/11",
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null // closedAt
+                    );
 
             Milestone result = processor.process(dto, testRepository, null, createContext());
             assertNotNull(result);
@@ -527,19 +538,19 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldDefaultToOpenStateForNullState() {
             Long milestoneId = 888999111L;
             GitHubMilestoneDTO dto = new GitHubMilestoneDTO(
-                milestoneId,
-                12,
-                "Unknown State Milestone",
-                "Description",
-                null, // null state
-                null,
-                "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/12",
-                0,
-                0,
-                Instant.now(),
-                Instant.now(),
-                null // closedAt
-            );
+                    milestoneId,
+                    12,
+                    "Unknown State Milestone",
+                    "Description",
+                    null, // null state
+                    null,
+                    "https://github.com/" + FIXTURE_REPO_FULL_NAME + "/milestone/12",
+                    0,
+                    0,
+                    Instant.now(),
+                    Instant.now(),
+                    null // closedAt
+                    );
 
             Milestone result = processor.process(dto, testRepository, null, createContext());
             assertNotNull(result);
@@ -567,37 +578,42 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             milestone.setRepository(testRepository);
             Milestone savedMilestone = milestoneRepository.save(milestone);
 
-            assertThat(milestoneRepository.findByNativeIdAndProviderId(milestoneId, providerId())).isPresent();
+            assertThat(milestoneRepository.findByNativeIdAndProviderId(milestoneId, providerId()))
+                    .isPresent();
 
             processor.delete(milestoneId, createContext());
 
             // Then - milestone deleted
-            assertThat(milestoneRepository.findByNativeIdAndProviderId(milestoneId, providerId())).isEmpty();
+            assertThat(milestoneRepository.findByNativeIdAndProviderId(milestoneId, providerId()))
+                    .isEmpty();
 
             // Verify event published
             assertThat(eventListener.ofType(ScmDomainEvent.MilestoneDeleted.class))
-                .hasSize(1)
-                .first()
-                .satisfies(event -> {
-                    assertThat(event.milestoneId()).isEqualTo(savedMilestone.getId());
-                    assertThat(event.title()).isEqualTo("To Delete Milestone");
-                    assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
-                    assertNotNull(event.context().repository());
-                    assertThat(event.context().repository().id()).isEqualTo(testRepository.getId());
-                });
+                    .hasSize(1)
+                    .first()
+                    .satisfies(event -> {
+                        assertThat(event.milestoneId()).isEqualTo(savedMilestone.getId());
+                        assertThat(event.title()).isEqualTo("To Delete Milestone");
+                        assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
+                        assertNotNull(event.context().repository());
+                        assertThat(event.context().repository().id()).isEqualTo(testRepository.getId());
+                    });
         }
 
         @Test
         void shouldHandleDeletionOfNonExistentMilestone() {
             // Given - milestone doesn't exist
             Long nonExistentId = 999999999L;
-            assertThat(milestoneRepository.findByNativeIdAndProviderId(nonExistentId, providerId())).isEmpty();
+            assertThat(milestoneRepository.findByNativeIdAndProviderId(nonExistentId, providerId()))
+                    .isEmpty();
 
             // When/Then - should not throw
-            assertThatCode(() -> processor.delete(nonExistentId, createContext())).doesNotThrowAnyException();
+            assertThatCode(() -> processor.delete(nonExistentId, createContext()))
+                    .doesNotThrowAnyException();
 
             // No event published
-            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneDeleted.class)).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneDeleted.class))
+                    .isEmpty();
         }
 
         @Test
@@ -606,7 +622,8 @@ class GitHubMilestoneProcessorIntegrationTest extends BaseIntegrationTest {
             assertThatCode(() -> processor.delete(null, createContext())).doesNotThrowAnyException();
 
             // No event published
-            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneDeleted.class)).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.MilestoneDeleted.class))
+                    .isEmpty();
         }
     }
 

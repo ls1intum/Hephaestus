@@ -29,15 +29,8 @@ class SlackLeaderboardDigestPublisherTest extends BaseUnitTest {
     }
 
     private static LeaderboardEntryDTO entry(String name, String email) {
-        UserInfoDTO user = new UserInfoDTO(
-            1L,
-            name,
-            email,
-            "https://example.com/a.png",
-            name,
-            "https://example.com/" + name,
-            0
-        );
+        UserInfoDTO user =
+                new UserInfoDTO(1L, name, email, "https://example.com/a.png", name, "https://example.com/" + name, 0);
         return new LeaderboardEntryDTO(1, 10, user, null, List.of(), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     }
 
@@ -45,56 +38,36 @@ class SlackLeaderboardDigestPublisherTest extends BaseUnitTest {
     void mentionsByExactHandle() {
         User alice = slackUser("U1", "Alice Smith", "alice@x.io");
         User bob = slackUser("U2", "bjones", "bob@x.io");
-        assertThat(
-            SlackLeaderboardDigestPublisher.mentionFor(entry("Alice Smith", "none@x.io"), List.of(alice, bob))
-        ).isEqualTo("<@U1>");
+        assertThat(SlackLeaderboardDigestPublisher.mentionFor(entry("Alice Smith", "none@x.io"), List.of(alice, bob)))
+                .isEqualTo("<@U1>");
     }
 
     @Test
     void doesNotMentionByEmail() {
         User alice = slackUser("U1", "asmith", "alice@x.io");
-        assertThat(
-            SlackLeaderboardDigestPublisher.mentionFor(entry("Alice Smith", "ALICE@x.io"), List.of(alice))
-        ).isEqualTo("Alice Smith");
+        assertThat(SlackLeaderboardDigestPublisher.mentionFor(entry("Alice Smith", "ALICE@x.io"), List.of(alice)))
+                .isEqualTo("Alice Smith");
     }
 
     @Test
     void rendersPlainNameWhenNoSlackMatch() {
         User bob = slackUser("U2", "bjones", "bob@x.io");
-        assertThat(
-            SlackLeaderboardDigestPublisher.mentionFor(entry("Zachariah Wong", "zw@x.io"), List.of(bob))
-        ).isEqualTo("Zachariah Wong");
+        assertThat(SlackLeaderboardDigestPublisher.mentionFor(entry("Zachariah Wong", "zw@x.io"), List.of(bob)))
+                .isEqualTo("Zachariah Wong");
     }
 
     @Test
     void doesNotMentionNearMiss() {
         User alice = slackUser("U1", "asmith", "alice@x.io");
-        assertThat(
-            SlackLeaderboardDigestPublisher.mentionFor(entry("Alice Smyth", "smyth@x.io"), List.of(alice))
-        ).isEqualTo("Alice Smyth");
+        assertThat(SlackLeaderboardDigestPublisher.mentionFor(entry("Alice Smyth", "smyth@x.io"), List.of(alice)))
+                .isEqualTo("Alice Smyth");
     }
 
     @Test
     void returnsNullForTeamRow() {
-        LeaderboardEntryDTO teamRow = new LeaderboardEntryDTO(
-            1,
-            10,
-            null,
-            null,
-            List.of(),
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-        );
-        assertThat(SlackLeaderboardDigestPublisher.mentionFor(teamRow, List.of())).isNull();
+        LeaderboardEntryDTO teamRow =
+                new LeaderboardEntryDTO(1, 10, null, null, List.of(), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        assertThat(SlackLeaderboardDigestPublisher.mentionFor(teamRow, List.of()))
+                .isNull();
     }
 }

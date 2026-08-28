@@ -31,14 +31,10 @@ public class PracticeGroupTrendQueryService {
         PracticeStandingService.StandingSnapshot snapshot = standingService.getStandingSnapshot(context.id());
         List<String> eligible = snapshot.eligiblePracticesByGroup().getOrDefault(groupSlug, List.of());
         Set<String> eligibleSet = Set.copyOf(eligible);
-        Map<String, List<Observation>> evidence = snapshot
-            .evidenceByPractice()
-            .entrySet()
-            .stream()
-            .filter(entry -> eligibleSet.contains(entry.getKey()))
-            .collect(
-                Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (left, right) -> left, LinkedHashMap::new)
-            );
+        Map<String, List<Observation>> evidence = snapshot.evidenceByPractice().entrySet().stream()
+                .filter(entry -> eligibleSet.contains(entry.getKey()))
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey, Map.Entry::getValue, (left, right) -> left, LinkedHashMap::new));
         return trendService.detail(groupSlug, eligible, evidence);
     }
 }

@@ -32,8 +32,12 @@ class MoneyWirePrecisionTest extends BaseUnitTest {
         BigDecimal largest = clampedCost(new BigDecimal("1000000000"), 1_000_000_000L);
         BigDecimal smallest = clampedCost(new BigDecimal("0.00000001"), 1L);
 
-        assertThat(largest).as("the maximum clamp must be reached by this input").isGreaterThan(BigDecimal.ONE);
-        assertThat(smallest).as("the minimum clamp must be reached by this input").isLessThan(BigDecimal.ONE);
+        assertThat(largest)
+                .as("the maximum clamp must be reached by this input")
+                .isGreaterThan(BigDecimal.ONE);
+        assertThat(smallest)
+                .as("the minimum clamp must be reached by this input")
+                .isLessThan(BigDecimal.ONE);
         assertRoundTrips(largest);
         assertRoundTrips(smallest);
 
@@ -53,10 +57,13 @@ class MoneyWirePrecisionTest extends BaseUnitTest {
      */
     @Test
     void theBudgetCapFitsBothItsValidatorAndItsColumn() throws NoSuchMethodException, NoSuchFieldException {
-        Digits accepted = UpdateLlmBudgetRequestDTO.class.getMethod("monthlyBudgetUsd").getAnnotation(Digits.class);
+        Digits accepted =
+                UpdateLlmBudgetRequestDTO.class.getMethod("monthlyBudgetUsd").getAnnotation(Digits.class);
         Column stored = Workspace.class.getDeclaredField("monthlyLlmBudgetUsd").getAnnotation(Column.class);
 
-        assertThat(accepted).as("the cap's width must stay declared, or nothing bounds it").isNotNull();
+        assertThat(accepted)
+                .as("the cap's width must stay declared, or nothing bounds it")
+                .isNotNull();
         assertThat(accepted.integer() + accepted.fraction()).isLessThanOrEqualTo(SIGNIFICANT_DIGITS);
         assertThat(accepted.fraction()).isLessThanOrEqualTo(stored.scale());
         assertThat(accepted.integer() + accepted.fraction()).isLessThanOrEqualTo(stored.precision());
@@ -78,7 +85,8 @@ class MoneyWirePrecisionTest extends BaseUnitTest {
     @Test
     void aFrozenRateIsTheSameNumberInTheCatalogAndTheLedger() throws NoSuchFieldException, NoSuchMethodException {
         Column catalog = LlmModelPrice.class.getDeclaredField("per1mInputUsd").getAnnotation(Column.class);
-        Column ledger = LlmUsageEvent.class.getDeclaredField("appliedPer1mInputUsd").getAnnotation(Column.class);
+        Column ledger =
+                LlmUsageEvent.class.getDeclaredField("appliedPer1mInputUsd").getAnnotation(Column.class);
 
         assertThat(ledger.scale()).isEqualTo(catalog.scale());
         assertThat(ledger.precision()).isGreaterThanOrEqualTo(catalog.precision());
@@ -86,30 +94,32 @@ class MoneyWirePrecisionTest extends BaseUnitTest {
         // The column is NUMERIC(18,8), wider than the wire; what actually bounds a rate is the request
         // validator. Taking the width from that annotation rather than from a literal is what makes the
         // round-trip a statement about this system: widening it to @Digits(integer = 8) fails here.
-        Digits acceptedRate = UpdateLlmModelPriceRequestDTO.class.getMethod("per1mInputUsd").getAnnotation(
-            Digits.class
-        );
-        assertThat(acceptedRate).as("a rate's width must stay declared, or nothing bounds it").isNotNull();
+        Digits acceptedRate =
+                UpdateLlmModelPriceRequestDTO.class.getMethod("per1mInputUsd").getAnnotation(Digits.class);
+        assertThat(acceptedRate)
+                .as("a rate's width must stay declared, or nothing bounds it")
+                .isNotNull();
         assertThat(acceptedRate.fraction())
-            .as("the accepted decimals and the stored decimals must be the same number of places")
-            .isEqualTo(catalog.scale());
+                .as("the accepted decimals and the stored decimals must be the same number of places")
+                .isEqualTo(catalog.scale());
         assertThat(acceptedRate.integer() + acceptedRate.fraction()).isLessThanOrEqualTo(SIGNIFICANT_DIGITS);
         assertRoundTrips(largestAt(acceptedRate.integer() + acceptedRate.fraction(), acceptedRate.fraction()));
     }
 
     private static BigDecimal clampedCost(BigDecimal per1mInputUsd, long inputTokens) {
         LlmPriceSnapshot price = new LlmPriceSnapshot(
-            FundingSource.INSTANCE,
-            PricingState.PRICED,
-            1L,
-            null,
-            per1mInputUsd,
-            BigDecimal.ZERO,
-            BigDecimal.ZERO,
-            BigDecimal.ZERO
-        );
+                FundingSource.INSTANCE,
+                PricingState.PRICED,
+                1L,
+                null,
+                per1mInputUsd,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO);
         LlmPriceSnapshot.Cost cost = price.calculateCost(inputTokens, 0, 0, 0);
-        assertThat(cost.clamp()).as("this input must reach a clamp, or the test is asserting nothing").isNotNull();
+        assertThat(cost.clamp())
+                .as("this input must reach a clamp, or the test is asserting nothing")
+                .isNotNull();
         BigDecimal usd = cost.usd();
         org.junit.jupiter.api.Assertions.assertNotNull(usd);
         return usd;
@@ -117,15 +127,16 @@ class MoneyWirePrecisionTest extends BaseUnitTest {
 
     /** The largest value {@code NUMERIC(precision, scale)} holds, e.g. {@code 99999999.99}. */
     private static BigDecimal largestAt(int precision, int scale) {
-        return BigDecimal.ONE.movePointRight(precision - scale)
-            .subtract(BigDecimal.ONE.movePointLeft(scale))
-            .setScale(scale, RoundingMode.UNNECESSARY);
+        return BigDecimal.ONE
+                .movePointRight(precision - scale)
+                .subtract(BigDecimal.ONE.movePointLeft(scale))
+                .setScale(scale, RoundingMode.UNNECESSARY);
     }
 
     private static void assertRoundTrips(BigDecimal amount) {
         assertThat(asBrowserWouldSee(amount))
-            .as("%s must survive JSON number -> binary64 -> shortest decimal", amount.toPlainString())
-            .isEqualByComparingTo(amount);
+                .as("%s must survive JSON number -> binary64 -> shortest decimal", amount.toPlainString())
+                .isEqualByComparingTo(amount);
     }
 
     /**

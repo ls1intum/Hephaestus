@@ -16,11 +16,10 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  */
 @ConfigurationProperties(prefix = "hephaestus.practice-review.backfill")
 public record ReviewBackfillProperties(
-    @DefaultValue("25") int batchSize,
-    @DefaultValue("400d") Duration maxWindow,
-    @DefaultValue("5000") int maxArtifacts,
-    @DefaultValue("90d") Duration costHistoryWindow
-) {
+        @DefaultValue("25") int batchSize,
+        @DefaultValue("400d") Duration maxWindow,
+        @DefaultValue("5000") int maxArtifacts,
+        @DefaultValue("90d") Duration costHistoryWindow) {
     public ReviewBackfillProperties {
         if (batchSize <= 0) {
             throw new IllegalArgumentException("batchSize must be positive, got " + batchSize);

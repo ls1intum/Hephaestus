@@ -29,17 +29,15 @@ class TaskEnvelopeFixtureTest extends BaseUnitTest {
         TaskEnvelopeWriter writer = new TaskEnvelopeWriter(productionMapper);
 
         TaskEnvelope envelope = new TaskEnvelope(
-            1,
-            UUID.fromString("00000000-0000-0000-0000-00000000abcd"),
-            99L,
-            new Task.PracticeReview(
-                "Review merge request #42 in owner/repo. Read the context files, " +
-                    "then persist every justified observation via the report_observation tool. " +
-                    "Follow .pi/AGENTS.md for the schema and rules.",
-                42,
-                "owner/repo"
-            )
-        );
+                1,
+                UUID.fromString("00000000-0000-0000-0000-00000000abcd"),
+                99L,
+                new Task.PracticeReview(
+                        "Review merge request #42 in owner/repo. Read the context files, "
+                                + "then persist every justified observation via the report_observation tool. "
+                                + "Follow .pi/AGENTS.md for the schema and rules.",
+                        42,
+                        "owner/repo"));
 
         String actual = writer.writeAsString(envelope);
 
@@ -62,7 +60,7 @@ class TaskEnvelopeFixtureTest extends BaseUnitTest {
     private static Path resolveFixturePath() {
         Path candidate = Path.of("src/test/resources").resolve(FIXTURE_PATH);
         return Files.exists(candidate)
-            ? candidate
-            : Path.of("server/application/src/test/resources").resolve(FIXTURE_PATH);
+                ? candidate
+                : Path.of("server/application/src/test/resources").resolve(FIXTURE_PATH);
     }
 }

@@ -98,9 +98,6 @@ public class FeatureFlagService {
         if (auth == null) {
             return false;
         }
-        return auth
-            .getAuthorities()
-            .stream()
-            .anyMatch(a -> role.equals(a.getAuthority()));
+        return auth.getAuthorities().stream().anyMatch(a -> role.equals(a.getAuthority()));
     }
 }

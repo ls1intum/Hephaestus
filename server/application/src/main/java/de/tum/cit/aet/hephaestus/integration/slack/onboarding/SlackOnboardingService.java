@@ -41,6 +41,7 @@ public class SlackOnboardingService {
 
     /** Distinct from the interactivity action_ids: this button only opens a URL, it posts no payload. */
     private static final String LINK_ACTION_ID = "link_slack_identity";
+
     private static final String FALLBACK_TEXT = "Connect your account to Hephaestus";
 
     private final SlackWorkspaceResolver workspaceResolver;
@@ -50,12 +51,11 @@ public class SlackOnboardingService {
     private final String authBasePath;
 
     public SlackOnboardingService(
-        SlackWorkspaceResolver workspaceResolver,
-        SlackMentorIdentityResolver identityResolver,
-        SlackMessageService messageService,
-        @Value("${hephaestus.webapp.url:}") String hostUrl,
-        @Value("${hephaestus.auth.api-base-path:}") String authBasePath
-    ) {
+            SlackWorkspaceResolver workspaceResolver,
+            SlackMentorIdentityResolver identityResolver,
+            SlackMessageService messageService,
+            @Value("${hephaestus.webapp.url:}") String hostUrl,
+            @Value("${hephaestus.auth.api-base-path:}") String authBasePath) {
         this.workspaceResolver = workspaceResolver;
         this.identityResolver = identityResolver;
         this.messageService = messageService;
@@ -89,44 +89,27 @@ public class SlackOnboardingService {
             messageService.sendForWorkspace(ws, slackUserId, linkCtaBlocks(), FALLBACK_TEXT);
         } catch (SlackSendException e) {
             log.warn(
-                "slack.onboarding: failed to surface link CTA for workspace={}, slackError={}",
-                ws,
-                e.slackError()
-            );
+                    "slack.onboarding: failed to surface link CTA for workspace={}, slackError={}", ws, e.slackError());
         }
     }
 
     public List<LayoutBlock> linkCtaBlocks() {
         return asBlocks(
-            section(s ->
-                s.text(
-                    markdownText(
-                        "*Link your Hephaestus account.*\n" +
-                            "Connect your Slack identity to your Hephaestus profile so the mentor can find your " +
-                            "repositories, reviews, and issues."
-                    )
-                )
-            ),
-            actions(a ->
-                a.elements(
-                    asElements(
-                        button(b ->
-                            b
-                                .text(plainText("Link Hephaestus account"))
-                                .url(linkUrl())
-                                .actionId(LINK_ACTION_ID)
-                                .style("primary")
-                        )
-                    )
-                )
-            )
-        );
+                section(s -> s.text(markdownText("*Link your Hephaestus account.*\n"
+                        + "Connect your Slack identity to your Hephaestus profile so the mentor can find your "
+                        + "repositories, reviews, and issues."))),
+                actions(a -> a.elements(asElements(button(b -> b.text(plainText("Link Hephaestus account"))
+                        .url(linkUrl())
+                        .actionId(LINK_ACTION_ID)
+                        .style("primary"))))));
     }
 
     /** The authenticated link-mode deep link. Slack opens it in the browser where the session cookie lives. */
     String linkUrl() {
         String base = hostUrl == null ? "" : hostUrl.trim().replaceAll("/+$", "");
-        String prefix = authBasePath == null ? "" : authBasePath.trim().replaceAll("^/+", "").replaceAll("/+$", "");
+        String prefix = authBasePath == null
+                ? ""
+                : authBasePath.trim().replaceAll("^/+", "").replaceAll("/+$", "");
         String apiPrefix = prefix.isBlank() ? "" : "/" + prefix;
         return base + apiPrefix + "/auth/login?provider=slack&mode=link&returnTo=/settings";
     }

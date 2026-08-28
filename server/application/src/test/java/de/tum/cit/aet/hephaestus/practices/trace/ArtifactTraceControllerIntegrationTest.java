@@ -104,11 +104,11 @@ class ArtifactTraceControllerIntegrationTest extends AbstractWorkspaceIntegratio
             recordSignal(workspace, ScmSignals.PULL_REQUEST_READY, SignalState.RECORDED, null, null);
 
             webTestClient
-                .get()
-                .uri(TRACE, workspace.getWorkspaceSlug(), ArtifactKinds.PULL_REQUEST.value(), ARTIFACT_ID)
-                .exchange()
-                .expectStatus()
-                .isUnauthorized();
+                    .get()
+                    .uri(TRACE, workspace.getWorkspaceSlug(), ArtifactKinds.PULL_REQUEST.value(), ARTIFACT_ID)
+                    .exchange()
+                    .expectStatus()
+                    .isUnauthorized();
         }
 
         @Test
@@ -116,8 +116,7 @@ class ArtifactTraceControllerIntegrationTest extends AbstractWorkspaceIntegratio
         void admitsAnOrdinaryWorkspaceMemberWithoutAdminPolicyFacts() {
             AgentJob job = persistJob();
             recordSignal(workspace, ScmSignals.PULL_REQUEST_READY, SignalState.TRIGGERED, null, job.getId());
-            deliveryPolicyEvaluationRepository.save(
-                DeliveryPolicyEvaluation.builder()
+            deliveryPolicyEvaluationRepository.save(DeliveryPolicyEvaluation.builder()
                     .workspaceId(workspace.getId())
                     .agentJobId(job.getId())
                     .admittedRevision(0L)
@@ -129,15 +128,14 @@ class ArtifactTraceControllerIntegrationTest extends AbstractWorkspaceIntegratio
                     .checks(OBJECT_MAPPER.createArrayNode())
                     .facts(OBJECT_MAPPER.createObjectNode().put("recipientConsent", false))
                     .evaluatedAt(Instant.now())
-                    .build()
-            );
+                    .build());
 
             get(TRACE, workspace.getWorkspaceSlug(), ArtifactKinds.PULL_REQUEST.value(), ARTIFACT_ID)
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.deliveryPolicy")
-                .doesNotExist();
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.deliveryPolicy")
+                    .doesNotExist();
         }
 
         /** The ledger, not the mirror, decides visibility: another tenant's artifact id has no row here. */
@@ -147,14 +145,16 @@ class ArtifactTraceControllerIntegrationTest extends AbstractWorkspaceIntegratio
             recordSignal(otherWorkspace, ScmSignals.PULL_REQUEST_READY, SignalState.RECORDED, null, null);
 
             get(TRACE, workspace.getWorkspaceSlug(), ArtifactKinds.PULL_REQUEST.value(), ARTIFACT_ID)
-                .expectStatus()
-                .isNotFound();
+                    .expectStatus()
+                    .isNotFound();
         }
 
         @Test
         @WithUser
         void refusesAnUnknownArtifactKind() {
-            get(TRACE, workspace.getWorkspaceSlug(), "NotAKind", ARTIFACT_ID).expectStatus().isBadRequest();
+            get(TRACE, workspace.getWorkspaceSlug(), "NotAKind", ARTIFACT_ID)
+                    .expectStatus()
+                    .isBadRequest();
         }
     }
 
@@ -179,37 +179,32 @@ class ArtifactTraceControllerIntegrationTest extends AbstractWorkspaceIntegratio
             insertObservation(reviewed, job);
 
             get(TRACE, workspace.getWorkspaceSlug(), ArtifactKinds.PULL_REQUEST.value(), ARTIFACT_ID)
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.artifactId")
-                .isEqualTo(ARTIFACT_ID)
-                .jsonPath("$.signals.length()")
-                .isEqualTo(1)
-                .jsonPath("$.signals[0].signal")
-                .isEqualTo(ScmSignals.PULL_REQUEST_READY.value())
-                .jsonPath("$.signals[0].displayName")
-                .isEqualTo("Marked ready for review")
-                .jsonPath("$.practices.length()")
-                .isEqualTo(4)
-                .jsonPath("$.practices[?(@.practiceSlug=='reviewed')].outcome")
-                .isEqualTo("REVIEWED")
-                .jsonPath("$.practices[?(@.practiceSlug=='reviewed')].observationCount")
-                .isEqualTo(1)
-                .jsonPath("$.practices[?(@.practiceSlug=='silenced')].outcome")
-                .isEqualTo("TURNED_OFF")
-                .jsonPath("$.practices[?(@.practiceSlug=='not-admitted')].outcome")
-                .isEqualTo("SKIPPED")
-                .jsonPath("$.practices[?(@.practiceSlug=='dormant')].outcome")
-                .isEqualTo("DORMANT")
-                .jsonPath("$.practices[?(@.practiceSlug=='dormant')].explanation")
-                .value(
-                    org.hamcrest.Matchers.hasItem(
-                        org.hamcrest.Matchers.containsString(
-                            "No connected integration raises scm.pull_request.merged; connect GITHUB or GITLAB"
-                        )
-                    )
-                );
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.artifactId")
+                    .isEqualTo(ARTIFACT_ID)
+                    .jsonPath("$.signals.length()")
+                    .isEqualTo(1)
+                    .jsonPath("$.signals[0].signal")
+                    .isEqualTo(ScmSignals.PULL_REQUEST_READY.value())
+                    .jsonPath("$.signals[0].displayName")
+                    .isEqualTo("Marked ready for review")
+                    .jsonPath("$.practices.length()")
+                    .isEqualTo(4)
+                    .jsonPath("$.practices[?(@.practiceSlug=='reviewed')].outcome")
+                    .isEqualTo("REVIEWED")
+                    .jsonPath("$.practices[?(@.practiceSlug=='reviewed')].observationCount")
+                    .isEqualTo(1)
+                    .jsonPath("$.practices[?(@.practiceSlug=='silenced')].outcome")
+                    .isEqualTo("TURNED_OFF")
+                    .jsonPath("$.practices[?(@.practiceSlug=='not-admitted')].outcome")
+                    .isEqualTo("SKIPPED")
+                    .jsonPath("$.practices[?(@.practiceSlug=='dormant')].outcome")
+                    .isEqualTo("DORMANT")
+                    .jsonPath("$.practices[?(@.practiceSlug=='dormant')].explanation")
+                    .value(org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString(
+                            "No connected integration raises scm.pull_request.merged; connect GITHUB or GITLAB")));
         }
 
         @Test
@@ -217,23 +212,22 @@ class ArtifactTraceControllerIntegrationTest extends AbstractWorkspaceIntegratio
         void explainsARefusedSignalWithTheActionThatWouldLiftIt() {
             persistPractice("waiting", "Waiting practice", PracticeAutonomy.AUTOMATIC);
             recordSignal(
-                workspace,
-                ScmSignals.PULL_REQUEST_READY,
-                SignalState.PENDING,
-                SignalStateReason.BUDGET_EXHAUSTED,
-                null
-            );
+                    workspace,
+                    ScmSignals.PULL_REQUEST_READY,
+                    SignalState.PENDING,
+                    SignalStateReason.BUDGET_EXHAUSTED,
+                    null);
 
             get(TRACE, workspace.getWorkspaceSlug(), ArtifactKinds.PULL_REQUEST.value(), ARTIFACT_ID)
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.practices[0].outcome")
-                .isEqualTo("PENDING")
-                .jsonPath("$.practices[0].explanation")
-                .value(String.class, org.hamcrest.Matchers.containsString("budget refills"))
-                .jsonPath("$.signals[0].stateReason")
-                .isEqualTo("BUDGET_EXHAUSTED");
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.practices[0].outcome")
+                    .isEqualTo("PENDING")
+                    .jsonPath("$.practices[0].explanation")
+                    .value(String.class, org.hamcrest.Matchers.containsString("budget refills"))
+                    .jsonPath("$.signals[0].stateReason")
+                    .isEqualTo("BUDGET_EXHAUSTED");
         }
 
         @Test
@@ -242,8 +236,8 @@ class ArtifactTraceControllerIntegrationTest extends AbstractWorkspaceIntegratio
             persistPractice("waiting", "Waiting practice", PracticeAutonomy.AUTOMATIC);
 
             get(TRACE, workspace.getWorkspaceSlug(), ArtifactKinds.PULL_REQUEST.value(), ARTIFACT_ID)
-                .expectStatus()
-                .isNotFound();
+                    .expectStatus()
+                    .isNotFound();
         }
     }
 
@@ -258,19 +252,19 @@ class ArtifactTraceControllerIntegrationTest extends AbstractWorkspaceIntegratio
             recordSignal(otherWorkspace, ScmSignals.PULL_REQUEST_MERGED, SignalState.RECORDED, null, null);
 
             get(LIST, workspace.getWorkspaceSlug())
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.content.length()")
-                .isEqualTo(1)
-                .jsonPath("$.content[0].artifactId")
-                .isEqualTo(ARTIFACT_ID)
-                .jsonPath("$.content[0].artifactKind")
-                .isEqualTo(ArtifactKinds.PULL_REQUEST.value())
-                .jsonPath("$.content[0].signalCount")
-                .isEqualTo(1)
-                .jsonPath("$.content[0].reviewedSignalCount")
-                .isEqualTo(0);
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.content.length()")
+                    .isEqualTo(1)
+                    .jsonPath("$.content[0].artifactId")
+                    .isEqualTo(ARTIFACT_ID)
+                    .jsonPath("$.content[0].artifactKind")
+                    .isEqualTo(ArtifactKinds.PULL_REQUEST.value())
+                    .jsonPath("$.content[0].signalCount")
+                    .isEqualTo(1)
+                    .jsonPath("$.content[0].reviewedSignalCount")
+                    .isEqualTo(0);
         }
 
         @Test
@@ -279,16 +273,20 @@ class ArtifactTraceControllerIntegrationTest extends AbstractWorkspaceIntegratio
             recordSignal(workspace, ScmSignals.PULL_REQUEST_READY, SignalState.RECORDED, null, null);
 
             get(LIST + "?artifactKind={kind}", workspace.getWorkspaceSlug(), ArtifactKinds.ISSUE.value())
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.content.length()")
-                .isEqualTo(0);
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.content.length()")
+                    .isEqualTo(0);
         }
     }
 
     private WebTestClient.ResponseSpec get(String uri, Object... vars) {
-        return webTestClient.get().uri(uri, vars).headers(TestAuthUtils.withCurrentUser()).exchange();
+        return webTestClient
+                .get()
+                .uri(uri, vars)
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange();
     }
 
     private Practice persistPractice(String slug, String name, PracticeAutonomy autonomy) {
@@ -320,12 +318,11 @@ class ArtifactTraceControllerIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     private ArtifactSignal recordSignal(
-        Workspace ws,
-        SignalName signal,
-        SignalState state,
-        @Nullable SignalStateReason reason,
-        @Nullable UUID jobId
-    ) {
+            Workspace ws,
+            SignalName signal,
+            SignalState state,
+            @Nullable SignalStateReason reason,
+            @Nullable UUID jobId) {
         ArtifactSignal row = new ArtifactSignal();
         row.setId(UUID.randomUUID());
         row.setWorkspace(ws);
@@ -345,23 +342,22 @@ class ArtifactTraceControllerIntegrationTest extends AbstractWorkspaceIntegratio
     private void insertObservation(Practice practice, AgentJob job) {
         UUID id = UUID.randomUUID();
         observationRepository.insertIfAbsent(
-            id,
-            "occurrence-" + id,
-            job.getId(),
-            practice.getId(),
-            null,
-            ArtifactKinds.PULL_REQUEST.value(),
-            ARTIFACT_ID,
-            author.getId(),
-            "Something was observed",
-            "PRESENT",
-            "GOOD",
-            "INFO",
-            "{\"citations\":[]}",
-            "Because the diff says so",
-            "recurrence-1",
-            READY_AT,
-            "LIVE"
-        );
+                id,
+                "occurrence-" + id,
+                job.getId(),
+                practice.getId(),
+                null,
+                ArtifactKinds.PULL_REQUEST.value(),
+                ARTIFACT_ID,
+                author.getId(),
+                "Something was observed",
+                "PRESENT",
+                "GOOD",
+                "INFO",
+                "{\"citations\":[]}",
+                "Because the diff says so",
+                "recurrence-1",
+                READY_AT,
+                "LIVE");
     }
 }

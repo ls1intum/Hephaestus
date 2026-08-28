@@ -81,7 +81,7 @@ public class AccountExport {
 
     /** The generated JSON bundle. Null until READY; nulled again on EXPIRED. */
     @Column(name = "payload")
-    private byte@Nullable [] payload;
+    private byte @Nullable [] payload;
 
     public AccountExport(Long accountId) {
         this.accountId = accountId;

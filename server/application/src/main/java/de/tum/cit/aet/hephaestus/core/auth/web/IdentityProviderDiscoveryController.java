@@ -35,6 +35,7 @@ public class IdentityProviderDiscoveryController {
 
     /** Synthetic registration id + provider type for the optional passwordless dev sign-in row. */
     private static final String DEV_REGISTRATION_ID = "dev";
+
     private static final String DEV_PROVIDER_TYPE = "DEV";
 
     private final IdentityProviderCatalog identityProviderCatalog;
@@ -42,10 +43,9 @@ public class IdentityProviderDiscoveryController {
     private final DevLoginService devLoginService;
 
     public IdentityProviderDiscoveryController(
-        IdentityProviderCatalog identityProviderCatalog,
-        LoginProviderService loginProviderService,
-        DevLoginService devLoginService
-    ) {
+            IdentityProviderCatalog identityProviderCatalog,
+            LoginProviderService loginProviderService,
+            DevLoginService devLoginService) {
         this.identityProviderCatalog = identityProviderCatalog;
         this.loginProviderService = loginProviderService;
         this.devLoginService = devLoginService;
@@ -63,30 +63,21 @@ public class IdentityProviderDiscoveryController {
      * value, so the discrepancy is harmless. Do not treat this as an SCM API base URL.
      */
     public record IdentityProviderViewDTO(
-        String registrationId,
-        String displayName,
-        String providerType,
-        String baseUrl
-    ) {}
+            String registrationId, String displayName, String providerType, String baseUrl) {}
 
     @GetMapping("/identity-providers")
     @PreAuthorize("permitAll()")
     @Operation(summary = "List available identity providers", operationId = "listIdentityProviders")
     public ResponseEntity<List<IdentityProviderViewDTO>> list() {
-        Map<String, LoginProvider.ProviderType> typesByRegistrationId = loginProviderService
-            .listEnabled()
-            .stream()
-            .collect(Collectors.toMap(LoginProvider::getRegistrationId, LoginProvider::getType, (a, b) -> a));
+        Map<String, LoginProvider.ProviderType> typesByRegistrationId = loginProviderService.listEnabled().stream()
+                .collect(Collectors.toMap(LoginProvider::getRegistrationId, LoginProvider::getType, (a, b) -> a));
         List<IdentityProviderViewDTO> views = new ArrayList<>();
         for (ClientRegistration reg : identityProviderCatalog.listRegistrations()) {
-            views.add(
-                new IdentityProviderViewDTO(
+            views.add(new IdentityProviderViewDTO(
                     reg.getRegistrationId(),
                     reg.getClientName() != null ? reg.getClientName() : reg.getRegistrationId(),
                     providerTypeOf(reg, typesByRegistrationId::get),
-                    baseUrlOf(reg)
-                )
-            );
+                    baseUrlOf(reg)));
         }
         // Optional passwordless dev sign-in. Advertised ONLY when enabled (never in prod), so the SPA
         // login page renders a "Dev sign-in" affordance (username field → POST /auth/dev-login) instead
@@ -104,9 +95,7 @@ public class IdentityProviderDiscoveryController {
      * the legacy host sniff when no row resolves.
      */
     static String providerTypeOf(
-        ClientRegistration reg,
-        Function<String, @Nullable ProviderType> typeByRegistrationId
-    ) {
+            ClientRegistration reg, Function<String, @Nullable ProviderType> typeByRegistrationId) {
         LoginProvider.ProviderType rowType = typeByRegistrationId.apply(reg.getRegistrationId());
         if (rowType != null) {
             return rowType.name();

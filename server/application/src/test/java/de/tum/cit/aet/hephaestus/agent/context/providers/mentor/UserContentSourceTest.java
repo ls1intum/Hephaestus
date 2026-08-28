@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
@@ -24,7 +23,6 @@ import org.mockito.Spy;
 import org.springframework.cache.CacheManager;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.node.ObjectNode;
 
 class UserContentSourceTest extends BaseUnitTest {
 
@@ -49,21 +47,18 @@ class UserContentSourceTest extends BaseUnitTest {
         user.setLogin("octo");
         user.setName("Octo Cat");
         when(userRepository.findById(eq(2L))).thenReturn(Optional.of(user));
-        when(
-            queryRepository.fetchUserCounts(eq(1L), eq(2L), any(Instant.class), any(Instant.class), any(Instant.class))
-        ).thenReturn(
-            new MentorUserCounts(
-                /* openPRs */ 2L,
-                /* mergedThisWeek */ 5L,
-                /* mergedLastWeek */ 3L,
-                /* openIssues */ 1L,
-                /* reviewsGivenThisWeek */ 8L,
-                /* reviewsGivenLastWeek */ 4L,
-                /* reviewsReceivedThisWeek */ 7L,
-                /* pendingReviewRequests */ 2L,
-                /* unresolvedThreads */ 1L
-            )
-        );
+        when(queryRepository.fetchUserCounts(
+                        eq(1L), eq(2L), any(Instant.class), any(Instant.class), any(Instant.class)))
+                .thenReturn(new MentorUserCounts(
+                        /* openPRs */ 2L,
+                        /* mergedThisWeek */ 5L,
+                        /* mergedLastWeek */ 3L,
+                        /* openIssues */ 1L,
+                        /* reviewsGivenThisWeek */ 8L,
+                        /* reviewsGivenLastWeek */ 4L,
+                        /* reviewsReceivedThisWeek */ 7L,
+                        /* pendingReviewRequests */ 2L,
+                        /* unresolvedThreads */ 1L));
 
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID()), files);
@@ -89,14 +84,13 @@ class UserContentSourceTest extends BaseUnitTest {
     @Test
     void velocityUp() {
         ActivityInsights insights = UserContentSource.generateInsights(
-            /* openPRs */ 0,
-            /* mergedThisWeek */ 5,
-            /* mergedLastWeek */ 2,
-            /* reviewsGivenThisWeek */ 3,
-            /* reviewsGivenLastWeek */ 3,
-            /* pendingReviewRequests */ 0,
-            /* unresolvedThreads */ 0
-        );
+                /* openPRs */ 0,
+                /* mergedThisWeek */ 5,
+                /* mergedLastWeek */ 2,
+                /* reviewsGivenThisWeek */ 3,
+                /* reviewsGivenLastWeek */ 3,
+                /* pendingReviewRequests */ 0,
+                /* unresolvedThreads */ 0);
         assertThat(insights.insights()).anyMatch(s -> s.contains("velocity increased"));
         assertThat(insights.reflectionTopics()).isEmpty();
     }
@@ -104,14 +98,13 @@ class UserContentSourceTest extends BaseUnitTest {
     @Test
     void velocityDown() {
         ActivityInsights insights = UserContentSource.generateInsights(
-            /* openPRs */ 0,
-            /* mergedThisWeek */ 1,
-            /* mergedLastWeek */ 5,
-            /* reviewsGivenThisWeek */ 3,
-            /* reviewsGivenLastWeek */ 3,
-            /* pendingReviewRequests */ 0,
-            /* unresolvedThreads */ 0
-        );
+                /* openPRs */ 0,
+                /* mergedThisWeek */ 1,
+                /* mergedLastWeek */ 5,
+                /* reviewsGivenThisWeek */ 3,
+                /* reviewsGivenLastWeek */ 3,
+                /* pendingReviewRequests */ 0,
+                /* unresolvedThreads */ 0);
         assertThat(insights.insights()).anyMatch(s -> s.contains("Shipping slowed"));
         assertThat(insights.reflectionTopics()).anyMatch(s -> s.contains("shipping pace"));
     }
@@ -122,14 +115,13 @@ class UserContentSourceTest extends BaseUnitTest {
         // Distinguishes a mergedThisWeek<->mergedLastWeek swap: with this<last the message is "slowed",
         // and "velocity increased" must NOT appear (a swapped projection would invert this).
         ActivityInsights insights = UserContentSource.generateInsights(
-            /* openPRs */ 0,
-            /* mergedThisWeek */ 2,
-            /* mergedLastWeek */ 5,
-            /* reviewsGivenThisWeek */ 3,
-            /* reviewsGivenLastWeek */ 3,
-            /* pendingReviewRequests */ 0,
-            /* unresolvedThreads */ 0
-        );
+                /* openPRs */ 0,
+                /* mergedThisWeek */ 2,
+                /* mergedLastWeek */ 5,
+                /* reviewsGivenThisWeek */ 3,
+                /* reviewsGivenLastWeek */ 3,
+                /* pendingReviewRequests */ 0,
+                /* unresolvedThreads */ 0);
         assertThat(insights.insights()).noneMatch(s -> s.contains("velocity increased"));
         assertThat(insights.insights()).anyMatch(s -> s.contains("Shipping slowed"));
     }
@@ -137,14 +129,13 @@ class UserContentSourceTest extends BaseUnitTest {
     @Test
     void manyOpenPrs() {
         ActivityInsights insights = UserContentSource.generateInsights(
-            /* openPRs */ 10,
-            /* mergedThisWeek */ 0,
-            /* mergedLastWeek */ 0,
-            /* reviewsGivenThisWeek */ 0,
-            /* reviewsGivenLastWeek */ 0,
-            /* pendingReviewRequests */ 0,
-            /* unresolvedThreads */ 0
-        );
+                /* openPRs */ 10,
+                /* mergedThisWeek */ 0,
+                /* mergedLastWeek */ 0,
+                /* reviewsGivenThisWeek */ 0,
+                /* reviewsGivenLastWeek */ 0,
+                /* pendingReviewRequests */ 0,
+                /* unresolvedThreads */ 0);
         assertThat(insights.insights()).anyMatch(s -> s.contains("open PRs"));
         assertThat(insights.reflectionTopics()).anyMatch(s -> s.contains("merge-ready"));
     }
@@ -153,14 +144,13 @@ class UserContentSourceTest extends BaseUnitTest {
     @DisplayName("insights: empty signal falls back to steady-week message")
     void steadyFallback() {
         ActivityInsights insights = UserContentSource.generateInsights(
-            /* openPRs */ 0,
-            /* mergedThisWeek */ 0,
-            /* mergedLastWeek */ 0,
-            /* reviewsGivenThisWeek */ 0,
-            /* reviewsGivenLastWeek */ 0,
-            /* pendingReviewRequests */ 0,
-            /* unresolvedThreads */ 0
-        );
+                /* openPRs */ 0,
+                /* mergedThisWeek */ 0,
+                /* mergedLastWeek */ 0,
+                /* reviewsGivenThisWeek */ 0,
+                /* reviewsGivenLastWeek */ 0,
+                /* pendingReviewRequests */ 0,
+                /* unresolvedThreads */ 0);
         assertThat(insights.insights()).containsExactly("Steady week with consistent activity.");
         assertThat(insights.reflectionTopics()).isEmpty();
     }
@@ -169,14 +159,13 @@ class UserContentSourceTest extends BaseUnitTest {
     @DisplayName("insights: no reviews this week when active last week surfaces nudge")
     void reviewDrop() {
         ActivityInsights insights = UserContentSource.generateInsights(
-            /* openPRs */ 0,
-            /* mergedThisWeek */ 0,
-            /* mergedLastWeek */ 0,
-            /* reviewsGivenThisWeek */ 0,
-            /* reviewsGivenLastWeek */ 3,
-            /* pendingReviewRequests */ 0,
-            /* unresolvedThreads */ 0
-        );
+                /* openPRs */ 0,
+                /* mergedThisWeek */ 0,
+                /* mergedLastWeek */ 0,
+                /* reviewsGivenThisWeek */ 0,
+                /* reviewsGivenLastWeek */ 3,
+                /* pendingReviewRequests */ 0,
+                /* unresolvedThreads */ 0);
         assertThat(insights.insights()).anyMatch(s -> s.contains("No reviews given this week"));
     }
 }

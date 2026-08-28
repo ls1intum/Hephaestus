@@ -59,12 +59,11 @@ class InContextDeliveryGate {
     private final WorkspaceRepository workspaceRepository;
 
     InContextDeliveryGate(
-        PracticeRepository practiceRepository,
-        ObservationRepository observationRepository,
-        FeedbackLedgerRecorder feedbackLedgerRecorder,
-        WorkspaceReviewDefaultsProvider workspaceDefaults,
-        WorkspaceRepository workspaceRepository
-    ) {
+            PracticeRepository practiceRepository,
+            ObservationRepository observationRepository,
+            FeedbackLedgerRecorder feedbackLedgerRecorder,
+            WorkspaceReviewDefaultsProvider workspaceDefaults,
+            WorkspaceRepository workspaceRepository) {
         this.practiceRepository = practiceRepository;
         this.observationRepository = observationRepository;
         this.feedbackLedgerRecorder = feedbackLedgerRecorder;
@@ -75,14 +74,14 @@ class InContextDeliveryGate {
     /** The subset of {@code observations} that may be placed on the artifact, in the order given. */
     @Transactional(readOnly = true)
     public List<ValidatedObservation> admitInContext(AgentJob job, List<ValidatedObservation> observations) {
-        if (observations.isEmpty() || job.getWorkspace() == null || job.getWorkspace().getId() == null) {
+        if (observations.isEmpty()
+                || job.getWorkspace() == null
+                || job.getWorkspace().getId() == null) {
             return observations;
         }
         long workspaceId = job.getWorkspace().getId();
-        FeedbackSuppressionReason rolloutRefusal = refusalIfRolloutRevisionMoved(
-            job.getPracticeRolloutRevision(),
-            workspaceId
-        );
+        FeedbackSuppressionReason rolloutRefusal =
+                refusalIfRolloutRevisionMoved(job.getPracticeRolloutRevision(), workspaceId);
         if (rolloutRefusal != null) {
             recordWithheld(job, observations, rolloutRefusal);
             return List.of();
@@ -90,11 +89,10 @@ class InContextDeliveryGate {
         ObservationOrigin origin = PracticeDetectionDeliveryService.originOf(job.getMetadata());
         if (!origin.delivers(FeedbackChannel.IN_CONTEXT)) {
             log.info(
-                "Provenance withheld all {} observation(s) from the artifact: origin={}, jobId={}",
-                observations.size(),
-                origin,
-                job.getId()
-            );
+                    "Provenance withheld all {} observation(s) from the artifact: origin={}, jobId={}",
+                    observations.size(),
+                    origin,
+                    job.getId());
             recordWithheld(job, observations, FeedbackSuppressionReason.BACKFILL_QUIET);
             return List.of();
         }
@@ -103,9 +101,7 @@ class InContextDeliveryGate {
         Map<String, PracticeAutonomy> autonomyBySlug = new HashMap<>();
         for (Practice practice : practiceRepository.findByWorkspaceId(workspaceId)) {
             autonomyBySlug.put(
-                practice.getSlug(),
-                AutonomyResolver.effectiveAutonomyOf(practice, defaults.defaultAutonomy())
-            );
+                    practice.getSlug(), AutonomyResolver.effectiveAutonomyOf(practice, defaults.defaultAutonomy()));
         }
 
         List<ValidatedObservation> admitted = new ArrayList<>(observations.size());
@@ -114,10 +110,9 @@ class InContextDeliveryGate {
             PracticeAutonomy autonomy = autonomyBySlug.get(observation.practiceSlug());
             if (autonomy == null) {
                 log.warn(
-                    "No autonomy resolved for observation; withholding it: slug={}, jobId={}",
-                    observation.practiceSlug(),
-                    job.getId()
-                );
+                        "No autonomy resolved for observation; withholding it: slug={}, jobId={}",
+                        observation.practiceSlug(),
+                        job.getId());
             }
             if (PracticeAutonomyPolicy.delivers(origin, autonomy, FeedbackChannel.IN_CONTEXT)) {
                 admitted.add(observation);
@@ -129,20 +124,19 @@ class InContextDeliveryGate {
             return admitted.size() == observations.size() ? observations : List.copyOf(admitted);
         }
         log.info(
-            "Practice autonomy withheld {} of {} observation(s) from the artifact: jobId={}",
-            withheld.size(),
-            observations.size(),
-            job.getId()
-        );
+                "Practice autonomy withheld {} of {} observation(s) from the artifact: jobId={}",
+                withheld.size(),
+                observations.size(),
+                job.getId());
         recordWithheld(job, withheld, FeedbackSuppressionReason.PRACTICE_REQUIRES_APPROVAL);
         return admitted;
     }
 
     @Transactional(readOnly = true)
     public List<ValidatedObservation> awaitingApproval(AgentJob job, List<ValidatedObservation> observations) {
-        if (
-            observations.isEmpty() || job.getWorkspace() == null || job.getWorkspace().getId() == null
-        ) return List.of();
+        if (observations.isEmpty()
+                || job.getWorkspace() == null
+                || job.getWorkspace().getId() == null) return List.of();
         long workspaceId = job.getWorkspace().getId();
         if (refusalIfRolloutRevisionMoved(job.getPracticeRolloutRevision(), workspaceId) != null) return List.of();
         ObservationOrigin origin = PracticeDetectionDeliveryService.originOf(job.getMetadata());
@@ -151,14 +145,12 @@ class InContextDeliveryGate {
         Map<String, PracticeAutonomy> autonomyBySlug = new HashMap<>();
         for (Practice practice : practiceRepository.findByWorkspaceId(workspaceId)) {
             autonomyBySlug.put(
-                practice.getSlug(),
-                AutonomyResolver.effectiveAutonomyOf(practice, defaults.defaultAutonomy())
-            );
+                    practice.getSlug(), AutonomyResolver.effectiveAutonomyOf(practice, defaults.defaultAutonomy()));
         }
-        return observations
-            .stream()
-            .filter(observation -> autonomyBySlug.get(observation.practiceSlug()) == PracticeAutonomy.HUMAN_APPROVAL)
-            .toList();
+        return observations.stream()
+                .filter(observation ->
+                        autonomyBySlug.get(observation.practiceSlug()) == PracticeAutonomy.HUMAN_APPROVAL)
+                .toList();
     }
 
     private void recordWithheld(AgentJob job, List<ValidatedObservation> withheld, FeedbackSuppressionReason reason) {
@@ -172,10 +164,9 @@ class InContextDeliveryGate {
             // guard would then read as "already recorded" and drop.
             if (index >= FeedbackLedgerRecorder.UNIT_ORDINAL_BAND_WIDTH) {
                 log.warn(
-                    "Withheld-feedback ledger band full at {} rows; remaining withheld observations are unrecorded: jobId={}",
-                    index,
-                    job.getId()
-                );
+                        "Withheld-feedback ledger band full at {} rows; remaining withheld observations are unrecorded: jobId={}",
+                        index,
+                        job.getId());
                 return;
             }
             String occurrenceKey = measured.occurrenceKey();
@@ -195,18 +186,14 @@ class InContextDeliveryGate {
     }
 
     private @Nullable FeedbackSuppressionReason refusalIfRolloutRevisionMoved(
-        @Nullable Long admittedRevision,
-        long workspaceId
-    ) {
+            @Nullable Long admittedRevision, long workspaceId) {
         Long revisionInForceNow = workspaceRepository
-            .findById(workspaceId)
-            .map(workspace -> workspace.getReviewSettings().getRolloutRevision())
-            .orElse(null);
-        if (
-            admittedRevision == null ||
-            revisionInForceNow == null ||
-            admittedRevision.longValue() != revisionInForceNow.longValue()
-        ) {
+                .findById(workspaceId)
+                .map(workspace -> workspace.getReviewSettings().getRolloutRevision())
+                .orElse(null);
+        if (admittedRevision == null
+                || revisionInForceNow == null
+                || admittedRevision.longValue() != revisionInForceNow.longValue()) {
             return FeedbackSuppressionReason.STALE_ROLLOUT_REVISION;
         }
         return null;

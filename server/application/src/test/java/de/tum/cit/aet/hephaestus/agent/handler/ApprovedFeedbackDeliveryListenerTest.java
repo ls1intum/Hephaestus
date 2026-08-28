@@ -43,35 +43,29 @@ class ApprovedFeedbackDeliveryListenerTest {
 
         fixture.listener().deliver(event(fixture.feedback()));
 
-        verify(fixture.feedbackRepository()).markApprovedSuppressed(
-            7L,
-            fixture.feedback().getId(),
-            FeedbackSuppressionReason.APPROVAL_NO_LONGER_ELIGIBLE.name()
-        );
+        verify(fixture.feedbackRepository())
+                .markApprovedSuppressed(
+                        7L, fixture.feedback().getId(), FeedbackSuppressionReason.APPROVAL_NO_LONGER_ELIGIBLE.name());
         verifyNoInteractions(fixture.dispatchService());
     }
 
     @Test
     void appliesCurrentApprovedStagePolicyBeforeDispatch() {
         Fixture fixture = fixture();
-        when(
-            fixture
-                .policy()
-                .evaluatePullRequest(
-                    fixture.job(),
-                    DeliveryPolicyStage.APPROVED,
-                    fixture.feedback().getId(),
-                    fixture.feedback().getProposedPracticeSlugs()
-                )
-        ).thenReturn(PracticeFeedbackDeliveryPolicy.Decision.suppressed(FeedbackSuppressionReason.RECIPIENT_OPTED_OUT));
+        when(fixture.policy()
+                        .evaluatePullRequest(
+                                fixture.job(),
+                                DeliveryPolicyStage.APPROVED,
+                                fixture.feedback().getId(),
+                                fixture.feedback().getProposedPracticeSlugs()))
+                .thenReturn(PracticeFeedbackDeliveryPolicy.Decision.suppressed(
+                        FeedbackSuppressionReason.RECIPIENT_OPTED_OUT));
 
         fixture.listener().deliver(event(fixture.feedback()));
 
-        verify(fixture.feedbackRepository()).markApprovedSuppressed(
-            7L,
-            fixture.feedback().getId(),
-            FeedbackSuppressionReason.RECIPIENT_OPTED_OUT.name()
-        );
+        verify(fixture.feedbackRepository())
+                .markApprovedSuppressed(
+                        7L, fixture.feedback().getId(), FeedbackSuppressionReason.RECIPIENT_OPTED_OUT.name());
         verifyNoInteractions(fixture.dispatchService());
     }
 
@@ -79,13 +73,13 @@ class ApprovedFeedbackDeliveryListenerTest {
     void marksDeliveredOnlyAfterSharedDispatchConfirmsSent() {
         Fixture fixture = fixture();
         allow(fixture);
-        when(fixture.dispatchService().dispatchApproved(fixture.job(), fixture.feedback())).thenReturn(
-            PracticeFeedbackDispatchService.Result.sent("provider-id")
-        );
+        when(fixture.dispatchService().dispatchApproved(fixture.job(), fixture.feedback()))
+                .thenReturn(PracticeFeedbackDispatchService.Result.sent("provider-id"));
 
         fixture.listener().deliver(event(fixture.feedback()));
 
-        verify(fixture.feedbackRepository()).markApprovedDelivered(7L, fixture.feedback().getId());
+        verify(fixture.feedbackRepository())
+                .markApprovedDelivered(7L, fixture.feedback().getId());
     }
 
     @Test
@@ -93,43 +87,40 @@ class ApprovedFeedbackDeliveryListenerTest {
         Fixture fixture = fixture();
         PullRequest current = new PullRequest();
         current.setHeadRefOid("new-head");
-        when(
-            fixture
-                .policy()
-                .evaluatePullRequest(fixture.job(), DeliveryPolicyStage.APPROVED, fixture.feedback().getId(), List.of())
-        ).thenReturn(PracticeFeedbackDeliveryPolicy.Decision.allowed(current));
+        when(fixture.policy()
+                        .evaluatePullRequest(
+                                fixture.job(),
+                                DeliveryPolicyStage.APPROVED,
+                                fixture.feedback().getId(),
+                                List.of()))
+                .thenReturn(PracticeFeedbackDeliveryPolicy.Decision.allowed(current));
         Feedback stale = Feedback.builder()
-            .id(fixture.feedback().getId())
-            .agentJobId(fixture.feedback().getAgentJobId())
-            .workspaceId(7L)
-            .artifactKind(ArtifactKinds.PULL_REQUEST)
-            .recipientUserId(8L)
-            .aboutUserId(8L)
-            .channel(FeedbackChannel.IN_CONTEXT)
-            .position(7_000)
-            .deliveryState(FeedbackDeliveryState.PREPARED)
-            .body("Exact proposal")
-            .reviewedRevision("old-head")
-            .source(FeedbackSource.AGENT)
-            .build();
-        when(fixture.feedbackRepository().findByIdAndWorkspaceId(stale.getId(), 7L)).thenReturn(Optional.of(stale));
-        when(fixture.approvalRepository().findByFeedbackIdAndWorkspaceId(stale.getId(), 7L)).thenReturn(
-            Optional.of(
-                FeedbackApproval.builder()
-                    .feedbackId(stale.getId())
-                    .workspaceId(7L)
-                    .contentDigest(FeedbackApprovalDigest.of(stale))
-                    .build()
-            )
-        );
+                .id(fixture.feedback().getId())
+                .agentJobId(fixture.feedback().getAgentJobId())
+                .workspaceId(7L)
+                .artifactKind(ArtifactKinds.PULL_REQUEST)
+                .recipientUserId(8L)
+                .aboutUserId(8L)
+                .channel(FeedbackChannel.IN_CONTEXT)
+                .position(7_000)
+                .deliveryState(FeedbackDeliveryState.PREPARED)
+                .body("Exact proposal")
+                .reviewedRevision("old-head")
+                .source(FeedbackSource.AGENT)
+                .build();
+        when(fixture.feedbackRepository().findByIdAndWorkspaceId(stale.getId(), 7L))
+                .thenReturn(Optional.of(stale));
+        when(fixture.approvalRepository().findByFeedbackIdAndWorkspaceId(stale.getId(), 7L))
+                .thenReturn(Optional.of(FeedbackApproval.builder()
+                        .feedbackId(stale.getId())
+                        .workspaceId(7L)
+                        .contentDigest(FeedbackApprovalDigest.of(stale))
+                        .build()));
 
         fixture.listener().deliver(event(stale));
 
-        verify(fixture.feedbackRepository()).markApprovedSuppressed(
-            7L,
-            stale.getId(),
-            FeedbackSuppressionReason.APPROVAL_STALE.name()
-        );
+        verify(fixture.feedbackRepository())
+                .markApprovedSuppressed(7L, stale.getId(), FeedbackSuppressionReason.APPROVAL_STALE.name());
         verifyNoInteractions(fixture.dispatchService());
     }
 
@@ -137,9 +128,8 @@ class ApprovedFeedbackDeliveryListenerTest {
     void leavesProposalPreparedWhileDispatchIsUncertain() {
         Fixture fixture = fixture();
         allow(fixture);
-        when(fixture.dispatchService().dispatchApproved(fixture.job(), fixture.feedback())).thenReturn(
-            PracticeFeedbackDispatchService.Result.uncertain(null)
-        );
+        when(fixture.dispatchService().dispatchApproved(fixture.job(), fixture.feedback()))
+                .thenReturn(PracticeFeedbackDispatchService.Result.uncertain(null));
 
         fixture.listener().deliver(event(fixture.feedback()));
 
@@ -151,17 +141,15 @@ class ApprovedFeedbackDeliveryListenerTest {
     void persistsTheDispatchEgressSuppressionReason() {
         Fixture fixture = fixture();
         allow(fixture);
-        when(fixture.dispatchService().dispatchApproved(fixture.job(), fixture.feedback())).thenReturn(
-            PracticeFeedbackDispatchService.Result.suppressed(FeedbackSuppressionReason.WORKSPACE_DELIVERY_PAUSED)
-        );
+        when(fixture.dispatchService().dispatchApproved(fixture.job(), fixture.feedback()))
+                .thenReturn(PracticeFeedbackDispatchService.Result.suppressed(
+                        FeedbackSuppressionReason.WORKSPACE_DELIVERY_PAUSED));
 
         fixture.listener().deliver(event(fixture.feedback()));
 
-        verify(fixture.feedbackRepository()).markApprovedSuppressed(
-            7L,
-            fixture.feedback().getId(),
-            FeedbackSuppressionReason.WORKSPACE_DELIVERY_PAUSED.name()
-        );
+        verify(fixture.feedbackRepository())
+                .markApprovedSuppressed(
+                        7L, fixture.feedback().getId(), FeedbackSuppressionReason.WORKSPACE_DELIVERY_PAUSED.name());
     }
 
     @Test
@@ -171,11 +159,9 @@ class ApprovedFeedbackDeliveryListenerTest {
 
         fixture.listener().deliver(event(fixture.feedback()));
 
-        verify(fixture.feedbackRepository()).markApprovedSuppressed(
-            7L,
-            fixture.feedback().getId(),
-            FeedbackSuppressionReason.APPROVAL_STALE.name()
-        );
+        verify(fixture.feedbackRepository())
+                .markApprovedSuppressed(
+                        7L, fixture.feedback().getId(), FeedbackSuppressionReason.APPROVAL_STALE.name());
         verifyNoInteractions(fixture.dispatchService());
     }
 
@@ -186,48 +172,39 @@ class ApprovedFeedbackDeliveryListenerTest {
 
         fixture.listener().deliver(event(fixture.feedback()));
 
-        verify(fixture.feedbackRepository()).markApprovedSuppressed(
-            7L,
-            fixture.feedback().getId(),
-            FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE.name()
-        );
+        verify(fixture.feedbackRepository())
+                .markApprovedSuppressed(
+                        7L, fixture.feedback().getId(), FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE.name());
         verifyNoInteractions(fixture.dispatchService());
     }
 
     @Test
     void suppressesWhenApprovedContentNoLongerMatches() {
         Fixture fixture = fixture();
-        when(fixture.approvalRepository().findByFeedbackIdAndWorkspaceId(fixture.feedback().getId(), 7L)).thenReturn(
-            Optional.of(
-                FeedbackApproval.builder()
-                    .feedbackId(fixture.feedback().getId())
-                    .workspaceId(7L)
-                    .contentDigest("0".repeat(64))
-                    .build()
-            )
-        );
+        when(fixture.approvalRepository()
+                        .findByFeedbackIdAndWorkspaceId(fixture.feedback().getId(), 7L))
+                .thenReturn(Optional.of(FeedbackApproval.builder()
+                        .feedbackId(fixture.feedback().getId())
+                        .workspaceId(7L)
+                        .contentDigest("0".repeat(64))
+                        .build()));
 
         fixture.listener().deliver(event(fixture.feedback()));
 
-        verify(fixture.feedbackRepository()).markApprovedSuppressed(
-            7L,
-            fixture.feedback().getId(),
-            FeedbackSuppressionReason.APPROVAL_STALE.name()
-        );
+        verify(fixture.feedbackRepository())
+                .markApprovedSuppressed(
+                        7L, fixture.feedback().getId(), FeedbackSuppressionReason.APPROVAL_STALE.name());
         verifyNoInteractions(fixture.dispatchService());
     }
 
     private static void allow(Fixture fixture) {
-        when(
-            fixture
-                .policy()
-                .evaluatePullRequest(
-                    fixture.job(),
-                    DeliveryPolicyStage.APPROVED,
-                    fixture.feedback().getId(),
-                    fixture.feedback().getProposedPracticeSlugs()
-                )
-        ).thenReturn(PracticeFeedbackDeliveryPolicy.Decision.allowed(new PullRequest()));
+        when(fixture.policy()
+                        .evaluatePullRequest(
+                                fixture.job(),
+                                DeliveryPolicyStage.APPROVED,
+                                fixture.feedback().getId(),
+                                fixture.feedback().getProposedPracticeSlugs()))
+                .thenReturn(PracticeFeedbackDeliveryPolicy.Decision.allowed(new PullRequest()));
     }
 
     private static Fixture fixture() {
@@ -244,42 +221,30 @@ class ApprovedFeedbackDeliveryListenerTest {
         Feedback feedback = proposal(UUID.randomUUID(), UUID.randomUUID(), body);
         AgentJob job = agentJob();
         when(feedbackRepository.findByIdAndWorkspaceId(feedback.getId(), 7L)).thenReturn(Optional.of(feedback));
-        when(approvalRepository.findByFeedbackIdAndWorkspaceId(feedback.getId(), 7L)).thenReturn(
-            Optional.of(
-                FeedbackApproval.builder()
-                    .feedbackId(feedback.getId())
-                    .workspaceId(7L)
-                    .contentDigest(FeedbackApprovalDigest.of(feedback))
-                    .build()
-            )
-        );
+        when(approvalRepository.findByFeedbackIdAndWorkspaceId(feedback.getId(), 7L))
+                .thenReturn(Optional.of(FeedbackApproval.builder()
+                        .feedbackId(feedback.getId())
+                        .workspaceId(7L)
+                        .contentDigest(FeedbackApprovalDigest.of(feedback))
+                        .build()));
         when(eligibility.isEligible(7L, feedback.getId())).thenReturn(true);
         when(jobRepository.findByIdAndWorkspaceId(feedback.getAgentJobId(), 7L)).thenReturn(Optional.of(job));
         org.mockito.Mockito.lenient()
-            .when(dispatchService.projectApproved(any(), any()))
-            .thenAnswer(invocation -> {
-                ((Runnable) invocation.getArgument(1)).run();
-                return true;
-            });
+                .when(dispatchService.projectApproved(any(), any()))
+                .thenAnswer(invocation -> {
+                    ((Runnable) invocation.getArgument(1)).run();
+                    return true;
+                });
         ApprovedFeedbackDeliveryListener listener = new ApprovedFeedbackDeliveryListener(
-            feedbackRepository,
-            approvalRepository,
-            jobRepository,
-            policy,
-            dispatchService,
-            eligibility,
-            mock(FeedbackLedgerRecorder.class)
-        );
+                feedbackRepository,
+                approvalRepository,
+                jobRepository,
+                policy,
+                dispatchService,
+                eligibility,
+                mock(FeedbackLedgerRecorder.class));
         return new Fixture(
-            listener,
-            feedbackRepository,
-            approvalRepository,
-            policy,
-            dispatchService,
-            eligibility,
-            feedback,
-            job
-        );
+                listener, feedbackRepository, approvalRepository, policy, dispatchService, eligibility, feedback, job);
     }
 
     private static ApprovedFeedbackReadyEvent event(Feedback feedback) {
@@ -288,30 +253,29 @@ class ApprovedFeedbackDeliveryListenerTest {
 
     private static Feedback proposal(UUID feedbackId, UUID jobId, String body) {
         return Feedback.builder()
-            .id(feedbackId)
-            .agentJobId(jobId)
-            .workspaceId(7L)
-            .artifactKind(ArtifactKinds.PULL_REQUEST)
-            .recipientUserId(8L)
-            .aboutUserId(8L)
-            .channel(FeedbackChannel.IN_CONTEXT)
-            .position(7_000)
-            .deliveryState(FeedbackDeliveryState.PREPARED)
-            .body(body)
-            .proposedPlacements(new ArrayList<>(List.of(ProposedPlacement.summary(body))))
-            .proposedPracticeSlugs(new ArrayList<>(List.of("review-quality")))
-            .source(FeedbackSource.AGENT)
-            .build();
+                .id(feedbackId)
+                .agentJobId(jobId)
+                .workspaceId(7L)
+                .artifactKind(ArtifactKinds.PULL_REQUEST)
+                .recipientUserId(8L)
+                .aboutUserId(8L)
+                .channel(FeedbackChannel.IN_CONTEXT)
+                .position(7_000)
+                .deliveryState(FeedbackDeliveryState.PREPARED)
+                .body(body)
+                .proposedPlacements(new ArrayList<>(List.of(ProposedPlacement.summary(body))))
+                .proposedPracticeSlugs(new ArrayList<>(List.of("review-quality")))
+                .source(FeedbackSource.AGENT)
+                .build();
     }
 
     private record Fixture(
-        ApprovedFeedbackDeliveryListener listener,
-        FeedbackRepository feedbackRepository,
-        FeedbackApprovalRepository approvalRepository,
-        PracticeFeedbackDeliveryPolicy policy,
-        PracticeFeedbackDispatchService dispatchService,
-        FeedbackApprovalEligibility eligibility,
-        Feedback feedback,
-        AgentJob job
-    ) {}
+            ApprovedFeedbackDeliveryListener listener,
+            FeedbackRepository feedbackRepository,
+            FeedbackApprovalRepository approvalRepository,
+            PracticeFeedbackDeliveryPolicy policy,
+            PracticeFeedbackDispatchService dispatchService,
+            FeedbackApprovalEligibility eligibility,
+            Feedback feedback,
+            AgentJob job) {}
 }

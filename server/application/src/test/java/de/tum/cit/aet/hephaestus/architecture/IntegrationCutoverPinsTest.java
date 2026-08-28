@@ -32,9 +32,9 @@ class IntegrationCutoverPinsTest extends HephaestusArchitectureTest {
     @DisplayName("no class resides in the legacy gitprovider package")
     void noClassResidesInGitProviderPackage() {
         ArchRule rule = noClasses()
-            .should()
-            .resideInAPackage("..gitprovider..")
-            .because("gitprovider/ was renamed to integration.scm/; re-introducing it forks the module graph");
+                .should()
+                .resideInAPackage("..gitprovider..")
+                .because("gitprovider/ was renamed to integration.scm/; re-introducing it forks the module graph");
         rule.check(classes);
     }
 
@@ -52,54 +52,41 @@ class IntegrationCutoverPinsTest extends HephaestusArchitectureTest {
     @Test
     @DisplayName("no retired per-vendor webhook PostMapping route")
     void noRetiredVendorWebhookRoutes() {
-        Set<String> retiredVendorRouteNames = Set.of(
-            "/github",
-            "/gitlab",
-            "/slack",
-            "/outline",
-            "/slack/interactivity"
-        );
+        Set<String> retiredVendorRouteNames =
+                Set.of("/github", "/gitlab", "/slack", "/outline", "/slack/interactivity");
 
-        ArchCondition<JavaMethod> notDeclareRetiredVendorRoute = new ArchCondition<>(
-            "not declare a retired vendor webhook @PostMapping route"
-        ) {
-            @Override
-            public void check(JavaMethod method, ConditionEvents events) {
-                if (!method.isAnnotatedWith(PostMapping.class)) {
-                    return;
-                }
-                PostMapping mapping = method.getAnnotationOfType(PostMapping.class);
-                String[] candidates = mapping.value().length > 0 ? mapping.value() : mapping.path();
-                for (String value : candidates) {
-                    String trimmed = value == null ? "" : value.trim();
-                    if (trimmed.isEmpty()) {
-                        continue;
+        ArchCondition<JavaMethod> notDeclareRetiredVendorRoute =
+                new ArchCondition<>("not declare a retired vendor webhook @PostMapping route") {
+                    @Override
+                    public void check(JavaMethod method, ConditionEvents events) {
+                        if (!method.isAnnotatedWith(PostMapping.class)) {
+                            return;
+                        }
+                        PostMapping mapping = method.getAnnotationOfType(PostMapping.class);
+                        String[] candidates = mapping.value().length > 0 ? mapping.value() : mapping.path();
+                        for (String value : candidates) {
+                            String trimmed = value == null ? "" : value.trim();
+                            if (trimmed.isEmpty()) {
+                                continue;
+                            }
+                            if (retiredVendorRouteNames.contains(trimmed)) {
+                                events.add(SimpleConditionEvent.violated(
+                                        method,
+                                        String.format(
+                                                "%s declares retired per-vendor webhook route '%s' — only "
+                                                        + "WebhookController.@PostMapping(\"/webhooks/{kind}\") is permitted",
+                                                method.getFullName(), trimmed)));
+                            }
+                        }
                     }
-                    if (retiredVendorRouteNames.contains(trimmed)) {
-                        events.add(
-                            SimpleConditionEvent.violated(
-                                method,
-                                String.format(
-                                    "%s declares retired per-vendor webhook route '%s' — only " +
-                                        "WebhookController.@PostMapping(\"/webhooks/{kind}\") is permitted",
-                                    method.getFullName(),
-                                    trimmed
-                                )
-                            )
-                        );
-                    }
-                }
-            }
-        };
+                };
 
         ArchRule rule = methods()
-            .that()
-            .areAnnotatedWith(PostMapping.class)
-            .should(notDeclareRetiredVendorRoute)
-            .because(
-                "all vendor webhook receivers live behind /webhooks/{kind}; re-adding /github, " +
-                    "/gitlab, /slack, or /outline would bypass the unified webhook namespace"
-            );
+                .that()
+                .areAnnotatedWith(PostMapping.class)
+                .should(notDeclareRetiredVendorRoute)
+                .because("all vendor webhook receivers live behind /webhooks/{kind}; re-adding /github, "
+                        + "/gitlab, /slack, or /outline would bypass the unified webhook namespace");
         rule.check(classes);
     }
 
@@ -113,53 +100,43 @@ class IntegrationCutoverPinsTest extends HephaestusArchitectureTest {
     @DisplayName("Workspace entity does not re-declare legacy Connection-owned fields")
     void noLegacyFieldsOnWorkspace() {
         Set<String> forbiddenFieldNames = Set.of(
-            "installationId",
-            "personalAccessToken",
-            "gitProviderMode",
-            "slackToken",
-            "slackSigningSecret",
-            "leaderboardNotificationTeam",
-            "leaderboardNotificationChannelId",
-            "installationLinkedAt",
-            "gitlabGroupId",
-            "gitlabWebhookId",
-            "serverUrl"
-        );
+                "installationId",
+                "personalAccessToken",
+                "gitProviderMode",
+                "slackToken",
+                "slackSigningSecret",
+                "leaderboardNotificationTeam",
+                "leaderboardNotificationChannelId",
+                "installationLinkedAt",
+                "gitlabGroupId",
+                "gitlabWebhookId",
+                "serverUrl");
 
-        ArchCondition<JavaField> notCarryLegacyName = new ArchCondition<>(
-            "not carry the name of a legacy Connection-owned column"
-        ) {
-            @Override
-            public void check(JavaField field, ConditionEvents events) {
-                if (forbiddenFieldNames.contains(field.getName())) {
-                    events.add(
-                        SimpleConditionEvent.violated(
-                            field,
-                            String.format(
-                                "%s re-introduces a legacy Connection-owned field name on a JPA " +
-                                    "entity — the Connection registry now owns this data.",
-                                field.getFullName()
-                            )
-                        )
-                    );
-                }
-            }
-        };
+        ArchCondition<JavaField> notCarryLegacyName =
+                new ArchCondition<>("not carry the name of a legacy Connection-owned column") {
+                    @Override
+                    public void check(JavaField field, ConditionEvents events) {
+                        if (forbiddenFieldNames.contains(field.getName())) {
+                            events.add(SimpleConditionEvent.violated(
+                                    field,
+                                    String.format(
+                                            "%s re-introduces a legacy Connection-owned field name on a JPA "
+                                                    + "entity — the Connection registry now owns this data.",
+                                            field.getFullName())));
+                        }
+                    }
+                };
 
         // Compose entity-AND-workspace-package via DescribedPredicate#and — chaining two
         // `.areDeclaredInClassesThat()` fluents on the ArchRule builder ORs them and would
         // sweep DTOs/context records that legitimately keep these field names on the wire.
-        DescribedPredicate<JavaClass> entityInWorkspace = JavaClass.Predicates.resideInAPackage("..workspace..").and(
-            CanBeAnnotated.Predicates.annotatedWith(jakarta.persistence.Entity.class)
-        );
-        ArchRule rule = fields()
-            .that()
-            .areDeclaredInClassesThat(entityInWorkspace)
-            .should(notCarryLegacyName)
-            .because(
-                "the Connection registry owns these fields; re-declaring them on a JPA entity " +
-                    "in the workspace package would re-create the dual-source-of-truth bug"
-            );
+        DescribedPredicate<JavaClass> entityInWorkspace = JavaClass.Predicates.resideInAPackage("..workspace..")
+                .and(CanBeAnnotated.Predicates.annotatedWith(jakarta.persistence.Entity.class));
+        ArchRule rule = fields().that()
+                .areDeclaredInClassesThat(entityInWorkspace)
+                .should(notCarryLegacyName)
+                .because("the Connection registry owns these fields; re-declaring them on a JPA entity "
+                        + "in the workspace package would re-create the dual-source-of-truth bug");
         rule.check(classes);
     }
 }

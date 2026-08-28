@@ -21,64 +21,59 @@ import org.jspecify.annotations.Nullable;
  */
 @Schema(description = "Request to create a new workspace")
 public record CreateWorkspaceRequestDTO(
-    @NotBlank(message = "Workspace slug is required")
-    @Pattern(
-        regexp = "^[a-z0-9][a-z0-9-]{2,50}$",
-        message = "Slug must be 3-51 characters, start with a lowercase letter or digit, and contain only lowercase letters, digits, or hyphens"
-    )
-    @Schema(description = "URL-friendly identifier for the workspace", example = "my-workspace")
-    @Nullable
-    String workspaceSlug,
+        @NotBlank(message = "Workspace slug is required")
+        @Pattern(
+                regexp = "^[a-z0-9][a-z0-9-]{2,50}$",
+                message =
+                        "Slug must be 3-51 characters, start with a lowercase letter or digit, and contain only lowercase letters, digits, or hyphens")
+        @Schema(description = "URL-friendly identifier for the workspace", example = "my-workspace")
+        @Nullable
+        String workspaceSlug,
 
-    @NotBlank(message = "Display name is required")
-    @Size(max = 120, message = "Display name must not exceed 120 characters")
-    @Schema(description = "Human-readable name of the workspace", example = "My Workspace")
-    @Nullable
-    String displayName,
+        @NotBlank(message = "Display name is required")
+        @Size(max = 120, message = "Display name must not exceed 120 characters")
+        @Schema(description = "Human-readable name of the workspace", example = "My Workspace")
+        @Nullable
+        String displayName,
 
-    @NotBlank(message = "Account login is required")
-    @Size(max = 255, message = "Account login must not exceed 255 characters")
-    @Schema(description = "Git provider account login (GitHub org/user or GitLab group path)", example = "my-org")
-    @Nullable
-    String accountLogin,
+        @NotBlank(message = "Account login is required")
+        @Size(max = 255, message = "Account login must not exceed 255 characters")
+        @Schema(description = "Git provider account login (GitHub org/user or GitLab group path)", example = "my-org")
+        @Nullable
+        String accountLogin,
 
-    @NotNull(message = "Account type is required")
-    @Schema(description = "Type of account (USER or ORG)")
-    @Nullable
-    AccountType accountType,
+        @NotNull(message = "Account type is required") @Schema(description = "Type of account (USER or ORG)") @Nullable
+        AccountType accountType,
 
-    @Deprecated(forRemoval = true)
-    @Schema(
-        description = "Deprecated: ignored by the server. The authenticated user always becomes the owner.",
-        requiredMode = Schema.RequiredMode.NOT_REQUIRED
-    )
-    @Nullable
-    Long ownerUserId,
+        @Deprecated(forRemoval = true)
+        @Schema(
+                description = "Deprecated: ignored by the server. The authenticated user always becomes the owner.",
+                requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+        @Nullable
+        Long ownerUserId,
 
-    @NotNull(message = "Integration kind is required")
-    @Schema(
-        description = "Integration kind to provision. SLACK flows through OAuth, not this endpoint.",
-        allowableValues = { "GITHUB", "GITLAB" },
-        example = "GITLAB"
-    )
-    @Nullable
-    IntegrationKind kind,
+        @NotNull(message = "Integration kind is required")
+        @Schema(
+                description = "Integration kind to provision. SLACK flows through OAuth, not this endpoint.",
+                allowableValues = {"GITHUB", "GITLAB"},
+                example = "GITLAB")
+        @Nullable
+        IntegrationKind kind,
 
-    @Size(max = 512, message = "Personal access token must not exceed 512 characters")
-    @Schema(
-        description = "Personal Access Token. Required for both kinds (GitLab API or GitHub PAT). Stored encrypted at rest.",
-        example = "glpat-..."
-    )
-    @Nullable
-    String personalAccessToken,
+        @Size(max = 512, message = "Personal access token must not exceed 512 characters")
+        @Schema(
+                description =
+                        "Personal Access Token. Required for both kinds (GitLab API or GitHub PAT). Stored encrypted at rest.",
+                example = "glpat-...")
+        @Nullable
+        String personalAccessToken,
 
-    @Schema(
-        description = "Custom server URL for self-hosted GitLab instances. Must use HTTPS. Defaults to https://gitlab.com if not specified.",
-        example = "https://gitlab.example.com"
-    )
-    @Nullable
-    String serverUrl
-) {
+        @Schema(
+                description =
+                        "Custom server URL for self-hosted GitLab instances. Must use HTTPS. Defaults to https://gitlab.com if not specified.",
+                example = "https://gitlab.example.com")
+        @Nullable
+        String serverUrl) {
     @AssertTrue(message = "Personal access token is required")
     @Schema(hidden = true)
     @SuppressWarnings("PMD.UnusedPrivateMethod")

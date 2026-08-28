@@ -44,7 +44,9 @@ class SlackChannelConsentGateTest extends BaseUnitTest {
      * PAUSED case fails.
      */
     @ParameterizedTest
-    @EnumSource(value = ConsentState.class, names = { "PENDING", "PAUSED", "REVOKED" })
+    @EnumSource(
+            value = ConsentState.class,
+            names = {"PENDING", "PAUSED", "REVOKED"})
     void nonActiveChannel_blocksIngest(ConsentState blockedState) {
         when(monitoredChannelRepository.findConsentState(7L, "C1")).thenReturn(Optional.of(blockedState));
 

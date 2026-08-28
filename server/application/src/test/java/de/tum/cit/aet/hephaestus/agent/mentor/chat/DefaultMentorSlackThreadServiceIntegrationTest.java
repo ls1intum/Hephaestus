@@ -59,13 +59,11 @@ class DefaultMentorSlackThreadServiceIntegrationTest extends BaseIntegrationTest
     void setUp() {
         databaseTestUtils.cleanDatabase();
         IdentityProvider provider = identityProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                identityProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> identityProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
         user = userRepository.save(
-            TestUserFactory.createUser(USER_SEQ.incrementAndGet(), "mentor-thread-user", provider)
-        );
+                TestUserFactory.createUser(USER_SEQ.incrementAndGet(), "mentor-thread-user", provider));
     }
 
     @Test

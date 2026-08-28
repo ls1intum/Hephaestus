@@ -52,21 +52,20 @@ class ReviewCountEvaluatorTest extends BaseUnitTest {
 
     private ActivitySavedEvent createReviewEvent(Long targetId) {
         return new ActivitySavedEvent(
-            Optional.of(reviewer),
-            ActivityEventType.REVIEW_APPROVED,
-            Instant.now(),
-            1L,
-            ActivityTargetType.REVIEW,
-            targetId
-        );
+                Optional.of(reviewer),
+                ActivityEventType.REVIEW_APPROVED,
+                Instant.now(),
+                1L,
+                ActivityTargetType.REVIEW,
+                targetId);
     }
 
     private UserAchievement createUserAchievement(int current, int target) {
         return UserAchievement.builder()
-            .user(reviewer)
-            .achievementId("review.common.1")
-            .progressData(new LinearAchievementProgress(current, target))
-            .build();
+                .user(reviewer)
+                .achievementId("review.common.1")
+                .progressData(new LinearAchievementProgress(current, target))
+                .build();
     }
 
     private PullRequestReview createReview(User pullRequestAuthor) {
@@ -84,9 +83,8 @@ class ReviewCountEvaluatorTest extends BaseUnitTest {
         @DisplayName("increments progress when reviewing someone else's PR")
         void incrementsForNonSelfReview() {
             Long reviewId = 100L;
-            when(reviewRepository.findByIdWithPullRequestAuthor(reviewId)).thenReturn(
-                Optional.of(createReview(prAuthor))
-            );
+            when(reviewRepository.findByIdWithPullRequestAuthor(reviewId))
+                    .thenReturn(Optional.of(createReview(prAuthor)));
 
             UserAchievement ua = createUserAchievement(0, 10);
             boolean result = evaluator.updateProgress(ua, createReviewEvent(reviewId));
@@ -100,9 +98,8 @@ class ReviewCountEvaluatorTest extends BaseUnitTest {
         @DisplayName("returns true when reaching target from non-self review")
         void unlocksAtTarget() {
             Long reviewId = 100L;
-            when(reviewRepository.findByIdWithPullRequestAuthor(reviewId)).thenReturn(
-                Optional.of(createReview(prAuthor))
-            );
+            when(reviewRepository.findByIdWithPullRequestAuthor(reviewId))
+                    .thenReturn(Optional.of(createReview(prAuthor)));
 
             UserAchievement ua = createUserAchievement(9, 10);
             boolean result = evaluator.updateProgress(ua, createReviewEvent(reviewId));
@@ -119,9 +116,8 @@ class ReviewCountEvaluatorTest extends BaseUnitTest {
         @Test
         void doesNotIncrementForSelfReview() {
             Long reviewId = 100L;
-            when(reviewRepository.findByIdWithPullRequestAuthor(reviewId)).thenReturn(
-                Optional.of(createReview(reviewer))
-            ); // Same user as reviewer
+            when(reviewRepository.findByIdWithPullRequestAuthor(reviewId))
+                    .thenReturn(Optional.of(createReview(reviewer))); // Same user as reviewer
 
             UserAchievement ua = createUserAchievement(5, 10);
             boolean result = evaluator.updateProgress(ua, createReviewEvent(reviewId));

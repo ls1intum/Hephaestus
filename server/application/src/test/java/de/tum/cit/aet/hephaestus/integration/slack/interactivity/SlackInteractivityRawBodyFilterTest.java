@@ -17,9 +17,8 @@ class SlackInteractivityRawBodyFilterTest extends BaseUnitTest {
 
     @Test
     void preservesOriginalFormBodyWhenParametersAreReadFirst() throws Exception {
-        byte[] body = "payload=%7B%22type%22%3A%22block_actions%22%2C%22text%22%3A%22a%2Bb%20c%22%7D".getBytes(
-            StandardCharsets.UTF_8
-        );
+        byte[] body = "payload=%7B%22type%22%3A%22block_actions%22%2C%22text%22%3A%22a%2Bb%20c%22%7D"
+                .getBytes(StandardCharsets.UTF_8);
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/webhooks/slack/interactivity");
         request.setContentType(MediaType.APPLICATION_FORM_URLENCODED_VALUE);
         request.setContent(body);
@@ -27,18 +26,14 @@ class SlackInteractivityRawBodyFilterTest extends BaseUnitTest {
         AtomicReference<byte[]> cachedBody = new AtomicReference<>();
         AtomicReference<byte[]> streamBody = new AtomicReference<>();
 
-        new SlackInteractivityRawBodyFilter().doFilter(
-            request,
-            response,
-            new MockFilterChain() {
-                @Override
-                public void doFilter(ServletRequest request, ServletResponse response) throws java.io.IOException {
-                    request.getParameterMap();
-                    cachedBody.set((byte[]) request.getAttribute(SlackInteractivityRawBodyFilter.RAW_BODY_ATTRIBUTE));
-                    streamBody.set(request.getInputStream().readAllBytes());
-                }
+        new SlackInteractivityRawBodyFilter().doFilter(request, response, new MockFilterChain() {
+            @Override
+            public void doFilter(ServletRequest request, ServletResponse response) throws java.io.IOException {
+                request.getParameterMap();
+                cachedBody.set((byte[]) request.getAttribute(SlackInteractivityRawBodyFilter.RAW_BODY_ATTRIBUTE));
+                streamBody.set(request.getInputStream().readAllBytes());
             }
-        );
+        });
 
         assertThat(response.getStatus()).isEqualTo(200);
         assertThat(cachedBody.get()).isEqualTo(body);

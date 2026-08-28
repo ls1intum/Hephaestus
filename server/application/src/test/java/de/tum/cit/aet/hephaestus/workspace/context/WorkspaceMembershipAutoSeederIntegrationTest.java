@@ -27,23 +27,17 @@ class WorkspaceMembershipAutoSeederIntegrationTest extends AbstractWorkspaceInte
         User owner = persistUser("auto-seed-owner");
         Workspace workspace = createWorkspace("auto-seed", "AutoSeed", "autoseed", AccountType.ORG, owner);
         membershipRepository.deleteAll(membershipRepository.findByWorkspace_Id(workspace.getId()));
-        WorkspaceMembershipAutoSeeder seeder = new WorkspaceMembershipAutoSeeder(
-            membershipRepository,
-            membershipService,
-            true
-        );
+        WorkspaceMembershipAutoSeeder seeder =
+                new WorkspaceMembershipAutoSeeder(membershipRepository, membershipService, true);
 
         var seeded = seeder.seedFirstUserWhenEmpty(workspace, List.of(visitor));
 
-        assertThat(seeded)
-            .get()
-            .extracting(membership -> membership.getRole())
-            .isEqualTo(WorkspaceRole.ADMIN);
+        assertThat(seeded).get().extracting(membership -> membership.getRole()).isEqualTo(WorkspaceRole.ADMIN);
         assertThat(membershipRepository.findByWorkspace_Id(workspace.getId()))
-            .singleElement()
-            .satisfies(membership -> {
-                assertThat(membership.getId().getUserId()).isEqualTo(visitor.getId());
-                assertThat(membership.getRole()).isEqualTo(WorkspaceRole.ADMIN);
-            });
+                .singleElement()
+                .satisfies(membership -> {
+                    assertThat(membership.getId().getUserId()).isEqualTo(visitor.getId());
+                    assertThat(membership.getRole()).isEqualTo(WorkspaceRole.ADMIN);
+                });
     }
 }

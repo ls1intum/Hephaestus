@@ -7,7 +7,6 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -81,12 +80,14 @@ class IntegrationPoisonHandlerTest extends BaseUnitTest {
             handler.nakWithBackoff(gh);
             handler.nakWithBackoff(gl);
 
-            assertThat(meterRegistry.counter(IntegrationPoisonHandler.NAK_COUNTER, "kind", "github").count()).isEqualTo(
-                1.0
-            );
-            assertThat(meterRegistry.counter(IntegrationPoisonHandler.NAK_COUNTER, "kind", "gitlab").count()).isEqualTo(
-                1.0
-            );
+            assertThat(meterRegistry
+                            .counter(IntegrationPoisonHandler.NAK_COUNTER, "kind", "github")
+                            .count())
+                    .isEqualTo(1.0);
+            assertThat(meterRegistry
+                            .counter(IntegrationPoisonHandler.NAK_COUNTER, "kind", "gitlab")
+                            .count())
+                    .isEqualTo(1.0);
         }
 
         @Test
@@ -105,7 +106,8 @@ class IntegrationPoisonHandlerTest extends BaseUnitTest {
             // No exception, no counter increment — keeps the consumer's error path
             // null-safe so an upstream NPE doesn't get rethrown out of the NAK handler.
             handler.nakWithBackoff(null);
-            assertThat(meterRegistry.find(IntegrationPoisonHandler.NAK_COUNTER).counter()).isNull();
+            assertThat(meterRegistry.find(IntegrationPoisonHandler.NAK_COUNTER).counter())
+                    .isNull();
         }
     }
 
@@ -130,9 +132,10 @@ class IntegrationPoisonHandlerTest extends BaseUnitTest {
             // Poison ACK breaks the redelivery loop — we ACK instead of NAK.
             verify(msg).ack();
             verify(msg, never()).nakWithDelay(any());
-            assertThat(
-                meterRegistry.counter(IntegrationPoisonHandler.POISON_COUNTER, "kind", "github").count()
-            ).isEqualTo(1.0);
+            assertThat(meterRegistry
+                            .counter(IntegrationPoisonHandler.POISON_COUNTER, "kind", "github")
+                            .count())
+                    .isEqualTo(1.0);
         }
 
         @Test
@@ -142,9 +145,10 @@ class IntegrationPoisonHandlerTest extends BaseUnitTest {
             handler.ackPoison(msg, "manual dead-letter");
 
             verify(msg).ack();
-            assertThat(
-                meterRegistry.counter(IntegrationPoisonHandler.POISON_COUNTER, "kind", "github").count()
-            ).isEqualTo(1.0);
+            assertThat(meterRegistry
+                            .counter(IntegrationPoisonHandler.POISON_COUNTER, "kind", "github")
+                            .count())
+                    .isEqualTo(1.0);
         }
 
         @Test
@@ -153,9 +157,10 @@ class IntegrationPoisonHandlerTest extends BaseUnitTest {
 
             handler.nakWithBackoff(msg);
 
-            assertThat(
-                meterRegistry.counter(IntegrationPoisonHandler.POISON_COUNTER, "kind", "unknown").count()
-            ).isEqualTo(1.0);
+            assertThat(meterRegistry
+                            .counter(IntegrationPoisonHandler.POISON_COUNTER, "kind", "unknown")
+                            .count())
+                    .isEqualTo(1.0);
         }
     }
 

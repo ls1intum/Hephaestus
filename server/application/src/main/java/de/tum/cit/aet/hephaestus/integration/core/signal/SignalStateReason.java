@@ -90,19 +90,29 @@ public enum SignalStateReason {
         return switch (this) {
             case GATE_SKIPPED -> "The workspace's review gate declined this occurrence.";
             case COOLDOWN_ACTIVE -> "Another review ran on this artifact inside the workspace's cooldown window.";
-            case REQUEST_COOLDOWN_ACTIVE -> "A review of this was already asked for inside the workspace's cooldown window.";
-            case REQUESTER_QUOTA_EXHAUSTED -> "You have asked for as many reviews as an hour allows; the allowance refills.";
+            case REQUEST_COOLDOWN_ACTIVE ->
+                "A review of this was already asked for inside the workspace's cooldown window.";
+            case REQUESTER_QUOTA_EXHAUSTED ->
+                "You have asked for as many reviews as an hour allows; the allowance refills.";
             case CONCURRENT_DUPLICATE -> "Another submission for the same work carries this review.";
-            case OUT_OF_REVIEW_SCOPE -> "This artifact is outside the branches and repositories this workspace reviews.";
-            case STALE_ROLLOUT_REVISION -> "The review rollout changed after this work was admitted; it is not replayed under the new configuration.";
+            case OUT_OF_REVIEW_SCOPE ->
+                "This artifact is outside the branches and repositories this workspace reviews.";
+            case STALE_ROLLOUT_REVISION ->
+                "The review rollout changed after this work was admitted; it is not replayed under the new configuration.";
             case WORKSPACE_INACTIVE -> "The workspace was not active; it is re-offered when the workspace is.";
-            case PRACTICES_DISABLED -> "Practice review is switched off for this workspace; it is re-offered when it is switched on.";
+            case PRACTICES_DISABLED ->
+                "Practice review is switched off for this workspace; it is re-offered when it is switched on.";
             case NO_ACTIVE_PRACTICE -> "No practice was bound to this occurrence when it was recorded.";
-            case REVIEW_MODEL_UNBOUND -> "No AI model is bound to practice review for this workspace; binding one in Administration re-offers it.";
-            case PRACTICE_AUTONOMY_OFF -> "Every practice bound to this occurrence sits at Off; raising one re-offers it.";
-            case BUDGET_EXHAUSTED -> "The budget funding this review was exhausted; it is re-offered when the budget refills.";
-            case SUBJECT_UNLINKED -> "This work could not be attributed to anybody Hephaestus knows; resolving the author re-offers it.";
-            case MODEL_UNAVAILABLE -> "The model this review is bound to left the catalog; re-pointing the binding re-offers it.";
+            case REVIEW_MODEL_UNBOUND ->
+                "No AI model is bound to practice review for this workspace; binding one in Administration re-offers it.";
+            case PRACTICE_AUTONOMY_OFF ->
+                "Every practice bound to this occurrence sits at Off; raising one re-offers it.";
+            case BUDGET_EXHAUSTED ->
+                "The budget funding this review was exhausted; it is re-offered when the budget refills.";
+            case SUBJECT_UNLINKED ->
+                "This work could not be attributed to anybody Hephaestus knows; resolving the author re-offers it.";
+            case MODEL_UNAVAILABLE ->
+                "The model this review is bound to left the catalog; re-pointing the binding re-offers it.";
             case PENDING_DEADLINE_EXCEEDED -> "It waited longer than the ledger keeps re-offering a signal.";
             case ARTIFACT_GONE -> "The artifact was deleted before a review could run.";
         };

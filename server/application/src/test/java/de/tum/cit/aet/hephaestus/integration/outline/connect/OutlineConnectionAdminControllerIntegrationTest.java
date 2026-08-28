@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.integration.outline.connect;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
@@ -77,25 +76,30 @@ class OutlineConnectionAdminControllerIntegrationTest extends AbstractWorkspaceI
         reset(outlineApiClient, outlineContentClient);
         User owner = persistUser("outline-conn-owner-" + System.nanoTime());
         workspace = createWorkspace(
-            "outline-conn-" + System.nanoTime(),
-            "Outline Connection Test",
-            "outline-conn-org",
-            AccountType.ORG,
-            owner
-        );
+                "outline-conn-" + System.nanoTime(),
+                "Outline Connection Test",
+                "outline-conn-org",
+                AccountType.ORG,
+                owner);
         seedActiveOutlineConnection(workspace);
 
         // Admin path: the token probe reports an accepted key without metadata, and the manual
         // reconcile's background pass (real scheduler, mocked client) stays a harmless no-op.
         lenient()
-            .when(outlineApiClient.validateToken(SERVER_URL, "outline-token"))
-            .thenReturn(new OutlineIdentity("team-1", "Acme", "user-1"));
-        lenient().when(outlineApiClient.describeToken(SERVER_URL, "outline-token")).thenReturn(Optional.empty());
-        lenient().when(outlineContentClient.listCollections(anyString(), anyString())).thenReturn(List.of());
-        lenient().when(outlineContentClient.listDocuments(anyString(), anyString(), anyString())).thenReturn(List.of());
+                .when(outlineApiClient.validateToken(SERVER_URL, "outline-token"))
+                .thenReturn(new OutlineIdentity("team-1", "Acme", "user-1"));
         lenient()
-            .when(outlineContentClient.listCollectionDocuments(anyString(), anyString(), anyString()))
-            .thenReturn(List.of());
+                .when(outlineApiClient.describeToken(SERVER_URL, "outline-token"))
+                .thenReturn(Optional.empty());
+        lenient()
+                .when(outlineContentClient.listCollections(anyString(), anyString()))
+                .thenReturn(List.of());
+        lenient()
+                .when(outlineContentClient.listDocuments(anyString(), anyString(), anyString()))
+                .thenReturn(List.of());
+        lenient()
+                .when(outlineContentClient.listCollectionDocuments(anyString(), anyString(), anyString()))
+                .thenReturn(List.of());
     }
 
     @Test
@@ -121,19 +125,18 @@ class OutlineConnectionAdminControllerIntegrationTest extends AbstractWorkspaceI
 
     private WebTestClient.ResponseSpec tokenRequest() {
         return webTestClient
-            .get()
-            .uri("/workspaces/{slug}/connections/outline/token", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange();
+                .get()
+                .uri("/workspaces/{slug}/connections/outline/token", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange();
     }
 
     private void seedActiveOutlineConnection(Workspace ws) {
         Connection connection = new Connection(
-            ws,
-            IntegrationKind.OUTLINE,
-            "team-1",
-            new ConnectionConfig.OutlineConfig(SERVER_URL, null, null, Set.of())
-        );
+                ws,
+                IntegrationKind.OUTLINE,
+                "team-1",
+                new ConnectionConfig.OutlineConfig(SERVER_URL, null, null, Set.of()));
         connection.setCredentials(new BearerToken("outline-token", null), credentialConverter);
         connection.setState(IntegrationState.ACTIVE);
         connectionRepository.save(connection);

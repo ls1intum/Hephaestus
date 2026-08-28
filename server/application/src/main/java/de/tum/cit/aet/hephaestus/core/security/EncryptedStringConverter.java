@@ -56,9 +56,7 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
      */
     @Autowired
     public EncryptedStringConverter(
-        SecurityProperties securityProperties,
-        @Value("${spring.profiles.active:}") String activeProfiles
-    ) {
+            SecurityProperties securityProperties, @Value("${spring.profiles.active:}") String activeProfiles) {
         this(securityProperties.encryptionKey(), activeProfiles);
     }
 
@@ -71,13 +69,10 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
         if (encryptionKey == null || encryptionKey.isBlank()) {
             if (activeProfiles != null && activeProfiles.contains("prod")) {
                 throw new IllegalStateException(
-                    "Encryption key is required in production! Set hephaestus.security.encryption-key"
-                );
+                        "Encryption key is required in production! Set hephaestus.security.encryption-key");
             }
-            log.warn(
-                "Skipped encryption configuration: reason=missing_key, " +
-                    "action=set_hephaestus_security_encryption_key_in_production"
-            );
+            log.warn("Skipped encryption configuration: reason=missing_key, "
+                    + "action=set_hephaestus_security_encryption_key_in_production");
             this.secretKey = null;
             this.enabled = false;
         } else {
@@ -90,21 +85,19 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
                 // passphrase with an umlaut in it looking for a 34-character key; "32 characters"
                 // alone is a lie for exactly that operator. Never echo the key itself.
                 int characters = encryptionKey.length();
-                String howToFix =
-                    keyBytes.length == characters
+                String howToFix = keyBytes.length == characters
                         ? "For ASCII, bytes and characters are the same, so that is 32 characters: "
-                        : "This key contains non-ASCII characters, and those cost more than one byte each. " +
-                          "Use ASCII only, exactly 32 characters: ";
+                        : "This key contains non-ASCII characters, and those cost more than one byte each. "
+                                + "Use ASCII only, exactly 32 characters: ";
                 throw new IllegalArgumentException(
-                    "hephaestus.security.encryption-key (HEPHAESTUS_SECURITY_ENCRYPTION_KEY) must be a " +
-                        "32-byte AES-256 key. Got " +
-                        keyBytes.length +
-                        " bytes from " +
-                        characters +
-                        " characters. " +
-                        howToFix +
-                        "openssl rand -base64 24 | cut -c1-32"
-                );
+                        "hephaestus.security.encryption-key (HEPHAESTUS_SECURITY_ENCRYPTION_KEY) must be a "
+                                + "32-byte AES-256 key. Got "
+                                + keyBytes.length
+                                + " bytes from "
+                                + characters
+                                + " characters. "
+                                + howToFix
+                                + "openssl rand -base64 24 | cut -c1-32");
             }
             this.secretKey = new SecretKeySpec(keyBytes, "AES");
             this.enabled = true;

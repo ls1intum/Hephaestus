@@ -94,10 +94,9 @@ public class ProjectIntegrityService {
         int deleted = projectRepository.deleteAllByOwnerTypeAndOwnerId(Project.OwnerType.ORGANIZATION, organizationId);
 
         log.info(
-            "Completed cascade delete of projects for organization: orgId={}, deletedCount={}",
-            organizationId,
-            deleted
-        );
+                "Completed cascade delete of projects for organization: orgId={}, deletedCount={}",
+                organizationId,
+                deleted);
 
         return deleted;
     }
@@ -133,10 +132,9 @@ public class ProjectIntegrityService {
         int deleted = projectRepository.deleteAllByOwnerTypeAndOwnerId(Project.OwnerType.REPOSITORY, repositoryId);
 
         log.info(
-            "Completed cascade delete of projects for repository: repoId={}, deletedCount={}",
-            repositoryId,
-            deleted
-        );
+                "Completed cascade delete of projects for repository: repoId={}, deletedCount={}",
+                repositoryId,
+                deleted);
 
         return deleted;
     }
@@ -286,11 +284,10 @@ public class ProjectIntegrityService {
 
         for (Project project : orphaned) {
             log.warn(
-                "Deleting orphaned project: projectId={}, ownerType={}, ownerId={}",
-                project.getId(),
-                project.getOwnerType(),
-                project.getOwnerId()
-            );
+                    "Deleting orphaned project: projectId={}, ownerType={}, ownerId={}",
+                    project.getId(),
+                    project.getOwnerType(),
+                    project.getOwnerId());
             projectRepository.delete(project);
         }
 

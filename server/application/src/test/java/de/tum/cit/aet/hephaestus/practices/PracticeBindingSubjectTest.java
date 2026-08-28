@@ -25,9 +25,7 @@ class PracticeBindingSubjectTest extends BaseUnitTest {
     @Test
     void readsABindingWithNoSubjectAsBeingAboutTheAuthor() {
         PracticeBinding binding = objectMapper.readValue(
-            "{\"signals\":[\"scm.pull_request.merged\"],\"needs\":[]}",
-            PracticeBinding.class
-        );
+                "{\"signals\":[\"scm.pull_request.merged\"],\"needs\":[]}", PracticeBinding.class);
 
         assertThat(binding.subject()).isEqualTo(ActorRole.AUTHOR);
     }
@@ -35,25 +33,19 @@ class PracticeBindingSubjectTest extends BaseUnitTest {
     @Test
     void readsADeclaredSubject() {
         PracticeBinding binding = objectMapper.readValue(
-            "{\"signals\":[\"scm.pull_request.reviewed\"],\"needs\":[],\"subject\":\"REVIEWER\"}",
-            PracticeBinding.class
-        );
+                "{\"signals\":[\"scm.pull_request.reviewed\"],\"needs\":[],\"subject\":\"REVIEWER\"}",
+                PracticeBinding.class);
 
         assertThat(binding.subject()).isEqualTo(ActorRole.REVIEWER);
     }
 
     @Test
     void resolvesTheSubjectOfTheOccasionThatRanTheReview() {
-        PracticeBinding reviewerSide = new PracticeBinding(
-            List.of(ScmSignals.PULL_REQUEST_REVIEWED),
-            List.of(),
-            false,
-            ActorRole.REVIEWER
-        );
+        PracticeBinding reviewerSide =
+                new PracticeBinding(List.of(ScmSignals.PULL_REQUEST_REVIEWED), List.of(), false, ActorRole.REVIEWER);
 
-        assertThat(PracticeBinding.subjectRoleOf(List.of(reviewerSide), ScmSignals.PULL_REQUEST_REVIEWED)).isEqualTo(
-            ActorRole.REVIEWER
-        );
+        assertThat(PracticeBinding.subjectRoleOf(List.of(reviewerSide), ScmSignals.PULL_REQUEST_REVIEWED))
+                .isEqualTo(ActorRole.REVIEWER);
     }
 
     /**
@@ -63,25 +55,15 @@ class PracticeBindingSubjectTest extends BaseUnitTest {
      */
     @Test
     void answersPerOccasionRatherThanPerSignal() {
-        PracticeBinding authorSide = new PracticeBinding(
-            List.of(ScmSignals.PULL_REQUEST_REVIEWED),
-            List.of(),
-            false,
-            ActorRole.AUTHOR
-        );
-        PracticeBinding reviewerSide = new PracticeBinding(
-            List.of(ScmSignals.PULL_REQUEST_REVIEWED),
-            List.of(),
-            false,
-            ActorRole.REVIEWER
-        );
+        PracticeBinding authorSide =
+                new PracticeBinding(List.of(ScmSignals.PULL_REQUEST_REVIEWED), List.of(), false, ActorRole.AUTHOR);
+        PracticeBinding reviewerSide =
+                new PracticeBinding(List.of(ScmSignals.PULL_REQUEST_REVIEWED), List.of(), false, ActorRole.REVIEWER);
 
-        assertThat(PracticeBinding.subjectRoleOf(List.of(authorSide), ScmSignals.PULL_REQUEST_REVIEWED)).isEqualTo(
-            ActorRole.AUTHOR
-        );
-        assertThat(PracticeBinding.subjectRoleOf(List.of(reviewerSide), ScmSignals.PULL_REQUEST_REVIEWED)).isEqualTo(
-            ActorRole.REVIEWER
-        );
+        assertThat(PracticeBinding.subjectRoleOf(List.of(authorSide), ScmSignals.PULL_REQUEST_REVIEWED))
+                .isEqualTo(ActorRole.AUTHOR);
+        assertThat(PracticeBinding.subjectRoleOf(List.of(reviewerSide), ScmSignals.PULL_REQUEST_REVIEWED))
+                .isEqualTo(ActorRole.REVIEWER);
     }
 
     /**
@@ -91,22 +73,13 @@ class PracticeBindingSubjectTest extends BaseUnitTest {
      */
     @Test
     void leansToTheNonAuthorRoleWhenTwoOccasionsDisagree() {
-        PracticeBinding authorSide = new PracticeBinding(
-            List.of(ScmSignals.PULL_REQUEST_MERGED),
-            List.of(),
-            false,
-            ActorRole.AUTHOR
-        );
-        PracticeBinding reviewerSide = new PracticeBinding(
-            List.of(ScmSignals.PULL_REQUEST_REVIEWED),
-            List.of(),
-            false,
-            ActorRole.REVIEWER
-        );
+        PracticeBinding authorSide =
+                new PracticeBinding(List.of(ScmSignals.PULL_REQUEST_MERGED), List.of(), false, ActorRole.AUTHOR);
+        PracticeBinding reviewerSide =
+                new PracticeBinding(List.of(ScmSignals.PULL_REQUEST_REVIEWED), List.of(), false, ActorRole.REVIEWER);
 
-        assertThat(PracticeBinding.subjectRoleOf(List.of(authorSide, reviewerSide), (SignalName) null)).isEqualTo(
-            ActorRole.REVIEWER
-        );
+        assertThat(PracticeBinding.subjectRoleOf(List.of(authorSide, reviewerSide), (SignalName) null))
+                .isEqualTo(ActorRole.REVIEWER);
     }
 
     /**
@@ -116,61 +89,38 @@ class PracticeBindingSubjectTest extends BaseUnitTest {
      */
     @Test
     void leansToTheNonAuthorRoleWhenNoOccasionWasNamed() {
-        PracticeBinding reviewerSide = new PracticeBinding(
-            List.of(ScmSignals.PULL_REQUEST_REVIEWED),
-            List.of(),
-            false,
-            ActorRole.REVIEWER
-        );
+        PracticeBinding reviewerSide =
+                new PracticeBinding(List.of(ScmSignals.PULL_REQUEST_REVIEWED), List.of(), false, ActorRole.REVIEWER);
 
-        assertThat(PracticeBinding.subjectRoleOf(List.of(reviewerSide), (SignalName) null)).isEqualTo(
-            ActorRole.REVIEWER
-        );
+        assertThat(PracticeBinding.subjectRoleOf(List.of(reviewerSide), (SignalName) null))
+                .isEqualTo(ActorRole.REVIEWER);
     }
 
     /** An occasion the run did not fire says nothing about who this run's results are about. */
     @Test
     void ignoresAnOccasionThatDidNotStartThisReview() {
-        PracticeBinding reviewerSide = new PracticeBinding(
-            List.of(ScmSignals.PULL_REQUEST_REVIEWED),
-            List.of(),
-            false,
-            ActorRole.REVIEWER
-        );
+        PracticeBinding reviewerSide =
+                new PracticeBinding(List.of(ScmSignals.PULL_REQUEST_REVIEWED), List.of(), false, ActorRole.REVIEWER);
 
-        assertThat(PracticeBinding.subjectRoleOf(List.of(reviewerSide), ScmSignals.PULL_REQUEST_MERGED)).isEqualTo(
-            ActorRole.AUTHOR
-        );
+        assertThat(PracticeBinding.subjectRoleOf(List.of(reviewerSide), ScmSignals.PULL_REQUEST_MERGED))
+                .isEqualTo(ActorRole.AUTHOR);
     }
 
     @Test
     void doesNotSkipAReviewWhenApplicableBindingsDisagreeAboutItsSubjectPredicate() {
         PracticeSubject manifests = new PracticeSubject(
-            "the change touches no dependency manifest",
-            List.of(PracticeSubjectClause.changedPathMatches(List.of("**/pom.xml")))
-        );
+                "the change touches no dependency manifest",
+                List.of(PracticeSubjectClause.changedPathMatches(List.of("**/pom.xml"))));
         PracticeSubject tests = new PracticeSubject(
-            "the change touches no tests",
-            List.of(PracticeSubjectClause.changedPathMatches(List.of("**/*Test.java")))
-        );
+                "the change touches no tests",
+                List.of(PracticeSubjectClause.changedPathMatches(List.of("**/*Test.java"))));
         PracticeBinding onOpen = new PracticeBinding(
-            List.of(ScmSignals.PULL_REQUEST_OPENED),
-            List.of(),
-            false,
-            ActorRole.AUTHOR,
-            manifests
-        );
-        PracticeBinding onMerged = new PracticeBinding(
-            List.of(ScmSignals.PULL_REQUEST_MERGED),
-            List.of(),
-            false,
-            ActorRole.AUTHOR,
-            tests
-        );
+                List.of(ScmSignals.PULL_REQUEST_OPENED), List.of(), false, ActorRole.AUTHOR, manifests);
+        PracticeBinding onMerged =
+                new PracticeBinding(List.of(ScmSignals.PULL_REQUEST_MERGED), List.of(), false, ActorRole.AUTHOR, tests);
 
         assertThat(PracticeBinding.subjectFor(List.of(onOpen, onMerged), null)).isNull();
-        assertThat(PracticeBinding.subjectFor(List.of(onOpen, onMerged), ScmSignals.PULL_REQUEST_OPENED)).isEqualTo(
-            manifests
-        );
+        assertThat(PracticeBinding.subjectFor(List.of(onOpen, onMerged), ScmSignals.PULL_REQUEST_OPENED))
+                .isEqualTo(manifests);
     }
 }

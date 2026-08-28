@@ -81,10 +81,9 @@ public class PracticeReviewSettings {
     }
 
     public void applyRollout(
-        @Nullable ReviewRepositoryMode repositoryMode,
-        @Nullable ReviewPersonMode personMode,
-        @Nullable PracticeDeliveryStatus deliveryStatus
-    ) {
+            @Nullable ReviewRepositoryMode repositoryMode,
+            @Nullable ReviewPersonMode personMode,
+            @Nullable PracticeDeliveryStatus deliveryStatus) {
         if (repositoryMode != null) this.repositoryCoverageMode = repositoryMode;
         if (personMode != null) this.personCoverageMode = personMode;
         if (deliveryStatus != null) this.deliveryStatus = deliveryStatus;
@@ -117,30 +116,31 @@ public class PracticeReviewSettings {
         for (PracticeReviewField field : fields) {
             // Switch EXPRESSION, not statement: the compiler then forces every constant to be handled
             // here. The yielded value is unused; the exhaustiveness check is the point.
-            boolean ignored = switch (field) {
-                // Kept so a reset request naming this field from an older client is still understood.
-                case SKIP_DRAFTS -> {
-                    this.skipDrafts = null;
-                    yield true;
-                }
-                case DELIVER_TO_MERGED -> {
-                    this.deliverToMerged = null;
-                    yield true;
-                }
-                case COOLDOWN_MINUTES -> {
-                    this.cooldownMinutes = null;
-                    yield true;
-                }
-                case REVIEW_SCOPE -> {
-                    this.repositoryCoverageMode = ReviewRepositoryMode.ALL_MONITORED;
-                    this.personCoverageMode = ReviewPersonMode.ALL_ELIGIBLE;
-                    yield true;
-                }
-                case DEFAULT_AUTONOMY -> {
-                    this.defaultAutonomy = null;
-                    yield true;
-                }
-            };
+            boolean ignored =
+                    switch (field) {
+                        // Kept so a reset request naming this field from an older client is still understood.
+                        case SKIP_DRAFTS -> {
+                            this.skipDrafts = null;
+                            yield true;
+                        }
+                        case DELIVER_TO_MERGED -> {
+                            this.deliverToMerged = null;
+                            yield true;
+                        }
+                        case COOLDOWN_MINUTES -> {
+                            this.cooldownMinutes = null;
+                            yield true;
+                        }
+                        case REVIEW_SCOPE -> {
+                            this.repositoryCoverageMode = ReviewRepositoryMode.ALL_MONITORED;
+                            this.personCoverageMode = ReviewPersonMode.ALL_ELIGIBLE;
+                            yield true;
+                        }
+                        case DEFAULT_AUTONOMY -> {
+                            this.defaultAutonomy = null;
+                            yield true;
+                        }
+                    };
         }
     }
 }

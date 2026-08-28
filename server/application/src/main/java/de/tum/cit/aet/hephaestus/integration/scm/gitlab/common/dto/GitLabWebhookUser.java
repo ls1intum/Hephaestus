@@ -18,9 +18,8 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitLabWebhookUser(
-    @Nullable Long id,
-    @Nullable String username,
-    @Nullable String name,
-    @JsonProperty("avatar_url") @Nullable String avatarUrl,
-    @Nullable String email
-) {}
+        @Nullable Long id,
+        @Nullable String username,
+        @Nullable String name,
+        @JsonProperty("avatar_url") @Nullable String avatarUrl,
+        @Nullable String email) {}

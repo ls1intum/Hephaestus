@@ -27,90 +27,85 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubUserDTO(
-    @JsonProperty("id") @Nullable Long id,
-    @JsonProperty("database_id") @Nullable Long databaseId,
-    @JsonProperty("login") String login,
-    @JsonProperty("avatar_url") @Nullable String avatarUrl,
-    @JsonProperty("html_url") @Nullable String htmlUrl,
-    @JsonProperty("name") @Nullable String name,
-    @JsonProperty("email") @Nullable String email,
-    // Profile fields - populated from full user fetch, may be null from webhooks
-    @JsonProperty("bio") @Nullable String bio,
-    @JsonProperty("company") @Nullable String company,
-    @JsonProperty("location") @Nullable String location,
-    @JsonProperty("blog") @Nullable String blog,
-    @JsonProperty("followers") @Nullable Integer followers,
-    @JsonProperty("following") @Nullable Integer following,
-    // Timestamp fields - populated from full user fetch via GraphQL
-    @JsonProperty("created_at") @Nullable Instant createdAt,
-    @JsonProperty("updated_at") @Nullable Instant updatedAt,
-    // User type - determined from GitHub API type field or GraphQL __typename
-    @JsonProperty("type") User.Type type
-) {
+        @JsonProperty("id") @Nullable Long id,
+        @JsonProperty("database_id") @Nullable Long databaseId,
+        @JsonProperty("login") String login,
+        @JsonProperty("avatar_url") @Nullable String avatarUrl,
+        @JsonProperty("html_url") @Nullable String htmlUrl,
+        @JsonProperty("name") @Nullable String name,
+        @JsonProperty("email") @Nullable String email,
+        // Profile fields - populated from full user fetch, may be null from webhooks
+        @JsonProperty("bio") @Nullable String bio,
+        @JsonProperty("company") @Nullable String company,
+        @JsonProperty("location") @Nullable String location,
+        @JsonProperty("blog") @Nullable String blog,
+        @JsonProperty("followers") @Nullable Integer followers,
+        @JsonProperty("following") @Nullable Integer following,
+        // Timestamp fields - populated from full user fetch via GraphQL
+        @JsonProperty("created_at") @Nullable Instant createdAt,
+        @JsonProperty("updated_at") @Nullable Instant updatedAt,
+        // User type - determined from GitHub API type field or GraphQL __typename
+        @JsonProperty("type") User.Type type) {
     /**
      * Compact constructor for minimal user references.
      * Profile fields default to null, type defaults to USER.
      */
     public GitHubUserDTO(
-        @Nullable Long id,
-        @Nullable Long databaseId,
-        String login,
-        @Nullable String avatarUrl,
-        @Nullable String htmlUrl,
-        @Nullable String name,
-        @Nullable String email
-    ) {
+            @Nullable Long id,
+            @Nullable Long databaseId,
+            String login,
+            @Nullable String avatarUrl,
+            @Nullable String htmlUrl,
+            @Nullable String name,
+            @Nullable String email) {
         this(
-            id,
-            databaseId,
-            login,
-            avatarUrl,
-            htmlUrl,
-            name,
-            email,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            User.Type.USER
-        );
+                id,
+                databaseId,
+                login,
+                avatarUrl,
+                htmlUrl,
+                name,
+                email,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                User.Type.USER);
     }
 
     /**
      * Constructor with type for creating user DTOs with explicit type information.
      */
     public GitHubUserDTO(
-        @Nullable Long id,
-        @Nullable Long databaseId,
-        String login,
-        @Nullable String avatarUrl,
-        @Nullable String htmlUrl,
-        @Nullable String name,
-        @Nullable String email,
-        User.Type type
-    ) {
+            @Nullable Long id,
+            @Nullable Long databaseId,
+            String login,
+            @Nullable String avatarUrl,
+            @Nullable String htmlUrl,
+            @Nullable String name,
+            @Nullable String email,
+            User.Type type) {
         this(
-            id,
-            databaseId,
-            login,
-            avatarUrl,
-            htmlUrl,
-            name,
-            email,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null,
-            type
-        );
+                id,
+                databaseId,
+                login,
+                avatarUrl,
+                htmlUrl,
+                name,
+                email,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                type);
     }
 
     /**
@@ -158,26 +153,25 @@ public record GitHubUserDTO(
             return null;
         }
         return new GitHubUserDTO(
-            null,
-            user.getDatabaseId() != null ? user.getDatabaseId().longValue() : null,
-            user.getLogin(),
-            uriToString(user.getAvatarUrl()),
-            uriToString(user.getUrl()),
-            user.getName(),
-            user.getEmail(),
-            // Profile fields
-            user.getBio(),
-            user.getCompany(),
-            user.getLocation(),
-            uriToString(user.getWebsiteUrl()),
-            user.getFollowers() != null ? user.getFollowers().getTotalCount() : null,
-            user.getFollowing() != null ? user.getFollowing().getTotalCount() : null,
-            // Timestamp fields
-            toInstant(user.getCreatedAt()),
-            toInstant(user.getUpdatedAt()),
-            // User type
-            User.Type.USER
-        );
+                null,
+                user.getDatabaseId() != null ? user.getDatabaseId().longValue() : null,
+                user.getLogin(),
+                uriToString(user.getAvatarUrl()),
+                uriToString(user.getUrl()),
+                user.getName(),
+                user.getEmail(),
+                // Profile fields
+                user.getBio(),
+                user.getCompany(),
+                user.getLocation(),
+                uriToString(user.getWebsiteUrl()),
+                user.getFollowers() != null ? user.getFollowers().getTotalCount() : null,
+                user.getFollowing() != null ? user.getFollowing().getTotalCount() : null,
+                // Timestamp fields
+                toInstant(user.getCreatedAt()),
+                toInstant(user.getUpdatedAt()),
+                // User type
+                User.Type.USER);
     }
 
     /**
@@ -189,15 +183,14 @@ public record GitHubUserDTO(
             return null;
         }
         return new GitHubUserDTO(
-            null,
-            bot.getDatabaseId() != null ? bot.getDatabaseId().longValue() : null,
-            bot.getLogin(),
-            uriToString(bot.getAvatarUrl()),
-            uriToString(bot.getUrl()),
-            null,
-            null,
-            User.Type.BOT
-        );
+                null,
+                bot.getDatabaseId() != null ? bot.getDatabaseId().longValue() : null,
+                bot.getLogin(),
+                uriToString(bot.getAvatarUrl()),
+                uriToString(bot.getUrl()),
+                null,
+                null,
+                User.Type.BOT);
     }
 
     /**
@@ -210,15 +203,14 @@ public record GitHubUserDTO(
             return null;
         }
         return new GitHubUserDTO(
-            null,
-            mannequin.getDatabaseId() != null ? mannequin.getDatabaseId().longValue() : null,
-            mannequin.getLogin(),
-            uriToString(mannequin.getAvatarUrl()),
-            uriToString(mannequin.getUrl()),
-            null,
-            mannequin.getEmail(),
-            User.Type.USER
-        );
+                null,
+                mannequin.getDatabaseId() != null ? mannequin.getDatabaseId().longValue() : null,
+                mannequin.getLogin(),
+                uriToString(mannequin.getAvatarUrl()),
+                uriToString(mannequin.getUrl()),
+                null,
+                mannequin.getEmail(),
+                User.Type.USER);
     }
 
     /**
@@ -230,15 +222,14 @@ public record GitHubUserDTO(
             return null;
         }
         return new GitHubUserDTO(
-            null,
-            org.getDatabaseId() != null ? org.getDatabaseId().longValue() : null,
-            org.getLogin(),
-            uriToString(org.getAvatarUrl()),
-            null,
-            org.getName(),
-            org.getEmail(),
-            User.Type.ORGANIZATION
-        );
+                null,
+                org.getDatabaseId() != null ? org.getDatabaseId().longValue() : null,
+                org.getLogin(),
+                uriToString(org.getAvatarUrl()),
+                null,
+                org.getName(),
+                org.getEmail(),
+                User.Type.ORGANIZATION);
     }
 
     /**
@@ -251,15 +242,14 @@ public record GitHubUserDTO(
             return null;
         }
         return new GitHubUserDTO(
-            null,
-            null,
-            enterprise.getLogin(),
-            uriToString(enterprise.getAvatarUrl()),
-            uriToString(enterprise.getUrl()),
-            enterprise.getName(),
-            null,
-            User.Type.USER
-        );
+                null,
+                null,
+                enterprise.getLogin(),
+                uriToString(enterprise.getAvatarUrl()),
+                uriToString(enterprise.getUrl()),
+                enterprise.getName(),
+                null,
+                User.Type.USER);
     }
 
     /**
@@ -268,15 +258,14 @@ public record GitHubUserDTO(
      */
     private static GitHubUserDTO fromActorBase(GHActor actor) {
         return new GitHubUserDTO(
-            null,
-            null,
-            actor.getLogin(),
-            uriToString(actor.getAvatarUrl()),
-            uriToString(actor.getUrl()),
-            null,
-            null,
-            User.Type.USER
-        );
+                null,
+                null,
+                actor.getLogin(),
+                uriToString(actor.getAvatarUrl()),
+                uriToString(actor.getUrl()),
+                null,
+                null,
+                User.Type.USER);
     }
 
     /**

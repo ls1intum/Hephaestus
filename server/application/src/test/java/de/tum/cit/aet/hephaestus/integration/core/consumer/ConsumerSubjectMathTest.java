@@ -22,45 +22,41 @@ class ConsumerSubjectMathTest extends BaseUnitTest {
 
         @Test
         void repositoryFilterForGitHubAppendsWildcardSuffix() {
-            assertThat(ConsumerSubjectMath.repositoryFilter("github", "ls1intum/Artemis")).isEqualTo(
-                "github.ls1intum.Artemis.>"
-            );
+            assertThat(ConsumerSubjectMath.repositoryFilter("github", "ls1intum/Artemis"))
+                    .isEqualTo("github.ls1intum.Artemis.>");
         }
 
         @Test
         void repositoryFilterForGitLabUsesTildeJoinedNamespace() {
-            assertThat(ConsumerSubjectMath.repositoryFilter("gitlab", "group/sub/project")).isEqualTo(
-                "gitlab.group~sub.project.>"
-            );
+            assertThat(ConsumerSubjectMath.repositoryFilter("gitlab", "group/sub/project"))
+                    .isEqualTo("gitlab.group~sub.project.>");
         }
 
         @Test
         void organizationFilterPlacesPlaceholderInRepoSlot() {
-            assertThat(ConsumerSubjectMath.organizationFilter("github", "ls1intum")).isEqualTo("github.ls1intum.?.>");
+            assertThat(ConsumerSubjectMath.organizationFilter("github", "ls1intum"))
+                    .isEqualTo("github.ls1intum.?.>");
         }
 
         @Test
         void installationAwareSubjectFilterForGithubMatchesAllInstallationEvents() {
-            assertThat(ConsumerSubjectMath.installationAwareSubjectFilter(IntegrationKind.GITHUB)).isEqualTo(
-                "github.?.?.>"
-            );
+            assertThat(ConsumerSubjectMath.installationAwareSubjectFilter(IntegrationKind.GITHUB))
+                    .isEqualTo("github.?.?.>");
         }
 
         @Test
         void installationAwareSubjectFilterRejectsNonInstallationKinds() {
             assertThatThrownBy(() -> ConsumerSubjectMath.installationAwareSubjectFilter(IntegrationKind.GITLAB))
-                .isInstanceOf(UnsupportedOperationException.class)
-                .hasMessageContaining("GITLAB");
-            assertThatThrownBy(() ->
-                ConsumerSubjectMath.installationAwareSubjectFilter(IntegrationKind.SLACK)
-            ).isInstanceOf(UnsupportedOperationException.class);
+                    .isInstanceOf(UnsupportedOperationException.class)
+                    .hasMessageContaining("GITLAB");
+            assertThatThrownBy(() -> ConsumerSubjectMath.installationAwareSubjectFilter(IntegrationKind.SLACK))
+                    .isInstanceOf(UnsupportedOperationException.class);
         }
 
         @Test
         void installationAwareSubjectFilterRejectsNullKind() {
-            assertThatThrownBy(() -> ConsumerSubjectMath.installationAwareSubjectFilter(null)).isInstanceOf(
-                IllegalArgumentException.class
-            );
+            assertThatThrownBy(() -> ConsumerSubjectMath.installationAwareSubjectFilter(null))
+                    .isInstanceOf(IllegalArgumentException.class);
         }
     }
 
@@ -69,17 +65,19 @@ class ConsumerSubjectMathTest extends BaseUnitTest {
 
         @Test
         void recognisesKnownKindsCaseInsensitively() {
-            assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("github.acme.foo.issues")).contains(
-                IntegrationKind.GITHUB
-            );
-            assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("GitLab.x.y.z")).contains(IntegrationKind.GITLAB);
-            assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("SLACK.t.c.message")).contains(IntegrationKind.SLACK);
+            assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("github.acme.foo.issues"))
+                    .contains(IntegrationKind.GITHUB);
+            assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("GitLab.x.y.z"))
+                    .contains(IntegrationKind.GITLAB);
+            assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("SLACK.t.c.message"))
+                    .contains(IntegrationKind.SLACK);
         }
 
         @Test
         void unknownPrefixReturnsEmpty() {
             // Explicit allow-list — never reflects on input; bitbucket is not in the map.
-            assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("bitbucket.repo.event")).isEmpty();
+            assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("bitbucket.repo.event"))
+                    .isEmpty();
         }
 
         @Test
@@ -104,10 +102,13 @@ class ConsumerSubjectMathTest extends BaseUnitTest {
 
         @Test
         void streamingKindsHaveStreamNames() {
-            assertThat(ConsumerSubjectMath.streamNameFor(IntegrationKind.GITHUB)).contains("github");
-            assertThat(ConsumerSubjectMath.streamNameFor(IntegrationKind.GITLAB)).contains("gitlab");
+            assertThat(ConsumerSubjectMath.streamNameFor(IntegrationKind.GITHUB))
+                    .contains("github");
+            assertThat(ConsumerSubjectMath.streamNameFor(IntegrationKind.GITLAB))
+                    .contains("gitlab");
             assertThat(ConsumerSubjectMath.streamNameFor(IntegrationKind.SLACK)).contains("slack");
-            assertThat(ConsumerSubjectMath.streamNameFor(IntegrationKind.OUTLINE)).contains("outline");
+            assertThat(ConsumerSubjectMath.streamNameFor(IntegrationKind.OUTLINE))
+                    .contains("outline");
         }
 
         @Test
@@ -123,21 +124,21 @@ class ConsumerSubjectMathTest extends BaseUnitTest {
 
         @Test
         void wrapsSubscriptionIdInAWildcardFilter() {
-            assertThat(ConsumerSubjectMath.subscriptionFilter("outline", "sub-abc")).isEqualTo("outline.sub-abc.>");
+            assertThat(ConsumerSubjectMath.subscriptionFilter("outline", "sub-abc"))
+                    .isEqualTo("outline.sub-abc.>");
         }
 
         @Test
         void rejectsBlankSubscriptionId() {
-            org.assertj.core.api.Assertions.assertThatThrownBy(() ->
-                ConsumerSubjectMath.subscriptionFilter("outline", "  ")
-            ).isInstanceOf(IllegalArgumentException.class);
+            org.assertj.core.api.Assertions.assertThatThrownBy(
+                            () -> ConsumerSubjectMath.subscriptionFilter("outline", "  "))
+                    .isInstanceOf(IllegalArgumentException.class);
         }
 
         @Test
         void outlinePrefixResolvesToKind() {
-            assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("outline.sub.documents~update")).contains(
-                IntegrationKind.OUTLINE
-            );
+            assertThat(ConsumerSubjectMath.kindFromSubjectPrefix("outline.sub.documents~update"))
+                    .contains(IntegrationKind.OUTLINE);
         }
     }
 
@@ -146,16 +147,14 @@ class ConsumerSubjectMathTest extends BaseUnitTest {
 
         @Test
         void scopeConsumerNameAppendsScopeIdSuffix() {
-            assertThat(ConsumerSubjectMath.scopeConsumerName("hephaestus-consumer", 42L)).isEqualTo(
-                "hephaestus-consumer-scope-42"
-            );
+            assertThat(ConsumerSubjectMath.scopeConsumerName("hephaestus-consumer", 42L))
+                    .isEqualTo("hephaestus-consumer-scope-42");
         }
 
         @Test
         void installationConsumerNameAppendsInstallationSuffix() {
-            assertThat(ConsumerSubjectMath.installationConsumerName("hephaestus-consumer")).isEqualTo(
-                "hephaestus-consumer-installation"
-            );
+            assertThat(ConsumerSubjectMath.installationConsumerName("hephaestus-consumer"))
+                    .isEqualTo("hephaestus-consumer-installation");
         }
 
         @Test
@@ -164,23 +163,22 @@ class ConsumerSubjectMathTest extends BaseUnitTest {
             // alone. If a name stopped carrying it, the loss counter would silently charge nothing.
             String prefix = ConsumerSubjectMath.durablePrefix("hephaestus-consumer");
 
-            assertThat(ConsumerSubjectMath.scopeConsumerName("hephaestus-consumer", 42L)).startsWith(prefix);
-            assertThat(ConsumerSubjectMath.installationConsumerName("hephaestus-consumer")).startsWith(prefix);
+            assertThat(ConsumerSubjectMath.scopeConsumerName("hephaestus-consumer", 42L))
+                    .startsWith(prefix);
+            assertThat(ConsumerSubjectMath.installationConsumerName("hephaestus-consumer"))
+                    .startsWith(prefix);
         }
 
         @Test
         void blankBaseNameIsRejected() {
             // Catching the misconfiguration here is cheaper than letting NATS reject a
             // consumer create with a partially-built name like "-scope-42".
-            assertThatThrownBy(() -> ConsumerSubjectMath.scopeConsumerName(null, 1L)).isInstanceOf(
-                IllegalArgumentException.class
-            );
-            assertThatThrownBy(() -> ConsumerSubjectMath.scopeConsumerName("", 1L)).isInstanceOf(
-                IllegalArgumentException.class
-            );
-            assertThatThrownBy(() -> ConsumerSubjectMath.installationConsumerName("   ")).isInstanceOf(
-                IllegalArgumentException.class
-            );
+            assertThatThrownBy(() -> ConsumerSubjectMath.scopeConsumerName(null, 1L))
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> ConsumerSubjectMath.scopeConsumerName("", 1L))
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> ConsumerSubjectMath.installationConsumerName("   "))
+                    .isInstanceOf(IllegalArgumentException.class);
         }
     }
 }

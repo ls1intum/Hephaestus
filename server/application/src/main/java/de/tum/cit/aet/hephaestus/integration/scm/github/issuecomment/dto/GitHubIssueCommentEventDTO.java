@@ -19,12 +19,12 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubIssueCommentEventDTO(
-    @JsonProperty("action") String action,
-    @JsonProperty("comment") GitHubCommentDTO comment,
-    @JsonProperty("issue") GitHubIssueDTO issue,
-    @JsonProperty("repository") GitHubRepositoryRefDTO repository,
-    @JsonProperty("sender") GitHubUserDTO sender
-) implements GitHubWebhookEvent {
+        @JsonProperty("action") String action,
+        @JsonProperty("comment") GitHubCommentDTO comment,
+        @JsonProperty("issue") GitHubIssueDTO issue,
+        @JsonProperty("repository") GitHubRepositoryRefDTO repository,
+        @JsonProperty("sender") GitHubUserDTO sender)
+        implements GitHubWebhookEvent {
     @Override
     public GitHubEventAction.IssueComment actionType() {
         return GitHubEventAction.IssueComment.fromString(action);
@@ -41,15 +41,14 @@ public record GitHubIssueCommentEventDTO(
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record GitHubCommentDTO(
-        @JsonProperty("id") @Nullable Long id,
-        @JsonProperty("node_id") String nodeId,
-        @JsonProperty("html_url") @Nullable String htmlUrl,
-        @JsonProperty("body") String body,
-        @JsonProperty("user") @Nullable GitHubUserDTO author,
-        @JsonProperty("author_association") @Nullable String authorAssociation,
-        @JsonProperty("created_at") @Nullable Instant createdAt,
-        @JsonProperty("updated_at") @Nullable Instant updatedAt
-    ) {
+            @JsonProperty("id") @Nullable Long id,
+            @JsonProperty("node_id") String nodeId,
+            @JsonProperty("html_url") @Nullable String htmlUrl,
+            @JsonProperty("body") String body,
+            @JsonProperty("user") @Nullable GitHubUserDTO author,
+            @JsonProperty("author_association") @Nullable String authorAssociation,
+            @JsonProperty("created_at") @Nullable Instant createdAt,
+            @JsonProperty("updated_at") @Nullable Instant updatedAt) {
         // STATIC FACTORY METHODS FOR GRAPHQL RESPONSES
 
         /**
@@ -62,15 +61,18 @@ public record GitHubIssueCommentEventDTO(
                 return null;
             }
             return new GitHubCommentDTO(
-                comment.getFullDatabaseId() != null ? comment.getFullDatabaseId().longValue() : null,
-                comment.getId(),
-                uriToString(comment.getUrl()),
-                comment.getBody(),
-                GitHubUserDTO.fromActor(comment.getAuthor()),
-                comment.getAuthorAssociation() != null ? comment.getAuthorAssociation().name() : null,
-                toInstant(comment.getCreatedAt()),
-                toInstant(comment.getUpdatedAt())
-            );
+                    comment.getFullDatabaseId() != null
+                            ? comment.getFullDatabaseId().longValue()
+                            : null,
+                    comment.getId(),
+                    uriToString(comment.getUrl()),
+                    comment.getBody(),
+                    GitHubUserDTO.fromActor(comment.getAuthor()),
+                    comment.getAuthorAssociation() != null
+                            ? comment.getAuthorAssociation().name()
+                            : null,
+                    toInstant(comment.getCreatedAt()),
+                    toInstant(comment.getUpdatedAt()));
         }
     }
 }

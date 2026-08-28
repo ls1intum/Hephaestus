@@ -7,38 +7,30 @@ import java.util.List;
 import java.util.Optional;
 
 public record EffectiveCatalog(
-    List<CatalogEntry<GroupDefinition>> groups,
-    List<CatalogEntry<PracticeDefinition>> practices,
-    boolean customOrder
-) {
+        List<CatalogEntry<GroupDefinition>> groups,
+        List<CatalogEntry<PracticeDefinition>> practices,
+        boolean customOrder) {
     public EffectiveCatalog {
         groups = List.copyOf(groups);
         practices = List.copyOf(practices);
     }
 
     public EffectiveCatalog(
-        List<CatalogEntry<GroupDefinition>> groups,
-        List<CatalogEntry<PracticeDefinition>> practices
-    ) {
+            List<CatalogEntry<GroupDefinition>> groups, List<CatalogEntry<PracticeDefinition>> practices) {
         this(groups, practices, false);
     }
 
     public Optional<CatalogEntry<PracticeDefinition>> practice(String slug) {
-        return practices
-            .stream()
-            .filter(entry -> entry.slug().equals(slug))
-            .findFirst();
+        return practices.stream().filter(entry -> entry.slug().equals(slug)).findFirst();
     }
 
     public Optional<CatalogEntry<GroupDefinition>> group(String slug) {
-        return groups
-            .stream()
-            .filter(entry -> entry.slug().equals(slug))
-            .findFirst();
+        return groups.stream().filter(entry -> entry.slug().equals(slug)).findFirst();
     }
 
     public String etag() {
-        CanonicalDigest digest = new CanonicalDigest().addInt(customOrder ? 1 : 0).addInt(groups.size());
+        CanonicalDigest digest =
+                new CanonicalDigest().addInt(customOrder ? 1 : 0).addInt(groups.size());
         groups.forEach(entry -> digest.add(entry.etag()).addInt(entry.position()));
         digest.addInt(practices.size());
         practices.forEach(entry -> digest.add(entry.etag()).addInt(entry.position()));
@@ -63,39 +55,38 @@ public record EffectiveCatalog(
     }
 
     public List<String> offeredPracticesIn(String groupSlug) {
-        return practices
-            .stream()
-            .filter(CatalogEntry::offered)
-            .filter(entry -> groupSlug.equals(entry.effective().groupSlug()))
-            .map(CatalogEntry::slug)
-            .toList();
+        return practices.stream()
+                .filter(CatalogEntry::offered)
+                .filter(entry -> groupSlug.equals(entry.effective().groupSlug()))
+                .map(CatalogEntry::slug)
+                .toList();
     }
 
     public CatalogSummary summary() {
         int total = practices.size() + groups.size();
-        int notOffered = total - installableGroups().size() - installablePractices().size();
+        int notOffered =
+                total - installableGroups().size() - installablePractices().size();
         return new CatalogSummary(
-            total,
-            count(CatalogEntryState.UPDATE_WAITING, CatalogChangeKind.DETECTION),
-            count(CatalogEntryState.UPDATE_WAITING, CatalogChangeKind.WORDING),
-            count(CatalogEntryState.UPDATE_WAITING, CatalogChangeKind.PRESENTATION),
-            (int) entries()
-                .filter(entry -> entry.state() == CatalogEntryState.EDITED_HERE)
-                .count(),
-            (int) entries()
-                .filter(entry -> entry.state() == CatalogEntryState.YOURS)
-                .count(),
-            notOffered,
-            (int) entries()
-                .filter(entry -> entry.state() == CatalogEntryState.NO_LONGER_SHIPPED)
-                .count()
-        );
+                total,
+                count(CatalogEntryState.UPDATE_WAITING, CatalogChangeKind.DETECTION),
+                count(CatalogEntryState.UPDATE_WAITING, CatalogChangeKind.WORDING),
+                count(CatalogEntryState.UPDATE_WAITING, CatalogChangeKind.PRESENTATION),
+                (int) entries()
+                        .filter(entry -> entry.state() == CatalogEntryState.EDITED_HERE)
+                        .count(),
+                (int) entries()
+                        .filter(entry -> entry.state() == CatalogEntryState.YOURS)
+                        .count(),
+                notOffered,
+                (int) entries()
+                        .filter(entry -> entry.state() == CatalogEntryState.NO_LONGER_SHIPPED)
+                        .count());
     }
 
     private int count(CatalogEntryState state, CatalogChangeKind kind) {
         return (int) entries()
-            .filter(entry -> entry.state() == state && entry.changeKind() == kind)
-            .count();
+                .filter(entry -> entry.state() == state && entry.changeKind() == kind)
+                .count();
     }
 
     private java.util.stream.Stream<CatalogEntry<?>> entries() {
@@ -103,15 +94,14 @@ public record EffectiveCatalog(
     }
 
     public record CatalogSummary(
-        int total,
-        int updatesChangingDetection,
-        int updatesChangingWordingOnly,
-        int updatesChangingPresentation,
-        int editedHere,
-        int yours,
-        int notOffered,
-        int noLongerShipped
-    ) {
+            int total,
+            int updatesChangingDetection,
+            int updatesChangingWordingOnly,
+            int updatesChangingPresentation,
+            int editedHere,
+            int yours,
+            int notOffered,
+            int noLongerShipped) {
         public int updatesWaiting() {
             return updatesChangingDetection + updatesChangingWordingOnly + updatesChangingPresentation;
         }

@@ -21,13 +21,8 @@ public class InsufficientWorkspacePermissionsException extends RuntimeException 
     private final WorkspaceRole requiredRole;
 
     public InsufficientWorkspacePermissionsException(String workspaceSlug, WorkspaceRole requiredRole) {
-        super(
-            String.format(
-                "Insufficient permissions to access workspace '%s'. Required role: %s",
-                workspaceSlug,
-                requiredRole
-            )
-        );
+        super(String.format(
+                "Insufficient permissions to access workspace '%s'. Required role: %s", workspaceSlug, requiredRole));
         this.workspaceSlug = workspaceSlug;
         this.requiredRole = requiredRole;
     }

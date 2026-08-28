@@ -32,90 +32,70 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
      * a connection in one grouped query. No join needed — a commit carries {@code repository_id}
      * directly, and {@code idx_git_commit_repository_id} already covers the grouping.
      */
-    @Query(
-        "SELECT c.repository.id AS repositoryId, COUNT(c) AS itemCount FROM Commit c " +
-            "WHERE c.repository.id IN :repositoryIds GROUP BY c.repository.id"
-    )
+    @Query("SELECT c.repository.id AS repositoryId, COUNT(c) AS itemCount FROM Commit c "
+            + "WHERE c.repository.id IN :repositoryIds GROUP BY c.repository.id")
     List<RepositoryItemCountProjection> countGroupedByRepositoryIds(
-        @Param("repositoryIds") Collection<Long> repositoryIds
-    );
+            @Param("repositoryIds") Collection<Long> repositoryIds);
 
     boolean existsByShaAndRepositoryId(String sha, Long repositoryId);
 
     long countByRepositoryId(Long repositoryId);
 
     /** Most recent commit for a repository by authored date. */
-    @Query(
-        """
+    @Query("""
         SELECT c FROM Commit c
         WHERE c.repository.id = :repositoryId
         ORDER BY c.authoredAt DESC
         LIMIT 1
-        """
-    )
+        """)
     Optional<Commit> findLatestByRepositoryId(@Param("repositoryId") Long repositoryId);
 
     void deleteByRepositoryId(Long repositoryId);
 
     /** Distinct author emails on commits with no linked user yet ({@code author_id IS NULL}). */
-    @Query(
-        value = """
+    @Query(value = """
         SELECT DISTINCT gc.author_email FROM git_commit gc
         WHERE gc.repository_id = :repositoryId AND gc.author_id IS NULL AND gc.author_email IS NOT NULL
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     List<String> findDistinctUnresolvedAuthorEmailsByRepositoryId(@Param("repositoryId") Long repositoryId);
 
     /** Distinct committer emails on commits with no linked user yet ({@code committer_id IS NULL}). */
-    @Query(
-        value = """
+    @Query(value = """
         SELECT DISTINCT gc.committer_email FROM git_commit gc
         WHERE gc.repository_id = :repositoryId AND gc.committer_id IS NULL AND gc.committer_email IS NOT NULL
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     List<String> findDistinctUnresolvedCommitterEmailsByRepositoryId(@Param("repositoryId") Long repositoryId);
 
     /** Sets {@code author_id} only where still NULL, so a concurrent resolver's write is never clobbered. */
     @Modifying
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         UPDATE git_commit SET author_id = :authorId, updated_at = NOW()
         WHERE repository_id = :repositoryId AND author_id IS NULL AND author_email = :email
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int bulkUpdateAuthorIdByEmail(
-        @Param("email") String email,
-        @Param("repositoryId") Long repositoryId,
-        @Param("authorId") @Nullable Long authorId
-    );
+            @Param("email") String email,
+            @Param("repositoryId") Long repositoryId,
+            @Param("authorId") @Nullable Long authorId);
 
     /** Sets {@code committer_id} only where still NULL, so a concurrent resolver's write is never clobbered. */
     @Modifying
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         UPDATE git_commit SET committer_id = :committerId, updated_at = NOW()
         WHERE repository_id = :repositoryId AND committer_id IS NULL AND committer_email = :email
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int bulkUpdateCommitterIdByEmail(
-        @Param("email") String email,
-        @Param("repositoryId") Long repositoryId,
-        @Param("committerId") @Nullable Long committerId
-    );
+            @Param("email") String email,
+            @Param("repositoryId") Long repositoryId,
+            @Param("committerId") @Nullable Long committerId);
 
     /**
      * Find one representative SHA per unresolved email for GraphQL author lookup.
      * Returns pairs of (email, sha) where author_id or committer_id is NULL.
      * Uses DISTINCT ON to pick exactly one SHA per email efficiently.
      */
-    @Query(
-        value = """
+    @Query(value = """
         SELECT sub.email, sub.sha FROM (
             SELECT DISTINCT ON (gc.author_email)
                 gc.author_email AS email, gc.sha AS sha
@@ -131,60 +111,44 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
               AND gc.committer_id IS NULL
               AND gc.committer_email IS NOT NULL
         ) sub
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     List<Object[]> findRepresentativeShasByUnresolvedEmail(@Param("repositoryId") Long repositoryId);
 
-    @Query(
-        value = """
+    @Query(value = """
         SELECT gc.sha FROM git_commit gc
         WHERE gc.repository_id = :repositoryId AND gc.author_id IS NULL
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     List<String> findShasWithNullAuthorByRepositoryId(@Param("repositoryId") Long repositoryId);
 
-    @Query(
-        value = """
+    @Query(value = """
         SELECT gc.sha FROM git_commit gc
         WHERE gc.repository_id = :repositoryId AND gc.committer_id IS NULL
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     List<String> findShasWithNullCommitterByRepositoryId(@Param("repositoryId") Long repositoryId);
 
     /** Sets {@code author_id} only where still NULL, so a concurrent resolver's write is never clobbered. */
     @Modifying
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         UPDATE git_commit SET author_id = :authorId, updated_at = NOW()
         WHERE repository_id = :repositoryId AND author_id IS NULL AND sha IN (:shas)
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int bulkUpdateAuthorId(
-        @Param("shas") List<String> shas,
-        @Param("repositoryId") Long repositoryId,
-        @Param("authorId") @Nullable Long authorId
-    );
+            @Param("shas") List<String> shas,
+            @Param("repositoryId") Long repositoryId,
+            @Param("authorId") @Nullable Long authorId);
 
     /** Sets {@code committer_id} only where still NULL, so a concurrent resolver's write is never clobbered. */
     @Modifying
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         UPDATE git_commit SET committer_id = :committerId, updated_at = NOW()
         WHERE repository_id = :repositoryId AND committer_id IS NULL AND sha IN (:shas)
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int bulkUpdateCommitterId(
-        @Param("shas") List<String> shas,
-        @Param("repositoryId") Long repositoryId,
-        @Param("committerId") @Nullable Long committerId
-    );
+            @Param("shas") List<String> shas,
+            @Param("repositoryId") Long repositoryId,
+            @Param("committerId") @Nullable Long committerId);
 
     /**
      * Upsert a commit by SHA and repository_id.
@@ -195,8 +159,7 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
      */
     @Modifying
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO git_commit (sha, message, message_body, html_url, authored_at, committed_at,
             additions, deletions, changed_files, last_sync_at, created_at, updated_at,
             repository_id, author_id, committer_id, author_email, committer_email)
@@ -219,48 +182,41 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
             committer_id = COALESCE(EXCLUDED.committer_id, git_commit.committer_id),
             author_email = COALESCE(EXCLUDED.author_email, git_commit.author_email),
             committer_email = COALESCE(EXCLUDED.committer_email, git_commit.committer_email)
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     void upsertCommit(
-        @Param("sha") String sha,
-        @Param("message") String message,
-        @Param("messageBody") @Nullable String messageBody,
-        @Param("htmlUrl") @Nullable String htmlUrl,
-        @Param("authoredAt") @Nullable Instant authoredAt,
-        @Param("committedAt") @Nullable Instant committedAt,
-        @Param("additions") @Nullable Integer additions,
-        @Param("deletions") @Nullable Integer deletions,
-        @Param("changedFiles") @Nullable Integer changedFiles,
-        @Param("lastSyncAt") Instant lastSyncAt,
-        @Param("repositoryId") Long repositoryId,
-        @Param("authorId") @Nullable Long authorId,
-        @Param("committerId") @Nullable Long committerId,
-        @Param("authorEmail") @Nullable String authorEmail,
-        @Param("committerEmail") @Nullable String committerEmail
-    );
+            @Param("sha") String sha,
+            @Param("message") String message,
+            @Param("messageBody") @Nullable String messageBody,
+            @Param("htmlUrl") @Nullable String htmlUrl,
+            @Param("authoredAt") @Nullable Instant authoredAt,
+            @Param("committedAt") @Nullable Instant committedAt,
+            @Param("additions") @Nullable Integer additions,
+            @Param("deletions") @Nullable Integer deletions,
+            @Param("changedFiles") @Nullable Integer changedFiles,
+            @Param("lastSyncAt") Instant lastSyncAt,
+            @Param("repositoryId") Long repositoryId,
+            @Param("authorId") @Nullable Long authorId,
+            @Param("committerId") @Nullable Long committerId,
+            @Param("authorEmail") @Nullable String authorEmail,
+            @Param("committerEmail") @Nullable String committerEmail);
 
     /**
      * Find SHAs of commits that have no contributor rows yet.
      * These commits need metadata enrichment (multi-author data + PR links).
      */
-    @Query(
-        value = """
+    @Query(value = """
         SELECT gc.sha FROM git_commit gc
         WHERE gc.repository_id = :repositoryId
           AND NOT EXISTS (
               SELECT 1 FROM commit_contributor cc WHERE cc.commit_id = gc.id
           )
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     List<String> findShasWithoutContributorsByRepositoryId(@Param("repositoryId") Long repositoryId);
 
     /** Links a commit to pull requests by PR number within the same repository. Idempotent ({@code ON CONFLICT DO NOTHING}). */
     @Modifying
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO commit_pull_request (commit_id, pull_request_id)
         SELECT :commitId, i.id
         FROM issue i
@@ -268,14 +224,11 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
           AND i.number IN (:prNumbers)
           AND i.issue_type = 'PULL_REQUEST'
         ON CONFLICT DO NOTHING
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     void linkCommitToPullRequests(
-        @Param("commitId") Long commitId,
-        @Param("repositoryId") Long repositoryId,
-        @Param("prNumbers") List<Integer> prNumbers
-    );
+            @Param("commitId") Long commitId,
+            @Param("repositoryId") Long repositoryId,
+            @Param("prNumbers") List<Integer> prNumbers);
 
     /**
      * Link a pull request to commits by SHA within the same repository.
@@ -289,8 +242,7 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
      */
     @Modifying
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO commit_pull_request (commit_id, pull_request_id)
         SELECT gc.id, i.id
         FROM git_commit gc
@@ -300,14 +252,11 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
           AND i.number = :prNumber
           AND i.issue_type = 'PULL_REQUEST'
         ON CONFLICT DO NOTHING
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int linkPullRequestToCommits(
-        @Param("repositoryId") Long repositoryId,
-        @Param("prNumber") Integer prNumber,
-        @Param("shas") List<String> shas
-    );
+            @Param("repositoryId") Long repositoryId,
+            @Param("prNumber") Integer prNumber,
+            @Param("shas") List<String> shas);
 
     /**
      * Bulk-update enrichment metadata fields on a commit.
@@ -318,8 +267,7 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
      */
     @Modifying
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         UPDATE git_commit SET
             additions = COALESCE(:additions, git_commit.additions),
             deletions = COALESCE(:deletions, git_commit.deletions),
@@ -341,30 +289,27 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
             on_behalf_of_login = COALESCE(:onBehalfOfLogin, git_commit.on_behalf_of_login),
             updated_at = NOW()
         WHERE git_commit.id = :commitId
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     void updateEnrichmentMetadata(
-        @Param("commitId") Long commitId,
-        @Param("additions") @Nullable Integer additions,
-        @Param("deletions") @Nullable Integer deletions,
-        @Param("changedFiles") @Nullable Integer changedFiles,
-        @Param("authoredAt") @Nullable Instant authoredAt,
-        @Param("committedAt") @Nullable Instant committedAt,
-        @Param("message") @Nullable String message,
-        @Param("messageBody") @Nullable String messageBody,
-        @Param("htmlUrl") @Nullable String htmlUrl,
-        @Param("signatureValid") @Nullable Boolean signatureValid,
-        @Param("authoredByCommitter") @Nullable Boolean authoredByCommitter,
-        @Param("committedViaWeb") @Nullable Boolean committedViaWeb,
-        @Param("parentCount") @Nullable Integer parentCount,
-        @Param("signatureState") @Nullable String signatureState,
-        @Param("signatureWasSignedByGitHub") @Nullable Boolean signatureWasSignedByGitHub,
-        @Param("signatureSignerLogin") @Nullable String signatureSignerLogin,
-        @Param("parentShas") @Nullable String parentShas,
-        @Param("statusCheckRollupState") @Nullable String statusCheckRollupState,
-        @Param("onBehalfOfLogin") @Nullable String onBehalfOfLogin
-    );
+            @Param("commitId") Long commitId,
+            @Param("additions") @Nullable Integer additions,
+            @Param("deletions") @Nullable Integer deletions,
+            @Param("changedFiles") @Nullable Integer changedFiles,
+            @Param("authoredAt") @Nullable Instant authoredAt,
+            @Param("committedAt") @Nullable Instant committedAt,
+            @Param("message") @Nullable String message,
+            @Param("messageBody") @Nullable String messageBody,
+            @Param("htmlUrl") @Nullable String htmlUrl,
+            @Param("signatureValid") @Nullable Boolean signatureValid,
+            @Param("authoredByCommitter") @Nullable Boolean authoredByCommitter,
+            @Param("committedViaWeb") @Nullable Boolean committedViaWeb,
+            @Param("parentCount") @Nullable Integer parentCount,
+            @Param("signatureState") @Nullable String signatureState,
+            @Param("signatureWasSignedByGitHub") @Nullable Boolean signatureWasSignedByGitHub,
+            @Param("signatureSignerLogin") @Nullable String signatureSignerLogin,
+            @Param("parentShas") @Nullable String parentShas,
+            @Param("statusCheckRollupState") @Nullable String statusCheckRollupState,
+            @Param("onBehalfOfLogin") @Nullable String onBehalfOfLogin);
 
     /**
      * Populate parent metadata ({@code parent_count}, {@code parent_shas}) for a
@@ -383,51 +328,39 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
      */
     @Modifying
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         UPDATE git_commit SET
             parent_count = COALESCE(:parentCount, git_commit.parent_count),
             parent_shas = COALESCE(:parentShas, git_commit.parent_shas),
             updated_at = NOW()
         WHERE repository_id = :repositoryId AND sha = :sha
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int updateParentMetadataBySha(
-        @Param("repositoryId") Long repositoryId,
-        @Param("sha") String sha,
-        @Param("parentCount") @Nullable Integer parentCount,
-        @Param("parentShas") @Nullable String parentShas
-    );
+            @Param("repositoryId") Long repositoryId,
+            @Param("sha") String sha,
+            @Param("parentCount") @Nullable Integer parentCount,
+            @Param("parentShas") @Nullable String parentShas);
 
     /** N most recent commits by an author as of {@code asOf}. Used by the AtomicChanges achievement evaluator. */
-    @Query(
-        """
+    @Query("""
         SELECT c FROM Commit c
         WHERE c.author.id = :authorId
         AND c.authoredAt <= :asOf
         ORDER BY c.authoredAt DESC
-        """
-    )
+        """)
     List<Commit> findTopNByAuthorIdOrderByAuthoredAtDesc(
-        @Param("authorId") @Nullable Long authorId,
-        @Param("asOf") Instant asOf,
-        Pageable pageable
-    );
+            @Param("authorId") @Nullable Long authorId, @Param("asOf") Instant asOf, Pageable pageable);
 
     /** Commit by id with file changes eagerly loaded. Used by the CrossBoundary achievement evaluator. */
-    @Query(
-        """
+    @Query("""
         SELECT c FROM Commit c
         LEFT JOIN FETCH c.fileChanges
         WHERE c.id = :id
-        """
-    )
+        """)
     Optional<Commit> findByIdWithFileChanges(@Param("id") Long id);
 
     /** Distinct file extensions across an author's commits as of {@code asOf}. Used by the Polyglot achievement evaluator. */
-    @Query(
-        value = """
+    @Query(value = """
         SELECT DISTINCT LOWER(
             CASE
                 WHEN cf.filename LIKE '%.%' THEN SUBSTRING(cf.filename FROM '\\.([^.]+)$')
@@ -439,11 +372,7 @@ public interface CommitRepository extends JpaRepository<Commit, Long> {
         WHERE gc.author_id = :authorId
         AND gc.authored_at <= :asOf
         AND cf.filename LIKE '%.%'
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     List<String> findDistinctFileExtensionsByAuthorId(
-        @Param("authorId") @Nullable Long authorId,
-        @Param("asOf") Instant asOf
-    );
+            @Param("authorId") @Nullable Long authorId, @Param("asOf") Instant asOf);
 }

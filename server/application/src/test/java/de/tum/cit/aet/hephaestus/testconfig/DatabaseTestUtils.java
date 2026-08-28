@@ -62,7 +62,7 @@ public class DatabaseTestUtils {
 
     @Name("hephaestus.test.DatabaseCleanup")
     @Label("Integration database cleanup")
-    @Category({ "Hephaestus", "Tests" })
+    @Category({"Hephaestus", "Tests"})
     static final class DatabaseCleanupEvent extends Event {
 
         @Label("Attempts")
@@ -102,15 +102,13 @@ public class DatabaseTestUtils {
 
     private synchronized String getTruncateStatement() {
         if (truncateStatement == null) {
-            truncateStatement = fetchApplicationTables()
-                .stream()
-                .sorted()
-                .map(this::quoteIdentifier)
-                .collect(
-                    Collectors.collectingAndThen(Collectors.joining(", "), tables ->
-                        tables.isEmpty() ? "" : "TRUNCATE TABLE " + tables + " RESTART IDENTITY CASCADE"
-                    )
-                );
+            truncateStatement = fetchApplicationTables().stream()
+                    .sorted()
+                    .map(this::quoteIdentifier)
+                    .collect(Collectors.collectingAndThen(
+                            Collectors.joining(", "),
+                            tables ->
+                                    tables.isEmpty() ? "" : "TRUNCATE TABLE " + tables + " RESTART IDENTITY CASCADE"));
         }
         return Objects.requireNonNull(truncateStatement);
     }
@@ -118,17 +116,14 @@ public class DatabaseTestUtils {
     @SuppressWarnings("unchecked")
     private List<String> fetchApplicationTables() {
         List<Object> tables = Objects.requireNonNull(entityManager)
-            .createNativeQuery(
-                "SELECT table_name FROM information_schema.tables " +
-                    "WHERE table_schema = 'public' AND table_type = 'BASE TABLE' " +
-                    "AND table_name NOT LIKE 'pg_%' AND table_name NOT LIKE 'sql_%'"
-            )
-            .getResultList();
-        return tables
-            .stream()
-            .map(Object::toString)
-            .filter(name -> !IGNORED_TABLES.contains(name.toLowerCase(Locale.ROOT)))
-            .toList();
+                .createNativeQuery("SELECT table_name FROM information_schema.tables "
+                        + "WHERE table_schema = 'public' AND table_type = 'BASE TABLE' "
+                        + "AND table_name NOT LIKE 'pg_%' AND table_name NOT LIKE 'sql_%'")
+                .getResultList();
+        return tables.stream()
+                .map(Object::toString)
+                .filter(name -> !IGNORED_TABLES.contains(name.toLowerCase(Locale.ROOT)))
+                .toList();
     }
 
     private String quoteIdentifier(String tableName) {

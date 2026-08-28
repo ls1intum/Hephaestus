@@ -40,19 +40,16 @@ public class PracticeReviewSettingsService {
     }
 
     public PracticeReviewCoveragePreviewDTO previewCoverage(
-        WorkspaceContext workspaceContext,
-        WorkspaceReviewScope proposed
-    ) {
+            WorkspaceContext workspaceContext, WorkspaceReviewScope proposed) {
         Workspace workspace = requireWorkspace(workspaceContext);
         return coverageService.preview(workspace, proposed, recentVolume(workspace));
     }
 
     @Transactional
     public PracticeReviewSettingsDTO updatePracticeReview(
-        WorkspaceContext workspaceContext,
-        UpdatePracticeReviewSettingsRequestDTO req,
-        @Nullable EntityTagPrecondition precondition
-    ) {
+            WorkspaceContext workspaceContext,
+            UpdatePracticeReviewSettingsRequestDTO req,
+            @Nullable EntityTagPrecondition precondition) {
         Workspace workspace = requireWorkspaceForUpdate(workspaceContext);
         PracticeReviewSettings settings = workspace.getReviewSettings();
         if (precondition == null) {
@@ -73,7 +70,8 @@ public class PracticeReviewSettingsService {
             coverageService.replace(workspace, req.reviewScope());
         }
         settings.applyRollout(null, null, req.deliveryStatus());
-        settings.applyDefaultAutonomy(req.defaultAutonomy() == null ? null : req.defaultAutonomy().name());
+        settings.applyDefaultAutonomy(
+                req.defaultAutonomy() == null ? null : req.defaultAutonomy().name());
         var afterScope = coverageService.scope(workspace);
         PracticeReviewSnapshot after = PracticeReviewSnapshot.of(settings, afterScope);
         if (!before.sameRolloutPolicyAs(after)) {
@@ -81,22 +79,19 @@ public class PracticeReviewSettingsService {
             after = PracticeReviewSnapshot.of(settings, afterScope);
         }
         settings.incrementConfigVersion();
-        configAudit.record(
-            ConfigAuditEntry.updated(
+        configAudit.record(ConfigAuditEntry.updated(
                 ConfigAuditEntityType.PRACTICE_REVIEW_SETTINGS,
                 workspaceContext.id(),
                 workspaceContext.id(),
                 before,
-                after
-            )
-        );
+                after));
         return toView(workspaceRepository.save(workspace));
     }
 
     private Workspace requireWorkspace(WorkspaceContext workspaceContext) {
         return workspaceRepository
-            .findById(workspaceContext.id())
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceContext.slug()));
+                .findById(workspaceContext.id())
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceContext.slug()));
     }
 
     /**
@@ -105,8 +100,8 @@ public class PracticeReviewSettingsService {
      */
     private Workspace requireWorkspaceForUpdate(WorkspaceContext workspaceContext) {
         return workspaceRepository
-            .findByIdForUpdate(workspaceContext.id())
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceContext.slug()));
+                .findByIdForUpdate(workspaceContext.id())
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceContext.slug()));
     }
 
     private PracticeReviewSettingsDTO toView(Workspace workspace) {
@@ -114,24 +109,22 @@ public class PracticeReviewSettingsService {
         WorkspaceReviewDefaults defaults = WorkspaceReviewDefaults.of(s);
         int recentVolume = recentVolume(workspace);
         return new PracticeReviewSettingsDTO(
-            EntityTagPrecondition.format(Long.toString(s.getConfigVersion())),
-            s.getRolloutRevision(),
-            s.resolveDeliverToMerged(reviewProperties.deliverToMerged()),
-            s.resolveCooldownMinutes(reviewProperties.cooldownMinutes()),
-            s.getDeliverToMerged(),
-            s.getCooldownMinutes(),
-            coverageService.scope(workspace),
-            s.getDeliveryStatus(),
-            coverageService.summary(workspace, recentVolume),
-            defaults.defaultAutonomy(),
-            s.getDefaultAutonomy() == null ? null : PracticeAutonomy.valueOf(s.getDefaultAutonomy())
-        );
+                EntityTagPrecondition.format(Long.toString(s.getConfigVersion())),
+                s.getRolloutRevision(),
+                s.resolveDeliverToMerged(reviewProperties.deliverToMerged()),
+                s.resolveCooldownMinutes(reviewProperties.cooldownMinutes()),
+                s.getDeliverToMerged(),
+                s.getCooldownMinutes(),
+                coverageService.scope(workspace),
+                s.getDeliveryStatus(),
+                coverageService.summary(workspace, recentVolume),
+                defaults.defaultAutonomy(),
+                s.getDefaultAutonomy() == null ? null : PracticeAutonomy.valueOf(s.getDefaultAutonomy()));
     }
 
     private int recentVolume(Workspace workspace) {
         return volumeQuery.countSince(
-            workspace.getId(),
-            Instant.now().minus(PracticeReviewCoverageService.ESTIMATE_WINDOW_DAYS, ChronoUnit.DAYS)
-        );
+                workspace.getId(),
+                Instant.now().minus(PracticeReviewCoverageService.ESTIMATE_WINDOW_DAYS, ChronoUnit.DAYS));
     }
 }

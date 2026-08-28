@@ -32,11 +32,10 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
         // Use production defaults: only reviews and review comments earn XP
         // PR opened/merged/ready and issue created are 0.0 (to be enabled in future release)
         ExperiencePointProperties properties = new ExperiencePointProperties(
-            List.of("Copilot", "dependabot[bot]"),
-            new ExperiencePointProperties.ReviewWeights(2.0, 2.5, 1.5),
-            new ExperiencePointProperties.XpAwards(0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
-            1000.0
-        );
+                List.of("Copilot", "dependabot[bot]"),
+                new ExperiencePointProperties.ReviewWeights(2.0, 2.5, 1.5),
+                new ExperiencePointProperties.XpAwards(0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+                1000.0);
         calculator = new ExperiencePointCalculator(pullRequestRepository, properties);
     }
 
@@ -120,8 +119,8 @@ class ExperiencePointCalculatorTest extends BaseUnitTest {
             double experiencePoints = calculator.calculateReviewExperiencePoints(List.of(dismissedReview));
 
             assertThat(experiencePoints)
-                .as("Dismissed reviews should earn XP - the effort of providing feedback is valuable")
-                .isGreaterThan(0.0);
+                    .as("Dismissed reviews should earn XP - the effort of providing feedback is valuable")
+                    .isGreaterThan(0.0);
         }
 
         @Test

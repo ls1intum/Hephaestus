@@ -58,12 +58,11 @@ public class GitLabMilestoneSyncService {
     private final GitLabProperties gitLabProperties;
 
     public GitLabMilestoneSyncService(
-        GitLabGraphQlClientProvider graphQlClientProvider,
-        GitLabGraphQlResponseHandler responseHandler,
-        GitLabMilestoneProcessor milestoneProcessor,
-        MilestoneRepository milestoneRepository,
-        GitLabProperties gitLabProperties
-    ) {
+            GitLabGraphQlClientProvider graphQlClientProvider,
+            GitLabGraphQlResponseHandler responseHandler,
+            GitLabMilestoneProcessor milestoneProcessor,
+            MilestoneRepository milestoneRepository,
+            GitLabProperties gitLabProperties) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.responseHandler = responseHandler;
         this.milestoneProcessor = milestoneProcessor;
@@ -115,13 +114,12 @@ public class GitLabMilestoneSyncService {
 
                 HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
-                ClientGraphQlResponse response = client
-                    .documentName(GET_PROJECT_MILESTONES_DOCUMENT)
-                    .variable("fullPath", projectPath)
-                    .variable("first", pageSize)
-                    .variable("after", cursor)
-                    .execute()
-                    .block(gitLabProperties.graphqlTimeout());
+                ClientGraphQlResponse response = client.documentName(GET_PROJECT_MILESTONES_DOCUMENT)
+                        .variable("fullPath", projectPath)
+                        .variable("first", pageSize)
+                        .variable("after", cursor)
+                        .execute()
+                        .block(gitLabProperties.graphqlTimeout());
 
                 var handleResult = responseHandler.handle(response, "milestones for " + safeProjectPath, log);
                 if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
@@ -135,10 +133,10 @@ public class GitLabMilestoneSyncService {
 
                 graphQlClientProvider.recordSuccess();
 
-                @SuppressWarnings({ "unchecked", "rawtypes" })
+                @SuppressWarnings({"unchecked", "rawtypes"})
                 List<Map<String, Object>> nodes = (List) Objects.requireNonNull(response)
-                    .field("project.milestones.nodes")
-                    .toEntityList(Map.class);
+                        .field("project.milestones.nodes")
+                        .toEntityList(Map.class);
 
                 if (nodes == null || nodes.isEmpty()) {
                     break;
@@ -159,17 +157,16 @@ public class GitLabMilestoneSyncService {
                 }
 
                 GitLabPageInfo pageInfo = Objects.requireNonNull(response)
-                    .field("project.milestones.pageInfo")
-                    .toEntity(GitLabPageInfo.class);
+                        .field("project.milestones.pageInfo")
+                        .toEntity(GitLabPageInfo.class);
                 cursor = pageInfo != null ? pageInfo.endCursor() : null;
                 page++;
 
                 if (pageInfo == null || !pageInfo.hasNextPage()) {
                     break;
                 }
-                if (
-                    responseHandler.isPaginationLoop(cursor, previousCursor, "milestones for " + safeProjectPath, log)
-                ) {
+                if (responseHandler.isPaginationLoop(
+                        cursor, previousCursor, "milestones for " + safeProjectPath, log)) {
                     errorAborted = true;
                     break;
                 }
@@ -185,28 +182,23 @@ public class GitLabMilestoneSyncService {
         // Remove stale milestones only if sync completed fully
         if (syncComplete) {
             int removedCount = removeStaleMilestones(
-                repository.getId(),
-                syncedNumbers,
-                ProcessingContext.forSync(scopeId, repository)
-            );
+                    repository.getId(), syncedNumbers, ProcessingContext.forSync(scopeId, repository));
             if (removedCount > 0) {
                 log.info("Removed stale milestones: removedCount={}, projectPath={}", removedCount, safeProjectPath);
             }
         } else {
             log.warn(
-                "Skipped stale milestone removal: reason=incompleteSync, projectPath={}, pagesProcessed={}",
-                safeProjectPath,
-                page
-            );
+                    "Skipped stale milestone removal: reason=incompleteSync, projectPath={}, pagesProcessed={}",
+                    safeProjectPath,
+                    page);
         }
 
         log.info(
-            "Completed milestone sync: projectPath={}, milestoneCount={}, complete={}, scopeId={}",
-            safeProjectPath,
-            totalSynced,
-            syncComplete,
-            scopeId
-        );
+                "Completed milestone sync: projectPath={}, milestoneCount={}, complete={}, scopeId={}",
+                safeProjectPath,
+                totalSynced,
+                syncComplete,
+                scopeId);
 
         if (rateLimitAborted) {
             return SyncResult.abortedRateLimit(totalSynced);
@@ -247,11 +239,10 @@ public class GitLabMilestoneSyncService {
         }
 
         log.info(
-            "Starting group milestone sync: scopeId={}, group={}, repoCount={}",
-            scopeId,
-            safeGroupPath,
-            repositoriesInGroup.size()
-        );
+                "Starting group milestone sync: scopeId={}, group={}, repoCount={}",
+                scopeId,
+                safeGroupPath,
+                repositoriesInGroup.size());
 
         List<GitLabMilestoneDTO> collected = new ArrayList<>();
         String cursor = null;
@@ -264,10 +255,9 @@ public class GitLabMilestoneSyncService {
             do {
                 if (page >= GitLabSyncConstants.MAX_PAGINATION_PAGES) {
                     log.warn(
-                        "Reached max pagination pages on group milestones: scopeId={}, group={}",
-                        scopeId,
-                        safeGroupPath
-                    );
+                            "Reached max pagination pages on group milestones: scopeId={}, group={}",
+                            scopeId,
+                            safeGroupPath);
                     break;
                 }
 
@@ -287,15 +277,14 @@ public class GitLabMilestoneSyncService {
 
                 HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
-                ClientGraphQlResponse response = client
-                    .documentName(GET_GROUP_MILESTONES_DOCUMENT)
-                    .variable("fullPath", groupFullPath)
-                    .variable("first", pageSize)
-                    .variable("after", cursor)
-                    .variable("includeAncestors", true)
-                    .variable("includeDescendants", true)
-                    .execute()
-                    .block(gitLabProperties.graphqlTimeout());
+                ClientGraphQlResponse response = client.documentName(GET_GROUP_MILESTONES_DOCUMENT)
+                        .variable("fullPath", groupFullPath)
+                        .variable("first", pageSize)
+                        .variable("after", cursor)
+                        .variable("includeAncestors", true)
+                        .variable("includeDescendants", true)
+                        .execute()
+                        .block(gitLabProperties.graphqlTimeout());
 
                 var handleResult = responseHandler.handle(response, "group milestones for " + safeGroupPath, log);
                 if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
@@ -303,18 +292,17 @@ public class GitLabMilestoneSyncService {
                 }
                 if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
                     graphQlClientProvider.recordFailure(
-                        new GitLabSyncException("Invalid GraphQL response on group milestones")
-                    );
+                            new GitLabSyncException("Invalid GraphQL response on group milestones"));
                     errorAborted = true;
                     break;
                 }
 
                 graphQlClientProvider.recordSuccess();
 
-                @SuppressWarnings({ "unchecked", "rawtypes" })
+                @SuppressWarnings({"unchecked", "rawtypes"})
                 List<Map<String, Object>> nodes = (List) Objects.requireNonNull(response)
-                    .field("group.milestones.nodes")
-                    .toEntityList(Map.class);
+                        .field("group.milestones.nodes")
+                        .toEntityList(Map.class);
 
                 if (nodes == null || nodes.isEmpty()) {
                     break;
@@ -332,22 +320,16 @@ public class GitLabMilestoneSyncService {
                 }
 
                 GitLabPageInfo pageInfo = Objects.requireNonNull(response)
-                    .field("group.milestones.pageInfo")
-                    .toEntity(GitLabPageInfo.class);
+                        .field("group.milestones.pageInfo")
+                        .toEntity(GitLabPageInfo.class);
                 cursor = pageInfo != null ? pageInfo.endCursor() : null;
                 page++;
 
                 if (pageInfo == null || !pageInfo.hasNextPage()) {
                     break;
                 }
-                if (
-                    responseHandler.isPaginationLoop(
-                        cursor,
-                        previousCursor,
-                        "group milestones for " + safeGroupPath,
-                        log
-                    )
-                ) {
+                if (responseHandler.isPaginationLoop(
+                        cursor, previousCursor, "group milestones for " + safeGroupPath, log)) {
                     errorAborted = true;
                     break;
                 }
@@ -370,24 +352,22 @@ public class GitLabMilestoneSyncService {
                         }
                     } catch (Exception e) {
                         log.warn(
-                            "Failed to persist group milestone: iid={}, repo={}, error={}",
-                            dto.iid(),
-                            sanitizeForLog(repo.getNameWithOwner()),
-                            e.getMessage()
-                        );
+                                "Failed to persist group milestone: iid={}, repo={}, error={}",
+                                dto.iid(),
+                                sanitizeForLog(repo.getNameWithOwner()),
+                                e.getMessage());
                     }
                 }
             }
         }
 
         log.info(
-            "Completed group milestone sync: scopeId={}, group={}, milestones={}, repos={}, written={}",
-            scopeId,
-            safeGroupPath,
-            collected.size(),
-            repositoriesInGroup.size(),
-            totalWritten
-        );
+                "Completed group milestone sync: scopeId={}, group={}, milestones={}, repos={}, written={}",
+                scopeId,
+                safeGroupPath,
+                collected.size(),
+                repositoriesInGroup.size(),
+                totalWritten);
 
         if (rateLimitAborted) {
             return SyncResult.abortedRateLimit(totalWritten);

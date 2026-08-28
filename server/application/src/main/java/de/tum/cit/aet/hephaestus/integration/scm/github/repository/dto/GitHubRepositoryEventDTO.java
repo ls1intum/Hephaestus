@@ -19,14 +19,16 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubRepositoryEventDTO(
-    @JsonProperty("action") String action,
-    @JsonProperty("repository") @Nullable GitHubRepositoryRefDTO repository,
-    @JsonProperty("changes") @Nullable Changes changes,
-    @JsonProperty("sender") @Nullable GitHubUserDTO sender,
-    @JsonProperty("installation") @Nullable InstallationRef installation
-) implements GitHubWebhookEvent {
+        @JsonProperty("action") String action,
+        @JsonProperty("repository") @Nullable GitHubRepositoryRefDTO repository,
+        @JsonProperty("changes") @Nullable Changes changes,
+        @JsonProperty("sender") @Nullable GitHubUserDTO sender,
+        @JsonProperty("installation") @Nullable InstallationRef installation)
+        implements GitHubWebhookEvent {
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record InstallationRef(@JsonProperty("id") Long id, @JsonProperty("node_id") String nodeId) {}
+    public record InstallationRef(
+            @JsonProperty("id") Long id,
+            @JsonProperty("node_id") String nodeId) {}
 
     @Override
     public GitHubEventAction.Repository actionType() {
@@ -40,11 +42,11 @@ public record GitHubRepositoryEventDTO(
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Changes(
-        @JsonProperty("repository") @Nullable RepositoryChanges repository,
-        @JsonProperty("owner") @Nullable OwnerChanges owner
-    ) {
+            @JsonProperty("repository") @Nullable RepositoryChanges repository,
+            @JsonProperty("owner") @Nullable OwnerChanges owner) {
         @JsonIgnoreProperties(ignoreUnknown = true)
-        public record RepositoryChanges(@JsonProperty("name") NameChange name) {}
+        public record RepositoryChanges(
+                @JsonProperty("name") NameChange name) {}
 
         @JsonIgnoreProperties(ignoreUnknown = true)
         public record OwnerChanges(@JsonProperty("from") Map<String, Object> from) {}
@@ -58,7 +60,9 @@ public record GitHubRepositoryEventDTO(
      *     present
      */
     public @Nullable String getOldName() {
-        if (changes == null || changes.repository() == null || changes.repository().name() == null) {
+        if (changes == null
+                || changes.repository() == null
+                || changes.repository().name() == null) {
             return null;
         }
         return changes.repository().name().from();
@@ -116,7 +120,7 @@ public record GitHubRepositoryEventDTO(
             return null;
         }
         Map<String, Object> from = changes.owner().from();
-        for (String accountKey : new String[] { "organization", "user" }) {
+        for (String accountKey : new String[] {"organization", "user"}) {
             if (from.get(accountKey) instanceof Map<?, ?> account && account.get("login") instanceof String login) {
                 return login;
             }

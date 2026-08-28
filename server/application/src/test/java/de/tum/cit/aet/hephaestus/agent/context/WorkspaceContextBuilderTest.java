@@ -94,21 +94,22 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         void recordsBuildDurationTimer() {
             var p = stubProvider(true, "a.txt", "A".getBytes(StandardCharsets.UTF_8), false);
             builderWithSharedRegistry(p).build(reviewRequest());
-            assertThat(
-                sharedRegistry.timer("agent.context.build.duration", "kind", "PracticeReviewRequest").count()
-            ).isEqualTo(1L);
+            assertThat(sharedRegistry
+                            .timer("agent.context.build.duration", "kind", "PracticeReviewRequest")
+                            .count())
+                    .isEqualTo(1L);
         }
 
         @Test
         void emitsRequiredFailureCounter() {
             var bad = stubProvider(true, "x.txt", new byte[0], true);
-            assertThatThrownBy(() -> builderWithSharedRegistry(bad).build(reviewRequest())).isInstanceOf(
-                JobPreparationException.class
-            );
+            assertThatThrownBy(() -> builderWithSharedRegistry(bad).build(reviewRequest()))
+                    .isInstanceOf(JobPreparationException.class);
             String providerName = bad.getClass().getSimpleName();
-            assertThat(
-                sharedRegistry.counter("agent.context.provider.required.failure", "provider", providerName).count()
-            ).isEqualTo(1d);
+            assertThat(sharedRegistry
+                            .counter("agent.context.provider.required.failure", "provider", providerName)
+                            .count())
+                    .isEqualTo(1d);
         }
     }
 
@@ -123,8 +124,12 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             Map<String, byte[]> files = builderOf(a, b).build(reviewRequest());
 
             assertThat(files).hasSize(2);
-            assertThat(files.get("inputs/context/a.txt")).asString(StandardCharsets.UTF_8).isEqualTo("A");
-            assertThat(files.get("inputs/context/b.txt")).asString(StandardCharsets.UTF_8).isEqualTo("B");
+            assertThat(files.get("inputs/context/a.txt"))
+                    .asString(StandardCharsets.UTF_8)
+                    .isEqualTo("A");
+            assertThat(files.get("inputs/context/b.txt"))
+                    .asString(StandardCharsets.UTF_8)
+                    .isEqualTo("B");
         }
 
         @Test
@@ -160,8 +165,8 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         void requiredFailureThrows() {
             var bad = stubProvider(true, "x.txt", new byte[0], true);
             assertThatThrownBy(() -> builderOf(bad).build(reviewRequest()))
-                .isInstanceOf(JobPreparationException.class)
-                .hasMessageContaining("Required content provider failed");
+                    .isInstanceOf(JobPreparationException.class)
+                    .hasMessageContaining("Required content provider failed");
         }
 
         @Test
@@ -187,8 +192,8 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             };
 
             assertThatThrownBy(() -> builderOf(bad).build(reviewRequest()))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("programmer bug");
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("programmer bug");
         }
 
         @Test
@@ -200,17 +205,16 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             EvidencePlan plan = new EvidencePlan(new SourceContractVersion("1.0.0"), ArtifactKinds.PULL_REQUEST);
 
             assertThatThrownBy(() -> builder.prepare(reviewRequest(), plan))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("must declare source kinds");
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("must declare source kinds");
         }
 
         static Stream<RuntimeException> collectionFailures() {
             return Stream.of(
-                new EvidenceCollectionException("provider boom", new RuntimeException("downstream failure")),
-                // The shape a repository actually throws, and the reason the catch cannot be narrowed to
-                // the declared one: letting it escape would abort every source that had already succeeded.
-                new org.springframework.dao.QueryTimeoutException("statement timed out")
-            );
+                    new EvidenceCollectionException("provider boom", new RuntimeException("downstream failure")),
+                    // The shape a repository actually throws, and the reason the catch cannot be narrowed to
+                    // the declared one: letting it escape would abort every source that had already succeeded.
+                    new org.springframework.dao.QueryTimeoutException("statement timed out"));
         }
 
         /**
@@ -250,32 +254,26 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             JsonMapper mapper = JsonMapper.builder().build();
             FabricLayout layout = new FabricLayout(root.toString());
             ContextManifestBuilder manifestBuilder = new ContextManifestBuilder(
-                new ContentAddressedStore(layout),
-                layout,
-                mapper,
-                new ClasspathArtifactSourceCatalogRegistry(mapper, java.time.Clock.systemUTC()),
-                new PracticeSubjectEvaluator(mapper),
-                Clock.systemUTC()
-            );
+                    new ContentAddressedStore(layout),
+                    layout,
+                    mapper,
+                    new ClasspathArtifactSourceCatalogRegistry(mapper, java.time.Clock.systemUTC()),
+                    new PracticeSubjectEvaluator(mapper),
+                    Clock.systemUTC());
             var builder = new WorkspaceContextBuilder(List.of(bad), new SimpleMeterRegistry(), manifestBuilder);
             EvidencePlan plan = new EvidencePlan(new SourceContractVersion("1.0.0"), ArtifactKinds.PULL_REQUEST);
             ContextRequest.PracticeReviewRequest request = reviewRequest();
 
             PreparedEvidence prepared = builder.prepare(request, plan);
 
-            var capture = prepared
-                .manifest()
-                .sources()
-                .stream()
-                .filter(source -> source.kind().equals(comments))
-                .findFirst()
-                .orElseThrow();
-            assertThat(capture.state()).isEqualTo(
-                new SourceCaptureState.CollectionError(SourceAbsenceReason.PROVIDER_FAILURE)
-            );
-            assertThat(
-                layout.jobDir(String.valueOf(request.job().getId())).resolve("artifact-source-manifest.json")
-            ).exists();
+            var capture = prepared.manifest().sources().stream()
+                    .filter(source -> source.kind().equals(comments))
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(capture.state())
+                    .isEqualTo(new SourceCaptureState.CollectionError(SourceAbsenceReason.PROVIDER_FAILURE));
+            assertThat(layout.jobDir(String.valueOf(request.job().getId())).resolve("artifact-source-manifest.json"))
+                    .exists();
         }
 
         @Test
@@ -295,13 +293,12 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
                 @Override
                 public EvidenceContribution capture(ContextRequest request, Set<SourceKind> selectedKinds) {
                     return new EvidenceContribution(
-                        Map.of("inputs/context/diff.patch", new byte[0]),
-                        Map.of(diff, SourceCompleteness.COMPLETE),
-                        Map.of(),
-                        Map.of(),
-                        Map.of(),
-                        Map.of(diff, SourceContentState.EMPTY)
-                    );
+                            Map.of("inputs/context/diff.patch", new byte[0]),
+                            Map.of(diff, SourceCompleteness.COMPLETE),
+                            Map.of(),
+                            Map.of(),
+                            Map.of(),
+                            Map.of(diff, SourceContentState.EMPTY));
                 }
 
                 @Override
@@ -315,29 +312,25 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             JsonMapper mapper = JsonMapper.builder().build();
             FabricLayout layout = new FabricLayout(root.toString());
             ContextManifestBuilder manifests = new ContextManifestBuilder(
-                new ContentAddressedStore(layout),
-                layout,
-                mapper,
-                new ClasspathArtifactSourceCatalogRegistry(mapper, Clock.systemUTC()),
-                new PracticeSubjectEvaluator(mapper),
-                Clock.systemUTC()
-            );
+                    new ContentAddressedStore(layout),
+                    layout,
+                    mapper,
+                    new ClasspathArtifactSourceCatalogRegistry(mapper, Clock.systemUTC()),
+                    new PracticeSubjectEvaluator(mapper),
+                    Clock.systemUTC());
             var builder = new WorkspaceContextBuilder(List.of(provider), new SimpleMeterRegistry(), manifests);
             EvidencePlan plan = new EvidencePlan(new SourceContractVersion("1.0.0"), ArtifactKinds.PULL_REQUEST);
 
-            var capture = builder
-                .prepare(reviewRequest(), plan)
-                .manifest()
-                .sources()
-                .stream()
-                .filter(source -> source.kind().equals(diff))
-                .findFirst()
-                .orElseThrow();
+            var capture = builder.prepare(reviewRequest(), plan).manifest().sources().stream()
+                    .filter(source -> source.kind().equals(diff))
+                    .findFirst()
+                    .orElseThrow();
 
             assertThat(capture.kind()).isEqualTo(diff);
-            assertThat(capture.state()).isInstanceOfSatisfying(SourceCaptureState.Available.class, available ->
-                assertThat(available.content()).isEqualTo(SourceContentState.EMPTY)
-            );
+            assertThat(capture.state())
+                    .isInstanceOfSatisfying(
+                            SourceCaptureState.Available.class,
+                            available -> assertThat(available.content()).isEqualTo(SourceContentState.EMPTY));
             assertThat(capture.artifacts()).extracting("path").containsExactly("inputs/context/diff.patch");
         }
 
@@ -376,8 +369,8 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             EvidencePlan plan = new EvidencePlan(new SourceContractVersion("1.0.0"), ArtifactKinds.PULL_REQUEST);
 
             assertThatThrownBy(() -> builder.prepare(reviewRequest(), plan))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("undeclared or unselected sources");
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("undeclared or unselected sources");
         }
 
         @Test
@@ -398,13 +391,12 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
                 @Override
                 public EvidenceContribution capture(ContextRequest request, Set<SourceKind> selectedKinds) {
                     return new EvidenceContribution(
-                        Map.of("inputs/context/core.json", new byte[] { 1 }),
-                        Map.of(),
-                        Map.of(),
-                        Map.of(),
-                        Map.of(),
-                        Map.of()
-                    );
+                            Map.of("inputs/context/core.json", new byte[] {1}),
+                            Map.of(),
+                            Map.of(),
+                            Map.of(),
+                            Map.of(),
+                            Map.of());
                 }
 
                 @Override
@@ -422,8 +414,8 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             EvidencePlan plan = new EvidencePlan(new SourceContractVersion("1.0.0"), ArtifactKinds.PULL_REQUEST);
 
             assertThatThrownBy(() -> builder.prepare(reviewRequest(), plan))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("outside this capture");
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("outside this capture");
         }
 
         @Test
@@ -441,8 +433,8 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
                 }
             };
             assertThatThrownBy(() -> builderOf(bad).build(reviewRequest()))
-                .isInstanceOf(JobPreparationException.class)
-                .hasMessage("data error");
+                    .isInstanceOf(JobPreparationException.class)
+                    .hasMessage("data error");
         }
     }
 
@@ -455,8 +447,8 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             ContentSource first = new ProviderA();
             ContentSource second = new ProviderB();
             assertThatThrownBy(() -> builderOf(first, second).build(reviewRequest()))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Duplicate workspace key");
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Duplicate workspace key");
         }
 
         @Test
@@ -478,7 +470,9 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
 
             Map<String, byte[]> files = builderOf(first, mutating).build(reviewRequest());
 
-            assertThat(files.get("inputs/context/first.txt")).asString(StandardCharsets.UTF_8).isEqualTo("FIRST");
+            assertThat(files.get("inputs/context/first.txt"))
+                    .asString(StandardCharsets.UTF_8)
+                    .isEqualTo("FIRST");
         }
 
         private final class ProviderA implements ContentSource {
@@ -526,8 +520,8 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
                 }
             };
             assertThatThrownBy(() -> builderOf(wrong).build(reviewRequest()))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("rogue/file.txt");
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("rogue/file.txt");
         }
     }
 
@@ -556,11 +550,8 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             CountDownLatch firstMayFinish = new CountDownLatch(1);
             ContentSource gatedFirst = new LatchedProvider(firstInside, firstMayFinish);
             ContentSource unboundedSecond = new LatchedProvider(null, null);
-            var builder = new WorkspaceContextBuilder(
-                List.of(gatedFirst, unboundedSecond),
-                new SimpleMeterRegistry(),
-                null
-            );
+            var builder =
+                    new WorkspaceContextBuilder(List.of(gatedFirst, unboundedSecond), new SimpleMeterRegistry(), null);
 
             ObjectMapper mapper = new ObjectMapper();
             AgentJob jobA = new AgentJob();
@@ -574,8 +565,8 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             Thread t2 = new Thread(() -> builder.build(new ContextRequest.PracticeReviewRequest(jobB)), "t2");
             t1.start();
             assertThat(firstInside.await(2, TimeUnit.SECONDS))
-                .as("t1 should enter the critical section quickly")
-                .isTrue();
+                    .as("t1 should enter the critical section quickly")
+                    .isTrue();
             t2.start();
             // Spin (with timeout) until t2 has parked on the lock. unboundedSecond's `entered`
             // latch is null, so if t2 ran ahead it would already be past the latch — but it
@@ -593,8 +584,7 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         @DisplayName("null repoKey requests do not serialise globally")
         void nullRepoKeyRequestsCanRunConcurrently() throws Exception {
             CountDownLatch bothInside = new CountDownLatch(2);
-            @Nullable
-            CountDownLatch mayFinish = new CountDownLatch(1);
+            @Nullable CountDownLatch mayFinish = new CountDownLatch(1);
             AtomicInteger inFlight = new AtomicInteger();
             AtomicInteger maxInFlight = new AtomicInteger();
             ContentSource concurrentProbe = new ConcurrentProbeProvider(bothInside, mayFinish, inFlight, maxInFlight);
@@ -613,8 +603,8 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             t2.start();
             try {
                 assertThat(bothInside.await(2, TimeUnit.SECONDS))
-                    .as("both null-repo builds should enter the provider concurrently")
-                    .isTrue();
+                        .as("both null-repo builds should enter the provider concurrently")
+                        .isTrue();
             } finally {
                 mayFinish.countDown();
             }
@@ -627,7 +617,7 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
     }
 
     private static void awaitState(Thread thread, Set<Thread.State> wanted, long timeoutMillis)
-        throws InterruptedException {
+            throws InterruptedException {
         long deadline = System.nanoTime() + timeoutMillis * 1_000_000L;
         while (System.nanoTime() < deadline) {
             if (wanted.contains(thread.getState())) {
@@ -637,8 +627,7 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             Thread.sleep(1);
         }
         throw new AssertionError(
-            "Thread " + thread.getName() + " never reached " + wanted + " (current=" + thread.getState() + ")"
-        );
+                "Thread " + thread.getName() + " never reached " + wanted + " (current=" + thread.getState() + ")");
     }
 
     private static final class LatchedProvider implements ContentSource {
@@ -680,11 +669,10 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         private final AtomicInteger maxInFlight;
 
         ConcurrentProbeProvider(
-            CountDownLatch bothInside,
-            @Nullable CountDownLatch mayFinish,
-            AtomicInteger inFlight,
-            AtomicInteger maxInFlight
-        ) {
+                CountDownLatch bothInside,
+                @Nullable CountDownLatch mayFinish,
+                AtomicInteger inFlight,
+                AtomicInteger maxInFlight) {
             this.bothInside = bothInside;
             this.mayFinish = mayFinish;
             this.inFlight = inFlight;

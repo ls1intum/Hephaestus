@@ -7,7 +7,6 @@ import jakarta.validation.constraints.Size;
 import org.jspecify.annotations.Nullable;
 
 public record DecideFeedbackProposalRequestDTO(
-    @NotNull FeedbackApprovalDecision decision,
-    @Nullable FeedbackRejectionReason rejectionReason,
-    @Size(max = 500) @Nullable String rejectionNote
-) {}
+        @NotNull FeedbackApprovalDecision decision,
+        @Nullable FeedbackRejectionReason rejectionReason,
+        @Size(max = 500) @Nullable String rejectionNote) {}

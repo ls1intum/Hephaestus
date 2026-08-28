@@ -18,14 +18,10 @@ public class LoginProviderConfiguration {
 
     @Bean
     public LoginProviderClientRegistrationRepository loginProviderClientRegistrationRepository(
-        LoginProviderRepository loginProviderRepository,
-        AuthProperties authProperties,
-        OutlineOriginPolicy outlineOriginPolicy
-    ) {
+            LoginProviderRepository loginProviderRepository,
+            AuthProperties authProperties,
+            OutlineOriginPolicy outlineOriginPolicy) {
         return new LoginProviderClientRegistrationRepository(
-            loginProviderRepository,
-            authProperties.apiBasePath(),
-            outlineOriginPolicy
-        );
+                loginProviderRepository, authProperties.apiBasePath(), outlineOriginPolicy);
     }
 }

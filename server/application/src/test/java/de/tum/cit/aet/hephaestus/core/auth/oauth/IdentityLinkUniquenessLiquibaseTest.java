@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.core.auth.oauth;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -41,9 +40,8 @@ class IdentityLinkUniquenessLiquibaseTest {
 
     private static final String UNIQUE_INDEX = "uq_identity_link_provider_subject_team";
 
-    private static final TestDatabase DATABASE = PostgreSQLTestContainer.createMigratedDatabase(
-        "identity_link_uniqueness_test"
-    );
+    private static final TestDatabase DATABASE =
+            PostgreSQLTestContainer.createMigratedDatabase("identity_link_uniqueness_test");
 
     @BeforeAll
     static void startAndMigrate() throws Exception {
@@ -52,9 +50,8 @@ class IdentityLinkUniquenessLiquibaseTest {
         // accepts them at real boot. We are proving index behaviour, not XSD conformance.
         System.setProperty("liquibase.validateXmlChangelogFiles", "false");
         try (Connection connection = newConnection()) {
-            Database database = DatabaseFactory.getInstance().findCorrectDatabaseImplementation(
-                new JdbcConnection(connection)
-            );
+            Database database =
+                    DatabaseFactory.getInstance().findCorrectDatabaseImplementation(new JdbcConnection(connection));
             try (Liquibase liquibase = new Liquibase("db/master.xml", new ClassLoaderResourceAccessor(), database)) {
                 liquibase.update(new Contexts());
             }
@@ -69,16 +66,14 @@ class IdentityLinkUniquenessLiquibaseTest {
             long accountB = insertAccount(c, "B");
 
             // First NULL-team login for (provider, subject) inserts cleanly.
-            assertThatCode(() ->
-                insertIdentityLink(c, accountA, provider, "race-subject", null)
-            ).doesNotThrowAnyException();
+            assertThatCode(() -> insertIdentityLink(c, accountA, provider, "race-subject", null))
+                    .doesNotThrowAnyException();
 
             // Second NULL-team login for the SAME (provider, subject) on a DIFFERENT account must be
             // rejected by uq_identity_link_provider_subject_team — under ddl-auto's plain UNIQUE this
             // would WRONGLY succeed (NULL != NULL), duplicating the account. COALESCE(team_id,'') closes it.
-            assertThatThrownBy(() ->
-                insertIdentityLink(c, accountB, provider, "race-subject", null)
-            ).hasMessageContaining(UNIQUE_INDEX);
+            assertThatThrownBy(() -> insertIdentityLink(c, accountB, provider, "race-subject", null))
+                    .hasMessageContaining(UNIQUE_INDEX);
         }
     }
 
@@ -92,9 +87,10 @@ class IdentityLinkUniquenessLiquibaseTest {
             // The same subject string under two different providers are two distinct identities — the
             // provider is part of the key, so this must NOT collide. (Schema-level nOAuth separation.)
             assertThatCode(() -> {
-                insertIdentityLink(c, account, github, "shared-subject", null);
-                insertIdentityLink(c, account, gitlab, "shared-subject", null);
-            }).doesNotThrowAnyException();
+                        insertIdentityLink(c, account, github, "shared-subject", null);
+                        insertIdentityLink(c, account, gitlab, "shared-subject", null);
+                    })
+                    .doesNotThrowAnyException();
         }
     }
 
@@ -108,23 +104,20 @@ class IdentityLinkUniquenessLiquibaseTest {
 
             // Distinct non-null teams partition the key (multi-instance IdP support).
             assertThatCode(() -> {
-                insertIdentityLink(c, a1, provider, "team-subject", "team-alpha");
-                insertIdentityLink(c, a2, provider, "team-subject", "team-beta");
-            }).doesNotThrowAnyException();
+                        insertIdentityLink(c, a1, provider, "team-subject", "team-alpha");
+                        insertIdentityLink(c, a2, provider, "team-subject", "team-beta");
+                    })
+                    .doesNotThrowAnyException();
 
             // Same provider+subject+team repeats the key → rejected, same as the NULL-team case.
-            assertThatThrownBy(() ->
-                insertIdentityLink(c, a3, provider, "team-subject", "team-alpha")
-            ).hasMessageContaining(UNIQUE_INDEX);
+            assertThatThrownBy(() -> insertIdentityLink(c, a3, provider, "team-subject", "team-alpha"))
+                    .hasMessageContaining(UNIQUE_INDEX);
         }
     }
 
     private static long insertGitProvider(Connection c, String type, String serverUrl) throws Exception {
-        try (
-            PreparedStatement ps = c.prepareStatement(
-                "INSERT INTO identity_provider (type, server_url) VALUES (?, ?) RETURNING id"
-            )
-        ) {
+        try (PreparedStatement ps =
+                c.prepareStatement("INSERT INTO identity_provider (type, server_url) VALUES (?, ?) RETURNING id")) {
             ps.setString(1, type);
             ps.setString(2, serverUrl);
             try (ResultSet rs = ps.executeQuery()) {
@@ -145,17 +138,9 @@ class IdentityLinkUniquenessLiquibaseTest {
     }
 
     private static void insertIdentityLink(
-        Connection c,
-        long accountId,
-        long providerId,
-        String subject,
-        @Nullable String teamId
-    ) throws Exception {
-        try (
-            PreparedStatement ps = c.prepareStatement(
-                "INSERT INTO identity_link (account_id, provider_id, subject, team_id) VALUES (?, ?, ?, ?)"
-            )
-        ) {
+            Connection c, long accountId, long providerId, String subject, @Nullable String teamId) throws Exception {
+        try (PreparedStatement ps = c.prepareStatement(
+                "INSERT INTO identity_link (account_id, provider_id, subject, team_id) VALUES (?, ?, ?, ?)")) {
             ps.setLong(1, accountId);
             ps.setLong(2, providerId);
             ps.setString(3, subject);

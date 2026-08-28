@@ -46,78 +46,63 @@ public class SlackChannelAdminController {
     private final SlackChannelDirectoryService directoryService;
 
     public SlackChannelAdminController(
-        SlackChannelConsentService consentService,
-        SlackChannelDirectoryService directoryService
-    ) {
+            SlackChannelConsentService consentService, SlackChannelDirectoryService directoryService) {
         this.consentService = consentService;
         this.directoryService = directoryService;
     }
 
     @GetMapping
     @Operation(
-        operationId = "listSlackChannels",
-        summary = "List the workspace's allow-listed Slack channels with their consent state"
-    )
+            operationId = "listSlackChannels",
+            summary = "List the workspace's allow-listed Slack channels with their consent state")
     public ResponseEntity<List<SlackMonitoredChannelDTO>> listSlackChannels(WorkspaceContext workspace) {
         return ResponseEntity.ok(consentService.listChannels(workspace.id()));
     }
 
     @GetMapping("/candidates")
     @Operation(
-        operationId = "listSlackChannelCandidates",
-        summary = "List Slack channels available to add to monitoring"
-    )
+            operationId = "listSlackChannelCandidates",
+            summary = "List Slack channels available to add to monitoring")
     public ResponseEntity<List<SlackChannelCandidateDTO>> listSlackChannelCandidates(WorkspaceContext workspace) {
         return ResponseEntity.ok(directoryService.listCandidates(workspace.id()));
     }
 
     @PostMapping
     @Operation(
-        operationId = "registerSlackChannel",
-        summary = "Allow-list a Slack channel (lands in PENDING; idempotent on the natural key)"
-    )
+            operationId = "registerSlackChannel",
+            summary = "Allow-list a Slack channel (lands in PENDING; idempotent on the natural key)")
     @AuditExempt(
-        reason = "channel consent state lives on slack_monitored_channel and its history is not recorded anywhere yet"
-    )
+            reason =
+                    "channel consent state lives on slack_monitored_channel and its history is not recorded anywhere yet")
     public ResponseEntity<SlackMonitoredChannelDTO> registerSlackChannel(
-        WorkspaceContext workspace,
-        @Valid @RequestBody RegisterSlackChannelRequestDTO request
-    ) {
-        RegistrationOutcome outcome = consentService.register(
-            workspace.id(),
-            request.slackChannelId(),
-            request.channelName()
-        );
-        return ResponseEntity.status(outcome.created() ? HttpStatus.CREATED : HttpStatus.OK).body(outcome.channel());
+            WorkspaceContext workspace, @Valid @RequestBody RegisterSlackChannelRequestDTO request) {
+        RegistrationOutcome outcome =
+                consentService.register(workspace.id(), request.slackChannelId(), request.channelName());
+        return ResponseEntity.status(outcome.created() ? HttpStatus.CREATED : HttpStatus.OK)
+                .body(outcome.channel());
     }
 
     @PatchMapping("/{slackChannelId}")
     @Operation(
-        operationId = "updateSlackChannelConsent",
-        summary = "Transition a Slack channel to a target consent state (activate / pause / resume / revoke)"
-    )
+            operationId = "updateSlackChannelConsent",
+            summary = "Transition a Slack channel to a target consent state (activate / pause / resume / revoke)")
     @AuditExempt(
-        reason = "channel consent state lives on slack_monitored_channel and its history is not recorded anywhere yet"
-    )
+            reason =
+                    "channel consent state lives on slack_monitored_channel and its history is not recorded anywhere yet")
     public ResponseEntity<SlackMonitoredChannelDTO> updateSlackChannelConsent(
-        WorkspaceContext workspace,
-        @PathVariable String slackChannelId,
-        @Valid @RequestBody UpdateSlackChannelConsentRequestDTO request
-    ) {
+            WorkspaceContext workspace,
+            @PathVariable String slackChannelId,
+            @Valid @RequestBody UpdateSlackChannelConsentRequestDTO request) {
         return ResponseEntity.ok(
-            consentService.transition(workspace.id(), slackChannelId, request.consentState(), request.reason())
-        );
+                consentService.transition(workspace.id(), slackChannelId, request.consentState(), request.reason()));
     }
 
     @GetMapping("/{slackChannelId}/consent-events")
     @Operation(
-        operationId = "listSlackChannelConsentEvents",
-        summary = "The immutable consent-transition audit trail of one Slack channel"
-    )
+            operationId = "listSlackChannelConsentEvents",
+            summary = "The immutable consent-transition audit trail of one Slack channel")
     public ResponseEntity<List<SlackChannelConsentEventDTO>> listSlackChannelConsentEvents(
-        WorkspaceContext workspace,
-        @PathVariable String slackChannelId
-    ) {
+            WorkspaceContext workspace, @PathVariable String slackChannelId) {
         return ResponseEntity.ok(consentService.listConsentEvents(workspace.id(), slackChannelId));
     }
 }

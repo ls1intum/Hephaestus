@@ -29,22 +29,20 @@ public final class DocsSignals {
     public static final SignalName DOCUMENT_ARCHIVED = SignalName.of("docs.document.archived");
 
     private static final Map<String, SignalName> BY_OUTLINE_EVENT = Map.of(
-        "documents.publish",
-        DOCUMENT_PUBLISHED,
-        "documents.update",
-        DOCUMENT_UPDATED,
-        "documents.archive",
-        DOCUMENT_ARCHIVED
-    );
+            "documents.publish",
+            DOCUMENT_PUBLISHED,
+            "documents.update",
+            DOCUMENT_UPDATED,
+            "documents.archive",
+            DOCUMENT_ARCHIVED);
 
     private static final Map<SignalName, RevisionScheme> SCHEMES = Map.of(
-        DOCUMENT_PUBLISHED,
-        RevisionScheme.CONTENT_DIGEST,
-        DOCUMENT_UPDATED,
-        RevisionScheme.CONTENT_DIGEST,
-        DOCUMENT_ARCHIVED,
-        RevisionScheme.TERMINAL_STATE
-    );
+            DOCUMENT_PUBLISHED,
+            RevisionScheme.CONTENT_DIGEST,
+            DOCUMENT_UPDATED,
+            RevisionScheme.CONTENT_DIGEST,
+            DOCUMENT_ARCHIVED,
+            RevisionScheme.TERMINAL_STATE);
 
     private DocsSignals() {}
 
@@ -78,29 +76,25 @@ public final class DocsSignals {
      *                    to key on, in which case no signal is recorded rather than a wrong one
      */
     public static Optional<SignalKey> documentKey(
-        long workspaceId,
-        long documentId,
-        SignalName signal,
-        @Nullable String contentHash,
-        @Nullable String title
-    ) {
+            long workspaceId,
+            long documentId,
+            SignalName signal,
+            @Nullable String contentHash,
+            @Nullable String title) {
         if (!DOCUMENT.equals(signal.artifactKind())) {
             return Optional.empty();
         }
-        return revisionFor(signal, contentHash, title).map(revision ->
-            new SignalKey(workspaceId, documentId, signal, revision)
-        );
+        return revisionFor(signal, contentHash, title)
+                .map(revision -> new SignalKey(workspaceId, documentId, signal, revision));
     }
 
     private static Optional<SignalRevision> revisionFor(
-        SignalName signal,
-        @Nullable String contentHash,
-        @Nullable String title
-    ) {
+            SignalName signal, @Nullable String contentHash, @Nullable String title) {
         return switch (revisionScheme(signal)) {
-            case CONTENT_DIGEST -> contentHash == null || contentHash.isBlank()
-                ? Optional.empty()
-                : Optional.of(SignalRevision.ofContentDigest(title, contentHash));
+            case CONTENT_DIGEST ->
+                contentHash == null || contentHash.isBlank()
+                        ? Optional.empty()
+                        : Optional.of(SignalRevision.ofContentDigest(title, contentHash));
             case TERMINAL_STATE -> Optional.of(SignalRevision.ofTerminalState(lastSegmentOf(signal)));
             // Neither scheme can produce an identity for a document: it has no commits, and no document
             // signal is raised by hand. Inventing a revision would key every occurrence alike.

@@ -40,53 +40,50 @@ import org.jspecify.annotations.Nullable;
  */
 @Schema(description = "An occasion that starts a review, and the evidence that review reads")
 public record PracticeBinding(
-    @NonNull
-    @NotEmpty(message = "A binding must name at least one signal")
-    @Schema(description = "Signals that occasion this review, e.g. scm.pull_request.merged")
-    List<SignalName> signals,
-    @NonNull
-    @NotNull
-    @Valid
-    @Schema(description = "Sources a review occasioned this way reads, each with the stance it takes")
-    List<PracticeEvidenceRequirement> needs,
-    @Schema(description = "Whether an artifact still marked draft occasions this review; omit for false")
-    boolean onDrafts,
-    @Schema(description = "Whose conduct this review judges; omit for AUTHOR") ActorRole subject,
-    @Valid
-    @Schema(description = "What must be in the work for this practice to apply; omit to always apply")
-    @Nullable
-    PracticeSubject appliesWhen
-) {
+        @NonNull
+        @NotEmpty(message = "A binding must name at least one signal")
+        @Schema(description = "Signals that occasion this review, e.g. scm.pull_request.merged")
+        List<SignalName> signals,
+
+        @NonNull
+        @NotNull
+        @Valid
+        @Schema(description = "Sources a review occasioned this way reads, each with the stance it takes")
+        List<PracticeEvidenceRequirement> needs,
+
+        @Schema(description = "Whether an artifact still marked draft occasions this review; omit for false")
+        boolean onDrafts,
+
+        @Schema(description = "Whose conduct this review judges; omit for AUTHOR")
+        ActorRole subject,
+
+        @Valid
+        @Schema(description = "What must be in the work for this practice to apply; omit to always apply")
+        @Nullable
+        PracticeSubject appliesWhen) {
     /** Applies contract defaults for optional binding fields. */
     @JsonCreator
     static PracticeBinding fromJson(
-        @JsonProperty("signals") List<SignalName> signals,
-        @JsonProperty("needs") List<PracticeEvidenceRequirement> needs,
-        @JsonProperty("onDrafts") @Nullable Boolean onDrafts,
-        @JsonProperty("subject") @Nullable ActorRole subject,
-        @JsonProperty("appliesWhen") @Nullable PracticeSubject appliesWhen
-    ) {
+            @JsonProperty("signals") List<SignalName> signals,
+            @JsonProperty("needs") List<PracticeEvidenceRequirement> needs,
+            @JsonProperty("onDrafts") @Nullable Boolean onDrafts,
+            @JsonProperty("subject") @Nullable ActorRole subject,
+            @JsonProperty("appliesWhen") @Nullable PracticeSubject appliesWhen) {
         return new PracticeBinding(
-            signals,
-            needs,
-            Boolean.TRUE.equals(onDrafts),
-            subject == null ? ActorRole.AUTHOR : subject,
-            appliesWhen
-        );
+                signals,
+                needs,
+                Boolean.TRUE.equals(onDrafts),
+                subject == null ? ActorRole.AUTHOR : subject,
+                appliesWhen);
     }
 
     public PracticeBinding {
         subject = subject == null ? ActorRole.AUTHOR : subject;
         // Sorted and de-duplicated: both lists are digested into the review-rule fingerprint, so the
         // same binding written in a different order must not read as a second rule.
-        signals = List.copyOf(
-            new LinkedHashSet<>(
-                Objects.requireNonNull(signals, "signals")
-                    .stream()
-                    .sorted(Comparator.comparing(SignalName::value))
-                    .toList()
-            )
-        );
+        signals = List.copyOf(new LinkedHashSet<>(Objects.requireNonNull(signals, "signals").stream()
+                .sorted(Comparator.comparing(SignalName::value))
+                .toList()));
         if (signals.isEmpty()) {
             throw new IllegalArgumentException("A binding must name at least one signal");
         }
@@ -94,14 +91,12 @@ public record PracticeBinding(
         for (SignalName signal : signals) {
             if (!kind.equals(signal.artifactKind())) {
                 throw new IllegalArgumentException(
-                    "One binding cannot mix artifact kinds: " + kind + " and " + signal.artifactKind()
-                );
+                        "One binding cannot mix artifact kinds: " + kind + " and " + signal.artifactKind());
             }
         }
-        needs = Objects.requireNonNull(needs, "needs")
-            .stream()
-            .sorted(Comparator.comparing(need -> need.sourceKind().value()))
-            .toList();
+        needs = Objects.requireNonNull(needs, "needs").stream()
+                .sorted(Comparator.comparing(need -> need.sourceKind().value()))
+                .toList();
         Set<String> seen = new HashSet<>();
         for (PracticeEvidenceRequirement need : needs) {
             if (!seen.add(need.sourceKind().value())) {
@@ -115,11 +110,7 @@ public record PracticeBinding(
     }
 
     public PracticeBinding(
-        List<SignalName> signals,
-        List<PracticeEvidenceRequirement> needs,
-        boolean onDrafts,
-        ActorRole subject
-    ) {
+            List<SignalName> signals, List<PracticeEvidenceRequirement> needs, boolean onDrafts, ActorRole subject) {
         this(signals, needs, onDrafts, subject, null);
     }
 
@@ -203,16 +194,16 @@ public record PracticeBinding(
      * contributes.
      */
     public static List<PracticeEvidenceRequirement> needsFor(
-        List<PracticeBinding> bindings,
-        @Nullable SignalName signal
-    ) {
+            List<PracticeBinding> bindings, @Nullable SignalName signal) {
         Set<PracticeEvidenceRequirement> union = new LinkedHashSet<>();
         for (PracticeBinding binding : bindings) {
             if (signal == null || binding.matches(signal)) {
                 union.addAll(binding.needs());
             }
         }
-        return union.stream().sorted(Comparator.comparing(need -> need.sourceKind().value())).toList();
+        return union.stream()
+                .sorted(Comparator.comparing(need -> need.sourceKind().value()))
+                .toList();
     }
 
     /** The one artifact kind every binding in the list is about. */
@@ -223,9 +214,8 @@ public record PracticeBinding(
         ArtifactKind kind = bindings.getFirst().artifactKind();
         for (PracticeBinding binding : bindings) {
             if (!kind.equals(binding.artifactKind())) {
-                throw new IllegalArgumentException(
-                    "A practice reviews one kind of artifact; bindings name " + kind + " and " + binding.artifactKind()
-                );
+                throw new IllegalArgumentException("A practice reviews one kind of artifact; bindings name " + kind
+                        + " and " + binding.artifactKind());
             }
         }
         return kind;
@@ -233,10 +223,9 @@ public record PracticeBinding(
 
     /** Every signal named by any binding, in order. */
     public static List<SignalName> signalsOf(List<PracticeBinding> bindings) {
-        return bindings
-            .stream()
-            .flatMap(binding -> binding.signals().stream())
-            .distinct()
-            .toList();
+        return bindings.stream()
+                .flatMap(binding -> binding.signals().stream())
+                .distinct()
+                .toList();
     }
 }

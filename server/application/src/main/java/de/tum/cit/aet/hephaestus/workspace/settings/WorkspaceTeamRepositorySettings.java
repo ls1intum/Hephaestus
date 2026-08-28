@@ -63,10 +63,9 @@ public class WorkspaceTeamRepositorySettings {
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("workspaceId")
     @JoinColumn(
-        name = "workspace_id",
-        nullable = false,
-        foreignKey = @ForeignKey(name = "fk_workspace_team_repo_settings_workspace")
-    )
+            name = "workspace_id",
+            nullable = false,
+            foreignKey = @ForeignKey(name = "fk_workspace_team_repo_settings_workspace"))
     @ToString.Exclude
     private Workspace workspace;
 
@@ -74,10 +73,9 @@ public class WorkspaceTeamRepositorySettings {
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("teamId")
     @JoinColumn(
-        name = "team_id",
-        nullable = false,
-        foreignKey = @ForeignKey(name = "fk_workspace_team_repo_settings_team")
-    )
+            name = "team_id",
+            nullable = false,
+            foreignKey = @ForeignKey(name = "fk_workspace_team_repo_settings_team"))
     @ToString.Exclude
     private Team team;
 
@@ -85,10 +83,9 @@ public class WorkspaceTeamRepositorySettings {
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("repositoryId")
     @JoinColumn(
-        name = "repository_id",
-        nullable = false,
-        foreignKey = @ForeignKey(name = "fk_workspace_team_repo_settings_repository")
-    )
+            name = "repository_id",
+            nullable = false,
+            foreignKey = @ForeignKey(name = "fk_workspace_team_repo_settings_repository"))
     @ToString.Exclude
     private Repository repository;
 

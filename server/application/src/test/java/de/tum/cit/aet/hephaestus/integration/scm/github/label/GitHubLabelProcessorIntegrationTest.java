@@ -78,10 +78,9 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
     private void setupTestData() {
         // Create GitHub provider
         gitProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
 
         // Create organization
         Organization org = new Organization();
@@ -135,14 +134,7 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldCreateNewLabelAndPublishEvent() {
             Long labelId = 111222333L;
             GitHubLabelDTO dto = new GitHubLabelDTO(
-                labelId,
-                "LA_node123",
-                "new-feature",
-                "A new feature label",
-                "00ff00",
-                null,
-                null
-            );
+                    labelId, "LA_node123", "new-feature", "A new feature label", "00ff00", null, null);
 
             Label result = processor.process(dto, testRepository, createContext());
 
@@ -155,18 +147,19 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(result.getRepository().getId()).isEqualTo(testRepository.getId());
 
             // Verify persisted
-            assertThat(labelRepository.findByNativeIdAndProviderId(labelId, gitProviderId())).isPresent();
+            assertThat(labelRepository.findByNativeIdAndProviderId(labelId, gitProviderId()))
+                    .isPresent();
 
             // Verify LabelCreated event published
             assertThat(eventListener.ofType(ScmDomainEvent.LabelCreated.class))
-                .hasSize(1)
-                .first()
-                .satisfies(event -> {
-                    assertThat(event.label().id()).isEqualTo(result.getId());
-                    assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
-                    assertNotNull(event.context().repository());
-                    assertThat(event.context().repository().id()).isEqualTo(testRepository.getId());
-                });
+                    .hasSize(1)
+                    .first()
+                    .satisfies(event -> {
+                        assertThat(event.label().id()).isEqualTo(result.getId());
+                        assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
+                        assertNotNull(event.context().repository());
+                        assertThat(event.context().repository().id()).isEqualTo(testRepository.getId());
+                    });
             assertThat(eventListener.ofType(ScmDomainEvent.LabelUpdated.class)).isEmpty();
         }
 
@@ -186,14 +179,7 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
             eventListener.clear();
 
             GitHubLabelDTO dto = new GitHubLabelDTO(
-                labelId,
-                "LA_node456",
-                "updated-name",
-                "Updated description",
-                "ff0000",
-                null,
-                null
-            );
+                    labelId, "LA_node456", "updated-name", "Updated description", "ff0000", null, null);
 
             Label result = processor.process(dto, testRepository, createContext());
             assertNotNull(result);
@@ -205,11 +191,11 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
 
             // Verify LabelUpdated event published
             assertThat(eventListener.ofType(ScmDomainEvent.LabelUpdated.class))
-                .hasSize(1)
-                .first()
-                .satisfies(event -> {
-                    assertThat(event.label().name()).isEqualTo("updated-name");
-                });
+                    .hasSize(1)
+                    .first()
+                    .satisfies(event -> {
+                        assertThat(event.label().name()).isEqualTo("updated-name");
+                    });
             assertThat(eventListener.ofType(ScmDomainEvent.LabelCreated.class)).isEmpty();
         }
 
@@ -226,14 +212,13 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldCreateLabelWithGeneratedIdWhenDtoHasNullId() {
             // Given - DTO without ID (like GraphQL sync)
             GitHubLabelDTO dto = new GitHubLabelDTO(
-                null, // null ID - simulates GraphQL response
-                "LA_node",
-                "graphql-synced-label",
-                "desc",
-                "000000",
-                null,
-                null
-            );
+                    null, // null ID - simulates GraphQL response
+                    "LA_node",
+                    "graphql-synced-label",
+                    "desc",
+                    "000000",
+                    null,
+                    null);
 
             Label result = processor.process(dto, testRepository, createContext());
 
@@ -260,14 +245,13 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
 
             // DTO without ID (like GraphQL sync) but matching name
             GitHubLabelDTO dto = new GitHubLabelDTO(
-                null, // null ID
-                "LA_node",
-                "existing-label", // same name
-                "new description",
-                "222222",
-                null,
-                null
-            );
+                    null, // null ID
+                    "LA_node",
+                    "existing-label", // same name
+                    "new description",
+                    "222222",
+                    null,
+                    null);
 
             Label result = processor.process(dto, testRepository, createContext());
 
@@ -283,37 +267,31 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
         void shouldHandleLabelWithNullDescription() {
             Long labelId = 777888999L;
             GitHubLabelDTO dto = new GitHubLabelDTO(
-                labelId,
-                "LA_node789",
-                "no-desc-label",
-                null, // null description
-                "abcdef",
-                null,
-                null
-            );
+                    labelId,
+                    "LA_node789",
+                    "no-desc-label",
+                    null, // null description
+                    "abcdef",
+                    null,
+                    null);
 
             Label result = processor.process(dto, testRepository, createContext());
             assertNotNull(result);
 
             assertThat(result.getDescription()).isNull();
-            assertThat(
-                labelRepository.findByNativeIdAndProviderId(labelId, gitProviderId()).get().getDescription()
-            ).isNull();
+            assertThat(labelRepository
+                            .findByNativeIdAndProviderId(labelId, gitProviderId())
+                            .get()
+                            .getDescription())
+                    .isNull();
         }
 
         @Test
         @DisplayName("Should be idempotent - processing same DTO twice")
         void shouldBeIdempotent() {
             Long labelId = 123123123L;
-            GitHubLabelDTO dto = new GitHubLabelDTO(
-                labelId,
-                "LA_idem",
-                "idempotent-label",
-                "Same every time",
-                "112233",
-                null,
-                null
-            );
+            GitHubLabelDTO dto =
+                    new GitHubLabelDTO(labelId, "LA_idem", "idempotent-label", "Same every time", "112233", null, null);
 
             // When - process twice
             processor.process(dto, testRepository, createContext());
@@ -344,35 +322,39 @@ class GitHubLabelProcessorIntegrationTest extends BaseIntegrationTest {
             label.setRepository(testRepository);
             label = labelRepository.save(label);
 
-            assertThat(labelRepository.findByNativeIdAndProviderId(labelId, gitProviderId())).isPresent();
+            assertThat(labelRepository.findByNativeIdAndProviderId(labelId, gitProviderId()))
+                    .isPresent();
             Long savedLabelId = label.getId();
 
             processor.delete(savedLabelId, createContext());
 
             // Then - label deleted
-            assertThat(labelRepository.findByNativeIdAndProviderId(labelId, gitProviderId())).isEmpty();
+            assertThat(labelRepository.findByNativeIdAndProviderId(labelId, gitProviderId()))
+                    .isEmpty();
 
             // Verify event published
             assertThat(eventListener.ofType(ScmDomainEvent.LabelDeleted.class))
-                .hasSize(1)
-                .first()
-                .satisfies(event -> {
-                    assertThat(event.labelId()).isEqualTo(savedLabelId);
-                    assertThat(event.labelName()).isEqualTo("to-delete");
-                    assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
-                    assertNotNull(event.context().repository());
-                    assertThat(event.context().repository().id()).isEqualTo(testRepository.getId());
-                });
+                    .hasSize(1)
+                    .first()
+                    .satisfies(event -> {
+                        assertThat(event.labelId()).isEqualTo(savedLabelId);
+                        assertThat(event.labelName()).isEqualTo("to-delete");
+                        assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
+                        assertNotNull(event.context().repository());
+                        assertThat(event.context().repository().id()).isEqualTo(testRepository.getId());
+                    });
         }
 
         @Test
         void shouldHandleDeletionOfNonExistentLabel() {
             // Given - label doesn't exist
             Long nonExistentId = 999999999L;
-            assertThat(labelRepository.findByNativeIdAndProviderId(nonExistentId, gitProviderId())).isEmpty();
+            assertThat(labelRepository.findByNativeIdAndProviderId(nonExistentId, gitProviderId()))
+                    .isEmpty();
 
             // When/Then - should not throw
-            assertThatCode(() -> processor.delete(nonExistentId, createContext())).doesNotThrowAnyException();
+            assertThatCode(() -> processor.delete(nonExistentId, createContext()))
+                    .doesNotThrowAnyException();
 
             // No event published
             assertThat(eventListener.ofType(ScmDomainEvent.LabelDeleted.class)).isEmpty();

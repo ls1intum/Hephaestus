@@ -21,9 +21,8 @@ class AgentControllerAdviceTest extends BaseUnitTest {
 
     @Test
     void jobStateConflictUsesSurfaceNeutralProblemDetail() {
-        var problem = advice.handleAgentJobStateConflict(
-            new AgentJobStateConflictException("Job is already COMPLETED")
-        );
+        var problem =
+                advice.handleAgentJobStateConflict(new AgentJobStateConflictException("Job is already COMPLETED"));
 
         assertThat(problem.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
         assertThat(problem.getTitle()).isEqualTo("Agent job state conflict");
@@ -45,24 +44,22 @@ class AgentControllerAdviceTest extends BaseUnitTest {
     @Test
     void everyConflictCarriesItsOwnStableTypeUri() {
         List<ProblemDetail> problems = List.of(
-            advice.handleAgentJobStateConflict(new AgentJobStateConflictException("x")),
-            advice.handleConnectionInUse(new LlmConnectionInUseException(1L)),
-            advice.handleModelInUse(new LlmModelInUseException(1L)),
-            advice.handleConnectionSlugConflict(new LlmConnectionSlugConflictException("slug")),
-            advice.handleModelSlugConflict(new LlmModelSlugConflictException(1L, "slug")),
-            advice.handleModelUpstreamIdConflict(new LlmModelUpstreamIdConflictException(1L, "gpt-x"))
-        );
+                advice.handleAgentJobStateConflict(new AgentJobStateConflictException("x")),
+                advice.handleConnectionInUse(new LlmConnectionInUseException(1L)),
+                advice.handleModelInUse(new LlmModelInUseException(1L)),
+                advice.handleConnectionSlugConflict(new LlmConnectionSlugConflictException("slug")),
+                advice.handleModelSlugConflict(new LlmModelSlugConflictException(1L, "slug")),
+                advice.handleModelUpstreamIdConflict(new LlmModelUpstreamIdConflictException(1L, "gpt-x")));
 
         assertThat(problems)
-            .allSatisfy(problem -> assertThat(problem.getStatus()).isEqualTo(HttpStatus.CONFLICT.value()))
-            .extracting(ProblemDetail::getType)
-            .containsExactly(
-                URI.create("/problems/agent-job-state-conflict"),
-                URI.create("/problems/llm-connection-in-use"),
-                URI.create("/problems/llm-model-in-use"),
-                URI.create("/problems/llm-connection-slug-conflict"),
-                URI.create("/problems/llm-model-slug-conflict"),
-                URI.create("/problems/llm-model-upstream-id-conflict")
-            );
+                .allSatisfy(problem -> assertThat(problem.getStatus()).isEqualTo(HttpStatus.CONFLICT.value()))
+                .extracting(ProblemDetail::getType)
+                .containsExactly(
+                        URI.create("/problems/agent-job-state-conflict"),
+                        URI.create("/problems/llm-connection-in-use"),
+                        URI.create("/problems/llm-model-in-use"),
+                        URI.create("/problems/llm-connection-slug-conflict"),
+                        URI.create("/problems/llm-model-slug-conflict"),
+                        URI.create("/problems/llm-model-upstream-id-conflict"));
     }
 }

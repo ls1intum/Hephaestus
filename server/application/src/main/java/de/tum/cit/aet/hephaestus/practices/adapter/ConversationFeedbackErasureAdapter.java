@@ -26,10 +26,9 @@ public class ConversationFeedbackErasureAdapter implements ConversationFeedbackE
     private final ObservationRepository observationRepository;
 
     public ConversationFeedbackErasureAdapter(
-        DeliveryPolicyEvaluationRepository evaluationRepository,
-        FeedbackRepository feedbackRepository,
-        ObservationRepository observationRepository
-    ) {
+            DeliveryPolicyEvaluationRepository evaluationRepository,
+            FeedbackRepository feedbackRepository,
+            ObservationRepository observationRepository) {
         this.evaluationRepository = evaluationRepository;
         this.feedbackRepository = feedbackRepository;
         this.observationRepository = observationRepository;
@@ -43,18 +42,15 @@ public class ConversationFeedbackErasureAdapter implements ConversationFeedbackE
         }
         evaluationRepository.deleteConversationEvaluationsForThreads(workspaceId, slackThreadIds);
         int feedbackDeleted = feedbackRepository.deleteConversationThreadFeedback(workspaceId, slackThreadIds);
-        int observationsDeleted = observationRepository.deleteConversationThreadObservations(
-            workspaceId,
-            slackThreadIds
-        );
+        int observationsDeleted =
+                observationRepository.deleteConversationThreadObservations(workspaceId, slackThreadIds);
         if (feedbackDeleted > 0 || observationsDeleted > 0) {
             log.info(
-                "Erased conversation-derived practice rows: workspaceId={}, threads={}, feedback={}, observations={}",
-                workspaceId,
-                slackThreadIds.size(),
-                feedbackDeleted,
-                observationsDeleted
-            );
+                    "Erased conversation-derived practice rows: workspaceId={}, threads={}, feedback={}, observations={}",
+                    workspaceId,
+                    slackThreadIds.size(),
+                    feedbackDeleted,
+                    observationsDeleted);
         }
         return feedbackDeleted + observationsDeleted;
     }
@@ -67,11 +63,10 @@ public class ConversationFeedbackErasureAdapter implements ConversationFeedbackE
         int observationsDeleted = observationRepository.deleteAllConversationThreadObservations(workspaceId);
         if (feedbackDeleted > 0 || observationsDeleted > 0) {
             log.info(
-                "Erased all conversation-derived practice rows for workspace: workspaceId={}, feedback={}, observations={}",
-                workspaceId,
-                feedbackDeleted,
-                observationsDeleted
-            );
+                    "Erased all conversation-derived practice rows for workspace: workspaceId={}, feedback={}, observations={}",
+                    workspaceId,
+                    feedbackDeleted,
+                    observationsDeleted);
         }
         return feedbackDeleted + observationsDeleted;
     }
@@ -81,18 +76,15 @@ public class ConversationFeedbackErasureAdapter implements ConversationFeedbackE
     public int eraseConversationFeedbackAboutUser(long workspaceId, long aboutUserId) {
         evaluationRepository.deleteConversationEvaluationsAboutUser(workspaceId, aboutUserId);
         int feedbackDeleted = feedbackRepository.deleteConversationThreadFeedbackAboutUser(workspaceId, aboutUserId);
-        int observationsDeleted = observationRepository.deleteConversationThreadObservationsAboutUser(
-            workspaceId,
-            aboutUserId
-        );
+        int observationsDeleted =
+                observationRepository.deleteConversationThreadObservationsAboutUser(workspaceId, aboutUserId);
         if (feedbackDeleted > 0 || observationsDeleted > 0) {
             log.info(
-                "Erased conversation-derived practice rows about user: workspaceId={}, aboutUserId={}, feedback={}, observations={}",
-                workspaceId,
-                aboutUserId,
-                feedbackDeleted,
-                observationsDeleted
-            );
+                    "Erased conversation-derived practice rows about user: workspaceId={}, aboutUserId={}, feedback={}, observations={}",
+                    workspaceId,
+                    aboutUserId,
+                    feedbackDeleted,
+                    observationsDeleted);
         }
         return feedbackDeleted + observationsDeleted;
     }

@@ -13,10 +13,13 @@ import org.jspecify.annotations.Nullable;
  */
 @Schema(description = "The complete response to delivered feedback")
 public record FeedbackResponseRequestDTO(
-    @Nullable @Schema(description = "How useful the feedback was") FeedbackUsefulness usefulness,
-    @Nullable @Schema(description = "What the recipient decided to do with the feedback") FeedbackResolution resolution,
-    @Nullable
-    @Size(max = 2000)
-    @Schema(description = "Optional explanation; required when resolution is DISPUTED.", maxLength = 2000)
-    String comment
-) {}
+        @Nullable @Schema(description = "How useful the feedback was")
+        FeedbackUsefulness usefulness,
+
+        @Nullable @Schema(description = "What the recipient decided to do with the feedback")
+        FeedbackResolution resolution,
+
+        @Nullable
+        @Size(max = 2000)
+        @Schema(description = "Optional explanation; required when resolution is DISPUTED.", maxLength = 2000)
+        String comment) {}

@@ -46,19 +46,18 @@ public class InteractiveSandboxRegistry {
     private volatile boolean shuttingDown = false;
 
     public InteractiveSandboxRegistry(
-        InteractiveSandboxProperties properties,
-        SandboxContainerManager containerManager,
-        InteractiveSandboxMetrics metrics,
-        StdinWriteWatchdog watchdog,
-        MeterRegistry meterRegistry
-    ) {
+            InteractiveSandboxProperties properties,
+            SandboxContainerManager containerManager,
+            InteractiveSandboxMetrics metrics,
+            StdinWriteWatchdog watchdog,
+            MeterRegistry meterRegistry) {
         this.properties = properties;
         this.containerManager = containerManager;
         this.metrics = metrics;
         this.watchdog = watchdog;
         Gauge.builder("mentor.session.active", sessions, ConcurrentHashMap::size)
-            .description("Currently attached mentor sandbox sessions on this replica")
-            .register(meterRegistry);
+                .description("Currently attached mentor sandbox sessions on this replica")
+                .register(meterRegistry);
         meterRegistry.gauge("mentor.watchdog.targets", Tags.empty(), watchdog, StdinWriteWatchdog::activeTargets);
     }
 
@@ -158,10 +157,9 @@ public class InteractiveSandboxRegistry {
             }
             if (sandbox.idleFor().compareTo(ttl) > 0) {
                 log.info(
-                    "Reaping idle sandbox: sessionId={}, idleFor={}s",
-                    sandbox.identity().sessionId(),
-                    sandbox.idleFor().toSeconds()
-                );
+                        "Reaping idle sandbox: sessionId={}, idleFor={}s",
+                        sandbox.identity().sessionId(),
+                        sandbox.idleFor().toSeconds());
                 // Fire and forget: the reaper shares Spring's single-thread scheduler with the
                 // watchdog, so blocking here would stall it.
                 sandbox.terminate(EvictionReason.IDLE);
@@ -204,18 +202,15 @@ public class InteractiveSandboxRegistry {
         log.info("Closing {} mentor sandbox(es) for shutdown", count);
         Duration grace = Duration.ofSeconds(properties.graceTimeoutSeconds());
         List<DockerAttachedSandboxAdapter> snapshot = new ArrayList<>(sessions.values());
-        CompletableFuture<?>[] futures = snapshot
-            .stream()
-            .map(sandbox ->
-                CompletableFuture.runAsync(() -> {
+        CompletableFuture<?>[] futures = snapshot.stream()
+                .map(sandbox -> CompletableFuture.runAsync(() -> {
                     try {
                         sandbox.close(grace);
                     } catch (Exception e) {
                         log.warn("Error closing sandbox during shutdown: {}", e.getMessage());
                     }
-                })
-            )
-            .toArray(CompletableFuture[]::new);
+                }))
+                .toArray(CompletableFuture[]::new);
         long deadlineSeconds = grace.toSeconds() + 5;
         try {
             CompletableFuture.allOf(futures).get(deadlineSeconds, TimeUnit.SECONDS);

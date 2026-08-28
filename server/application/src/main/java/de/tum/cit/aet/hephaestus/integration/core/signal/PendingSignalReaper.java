@@ -40,10 +40,9 @@ public class PendingSignalReaper {
     private final Map<ArtifactKind, PendingSignalResubmitter> resubmitters;
 
     public PendingSignalReaper(
-        ArtifactSignalRepository repository,
-        SignalLedgerProperties properties,
-        List<PendingSignalResubmitter> resubmitterList
-    ) {
+            ArtifactSignalRepository repository,
+            SignalLedgerProperties properties,
+            List<PendingSignalResubmitter> resubmitterList) {
         this.repository = repository;
         this.properties = properties;
         Map<ArtifactKind, PendingSignalResubmitter> byKind = new HashMap<>();
@@ -69,9 +68,7 @@ public class PendingSignalReaper {
         }
 
         List<ArtifactSignal> due = repository.findRetryablePending(
-            now.minus(properties.pendingRetryAfter()),
-            PageRequest.ofSize(properties.sweepBatchSize())
-        );
+                now.minus(properties.pendingRetryAfter()), PageRequest.ofSize(properties.sweepBatchSize()));
         if (due.isEmpty()) {
             return;
         }
@@ -90,13 +87,12 @@ public class PendingSignalReaper {
                 resubmitter.resubmit(signal);
             } catch (RuntimeException e) {
                 log.warn(
-                    "Failed to re-offer pending signal: signalId={}, signal={}, artifactId={}, kind={}",
-                    signal.getId(),
-                    signal.getSignalName(),
-                    signal.getArtifactId(),
-                    signal.getArtifactKind(),
-                    e
-                );
+                        "Failed to re-offer pending signal: signalId={}, signal={}, artifactId={}, kind={}",
+                        signal.getId(),
+                        signal.getSignalName(),
+                        signal.getArtifactId(),
+                        signal.getArtifactKind(),
+                        e);
             }
         }
     }

@@ -55,10 +55,8 @@ public class CommitAuthorResolver {
      *   <li>{@code 12345+username@users.noreply.github.com} (ID-prefixed)</li>
      * </ul>
      */
-    private static final Pattern GITHUB_NOREPLY_PATTERN = Pattern.compile(
-        "^(?:\\d+\\+)?([^@]+)@users\\.noreply\\.github\\.com$",
-        Pattern.CASE_INSENSITIVE
-    );
+    private static final Pattern GITHUB_NOREPLY_PATTERN =
+            Pattern.compile("^(?:\\d+\\+)?([^@]+)@users\\.noreply\\.github\\.com$", Pattern.CASE_INSENSITIVE);
 
     /**
      * Matches email local-parts that look like a single login (no dot, no plus).
@@ -72,10 +70,8 @@ public class CommitAuthorResolver {
      * {@code group_{id}_bot_{hash}@noreply.<host>} or
      * {@code project_{id}_bot_{hash}@noreply.<host>}. These cannot be resolved to a user.
      */
-    private static final Pattern GITLAB_BOT_NOREPLY_PATTERN = Pattern.compile(
-        "^(?:group|project)_\\d+_bot[_a-z0-9-]*@noreply\\..+$",
-        Pattern.CASE_INSENSITIVE
-    );
+    private static final Pattern GITLAB_BOT_NOREPLY_PATTERN =
+            Pattern.compile("^(?:group|project)_\\d+_bot[_a-z0-9-]*@noreply\\..+$", Pattern.CASE_INSENSITIVE);
 
     /**
      * Matches dotted local-parts consisting of two or more tokens separated by dots,
@@ -83,9 +79,8 @@ public class CommitAuthorResolver {
      * {@code firstname.lastname@tum.de} / {@code first.middle.last@example.com} style
      * institutional addresses while filtering out {@code 42.spam@domain} style noise.
      */
-    private static final Pattern FIRSTNAME_LASTNAME_LOCAL_PART = Pattern.compile(
-        "^[A-Za-z][A-Za-z-]*(?:\\.[A-Za-z][A-Za-z-]*)+$"
-    );
+    private static final Pattern FIRSTNAME_LASTNAME_LOCAL_PART =
+            Pattern.compile("^[A-Za-z][A-Za-z-]*(?:\\.[A-Za-z][A-Za-z-]*)+$");
 
     private static final Logger log = LoggerFactory.getLogger(CommitAuthorResolver.class);
 
@@ -108,7 +103,10 @@ public class CommitAuthorResolver {
         // Strategy 1: direct email match (provider-scoped if available)
         Long id;
         if (providerId != null) {
-            id = userRepository.findByEmailAndProviderId(email, providerId).map(User::getId).orElse(null);
+            id = userRepository
+                    .findByEmailAndProviderId(email, providerId)
+                    .map(User::getId)
+                    .orElse(null);
         } else {
             id = userRepository.findByEmail(email).map(User::getId).orElse(null);
         }
@@ -120,7 +118,10 @@ public class CommitAuthorResolver {
         String login = extractLoginFromNoreply(email);
         if (login != null) {
             if (providerId != null) {
-                return userRepository.findByLoginAndProviderId(login, providerId).map(User::getId).orElse(null);
+                return userRepository
+                        .findByLoginAndProviderId(login, providerId)
+                        .map(User::getId)
+                        .orElse(null);
             }
             return userRepository.findByLogin(login).map(User::getId).orElse(null);
         }
@@ -137,14 +138,17 @@ public class CommitAuthorResolver {
             if (LOGIN_LIKE_LOCAL_PART.matcher(localPart).matches()) {
                 if (providerId != null) {
                     Long resolved = userRepository
-                        .findByLoginAndProviderId(localPart, providerId)
-                        .map(User::getId)
-                        .orElse(null);
+                            .findByLoginAndProviderId(localPart, providerId)
+                            .map(User::getId)
+                            .orElse(null);
                     if (resolved != null) {
                         return resolved;
                     }
                 } else {
-                    Long resolved = userRepository.findByLogin(localPart).map(User::getId).orElse(null);
+                    Long resolved = userRepository
+                            .findByLogin(localPart)
+                            .map(User::getId)
+                            .orElse(null);
                     if (resolved != null) {
                         return resolved;
                     }
@@ -157,8 +161,7 @@ public class CommitAuthorResolver {
             if (FIRSTNAME_LASTNAME_LOCAL_PART.matcher(localPart).matches()) {
                 String displayName = dottedLocalPartToDisplayName(localPart);
                 if (displayName != null) {
-                    List<User> candidates =
-                        providerId != null
+                    List<User> candidates = providerId != null
                             ? userRepository.findAllByNameAndProviderId(displayName, providerId)
                             : userRepository.findAllByName(displayName);
                     if (candidates.size() == 1) {
@@ -166,10 +169,9 @@ public class CommitAuthorResolver {
                     }
                     if (candidates.size() > 1) {
                         log.debug(
-                            "Skipped display-name match: ambiguous candidates for email={}, candidates={}",
-                            email,
-                            candidates.size()
-                        );
+                                "Skipped display-name match: ambiguous candidates for email={}, candidates={}",
+                                email,
+                                candidates.size());
                     }
                 }
             }
@@ -247,10 +249,8 @@ public class CommitAuthorResolver {
         // Only backfill when local-part is a login-shape (strategy 3 territory)
         // or firstname.lastname (strategy 4 territory). Anything else is too
         // noisy (marketing list addresses, shared mailboxes, etc.).
-        return (
-            LOGIN_LIKE_LOCAL_PART.matcher(localPart).matches() ||
-            FIRSTNAME_LASTNAME_LOCAL_PART.matcher(localPart).matches()
-        );
+        return (LOGIN_LIKE_LOCAL_PART.matcher(localPart).matches()
+                || FIRSTNAME_LASTNAME_LOCAL_PART.matcher(localPart).matches());
     }
 
     /**
@@ -302,7 +302,10 @@ public class CommitAuthorResolver {
             return null;
         }
         if (providerId != null) {
-            return userRepository.findByLoginAndProviderId(login, providerId).map(User::getId).orElse(null);
+            return userRepository
+                    .findByLoginAndProviderId(login, providerId)
+                    .map(User::getId)
+                    .orElse(null);
         }
         return userRepository.findByLogin(login).map(User::getId).orElse(null);
     }

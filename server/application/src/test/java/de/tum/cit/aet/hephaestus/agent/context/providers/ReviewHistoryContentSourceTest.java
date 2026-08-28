@@ -68,11 +68,8 @@ class ReviewHistoryContentSourceTest {
     private static final int DELIVERED_ARTIFACT_NUMBER = 23;
     private static final long UNNAMEABLE_ARTIFACT_ROW_ID = 909L;
 
-    private static final Set<Long> ROW_IDS = Set.of(
-        OBSERVED_ARTIFACT_ROW_ID,
-        DELIVERED_ARTIFACT_ROW_ID,
-        UNNAMEABLE_ARTIFACT_ROW_ID
-    );
+    private static final Set<Long> ROW_IDS =
+            Set.of(OBSERVED_ARTIFACT_ROW_ID, DELIVERED_ARTIFACT_ROW_ID, UNNAMEABLE_ARTIFACT_ROW_ID);
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private ObservationRepository observationRepository;
@@ -90,34 +87,31 @@ class ReviewHistoryContentSourceTest {
         pullRequestRepository = mock(PullRequestRepository.class);
         issueRepository = mock(IssueRepository.class);
         provider = new ReviewHistoryContentSource(
-            observationRepository,
-            feedbackRepository,
-            visibilityPolicy,
-            pullRequestRepository,
-            issueRepository,
-            new StagedArtifactNames(ReviewHistoryContentSourceTest::identitiesOf),
-            objectMapper
-        );
-        when(
-            observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), anyBoolean(), any())
-        ).thenReturn(List.of());
-        when(feedbackRepository.findRecentDeliveredForRecipient(any(), any(), any(), any())).thenReturn(List.of());
+                observationRepository,
+                feedbackRepository,
+                visibilityPolicy,
+                pullRequestRepository,
+                issueRepository,
+                new StagedArtifactNames(ReviewHistoryContentSourceTest::identitiesOf),
+                objectMapper);
+        when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), anyBoolean(), any()))
+                .thenReturn(List.of());
+        when(feedbackRepository.findRecentDeliveredForRecipient(any(), any(), any(), any()))
+                .thenReturn(List.of());
         when(feedbackRepository.findPreparedForRecipient(any(), any(), any())).thenReturn(List.of());
         when(visibilityPolicy.permitsAll(anyLong(), any(), any())).thenAnswer(invocation -> {
             Collection<Observation> batch = invocation.getArgument(1);
             return batch.stream().map(Observation::getId).collect(Collectors.toSet());
         });
-        when(pullRequestRepository.findByIdWithAuthorAndRepository(eq(PR_ID))).thenReturn(
-            Optional.of(pullRequestBy(AUTHOR_ID))
-        );
+        when(pullRequestRepository.findByIdWithAuthorAndRepository(eq(PR_ID)))
+                .thenReturn(Optional.of(pullRequestBy(AUTHOR_ID)));
     }
 
     @Test
     void answersForBothHistoryKindsWithoutAnyPracticeDeclaringThem() {
-        assertThat(provider.sourceKinds()).containsExactlyInAnyOrder(
-            ReviewHistoryContentSource.OBSERVATION_HISTORY,
-            ReviewHistoryContentSource.FEEDBACK_HISTORY
-        );
+        assertThat(provider.sourceKinds())
+                .containsExactlyInAnyOrder(
+                        ReviewHistoryContentSource.OBSERVATION_HISTORY, ReviewHistoryContentSource.FEEDBACK_HISTORY);
     }
 
     @Nested
@@ -126,10 +120,8 @@ class ReviewHistoryContentSourceTest {
         @Test
         void observationHistoryAloneAnswersForObservationHistoryOnly() {
             var captured = provider.capture(prRequest(), Set.of(ReviewHistoryContentSource.OBSERVATION_HISTORY));
-            assertThat(captured.files()).containsOnlyKeys(
-                "inputs/history/observations.json",
-                "inputs/history/delta.json"
-            );
+            assertThat(captured.files())
+                    .containsOnlyKeys("inputs/history/observations.json", "inputs/history/delta.json");
             assertThat(captured.completeness()).containsOnlyKeys(ReviewHistoryContentSource.OBSERVATION_HISTORY);
             assertThat(captured.contentStates()).containsOnlyKeys(ReviewHistoryContentSource.OBSERVATION_HISTORY);
         }
@@ -138,10 +130,8 @@ class ReviewHistoryContentSourceTest {
         void feedbackHistoryAloneAnswersForFeedbackHistoryOnly() {
             var captured = provider.capture(prRequest(), Set.of(ReviewHistoryContentSource.FEEDBACK_HISTORY));
 
-            assertThat(captured.files()).containsOnlyKeys(
-                "inputs/history/feedback.json",
-                "inputs/history/prepared.json"
-            );
+            assertThat(captured.files())
+                    .containsOnlyKeys("inputs/history/feedback.json", "inputs/history/prepared.json");
             assertThat(captured.completeness()).containsOnlyKeys(ReviewHistoryContentSource.FEEDBACK_HISTORY);
             assertThat(captured.contentStates()).containsOnlyKeys(ReviewHistoryContentSource.FEEDBACK_HISTORY);
         }
@@ -164,73 +154,62 @@ class ReviewHistoryContentSourceTest {
         JsonNode feedback = read(feedbackCapture.files().get("inputs/history/feedback.json"));
         assertThat(observations.get("observations")).isEmpty();
         assertThat(feedback.get("feedback")).isEmpty();
-        assertThat(observationsCapture.contentStates()).containsEntry(
-            ReviewHistoryContentSource.OBSERVATION_HISTORY,
-            SourceContentState.EMPTY
-        );
-        assertThat(feedbackCapture.contentStates()).containsEntry(
-            ReviewHistoryContentSource.FEEDBACK_HISTORY,
-            SourceContentState.EMPTY
-        );
+        assertThat(observationsCapture.contentStates())
+                .containsEntry(ReviewHistoryContentSource.OBSERVATION_HISTORY, SourceContentState.EMPTY);
+        assertThat(feedbackCapture.contentStates())
+                .containsEntry(ReviewHistoryContentSource.FEEDBACK_HISTORY, SourceContentState.EMPTY);
     }
 
     @Test
     void stagesEarlierObservationsWithTheRecurrenceKeyThatLinksThem() {
-        when(
-            observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), anyBoolean(), any())
-        ).thenReturn(List.of(observation("swallows-errors", "rec-1", "Caught and ignored")));
+        when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), anyBoolean(), any()))
+                .thenReturn(List.of(observation("swallows-errors", "rec-1", "Caught and ignored")));
 
         var captured = captureObservationHistory();
 
-        JsonNode entry = read(captured.files().get("inputs/history/observations.json")).get("observations").get(0);
+        JsonNode entry = read(captured.files().get("inputs/history/observations.json"))
+                .get("observations")
+                .get(0);
         assertThat(entry.get("practiceSlug").asString()).isEqualTo("swallows-errors");
         assertThat(entry.get("recurrenceKey").asString()).isEqualTo("rec-1");
         assertThat(entry.get("summary").asString()).isEqualTo("Caught and ignored");
-        assertThat(captured.contentStates()).containsEntry(
-            ReviewHistoryContentSource.OBSERVATION_HISTORY,
-            SourceContentState.NON_EMPTY
-        );
+        assertThat(captured.contentStates())
+                .containsEntry(ReviewHistoryContentSource.OBSERVATION_HISTORY, SourceContentState.NON_EMPTY);
     }
 
     @Test
     void stagesFeedbackThatWasAlreadyDeliveredWithItsChannel() {
-        when(feedbackRepository.findRecentDeliveredForRecipient(any(), any(), any(), any())).thenReturn(
-            List.of(
-                Feedback.builder()
-                    .channel(FeedbackChannel.IN_CONTEXT)
-                    .body("Consider handling this error rather than logging it.")
-                    .deliveredAt(Instant.parse("2026-07-01T09:00:00Z"))
-                    .build()
-            )
-        );
+        when(feedbackRepository.findRecentDeliveredForRecipient(any(), any(), any(), any()))
+                .thenReturn(List.of(Feedback.builder()
+                        .channel(FeedbackChannel.IN_CONTEXT)
+                        .body("Consider handling this error rather than logging it.")
+                        .deliveredAt(Instant.parse("2026-07-01T09:00:00Z"))
+                        .build()));
 
         var captured = captureFeedbackHistory();
 
-        JsonNode entry = read(captured.files().get("inputs/history/feedback.json")).get("feedback").get(0);
+        JsonNode entry = read(captured.files().get("inputs/history/feedback.json"))
+                .get("feedback")
+                .get(0);
         assertThat(entry.get("channel").asString()).isEqualTo("IN_CONTEXT");
         assertThat(entry.get("body").asString()).contains("rather than logging it");
-        assertThat(captured.contentStates()).containsEntry(
-            ReviewHistoryContentSource.FEEDBACK_HISTORY,
-            SourceContentState.NON_EMPTY
-        );
+        assertThat(captured.contentStates())
+                .containsEntry(ReviewHistoryContentSource.FEEDBACK_HISTORY, SourceContentState.NON_EMPTY);
     }
 
     @Test
     void stagesWhatIsQueuedAndUnreadWithTheKeyThatIdentifiesIt() {
-        when(feedbackRepository.findPreparedForRecipient(any(), any(), any())).thenReturn(
-            List.of(
-                Feedback.builder()
-                    .channel(FeedbackChannel.IN_APP)
-                    .threadKey("in-app:99:swallows-errors")
-                    .body("A habit nobody has read yet.")
-                    .createdAt(Instant.parse("2026-07-02T09:00:00Z"))
-                    .build()
-            )
-        );
+        when(feedbackRepository.findPreparedForRecipient(any(), any(), any()))
+                .thenReturn(List.of(Feedback.builder()
+                        .channel(FeedbackChannel.IN_APP)
+                        .threadKey("in-app:99:swallows-errors")
+                        .body("A habit nobody has read yet.")
+                        .createdAt(Instant.parse("2026-07-02T09:00:00Z"))
+                        .build()));
 
         JsonNode entry = read(captureFeedbackHistory().files().get("inputs/history/prepared.json"))
-            .get("prepared")
-            .get(0);
+                .get("prepared")
+                .get(0);
 
         assertThat(entry.get("threadKey").asString()).isEqualTo("in-app:99:swallows-errors");
         assertThat(entry.get("channel").asString()).isEqualTo("IN_APP");
@@ -239,9 +218,8 @@ class ReviewHistoryContentSourceTest {
 
     @Test
     void stagesHowEachLocusMovedWithoutStagingTheKeyItMovedAt() {
-        when(
-            observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), anyBoolean(), any())
-        ).thenReturn(List.of(observation("swallows-errors", "rec-1", "Caught and ignored")));
+        when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), anyBoolean(), any()))
+                .thenReturn(List.of(observation("swallows-errors", "rec-1", "Caught and ignored")));
 
         JsonNode delta = read(captureObservationHistory().files().get("inputs/history/delta.json"));
 
@@ -254,12 +232,13 @@ class ReviewHistoryContentSourceTest {
 
     @Test
     void theDeltaHoldsNothingTheVisibilityPolicyRefused() {
-        when(
-            observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), anyBoolean(), any())
-        ).thenReturn(List.of(observation("swallows-errors", "rec-1", "Caught and ignored")));
+        when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), anyBoolean(), any()))
+                .thenReturn(List.of(observation("swallows-errors", "rec-1", "Caught and ignored")));
         doReturn(Set.of()).when(visibilityPolicy).permitsAll(anyLong(), any(), any());
 
-        assertThat(read(captureObservationHistory().files().get("inputs/history/delta.json")).get("loci")).isEmpty();
+        assertThat(read(captureObservationHistory().files().get("inputs/history/delta.json"))
+                        .get("loci"))
+                .isEmpty();
     }
 
     @Test
@@ -270,18 +249,17 @@ class ReviewHistoryContentSourceTest {
 
     @Test
     void withholdsAnObservationTheVisibilityPolicyRefuses() {
-        when(
-            observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), anyBoolean(), any())
-        ).thenReturn(List.of(observation("swallows-errors", "rec-1", "Caught and ignored")));
+        when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), anyBoolean(), any()))
+                .thenReturn(List.of(observation("swallows-errors", "rec-1", "Caught and ignored")));
         doReturn(Set.of()).when(visibilityPolicy).permitsAll(anyLong(), any(), any());
 
         var captured = captureObservationHistory();
 
-        assertThat(read(captured.files().get("inputs/history/observations.json")).get("observations")).isEmpty();
-        assertThat(captured.contentStates()).containsEntry(
-            ReviewHistoryContentSource.OBSERVATION_HISTORY,
-            SourceContentState.EMPTY
-        );
+        assertThat(read(captured.files().get("inputs/history/observations.json"))
+                        .get("observations"))
+                .isEmpty();
+        assertThat(captured.contentStates())
+                .containsEntry(ReviewHistoryContentSource.OBSERVATION_HISTORY, SourceContentState.EMPTY);
     }
 
     @Test
@@ -296,11 +274,14 @@ class ReviewHistoryContentSourceTest {
     private static void assertUnavailable(EvidenceContribution captured, SourceKind kind) {
         assertThat(captured.files()).isEmpty();
         assertThat(captured.stateOverrides()).containsOnlyKeys(kind);
-        assertThat(captured.stateOverrides()).hasEntrySatisfying(kind, state ->
-            assertThat(state).isInstanceOfSatisfying(SourceCaptureState.Unavailable.class, unavailable ->
-                assertThat(unavailable.reasonCode()).isEqualTo(SourceAbsenceReason.NOT_FOUND)
-            )
-        );
+        assertThat(captured.stateOverrides())
+                .hasEntrySatisfying(
+                        kind,
+                        state -> assertThat(state)
+                                .isInstanceOfSatisfying(
+                                        SourceCaptureState.Unavailable.class,
+                                        unavailable -> assertThat(unavailable.reasonCode())
+                                                .isEqualTo(SourceAbsenceReason.NOT_FOUND)));
     }
 
     @Nested
@@ -308,14 +289,13 @@ class ReviewHistoryContentSourceTest {
 
         @Test
         void anObservationCarriesTheHandleOfTheWorkItWasFiledAgainst() {
-            when(
-                observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), anyBoolean(), any())
-            ).thenReturn(List.of(observationAgainst(ArtifactKinds.PULL_REQUEST, OBSERVED_ARTIFACT_ROW_ID)));
+            when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), anyBoolean(), any()))
+                    .thenReturn(List.of(observationAgainst(ArtifactKinds.PULL_REQUEST, OBSERVED_ARTIFACT_ROW_ID)));
 
             JsonNode artifact = read(captureObservationHistory().files().get("inputs/history/observations.json"))
-                .get("observations")
-                .get(0)
-                .get("artifact");
+                    .get("observations")
+                    .get(0)
+                    .get("artifact");
 
             assertThat(artifact.get("kind").asString()).isEqualTo("scm.pull_request");
             assertThat(artifact.get("number").asInt()).isEqualTo(OBSERVED_ARTIFACT_NUMBER);
@@ -326,14 +306,13 @@ class ReviewHistoryContentSourceTest {
 
         @Test
         void deliveredFeedbackCarriesTheSameHandle() {
-            when(feedbackRepository.findRecentDeliveredForRecipient(any(), any(), any(), any())).thenReturn(
-                List.of(deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID))
-            );
+            when(feedbackRepository.findRecentDeliveredForRecipient(any(), any(), any(), any()))
+                    .thenReturn(List.of(deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID)));
 
             JsonNode artifact = read(captureFeedbackHistory().files().get("inputs/history/feedback.json"))
-                .get("feedback")
-                .get(0)
-                .get("artifact");
+                    .get("feedback")
+                    .get(0)
+                    .get("artifact");
 
             assertThat(artifact.get("number").asInt()).isEqualTo(DELIVERED_ARTIFACT_NUMBER);
             assertThat(artifact.get("container").asString()).isEqualTo("acme/web");
@@ -341,14 +320,14 @@ class ReviewHistoryContentSourceTest {
 
         @Test
         void workNoResolverCanNameIsStagedAsItsKindWithoutANumber() {
-            when(
-                observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), anyBoolean(), any())
-            ).thenReturn(List.of(observationAgainst(ArtifactKinds.CONVERSATION_THREAD, UNNAMEABLE_ARTIFACT_ROW_ID)));
+            when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), anyBoolean(), any()))
+                    .thenReturn(
+                            List.of(observationAgainst(ArtifactKinds.CONVERSATION_THREAD, UNNAMEABLE_ARTIFACT_ROW_ID)));
 
             JsonNode artifact = read(captureObservationHistory().files().get("inputs/history/observations.json"))
-                .get("observations")
-                .get(0)
-                .get("artifact");
+                    .get("observations")
+                    .get(0)
+                    .get("artifact");
 
             assertThat(artifact.get("kind").asString()).isEqualTo("chat.conversation_thread");
             assertThat(artifact.get("title").asString()).isEqualTo("Conversation thread");
@@ -358,27 +337,19 @@ class ReviewHistoryContentSourceTest {
 
         @Test
         void noHistoryFileCarriesARowIdAnywhere() {
-            when(
-                observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), anyBoolean(), any())
-            ).thenReturn(
-                List.of(
-                    observationAgainst(ArtifactKinds.PULL_REQUEST, OBSERVED_ARTIFACT_ROW_ID),
-                    observationAgainst(ArtifactKinds.CONVERSATION_THREAD, UNNAMEABLE_ARTIFACT_ROW_ID)
-                )
-            );
-            when(feedbackRepository.findRecentDeliveredForRecipient(any(), any(), any(), any())).thenReturn(
-                List.of(deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID))
-            );
-            when(feedbackRepository.findPreparedForRecipient(any(), any(), any())).thenReturn(
-                List.of(deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID))
-            );
+            when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), anyBoolean(), any()))
+                    .thenReturn(List.of(
+                            observationAgainst(ArtifactKinds.PULL_REQUEST, OBSERVED_ARTIFACT_ROW_ID),
+                            observationAgainst(ArtifactKinds.CONVERSATION_THREAD, UNNAMEABLE_ARTIFACT_ROW_ID)));
+            when(feedbackRepository.findRecentDeliveredForRecipient(any(), any(), any(), any()))
+                    .thenReturn(List.of(deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID)));
+            when(feedbackRepository.findPreparedForRecipient(any(), any(), any()))
+                    .thenReturn(List.of(deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID)));
 
             var observationCapture = captureObservationHistory();
             var feedbackCapture = captureFeedbackHistory();
             assertCarriesNoRowId(
-                read(observationCapture.files().get("inputs/history/observations.json")),
-                "observations.json"
-            );
+                    read(observationCapture.files().get("inputs/history/observations.json")), "observations.json");
             assertCarriesNoRowId(read(observationCapture.files().get("inputs/history/delta.json")), "delta.json");
             assertCarriesNoRowId(read(feedbackCapture.files().get("inputs/history/feedback.json")), "feedback.json");
             assertCarriesNoRowId(read(feedbackCapture.files().get("inputs/history/prepared.json")), "prepared.json");
@@ -387,9 +358,8 @@ class ReviewHistoryContentSourceTest {
 
     @Test
     void doesNotSupportTheMentorChat() {
-        assertThat(
-            provider.supports(new ContextRequest.MentorChatRequest(WORKSPACE_ID, AUTHOR_ID, UUID.randomUUID()))
-        ).isFalse();
+        assertThat(provider.supports(new ContextRequest.MentorChatRequest(WORKSPACE_ID, AUTHOR_ID, UUID.randomUUID())))
+                .isFalse();
         assertThat(provider.supports(prRequest())).isTrue();
     }
 
@@ -401,7 +371,7 @@ class ReviewHistoryContentSourceTest {
         return provider.capture(prRequest(), Set.of(ReviewHistoryContentSource.FEEDBACK_HISTORY));
     }
 
-    private JsonNode read(byte@Nullable [] bytes) {
+    private JsonNode read(byte @Nullable [] bytes) {
         assertThat(bytes).isNotNull();
         return objectMapper.readTree(bytes);
     }
@@ -445,23 +415,15 @@ class ReviewHistoryContentSourceTest {
 
     private static ArtifactIdentity mergeRequest(ArtifactKind kind, Long id, int number, String title) {
         return new ArtifactIdentity(
-            kind,
-            id,
-            number,
-            title,
-            "acme/web",
-            "https://gitlab.example.com/acme/web/-/merge_requests/" + number
-        );
+                kind, id, number, title, "acme/web", "https://gitlab.example.com/acme/web/-/merge_requests/" + number);
     }
 
     private static void assertCarriesNoRowId(JsonNode node, String path) {
         if (node.isObject()) {
-            node
-                .properties()
-                .forEach(entry -> {
-                    assertThat(entry.getKey()).as("staged field at %s", path).isNotEqualTo("artifactId");
-                    assertCarriesNoRowId(entry.getValue(), path + "." + entry.getKey());
-                });
+            node.properties().forEach(entry -> {
+                assertThat(entry.getKey()).as("staged field at %s", path).isNotEqualTo("artifactId");
+                assertCarriesNoRowId(entry.getValue(), path + "." + entry.getKey());
+            });
             return;
         }
         if (node.isArray()) {
@@ -471,7 +433,9 @@ class ReviewHistoryContentSourceTest {
             return;
         }
         if (node.isNumber()) {
-            assertThat(ROW_IDS.contains(node.asLong())).as("a row id reached the staged history at %s", path).isFalse();
+            assertThat(ROW_IDS.contains(node.asLong()))
+                    .as("a row id reached the staged history at %s", path)
+                    .isFalse();
         }
     }
 
@@ -481,12 +445,12 @@ class ReviewHistoryContentSourceTest {
 
     private static Feedback deliveredAgainst(ArtifactKind kind, long artifactId) {
         return Feedback.builder()
-            .channel(FeedbackChannel.IN_CONTEXT)
-            .artifactKind(kind)
-            .artifactId(artifactId)
-            .body("Consider handling this error rather than logging it.")
-            .deliveredAt(Instant.parse("2026-07-01T09:00:00Z"))
-            .build();
+                .channel(FeedbackChannel.IN_CONTEXT)
+                .artifactKind(kind)
+                .artifactId(artifactId)
+                .body("Consider handling this error rather than logging it.")
+                .deliveredAt(Instant.parse("2026-07-01T09:00:00Z"))
+                .build();
     }
 
     private static Observation observation(String practiceSlug, String recurrenceKey, String title) {
@@ -494,25 +458,24 @@ class ReviewHistoryContentSourceTest {
     }
 
     private static Observation observation(
-        String practiceSlug,
-        String recurrenceKey,
-        String title,
-        @Nullable ArtifactKind artifactKind,
-        @Nullable Long artifactId
-    ) {
+            String practiceSlug,
+            String recurrenceKey,
+            String title,
+            @Nullable ArtifactKind artifactKind,
+            @Nullable Long artifactId) {
         Practice practice = new Practice();
         practice.setSlug(practiceSlug);
         return Observation.builder()
-            .id(UUID.randomUUID())
-            .practice(practice)
-            .recurrenceKey(recurrenceKey)
-            .summary(title)
-            .presence(Presence.PRESENT)
-            .assessment(Assessment.BAD)
-            .artifactKind(artifactKind)
-            .artifactId(artifactId)
-            .observedAt(Instant.parse("2026-07-01T09:00:00Z"))
-            .evidenceRationale("The catch block logs and continues.")
-            .build();
+                .id(UUID.randomUUID())
+                .practice(practice)
+                .recurrenceKey(recurrenceKey)
+                .summary(title)
+                .presence(Presence.PRESENT)
+                .assessment(Assessment.BAD)
+                .artifactKind(artifactKind)
+                .artifactId(artifactId)
+                .observedAt(Instant.parse("2026-07-01T09:00:00Z"))
+                .evidenceRationale("The catch block logs and continues.")
+                .build();
     }
 }

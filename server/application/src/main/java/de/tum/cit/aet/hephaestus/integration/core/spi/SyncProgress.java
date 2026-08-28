@@ -31,12 +31,11 @@ import org.jspecify.annotations.Nullable;
  * @param unitsTotal       phase-local total units, or {@code null} when genuinely not yet known
  */
 public record SyncProgress(
-    @NonNull SyncPhase phase,
-    @NonNull String currentStep,
-    @Nullable String currentRepository,
-    @Nullable Integer unitsCompleted,
-    @Nullable Integer unitsTotal
-) {
+        @NonNull SyncPhase phase,
+        @NonNull String currentStep,
+        @Nullable String currentRepository,
+        @Nullable Integer unitsCompleted,
+        @Nullable Integer unitsTotal) {
     /** Detail key carrying {@link SyncPhase#token()}. */
     public static final String KEY_PHASE = "phase";
     /** Detail key carrying the human sentence — the UI's render key. */
@@ -66,12 +65,11 @@ public record SyncProgress(
      * Per-resource step: {@code unitsCompleted}/{@code unitsTotal} count resources within the phase.
      */
     public static SyncProgress ofResource(
-        SyncPhase phase,
-        String currentStep,
-        @Nullable String currentRepository,
-        @Nullable Integer unitsCompleted,
-        @Nullable Integer unitsTotal
-    ) {
+            SyncPhase phase,
+            String currentStep,
+            @Nullable String currentRepository,
+            @Nullable Integer unitsCompleted,
+            @Nullable Integer unitsTotal) {
         return new SyncProgress(phase, currentStep, currentRepository, unitsCompleted, unitsTotal);
     }
 

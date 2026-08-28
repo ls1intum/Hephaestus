@@ -54,12 +54,11 @@ public class GitLabIssueSyncService {
     private final GitLabProperties gitLabProperties;
 
     public GitLabIssueSyncService(
-        GitLabGraphQlClientProvider graphQlClientProvider,
-        GitLabGraphQlResponseHandler responseHandler,
-        GitLabIssueProcessor issueProcessor,
-        GitLabNoteSyncService noteSyncService,
-        GitLabProperties gitLabProperties
-    ) {
+            GitLabGraphQlClientProvider graphQlClientProvider,
+            GitLabGraphQlResponseHandler responseHandler,
+            GitLabIssueProcessor issueProcessor,
+            GitLabNoteSyncService noteSyncService,
+            GitLabProperties gitLabProperties) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.responseHandler = responseHandler;
         this.issueProcessor = issueProcessor;
@@ -80,11 +79,10 @@ public class GitLabIssueSyncService {
         String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(projectPath), "<unknown>");
 
         log.info(
-            "Starting issue sync: scopeId={}, projectPath={}, updatedAfter={}",
-            scopeId,
-            safeProjectPath,
-            updatedAfter
-        );
+                "Starting issue sync: scopeId={}, projectPath={}, updatedAfter={}",
+                scopeId,
+                safeProjectPath,
+                updatedAfter);
 
         int totalSynced = 0;
         int totalSkipped = 0;
@@ -119,14 +117,13 @@ public class GitLabIssueSyncService {
 
                 HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
-                ClientGraphQlResponse response = client
-                    .documentName(GET_PROJECT_ISSUES_DOCUMENT)
-                    .variable("fullPath", projectPath)
-                    .variable("first", pageSize)
-                    .variable("after", cursor)
-                    .variable("updatedAfter", updatedAfter != null ? updatedAfter.toString() : null)
-                    .execute()
-                    .block(gitLabProperties.extendedGraphqlTimeout());
+                ClientGraphQlResponse response = client.documentName(GET_PROJECT_ISSUES_DOCUMENT)
+                        .variable("fullPath", projectPath)
+                        .variable("first", pageSize)
+                        .variable("after", cursor)
+                        .variable("updatedAfter", updatedAfter != null ? updatedAfter.toString() : null)
+                        .execute()
+                        .block(gitLabProperties.extendedGraphqlTimeout());
 
                 var handleResult = responseHandler.handle(response, "issues for " + safeProjectPath, log);
                 if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
@@ -143,14 +140,15 @@ public class GitLabIssueSyncService {
                 // Extract reported total count on first page for post-sync verification
                 if (page == 0) {
                     try {
-                        Object countField = Objects.requireNonNull(response).field("project.issues.count").getValue();
+                        Object countField = Objects.requireNonNull(response)
+                                .field("project.issues.count")
+                                .getValue();
                         if (countField instanceof Number number) {
                             reportedTotalCount = number.intValue();
                             log.info(
-                                "Issue connection reports count={}, projectPath={}",
-                                reportedTotalCount,
-                                safeProjectPath
-                            );
+                                    "Issue connection reports count={}, projectPath={}",
+                                    reportedTotalCount,
+                                    safeProjectPath);
                         }
                     } catch (Exception e) {
                         log.debug("Could not extract issue count: projectPath={}", safeProjectPath);
@@ -158,10 +156,10 @@ public class GitLabIssueSyncService {
                 }
 
                 // Extract issues from response using dot-notation paths
-                @SuppressWarnings({ "unchecked", "rawtypes" })
+                @SuppressWarnings({"unchecked", "rawtypes"})
                 List<Map<String, Object>> nodes = (List) Objects.requireNonNull(response)
-                    .field("project.issues.nodes")
-                    .toEntityList(Map.class);
+                        .field("project.issues.nodes")
+                        .toEntityList(Map.class);
 
                 if (nodes == null || nodes.isEmpty()) {
                     break;
@@ -176,18 +174,17 @@ public class GitLabIssueSyncService {
                         }
                     } catch (Exception e) {
                         log.warn(
-                            "Error processing issue: projectPath={}, issueId={}",
-                            safeProjectPath,
-                            issueNode.get("iid"),
-                            e
-                        );
+                                "Error processing issue: projectPath={}, issueId={}",
+                                safeProjectPath,
+                                issueNode.get("iid"),
+                                e);
                     }
                 }
 
                 // Pagination
                 GitLabPageInfo pageInfo = Objects.requireNonNull(response)
-                    .field("project.issues.pageInfo")
-                    .toEntity(GitLabPageInfo.class);
+                        .field("project.issues.pageInfo")
+                        .toEntity(GitLabPageInfo.class);
 
                 if (pageInfo == null || !pageInfo.hasNextPage()) {
                     break;
@@ -195,10 +192,9 @@ public class GitLabIssueSyncService {
                 cursor = pageInfo.endCursor();
                 if (cursor == null) {
                     log.warn(
-                        "Pagination cursor is null despite hasNextPage=true: projectPath={}, page={}",
-                        safeProjectPath,
-                        page
-                    );
+                            "Pagination cursor is null despite hasNextPage=true: projectPath={}, page={}",
+                            safeProjectPath,
+                            page);
                     break;
                 }
                 if (responseHandler.isPaginationLoop(cursor, previousCursor, "issues for " + safeProjectPath, log)) {
@@ -227,12 +223,11 @@ public class GitLabIssueSyncService {
         // totalSkipped accounts for confidential issues that are fetched but not persisted
         if (reportedTotalCount >= 0 && totalSynced + totalSkipped < reportedTotalCount) {
             log.warn(
-                "Issue connection overflow detected: projectPath={}, synced={}, reportedCount={}. " +
-                    "Some issues may not have been fetched.",
-                safeProjectPath,
-                totalSynced,
-                reportedTotalCount
-            );
+                    "Issue connection overflow detected: projectPath={}, synced={}, reportedCount={}. "
+                            + "Some issues may not have been fetched.",
+                    safeProjectPath,
+                    totalSynced,
+                    reportedTotalCount);
         }
 
         SyncResult result;
@@ -245,13 +240,12 @@ public class GitLabIssueSyncService {
         }
 
         log.info(
-            "Completed issue sync: scopeId={}, projectPath={}, status={}, totalSynced={}, reportedCount={}",
-            scopeId,
-            safeProjectPath,
-            result.status(),
-            totalSynced,
-            reportedTotalCount
-        );
+                "Completed issue sync: scopeId={}, projectPath={}, status={}, totalSynced={}, reportedCount={}",
+                scopeId,
+                safeProjectPath,
+                result.status(),
+                totalSynced,
+                reportedTotalCount);
 
         return result;
     }
@@ -267,11 +261,7 @@ public class GitLabIssueSyncService {
      * @return backfill batch result with IID range and next cursor
      */
     public BackfillBatchResult backfillIssues(
-        Long scopeId,
-        Repository repository,
-        @Nullable String cursor,
-        int maxItems
-    ) {
+            Long scopeId, Repository repository, @Nullable String cursor, int maxItems) {
         String projectPath = repository.getNameWithOwner();
         String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(projectPath), "<unknown>");
 
@@ -291,18 +281,16 @@ public class GitLabIssueSyncService {
 
                 int rateLimitRemaining = graphQlClientProvider.getRateLimitRemaining(scopeId);
                 int pageSize = Math.min(
-                    GitLabSyncConstants.adaptPageSize(GitLabSyncConstants.ISSUE_SYNC_PAGE_SIZE, rateLimitRemaining),
-                    remaining
-                );
+                        GitLabSyncConstants.adaptPageSize(GitLabSyncConstants.ISSUE_SYNC_PAGE_SIZE, rateLimitRemaining),
+                        remaining);
 
                 HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
-                ClientGraphQlResponse response = client
-                    .documentName(GET_PROJECT_ISSUES_HISTORICAL_DOCUMENT)
-                    .variable("fullPath", projectPath)
-                    .variable("first", pageSize)
-                    .variable("after", currentCursor)
-                    .execute()
-                    .block(gitLabProperties.extendedGraphqlTimeout());
+                ClientGraphQlResponse response = client.documentName(GET_PROJECT_ISSUES_HISTORICAL_DOCUMENT)
+                        .variable("fullPath", projectPath)
+                        .variable("first", pageSize)
+                        .variable("after", currentCursor)
+                        .execute()
+                        .block(gitLabProperties.extendedGraphqlTimeout());
 
                 var handleResult = responseHandler.handle(response, "historical issues for " + safeProjectPath, log);
                 if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
@@ -310,16 +298,15 @@ public class GitLabIssueSyncService {
                 }
                 if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
                     graphQlClientProvider.recordFailure(
-                        new GitLabSyncException("Invalid response for historical issues")
-                    );
+                            new GitLabSyncException("Invalid response for historical issues"));
                     return BackfillBatchResult.abortedWithError();
                 }
                 graphQlClientProvider.recordSuccess();
 
-                @SuppressWarnings({ "unchecked", "rawtypes" })
+                @SuppressWarnings({"unchecked", "rawtypes"})
                 List<Map<String, Object>> nodes = (List) Objects.requireNonNull(response)
-                    .field("project.issues.nodes")
-                    .toEntityList(Map.class);
+                        .field("project.issues.nodes")
+                        .toEntityList(Map.class);
 
                 if (nodes == null || nodes.isEmpty()) break;
 
@@ -327,8 +314,9 @@ public class GitLabIssueSyncService {
                     try {
                         Object iidObj = issueNode.get("iid");
                         if (iidObj != null) {
-                            int iid =
-                                iidObj instanceof Number n ? n.intValue() : Integer.parseInt(String.valueOf(iidObj));
+                            int iid = iidObj instanceof Number n
+                                    ? n.intValue()
+                                    : Integer.parseInt(String.valueOf(iidObj));
                             minIid = Math.min(minIid, iid);
                             maxIid = Math.max(maxIid, iid);
                         }
@@ -336,31 +324,24 @@ public class GitLabIssueSyncService {
                         totalProcessed++;
                     } catch (Exception e) {
                         log.warn(
-                            "Error in historical issue backfill: project={}, iid={}",
-                            safeProjectPath,
-                            issueNode.get("iid"),
-                            e
-                        );
+                                "Error in historical issue backfill: project={}, iid={}",
+                                safeProjectPath,
+                                issueNode.get("iid"),
+                                e);
                     }
                 }
 
                 remaining -= nodes.size();
 
                 GitLabPageInfo pageInfo = Objects.requireNonNull(response)
-                    .field("project.issues.pageInfo")
-                    .toEntity(GitLabPageInfo.class);
+                        .field("project.issues.pageInfo")
+                        .toEntity(GitLabPageInfo.class);
 
                 if (pageInfo == null || !pageInfo.hasNextPage()) break;
 
                 currentCursor = pageInfo.endCursor();
-                if (
-                    responseHandler.isPaginationLoop(
-                        currentCursor,
-                        previousBackfillCursor,
-                        "historical issues for " + safeProjectPath,
-                        log
-                    )
-                ) {
+                if (responseHandler.isPaginationLoop(
+                        currentCursor, previousBackfillCursor, "historical issues for " + safeProjectPath, log)) {
                     return BackfillBatchResult.abortedWithError();
                 }
                 previousBackfillCursor = currentCursor;
@@ -376,22 +357,15 @@ public class GitLabIssueSyncService {
 
             if (totalProcessed > 0) {
                 log.info(
-                    "Historical issue backfill batch: project={}, processed={}, iidRange=[{},{}]",
-                    safeProjectPath,
-                    totalProcessed,
-                    minIid,
-                    maxIid
-                );
+                        "Historical issue backfill batch: project={}, processed={}, iidRange=[{},{}]",
+                        safeProjectPath,
+                        totalProcessed,
+                        minIid,
+                        maxIid);
             }
 
             return new BackfillBatchResult(
-                totalProcessed,
-                minIid == Integer.MAX_VALUE ? -1 : minIid,
-                maxIid,
-                resumeCursor,
-                complete,
-                false
-            );
+                    totalProcessed, minIid == Integer.MAX_VALUE ? -1 : minIid, maxIid, resumeCursor, complete, false);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.info("Historical issue backfill interrupted: project={}", safeProjectPath);
@@ -438,10 +412,10 @@ public class GitLabIssueSyncService {
 
         // Author
         String authorGlobalId = null,
-            authorUsername = null,
-            authorName = null,
-            authorAvatarUrl = null,
-            authorWebUrl = null;
+                authorUsername = null,
+                authorName = null,
+                authorAvatarUrl = null,
+                authorWebUrl = null;
         Map<String, Object> authorMap = (Map<String, Object>) node.get("author");
         if (authorMap != null) {
             authorGlobalId = (String) authorMap.get("id");
@@ -459,24 +433,14 @@ public class GitLabIssueSyncService {
             if (labelNodes != null) {
                 syncLabels = new ArrayList<>(labelNodes.size());
                 for (Map<String, Object> lbl : labelNodes) {
-                    syncLabels.add(
-                        new GitLabIssueProcessor.SyncLabelData(
-                            (String) lbl.get("id"),
-                            (String) lbl.get("title"),
-                            (String) lbl.get("color")
-                        )
-                    );
+                    syncLabels.add(new GitLabIssueProcessor.SyncLabelData(
+                            (String) lbl.get("id"), (String) lbl.get("title"), (String) lbl.get("color")));
                 }
                 // Detect nested pagination overflow for labels and fetch remaining if needed
                 NestedOverflow overflow = detectNestedOverflow(labelsMap, "labels", labelNodes.size(), issueContext);
                 if (overflow.hasOverflow()) {
                     List<GitLabIssueProcessor.SyncLabelData> remaining = fetchRemainingLabels(
-                        scopeId,
-                        repository.getNameWithOwner(),
-                        iid,
-                        overflow.endCursor(),
-                        issueContext
-                    );
+                            scopeId, repository.getNameWithOwner(), iid, overflow.endCursor(), issueContext);
                     if (remaining != null) {
                         syncLabels.addAll(remaining);
                     }
@@ -492,31 +456,19 @@ public class GitLabIssueSyncService {
             if (assigneeNodes != null) {
                 syncAssignees = new ArrayList<>(assigneeNodes.size());
                 for (Map<String, Object> a : assigneeNodes) {
-                    syncAssignees.add(
-                        new GitLabIssueProcessor.SyncAssigneeData(
+                    syncAssignees.add(new GitLabIssueProcessor.SyncAssigneeData(
                             (String) a.get("id"),
                             (String) a.get("username"),
                             (String) a.get("name"),
                             (String) a.get("avatarUrl"),
-                            (String) a.get("webUrl")
-                        )
-                    );
+                            (String) a.get("webUrl")));
                 }
                 // Detect nested pagination overflow for assignees and fetch remaining if needed
-                NestedOverflow overflow = detectNestedOverflow(
-                    assigneesMap,
-                    "assignees",
-                    assigneeNodes.size(),
-                    issueContext
-                );
+                NestedOverflow overflow =
+                        detectNestedOverflow(assigneesMap, "assignees", assigneeNodes.size(), issueContext);
                 if (overflow.hasOverflow()) {
                     List<GitLabIssueProcessor.SyncAssigneeData> remaining = fetchRemainingAssignees(
-                        scopeId,
-                        repository.getNameWithOwner(),
-                        iid,
-                        overflow.endCursor(),
-                        issueContext
-                    );
+                            scopeId, repository.getNameWithOwner(), iid, overflow.endCursor(), issueContext);
                     if (remaining != null) {
                         syncAssignees.addAll(remaining);
                     }
@@ -525,28 +477,27 @@ public class GitLabIssueSyncService {
         }
 
         var syncData = new GitLabIssueProcessor.SyncIssueData(
-            globalId,
-            iid,
-            title,
-            description,
-            state,
-            Boolean.TRUE.equals(confidential),
-            webUrl,
-            createdAt,
-            updatedAt,
-            closedAt,
-            authorGlobalId,
-            authorUsername,
-            authorName,
-            authorAvatarUrl,
-            authorWebUrl,
-            userNotesCount,
-            syncLabels,
-            syncAssignees,
-            milestoneIid,
-            typeName,
-            closedAsDuplicateOfGid
-        );
+                globalId,
+                iid,
+                title,
+                description,
+                state,
+                Boolean.TRUE.equals(confidential),
+                webUrl,
+                createdAt,
+                updatedAt,
+                closedAt,
+                authorGlobalId,
+                authorUsername,
+                authorName,
+                authorAvatarUrl,
+                authorWebUrl,
+                userNotesCount,
+                syncLabels,
+                syncAssignees,
+                milestoneIid,
+                typeName,
+                closedAsDuplicateOfGid);
         Issue issue = issueProcessor.processFromSync(syncData, repository, scopeId);
 
         // Sync notes for this issue if it has comments and wasn't skipped
@@ -590,7 +541,8 @@ public class GitLabIssueSyncService {
      * @param endCursor   the cursor for fetching the next page (null if no overflow)
      * @param count       the total count reported by the connection (-1 if unavailable)
      */
-    private record NestedOverflow(boolean hasOverflow, @Nullable String endCursor, int count) {}
+    private record NestedOverflow(
+            boolean hasOverflow, @Nullable String endCursor, int count) {}
 
     /**
      * Checks if a nested GraphQL connection has more pages than were fetched.
@@ -598,11 +550,7 @@ public class GitLabIssueSyncService {
      */
     @SuppressWarnings("unchecked")
     private static NestedOverflow detectNestedOverflow(
-        Map<String, Object> connectionMap,
-        String connectionName,
-        int fetchedCount,
-        String context
-    ) {
+            Map<String, Object> connectionMap, String connectionName, int fetchedCount, String context) {
         int count = -1;
         Object countField = connectionMap.get("count");
         if (countField instanceof Number number) {
@@ -617,14 +565,13 @@ public class GitLabIssueSyncService {
 
         if (overflow) {
             log.warn(
-                "GraphQL nested connection overflow: connection={}, fetchedCount={}, count={}, " +
-                    "hasNextPage={}, context={}. Will attempt follow-up pagination.",
-                connectionName,
-                fetchedCount,
-                count,
-                hasNextPage,
-                context
-            );
+                    "GraphQL nested connection overflow: connection={}, fetchedCount={}, count={}, "
+                            + "hasNextPage={}, context={}. Will attempt follow-up pagination.",
+                    connectionName,
+                    fetchedCount,
+                    count,
+                    hasNextPage,
+                    context);
         }
 
         return new NestedOverflow(overflow, endCursor, count);
@@ -643,12 +590,7 @@ public class GitLabIssueSyncService {
     @SuppressWarnings("unchecked")
     @Nullable
     private List<GitLabIssueProcessor.SyncLabelData> fetchRemainingLabels(
-        Long scopeId,
-        String projectPath,
-        String iid,
-        @Nullable String afterCursor,
-        String context
-    ) {
+            Long scopeId, String projectPath, String iid, @Nullable String afterCursor, String context) {
         if (afterCursor == null) {
             log.warn("Cannot fetch remaining labels: endCursor is null, context={}", context);
             return null;
@@ -666,14 +608,13 @@ public class GitLabIssueSyncService {
 
                 HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
-                ClientGraphQlResponse response = client
-                    .documentName(GET_ISSUE_LABELS_DOCUMENT)
-                    .variable("fullPath", projectPath)
-                    .variable("iid", iid)
-                    .variable("first", GitLabSyncConstants.LARGE_PAGE_SIZE)
-                    .variable("after", cursor)
-                    .execute()
-                    .block(gitLabProperties.graphqlTimeout());
+                ClientGraphQlResponse response = client.documentName(GET_ISSUE_LABELS_DOCUMENT)
+                        .variable("fullPath", projectPath)
+                        .variable("iid", iid)
+                        .variable("first", GitLabSyncConstants.LARGE_PAGE_SIZE)
+                        .variable("after", cursor)
+                        .execute()
+                        .block(gitLabProperties.graphqlTimeout());
 
                 var handleResult = responseHandler.handle(response, "remaining labels for " + context, log);
                 if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
@@ -689,8 +630,8 @@ public class GitLabIssueSyncService {
                 // Navigate: project.issues.nodes[0].labels
                 @SuppressWarnings("rawtypes")
                 List issueNodesRaw = Objects.requireNonNull(response)
-                    .field("project.issues.nodes")
-                    .toEntityList(Map.class);
+                        .field("project.issues.nodes")
+                        .toEntityList(Map.class);
                 @SuppressWarnings("unchecked")
                 List<Map<String, Object>> issueNodes = (List<Map<String, Object>>) issueNodesRaw;
 
@@ -698,7 +639,8 @@ public class GitLabIssueSyncService {
                     break;
                 }
 
-                Map<String, Object> labelsMap = (Map<String, Object>) issueNodes.get(0).get("labels");
+                Map<String, Object> labelsMap =
+                        (Map<String, Object>) issueNodes.get(0).get("labels");
                 if (labelsMap == null) {
                     break;
                 }
@@ -709,13 +651,8 @@ public class GitLabIssueSyncService {
                 }
 
                 for (Map<String, Object> lbl : labelNodes) {
-                    allRemaining.add(
-                        new GitLabIssueProcessor.SyncLabelData(
-                            (String) lbl.get("id"),
-                            (String) lbl.get("title"),
-                            (String) lbl.get("color")
-                        )
-                    );
+                    allRemaining.add(new GitLabIssueProcessor.SyncLabelData(
+                            (String) lbl.get("id"), (String) lbl.get("title"), (String) lbl.get("color")));
                 }
 
                 // Check for more pages
@@ -724,14 +661,8 @@ public class GitLabIssueSyncService {
                     break;
                 }
                 cursor = (String) pageInfo.get("endCursor");
-                if (
-                    responseHandler.isPaginationLoop(
-                        cursor,
-                        previousLabelCursor,
-                        "remaining labels for " + context,
-                        log
-                    )
-                ) {
+                if (responseHandler.isPaginationLoop(
+                        cursor, previousLabelCursor, "remaining labels for " + context, log)) {
                     break;
                 }
                 previousLabelCursor = cursor;
@@ -764,12 +695,7 @@ public class GitLabIssueSyncService {
     @SuppressWarnings("unchecked")
     @Nullable
     private List<GitLabIssueProcessor.SyncAssigneeData> fetchRemainingAssignees(
-        Long scopeId,
-        String projectPath,
-        String iid,
-        @Nullable String afterCursor,
-        String context
-    ) {
+            Long scopeId, String projectPath, String iid, @Nullable String afterCursor, String context) {
         if (afterCursor == null) {
             log.warn("Cannot fetch remaining assignees: endCursor is null, context={}", context);
             return null;
@@ -787,14 +713,13 @@ public class GitLabIssueSyncService {
 
                 HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
-                ClientGraphQlResponse response = client
-                    .documentName(GET_ISSUE_ASSIGNEES_DOCUMENT)
-                    .variable("fullPath", projectPath)
-                    .variable("iid", iid)
-                    .variable("first", GitLabSyncConstants.LARGE_PAGE_SIZE)
-                    .variable("after", cursor)
-                    .execute()
-                    .block(gitLabProperties.graphqlTimeout());
+                ClientGraphQlResponse response = client.documentName(GET_ISSUE_ASSIGNEES_DOCUMENT)
+                        .variable("fullPath", projectPath)
+                        .variable("iid", iid)
+                        .variable("first", GitLabSyncConstants.LARGE_PAGE_SIZE)
+                        .variable("after", cursor)
+                        .execute()
+                        .block(gitLabProperties.graphqlTimeout());
 
                 var handleResult = responseHandler.handle(response, "remaining assignees for " + context, log);
                 if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
@@ -810,8 +735,8 @@ public class GitLabIssueSyncService {
                 // Navigate: project.issues.nodes[0].assignees
                 @SuppressWarnings("rawtypes")
                 List assigneeIssueNodesRaw = Objects.requireNonNull(response)
-                    .field("project.issues.nodes")
-                    .toEntityList(Map.class);
+                        .field("project.issues.nodes")
+                        .toEntityList(Map.class);
                 @SuppressWarnings("unchecked")
                 List<Map<String, Object>> issueNodes = (List<Map<String, Object>>) assigneeIssueNodesRaw;
 
@@ -819,7 +744,8 @@ public class GitLabIssueSyncService {
                     break;
                 }
 
-                Map<String, Object> assigneesMap = (Map<String, Object>) issueNodes.get(0).get("assignees");
+                Map<String, Object> assigneesMap =
+                        (Map<String, Object>) issueNodes.get(0).get("assignees");
                 if (assigneesMap == null) {
                     break;
                 }
@@ -830,15 +756,12 @@ public class GitLabIssueSyncService {
                 }
 
                 for (Map<String, Object> a : assigneeNodes) {
-                    allRemaining.add(
-                        new GitLabIssueProcessor.SyncAssigneeData(
+                    allRemaining.add(new GitLabIssueProcessor.SyncAssigneeData(
                             (String) a.get("id"),
                             (String) a.get("username"),
                             (String) a.get("name"),
                             (String) a.get("avatarUrl"),
-                            (String) a.get("webUrl")
-                        )
-                    );
+                            (String) a.get("webUrl")));
                 }
 
                 // Check for more pages
@@ -847,14 +770,8 @@ public class GitLabIssueSyncService {
                     break;
                 }
                 cursor = (String) pageInfo.get("endCursor");
-                if (
-                    responseHandler.isPaginationLoop(
-                        cursor,
-                        previousAssigneeCursor,
-                        "remaining assignees for " + context,
-                        log
-                    )
-                ) {
+                if (responseHandler.isPaginationLoop(
+                        cursor, previousAssigneeCursor, "remaining assignees for " + context, log)) {
                     break;
                 }
                 previousAssigneeCursor = cursor;
@@ -869,10 +786,9 @@ public class GitLabIssueSyncService {
 
         if (!allRemaining.isEmpty()) {
             log.info(
-                "Fetched {} additional assignees via follow-up pagination: context={}",
-                allRemaining.size(),
-                context
-            );
+                    "Fetched {} additional assignees via follow-up pagination: context={}",
+                    allRemaining.size(),
+                    context);
         }
 
         return allRemaining;

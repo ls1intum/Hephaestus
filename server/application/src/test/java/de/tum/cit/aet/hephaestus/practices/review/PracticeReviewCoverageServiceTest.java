@@ -54,15 +54,14 @@ class PracticeReviewCoverageServiceTest extends BaseUnitTest {
     void selectedRepositoryFromAnotherTenantIsRejected() {
         when(monitors.findByWorkspaceId(1L)).thenReturn(List.of(monitor(11L, "owner/local")));
         WorkspaceReviewScope crossTenant = new WorkspaceReviewScope(
-            ReviewRepositoryMode.SELECTED,
-            ReviewPersonMode.ALL_ELIGIBLE,
-            List.of(new ReviewRepositoryTarget("other/tenant", List.of())),
-            List.of()
-        );
+                ReviewRepositoryMode.SELECTED,
+                ReviewPersonMode.ALL_ELIGIBLE,
+                List.of(new ReviewRepositoryTarget("other/tenant", List.of())),
+                List.of());
 
         assertThatThrownBy(() -> service.replace(workspace, crossTenant))
-            .isInstanceOf(InvalidReviewCoverageException.class)
-            .hasMessageContaining("not monitored by this workspace");
+                .isInstanceOf(InvalidReviewCoverageException.class)
+                .hasMessageContaining("not monitored by this workspace");
     }
 
     @Test
@@ -70,15 +69,11 @@ class PracticeReviewCoverageServiceTest extends BaseUnitTest {
         when(monitors.findByWorkspaceId(1L)).thenReturn(List.of());
         when(memberships.findAllWithUserByWorkspaceId(1L)).thenReturn(List.of(membership(7L, User.Type.USER)));
         WorkspaceReviewScope crossTenant = new WorkspaceReviewScope(
-            ReviewRepositoryMode.ALL_MONITORED,
-            ReviewPersonMode.SELECTED,
-            List.of(),
-            List.of(8L)
-        );
+                ReviewRepositoryMode.ALL_MONITORED, ReviewPersonMode.SELECTED, List.of(), List.of(8L));
 
         assertThatThrownBy(() -> service.replace(workspace, crossTenant))
-            .isInstanceOf(InvalidReviewCoverageException.class)
-            .hasMessageContaining("eligible linked workspace member");
+                .isInstanceOf(InvalidReviewCoverageException.class)
+                .hasMessageContaining("eligible linked workspace member");
     }
 
     @Test
@@ -120,28 +115,21 @@ class PracticeReviewCoverageServiceTest extends BaseUnitTest {
     @Test
     void previewDistinguishesWideningFromNarrowingAcrossBothAxes() {
         workspace.getReviewSettings().applyRollout(ReviewRepositoryMode.SELECTED, ReviewPersonMode.SELECTED, null);
-        when(monitors.findByWorkspaceId(1L)).thenReturn(
-            List.of(monitor(11L, "owner/first"), monitor(12L, "owner/second"))
-        );
-        when(memberships.findAllWithUserByWorkspaceId(1L)).thenReturn(
-            List.of(membership(7L, User.Type.USER), membership(8L, User.Type.USER))
-        );
-        when(repositoryTargets.findByWorkspaceId(1L)).thenReturn(
-            List.of(new PracticeReviewRepositoryTarget(1L, 11L, List.of("main")))
-        );
+        when(monitors.findByWorkspaceId(1L))
+                .thenReturn(List.of(monitor(11L, "owner/first"), monitor(12L, "owner/second")));
+        when(memberships.findAllWithUserByWorkspaceId(1L))
+                .thenReturn(List.of(membership(7L, User.Type.USER), membership(8L, User.Type.USER)));
+        when(repositoryTargets.findByWorkspaceId(1L))
+                .thenReturn(List.of(new PracticeReviewRepositoryTarget(1L, 11L, List.of("main"))));
         when(people.findByWorkspaceId(1L)).thenReturn(List.of(new PracticeReviewPersonTarget(1L, 7L)));
 
         var addRepository = scope(
-            List.of(
-                new ReviewRepositoryTarget("owner/first", List.of("main")),
-                new ReviewRepositoryTarget("owner/second", List.of())
-            ),
-            List.of(7L)
-        );
-        var addBranch = scope(
-            List.of(new ReviewRepositoryTarget("owner/first", List.of("main", "develop"))),
-            List.of(7L)
-        );
+                List.of(
+                        new ReviewRepositoryTarget("owner/first", List.of("main")),
+                        new ReviewRepositoryTarget("owner/second", List.of())),
+                List.of(7L));
+        var addBranch =
+                scope(List.of(new ReviewRepositoryTarget("owner/first", List.of("main", "develop"))), List.of(7L));
         var addPerson = scope(List.of(new ReviewRepositoryTarget("owner/first", List.of("main"))), List.of(7L, 8L));
         var narrow = scope(List.of(), List.of());
 

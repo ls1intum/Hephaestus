@@ -43,20 +43,19 @@ class AgentBindingTimeoutRangeTest extends BaseUnitTest {
     void acceptsTheWholeRange() {
         assertThat(violationsFor(AgentBindingLimits.MIN_TIMEOUT_SECONDS)).isEmpty();
         assertThat(violationsFor(AgentBindingLimits.MAX_TIMEOUT_SECONDS)).isEmpty();
-        assertThat(Duration.ofSeconds(AgentBindingLimits.MAX_TIMEOUT_SECONDS)).isLessThanOrEqualTo(
-            ResourceLimits.MAX_RUNTIME
-        );
+        assertThat(Duration.ofSeconds(AgentBindingLimits.MAX_TIMEOUT_SECONDS))
+                .isLessThanOrEqualTo(ResourceLimits.MAX_RUNTIME);
     }
 
     @Test
     @DisplayName("a timeout past either end is refused before any binding is written")
     void refusesOutsideTheRange() {
         assertThat(violationsFor(AgentBindingLimits.MIN_TIMEOUT_SECONDS - 1))
-            .as("below the floor a run cannot finish a single model call")
-            .isNotEmpty();
+                .as("below the floor a run cannot finish a single model call")
+                .isNotEmpty();
         assertThat(violationsFor(AgentBindingLimits.MAX_TIMEOUT_SECONDS + 1))
-            .as("above the ceiling a turn can outlive the sweep that bills abandoned turns")
-            .isNotEmpty();
+                .as("above the ceiling a turn can outlive the sweep that bills abandoned turns")
+                .isNotEmpty();
     }
 
     @Test
@@ -67,10 +66,8 @@ class AgentBindingTimeoutRangeTest extends BaseUnitTest {
 
     private static Set<ConstraintViolation<AgentBindingRequestDTO>> violationsFor(@Nullable Integer timeoutSeconds) {
         AgentBindingRequestDTO request = new AgentBindingRequestDTO(1L, null, timeoutSeconds, null, null, null);
-        return validator
-            .validate(request)
-            .stream()
-            .filter(v -> v.getPropertyPath().toString().equals("timeoutSeconds"))
-            .collect(Collectors.toSet());
+        return validator.validate(request).stream()
+                .filter(v -> v.getPropertyPath().toString().equals("timeoutSeconds"))
+                .collect(Collectors.toSet());
     }
 }

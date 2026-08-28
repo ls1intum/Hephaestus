@@ -36,9 +36,9 @@ class CatalogEntryTest extends BaseUnitTest {
     void anEditIsHeldAgainstTheDefinitionItWasWrittenAgainst() {
         PracticeDefinition mine = practice("Small PRs", "Our criteria", "Shipped reason");
 
-        assertThat(entry(mine, SHIPPED, CuratedDefinitionDigest.of(SLUG, SHIPPED)).state()).isEqualTo(
-            CatalogEntryState.EDITED_HERE
-        );
+        assertThat(entry(mine, SHIPPED, CuratedDefinitionDigest.of(SLUG, SHIPPED))
+                        .state())
+                .isEqualTo(CatalogEntryState.EDITED_HERE);
     }
 
     @Test
@@ -63,9 +63,8 @@ class CatalogEntryTest extends BaseUnitTest {
     void anEntryTheBuildStopsShippingKeepsTheInstancesOwnDefinition() {
         PracticeDefinition mine = practice("Small PRs", "Our criteria", "Shipped reason");
 
-        assertThat(entry(mine, null, CuratedDefinitionDigest.of(SLUG, SHIPPED)).state()).isEqualTo(
-            CatalogEntryState.NO_LONGER_SHIPPED
-        );
+        assertThat(entry(mine, null, CuratedDefinitionDigest.of(SLUG, SHIPPED)).state())
+                .isEqualTo(CatalogEntryState.NO_LONGER_SHIPPED);
     }
 
     @Test
@@ -116,18 +115,17 @@ class CatalogEntryTest extends BaseUnitTest {
         PracticeDefinition mine = practice("Small PRs", "Our criteria", "Shipped reason");
 
         assertThat(untouched.etag()).isNotBlank();
-        assertThat(entry(mine, SHIPPED, CuratedDefinitionDigest.of(SLUG, SHIPPED)).etag()).isNotEqualTo(
-            untouched.etag()
-        );
+        assertThat(entry(mine, SHIPPED, CuratedDefinitionDigest.of(SLUG, SHIPPED))
+                        .etag())
+                .isNotEqualTo(untouched.etag());
         assertThat(retired(untouched).etag()).isNotEqualTo(untouched.etag());
         assertThat(withPosition(untouched, 1).etag()).isEqualTo(untouched.etag());
     }
 
     private static CatalogEntry<PracticeDefinition> entry(
-        @Nullable PracticeDefinition mine,
-        @Nullable PracticeDefinition shipped,
-        @Nullable String acceptedBundledDigest
-    ) {
+            @Nullable PracticeDefinition mine,
+            @Nullable PracticeDefinition shipped,
+            @Nullable String acceptedBundledDigest) {
         PracticeDefinition effective = mine != null ? mine : shipped;
         assertNotNull(effective);
         return new CatalogEntry<>(SLUG, effective, shipped, mine, acceptedBundledDigest, false, 0, null);
@@ -135,27 +133,25 @@ class CatalogEntryTest extends BaseUnitTest {
 
     private static CatalogEntry<PracticeDefinition> retired(CatalogEntry<PracticeDefinition> entry) {
         return new CatalogEntry<>(
-            entry.slug(),
-            entry.effective(),
-            entry.shipped(),
-            entry.overridden(),
-            entry.acceptedBundledDigest(),
-            true,
-            entry.position(),
-            entry.updatedAt()
-        );
+                entry.slug(),
+                entry.effective(),
+                entry.shipped(),
+                entry.overridden(),
+                entry.acceptedBundledDigest(),
+                true,
+                entry.position(),
+                entry.updatedAt());
     }
 
     private static CatalogEntry<PracticeDefinition> withPosition(CatalogEntry<PracticeDefinition> entry, int position) {
         return new CatalogEntry<>(
-            entry.slug(),
-            entry.effective(),
-            entry.shipped(),
-            entry.overridden(),
-            entry.acceptedBundledDigest(),
-            entry.retired(),
-            position,
-            entry.updatedAt()
-        );
+                entry.slug(),
+                entry.effective(),
+                entry.shipped(),
+                entry.overridden(),
+                entry.acceptedBundledDigest(),
+                entry.retired(),
+                position,
+                entry.updatedAt());
     }
 }

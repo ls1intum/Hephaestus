@@ -33,11 +33,10 @@ public class ConnectionActivity {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
-        name = "connection_id",
-        insertable = false,
-        updatable = false,
-        foreignKey = @ForeignKey(name = "fk_connection_activity_connection")
-    )
+            name = "connection_id",
+            insertable = false,
+            updatable = false,
+            foreignKey = @ForeignKey(name = "fk_connection_activity_connection"))
     private @Nullable Connection connection;
 
     @Column(name = "workspace_id", nullable = false)
@@ -45,11 +44,10 @@ public class ConnectionActivity {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
-        name = "workspace_id",
-        insertable = false,
-        updatable = false,
-        foreignKey = @ForeignKey(name = "fk_connection_activity_workspace")
-    )
+            name = "workspace_id",
+            insertable = false,
+            updatable = false,
+            foreignKey = @ForeignKey(name = "fk_connection_activity_workspace"))
     private @Nullable Workspace workspace;
 
     @Column(name = "last_event_at")

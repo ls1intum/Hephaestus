@@ -35,13 +35,7 @@ class WorkerJwtTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         properties = new WorkerTokenProperties(
-            "hephaestus-test",
-            "hephaestus-worker",
-            Duration.ofMinutes(15),
-            "register-me",
-            List.of(),
-            null
-        );
+                "hephaestus-test", "hephaestus-worker", Duration.ofMinutes(15), "register-me", List.of(), null);
         keyRing = WorkerKeyRing.fromConfig(properties);
         issuer = new WorkerJwtIssuer(keyRing, properties);
         denylist = mock(WorkerTokenDenylistService.class);
@@ -56,10 +50,8 @@ class WorkerJwtTest extends BaseUnitTest {
 
         assertThat(jwt.workerId()).isEqualTo("worker-1");
         assertThat(jwt.jti()).isEqualTo(issued.jti());
-        assertThat(jwt.expiresAt()).isCloseTo(
-            issued.expiresAt(),
-            Assertions.within(1, java.time.temporal.ChronoUnit.SECONDS)
-        );
+        assertThat(jwt.expiresAt())
+                .isCloseTo(issued.expiresAt(), Assertions.within(1, java.time.temporal.ChronoUnit.SECONDS));
     }
 
     @Test
@@ -68,40 +60,41 @@ class WorkerJwtTest extends BaseUnitTest {
         when(denylist.isRevoked(issued.jti())).thenReturn(true);
 
         assertThatThrownBy(() -> verifier.verify(issued.token()))
-            .isInstanceOf(WorkerJwtInvalidException.class)
-            .hasMessageContaining("revoked");
+                .isInstanceOf(WorkerJwtInvalidException.class)
+                .hasMessageContaining("revoked");
     }
 
     @Test
     void unknownKidRejected() {
         WorkerSigningKey other = WorkerSigningKey.generateEphemeral("foreign-kid");
         String token = JWT.create()
-            .withKeyId("foreign-kid")
-            .withIssuer("hephaestus-test")
-            .withSubject("worker-1")
-            .withJWTId("j")
-            .withIssuedAt(Instant.now())
-            .withExpiresAt(Instant.now().plusSeconds(60))
-            .sign(Algorithm.RSA256(other.publicKey(), other.privateKey()));
+                .withKeyId("foreign-kid")
+                .withIssuer("hephaestus-test")
+                .withSubject("worker-1")
+                .withJWTId("j")
+                .withIssuedAt(Instant.now())
+                .withExpiresAt(Instant.now().plusSeconds(60))
+                .sign(Algorithm.RSA256(other.publicKey(), other.privateKey()));
 
         assertThatThrownBy(() -> verifier.verify(token))
-            .isInstanceOf(WorkerJwtInvalidException.class)
-            .hasMessageContaining("unknown kid");
+                .isInstanceOf(WorkerJwtInvalidException.class)
+                .hasMessageContaining("unknown kid");
     }
 
     @Test
     void missingKidRejected() {
         String token = JWT.create()
-            .withIssuer("hephaestus-test")
-            .withSubject("worker-1")
-            .withJWTId("j")
-            .withIssuedAt(Instant.now())
-            .withExpiresAt(Instant.now().plusSeconds(60))
-            .sign(Algorithm.RSA256(keyRing.active().publicKey(), keyRing.active().privateKey()));
+                .withIssuer("hephaestus-test")
+                .withSubject("worker-1")
+                .withJWTId("j")
+                .withIssuedAt(Instant.now())
+                .withExpiresAt(Instant.now().plusSeconds(60))
+                .sign(Algorithm.RSA256(
+                        keyRing.active().publicKey(), keyRing.active().privateKey()));
 
         assertThatThrownBy(() -> verifier.verify(token))
-            .isInstanceOf(WorkerJwtInvalidException.class)
-            .hasMessageContaining("missing kid");
+                .isInstanceOf(WorkerJwtInvalidException.class)
+                .hasMessageContaining("missing kid");
     }
 
     @Test
@@ -111,55 +104,34 @@ class WorkerJwtTest extends BaseUnitTest {
         WorkerSigningKey keyB = WorkerSigningKey.generateEphemeral("kid-B");
 
         WorkerTokenProperties propsBefore = new WorkerTokenProperties(
-            issuerName,
-            "hephaestus-worker",
-            Duration.ofMinutes(15),
-            "register",
-            List.of(toEntry(keyA)),
-            "kid-A"
-        );
+                issuerName, "hephaestus-worker", Duration.ofMinutes(15), "register", List.of(toEntry(keyA)), "kid-A");
         String tokenSignedByA = new WorkerJwtIssuer(WorkerKeyRing.fromConfig(propsBefore), propsBefore)
-            .issue("worker-1")
-            .token();
+                .issue("worker-1")
+                .token();
 
         WorkerTokenProperties propsAfter = new WorkerTokenProperties(
-            issuerName,
-            "hephaestus-worker",
-            Duration.ofMinutes(15),
-            "register",
-            List.of(toEntry(keyA), toEntry(keyB)),
-            "kid-B"
-        );
+                issuerName,
+                "hephaestus-worker",
+                Duration.ofMinutes(15),
+                "register",
+                List.of(toEntry(keyA), toEntry(keyB)),
+                "kid-B");
         WorkerJwtVerifier verifierAfter = new JavaJwtWorkerJwtVerifier(
-            WorkerKeyRing.fromConfig(propsAfter),
-            propsAfter,
-            denylist,
-            new SimpleMeterRegistry()
-        );
+                WorkerKeyRing.fromConfig(propsAfter), propsAfter, denylist, new SimpleMeterRegistry());
         String tokenSignedByB = new WorkerJwtIssuer(WorkerKeyRing.fromConfig(propsAfter), propsAfter)
-            .issue("worker-2")
-            .token();
+                .issue("worker-2")
+                .token();
 
         assertThatNoException().isThrownBy(() -> verifierAfter.verify(tokenSignedByA));
         assertThatNoException().isThrownBy(() -> verifierAfter.verify(tokenSignedByB));
 
         WorkerTokenProperties propsDropA = new WorkerTokenProperties(
-            issuerName,
-            "hephaestus-worker",
-            Duration.ofMinutes(15),
-            "register",
-            List.of(toEntry(keyB)),
-            "kid-B"
-        );
+                issuerName, "hephaestus-worker", Duration.ofMinutes(15), "register", List.of(toEntry(keyB)), "kid-B");
         WorkerJwtVerifier verifierDropA = new JavaJwtWorkerJwtVerifier(
-            WorkerKeyRing.fromConfig(propsDropA),
-            propsDropA,
-            denylist,
-            new SimpleMeterRegistry()
-        );
+                WorkerKeyRing.fromConfig(propsDropA), propsDropA, denylist, new SimpleMeterRegistry());
         assertThatThrownBy(() -> verifierDropA.verify(tokenSignedByA))
-            .isInstanceOf(WorkerJwtInvalidException.class)
-            .hasMessageContaining("unknown kid");
+                .isInstanceOf(WorkerJwtInvalidException.class)
+                .hasMessageContaining("unknown kid");
         assertThatNoException().isThrownBy(() -> verifierDropA.verify(tokenSignedByB));
     }
 
@@ -167,50 +139,29 @@ class WorkerJwtTest extends BaseUnitTest {
     @MethodSource("invalidRings")
     void fromConfigRejectsInvalidRings(String label, WorkerTokenProperties props, String expectedMessage) {
         assertThatThrownBy(() -> WorkerKeyRing.fromConfig(props))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining(expectedMessage);
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(expectedMessage);
     }
 
     static Stream<Arguments> invalidRings() {
         WorkerSigningKey k = WorkerSigningKey.generateEphemeral("only-kid");
         return Stream.of(
-            Arguments.of(
-                "duplicate kid",
-                new WorkerTokenProperties(
-                    "iss",
-                    "aud",
-                    Duration.ofMinutes(15),
-                    "r",
-                    List.of(toEntry(k), toEntry(k)),
-                    null
-                ),
-                "Duplicate kid"
-            ),
-            Arguments.of(
-                "active-kid not in ring",
-                new WorkerTokenProperties(
-                    "iss",
-                    "aud",
-                    Duration.ofMinutes(15),
-                    "r",
-                    List.of(toEntry(k)),
-                    "missing-kid"
-                ),
-                "active-kid"
-            )
-        );
+                Arguments.of(
+                        "duplicate kid",
+                        new WorkerTokenProperties(
+                                "iss", "aud", Duration.ofMinutes(15), "r", List.of(toEntry(k), toEntry(k)), null),
+                        "Duplicate kid"),
+                Arguments.of(
+                        "active-kid not in ring",
+                        new WorkerTokenProperties(
+                                "iss", "aud", Duration.ofMinutes(15), "r", List.of(toEntry(k)), "missing-kid"),
+                        "active-kid"));
     }
 
     @Test
     void propertiesToStringRedactsRegistrationToken() {
-        WorkerTokenProperties props = new WorkerTokenProperties(
-            "iss",
-            "aud",
-            Duration.ofMinutes(5),
-            "the-secret",
-            List.of(),
-            null
-        );
+        WorkerTokenProperties props =
+                new WorkerTokenProperties("iss", "aud", Duration.ofMinutes(5), "the-secret", List.of(), null);
         String dumped = props.toString();
         assertThat(dumped).doesNotContain("the-secret");
         assertThat(dumped).contains("<redacted>");
@@ -221,10 +172,8 @@ class WorkerJwtTest extends BaseUnitTest {
     }
 
     private static String toPemPkcs8(java.security.interfaces.RSAPrivateKey key) {
-        return (
-            "-----BEGIN PRIVATE KEY-----\n" +
-            Base64.getMimeEncoder(64, new byte[] { '\n' }).encodeToString(key.getEncoded()) +
-            "\n-----END PRIVATE KEY-----\n"
-        );
+        return ("-----BEGIN PRIVATE KEY-----\n"
+                + Base64.getMimeEncoder(64, new byte[] {'\n'}).encodeToString(key.getEncoded())
+                + "\n-----END PRIVATE KEY-----\n");
     }
 }

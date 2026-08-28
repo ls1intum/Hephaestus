@@ -24,13 +24,12 @@ import tools.jackson.databind.JsonNode;
 @Entity
 @Immutable
 @Table(
-    name = "delivery_policy_evaluation",
-    indexes = {
-        @Index(name = "idx_delivery_policy_eval_job", columnList = "agent_job_id, evaluated_at DESC"),
-        @Index(name = "idx_delivery_policy_eval_feedback", columnList = "feedback_id, evaluated_at DESC"),
-        @Index(name = "idx_delivery_policy_eval_workspace", columnList = "workspace_id, evaluated_at DESC"),
-    }
-)
+        name = "delivery_policy_evaluation",
+        indexes = {
+            @Index(name = "idx_delivery_policy_eval_job", columnList = "agent_job_id, evaluated_at DESC"),
+            @Index(name = "idx_delivery_policy_eval_feedback", columnList = "feedback_id, evaluated_at DESC"),
+            @Index(name = "idx_delivery_policy_eval_workspace", columnList = "workspace_id, evaluated_at DESC"),
+        })
 @Getter
 @Builder
 @NoArgsConstructor

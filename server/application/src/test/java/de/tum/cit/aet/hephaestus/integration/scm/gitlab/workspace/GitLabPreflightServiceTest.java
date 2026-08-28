@@ -41,12 +41,11 @@ class GitLabPreflightServiceTest extends BaseUnitTest {
     void setUp() {
         mockWebClient = mock(WebClient.class);
         GitLabProperties properties = new GitLabProperties(
-            "https://gitlab.com",
-            Duration.ofSeconds(30),
-            Duration.ofSeconds(60),
-            Duration.ofMillis(200),
-            Duration.ofMinutes(5)
-        );
+                "https://gitlab.com",
+                Duration.ofSeconds(30),
+                Duration.ofSeconds(60),
+                Duration.ofMillis(200),
+                Duration.ofMinutes(5));
         preflightService = new GitLabPreflightService(properties);
         // Replace the internally-created WebClient with our mock
         ReflectionTestUtils.setField(preflightService, "webClient", mockWebClient);
@@ -100,15 +99,12 @@ class GitLabPreflightServiceTest extends BaseUnitTest {
         @Test
         @DisplayName("returns failure for 401 without group fallback")
         void returnsInvalidFor401WithoutGroupPath() {
-            mockGetRequestThrows(
-                WebClientResponseException.create(
+            mockGetRequestThrows(WebClientResponseException.create(
                     HttpStatus.UNAUTHORIZED.value(),
                     "Unauthorized",
                     HttpHeaders.EMPTY,
                     new byte[0],
-                    StandardCharsets.UTF_8
-                )
-            );
+                    StandardCharsets.UTF_8));
 
             GitLabPreflightResponseDTO result = preflightService.validateToken("glpat-bad", null, null);
 
@@ -132,11 +128,8 @@ class GitLabPreflightServiceTest extends BaseUnitTest {
             mockGetRequest(new GitLabPreflightService.GitLabUserResponse(99L, "custom-user", "Custom", null, null));
 
             // Note: actual server URL validation (SSRF) is tested in ServerUrlValidatorTest
-            GitLabPreflightResponseDTO result = preflightService.validateToken(
-                "glpat-test",
-                "https://gitlab.example.com",
-                null
-            );
+            GitLabPreflightResponseDTO result =
+                    preflightService.validateToken("glpat-test", "https://gitlab.example.com", null);
 
             assertThat(result.valid()).isTrue();
             assertThat(result.username()).isEqualTo("custom-user");
@@ -145,8 +138,8 @@ class GitLabPreflightServiceTest extends BaseUnitTest {
         @Test
         void rejectsUnsafeServerUrl() {
             assertThatThrownBy(() -> preflightService.validateToken("glpat-test", "http://evil.com", null))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("HTTPS");
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("HTTPS");
         }
     }
 
@@ -164,9 +157,8 @@ class GitLabPreflightServiceTest extends BaseUnitTest {
             when(uriSpec.uri(anyString())).thenReturn((RequestHeadersSpec) headersSpec);
             when(headersSpec.header(anyString(), anyString())).thenReturn((RequestHeadersSpec) headersSpec);
             when(headersSpec.retrieve()).thenReturn(responseSpec);
-            when(responseSpec.bodyToFlux(eq(GitLabPreflightService.GitLabGroupListItem.class))).thenReturn(
-                Flux.empty()
-            );
+            when(responseSpec.bodyToFlux(eq(GitLabPreflightService.GitLabGroupListItem.class)))
+                    .thenReturn(Flux.empty());
 
             List<GitLabGroupDTO> groups = preflightService.listAccessibleGroups("glpat-test", null);
 
@@ -186,25 +178,12 @@ class GitLabPreflightServiceTest extends BaseUnitTest {
             when(headersSpec.retrieve()).thenReturn(responseSpec);
 
             var group1 = new GitLabPreflightService.GitLabGroupListItem(
-                1L,
-                "My Group",
-                "my-org/my-group",
-                null,
-                "https://gitlab.com/my-org/my-group",
-                "private"
-            );
+                    1L, "My Group", "my-org/my-group", null, "https://gitlab.com/my-org/my-group", "private");
             var group2 = new GitLabPreflightService.GitLabGroupListItem(
-                2L,
-                "Public Group",
-                "public-group",
-                null,
-                "https://gitlab.com/public-group",
-                "public"
-            );
+                    2L, "Public Group", "public-group", null, "https://gitlab.com/public-group", "public");
 
-            when(responseSpec.bodyToFlux(eq(GitLabPreflightService.GitLabGroupListItem.class))).thenReturn(
-                Flux.just(group1, group2)
-            );
+            when(responseSpec.bodyToFlux(eq(GitLabPreflightService.GitLabGroupListItem.class)))
+                    .thenReturn(Flux.just(group1, group2));
 
             List<GitLabGroupDTO> groups = preflightService.listAccessibleGroups("glpat-test", null);
 
@@ -218,8 +197,8 @@ class GitLabPreflightServiceTest extends BaseUnitTest {
         @Test
         void rejectsUnsafeServerUrl() {
             assertThatThrownBy(() -> preflightService.listAccessibleGroups("glpat-test", "http://evil.com"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("HTTPS");
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("HTTPS");
         }
     }
 }

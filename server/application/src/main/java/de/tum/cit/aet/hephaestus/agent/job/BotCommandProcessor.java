@@ -63,13 +63,12 @@ public class BotCommandProcessor {
     private final SilentModeQuery silentModeQuery;
 
     public BotCommandProcessor(
-        ManualReviewRequests manualReviewRequests,
-        PullRequestRepository pullRequestRepository,
-        UserRepository userRepository,
-        WorkspaceResolver workspaceResolver,
-        List<ScmCommentReactionSink> reactionSinkList,
-        SilentModeQuery silentModeQuery
-    ) {
+            ManualReviewRequests manualReviewRequests,
+            PullRequestRepository pullRequestRepository,
+            UserRepository userRepository,
+            WorkspaceResolver workspaceResolver,
+            List<ScmCommentReactionSink> reactionSinkList,
+            SilentModeQuery silentModeQuery) {
         this.manualReviewRequests = manualReviewRequests;
         this.pullRequestRepository = pullRequestRepository;
         this.userRepository = userRepository;
@@ -107,12 +106,11 @@ public class BotCommandProcessor {
             handleReviewCommand(event);
         } else {
             log.debug(
-                "Unknown bot command: command={}, repoId={}, mrNumber={}, author={}",
-                command,
-                event.repositoryId(),
-                event.mrNumber(),
-                event.noteAuthor()
-            );
+                    "Unknown bot command: command={}, repoId={}, mrNumber={}, author={}",
+                    command,
+                    event.repositoryId(),
+                    event.mrNumber(),
+                    event.noteAuthor());
         }
     }
 
@@ -122,18 +120,20 @@ public class BotCommandProcessor {
         String noteAuthor = event.noteAuthor();
         try {
             // Found by (repo, number), then re-fetched with the association graph the gate needs.
-            PullRequest stub = pullRequestRepository.findByRepositoryIdAndNumber(repositoryId, mrNumber).orElse(null);
+            PullRequest stub = pullRequestRepository
+                    .findByRepositoryIdAndNumber(repositoryId, mrNumber)
+                    .orElse(null);
             if (stub == null) {
                 log.warn(
-                    "Bot command: PR not found, repoId={}, mrNumber={}, author={}",
-                    repositoryId,
-                    mrNumber,
-                    noteAuthor
-                );
+                        "Bot command: PR not found, repoId={}, mrNumber={}, author={}",
+                        repositoryId,
+                        mrNumber,
+                        noteAuthor);
                 return;
             }
 
-            PullRequest pr = pullRequestRepository.findByIdWithAllForGate(stub.getId()).orElse(null);
+            PullRequest pr =
+                    pullRequestRepository.findByIdWithAllForGate(stub.getId()).orElse(null);
             if (pr == null) {
                 log.warn("Bot command: PR disappeared during re-fetch, prId={}", stub.getId());
                 return;
@@ -141,18 +141,17 @@ public class BotCommandProcessor {
 
             if (pr.getHeadRefOid() == null || pr.getHeadRefName() == null || pr.getBaseRefName() == null) {
                 log.warn(
-                    "Bot command: missing branch info, prId={}, headRefOid={}, headRefName={}, baseRefName={}",
-                    pr.getId(),
-                    pr.getHeadRefOid(),
-                    pr.getHeadRefName(),
-                    pr.getBaseRefName()
-                );
+                        "Bot command: missing branch info, prId={}, headRefOid={}, headRefName={}, baseRefName={}",
+                        pr.getId(),
+                        pr.getHeadRefOid(),
+                        pr.getHeadRefName(),
+                        pr.getBaseRefName());
                 return;
             }
 
-            if (
-                pr.getState() == PullRequest.State.CLOSED || pr.getState() == PullRequest.State.MERGED || pr.isMerged()
-            ) {
+            if (pr.getState() == PullRequest.State.CLOSED
+                    || pr.getState() == PullRequest.State.MERGED
+                    || pr.isMerged()) {
                 log.info("Bot command: skipping closed/merged PR, prId={}, state={}", pr.getId(), pr.getState());
                 return;
             }
@@ -160,8 +159,9 @@ public class BotCommandProcessor {
             // Resolved before anything is authorized or spent: the workspace is what the commenter's
             // standing is judged against and what the ledger row and the job belong to.
             Workspace workspace = workspaceResolver
-                .resolveForRepository(pr.getRepository() != null ? pr.getRepository().getNameWithOwner() : null)
-                .orElse(null);
+                    .resolveForRepository(
+                            pr.getRepository() != null ? pr.getRepository().getNameWithOwner() : null)
+                    .orElse(null);
             if (workspace == null) {
                 log.debug("Bot command: no workspace monitors this repository, prId={}", pr.getId());
                 return;
@@ -172,44 +172,43 @@ public class BotCommandProcessor {
             // account's whole set: a comment carries no Hephaestus account, so an admin under a second
             // provider would otherwise be authorized by a link this comment does not prove they hold.
             List<User> commenter = userRepository
-                .findByNativeIdAndProviderId(event.authorNativeId(), event.providerId())
-                .map(List::of)
-                .orElseGet(List::of);
+                    .findByNativeIdAndProviderId(event.authorNativeId(), event.providerId())
+                    .map(List::of)
+                    .orElseGet(List::of);
 
             ManualReviewOutcome outcome = manualReviewRequests.requestPullRequestReview(workspace, pr, commenter);
             switch (outcome.status()) {
-                case SUBMITTED -> log.info(
-                    "Bot command: review triggered, jobId={}, prId={}, mrNumber={}, author={}",
-                    outcome.jobId(),
-                    pr.getId(),
-                    mrNumber,
-                    noteAuthor
-                );
-                case REFUSED -> log.info(
-                    "Bot command: no review, prId={}, mrNumber={}, author={}, reason={}",
-                    pr.getId(),
-                    mrNumber,
-                    noteAuthor,
-                    outcome.reason()
-                );
+                case SUBMITTED ->
+                    log.info(
+                            "Bot command: review triggered, jobId={}, prId={}, mrNumber={}, author={}",
+                            outcome.jobId(),
+                            pr.getId(),
+                            mrNumber,
+                            noteAuthor);
+                case REFUSED ->
+                    log.info(
+                            "Bot command: no review, prId={}, mrNumber={}, author={}, reason={}",
+                            pr.getId(),
+                            mrNumber,
+                            noteAuthor,
+                            outcome.reason());
                 // Logged at warn: a request from somebody with no standing on the artifact is the shape
                 // an attempt to aim coaching at a colleague takes, and it should be visible as one.
-                case FORBIDDEN -> log.warn(
-                    "Bot command: refused, the commenter is neither an actor on this merge request nor a " +
-                        "workspace admin, prId={}, mrNumber={}, author={}",
-                    pr.getId(),
-                    mrNumber,
-                    noteAuthor
-                );
+                case FORBIDDEN ->
+                    log.warn(
+                            "Bot command: refused, the commenter is neither an actor on this merge request nor a "
+                                    + "workspace admin, prId={}, mrNumber={}, author={}",
+                            pr.getId(),
+                            mrNumber,
+                            noteAuthor);
             }
         } catch (Exception e) {
             log.error(
-                "Bot command: failed to process review, repoId={}, mrNumber={}, author={}",
-                repositoryId,
-                mrNumber,
-                noteAuthor,
-                e
-            );
+                    "Bot command: failed to process review, repoId={}, mrNumber={}, author={}",
+                    repositoryId,
+                    mrNumber,
+                    noteAuthor,
+                    e);
         }
     }
 

@@ -23,10 +23,8 @@ class ReviewSubjectResolver {
         if (ids.isEmpty()) {
             return Map.of();
         }
-        return userRepository
-            .findAllById(ids)
-            .stream()
-            .map(ReviewSubjectDTO::from)
-            .collect(Collectors.toMap(ReviewSubjectDTO::id, Function.identity()));
+        return userRepository.findAllById(ids).stream()
+                .map(ReviewSubjectDTO::from)
+                .collect(Collectors.toMap(ReviewSubjectDTO::id, Function.identity()));
     }
 }

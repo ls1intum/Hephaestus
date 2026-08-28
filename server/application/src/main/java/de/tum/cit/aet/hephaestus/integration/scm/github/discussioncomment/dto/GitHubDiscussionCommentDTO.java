@@ -27,21 +27,20 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubDiscussionCommentDTO(
-    @JsonProperty("id") @Nullable Long id,
-    @JsonProperty("database_id") @Nullable Long databaseId,
-    @JsonProperty("node_id") @Nullable String nodeId,
-    @JsonProperty("body") @Nullable String body,
-    @JsonProperty("html_url") @Nullable String htmlUrl,
-    @JsonProperty("is_answer") boolean isAnswer,
-    @JsonProperty("is_minimized") boolean isMinimized,
-    @JsonProperty("minimized_reason") @Nullable String minimizedReason,
-    @JsonProperty("author_association") @Nullable String authorAssociation,
-    @JsonProperty("created_at") @Nullable Instant createdAt,
-    @JsonProperty("updated_at") @Nullable Instant updatedAt,
-    @JsonProperty("user") @Nullable GitHubUserDTO author,
-    // For reply threading - contains the parent comment's node ID
-    @JsonProperty("reply_to_id") @Nullable String replyToNodeId
-) {
+        @JsonProperty("id") @Nullable Long id,
+        @JsonProperty("database_id") @Nullable Long databaseId,
+        @JsonProperty("node_id") @Nullable String nodeId,
+        @JsonProperty("body") @Nullable String body,
+        @JsonProperty("html_url") @Nullable String htmlUrl,
+        @JsonProperty("is_answer") boolean isAnswer,
+        @JsonProperty("is_minimized") boolean isMinimized,
+        @JsonProperty("minimized_reason") @Nullable String minimizedReason,
+        @JsonProperty("author_association") @Nullable String authorAssociation,
+        @JsonProperty("created_at") @Nullable Instant createdAt,
+        @JsonProperty("updated_at") @Nullable Instant updatedAt,
+        @JsonProperty("user") @Nullable GitHubUserDTO author,
+        // For reply threading - contains the parent comment's node ID
+        @JsonProperty("reply_to_id") @Nullable String replyToNodeId) {
     /**
      * Get the database ID, preferring databaseId over id for GraphQL responses.
      * <p>
@@ -66,20 +65,19 @@ public record GitHubDiscussionCommentDTO(
         }
 
         return new GitHubDiscussionCommentDTO(
-            null,
-            comment.getDatabaseId() != null ? comment.getDatabaseId().longValue() : null,
-            comment.getId(),
-            comment.getBody(),
-            uriToString(comment.getUrl()),
-            comment.getIsAnswer(),
-            comment.getIsMinimized(),
-            comment.getMinimizedReason(),
-            convertAuthorAssociation(comment.getAuthorAssociation()),
-            toInstant(comment.getCreatedAt()),
-            toInstant(comment.getUpdatedAt()),
-            GitHubUserDTO.fromActor(comment.getAuthor()),
-            comment.getReplyTo() != null ? comment.getReplyTo().getId() : null
-        );
+                null,
+                comment.getDatabaseId() != null ? comment.getDatabaseId().longValue() : null,
+                comment.getId(),
+                comment.getBody(),
+                uriToString(comment.getUrl()),
+                comment.getIsAnswer(),
+                comment.getIsMinimized(),
+                comment.getMinimizedReason(),
+                convertAuthorAssociation(comment.getAuthorAssociation()),
+                toInstant(comment.getCreatedAt()),
+                toInstant(comment.getUpdatedAt()),
+                GitHubUserDTO.fromActor(comment.getAuthor()),
+                comment.getReplyTo() != null ? comment.getReplyTo().getId() : null);
     }
 
     /**
@@ -90,8 +88,7 @@ public record GitHubDiscussionCommentDTO(
      * {@code replyToNodeId} set to the parent comment's node ID for threading.
      */
     public static List<GitHubDiscussionCommentDTO> fromDiscussionCommentConnection(
-        @Nullable GHDiscussionCommentConnection connection
-    ) {
+            @Nullable GHDiscussionCommentConnection connection) {
         if (connection == null || connection.getNodes() == null) {
             return Collections.emptyList();
         }
@@ -115,9 +112,9 @@ public record GitHubDiscussionCommentDTO(
      * {@code replyTo { id }}).
      */
     private static void extractReplies(GHDiscussionComment parentComment, List<GitHubDiscussionCommentDTO> result) {
-        if (
-            parentComment == null || parentComment.getReplies() == null || parentComment.getReplies().getNodes() == null
-        ) {
+        if (parentComment == null
+                || parentComment.getReplies() == null
+                || parentComment.getReplies().getNodes() == null) {
             return;
         }
         String parentNodeId = parentComment.getId();
@@ -126,20 +123,20 @@ public record GitHubDiscussionCommentDTO(
                 continue;
             }
             GitHubDiscussionCommentDTO replyDto = new GitHubDiscussionCommentDTO(
-                null,
-                reply.getDatabaseId() != null ? reply.getDatabaseId().longValue() : null,
-                reply.getId(),
-                reply.getBody(),
-                uriToString(reply.getUrl()),
-                reply.getIsAnswer(),
-                reply.getIsMinimized(),
-                reply.getMinimizedReason(),
-                convertAuthorAssociation(reply.getAuthorAssociation()),
-                toInstant(reply.getCreatedAt()),
-                toInstant(reply.getUpdatedAt()),
-                GitHubUserDTO.fromActor(reply.getAuthor()),
-                parentNodeId // set replyToNodeId to the parent comment's node ID
-            );
+                    null,
+                    reply.getDatabaseId() != null ? reply.getDatabaseId().longValue() : null,
+                    reply.getId(),
+                    reply.getBody(),
+                    uriToString(reply.getUrl()),
+                    reply.getIsAnswer(),
+                    reply.getIsMinimized(),
+                    reply.getMinimizedReason(),
+                    convertAuthorAssociation(reply.getAuthorAssociation()),
+                    toInstant(reply.getCreatedAt()),
+                    toInstant(reply.getUpdatedAt()),
+                    GitHubUserDTO.fromActor(reply.getAuthor()),
+                    parentNodeId // set replyToNodeId to the parent comment's node ID
+                    );
             result.add(replyDto);
         }
     }

@@ -57,31 +57,28 @@ public class GitLabMemberMessageHandler extends AbstractIntegrationMessageHandle
     private final TransactionTemplate requiresNewTransaction;
 
     GitLabMemberMessageHandler(
-        OrganizationRepository organizationRepository,
-        OrganizationMembershipRepository membershipRepository,
-        UserRepository userRepository,
-        IdentityProviderRepository gitProviderRepository,
-        GitLabProperties gitLabProperties,
-        @Nullable OrganizationMembershipListener membershipListener,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            OrganizationRepository organizationRepository,
+            OrganizationMembershipRepository membershipRepository,
+            UserRepository userRepository,
+            IdentityProviderRepository gitProviderRepository,
+            GitLabProperties gitLabProperties,
+            @Nullable OrganizationMembershipListener membershipListener,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITLAB,
-            GitLabEventType.MEMBER.getValue(),
-            GitLabMemberEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITLAB,
+                GitLabEventType.MEMBER.getValue(),
+                GitLabMemberEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.organizationRepository = organizationRepository;
         this.membershipRepository = membershipRepository;
         this.userRepository = userRepository;
         this.gitProviderRepository = gitProviderRepository;
         this.gitLabProperties = gitLabProperties;
         this.membershipListener = membershipListener;
-        this.requiresNewTransaction = new TransactionTemplate(
-            Objects.requireNonNull(transactionTemplate.getTransactionManager())
-        );
+        this.requiresNewTransaction =
+                new TransactionTemplate(Objects.requireNonNull(transactionTemplate.getTransactionManager()));
         this.requiresNewTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
@@ -91,33 +88,28 @@ public class GitLabMemberMessageHandler extends AbstractIntegrationMessageHandle
         String safeUsername = sanitizeForLog(event.userUsername());
 
         log.debug(
-            "Received member event: eventName={}, groupPath={}, user={}, access={}",
-            event.eventName(),
-            safeGroupPath,
-            safeUsername,
-            event.groupAccess()
-        );
+                "Received member event: eventName={}, groupPath={}, user={}, access={}",
+                event.eventName(),
+                safeGroupPath,
+                safeUsername,
+                event.groupAccess());
 
-        Long providerId = Objects.requireNonNull(
-            gitProviderRepository
+        Long providerId = Objects.requireNonNull(gitProviderRepository
                 .findByTypeAndServerUrl(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
-                .orElseThrow(() ->
-                    new IllegalStateException(
-                        "IdentityProvider not found for type=GITLAB, serverUrl=" + gitLabProperties.defaultServerUrl()
-                    )
-                )
-                .getId()
-        );
+                .orElseThrow(() -> new IllegalStateException(
+                        "IdentityProvider not found for type=GITLAB, serverUrl=" + gitLabProperties.defaultServerUrl()))
+                .getId());
 
         // Look up the organization by the group's native ID
-        Organization org = organizationRepository.findByNativeIdAndProviderId(event.groupId(), providerId).orElse(null);
+        Organization org = organizationRepository
+                .findByNativeIdAndProviderId(event.groupId(), providerId)
+                .orElse(null);
 
         if (org == null) {
             log.debug(
-                "Organization not yet synced, skipping member event: groupId={}, groupPath={}",
-                event.groupId(),
-                safeGroupPath
-            );
+                    "Organization not yet synced, skipping member event: groupId={}, groupPath={}",
+                    event.groupId(),
+                    safeGroupPath);
             return;
         }
 
@@ -143,20 +135,21 @@ public class GitLabMemberMessageHandler extends AbstractIntegrationMessageHandle
             }
             String avatarUrl = event.userAvatar() != null ? event.userAvatar() : "";
             userRepository.upsertUser(
-                nativeUserId,
-                providerId,
-                login,
-                name,
-                avatarUrl,
-                "", // htmlUrl not available in member webhook payload
-                GitLabUserClassifier.classify(login).name(),
-                null,
-                null,
-                null
-            );
+                    nativeUserId,
+                    providerId,
+                    login,
+                    name,
+                    avatarUrl,
+                    "", // htmlUrl not available in member webhook payload
+                    GitLabUserClassifier.classify(login).name(),
+                    null,
+                    null,
+                    null);
         });
 
-        User user = userRepository.findByNativeIdAndProviderId(nativeUserId, providerId).orElse(null);
+        User user = userRepository
+                .findByNativeIdAndProviderId(nativeUserId, providerId)
+                .orElse(null);
         if (user == null) {
             log.warn("Failed to upsert user from member event: userId={}, login={}", nativeUserId, login);
             return;
@@ -166,44 +159,41 @@ public class GitLabMemberMessageHandler extends AbstractIntegrationMessageHandle
         membershipRepository.upsertMembership(org.getId(), user.getId(), role);
 
         log.info(
-            "Added/updated group member: orgId={}, orgLogin={}, userLogin={}, role={}",
-            org.getId(),
-            sanitizeForLog(org.getLogin()),
-            sanitizeForLog(login),
-            role
-        );
+                "Added/updated group member: orgId={}, orgLogin={}, userLogin={}, role={}",
+                org.getId(),
+                sanitizeForLog(org.getLogin()),
+                sanitizeForLog(login),
+                role);
 
         if (membershipListener != null) {
             membershipListener.onMemberAdded(
-                new MembershipChangedEvent(org.getId(), org.getLogin(), user.getId(), login, event.groupAccess())
-            );
+                    new MembershipChangedEvent(org.getId(), org.getLogin(), user.getId(), login, event.groupAccess()));
         }
     }
 
     private void handleMemberRemoval(GitLabMemberEventDTO event, Organization org, Long providerId) {
-        User user = userRepository.findByNativeIdAndProviderId(event.userId(), providerId).orElse(null);
+        User user = userRepository
+                .findByNativeIdAndProviderId(event.userId(), providerId)
+                .orElse(null);
         if (user == null) {
             log.debug(
-                "User not found for member removal: userId={}, login={}",
-                event.userId(),
-                sanitizeForLog(event.userUsername())
-            );
+                    "User not found for member removal: userId={}, login={}",
+                    event.userId(),
+                    sanitizeForLog(event.userUsername()));
             return;
         }
 
         membershipRepository.deleteByOrganizationIdAndUserIdIn(org.getId(), List.of(user.getId()));
 
         log.info(
-            "Removed group member: orgId={}, orgLogin={}, userLogin={}",
-            org.getId(),
-            sanitizeForLog(org.getLogin()),
-            sanitizeForLog(event.userUsername())
-        );
+                "Removed group member: orgId={}, orgLogin={}, userLogin={}",
+                org.getId(),
+                sanitizeForLog(org.getLogin()),
+                sanitizeForLog(event.userUsername()));
 
         if (membershipListener != null) {
             membershipListener.onMemberRemoved(
-                new MembershipChangedEvent(org.getId(), org.getLogin(), user.getId(), event.userUsername(), null)
-            );
+                    new MembershipChangedEvent(org.getId(), org.getLogin(), user.getId(), event.userUsername(), null));
         }
     }
 

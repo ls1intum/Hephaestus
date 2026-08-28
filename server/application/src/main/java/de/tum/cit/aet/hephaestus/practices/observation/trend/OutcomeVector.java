@@ -7,22 +7,15 @@ import org.jspecify.annotations.Nullable;
 
 /** Complete presence-assessment outcome distribution for one or more evidence opportunities. */
 public record OutcomeVector(
-    int demonstratedStrengths,
-    int safeAvoidances,
-    int commissionProblems,
-    int omissionGaps,
-    int notApplicable
-) {
+        int demonstratedStrengths, int safeAvoidances, int commissionProblems, int omissionGaps, int notApplicable) {
     static final OutcomeVector EMPTY = new OutcomeVector(0, 0, 0, 0, 0);
 
     public OutcomeVector {
-        if (
-            demonstratedStrengths < 0 ||
-            safeAvoidances < 0 ||
-            commissionProblems < 0 ||
-            omissionGaps < 0 ||
-            notApplicable < 0
-        ) {
+        if (demonstratedStrengths < 0
+                || safeAvoidances < 0
+                || commissionProblems < 0
+                || omissionGaps < 0
+                || notApplicable < 0) {
             throw new IllegalArgumentException("Outcome counts must be non-negative");
         }
     }
@@ -54,12 +47,11 @@ public record OutcomeVector(
 
     public OutcomeVector plus(OutcomeVector other) {
         return new OutcomeVector(
-            demonstratedStrengths + other.demonstratedStrengths,
-            safeAvoidances + other.safeAvoidances,
-            commissionProblems + other.commissionProblems,
-            omissionGaps + other.omissionGaps,
-            notApplicable + other.notApplicable
-        );
+                demonstratedStrengths + other.demonstratedStrengths,
+                safeAvoidances + other.safeAvoidances,
+                commissionProblems + other.commissionProblems,
+                omissionGaps + other.omissionGaps,
+                notApplicable + other.notApplicable);
     }
 
     public int positives() {

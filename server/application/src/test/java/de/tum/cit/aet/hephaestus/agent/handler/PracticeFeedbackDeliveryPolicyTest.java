@@ -94,8 +94,10 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
     void compositionIsAllowedBeforeAnyPracticeSetIsKnown() {
         AgentJob job = conversationJob();
 
-        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.IN_APP)).isTrue();
-        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.CONVERSATION)).isTrue();
+        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.IN_APP))
+                .isTrue();
+        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.CONVERSATION))
+                .isTrue();
     }
 
     @Test
@@ -103,7 +105,8 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
         AgentJob job = conversationJob();
         when(coverageService.assessRepositoryless(any(), any())).thenReturn(coverage(false));
 
-        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.CONVERSATION)).isFalse();
+        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.CONVERSATION))
+                .isFalse();
         assertThat(recordedRefusal()).isEqualTo(FeedbackSuppressionReason.OUTSIDE_CURRENT_COVERAGE);
     }
 
@@ -112,7 +115,8 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
         AgentJob job = conversationJob();
         when(accountPreferencesQuery.practiceFeedbackDeliveryEnabled(AUTHOR_ID)).thenReturn(false);
 
-        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.CONVERSATION)).isFalse();
+        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.CONVERSATION))
+                .isFalse();
         assertThat(recordedRefusal()).isEqualTo(FeedbackSuppressionReason.RECIPIENT_OPTED_OUT);
     }
 
@@ -121,8 +125,10 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
         AgentJob job = conversationJob();
         when(silentModeQuery.isSilentModeEngaged()).thenReturn(true);
 
-        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.CONVERSATION)).isFalse();
-        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.IN_APP)).isTrue();
+        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.CONVERSATION))
+                .isFalse();
+        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.IN_APP))
+                .isTrue();
     }
 
     @Test
@@ -131,18 +137,18 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
         job.getWorkspace().getReviewSettings().setDeliveryStatus(PracticeDeliveryStatus.PAUSED);
         job.setPracticeRolloutRevision(job.getWorkspace().getReviewSettings().getRolloutRevision());
 
-        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.CONVERSATION)).isFalse();
+        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.CONVERSATION))
+                .isFalse();
         assertThat(recordedRefusal()).isEqualTo(FeedbackSuppressionReason.WORKSPACE_DELIVERY_PAUSED);
-        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.IN_APP)).isTrue();
+        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.IN_APP))
+                .isTrue();
     }
 
     @Test
     void artifactCompositionMustUseTheTypedEntryPoint() {
-        assertThat(
-            org.assertj.core.api.Assertions.catchThrowable(() ->
-                policy().allowsComposition(conversationJob(), DeliveryPolicySurface.ARTIFACT)
-            )
-        ).isInstanceOf(IllegalArgumentException.class);
+        assertThat(org.assertj.core.api.Assertions.catchThrowable(
+                        () -> policy().allowsComposition(conversationJob(), DeliveryPolicySurface.ARTIFACT)))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -151,7 +157,8 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
         job.getWorkspace().getReviewSettings().setDeliveryStatus(PracticeDeliveryStatus.ACTIVE);
         job.setPracticeRolloutRevision(job.getWorkspace().getReviewSettings().getRolloutRevision() - 1);
 
-        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.CONVERSATION)).isFalse();
+        assertThat(policy().allowsComposition(job, DeliveryPolicySurface.CONVERSATION))
+                .isFalse();
         assertThat(recordedRefusal()).isEqualTo(FeedbackSuppressionReason.STALE_ROLLOUT_REVISION);
     }
 
@@ -166,25 +173,17 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
         Practice practice = new Practice();
         practice.setSlug("review-quality");
         practice.setAutonomy(PracticeAutonomy.HUMAN_APPROVAL);
-        when(
-            practiceRepository.findByWorkspaceIdAndSlugIn(WORKSPACE_ID, java.util.Set.of("review-quality"))
-        ).thenReturn(java.util.List.of(practice));
-        when(approvalRepository.findByFeedbackIdAndWorkspaceId(feedbackId, WORKSPACE_ID)).thenReturn(
-            Optional.of(
-                FeedbackApproval.builder()
-                    .feedbackId(feedbackId)
-                    .workspaceId(WORKSPACE_ID)
-                    .decision(FeedbackApprovalDecision.APPROVED)
-                    .build()
-            )
-        );
+        when(practiceRepository.findByWorkspaceIdAndSlugIn(WORKSPACE_ID, java.util.Set.of("review-quality")))
+                .thenReturn(java.util.List.of(practice));
+        when(approvalRepository.findByFeedbackIdAndWorkspaceId(feedbackId, WORKSPACE_ID))
+                .thenReturn(Optional.of(FeedbackApproval.builder()
+                        .feedbackId(feedbackId)
+                        .workspaceId(WORKSPACE_ID)
+                        .decision(FeedbackApprovalDecision.APPROVED)
+                        .build()));
 
         var decision = policy().evaluatePullRequest(
-            job,
-            DeliveryPolicyStage.EGRESS,
-            feedbackId,
-            java.util.Set.of("review-quality")
-        );
+                        job, DeliveryPolicyStage.EGRESS, feedbackId, java.util.Set.of("review-quality"));
 
         assertThat(decision.allowed()).isTrue();
         assertThat(recordedEvaluation().result().checks()).anySatisfy(check -> {
@@ -200,18 +199,16 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
         Practice practice = new Practice();
         practice.setSlug("review-quality");
         practice.setAutonomy(PracticeAutonomy.HUMAN_APPROVAL);
-        when(
-            practiceRepository.findByWorkspaceIdAndSlugIn(WORKSPACE_ID, java.util.Set.of("review-quality"))
-        ).thenReturn(java.util.List.of(practice));
+        when(practiceRepository.findByWorkspaceIdAndSlugIn(WORKSPACE_ID, java.util.Set.of("review-quality")))
+                .thenReturn(java.util.List.of(practice));
 
         var decision = policy().evaluateRepositoryless(
-            job,
-            DeliveryPolicyStage.EGRESS,
-            feedbackId,
-            DeliveryPolicySurface.CONVERSATION,
-            AUTHOR_ID,
-            java.util.Set.of("review-quality")
-        );
+                        job,
+                        DeliveryPolicyStage.EGRESS,
+                        feedbackId,
+                        DeliveryPolicySurface.CONVERSATION,
+                        AUTHOR_ID,
+                        java.util.Set.of("review-quality"));
 
         assertThat(decision.allowed()).isFalse();
         assertThat(recordedRefusal()).isEqualTo(FeedbackSuppressionReason.PRACTICE_REQUIRES_APPROVAL);
@@ -225,18 +222,16 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
         Practice practice = new Practice();
         practice.setSlug("review-quality");
         practice.setAutonomy(PracticeAutonomy.AUTOMATIC);
-        when(
-            practiceRepository.findByWorkspaceIdAndSlugIn(WORKSPACE_ID, java.util.Set.of("review-quality"))
-        ).thenReturn(java.util.List.of(practice));
+        when(practiceRepository.findByWorkspaceIdAndSlugIn(WORKSPACE_ID, java.util.Set.of("review-quality")))
+                .thenReturn(java.util.List.of(practice));
 
         var decision = policy().evaluateRepositoryless(
-            job,
-            DeliveryPolicyStage.EGRESS,
-            feedbackId,
-            DeliveryPolicySurface.CONVERSATION,
-            AUTHOR_ID,
-            java.util.Set.of("review-quality")
-        );
+                        job,
+                        DeliveryPolicyStage.EGRESS,
+                        feedbackId,
+                        DeliveryPolicySurface.CONVERSATION,
+                        AUTHOR_ID,
+                        java.util.Set.of("review-quality"));
 
         assertThat(decision.allowed()).isFalse();
         assertThat(recordedRefusal()).isEqualTo(FeedbackSuppressionReason.STALE_ROLLOUT_REVISION);
@@ -282,9 +277,7 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
     void reviewerFeedbackUsesTheReviewerForCoverageAndConsent() {
         AgentJob job = pullRequestJob();
         var metadata = org.junit.jupiter.api.Assertions.assertInstanceOf(
-            tools.jackson.databind.node.ObjectNode.class,
-            job.getMetadata()
-        );
+                tools.jackson.databind.node.ObjectNode.class, job.getMetadata());
         metadata.put("subject_role", "REVIEWER");
         metadata.put("review_id", REVIEW_ID);
         metadata.put("about_user_id", REVIEWER_ID);
@@ -298,19 +291,15 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
         review.setAuthor(reviewer);
         when(pullRequestReviewRepository.findById(REVIEW_ID)).thenReturn(Optional.of(review));
         stubPullRequestEvaluation(pullRequest, coverage(true));
-        when(accountPreferencesQuery.practiceFeedbackDeliveryEnabled(REVIEWER_ID)).thenReturn(false);
+        when(accountPreferencesQuery.practiceFeedbackDeliveryEnabled(REVIEWER_ID))
+                .thenReturn(false);
 
         PracticeFeedbackDeliveryPolicy.Decision<PullRequest> decision = policy().evaluatePullRequest(job);
 
         assertThat(decision.allowed()).isFalse();
         assertThat(recordedRefusal()).isEqualTo(FeedbackSuppressionReason.RECIPIENT_OPTED_OUT);
-        org.mockito.Mockito.verify(coverageService).assess(
-            any(),
-            eq("owner/repo"),
-            eq("main"),
-            eq(new ReviewSubject(REVIEWER_ID, true)),
-            eq(true)
-        );
+        org.mockito.Mockito.verify(coverageService)
+                .assess(any(), eq("owner/repo"), eq("main"), eq(new ReviewSubject(REVIEWER_ID, true)), eq(true));
     }
 
     private FeedbackSuppressionReason recordedRefusal() {
@@ -318,9 +307,8 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
     }
 
     private DeliveryPolicyEvaluationCommand recordedEvaluation() {
-        ArgumentCaptor<DeliveryPolicyEvaluationCommand> recorded = ArgumentCaptor.forClass(
-            DeliveryPolicyEvaluationCommand.class
-        );
+        ArgumentCaptor<DeliveryPolicyEvaluationCommand> recorded =
+                ArgumentCaptor.forClass(DeliveryPolicyEvaluationCommand.class);
         org.mockito.Mockito.verify(evaluationRecorder).record(recorded.capture());
         return recorded.getValue();
     }
@@ -340,7 +328,9 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
         metadata.put("about_user_id", AUTHOR_ID);
         job.setMetadata(metadata);
         lenient().when(coverageService.assessRepositoryless(any(), any())).thenReturn(coverage(true));
-        lenient().when(accountPreferencesQuery.practiceFeedbackDeliveryEnabled(AUTHOR_ID)).thenReturn(true);
+        lenient()
+                .when(accountPreferencesQuery.practiceFeedbackDeliveryEnabled(AUTHOR_ID))
+                .thenReturn(true);
         return job;
     }
 
@@ -374,44 +364,39 @@ class PracticeFeedbackDeliveryPolicyTest extends BaseUnitTest {
     }
 
     private void stubPullRequestEvaluation(
-        PullRequest pullRequest,
-        PracticeReviewCoverageService.CoverageAssessment coverage
-    ) {
-        when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID)).thenReturn(
-            Optional.of(pullRequest)
-        );
-        when(repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(WORKSPACE_ID, "owner/repo")).thenReturn(
-            true
-        );
-        when(coverageService.assess(any(), eq("owner/repo"), eq("main"), any(), eq(true))).thenReturn(coverage);
+            PullRequest pullRequest, PracticeReviewCoverageService.CoverageAssessment coverage) {
+        when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID))
+                .thenReturn(Optional.of(pullRequest));
+        when(repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(WORKSPACE_ID, "owner/repo"))
+                .thenReturn(true);
+        when(coverageService.assess(any(), eq("owner/repo"), eq("main"), any(), eq(true)))
+                .thenReturn(coverage);
     }
 
     private static PracticeReviewCoverageService.CoverageAssessment coverage(boolean admitted) {
         return new PracticeReviewCoverageService.CoverageAssessment(
-            ReviewRepositoryMode.ALL_MONITORED,
-            ReviewPersonMode.SELECTED,
-            ReviewSubjectStatus.RESOLVED_LINKED_HUMAN,
-            true,
-            true,
-            admitted,
-            admitted
-        );
+                ReviewRepositoryMode.ALL_MONITORED,
+                ReviewPersonMode.SELECTED,
+                ReviewSubjectStatus.RESOLVED_LINKED_HUMAN,
+                true,
+                true,
+                admitted,
+                admitted);
     }
 
     private PracticeFeedbackDeliveryPolicy policy() {
         return new PracticeFeedbackDeliveryPolicy(
-            issueRepository,
-            pullRequestRepository,
-            pullRequestReviewRepository,
-            repositoryToMonitorRepository,
-            workspaceRepository,
-            accountPreferencesQuery,
-            mock(PracticeReviewProperties.class),
-            silentModeQuery,
-            coverageService,
-            evaluationRecorder,
-            practiceRepository,
-            approvalRepository
-        );
+                issueRepository,
+                pullRequestRepository,
+                pullRequestReviewRepository,
+                repositoryToMonitorRepository,
+                workspaceRepository,
+                accountPreferencesQuery,
+                mock(PracticeReviewProperties.class),
+                silentModeQuery,
+                coverageService,
+                evaluationRecorder,
+                practiceRepository,
+                approvalRepository);
     }
 }

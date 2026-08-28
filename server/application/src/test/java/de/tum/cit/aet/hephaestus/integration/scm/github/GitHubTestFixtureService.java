@@ -47,11 +47,11 @@ public class GitHubTestFixtureService {
     public GitHubTestFixtureService(HttpGraphQlClient graphQlClient, String token) {
         this.graphQlClient = graphQlClient;
         this.restClient = WebClient.builder()
-            .baseUrl(GITHUB_API_URL)
-            .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-            .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
-            .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
-            .build();
+                .baseUrl(GITHUB_API_URL)
+                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
+                .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
+                .build();
     }
 
     // REPOSITORY OPERATIONS
@@ -60,7 +60,7 @@ public class GitHubTestFixtureService {
      * Creates an ephemeral private repository in the given organization.
      */
     public CreatedRepository createRepository(String orgLogin, String repositoryName, boolean autoInit)
-        throws InterruptedException {
+            throws InterruptedException {
         // First, get organization node ID via GraphQL query
         String orgNodeId = getOrganizationNodeId(orgLogin);
 
@@ -82,26 +82,24 @@ public class GitHubTestFixtureService {
             """;
 
         Map<String, Object> input = Map.of(
-            "name",
-            repositoryName,
-            "ownerId",
-            orgNodeId,
-            "visibility",
-            "PRIVATE",
-            "description",
-            "Temporary repository for live integration testing"
-        );
+                "name",
+                repositoryName,
+                "ownerId",
+                orgNodeId,
+                "visibility",
+                "PRIVATE",
+                "description",
+                "Temporary repository for live integration testing");
 
         ClientGraphQlResponse response = graphQlClient
-            .document(mutation)
-            .variable("input", input)
-            .execute()
-            .block(Duration.ofSeconds(30));
+                .document(mutation)
+                .variable("input", input)
+                .execute()
+                .block(Duration.ofSeconds(30));
 
         if (response == null || !response.isValid()) {
             throw new RuntimeException(
-                "Failed to create repository: " + (response != null ? response.getErrors() : "null response")
-            );
+                    "Failed to create repository: " + (response != null ? response.getErrors() : "null response"));
         }
 
         Map<String, Object> repo = response.field("createRepository.repository").toEntity(Map.class);
@@ -134,11 +132,11 @@ public class GitHubTestFixtureService {
         for (int attempt = 1; attempt <= maxRetries; attempt++) {
             try {
                 restClient
-                    .delete()
-                    .uri("/repos/{owner}/{repo}", parts[0], parts[1])
-                    .retrieve()
-                    .toBodilessEntity()
-                    .block(Duration.ofSeconds(30));
+                        .delete()
+                        .uri("/repos/{owner}/{repo}", parts[0], parts[1])
+                        .retrieve()
+                        .toBodilessEntity()
+                        .block(Duration.ofSeconds(30));
                 log.info("Deleted repository: {}", fullName);
                 return;
             } catch (Exception e) {
@@ -152,13 +150,12 @@ public class GitHubTestFixtureService {
                     log.error("Failed to delete repository {} after {} attempts: {}", fullName, maxRetries, message);
                 } else {
                     log.warn(
-                        "Attempt {}/{} to delete repository {} failed: {}. Retrying in {}ms...",
-                        attempt,
-                        maxRetries,
-                        fullName,
-                        message,
-                        retryDelayMs
-                    );
+                            "Attempt {}/{} to delete repository {} failed: {}. Retrying in {}ms...",
+                            attempt,
+                            maxRetries,
+                            fullName,
+                            message,
+                            retryDelayMs);
                     try {
                         Thread.sleep(retryDelayMs);
                     } catch (InterruptedException ie) {
@@ -192,35 +189,32 @@ public class GitHubTestFixtureService {
             """;
 
         Map<String, Object> input = Map.of(
-            "repositoryId",
-            repositoryNodeId,
-            "name",
-            name,
-            "color",
-            color,
-            "description",
-            description != null ? description : ""
-        );
+                "repositoryId",
+                repositoryNodeId,
+                "name",
+                name,
+                "color",
+                color,
+                "description",
+                description != null ? description : "");
 
         ClientGraphQlResponse response = graphQlClient
-            .document(mutation)
-            .variable("input", input)
-            .execute()
-            .block(Duration.ofSeconds(30));
+                .document(mutation)
+                .variable("input", input)
+                .execute()
+                .block(Duration.ofSeconds(30));
 
         if (response == null || !response.isValid()) {
             throw new RuntimeException(
-                "Failed to create label: " + (response != null ? response.getErrors() : "null response")
-            );
+                    "Failed to create label: " + (response != null ? response.getErrors() : "null response"));
         }
 
         Map<String, Object> label = response.field("createLabel.label").toEntity(Map.class);
         assertNotNull(label);
         return new CreatedLabel(
-            requiredField(label, "id", String.class),
-            requiredField(label, "name", String.class),
-            requiredField(label, "color", String.class)
-        );
+                requiredField(label, "id", String.class),
+                requiredField(label, "name", String.class),
+                requiredField(label, "color", String.class));
     }
 
     /**
@@ -259,10 +253,10 @@ public class GitHubTestFixtureService {
             """;
 
         graphQlClient
-            .document(mutation)
-            .variable("input", Map.of("id", labelNodeId))
-            .execute()
-            .block(Duration.ofSeconds(30));
+                .document(mutation)
+                .variable("input", Map.of("id", labelNodeId))
+                .execute()
+                .block(Duration.ofSeconds(30));
     }
 
     // MILESTONE OPERATIONS (REST API - no GraphQL mutation)
@@ -271,24 +265,18 @@ public class GitHubTestFixtureService {
      * Creates a milestone via REST API (no GraphQL mutation exists).
      */
     public CreatedMilestone createMilestone(String fullName, String title, String description) {
-        Map<String, Object> body = Map.of(
-            "title",
-            title,
-            "description",
-            description != null ? description : "",
-            "state",
-            "open"
-        );
+        Map<String, Object> body =
+                Map.of("title", title, "description", description != null ? description : "", "state", "open");
 
         String[] parts = fullName.split("/");
         MilestoneResponse response = restClient
-            .post()
-            .uri("/repos/{owner}/{repo}/milestones", parts[0], parts[1])
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(body)
-            .retrieve()
-            .bodyToMono(MilestoneResponse.class)
-            .block(Duration.ofSeconds(30));
+                .post()
+                .uri("/repos/{owner}/{repo}/milestones", parts[0], parts[1])
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(body)
+                .retrieve()
+                .bodyToMono(MilestoneResponse.class)
+                .block(Duration.ofSeconds(30));
 
         if (response == null) {
             throw new RuntimeException("Failed to create milestone");
@@ -303,13 +291,13 @@ public class GitHubTestFixtureService {
     public void closeMilestone(String fullName, int milestoneNumber) {
         String[] parts = fullName.split("/");
         restClient
-            .patch()
-            .uri("/repos/{owner}/{repo}/milestones/{number}", parts[0], parts[1], milestoneNumber)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("state", "closed"))
-            .retrieve()
-            .toBodilessEntity()
-            .block(Duration.ofSeconds(30));
+                .patch()
+                .uri("/repos/{owner}/{repo}/milestones/{number}", parts[0], parts[1], milestoneNumber)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("state", "closed"))
+                .retrieve()
+                .toBodilessEntity()
+                .block(Duration.ofSeconds(30));
     }
 
     /**
@@ -318,11 +306,11 @@ public class GitHubTestFixtureService {
     public void deleteMilestone(String fullName, int milestoneNumber) {
         String[] parts = fullName.split("/");
         restClient
-            .delete()
-            .uri("/repos/{owner}/{repo}/milestones/{number}", parts[0], parts[1], milestoneNumber)
-            .retrieve()
-            .toBodilessEntity()
-            .block(Duration.ofSeconds(30));
+                .delete()
+                .uri("/repos/{owner}/{repo}/milestones/{number}", parts[0], parts[1], milestoneNumber)
+                .retrieve()
+                .toBodilessEntity()
+                .block(Duration.ofSeconds(30));
     }
 
     /**
@@ -331,15 +319,15 @@ public class GitHubTestFixtureService {
     public List<MilestoneResponse> listMilestones(String fullName, String state) {
         String[] parts = fullName.split("/");
         return restClient
-            .get()
-            .uri(uri ->
-                uri.path("/repos/{owner}/{repo}/milestones").queryParam("state", state).build(parts[0], parts[1])
-            )
-            .retrieve()
-            .bodyToFlux(MilestoneResponse.class)
-            .collectList()
-            .blockOptional(Duration.ofSeconds(30))
-            .orElseThrow(() -> new IllegalStateException("GitHub milestone listing returned no response"));
+                .get()
+                .uri(uri -> uri.path("/repos/{owner}/{repo}/milestones")
+                        .queryParam("state", state)
+                        .build(parts[0], parts[1]))
+                .retrieve()
+                .bodyToFlux(MilestoneResponse.class)
+                .collectList()
+                .blockOptional(Duration.ofSeconds(30))
+                .orElseThrow(() -> new IllegalStateException("GitHub milestone listing returned no response"));
     }
 
     // ISSUE OPERATIONS
@@ -368,25 +356,23 @@ public class GitHubTestFixtureService {
         if (body != null) input.put("body", body);
 
         ClientGraphQlResponse response = graphQlClient
-            .document(mutation)
-            .variable("input", input)
-            .execute()
-            .block(Duration.ofSeconds(30));
+                .document(mutation)
+                .variable("input", input)
+                .execute()
+                .block(Duration.ofSeconds(30));
 
         if (response == null || !response.isValid()) {
             throw new RuntimeException(
-                "Failed to create issue: " + (response != null ? response.getErrors() : "null response")
-            );
+                    "Failed to create issue: " + (response != null ? response.getErrors() : "null response"));
         }
 
         Map<String, Object> issue = response.field("createIssue.issue").toEntity(Map.class);
         assertNotNull(issue);
         return new CreatedIssue(
-            requiredField(issue, "id", String.class),
-            requiredField(issue, "databaseId", Number.class).longValue(),
-            requiredField(issue, "number", Number.class).intValue(),
-            requiredField(issue, "title", String.class)
-        );
+                requiredField(issue, "id", String.class),
+                requiredField(issue, "databaseId", Number.class).longValue(),
+                requiredField(issue, "number", Number.class).intValue(),
+                requiredField(issue, "title", String.class));
     }
 
     /**
@@ -410,24 +396,23 @@ public class GitHubTestFixtureService {
         Map<String, Object> input = Map.of("subjectId", issueNodeId, "body", body);
 
         ClientGraphQlResponse response = graphQlClient
-            .document(mutation)
-            .variable("input", input)
-            .execute()
-            .block(Duration.ofSeconds(30));
+                .document(mutation)
+                .variable("input", input)
+                .execute()
+                .block(Duration.ofSeconds(30));
 
         if (response == null || !response.isValid()) {
             throw new RuntimeException(
-                "Failed to add comment: " + (response != null ? response.getErrors() : "null response")
-            );
+                    "Failed to add comment: " + (response != null ? response.getErrors() : "null response"));
         }
 
-        Map<String, Object> comment = response.field("addComment.commentEdge.node").toEntity(Map.class);
+        Map<String, Object> comment =
+                response.field("addComment.commentEdge.node").toEntity(Map.class);
         assertNotNull(comment);
         return new CreatedIssueComment(
-            requiredField(comment, "id", String.class),
-            requiredField(comment, "databaseId", Number.class).longValue(),
-            requiredField(comment, "body", String.class)
-        );
+                requiredField(comment, "id", String.class),
+                requiredField(comment, "databaseId", Number.class).longValue(),
+                requiredField(comment, "body", String.class));
     }
 
     // PULL REQUEST OPERATIONS
@@ -437,12 +422,7 @@ public class GitHubTestFixtureService {
      * Requires a feature branch with commits.
      */
     public CreatedPullRequest createPullRequest(
-        String repositoryNodeId,
-        String title,
-        String body,
-        String headBranch,
-        String baseBranch
-    ) {
+            String repositoryNodeId, String title, String body, String headBranch, String baseBranch) {
         String mutation = """
             mutation CreatePullRequest($input: CreatePullRequestInput!) {
                 createPullRequest(input: $input) {
@@ -459,51 +439,43 @@ public class GitHubTestFixtureService {
             """;
 
         Map<String, Object> input = Map.of(
-            "repositoryId",
-            repositoryNodeId,
-            "title",
-            title,
-            "body",
-            body != null ? body : "",
-            "headRefName",
-            headBranch,
-            "baseRefName",
-            baseBranch
-        );
+                "repositoryId",
+                repositoryNodeId,
+                "title",
+                title,
+                "body",
+                body != null ? body : "",
+                "headRefName",
+                headBranch,
+                "baseRefName",
+                baseBranch);
 
         ClientGraphQlResponse response = graphQlClient
-            .document(mutation)
-            .variable("input", input)
-            .execute()
-            .block(Duration.ofSeconds(30));
+                .document(mutation)
+                .variable("input", input)
+                .execute()
+                .block(Duration.ofSeconds(30));
 
         if (response == null || !response.isValid()) {
             throw new RuntimeException(
-                "Failed to create pull request: " + (response != null ? response.getErrors() : "null response")
-            );
+                    "Failed to create pull request: " + (response != null ? response.getErrors() : "null response"));
         }
 
         Map<String, Object> pr = response.field("createPullRequest.pullRequest").toEntity(Map.class);
         assertNotNull(pr);
         return new CreatedPullRequest(
-            requiredField(pr, "id", String.class),
-            requiredField(pr, "databaseId", Number.class).longValue(),
-            requiredField(pr, "number", Number.class).intValue(),
-            requiredField(pr, "title", String.class),
-            requiredField(pr, "headRefOid", String.class)
-        );
+                requiredField(pr, "id", String.class),
+                requiredField(pr, "databaseId", Number.class).longValue(),
+                requiredField(pr, "number", Number.class).intValue(),
+                requiredField(pr, "title", String.class),
+                requiredField(pr, "headRefOid", String.class));
     }
 
     /**
      * Creates a pull request review via GraphQL.
      */
     public CreatedReview addPullRequestReview(
-        String pullRequestNodeId,
-        String body,
-        String event,
-        String commitOid,
-        List<ReviewComment> comments
-    ) {
+            String pullRequestNodeId, String body, String event, String commitOid, List<ReviewComment> comments) {
         String mutation = """
             mutation AddPullRequestReview($input: AddPullRequestReviewInput!) {
                 addPullRequestReview(input: $input) {
@@ -524,34 +496,31 @@ public class GitHubTestFixtureService {
         if (commitOid != null) input.put("commitOID", commitOid);
         if (comments != null && !comments.isEmpty()) {
             input.put(
-                "comments",
-                comments
-                    .stream()
-                    .map(c -> Map.of("path", c.path(), "position", c.position(), "body", c.body()))
-                    .toList()
-            );
+                    "comments",
+                    comments.stream()
+                            .map(c -> Map.of("path", c.path(), "position", c.position(), "body", c.body()))
+                            .toList());
         }
 
         ClientGraphQlResponse response = graphQlClient
-            .document(mutation)
-            .variable("input", input)
-            .execute()
-            .block(Duration.ofSeconds(30));
+                .document(mutation)
+                .variable("input", input)
+                .execute()
+                .block(Duration.ofSeconds(30));
 
         if (response == null || !response.isValid()) {
             throw new RuntimeException(
-                "Failed to add review: " + (response != null ? response.getErrors() : "null response")
-            );
+                    "Failed to add review: " + (response != null ? response.getErrors() : "null response"));
         }
 
-        Map<String, Object> review = response.field("addPullRequestReview.pullRequestReview").toEntity(Map.class);
+        Map<String, Object> review =
+                response.field("addPullRequestReview.pullRequestReview").toEntity(Map.class);
         assertNotNull(review);
         return new CreatedReview(
-            requiredField(review, "id", String.class),
-            requiredField(review, "databaseId", Number.class).longValue(),
-            requiredField(review, "body", String.class),
-            requiredField(review, "state", String.class)
-        );
+                requiredField(review, "id", String.class),
+                requiredField(review, "databaseId", Number.class).longValue(),
+                requiredField(review, "body", String.class),
+                requiredField(review, "state", String.class));
     }
 
     // BRANCH OPERATIONS
@@ -574,25 +543,18 @@ public class GitHubTestFixtureService {
             }
             """;
 
-        Map<String, Object> input = Map.of(
-            "repositoryId",
-            repositoryNodeId,
-            "name",
-            "refs/heads/" + branchName,
-            "oid",
-            commitSha
-        );
+        Map<String, Object> input =
+                Map.of("repositoryId", repositoryNodeId, "name", "refs/heads/" + branchName, "oid", commitSha);
 
         ClientGraphQlResponse response = graphQlClient
-            .document(mutation)
-            .variable("input", input)
-            .execute()
-            .block(Duration.ofSeconds(30));
+                .document(mutation)
+                .variable("input", input)
+                .execute()
+                .block(Duration.ofSeconds(30));
 
         if (response == null || !response.isValid()) {
             throw new RuntimeException(
-                "Failed to create branch: " + (response != null ? response.getErrors() : "null response")
-            );
+                    "Failed to create branch: " + (response != null ? response.getErrors() : "null response"));
         }
     }
 
@@ -600,12 +562,7 @@ public class GitHubTestFixtureService {
      * Creates a commit on a branch via GraphQL mutation.
      */
     public String createCommitOnBranch(
-        String repositoryFullName,
-        String branchName,
-        String commitMessage,
-        String filePath,
-        String fileContent
-    ) {
+            String repositoryFullName, String branchName, String commitMessage, String filePath, String fileContent) {
         String[] parts = repositoryFullName.split("/");
         String owner = parts[0];
         String repo = parts[1];
@@ -625,17 +582,16 @@ public class GitHubTestFixtureService {
             """;
 
         ClientGraphQlResponse infoResponse = graphQlClient
-            .document(query)
-            .variable("owner", owner)
-            .variable("name", repo)
-            .variable("qualifiedName", "refs/heads/" + branchName)
-            .execute()
-            .block(Duration.ofSeconds(30));
+                .document(query)
+                .variable("owner", owner)
+                .variable("name", repo)
+                .variable("qualifiedName", "refs/heads/" + branchName)
+                .execute()
+                .block(Duration.ofSeconds(30));
 
         if (infoResponse == null || !infoResponse.isValid()) {
-            throw new RuntimeException(
-                "Failed to get branch info: " + (infoResponse != null ? infoResponse.getErrors() : "null response")
-            );
+            throw new RuntimeException("Failed to get branch info: "
+                    + (infoResponse != null ? infoResponse.getErrors() : "null response"));
         }
 
         String expectedHeadOid = infoResponse.field("repository.ref.target.oid").toEntity(String.class);
@@ -654,31 +610,29 @@ public class GitHubTestFixtureService {
         String base64Content = Base64.getEncoder().encodeToString(fileContent.getBytes());
 
         Map<String, Object> input = Map.of(
-            "branch",
-            Map.of("repositoryNameWithOwner", repositoryFullName, "branchName", branchName),
-            "message",
-            Map.of("headline", commitMessage),
-            "expectedHeadOid",
-            expectedHeadOid,
-            "fileChanges",
-            Map.of("additions", List.of(Map.of("path", filePath, "contents", base64Content)))
-        );
+                "branch",
+                Map.of("repositoryNameWithOwner", repositoryFullName, "branchName", branchName),
+                "message",
+                Map.of("headline", commitMessage),
+                "expectedHeadOid",
+                expectedHeadOid,
+                "fileChanges",
+                Map.of("additions", List.of(Map.of("path", filePath, "contents", base64Content))));
 
         ClientGraphQlResponse response = graphQlClient
-            .document(mutation)
-            .variable("input", input)
-            .execute()
-            .block(Duration.ofSeconds(30));
+                .document(mutation)
+                .variable("input", input)
+                .execute()
+                .block(Duration.ofSeconds(30));
 
         if (response == null || !response.isValid()) {
             throw new RuntimeException(
-                "Failed to create commit: " + (response != null ? response.getErrors() : "null response")
-            );
+                    "Failed to create commit: " + (response != null ? response.getErrors() : "null response"));
         }
 
         return Optional.ofNullable(
-            response.field("createCommitOnBranch.commit.oid").toEntity(String.class)
-        ).orElseThrow(() -> new IllegalStateException("GitHub commit mutation returned no commit ID"));
+                        response.field("createCommitOnBranch.commit.oid").toEntity(String.class))
+                .orElseThrow(() -> new IllegalStateException("GitHub commit mutation returned no commit ID"));
     }
 
     // TEAM OPERATIONS (REST API)
@@ -690,13 +644,13 @@ public class GitHubTestFixtureService {
         Map<String, Object> body = Map.of("name", teamName, "privacy", "closed");
 
         TeamResponse response = restClient
-            .post()
-            .uri("/orgs/{org}/teams", orgLogin)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(body)
-            .retrieve()
-            .bodyToMono(TeamResponse.class)
-            .block(Duration.ofSeconds(30));
+                .post()
+                .uri("/orgs/{org}/teams", orgLogin)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(body)
+                .retrieve()
+                .bodyToMono(TeamResponse.class)
+                .block(Duration.ofSeconds(30));
 
         if (response == null) {
             throw new RuntimeException("Failed to create team");
@@ -716,11 +670,11 @@ public class GitHubTestFixtureService {
         for (int attempt = 1; attempt <= maxRetries; attempt++) {
             try {
                 restClient
-                    .delete()
-                    .uri("/orgs/{org}/teams/{team_slug}", orgLogin, teamSlug)
-                    .retrieve()
-                    .toBodilessEntity()
-                    .block(Duration.ofSeconds(30));
+                        .delete()
+                        .uri("/orgs/{org}/teams/{team_slug}", orgLogin, teamSlug)
+                        .retrieve()
+                        .toBodilessEntity()
+                        .block(Duration.ofSeconds(30));
                 log.info("Deleted team: {}/{}", orgLogin, teamSlug);
                 return;
             } catch (Exception e) {
@@ -732,22 +686,20 @@ public class GitHubTestFixtureService {
                 }
                 if (attempt == maxRetries) {
                     log.error(
-                        "Failed to delete team {}/{} after {} attempts: {}",
-                        orgLogin,
-                        teamSlug,
-                        maxRetries,
-                        message
-                    );
+                            "Failed to delete team {}/{} after {} attempts: {}",
+                            orgLogin,
+                            teamSlug,
+                            maxRetries,
+                            message);
                 } else {
                     log.warn(
-                        "Attempt {}/{} to delete team {}/{} failed: {}. Retrying in {}ms...",
-                        attempt,
-                        maxRetries,
-                        orgLogin,
-                        teamSlug,
-                        message,
-                        retryDelayMs
-                    );
+                            "Attempt {}/{} to delete team {}/{} failed: {}. Retrying in {}ms...",
+                            attempt,
+                            maxRetries,
+                            orgLogin,
+                            teamSlug,
+                            message,
+                            retryDelayMs);
                     try {
                         Thread.sleep(retryDelayMs);
                     } catch (InterruptedException ie) {
@@ -766,19 +718,18 @@ public class GitHubTestFixtureService {
      */
     public void addRepositoryToTeam(String orgLogin, String teamSlug, String fullName, String permission) {
         restClient
-            .put()
-            .uri(
-                "/orgs/{org}/teams/{team_slug}/repos/{owner}/{repo}",
-                orgLogin,
-                teamSlug,
-                fullName.split("/")[0],
-                fullName.split("/")[1]
-            )
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("permission", permission))
-            .retrieve()
-            .toBodilessEntity()
-            .block(Duration.ofSeconds(30));
+                .put()
+                .uri(
+                        "/orgs/{org}/teams/{team_slug}/repos/{owner}/{repo}",
+                        orgLogin,
+                        teamSlug,
+                        fullName.split("/")[0],
+                        fullName.split("/")[1])
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("permission", permission))
+                .retrieve()
+                .toBodilessEntity()
+                .block(Duration.ofSeconds(30));
     }
 
     // COLLABORATOR OPERATIONS (REST API)
@@ -789,13 +740,13 @@ public class GitHubTestFixtureService {
     public void addCollaborator(String fullName, String username, String permission) {
         String[] parts = fullName.split("/");
         restClient
-            .put()
-            .uri("/repos/{owner}/{repo}/collaborators/{username}", parts[0], parts[1], username)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("permission", permission))
-            .retrieve()
-            .toBodilessEntity()
-            .block(Duration.ofSeconds(30));
+                .put()
+                .uri("/repos/{owner}/{repo}/collaborators/{username}", parts[0], parts[1], username)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("permission", permission))
+                .retrieve()
+                .toBodilessEntity()
+                .block(Duration.ofSeconds(30));
     }
 
     /**
@@ -804,11 +755,11 @@ public class GitHubTestFixtureService {
     public void removeCollaborator(String fullName, String username) {
         String[] parts = fullName.split("/");
         restClient
-            .delete()
-            .uri("/repos/{owner}/{repo}/collaborators/{username}", parts[0], parts[1], username)
-            .retrieve()
-            .toBodilessEntity()
-            .block(Duration.ofSeconds(30));
+                .delete()
+                .uri("/repos/{owner}/{repo}/collaborators/{username}", parts[0], parts[1], username)
+                .retrieve()
+                .toBodilessEntity()
+                .block(Duration.ofSeconds(30));
     }
 
     // ORGANIZATION QUERIES
@@ -825,21 +776,16 @@ public class GitHubTestFixtureService {
             }
             """;
 
-        ClientGraphQlResponse response = graphQlClient
-            .document(query)
-            .variable("login", login)
-            .execute()
-            .block(Duration.ofSeconds(30));
+        ClientGraphQlResponse response =
+                graphQlClient.document(query).variable("login", login).execute().block(Duration.ofSeconds(30));
 
         if (response == null || !response.isValid()) {
             throw new RuntimeException(
-                "Failed to get organization: " + (response != null ? response.getErrors() : "null response")
-            );
+                    "Failed to get organization: " + (response != null ? response.getErrors() : "null response"));
         }
 
-        return Optional.ofNullable(response.field("organization.id").toEntity(String.class)).orElseThrow(() ->
-            new IllegalStateException("GitHub organization query returned no ID")
-        );
+        return Optional.ofNullable(response.field("organization.id").toEntity(String.class))
+                .orElseThrow(() -> new IllegalStateException("GitHub organization query returned no ID"));
     }
 
     /**
@@ -858,24 +804,21 @@ public class GitHubTestFixtureService {
             }
             """;
 
-        ClientGraphQlResponse response = graphQlClient
-            .document(query)
-            .variable("login", login)
-            .execute()
-            .block(Duration.ofSeconds(30));
+        ClientGraphQlResponse response =
+                graphQlClient.document(query).variable("login", login).execute().block(Duration.ofSeconds(30));
 
         if (response == null || !response.isValid()) {
-            throw new RuntimeException(
-                "Failed to get organization members: " + (response != null ? response.getErrors() : "null response")
-            );
+            throw new RuntimeException("Failed to get organization members: "
+                    + (response != null ? response.getErrors() : "null response"));
         }
 
-        List<Map<String, Object>> nodes = response.field("organization.membersWithRole.nodes").toEntity(List.class);
+        List<Map<String, Object>> nodes =
+                response.field("organization.membersWithRole.nodes").toEntity(List.class);
         return Optional.ofNullable(nodes)
-            .orElseThrow(() -> new IllegalStateException("GitHub organization query returned no members"))
-            .stream()
-            .map(n -> requiredField(n, "login", String.class))
-            .toList();
+                .orElseThrow(() -> new IllegalStateException("GitHub organization query returned no members"))
+                .stream()
+                .map(n -> requiredField(n, "login", String.class))
+                .toList();
     }
 
     // REPOSITORY QUERIES
@@ -904,16 +847,15 @@ public class GitHubTestFixtureService {
             """;
 
         ClientGraphQlResponse response = graphQlClient
-            .document(query)
-            .variable("owner", parts[0])
-            .variable("name", parts[1])
-            .execute()
-            .block(Duration.ofSeconds(30));
+                .document(query)
+                .variable("owner", parts[0])
+                .variable("name", parts[1])
+                .execute()
+                .block(Duration.ofSeconds(30));
 
         if (response == null || !response.isValid()) {
             throw new RuntimeException(
-                "Failed to get repository: " + (response != null ? response.getErrors() : "null response")
-            );
+                    "Failed to get repository: " + (response != null ? response.getErrors() : "null response"));
         }
 
         Map<String, Object> repo = response.field("repository").toEntity(Map.class);
@@ -922,12 +864,11 @@ public class GitHubTestFixtureService {
         Map<String, Object> target = defaultBranch != null ? (Map<String, Object>) defaultBranch.get("target") : null;
 
         return new RepositoryInfo(
-            requiredField(repo, "id", String.class),
-            requiredField(repo, "databaseId", Number.class).longValue(),
-            requiredField(repo, "nameWithOwner", String.class),
-            defaultBranch != null ? requiredField(defaultBranch, "name", String.class) : null,
-            target != null ? requiredField(target, "oid", String.class) : null
-        );
+                requiredField(repo, "id", String.class),
+                requiredField(repo, "databaseId", Number.class).longValue(),
+                requiredField(repo, "nameWithOwner", String.class),
+                defaultBranch != null ? requiredField(defaultBranch, "name", String.class) : null,
+                target != null ? requiredField(target, "oid", String.class) : null);
     }
 
     /**
@@ -950,29 +891,26 @@ public class GitHubTestFixtureService {
             """;
 
         ClientGraphQlResponse response = graphQlClient
-            .document(query)
-            .variable("owner", parts[0])
-            .variable("name", parts[1])
-            .execute()
-            .block(Duration.ofSeconds(30));
+                .document(query)
+                .variable("owner", parts[0])
+                .variable("name", parts[1])
+                .execute()
+                .block(Duration.ofSeconds(30));
 
         if (response == null || !response.isValid()) {
             return List.of();
         }
 
-        List<Map<String, Object>> nodes = response.field("repository.labels.nodes").toEntity(List.class);
+        List<Map<String, Object>> nodes =
+                response.field("repository.labels.nodes").toEntity(List.class);
         if (nodes == null) return List.of();
 
-        return nodes
-            .stream()
-            .map(n ->
-                new LabelInfo(
-                    requiredField(n, "id", String.class),
-                    requiredField(n, "name", String.class),
-                    requiredField(n, "color", String.class)
-                )
-            )
-            .toList();
+        return nodes.stream()
+                .map(n -> new LabelInfo(
+                        requiredField(n, "id", String.class),
+                        requiredField(n, "name", String.class),
+                        requiredField(n, "color", String.class)))
+                .toList();
     }
 
     // HELPER METHODS
@@ -1002,20 +940,16 @@ public class GitHubTestFixtureService {
         // Create initial commit via REST (file creation)
         // Use separate path variables to avoid URL encoding issues with slash
         Map<String, Object> body = Map.of(
-            "message",
-            "Initial commit",
-            "content",
-            Base64.getEncoder().encodeToString(readmeContent.getBytes())
-        );
+                "message", "Initial commit", "content", Base64.getEncoder().encodeToString(readmeContent.getBytes()));
 
         restClient
-            .put()
-            .uri("/repos/{owner}/{repo}/contents/README.md", owner, repo)
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(body)
-            .retrieve()
-            .toBodilessEntity()
-            .block(Duration.ofSeconds(30));
+                .put()
+                .uri("/repos/{owner}/{repo}/contents/README.md", owner, repo)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(body)
+                .retrieve()
+                .toBodilessEntity()
+                .block(Duration.ofSeconds(30));
     }
 
     private void awaitDefaultBranch(String fullName) throws InterruptedException {
@@ -1055,29 +989,26 @@ public class GitHubTestFixtureService {
     public record ReviewComment(String path, int position, String body) {}
 
     public record RepositoryInfo(
-        String nodeId,
-        Long databaseId,
-        String fullName,
-        @Nullable String defaultBranch,
-        @Nullable String headCommitSha
-    ) {}
+            String nodeId,
+            Long databaseId,
+            String fullName,
+            @Nullable String defaultBranch,
+            @Nullable String headCommitSha) {}
 
     public record LabelInfo(String nodeId, String name, String color) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record MilestoneResponse(
-        @JsonProperty("node_id") String nodeId,
-        @JsonProperty("id") Long id,
-        @JsonProperty("number") int number,
-        @JsonProperty("title") String title,
-        @JsonProperty("state") String state
-    ) {}
+            @JsonProperty("node_id") String nodeId,
+            @JsonProperty("id") Long id,
+            @JsonProperty("number") int number,
+            @JsonProperty("title") String title,
+            @JsonProperty("state") String state) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record TeamResponse(
-        @JsonProperty("node_id") String nodeId,
-        @JsonProperty("id") Long id,
-        @JsonProperty("name") String name,
-        @JsonProperty("slug") String slug
-    ) {}
+            @JsonProperty("node_id") String nodeId,
+            @JsonProperty("id") Long id,
+            @JsonProperty("name") String name,
+            @JsonProperty("slug") String slug) {}
 }

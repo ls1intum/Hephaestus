@@ -12,21 +12,23 @@ import org.jspecify.annotations.NonNull;
  */
 @Schema(description = "Resource-level rollup for the connection overview badge")
 public record ResourceCountsDTO(
-    @NonNull @Schema(description = "Total resources known to this connection") Long total,
-    @NonNull @Schema(description = "Resources currently reporting a sync error") Long errored,
-    @NonNull
-    @Schema(
-        description = "Resources that have never completed a sync (no lastSyncedAt). Defined on the " +
-            "timestamp rather than on a provider's status vocabulary so it means the same thing for a " +
-            "repository, a Slack channel and an Outline collection."
-    )
-    Long pending,
-    @NonNull
-    @Schema(
-        description = "Resources whose last sync is older than twice the connection's scheduled cadence. " +
-            "Always 0 when the cadence is unknown or the schedule is irregular — staleness is a " +
-            "judgement against a known cron, and without one this declines to guess rather than " +
-            "flagging healthy resources."
-    )
-    Long stale
-) {}
+        @NonNull @Schema(description = "Total resources known to this connection")
+        Long total,
+
+        @NonNull @Schema(description = "Resources currently reporting a sync error")
+        Long errored,
+
+        @NonNull
+        @Schema(
+                description = "Resources that have never completed a sync (no lastSyncedAt). Defined on the "
+                        + "timestamp rather than on a provider's status vocabulary so it means the same thing for a "
+                        + "repository, a Slack channel and an Outline collection.")
+        Long pending,
+
+        @NonNull
+        @Schema(
+                description = "Resources whose last sync is older than twice the connection's scheduled cadence. "
+                        + "Always 0 when the cadence is unknown or the schedule is irregular — staleness is a "
+                        + "judgement against a known cron, and without one this declines to guess rather than "
+                        + "flagging healthy resources.")
+        Long stale) {}

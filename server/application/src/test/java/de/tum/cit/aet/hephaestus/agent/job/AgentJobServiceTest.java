@@ -1,13 +1,9 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -25,7 +21,6 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
-import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
@@ -43,12 +38,8 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import jakarta.persistence.Convert;
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-import java.util.function.Consumer;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -107,19 +98,18 @@ class AgentJobServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         service = new AgentJobService(
-            agentJobRepository,
-            agentBindingRepository,
-            workspaceRepository,
-            connectionService,
-            handlerRegistry,
-            objectMapper,
-            transactionTemplate,
-            new PracticeReviewProperties(false, 15, 5, false, false),
-            practiceRepository,
-            llmBudgetService,
-            llmModelResolver,
-            signalRecorder
-        );
+                agentJobRepository,
+                agentBindingRepository,
+                workspaceRepository,
+                connectionService,
+                handlerRegistry,
+                objectMapper,
+                transactionTemplate,
+                new PracticeReviewProperties(false, 15, 5, false, false),
+                practiceRepository,
+                llmBudgetService,
+                llmModelResolver,
+                signalRecorder);
 
         workspace = new Workspace();
         workspace.setId(1L);
@@ -131,8 +121,8 @@ class AgentJobServiceTest extends BaseUnitTest {
         // and the workspace has expressed no opinion either, so the chain bottoms out at AUTOMATIC, which
         // admits a review.
         lenient()
-            .when(practiceRepository.findAutonomyRows(anyLong()))
-            .thenReturn(List.of(tierRow(null, ArtifactKinds.PULL_REQUEST)));
+                .when(practiceRepository.findAutonomyRows(anyLong()))
+                .thenReturn(List.of(tierRow(null, ArtifactKinds.PULL_REQUEST)));
 
         enabledBinding = new WorkspaceAgentBinding();
         enabledBinding.setId(10L);
@@ -143,27 +133,19 @@ class AgentJobServiceTest extends BaseUnitTest {
         // Two lookups, deliberately: submit() discovers the binding WITH its models (it needs the
         // funding source to pick the right cap), then re-reads it inside the write transaction.
         lenient()
-            .when(agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_REVIEW))
-            .thenReturn(Optional.of(enabledBinding));
+                .when(agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_REVIEW))
+                .thenReturn(Optional.of(enabledBinding));
         lenient()
-            .when(agentBindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_REVIEW))
-            .thenReturn(Optional.of(enabledBinding));
+                .when(agentBindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_REVIEW))
+                .thenReturn(Optional.of(enabledBinding));
 
         lenient()
-            .when(llmModelResolver.resolve(any()))
-            .thenReturn(
-                new ResolvedLlmModel(
-                    "https://api.anthropic.com",
-                    "anthropic-messages",
-                    "claude-sonnet-4",
-                    null,
-                    null,
-                    false
-                )
-            );
+                .when(llmModelResolver.resolve(any()))
+                .thenReturn(new ResolvedLlmModel(
+                        "https://api.anthropic.com", "anthropic-messages", "claude-sonnet-4", null, null, false));
         lenient()
-            .when(llmModelResolver.connectionRef(any()))
-            .thenReturn(new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 99L, null, null));
+                .when(llmModelResolver.connectionRef(any()))
+                .thenReturn(new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 99L, null, null));
     }
 
     /**
@@ -171,9 +153,7 @@ class AgentJobServiceTest extends BaseUnitTest {
      * group's, ungrouped here so the chain runs practice → workspace.
      */
     private static PracticeRepository.PracticeAutonomyRow tierRow(
-        @Nullable PracticeAutonomy practiceAutonomy,
-        ArtifactKind artifactKind
-    ) {
+            @Nullable PracticeAutonomy practiceAutonomy, ArtifactKind artifactKind) {
         return new PracticeRepository.PracticeAutonomyRow() {
             @Override
             public @Nullable PracticeAutonomy getPracticeAutonomy() {
@@ -213,12 +193,10 @@ class AgentJobServiceTest extends BaseUnitTest {
         void setUpSubmit() {
             // Make transactionTemplate.execute() actually invoke the callback
             // (submitForConfig uses transactionTemplate.execute() for per-config isolation)
-            lenient()
-                .when(transactionTemplate.execute(any()))
-                .thenAnswer(inv -> {
-                    TransactionCallback<?> callback = inv.getArgument(0);
-                    return callback.doInTransaction(mock(TransactionStatus.class));
-                });
+            lenient().when(transactionTemplate.execute(any())).thenAnswer(inv -> {
+                TransactionCallback<?> callback = inv.getArgument(0);
+                return callback.doInTransaction(mock(TransactionStatus.class));
+            });
         }
 
         @Test
@@ -226,12 +204,8 @@ class AgentJobServiceTest extends BaseUnitTest {
             enabledBinding.setEnabled(false);
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
-            Optional<AgentJob> result = service.submit(
-                1L,
-                AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class),
-                null
-            );
+            Optional<AgentJob> result =
+                    service.submit(1L, AgentJobType.PULL_REQUEST_REVIEW, mock(JobSubmissionRequest.class), null);
 
             assertThat(result).isEmpty();
             verify(agentJobRepository, never()).saveAndFlush(any());
@@ -239,17 +213,12 @@ class AgentJobServiceTest extends BaseUnitTest {
 
         @Test
         void shouldReturnEmptyWhenPracticeIsUnbound() {
-            when(
-                agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_REVIEW)
-            ).thenReturn(Optional.empty());
+            when(agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_REVIEW))
+                    .thenReturn(Optional.empty());
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
-            Optional<AgentJob> result = service.submit(
-                1L,
-                AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class),
-                null
-            );
+            Optional<AgentJob> result =
+                    service.submit(1L, AgentJobType.PULL_REQUEST_REVIEW, mock(JobSubmissionRequest.class), null);
 
             assertThat(result).isEmpty();
             verify(agentJobRepository, never()).saveAndFlush(any());
@@ -263,12 +232,8 @@ class AgentJobServiceTest extends BaseUnitTest {
             when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
             when(handler.createSubmission(any())).thenReturn(createSubmission());
 
-            Optional<AgentJob> result = service.submit(
-                1L,
-                AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class),
-                null
-            );
+            Optional<AgentJob> result =
+                    service.submit(1L, AgentJobType.PULL_REQUEST_REVIEW, mock(JobSubmissionRequest.class), null);
 
             assertThat(result).isEmpty();
             verify(agentJobRepository, never()).saveAndFlush(any());
@@ -282,12 +247,8 @@ class AgentJobServiceTest extends BaseUnitTest {
             when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
             when(handler.createSubmission(any())).thenReturn(createSubmission());
 
-            Optional<AgentJob> result = service.submit(
-                1L,
-                AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class),
-                null
-            );
+            Optional<AgentJob> result =
+                    service.submit(1L, AgentJobType.PULL_REQUEST_REVIEW, mock(JobSubmissionRequest.class), null);
 
             assertThat(result).isEmpty();
             verify(agentJobRepository, never()).saveAndFlush(any());
@@ -299,19 +260,14 @@ class AgentJobServiceTest extends BaseUnitTest {
             // The workspace has a conversation practice, and it is switched OFF — the case that has to read
             // differently from "nothing is bound to this work at all", and the reason the autonomy survives to
             // the JVM instead of being filtered away in SQL.
-            when(practiceRepository.findAutonomyRows(1L)).thenReturn(
-                List.of(tierRow(PracticeAutonomy.OFF, ArtifactKinds.CONVERSATION_THREAD))
-            );
+            when(practiceRepository.findAutonomyRows(1L))
+                    .thenReturn(List.of(tierRow(PracticeAutonomy.OFF, ArtifactKinds.CONVERSATION_THREAD)));
             JobTypeHandler handler = mock(JobTypeHandler.class);
             when(handlerRegistry.getHandler(AgentJobType.CONVERSATION_REVIEW)).thenReturn(handler);
             when(handler.createSubmission(any())).thenReturn(createSubmission());
 
-            Optional<AgentJob> result = service.submit(
-                1L,
-                AgentJobType.CONVERSATION_REVIEW,
-                mock(JobSubmissionRequest.class),
-                null
-            );
+            Optional<AgentJob> result =
+                    service.submit(1L, AgentJobType.CONVERSATION_REVIEW, mock(JobSubmissionRequest.class), null);
 
             assertThat(result).isEmpty();
             verify(agentJobRepository, never()).saveAndFlush(any());
@@ -322,12 +278,9 @@ class AgentJobServiceTest extends BaseUnitTest {
          * an exhausted cap, so the job survives if and only if the service consulted the OTHER purse.
          */
         @ParameterizedTest(name = "a binding on {1}''s model is paused by {1}''s exhausted cap, and only by it")
-        @CsvSource({ "true, INSTANCE, WORKSPACE", "false, WORKSPACE, INSTANCE" })
+        @CsvSource({"true, INSTANCE, WORKSPACE", "false, WORKSPACE, INSTANCE"})
         void shouldCheckTheBudgetOfWhoeverFundsTheBoundDetectionModel(
-            boolean boundToAnInstanceModel,
-            FundingSource payer,
-            FundingSource otherPurse
-        ) {
+                boolean boundToAnInstanceModel, FundingSource payer, FundingSource otherPurse) {
             // An instance model on the binding = the host's shared models pay; none = the workspace's
             // own connected provider does.
             if (boundToAnInstanceModel) {
@@ -338,27 +291,25 @@ class AgentJobServiceTest extends BaseUnitTest {
             when(llmBudgetService.blockSubmission(any(), any(), eq(payer))).thenReturn(true);
 
             JobTypeHandler handler = mock(JobTypeHandler.class);
-            lenient().when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
+            lenient()
+                    .when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW))
+                    .thenReturn(handler);
             lenient().when(handler.createSubmission(any())).thenReturn(createSubmission());
             lenient()
-                .when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any()))
-                .thenReturn(Optional.empty());
-            lenient()
-                .when(agentJobRepository.saveAndFlush(any(AgentJob.class)))
-                .thenAnswer(inv -> {
-                    AgentJob j = inv.getArgument(0);
-                    j.prePersist();
-                    return j;
-                });
+                    .when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any()))
+                    .thenReturn(Optional.empty());
+            lenient().when(agentJobRepository.saveAndFlush(any(AgentJob.class))).thenAnswer(inv -> {
+                AgentJob j = inv.getArgument(0);
+                j.prePersist();
+                return j;
+            });
 
-            Optional<AgentJob> result = service.submit(
-                1L,
-                AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class),
-                null
-            );
+            Optional<AgentJob> result =
+                    service.submit(1L, AgentJobType.PULL_REQUEST_REVIEW, mock(JobSubmissionRequest.class), null);
 
-            assertThat(result).as("the payer's cap is exhausted, so no job may be created").isEmpty();
+            assertThat(result)
+                    .as("the payer's cap is exhausted, so no job may be created")
+                    .isEmpty();
             verify(agentJobRepository, never()).saveAndFlush(any(AgentJob.class));
             verify(llmBudgetService, never()).blockSubmission(any(), any(), eq(otherPurse));
         }
@@ -366,20 +317,12 @@ class AgentJobServiceTest extends BaseUnitTest {
         @Test
         void shouldSubmitNothingWhenThePayersBudgetIsBlocked() {
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-            when(
-                llmBudgetService.blockSubmission(
-                    any(),
-                    any(),
-                    eq(de.tum.cit.aet.hephaestus.agent.usage.FundingSource.WORKSPACE)
-                )
-            ).thenReturn(true);
+            when(llmBudgetService.blockSubmission(
+                            any(), any(), eq(de.tum.cit.aet.hephaestus.agent.usage.FundingSource.WORKSPACE)))
+                    .thenReturn(true);
 
-            Optional<AgentJob> result = service.submit(
-                1L,
-                AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class),
-                null
-            );
+            Optional<AgentJob> result =
+                    service.submit(1L, AgentJobType.PULL_REQUEST_REVIEW, mock(JobSubmissionRequest.class), null);
 
             assertThat(result).isEmpty();
             verify(agentJobRepository, never()).saveAndFlush(any());
@@ -393,16 +336,11 @@ class AgentJobServiceTest extends BaseUnitTest {
             JobTypeHandler handler = mock(JobTypeHandler.class);
             when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
             when(handler.createSubmission(any())).thenReturn(createSubmission());
-            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any())).thenReturn(
-                Optional.empty()
-            );
+            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any()))
+                    .thenReturn(Optional.empty());
 
-            Optional<AgentJob> result = service.submit(
-                1L,
-                AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class),
-                null
-            );
+            Optional<AgentJob> result =
+                    service.submit(1L, AgentJobType.PULL_REQUEST_REVIEW, mock(JobSubmissionRequest.class), null);
 
             assertThat(result).isEmpty();
             verify(agentJobRepository, never()).saveAndFlush(any());
@@ -418,20 +356,12 @@ class AgentJobServiceTest extends BaseUnitTest {
 
             AgentJob existingJob = new AgentJob();
             existingJob.prePersist(); // generates ID
-            when(
-                agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(
-                    eq(1L),
-                    eq("pr_review:owner/repo:42:authoring:abc123:detection"),
-                    any()
-                )
-            ).thenReturn(Optional.of(existingJob));
+            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(
+                            eq(1L), eq("pr_review:owner/repo:42:authoring:abc123:detection"), any()))
+                    .thenReturn(Optional.of(existingJob));
 
-            Optional<AgentJob> result = service.submit(
-                1L,
-                AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class),
-                null
-            );
+            Optional<AgentJob> result =
+                    service.submit(1L, AgentJobType.PULL_REQUEST_REVIEW, mock(JobSubmissionRequest.class), null);
 
             assertThat(result).isPresent();
             assertThat(result.get().getId()).isEqualTo(existingJob.getId());
@@ -446,9 +376,8 @@ class AgentJobServiceTest extends BaseUnitTest {
             when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
             when(handler.createSubmission(any())).thenReturn(createSubmission());
 
-            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any())).thenReturn(
-                Optional.empty()
-            );
+            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any()))
+                    .thenReturn(Optional.empty());
 
             when(agentJobRepository.saveAndFlush(any(AgentJob.class))).thenAnswer(inv -> {
                 AgentJob j = inv.getArgument(0);
@@ -456,12 +385,8 @@ class AgentJobServiceTest extends BaseUnitTest {
                 return j;
             });
 
-            Optional<AgentJob> result = service.submit(
-                1L,
-                AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class),
-                null
-            );
+            Optional<AgentJob> result =
+                    service.submit(1L, AgentJobType.PULL_REQUEST_REVIEW, mock(JobSubmissionRequest.class), null);
 
             assertThat(result).isPresent();
             AgentJob job = result.get();
@@ -480,14 +405,11 @@ class AgentJobServiceTest extends BaseUnitTest {
             // job has nowhere to put a provider credential at all, which a future write path cannot
             // undo by forgetting to leave a field unset.
             assertThat(AgentJob.class.getDeclaredFields())
-                .filteredOn(
-                    field ->
-                        field.isAnnotationPresent(Convert.class) &&
-                        field.getAnnotation(Convert.class).converter() == EncryptedStringConverter.class
-                )
-                .describedAs("the job's own bearer token is the ONLY secret an agent_job row may carry")
-                .extracting(java.lang.reflect.Field::getName)
-                .containsExactly("jobToken");
+                    .filteredOn(field -> field.isAnnotationPresent(Convert.class)
+                            && field.getAnnotation(Convert.class).converter() == EncryptedStringConverter.class)
+                    .describedAs("the job's own bearer token is the ONLY secret an agent_job row may carry")
+                    .extracting(java.lang.reflect.Field::getName)
+                    .containsExactly("jobToken");
         }
 
         @Test
@@ -498,24 +420,15 @@ class AgentJobServiceTest extends BaseUnitTest {
             when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
             when(handler.createSubmission(any())).thenReturn(createSubmission());
 
-            when(
-                agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(
-                    eq(1L),
-                    eq("pr_review:owner/repo:42:authoring:abc123:detection"),
-                    any()
-                )
-            ).thenReturn(Optional.empty());
+            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(
+                            eq(1L), eq("pr_review:owner/repo:42:authoring:abc123:detection"), any()))
+                    .thenReturn(Optional.empty());
 
-            when(agentJobRepository.saveAndFlush(any())).thenThrow(
-                new DataIntegrityViolationException("uk_agent_job_idempotency")
-            );
+            when(agentJobRepository.saveAndFlush(any()))
+                    .thenThrow(new DataIntegrityViolationException("uk_agent_job_idempotency"));
 
-            Optional<AgentJob> result = service.submit(
-                1L,
-                AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class),
-                null
-            );
+            Optional<AgentJob> result =
+                    service.submit(1L, AgentJobType.PULL_REQUEST_REVIEW, mock(JobSubmissionRequest.class), null);
 
             assertThat(result).isEmpty();
         }
@@ -527,20 +440,16 @@ class AgentJobServiceTest extends BaseUnitTest {
             JobTypeHandler handler = mock(JobTypeHandler.class);
             when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
             when(handler.createSubmission(any())).thenReturn(createSubmission());
-            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any())).thenReturn(
-                Optional.empty()
-            );
+            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any()))
+                    .thenReturn(Optional.empty());
 
             AgentJob recent = new AgentJob();
             recent.prePersist();
-            when(agentJobRepository.findRecentJobByKeyPrefix(eq(1L), any(), any())).thenReturn(Optional.of(recent));
+            when(agentJobRepository.findRecentJobByKeyPrefix(eq(1L), any(), any()))
+                    .thenReturn(Optional.of(recent));
 
-            Optional<AgentJob> result = service.submit(
-                1L,
-                AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class),
-                null
-            );
+            Optional<AgentJob> result =
+                    service.submit(1L, AgentJobType.PULL_REQUEST_REVIEW, mock(JobSubmissionRequest.class), null);
 
             assertThat(result).isEmpty();
             verify(agentJobRepository, never()).saveAndFlush(any());
@@ -553,22 +462,18 @@ class AgentJobServiceTest extends BaseUnitTest {
             JobTypeHandler handler = mock(JobTypeHandler.class);
             when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
             when(handler.createSubmission(any())).thenReturn(createSubmission());
-            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any())).thenReturn(
-                Optional.empty()
-            );
-            when(agentJobRepository.findRecentJobByKeyPrefix(eq(1L), any(), any())).thenReturn(Optional.empty());
+            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any()))
+                    .thenReturn(Optional.empty());
+            when(agentJobRepository.findRecentJobByKeyPrefix(eq(1L), any(), any()))
+                    .thenReturn(Optional.empty());
             when(agentJobRepository.saveAndFlush(any())).thenAnswer(inv -> {
                 AgentJob j = inv.getArgument(0);
                 j.prePersist();
                 return j;
             });
 
-            Optional<AgentJob> result = service.submit(
-                1L,
-                AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class),
-                null
-            );
+            Optional<AgentJob> result =
+                    service.submit(1L, AgentJobType.PULL_REQUEST_REVIEW, mock(JobSubmissionRequest.class), null);
 
             assertThat(result).isPresent();
             verify(agentJobRepository).saveAndFlush(any());
@@ -586,10 +491,10 @@ class AgentJobServiceTest extends BaseUnitTest {
             JobTypeHandler handler = mock(JobTypeHandler.class);
             when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
             when(handler.createSubmission(any())).thenReturn(underscoreKey);
-            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any())).thenReturn(
-                Optional.empty()
-            );
-            when(agentJobRepository.findRecentJobByKeyPrefix(eq(1L), any(), any())).thenReturn(Optional.empty());
+            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any()))
+                    .thenReturn(Optional.empty());
+            when(agentJobRepository.findRecentJobByKeyPrefix(eq(1L), any(), any()))
+                    .thenReturn(Optional.empty());
             when(agentJobRepository.saveAndFlush(any())).thenAnswer(inv -> {
                 AgentJob j = inv.getArgument(0);
                 j.prePersist();
@@ -613,9 +518,8 @@ class AgentJobServiceTest extends BaseUnitTest {
             // 5-segment PR key: <type>:<nameWithOwner>:<number>:<phase>:<sha>. Only the trailing
             // SHA is stripped → cooldown scopes per (PR, phase), so an authoring re-trigger is cooled
             // down but a later merge retrospective (different phase) is NOT.
-            assertThat(AgentJobService.extractCooldownKeyPrefix("pr_review:owner/repo:42:authoring:abc123")).isEqualTo(
-                "pr_review:owner/repo:42:authoring:"
-            );
+            assertThat(AgentJobService.extractCooldownKeyPrefix("pr_review:owner/repo:42:authoring:abc123"))
+                    .isEqualTo("pr_review:owner/repo:42:authoring:");
         }
 
         @Test
@@ -623,9 +527,8 @@ class AgentJobServiceTest extends BaseUnitTest {
             // 5-segment issue key: the trailing segment is the disposable updatedAt version, the
             // 4th is the phase. A regression that dropped the freshness segment AND the phase would
             // collapse cooldown back to per-repo; pin that the (issue number, phase) scope survives.
-            assertThat(
-                AgentJobService.extractCooldownKeyPrefix("issue_review:owner/repo:12:IssueOpened:1700000000000")
-            ).isEqualTo("issue_review:owner/repo:12:IssueOpened:");
+            assertThat(AgentJobService.extractCooldownKeyPrefix("issue_review:owner/repo:12:IssueOpened:1700000000000"))
+                    .isEqualTo("issue_review:owner/repo:12:IssueOpened:");
         }
     }
 
@@ -637,7 +540,8 @@ class AgentJobServiceTest extends BaseUnitTest {
             PullRequest pr = new PullRequest();
             pr.setId(5L);
             // headRefOid/headRefName/baseRefName all null → nothing to clone or diff.
-            assertThat(service.buildReviewRequest(pr, ScmSignals.PULL_REQUEST_MERGED)).isNull();
+            assertThat(service.buildReviewRequest(pr, ScmSignals.PULL_REQUEST_MERGED))
+                    .isNull();
         }
 
         @Test
@@ -663,33 +567,27 @@ class AgentJobServiceTest extends BaseUnitTest {
         void buildIssueRequestReturnsNullWhenRepositoryMissing() {
             Issue issue = new Issue();
             issue.setId(7L);
-            assertThat(service.buildIssueRequest(issue, ScmSignals.ISSUE_CLOSED)).isNull();
+            assertThat(service.buildIssueRequest(issue, ScmSignals.ISSUE_CLOSED))
+                    .isNull();
         }
 
         @BeforeEach
         @SuppressWarnings("unchecked")
         void runTheSubmissionTransaction() {
-            lenient()
-                .when(transactionTemplate.execute(any()))
-                .thenAnswer(inv -> {
-                    TransactionCallback<?> callback = inv.getArgument(0);
-                    return callback.doInTransaction(mock(TransactionStatus.class));
-                });
+            lenient().when(transactionTemplate.execute(any())).thenAnswer(inv -> {
+                TransactionCallback<?> callback = inv.getArgument(0);
+                return callback.doInTransaction(mock(TransactionStatus.class));
+            });
         }
 
         @Test
         void submitPreparedNamesTheReasonTheSubmissionActuallyStoppedOn() {
-            when(
-                agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_REVIEW)
-            ).thenReturn(Optional.empty());
+            when(agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_REVIEW))
+                    .thenReturn(Optional.empty());
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             String result = service.submitPrepared(
-                1L,
-                AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class),
-                null
-            );
+                    1L, AgentJobType.PULL_REQUEST_REVIEW, mock(JobSubmissionRequest.class), null);
 
             assertThat(result).isEqualTo("No job created. " + SignalStateReason.REVIEW_MODEL_UNBOUND.describe());
         }
@@ -702,19 +600,15 @@ class AgentJobServiceTest extends BaseUnitTest {
             JobTypeHandler handler = mock(JobTypeHandler.class);
             when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
             when(handler.createSubmission(any())).thenReturn(createSubmission());
-            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any())).thenReturn(
-                Optional.empty()
-            );
+            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any()))
+                    .thenReturn(Optional.empty());
             AgentJob recent = new AgentJob();
             recent.prePersist();
-            when(agentJobRepository.findRecentJobByKeyPrefix(eq(1L), any(), any())).thenReturn(Optional.of(recent));
+            when(agentJobRepository.findRecentJobByKeyPrefix(eq(1L), any(), any()))
+                    .thenReturn(Optional.of(recent));
 
             String result = service.submitPrepared(
-                1L,
-                AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class),
-                null
-            );
+                    1L, AgentJobType.PULL_REQUEST_REVIEW, mock(JobSubmissionRequest.class), null);
 
             assertThat(result).isEqualTo("No job created. " + SignalStateReason.COOLDOWN_ACTIVE.describe());
             assertThat(result).doesNotContain("budget");
@@ -726,10 +620,10 @@ class AgentJobServiceTest extends BaseUnitTest {
             JobTypeHandler handler = mock(JobTypeHandler.class);
             when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
             when(handler.createSubmission(any())).thenReturn(createSubmission());
-            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any())).thenReturn(
-                Optional.empty()
-            );
-            when(agentJobRepository.findRecentJobByKeyPrefix(eq(1L), any(), any())).thenReturn(Optional.empty());
+            when(agentJobRepository.findByWorkspaceIdAndIdempotencyKeyAndStatusIn(anyLong(), any(), any()))
+                    .thenReturn(Optional.empty());
+            when(agentJobRepository.findRecentJobByKeyPrefix(eq(1L), any(), any()))
+                    .thenReturn(Optional.empty());
             when(agentJobRepository.saveAndFlush(any())).thenAnswer(inv -> {
                 AgentJob saved = inv.getArgument(0);
                 saved.prePersist();
@@ -737,11 +631,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             });
 
             String result = service.submitPrepared(
-                1L,
-                AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class),
-                null
-            );
+                    1L, AgentJobType.PULL_REQUEST_REVIEW, mock(JobSubmissionRequest.class), null);
 
             assertThat(result).startsWith("Job submitted: ");
         }

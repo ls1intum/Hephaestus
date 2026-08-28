@@ -24,35 +24,32 @@ final class TraceInputs {
      *                      something can; the sentence comes straight from {@code DormantBinding}
      */
     record TracedPractice(
-        Long id,
-        String slug,
-        String name,
-        PracticeAutonomy autonomy,
-        List<SignalName> watches,
-        @Nullable String dormancyReason
-    ) {}
+            Long id,
+            String slug,
+            String name,
+            PracticeAutonomy autonomy,
+            List<SignalName> watches,
+            @Nullable String dormancyReason) {}
 
     /**
      * @param id carried because a signal name alone cannot identify which occurrence an answer rests on:
      *           the same signal recurs on every new revision
      */
     record SignalOccurrence(
-        UUID id,
-        SignalName signal,
-        Instant occurredAt,
-        SignalState state,
-        @Nullable SignalStateReason stateReason,
-        @Nullable UUID reviewId
-    ) {}
+            UUID id,
+            SignalName signal,
+            Instant occurredAt,
+            SignalState state,
+            @Nullable SignalStateReason stateReason,
+            @Nullable UUID reviewId) {}
 
     /** What one practice produced on this artifact, across every run of it. */
     record PracticeOutput(
-        int observations,
-        int delivered,
-        List<FeedbackSuppressionReason> withheldReasons,
-        @Nullable UUID latestReviewId,
-        @Nullable Instant latestObservedAt
-    ) {
+            int observations,
+            int delivered,
+            List<FeedbackSuppressionReason> withheldReasons,
+            @Nullable UUID latestReviewId,
+            @Nullable Instant latestObservedAt) {
         static final PracticeOutput NONE = new PracticeOutput(0, 0, List.of(), null, null);
     }
 }

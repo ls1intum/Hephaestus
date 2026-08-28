@@ -29,14 +29,13 @@ public class GitHubGraphQlSyncCoordinator {
      * @param log              logger to use for messages
      */
     public record GraphQlClassificationContext(
-        ClassificationResult classification,
-        int retryAttempt,
-        int maxRetryAttempts,
-        String phase,
-        String scopeLabel,
-        Object scopeValue,
-        Logger log
-    ) {}
+            ClassificationResult classification,
+            int retryAttempt,
+            int maxRetryAttempts,
+            String phase,
+            String scopeLabel,
+            Object scopeValue,
+            Logger log) {}
 
     @Nullable
     public ClassificationResult classifyGraphQlErrors(@Nullable ClientGraphQlResponse response) {
@@ -51,18 +50,13 @@ public class GitHubGraphQlSyncCoordinator {
         }
 
         return switch (transientError.type()) {
-            case RATE_LIMIT -> ClassificationResult.rateLimited(
-                transientError.getRecommendedWait(),
-                "GraphQL rate limit: " + transientError.message()
-            );
-            case TIMEOUT, SERVER_ERROR -> ClassificationResult.of(
-                Category.RETRYABLE,
-                "GraphQL transient error: " + transientError.message()
-            );
-            case RESOURCE_LIMIT -> ClassificationResult.of(
-                Category.CLIENT_ERROR,
-                "GraphQL resource limit: " + transientError.message()
-            );
+            case RATE_LIMIT ->
+                ClassificationResult.rateLimited(
+                        transientError.getRecommendedWait(), "GraphQL rate limit: " + transientError.message());
+            case TIMEOUT, SERVER_ERROR ->
+                ClassificationResult.of(Category.RETRYABLE, "GraphQL transient error: " + transientError.message());
+            case RESOURCE_LIMIT ->
+                ClassificationResult.of(Category.CLIENT_ERROR, "GraphQL resource limit: " + transientError.message());
         };
     }
 
@@ -87,13 +81,12 @@ public class GitHubGraphQlSyncCoordinator {
             case RETRYABLE -> {
                 if (retryAttempt < maxRetryAttempts) {
                     log.warn(
-                        "Retrying {} after transient GraphQL error: {}={}, attempt={}, error={}",
-                        phase,
-                        scopeLabel,
-                        scopeValue,
-                        retryAttempt + 1,
-                        classification.message()
-                    );
+                            "Retrying {} after transient GraphQL error: {}={}, attempt={}, error={}",
+                            phase,
+                            scopeLabel,
+                            scopeValue,
+                            retryAttempt + 1,
+                            classification.message());
                     try {
                         ExponentialBackoff.sleep(retryAttempt + 1);
                     } catch (InterruptedException ie) {
@@ -103,25 +96,19 @@ public class GitHubGraphQlSyncCoordinator {
                     return true;
                 }
                 log.error(
-                    "Failed {} after {} retries due to GraphQL error: {}={}, error={}",
-                    phase,
-                    maxRetryAttempts,
-                    scopeLabel,
-                    scopeValue,
-                    classification.message()
-                );
+                        "Failed {} after {} retries due to GraphQL error: {}={}, error={}",
+                        phase,
+                        maxRetryAttempts,
+                        scopeLabel,
+                        scopeValue,
+                        classification.message());
                 return false;
             }
             case RATE_LIMITED -> {
                 if (retryAttempt < maxRetryAttempts && classification.suggestedWait() != null) {
                     long waitMs = Math.min(classification.suggestedWait().toMillis(), MAX_RATE_LIMIT_WAIT_MS);
                     log.warn(
-                        "Rate limited during {}, waiting: {}={}, waitMs={}",
-                        phase,
-                        scopeLabel,
-                        scopeValue,
-                        waitMs
-                    );
+                            "Rate limited during {}, waiting: {}={}, waitMs={}", phase, scopeLabel, scopeValue, waitMs);
                     try {
                         Thread.sleep(waitMs);
                     } catch (InterruptedException ie) {
@@ -131,77 +118,66 @@ public class GitHubGraphQlSyncCoordinator {
                     return true;
                 }
                 log.error(
-                    "Aborting {} due to GraphQL rate limit: {}={}, error={}",
-                    phase,
-                    scopeLabel,
-                    scopeValue,
-                    classification.message()
-                );
+                        "Aborting {} due to GraphQL rate limit: {}={}, error={}",
+                        phase,
+                        scopeLabel,
+                        scopeValue,
+                        classification.message());
                 return false;
             }
             case NOT_FOUND -> {
                 log.warn(
-                    "Resource not found during {} GraphQL response: {}={}, error={}",
-                    phase,
-                    scopeLabel,
-                    scopeValue,
-                    classification.message()
-                );
+                        "Resource not found during {} GraphQL response: {}={}, error={}",
+                        phase,
+                        scopeLabel,
+                        scopeValue,
+                        classification.message());
                 return false;
             }
             case AUTH_ERROR -> {
                 log.error(
-                    "Authentication error during {} GraphQL response: {}={}, error={}",
-                    phase,
-                    scopeLabel,
-                    scopeValue,
-                    classification.message()
-                );
+                        "Authentication error during {} GraphQL response: {}={}, error={}",
+                        phase,
+                        scopeLabel,
+                        scopeValue,
+                        classification.message());
                 return false;
             }
             case CLIENT_ERROR -> {
-                boolean isResourceLimit =
-                    classification.message() != null && classification.message().contains("resource limit");
+                boolean isResourceLimit = classification.message() != null
+                        && classification.message().contains("resource limit");
                 if (isResourceLimit) {
                     log.warn(
-                        "Resource limit exceeded during {} GraphQL response (reduce page size): {}={}, error={}",
-                        phase,
-                        scopeLabel,
-                        scopeValue,
-                        classification.message()
-                    );
+                            "Resource limit exceeded during {} GraphQL response (reduce page size): {}={}, error={}",
+                            phase,
+                            scopeLabel,
+                            scopeValue,
+                            classification.message());
                 } else {
                     log.error(
-                        "Client error during {} GraphQL response: {}={}, error={}",
-                        phase,
-                        scopeLabel,
-                        scopeValue,
-                        classification.message()
-                    );
+                            "Client error during {} GraphQL response: {}={}, error={}",
+                            phase,
+                            scopeLabel,
+                            scopeValue,
+                            classification.message());
                 }
                 return false;
             }
             default -> {
                 log.error(
-                    "Aborting {} due to GraphQL error: {}={}, category={}, error={}",
-                    phase,
-                    scopeLabel,
-                    scopeValue,
-                    category,
-                    classification.message()
-                );
+                        "Aborting {} due to GraphQL error: {}={}, category={}, error={}",
+                        phase,
+                        scopeLabel,
+                        scopeValue,
+                        category,
+                        classification.message());
                 return false;
             }
         }
     }
 
     public boolean waitForRateLimitIfNeeded(
-        Long scopeId,
-        String phase,
-        String scopeLabel,
-        Object scopeValue,
-        Logger log
-    ) {
+            Long scopeId, String phase, String scopeLabel, Object scopeValue, Logger log) {
         try {
             boolean waited = graphQlClientProvider.waitIfRateLimitLow(scopeId);
             if (waited) {

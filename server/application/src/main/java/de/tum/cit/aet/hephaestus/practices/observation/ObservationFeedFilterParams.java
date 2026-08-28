@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.practices.observation;
 
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.web.QueryFilterSupport;
@@ -25,42 +24,50 @@ import org.springframework.web.bind.annotation.RequestParam;
  * {@code defaultValue} on {@code @RequestParam}.
  */
 public record ObservationFeedFilterParams(
-    @Parameter(description = "Filter by practice slug") @RequestParam(required = false) @Nullable String practiceSlug,
-    @Parameter(description = "Filter by the practice group the observed practice belongs to")
-    @RequestParam(required = false)
-    @Nullable
-    String groupSlug,
-    @Parameter(description = "Filter by presence") @RequestParam(required = false) @Nullable Presence presence,
-    /**
-     * Bare strings, not {@link ArtifactKind}s — {@link QueryFilterSupport#artifactKind} has the reason,
-     * and parses them in {@link #toQuery()}, where a malformed value becomes a 400.
-     */
-    @Parameter(description = "Only observations on these kinds of reviewed work, e.g. scm.pull_request (repeatable)")
-    @RequestParam(required = false)
-    @Nullable
-    List<String> artifactKinds,
-    @Parameter(description = "Only observations with these severities (repeatable); omit for all")
-    @RequestParam(required = false)
-    @Nullable
-    List<Severity> severities,
-    @Parameter(description = "Drop NOT_APPLICABLE rows — only observations where the practice actually applied")
-    @RequestParam(required = false)
-    @Nullable
-    Boolean displayableOnly,
-    @Parameter(description = "Feed ordering: DATE (default) or SEVERITY (most severe first, ties newest-first)")
-    @RequestParam(required = false)
-    ObservationService.@Nullable ObservationSort sort,
-    @Parameter(description = "Ordering direction: for DATE newest/oldest first, for SEVERITY most/least severe first")
-    @RequestParam(required = false)
-    Sort.@Nullable Direction direction,
-    @Parameter(description = "Zero-based page") @RequestParam(required = false) @PositiveOrZero @Nullable Integer page,
-    @Parameter(description = "Page size from 1 to 100")
-    @RequestParam(required = false)
-    @Min(1)
-    @Max(100)
-    @Nullable
-    Integer size
-) {
+        @Parameter(description = "Filter by practice slug") @RequestParam(required = false) @Nullable
+        String practiceSlug,
+
+        @Parameter(description = "Filter by the practice group the observed practice belongs to")
+        @RequestParam(required = false)
+        @Nullable
+        String groupSlug,
+
+        @Parameter(description = "Filter by presence") @RequestParam(required = false) @Nullable
+        Presence presence,
+        /**
+         * Bare strings, not {@link ArtifactKind}s — {@link QueryFilterSupport#artifactKind} has the reason,
+         * and parses them in {@link #toQuery()}, where a malformed value becomes a 400.
+         */
+        @Parameter(
+                description = "Only observations on these kinds of reviewed work, e.g. scm.pull_request (repeatable)")
+        @RequestParam(required = false)
+        @Nullable
+        List<String> artifactKinds,
+
+        @Parameter(description = "Only observations with these severities (repeatable); omit for all")
+        @RequestParam(required = false)
+        @Nullable
+        List<Severity> severities,
+
+        @Parameter(description = "Drop NOT_APPLICABLE rows — only observations where the practice actually applied")
+        @RequestParam(required = false)
+        @Nullable
+        Boolean displayableOnly,
+
+        @Parameter(description = "Feed ordering: DATE (default) or SEVERITY (most severe first, ties newest-first)")
+        @RequestParam(required = false)
+        ObservationService.@Nullable ObservationSort sort,
+
+        @Parameter(
+                description = "Ordering direction: for DATE newest/oldest first, for SEVERITY most/least severe first")
+        @RequestParam(required = false)
+        Sort.@Nullable Direction direction,
+
+        @Parameter(description = "Zero-based page") @RequestParam(required = false) @PositiveOrZero @Nullable
+        Integer page,
+
+        @Parameter(description = "Page size from 1 to 100") @RequestParam(required = false) @Min(1) @Max(100) @Nullable
+        Integer size) {
     private static final int DEFAULT_PAGE_SIZE = 20;
 
     public ObservationFeedFilterParams {
@@ -78,25 +85,23 @@ public record ObservationFeedFilterParams(
     public Pageable pageable() {
         Pageable page = QueryFilterSupport.pageable(this.page, size, DEFAULT_PAGE_SIZE);
         return sort() == ObservationService.ObservationSort.SEVERITY
-            ? page
-            : PageRequest.of(
-                  page.getPageNumber(),
-                  page.getPageSize(),
-                  Sort.by(Objects.requireNonNull(direction), "observedAt")
-              );
+                ? page
+                : PageRequest.of(
+                        page.getPageNumber(),
+                        page.getPageSize(),
+                        Sort.by(Objects.requireNonNull(direction), "observedAt"));
     }
 
     /** The domain-facing shape; {@code direction} collapses into the severity sort's only use of it. */
     public ObservationFeedQuery toQuery() {
         return new ObservationFeedQuery(
-            practiceSlug,
-            groupSlug,
-            presence,
-            QueryFilterSupport.artifactKinds(artifactKinds),
-            severities,
-            Objects.requireNonNull(displayableOnly),
-            Objects.requireNonNull(sort),
-            direction == Sort.Direction.DESC
-        );
+                practiceSlug,
+                groupSlug,
+                presence,
+                QueryFilterSupport.artifactKinds(artifactKinds),
+                severities,
+                Objects.requireNonNull(displayableOnly),
+                Objects.requireNonNull(sort),
+                direction == Sort.Direction.DESC);
     }
 }

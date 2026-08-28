@@ -27,9 +27,7 @@ public class WorkspaceResolver {
     private final WorkspaceRepository workspaceRepository;
 
     public WorkspaceResolver(
-        RepositoryToMonitorRepository repositoryToMonitorRepository,
-        WorkspaceRepository workspaceRepository
-    ) {
+            RepositoryToMonitorRepository repositoryToMonitorRepository, WorkspaceRepository workspaceRepository) {
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.workspaceRepository = workspaceRepository;
     }

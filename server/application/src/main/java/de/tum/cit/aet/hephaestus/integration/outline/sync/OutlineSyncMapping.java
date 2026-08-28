@@ -27,7 +27,11 @@ final class OutlineSyncMapping {
     private OutlineSyncMapping() {}
 
     /** One document flattened out of the collection tree, with its parent id resolved from the nesting. */
-    record FlatNode(String id, @Nullable String title, @Nullable String slug, @Nullable String parentId) {}
+    record FlatNode(
+            String id,
+            @Nullable String title,
+            @Nullable String slug,
+            @Nullable String parentId) {}
 
     /** Depth-first flatten of the document tree, carrying each node's parent id down the recursion. */
     static void flatten(@Nullable List<OutlineNavigationNode> nodes, @Nullable String parentId, List<FlatNode> out) {
@@ -85,15 +89,18 @@ final class OutlineSyncMapping {
      */
     static void applyAuthorship(OutlineDocument doc, OutlineDocumentModel meta) {
         doc.setOutlineCreatedAt(meta.getCreatedAt());
-        doc.setCreatedBySubject(meta.getCreatedBy() == null ? null : meta.getCreatedBy().getId());
-        doc.setCreatedByName(meta.getCreatedBy() == null ? null : meta.getCreatedBy().getName());
-        doc.setUpdatedBySubject(meta.getUpdatedBy() == null ? null : meta.getUpdatedBy().getId());
-        doc.setUpdatedByName(meta.getUpdatedBy() == null ? null : meta.getUpdatedBy().getName());
+        doc.setCreatedBySubject(
+                meta.getCreatedBy() == null ? null : meta.getCreatedBy().getId());
+        doc.setCreatedByName(
+                meta.getCreatedBy() == null ? null : meta.getCreatedBy().getName());
+        doc.setUpdatedBySubject(
+                meta.getUpdatedBy() == null ? null : meta.getUpdatedBy().getId());
+        doc.setUpdatedByName(
+                meta.getUpdatedBy() == null ? null : meta.getUpdatedBy().getName());
         doc.setCollaboratorSubjects(
-            meta.getCollaboratorIds() == null || meta.getCollaboratorIds().isEmpty()
-                ? null
-                : List.copyOf(meta.getCollaboratorIds())
-        );
+                meta.getCollaboratorIds() == null || meta.getCollaboratorIds().isEmpty()
+                        ? null
+                        : List.copyOf(meta.getCollaboratorIds()));
     }
 
     /** Truncates a value to at most {@code maxLen} characters; {@code null} passes through unchanged. */

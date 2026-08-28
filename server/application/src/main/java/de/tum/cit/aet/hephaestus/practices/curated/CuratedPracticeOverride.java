@@ -87,25 +87,22 @@ public class CuratedPracticeOverride {
     }
 
     public @Nullable PracticeDefinition definition() {
-        if (
-            name == null ||
-            artifactKind == null ||
-            bindings == null ||
-            criteria == null ||
-            automatedReviewPolicy == null
-        ) {
+        if (name == null
+                || artifactKind == null
+                || bindings == null
+                || criteria == null
+                || automatedReviewPolicy == null) {
             return null;
         }
         return new PracticeDefinition(
-            name,
-            bindings,
-            criteria,
-            precomputeScript,
-            automatedReviewPolicy,
-            whyItMatters,
-            whatGoodLooksLike,
-            groupSlug
-        );
+                name,
+                bindings,
+                criteria,
+                precomputeScript,
+                automatedReviewPolicy,
+                whyItMatters,
+                whatGoodLooksLike,
+                groupSlug);
     }
 
     public void write(PracticeDefinition definition, @Nullable String acceptedBundledDigest, Instant now) {

@@ -54,19 +54,18 @@ public class IntegrationFrameworkBootstrap {
     private final boolean webhookRoleEnabled;
 
     public IntegrationFrameworkBootstrap(
-        IntegrationManifestRegistry manifests,
-        List<WebhookSignatureVerifier> signatureVerifiers,
-        List<SubjectKeyDeriver> subjectKeyDerivers,
-        List<SubjectParser> subjectParsers,
-        List<ApiCredentialProvider> credentialProviders,
-        List<TokenRefresher> tokenRefreshers,
-        List<SummaryChannel> feedbackChannels,
-        List<InlineFeedbackChannel> inlineFeedbackChannels,
-        List<ApprovalChannel> approvalChannels,
-        List<IntegrationLifecycleListener> lifecycleListeners,
-        ReviewContractValidator reviewContract,
-        @Value("${" + RuntimeRole.WEBHOOK_PROPERTY + ":true}") boolean webhookRoleEnabled
-    ) {
+            IntegrationManifestRegistry manifests,
+            List<WebhookSignatureVerifier> signatureVerifiers,
+            List<SubjectKeyDeriver> subjectKeyDerivers,
+            List<SubjectParser> subjectParsers,
+            List<ApiCredentialProvider> credentialProviders,
+            List<TokenRefresher> tokenRefreshers,
+            List<SummaryChannel> feedbackChannels,
+            List<InlineFeedbackChannel> inlineFeedbackChannels,
+            List<ApprovalChannel> approvalChannels,
+            List<IntegrationLifecycleListener> lifecycleListeners,
+            ReviewContractValidator reviewContract,
+            @Value("${" + RuntimeRole.WEBHOOK_PROPERTY + ":true}") boolean webhookRoleEnabled) {
         this.manifests = manifests;
         this.signatureVerifiers = signatureVerifiers;
         this.subjectKeyDerivers = subjectKeyDerivers;
@@ -103,7 +102,9 @@ public class IntegrationFrameworkBootstrap {
             String joined = String.join("\n  - ", violations);
             throw new IllegalStateException("IntegrationManifest validation failed:\n  - " + joined);
         }
-        log.info("Integration framework bootstrap OK ({} kinds registered)", manifests.registeredKinds().size());
+        log.info(
+                "Integration framework bootstrap OK ({} kinds registered)",
+                manifests.registeredKinds().size());
     }
 
     private void checkRequired(IntegrationKind kind, Set<Capability> declared, List<String> violations) {
@@ -114,11 +115,10 @@ public class IntegrationFrameworkBootstrap {
         // transitions can be wired into the right vendor adapter (even when the body is
         // a no-op stub — that's per-kind policy, not a framework gap).
         require(
-            kind,
-            "IntegrationLifecycleListener",
-            anyMatchKind(lifecycleListeners, l -> l.kind() == kind),
-            violations
-        );
+                kind,
+                "IntegrationLifecycleListener",
+                anyMatchKind(lifecycleListeners, l -> l.kind() == kind),
+                violations);
 
         if (declared.contains(Capability.WEBHOOK_INGEST)) {
             // No WebhookSecretSource check here: Slack resolves its signing secret via
@@ -127,11 +127,10 @@ public class IntegrationFrameworkBootstrap {
             // WebhookSignatureVerifier (missing-bean DI failure / IllegalStateException).
             if (webhookRoleEnabled) {
                 require(
-                    kind,
-                    "WebhookSignatureVerifier",
-                    anyMatchKind(signatureVerifiers, v -> v.kind() == kind),
-                    violations
-                );
+                        kind,
+                        "WebhookSignatureVerifier",
+                        anyMatchKind(signatureVerifiers, v -> v.kind() == kind),
+                        violations);
                 require(kind, "SubjectKeyDeriver", anyMatchKind(subjectKeyDerivers, s -> s.kind() == kind), violations);
             }
             require(kind, "SubjectParser", anyMatchKind(subjectParsers, s -> s.kind() == kind), violations);
@@ -144,11 +143,10 @@ public class IntegrationFrameworkBootstrap {
         }
         if (declared.contains(Capability.INLINE_FEEDBACK)) {
             require(
-                kind,
-                "InlineFeedbackChannel",
-                anyMatchKind(inlineFeedbackChannels, f -> f.kind() == kind),
-                violations
-            );
+                    kind,
+                    "InlineFeedbackChannel",
+                    anyMatchKind(inlineFeedbackChannels, f -> f.kind() == kind),
+                    violations);
         }
         if (declared.contains(Capability.APPROVAL_WORKFLOW)) {
             require(kind, "ApprovalChannel", anyMatchKind(approvalChannels, f -> f.kind() == kind), violations);
@@ -158,11 +156,10 @@ public class IntegrationFrameworkBootstrap {
             // must therefore have a real body. We can't introspect for that, but we
             // can at least force the listener bean to be wired.
             require(
-                kind,
-                "IntegrationLifecycleListener (scope-change emitter)",
-                anyMatchKind(lifecycleListeners, l -> l.kind() == kind),
-                violations
-            );
+                    kind,
+                    "IntegrationLifecycleListener (scope-change emitter)",
+                    anyMatchKind(lifecycleListeners, l -> l.kind() == kind),
+                    violations);
         }
 
         // Forward-compat: the moment a new Capability is added to the enum without a
@@ -174,24 +171,20 @@ public class IntegrationFrameworkBootstrap {
         unmapped.addAll(declared);
         unmapped.removeAll(ENFORCED_CAPABILITIES);
         for (Capability cap : unmapped) {
-            violations.add(
-                kind +
-                    " declares capability " +
-                    cap +
-                    " but the bootstrap has no enforcement rule for it — add a require() branch"
-            );
+            violations.add(kind + " declares capability "
+                    + cap
+                    + " but the bootstrap has no enforcement rule for it — add a require() branch");
         }
     }
 
     /** Capabilities the {@link #checkRequired} switch above pins to a bean check. */
     private static final Set<Capability> ENFORCED_CAPABILITIES = EnumSet.of(
-        Capability.WEBHOOK_INGEST,
-        Capability.TOKEN_REFRESH,
-        Capability.FEEDBACK_DELIVERY,
-        Capability.INLINE_FEEDBACK,
-        Capability.APPROVAL_WORKFLOW,
-        Capability.SCOPE_CHANGES
-    );
+            Capability.WEBHOOK_INGEST,
+            Capability.TOKEN_REFRESH,
+            Capability.FEEDBACK_DELIVERY,
+            Capability.INLINE_FEEDBACK,
+            Capability.APPROVAL_WORKFLOW,
+            Capability.SCOPE_CHANGES);
 
     private static <T> boolean anyMatchKind(List<T> beans, Predicate<T> predicate) {
         return beans.stream().anyMatch(predicate);

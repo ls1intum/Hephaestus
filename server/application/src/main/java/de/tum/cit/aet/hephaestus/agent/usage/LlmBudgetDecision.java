@@ -7,10 +7,8 @@ import org.jspecify.annotations.Nullable;
  * blocked?" has no single answer — only "is THIS call blocked?", which depends on who is paying.
  */
 public record LlmBudgetDecision(LlmBudgetBlockReason instanceFunded, LlmBudgetBlockReason workspaceFunded) {
-    public static final LlmBudgetDecision ALLOWED = new LlmBudgetDecision(
-        LlmBudgetBlockReason.NONE,
-        LlmBudgetBlockReason.NONE
-    );
+    public static final LlmBudgetDecision ALLOWED =
+            new LlmBudgetDecision(LlmBudgetBlockReason.NONE, LlmBudgetBlockReason.NONE);
 
     /**
      * @param purse the purse that produced the block, or {@code null} when nothing is blocked. For an
@@ -35,13 +33,14 @@ public record LlmBudgetDecision(LlmBudgetBlockReason instanceFunded, LlmBudgetBl
                 return new Block(FundingSource.INSTANCE, instanceFunded);
             }
             return workspaceFunded != LlmBudgetBlockReason.NONE
-                ? new Block(FundingSource.WORKSPACE, workspaceFunded)
-                : Block.NONE;
+                    ? new Block(FundingSource.WORKSPACE, workspaceFunded)
+                    : Block.NONE;
         }
-        LlmBudgetBlockReason reason = switch (fundingSource) {
-            case INSTANCE -> instanceFunded;
-            case WORKSPACE -> workspaceFunded;
-        };
+        LlmBudgetBlockReason reason =
+                switch (fundingSource) {
+                    case INSTANCE -> instanceFunded;
+                    case WORKSPACE -> workspaceFunded;
+                };
         return reason != LlmBudgetBlockReason.NONE ? new Block(fundingSource, reason) : Block.NONE;
     }
 

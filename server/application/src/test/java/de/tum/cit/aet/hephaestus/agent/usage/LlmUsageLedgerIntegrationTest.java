@@ -88,49 +88,42 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     private LlmUsageRecorder.LlmUsageSample sample(
-        LlmUsageJobType jobType,
-        LlmUsageSourceType sourceType,
-        UUID sourceId,
-        int sourceAttempt,
-        String model,
-        long inputTokens,
-        long outputTokens,
-        LlmPriceSnapshot price
-    ) {
+            LlmUsageJobType jobType,
+            LlmUsageSourceType sourceType,
+            UUID sourceId,
+            int sourceAttempt,
+            String model,
+            long inputTokens,
+            long outputTokens,
+            LlmPriceSnapshot price) {
         return new LlmUsageRecorder.LlmUsageSample(
-            jobType,
-            sourceType,
-            sourceId,
-            sourceAttempt,
-            model,
-            inputTokens,
-            outputTokens,
-            0,
-            0,
-            0,
-            1,
-            price,
-            UsageProvenance.RUNNER,
-            Instant.now()
-        );
+                jobType,
+                sourceType,
+                sourceId,
+                sourceAttempt,
+                model,
+                inputTokens,
+                outputTokens,
+                0,
+                0,
+                0,
+                1,
+                price,
+                UsageProvenance.RUNNER,
+                Instant.now());
     }
 
     private LlmUsageRecorder.LlmUsageSample agentSample(
-        UUID sourceId,
-        int sourceAttempt,
-        long inputTokens,
-        LlmPriceSnapshot price
-    ) {
+            UUID sourceId, int sourceAttempt, long inputTokens, LlmPriceSnapshot price) {
         return sample(
-            LlmUsageJobType.PULL_REQUEST_REVIEW,
-            LlmUsageSourceType.AGENT_JOB,
-            sourceId,
-            sourceAttempt,
-            "gpt-5",
-            inputTokens,
-            0,
-            price
-        );
+                LlmUsageJobType.PULL_REQUEST_REVIEW,
+                LlmUsageSourceType.AGENT_JOB,
+                sourceId,
+                sourceAttempt,
+                "gpt-5",
+                inputTokens,
+                0,
+                price);
     }
 
     private void record(Long workspaceId, LlmUsageRecorder.LlmUsageSample sample) {
@@ -146,41 +139,39 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
      * — so this filter lives here rather than as a finder on the repository.
      */
     private List<LlmUsageEvent> eventsOf(Workspace workspace) {
-        return usageRepository
-            .findAll()
-            .stream()
-            .filter(event -> workspace.getId().equals(event.getWorkspace().getId()))
-            .toList();
+        return usageRepository.findAll().stream()
+                .filter(event -> workspace.getId().equals(event.getWorkspace().getId()))
+                .toList();
     }
 
     private LlmPriceSnapshot pricedInstance(String perMInput, String perMOutput) {
         return new LlmPriceSnapshot(
-            FundingSource.INSTANCE,
-            PricingState.PRICED,
-            42L,
-            null,
-            new BigDecimal(perMInput),
-            new BigDecimal(perMOutput),
-            BigDecimal.ZERO,
-            BigDecimal.ZERO
-        );
+                FundingSource.INSTANCE,
+                PricingState.PRICED,
+                42L,
+                null,
+                new BigDecimal(perMInput),
+                new BigDecimal(perMOutput),
+                BigDecimal.ZERO,
+                BigDecimal.ZERO);
     }
 
     private LlmPriceSnapshot workspacePriced(String perMInput, String perMOutput) {
         return new LlmPriceSnapshot(
-            FundingSource.WORKSPACE,
-            PricingState.PRICED,
-            null,
-            84L,
-            new BigDecimal(perMInput),
-            new BigDecimal(perMOutput),
-            BigDecimal.ZERO,
-            BigDecimal.ZERO
-        );
+                FundingSource.WORKSPACE,
+                PricingState.PRICED,
+                null,
+                84L,
+                new BigDecimal(perMInput),
+                new BigDecimal(perMOutput),
+                BigDecimal.ZERO,
+                BigDecimal.ZERO);
     }
 
     private double blockedCount(String cap) {
-        return meterRegistry.counter("llm.budget.blocked", "surface", "agent_job", "cap", cap).count();
+        return meterRegistry
+                .counter("llm.budget.blocked", "surface", "agent_job", "cap", cap)
+                .count();
     }
 
     /**
@@ -225,18 +216,16 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         UUID sourceId = UUID.randomUUID();
 
         record(
-            workspace.getId(),
-            sample(
-                LlmUsageJobType.PULL_REQUEST_REVIEW,
-                LlmUsageSourceType.AGENT_JOB,
-                sourceId,
-                2,
-                "gpt-5",
-                1_000_000,
-                1_000_000,
-                pricedInstance("3.00", "9.00")
-            )
-        );
+                workspace.getId(),
+                sample(
+                        LlmUsageJobType.PULL_REQUEST_REVIEW,
+                        LlmUsageSourceType.AGENT_JOB,
+                        sourceId,
+                        2,
+                        "gpt-5",
+                        1_000_000,
+                        1_000_000,
+                        pricedInstance("3.00", "9.00")));
 
         var events = eventsOf(workspace);
         assertThat(events).hasSize(1);
@@ -257,36 +246,27 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         workspace.setMonthlyLlmBudgetUsd(new BigDecimal("50.00"));
         workspaceRepository.save(workspace);
         double before = meterRegistry.counter("llm.budget.exhausted").count();
-        LlmPriceSnapshot noCharge = new LlmPriceSnapshot(
-            FundingSource.INSTANCE,
-            PricingState.NO_CHARGE,
-            43L,
-            null,
-            null,
-            null,
-            null,
-            null
-        );
+        LlmPriceSnapshot noCharge =
+                new LlmPriceSnapshot(FundingSource.INSTANCE, PricingState.NO_CHARGE, 43L, null, null, null, null, null);
 
         record(
-            workspace.getId(),
-            sample(
-                LlmUsageJobType.MENTOR_TURN,
-                LlmUsageSourceType.MENTOR_TURN,
-                UUID.randomUUID(),
-                0,
-                "local-model",
-                1000,
-                200,
-                noCharge
-            )
-        );
+                workspace.getId(),
+                sample(
+                        LlmUsageJobType.MENTOR_TURN,
+                        LlmUsageSourceType.MENTOR_TURN,
+                        UUID.randomUUID(),
+                        0,
+                        "local-model",
+                        1000,
+                        200,
+                        noCharge));
 
         var event = eventsOf(workspace).getFirst();
         assertThat(event.getPricingState()).isEqualTo(PricingState.NO_CHARGE);
         assertThat(event.getCostUsd()).isEqualByComparingTo("0");
         assertThat(budgetService.headroom(workspace.getId()).instanceSpentUsd()).isEqualByComparingTo("0");
-        assertThat(budgetService.decide(workspace.getId()).blocks(FundingSource.INSTANCE)).isFalse();
+        assertThat(budgetService.decide(workspace.getId()).blocks(FundingSource.INSTANCE))
+                .isFalse();
         assertThat(meterRegistry.counter("llm.budget.exhausted").count()).isEqualTo(before);
     }
 
@@ -296,36 +276,34 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         workspace.setMonthlyLlmBudgetUsd(new BigDecimal("1.00"));
         workspaceRepository.save(workspace);
         LlmPriceSnapshot workspacePrice = new LlmPriceSnapshot(
-            FundingSource.WORKSPACE,
-            PricingState.PRICED,
-            null,
-            84L,
-            new BigDecimal("100.00"),
-            new BigDecimal("100.00"),
-            BigDecimal.ZERO,
-            BigDecimal.ZERO
-        );
+                FundingSource.WORKSPACE,
+                PricingState.PRICED,
+                null,
+                84L,
+                new BigDecimal("100.00"),
+                new BigDecimal("100.00"),
+                BigDecimal.ZERO,
+                BigDecimal.ZERO);
 
         record(
-            workspace.getId(),
-            sample(
-                LlmUsageJobType.MENTOR_TURN,
-                LlmUsageSourceType.MENTOR_TURN,
-                UUID.randomUUID(),
-                0,
-                "byo-model",
-                1_000_000,
-                1_000_000,
-                workspacePrice
-            )
-        );
+                workspace.getId(),
+                sample(
+                        LlmUsageJobType.MENTOR_TURN,
+                        LlmUsageSourceType.MENTOR_TURN,
+                        UUID.randomUUID(),
+                        0,
+                        "byo-model",
+                        1_000_000,
+                        1_000_000,
+                        workspacePrice));
 
         var event = eventsOf(workspace).getFirst();
         assertThat(event.getCostUsd()).isEqualByComparingTo("200.00");
         assertThat(event.getFundingSource()).isEqualTo(FundingSource.WORKSPACE);
         assertThat(event.getAppliedWorkspaceModelId()).isEqualTo(84L);
         assertThat(budgetService.headroom(workspace.getId()).instanceSpentUsd()).isEqualByComparingTo("0");
-        assertThat(budgetService.decide(workspace.getId()).blocks(FundingSource.INSTANCE)).isFalse();
+        assertThat(budgetService.decide(workspace.getId()).blocks(FundingSource.INSTANCE))
+                .isFalse();
     }
 
     @Test
@@ -338,7 +316,9 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         record(workspace.getId(), agentSample(sourceId, 0, 1000, price));
         record(workspace.getId(), agentSample(sourceId, 1, 1000, price));
 
-        assertThat(eventsOf(workspace)).extracting(LlmUsageEvent::getSourceAttempt).containsExactlyInAnyOrder(0, 1);
+        assertThat(eventsOf(workspace))
+                .extracting(LlmUsageEvent::getSourceAttempt)
+                .containsExactlyInAnyOrder(0, 1);
     }
 
     @Test
@@ -354,9 +334,8 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         record(workspace.getId(), agentSample(UUID.randomUUID(), 0, 1000, price));
 
         assertThat(meterRegistry.counter("llm.budget.exhausted").count()).isEqualTo(before + 1);
-        assertThat(budgetService.decide(workspace.getId()).forFunding(FundingSource.INSTANCE)).isEqualTo(
-            LlmBudgetBlockReason.EXHAUSTED
-        );
+        assertThat(budgetService.decide(workspace.getId()).forFunding(FundingSource.INSTANCE))
+                .isEqualTo(LlmBudgetBlockReason.EXHAUSTED);
     }
 
     @Test
@@ -370,11 +349,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         double blockedBefore = blockedCount("instance");
 
         var job = agentJobService.submit(
-            workspace.getId(),
-            AgentJobType.PULL_REQUEST_REVIEW,
-            mock(JobSubmissionRequest.class),
-            null
-        );
+                workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, mock(JobSubmissionRequest.class), null);
 
         assertThat(job).isEmpty();
         assertThat(blockedCount("instance")).isEqualTo(blockedBefore + 1);
@@ -394,20 +369,16 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         double instanceBlockedBefore = blockedCount("instance");
         double byoBlockedBefore = blockedCount("byo");
 
-        Throwable thrown = catchThrowable(() ->
-            agentJobService.submit(
-                workspace.getId(),
-                AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class),
-                null
-            )
-        );
+        Throwable thrown = catchThrowable(() -> agentJobService.submit(
+                workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, mock(JobSubmissionRequest.class), null));
 
         // A budget refusal is a QUIET return of Optional.empty(), never a throw. So a non-null
         // throwable is the proof that execution reached past the gate — the fixture then has no
         // reviewable subject and fails downstream, which is a different failure entirely. Without this
         // assertion the test would still pass if the host's cap HAD refused the submission.
-        assertThat(thrown).as("submission ran past the budget gate and failed downstream instead").isNotNull();
+        assertThat(thrown)
+                .as("submission ran past the budget gate and failed downstream instead")
+                .isNotNull();
         assertThat(thrown).isNotInstanceOf(LlmBudgetExhaustedException.class);
         assertThat(blockedCount("instance")).isEqualTo(instanceBlockedBefore);
         assertThat(blockedCount("byo")).isEqualTo(byoBlockedBefore);
@@ -422,11 +393,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         double blockedBefore = blockedCount("byo");
 
         var job = agentJobService.submit(
-            workspace.getId(),
-            AgentJobType.PULL_REQUEST_REVIEW,
-            mock(JobSubmissionRequest.class),
-            null
-        );
+                workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, mock(JobSubmissionRequest.class), null);
 
         assertThat(job).isEmpty();
         assertThat(blockedCount("byo")).isEqualTo(blockedBefore + 1);
@@ -441,18 +408,14 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         double instanceBlockedBefore = blockedCount("instance");
         double byoBlockedBefore = blockedCount("byo");
 
-        Throwable thrown = catchThrowable(() ->
-            agentJobService.submit(
-                workspace.getId(),
-                AgentJobType.PULL_REQUEST_REVIEW,
-                mock(JobSubmissionRequest.class),
-                null
-            )
-        );
+        Throwable thrown = catchThrowable(() -> agentJobService.submit(
+                workspace.getId(), AgentJobType.PULL_REQUEST_REVIEW, mock(JobSubmissionRequest.class), null));
 
         // As above: a throw means the gate let this through. A zero BYO cap that reached across would
         // instead have returned Optional.empty() with no throwable at all.
-        assertThat(thrown).as("the workspace's own cap did not pause shared-model work").isNotNull();
+        assertThat(thrown)
+                .as("the workspace's own cap did not pause shared-model work")
+                .isNotNull();
         assertThat(thrown).isNotInstanceOf(LlmBudgetExhaustedException.class);
         assertThat(blockedCount("instance")).isEqualTo(instanceBlockedBefore);
         assertThat(blockedCount("byo")).isEqualTo(byoBlockedBefore);
@@ -588,10 +551,13 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
             llmUsageService.updateOwnProviderBudget(workspace.getId(), null);
 
-            assertThat(jobRepository.findById(held.getId()).orElseThrow().getHoldReason()).isNull();
-            assertThat(
-                workspaceRepository.findById(workspace.getId()).orElseThrow().getMonthlyByoLlmBudgetUsd()
-            ).isNull();
+            assertThat(jobRepository.findById(held.getId()).orElseThrow().getHoldReason())
+                    .isNull();
+            assertThat(workspaceRepository
+                            .findById(workspace.getId())
+                            .orElseThrow()
+                            .getMonthlyByoLlmBudgetUsd())
+                    .isNull();
         }
     }
 
@@ -610,18 +576,15 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         private LlmUsageEvent unpricedRow(String slug) {
             Workspace workspace = setupWorkspace(slug);
             recordUnverifiable(
-                workspace.getId(),
-                agentSample(UUID.randomUUID(), 1, 1_000_000, pricedInstance("3.00", "9.00"))
-            );
+                    workspace.getId(), agentSample(UUID.randomUUID(), 1, 1_000_000, pricedInstance("3.00", "9.00")));
             LlmUsageEvent row = eventsOf(workspace).getFirst();
             assertThat(row.getPricingState()).isEqualTo(PricingState.UNPRICED);
             return row;
         }
 
         private int reprice(UUID eventId, BigDecimal costUsd, LlmPriceSnapshot price) {
-            Integer updated = transactionTemplate.execute(status ->
-                usageRepository.applyResolvedPrice(eventId, costUsd, price)
-            );
+            Integer updated =
+                    transactionTemplate.execute(status -> usageRepository.applyResolvedPrice(eventId, costUsd, price));
             return updated == null ? 0 : updated;
         }
 
@@ -635,19 +598,17 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
             LlmUsageEvent row = unpricedRow("reprice-columns");
 
             int updated = reprice(
-                row.getId(),
-                new BigDecimal("1.234567"),
-                new LlmPriceSnapshot(
-                    FundingSource.INSTANCE,
-                    PricingState.PRICED,
-                    42L,
-                    84L,
-                    new BigDecimal("1.11"),
-                    new BigDecimal("2.22"),
-                    new BigDecimal("3.33"),
-                    new BigDecimal("4.44")
-                )
-            );
+                    row.getId(),
+                    new BigDecimal("1.234567"),
+                    new LlmPriceSnapshot(
+                            FundingSource.INSTANCE,
+                            PricingState.PRICED,
+                            42L,
+                            84L,
+                            new BigDecimal("1.11"),
+                            new BigDecimal("2.22"),
+                            new BigDecimal("3.33"),
+                            new BigDecimal("4.44")));
 
             assertThat(updated).isEqualTo(1);
             LlmUsageEvent repriced = reload(row.getId());
@@ -670,10 +631,10 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
             LlmUsageEvent row = unpricedRow("reprice-no-charge");
 
             int updated = reprice(
-                row.getId(),
-                BigDecimal.ZERO,
-                new LlmPriceSnapshot(FundingSource.INSTANCE, PricingState.NO_CHARGE, null, null, null, null, null, null)
-            );
+                    row.getId(),
+                    BigDecimal.ZERO,
+                    new LlmPriceSnapshot(
+                            FundingSource.INSTANCE, PricingState.NO_CHARGE, null, null, null, null, null, null));
 
             assertThat(updated).isEqualTo(1);
             LlmUsageEvent settled = reload(row.getId());
@@ -690,16 +651,9 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         void theUnpricedFenceHoldsAgainstASecondApplication() {
             LlmUsageEvent row = unpricedRow("reprice-fence");
             LlmPriceSnapshot resolved = new LlmPriceSnapshot(
-                FundingSource.INSTANCE,
-                PricingState.PRICED,
-                42L,
-                null,
-                new BigDecimal("1.11"),
-                null,
-                null,
-                null
-            );
-            assertThat(reprice(row.getId(), new BigDecimal("1.234567"), resolved)).isEqualTo(1);
+                    FundingSource.INSTANCE, PricingState.PRICED, 42L, null, new BigDecimal("1.11"), null, null, null);
+            assertThat(reprice(row.getId(), new BigDecimal("1.234567"), resolved))
+                    .isEqualTo(1);
 
             // What a second pod, or a later sweep, would try: the amount somebody was charged is frozen.
             int again = reprice(row.getId(), new BigDecimal("99.999999"), resolved);

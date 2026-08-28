@@ -21,51 +21,44 @@ class ScmSignalsTest extends BaseUnitTest {
     private static final long ARTIFACT_ID = 42L;
 
     private Optional<SignalKey> pullRequest(
-        String triggerEvent,
-        @Nullable String headRefOid,
-        String title,
-        String body
-    ) {
+            String triggerEvent, @Nullable String headRefOid, String title, String body) {
         return ScmSignals.pullRequestKey(
-            WORKSPACE_ID,
-            ARTIFACT_ID,
-            ScmSignals.forTriggerEvent(triggerEvent).orElseThrow(),
-            headRefOid,
-            title,
-            body
-        );
+                WORKSPACE_ID,
+                ARTIFACT_ID,
+                ScmSignals.forTriggerEvent(triggerEvent).orElseThrow(),
+                headRefOid,
+                title,
+                body);
     }
 
     private Optional<SignalKey> issue(String triggerEvent, String title, String body, @Nullable String labelName) {
         return ScmSignals.issueKey(
-            WORKSPACE_ID,
-            ARTIFACT_ID,
-            ScmSignals.forTriggerEvent(triggerEvent).orElseThrow(),
-            title,
-            body,
-            labelName
-        );
+                WORKSPACE_ID,
+                ARTIFACT_ID,
+                ScmSignals.forTriggerEvent(triggerEvent).orElseThrow(),
+                title,
+                body,
+                labelName);
     }
 
     @Test
     void shouldReMeasureAnIssueAfterItsAuthorRewritesTheDescription() {
         // An issue has no commits, so if its signal keyed on anything code-shaped, an issue-writing
         // practice could be measured once and never again.
-        SignalKey before = issue(TriggerEventNames.ISSUE_CREATED, "Bug", "it broke", null).orElseThrow();
-        SignalKey after = issue(
-            TriggerEventNames.ISSUE_CREATED,
-            "Bug",
-            "Login 500s on expired token",
-            null
-        ).orElseThrow();
+        SignalKey before =
+                issue(TriggerEventNames.ISSUE_CREATED, "Bug", "it broke", null).orElseThrow();
+        SignalKey after = issue(TriggerEventNames.ISSUE_CREATED, "Bug", "Login 500s on expired token", null)
+                .orElseThrow();
 
         assertThat(after.revision()).isNotEqualTo(before.revision());
     }
 
     @Test
     void shouldNotReMeasureAnIssueThatWasMerelyRedelivered() {
-        SignalKey first = issue(TriggerEventNames.ISSUE_CREATED, "Bug", "it broke", null).orElseThrow();
-        SignalKey redelivered = issue(TriggerEventNames.ISSUE_CREATED, "Bug", "it broke", null).orElseThrow();
+        SignalKey first =
+                issue(TriggerEventNames.ISSUE_CREATED, "Bug", "it broke", null).orElseThrow();
+        SignalKey redelivered =
+                issue(TriggerEventNames.ISSUE_CREATED, "Bug", "it broke", null).orElseThrow();
 
         assertThat(redelivered).isEqualTo(first);
     }
@@ -75,32 +68,25 @@ class ScmSignalsTest extends BaseUnitTest {
         // Applying three labels in one edit raises three events differing only in the label; keying on
         // anything else collapses them into one ledger row, measuring a labelling-bound practice once per
         // edit instead of once per label.
-        SignalKey bug = issue(
-            TriggerEventNames.ISSUE_LABELED,
-            "Login fails",
-            "500 on expired token",
-            "bug"
-        ).orElseThrow();
+        SignalKey bug = issue(TriggerEventNames.ISSUE_LABELED, "Login fails", "500 on expired token", "bug")
+                .orElseThrow();
         SignalKey regression = issue(
-            TriggerEventNames.ISSUE_LABELED,
-            "Login fails",
-            "500 on expired token",
-            "regression"
-        ).orElseThrow();
+                        TriggerEventNames.ISSUE_LABELED, "Login fails", "500 on expired token", "regression")
+                .orElseThrow();
         SignalKey priorityHigh = issue(
-            TriggerEventNames.ISSUE_LABELED,
-            "Login fails",
-            "500 on expired token",
-            "priority/high"
-        ).orElseThrow();
+                        TriggerEventNames.ISSUE_LABELED, "Login fails", "500 on expired token", "priority/high")
+                .orElseThrow();
 
-        assertThat(List.of(bug.revision(), regression.revision(), priorityHigh.revision())).doesNotHaveDuplicates();
+        assertThat(List.of(bug.revision(), regression.revision(), priorityHigh.revision()))
+                .doesNotHaveDuplicates();
     }
 
     @Test
     void shouldNotReMeasureTheSameLabellingThatWasMerelyRedelivered() {
-        SignalKey first = issue(TriggerEventNames.ISSUE_LABELED, "Login fails", "500", "bug").orElseThrow();
-        SignalKey redelivered = issue(TriggerEventNames.ISSUE_LABELED, "Login fails", "500", "bug").orElseThrow();
+        SignalKey first = issue(TriggerEventNames.ISSUE_LABELED, "Login fails", "500", "bug")
+                .orElseThrow();
+        SignalKey redelivered = issue(TriggerEventNames.ISSUE_LABELED, "Login fails", "500", "bug")
+                .orElseThrow();
 
         assertThat(redelivered).isEqualTo(first);
     }
@@ -108,43 +94,29 @@ class ScmSignalsTest extends BaseUnitTest {
     @Test
     void shouldDeclineToKeyALabellingThatCannotNameItsLabel() {
         // Same rule as a code-shaped signal with no head commit: a row keyed on nothing swallows every later labelling.
-        assertThat(issue(TriggerEventNames.ISSUE_LABELED, "Login fails", "500", null)).isEmpty();
+        assertThat(issue(TriggerEventNames.ISSUE_LABELED, "Login fails", "500", null))
+                .isEmpty();
     }
 
     @Test
     void shouldNotReReviewUnchangedCodeBecauseTheDescriptionWasEdited() {
         // Converse of the issue case: a push signal's subject is the code, so editing prose must not buy
         // another review.
-        SignalKey before = pullRequest(
-            TriggerEventNames.PULL_REQUEST_SYNCHRONIZED,
-            "abc123",
-            "Add cache",
-            "faster"
-        ).orElseThrow();
+        SignalKey before = pullRequest(TriggerEventNames.PULL_REQUEST_SYNCHRONIZED, "abc123", "Add cache", "faster")
+                .orElseThrow();
         SignalKey after = pullRequest(
-            TriggerEventNames.PULL_REQUEST_SYNCHRONIZED,
-            "abc123",
-            "Add cache",
-            "cuts p99 by 40%"
-        ).orElseThrow();
+                        TriggerEventNames.PULL_REQUEST_SYNCHRONIZED, "abc123", "Add cache", "cuts p99 by 40%")
+                .orElseThrow();
 
         assertThat(after).isEqualTo(before);
     }
 
     @Test
     void shouldReReviewAfterAPush() {
-        SignalKey before = pullRequest(
-            TriggerEventNames.PULL_REQUEST_SYNCHRONIZED,
-            "abc123",
-            "Add cache",
-            "body"
-        ).orElseThrow();
-        SignalKey after = pullRequest(
-            TriggerEventNames.PULL_REQUEST_SYNCHRONIZED,
-            "def456",
-            "Add cache",
-            "body"
-        ).orElseThrow();
+        SignalKey before = pullRequest(TriggerEventNames.PULL_REQUEST_SYNCHRONIZED, "abc123", "Add cache", "body")
+                .orElseThrow();
+        SignalKey after = pullRequest(TriggerEventNames.PULL_REQUEST_SYNCHRONIZED, "def456", "Add cache", "body")
+                .orElseThrow();
 
         assertThat(after.revision()).isNotEqualTo(before.revision());
     }
@@ -152,26 +124,20 @@ class ScmSignalsTest extends BaseUnitTest {
     @Test
     void shouldMakeARedeliveredMergeInert() {
         // A merge happens once; keying it on anything that can move would let a redelivery spend a second review.
-        SignalKey merged = pullRequest(
-            TriggerEventNames.PULL_REQUEST_MERGED,
-            "abc123",
-            "Add cache",
-            "body"
-        ).orElseThrow();
-        SignalKey redelivered = pullRequest(
-            TriggerEventNames.PULL_REQUEST_MERGED,
-            "def456",
-            "Add cache",
-            "body"
-        ).orElseThrow();
+        SignalKey merged = pullRequest(TriggerEventNames.PULL_REQUEST_MERGED, "abc123", "Add cache", "body")
+                .orElseThrow();
+        SignalKey redelivered = pullRequest(TriggerEventNames.PULL_REQUEST_MERGED, "def456", "Add cache", "body")
+                .orElseThrow();
 
         assertThat(redelivered).isEqualTo(merged);
     }
 
     @Test
     void shouldKeepMergedAndClosedApart() {
-        SignalKey merged = pullRequest(TriggerEventNames.PULL_REQUEST_MERGED, "abc123", "t", "b").orElseThrow();
-        SignalKey closed = pullRequest(TriggerEventNames.PULL_REQUEST_CLOSED, "abc123", "t", "b").orElseThrow();
+        SignalKey merged = pullRequest(TriggerEventNames.PULL_REQUEST_MERGED, "abc123", "t", "b")
+                .orElseThrow();
+        SignalKey closed = pullRequest(TriggerEventNames.PULL_REQUEST_CLOSED, "abc123", "t", "b")
+                .orElseThrow();
 
         assertThat(closed).isNotEqualTo(merged);
     }
@@ -179,12 +145,14 @@ class ScmSignalsTest extends BaseUnitTest {
     @Test
     void shouldDeclineToKeyACodeShapedSignalWithNoHeadCommit() {
         // Better no ledger row than one keyed on nothing, which would deduplicate away every later occurrence.
-        assertThat(pullRequest(TriggerEventNames.PULL_REQUEST_READY, null, "t", "b")).isEmpty();
+        assertThat(pullRequest(TriggerEventNames.PULL_REQUEST_READY, null, "t", "b"))
+                .isEmpty();
     }
 
     @Test
     void shouldDeriveTheArtifactKindFromTheSignalRatherThanTheCaller() {
-        SignalKey key = pullRequest(TriggerEventNames.PULL_REQUEST_READY, "abc123", "t", "b").orElseThrow();
+        SignalKey key = pullRequest(TriggerEventNames.PULL_REQUEST_READY, "abc123", "t", "b")
+                .orElseThrow();
 
         assertThat(key.artifactKind()).isEqualTo(ScmSignals.PULL_REQUEST);
     }

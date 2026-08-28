@@ -54,12 +54,11 @@ public class OutlineWebhookMessageHandler implements IntegrationMessageHandler {
     private final OutlineOriginPolicy originPolicy;
 
     public OutlineWebhookMessageHandler(
-        ConnectionService connectionService,
-        OutlineDocumentSyncScheduler syncScheduler,
-        OutlineDocumentEventRepository documentEventRepository,
-        ObjectMapper objectMapper,
-        OutlineOriginPolicy originPolicy
-    ) {
+            ConnectionService connectionService,
+            OutlineDocumentSyncScheduler syncScheduler,
+            OutlineDocumentEventRepository documentEventRepository,
+            ObjectMapper objectMapper,
+            OutlineOriginPolicy originPolicy) {
         this.connectionService = connectionService;
         this.syncScheduler = syncScheduler;
         this.documentEventRepository = documentEventRepository;
@@ -75,9 +74,8 @@ public class OutlineWebhookMessageHandler implements IntegrationMessageHandler {
     @Override
     public void onMessage(Message msg) {
         Delivery delivery = parse(msg.getData());
-        Optional<OutlineSubscription> subscription = connectionService.findOutlineSubscription(
-            delivery.subscriptionId()
-        );
+        Optional<OutlineSubscription> subscription =
+                connectionService.findOutlineSubscription(delivery.subscriptionId());
         if (subscription.isEmpty() || !originPolicy.allows(subscription.get().serverUrl())) {
             // The subscription was deleted/disconnected between publish and consume. Nothing to
             // refresh; ACK-as-no-op (returning normally) rather than NAK-looping forever.
@@ -96,10 +94,7 @@ public class OutlineWebhookMessageHandler implements IntegrationMessageHandler {
             }
         } else if (event.startsWith("collections.")) {
             syncScheduler.refreshCollectionCatalogNow(
-                workspaceId,
-                event,
-                delivery.payloadId().isBlank() ? null : delivery.payloadId()
-            );
+                    workspaceId, event, delivery.payloadId().isBlank() ? null : delivery.payloadId());
         } else {
             log.debug("outline.consumer: ignoring event '{}' for workspaceId={}", event, workspaceId);
         }
@@ -116,28 +111,24 @@ public class OutlineWebhookMessageHandler implements IntegrationMessageHandler {
         }
         try {
             Optional<Long> connectionId = connectionService
-                .findActive(workspaceId, IntegrationKind.OUTLINE)
-                .map(Connection::getId);
+                    .findActive(workspaceId, IntegrationKind.OUTLINE)
+                    .map(Connection::getId);
             if (connectionId.isEmpty()) {
                 return;
             }
-            documentEventRepository.save(
-                new OutlineDocumentEvent(
+            documentEventRepository.save(new OutlineDocumentEvent(
                     workspaceId,
                     connectionId.get(),
                     delivery.payloadId(),
                     delivery.event(),
                     delivery.actorId().isBlank() ? null : delivery.actorId(),
-                    delivery.occurredAt()
-                )
-            );
+                    delivery.occurredAt()));
         } catch (RuntimeException e) {
             log.warn(
-                "outline.consumer: failed to append document event '{}' for workspaceId={}: {}",
-                delivery.event(),
-                workspaceId,
-                e.toString()
-            );
+                    "outline.consumer: failed to append document event '{}' for workspaceId={}: {}",
+                    delivery.event(),
+                    workspaceId,
+                    e.toString());
         }
     }
 
@@ -149,13 +140,12 @@ public class OutlineWebhookMessageHandler implements IntegrationMessageHandler {
             JsonNode root = objectMapper.readTree(body);
             String event = root.path("event").asString("");
             return new Delivery(
-                root.path("webhookSubscriptionId").asString(""),
-                event,
-                root.path("payload").path("id").asString(""),
-                root.path("actorId").asString(""),
-                parseInstant(root.path("createdAt").asString("")),
-                parseModel(event, root.path("payload").path("model"))
-            );
+                    root.path("webhookSubscriptionId").asString(""),
+                    event,
+                    root.path("payload").path("id").asString(""),
+                    root.path("actorId").asString(""),
+                    parseInstant(root.path("createdAt").asString("")),
+                    parseModel(event, root.path("payload").path("model")));
         } catch (RuntimeException e) {
             return new Delivery("", "", "", "", null, null);
         }
@@ -173,7 +163,8 @@ public class OutlineWebhookMessageHandler implements IntegrationMessageHandler {
         if (!event.startsWith("documents.") || modelNode == null || modelNode.isMissingNode() || modelNode.isNull()) {
             return null;
         }
-        if (modelNode.path("id").asString("").isBlank() || modelNode.path("collectionId").asString("").isBlank()) {
+        if (modelNode.path("id").asString("").isBlank()
+                || modelNode.path("collectionId").asString("").isBlank()) {
             return null;
         }
         try {
@@ -200,11 +191,10 @@ public class OutlineWebhookMessageHandler implements IntegrationMessageHandler {
      * absent/incomplete) — see {@link #parseModel}.
      */
     private record Delivery(
-        String subscriptionId,
-        String event,
-        String payloadId,
-        String actorId,
-        @Nullable Instant occurredAt,
-        @Nullable OutlineDocumentModel model
-    ) {}
+            String subscriptionId,
+            String event,
+            String payloadId,
+            String actorId,
+            @Nullable Instant occurredAt,
+            @Nullable OutlineDocumentModel model) {}
 }

@@ -46,10 +46,9 @@ public class AuthenticatedGitProviderUserService {
     private final AccountIdentityQuery accountIdentityQuery;
 
     public AuthenticatedGitProviderUserService(
-        UserRepository userRepository,
-        IdentityProviderRepository gitProviderRepository,
-        AccountIdentityQuery accountIdentityQuery
-    ) {
+            UserRepository userRepository,
+            IdentityProviderRepository gitProviderRepository,
+            AccountIdentityQuery accountIdentityQuery) {
         this.userRepository = userRepository;
         this.gitProviderRepository = gitProviderRepository;
         this.accountIdentityQuery = accountIdentityQuery;
@@ -102,15 +101,13 @@ public class AuthenticatedGitProviderUserService {
 
         if (firstOfType(links, IdentityProviderType.GITHUB) != null) {
             throw new ResponseStatusException(
-                HttpStatus.CONFLICT,
-                "You need to link your GitLab account before creating a GitLab workspace. Go to Settings → Linked Accounts to connect your GitLab identity."
-            );
+                    HttpStatus.CONFLICT,
+                    "You need to link your GitLab account before creating a GitLab workspace. Go to Settings → Linked Accounts to connect your GitLab identity.");
         }
 
         throw new ResponseStatusException(
-            HttpStatus.CONFLICT,
-            "No GitLab identity found. Please link your GitLab account in Settings → Linked Accounts."
-        );
+                HttpStatus.CONFLICT,
+                "No GitLab identity found. Please link your GitLab account in Settings → Linked Accounts.");
     }
 
     private List<IdentityLinkView> activeLinksForCurrentAccount() {
@@ -129,7 +126,8 @@ public class AuthenticatedGitProviderUserService {
     @Nullable
     private IdentityLinkView firstOfType(List<IdentityLinkView> links, IdentityProviderType type) {
         for (IdentityLinkView link : links) {
-            IdentityProvider provider = gitProviderRepository.findById(link.gitProviderId()).orElse(null);
+            IdentityProvider provider =
+                    gitProviderRepository.findById(link.gitProviderId()).orElse(null);
             if (provider != null && provider.getType() == type) {
                 return link;
             }
@@ -144,27 +142,25 @@ public class AuthenticatedGitProviderUserService {
      */
     private User provisionUser(IdentityLinkView link) {
         IdentityProvider provider = gitProviderRepository
-            .findById(link.gitProviderId())
-            .orElseThrow(() ->
-                new IllegalStateException(
-                    "git_provider row missing for IdentityLink.gitProviderId=" + link.gitProviderId()
-                )
-            );
+                .findById(link.gitProviderId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "git_provider row missing for IdentityLink.gitProviderId=" + link.gitProviderId()));
         long nativeId = parseSubject(link.subject(), provider.getType());
-        String login = (link.usernameAtSignup() != null && !link.usernameAtSignup().isBlank())
-            ? link.usernameAtSignup()
-            : link.subject();
+        String login =
+                (link.usernameAtSignup() != null && !link.usernameAtSignup().isBlank())
+                        ? link.usernameAtSignup()
+                        : link.subject();
         String name = (link.displayName() != null && !link.displayName().isBlank()) ? link.displayName() : login;
         String webUrl = (link.profileUrl() != null && !link.profileUrl().isBlank())
-            ? link.profileUrl()
-            : provider.getServerUrl() + "/" + login;
+                ? link.profileUrl()
+                : provider.getServerUrl() + "/" + login;
         String avatar = normalizeAvatar(link.avatarUrl(), provider.getServerUrl());
 
         Long userId = upsertUser(nativeId, login, name, avatar, webUrl, provider);
         accountIdentityQuery.linkExternalActor(link.identityLinkId(), userId);
         return userRepository
-            .findById(userId)
-            .orElseThrow(() -> new IllegalStateException("User not found after upsert: userId=" + userId));
+                .findById(userId)
+                .orElseThrow(() -> new IllegalStateException("User not found after upsert: userId=" + userId));
     }
 
     private static long parseSubject(String subject, IdentityProviderType type) {
@@ -175,12 +171,10 @@ public class AuthenticatedGitProviderUserService {
             // env-default registrations via userNameAttributeName("id")). A non-numeric subject
             // means a mis-configured registration mapped a mutable username as the subject.
             throw new ResponseStatusException(
-                HttpStatus.CONFLICT,
-                "Linked " +
-                    type +
-                    " identity has a non-numeric subject; the account must be re-linked. Go to Settings → Linked Accounts.",
-                e
-            );
+                    HttpStatus.CONFLICT,
+                    "Linked " + type
+                            + " identity has a non-numeric subject; the account must be re-linked. Go to Settings → Linked Accounts.",
+                    e);
         }
     }
 
@@ -193,13 +187,12 @@ public class AuthenticatedGitProviderUserService {
     }
 
     private Long upsertUser(
-        long nativeId,
-        String login,
-        String name,
-        @Nullable String avatarUrl,
-        String webUrl,
-        IdentityProvider provider
-    ) {
+            long nativeId,
+            String login,
+            String name,
+            @Nullable String avatarUrl,
+            String webUrl,
+            IdentityProvider provider) {
         String safeName = name != null ? name : login;
         String safeAvatar = avatarUrl != null ? avatarUrl : "";
         Long providerId = Objects.requireNonNull(provider.getId(), "Identity provider must be persisted");
@@ -207,27 +200,25 @@ public class AuthenticatedGitProviderUserService {
         userRepository.acquireLoginLock(login, providerId);
         userRepository.freeLoginConflicts(login, nativeId, providerId);
         userRepository.upsertUser(
-            nativeId,
-            providerId,
-            login,
-            safeName,
-            safeAvatar,
-            webUrl != null ? webUrl : "",
-            User.Type.USER.name(),
-            null,
-            null,
-            null
-        );
+                nativeId,
+                providerId,
+                login,
+                safeName,
+                safeAvatar,
+                webUrl != null ? webUrl : "",
+                User.Type.USER.name(),
+                null,
+                null,
+                null);
         log.info(
-            "Upserted authenticated git provider user: userLogin={}, nativeId={}, providerType={}",
-            LoggingUtils.sanitizeForLog(login),
-            nativeId,
-            provider.getType()
-        );
+                "Upserted authenticated git provider user: userLogin={}, nativeId={}, providerType={}",
+                LoggingUtils.sanitizeForLog(login),
+                nativeId,
+                provider.getType());
         return userRepository
-            .findByLoginAndProviderId(login, providerId)
-            .map(User::getId)
-            .orElseThrow(() -> new IllegalStateException("User not found after upsert: login=" + login));
+                .findByLoginAndProviderId(login, providerId)
+                .map(User::getId)
+                .orElseThrow(() -> new IllegalStateException("User not found after upsert: login=" + login));
     }
 
     @Nullable

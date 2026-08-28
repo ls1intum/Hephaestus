@@ -72,23 +72,21 @@ class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         SyncSchedulerProperties syncProps = new SyncSchedulerProperties(
-            true,
-            7,
-            "0 0 3 * * *",
-            15,
-            new SyncSchedulerProperties.BackfillProperties(false, 50, 100, 60),
-            new SyncSchedulerProperties.FilterProperties(Set.of(), Set.of(), Set.of()),
-            new SyncSchedulerProperties.DiscussionsProperties(false),
-            new SyncSchedulerProperties.ProjectsProperties(false)
-        );
+                true,
+                7,
+                "0 0 3 * * *",
+                15,
+                new SyncSchedulerProperties.BackfillProperties(false, 50, 100, 60),
+                new SyncSchedulerProperties.FilterProperties(Set.of(), Set.of(), Set.of()),
+                new SyncSchedulerProperties.DiscussionsProperties(false),
+                new SyncSchedulerProperties.ProjectsProperties(false));
         provider = new GitlabConnectionSyncStateProvider(
-            connectionService,
-            rateLimitTrackerProvider,
-            syncProps,
-            repositoryToMonitorRepository,
-            repositoryRepository,
-            countReader
-        );
+                connectionService,
+                rateLimitTrackerProvider,
+                syncProps,
+                repositoryToMonitorRepository,
+                repositoryRepository,
+                countReader);
         ref = new IntegrationRef(IntegrationKind.GITLAB, WORKSPACE_ID, "gitlab.com:1");
         lenient().when(rateLimitTrackerProvider.getIfAvailable()).thenReturn(rateLimitTracker);
     }
@@ -126,13 +124,8 @@ class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
         @Test
         void shouldReportRateLimitSnapshotFromTracker() {
             when(connectionService.findActiveGitLabConfig(WORKSPACE_ID)).thenReturn(Optional.empty());
-            RateLimitSnapshot snapshot = new RateLimitSnapshot(
-                100,
-                42,
-                Instant.now().plusSeconds(30),
-                Instant.now(),
-                null
-            );
+            RateLimitSnapshot snapshot =
+                    new RateLimitSnapshot(100, 42, Instant.now().plusSeconds(30), Instant.now(), null);
             when(rateLimitTracker.snapshot(WORKSPACE_ID)).thenReturn(snapshot);
 
             ConnectionSyncDetails details = provider.describe(ref, CONNECTION_ID);
@@ -173,24 +166,23 @@ class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
         void shouldYieldNullNextScheduledSyncAtForAnInvalidCron() {
             when(connectionService.findActiveGitLabConfig(WORKSPACE_ID)).thenReturn(Optional.empty());
             GitlabConnectionSyncStateProvider brokenCron = new GitlabConnectionSyncStateProvider(
-                connectionService,
-                rateLimitTrackerProvider,
-                new SyncSchedulerProperties(
-                    true,
-                    7,
-                    "not a cron",
-                    15,
-                    new SyncSchedulerProperties.BackfillProperties(false, 50, 100, 60),
-                    new SyncSchedulerProperties.FilterProperties(Set.of(), Set.of(), Set.of()),
-                    new SyncSchedulerProperties.DiscussionsProperties(false),
-                    new SyncSchedulerProperties.ProjectsProperties(false)
-                ),
-                repositoryToMonitorRepository,
-                repositoryRepository,
-                countReader
-            );
+                    connectionService,
+                    rateLimitTrackerProvider,
+                    new SyncSchedulerProperties(
+                            true,
+                            7,
+                            "not a cron",
+                            15,
+                            new SyncSchedulerProperties.BackfillProperties(false, 50, 100, 60),
+                            new SyncSchedulerProperties.FilterProperties(Set.of(), Set.of(), Set.of()),
+                            new SyncSchedulerProperties.DiscussionsProperties(false),
+                            new SyncSchedulerProperties.ProjectsProperties(false)),
+                    repositoryToMonitorRepository,
+                    repositoryRepository,
+                    countReader);
 
-            assertThat(brokenCron.describe(ref, CONNECTION_ID).nextScheduledSyncAt()).isNull();
+            assertThat(brokenCron.describe(ref, CONNECTION_ID).nextScheduledSyncAt())
+                    .isNull();
         }
 
         @Test
@@ -275,22 +267,13 @@ class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
 
         private GitlabConnectionSyncStateProvider backfillEnabledProvider() {
             return new GitlabConnectionSyncStateProvider(
-                connectionService,
-                rateLimitTrackerProvider,
-                new SyncSchedulerProperties(
-                    true,
-                    7,
-                    "0 0 3 * * *",
-                    15,
-                    new BackfillProperties(true, 50, 100, 60),
-                    null,
-                    null,
-                    null
-                ),
-                repositoryToMonitorRepository,
-                repositoryRepository,
-                countReader
-            );
+                    connectionService,
+                    rateLimitTrackerProvider,
+                    new SyncSchedulerProperties(
+                            true, 7, "0 0 3 * * *", 15, new BackfillProperties(true, 50, 100, 60), null, null, null),
+                    repositoryToMonitorRepository,
+                    repositoryRepository,
+                    countReader);
         }
 
         private RepositoryToMonitor monitor(long id, String nameWithOwner) {
@@ -302,12 +285,7 @@ class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
 
         private ConnectionConfig.GitLabConfig gitLabConfig(@Nullable Long webhookId) {
             return new ConnectionConfig.GitLabConfig(
-                "https://gitlab.com",
-                1L,
-                webhookId,
-                ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
-                Set.of()
-            );
+                    "https://gitlab.com", 1L, webhookId, ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT, Set.of());
         }
     }
 
@@ -336,9 +314,8 @@ class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
             when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of(repo));
 
             // Headline itemCount is issues + merge requests: 9 + 3 = 12.
-            when(countReader.countsByRepositoryId(List.of(500L))).thenReturn(
-                Map.of(500L, new ScmResourceCounts(9, 3, 0, 0, 0, 0))
-            );
+            when(countReader.countsByRepositoryId(List.of(500L)))
+                    .thenReturn(Map.of(500L, new ScmResourceCounts(9, 3, 0, 0, 0, 0)));
 
             List<SyncResourceState> resources = provider.resources(ref, CONNECTION_ID);
 
@@ -396,23 +373,21 @@ class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
             repo.setNameWithOwner("group/full-repo");
             repo.setLastSyncAt(Instant.now());
             when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of(repo));
-            when(countReader.countsByRepositoryId(List.of(502L))).thenReturn(
-                Map.of(502L, new ScmResourceCounts(9, 3, 13, 14, 15, 16))
-            );
+            when(countReader.countsByRepositoryId(List.of(502L)))
+                    .thenReturn(Map.of(502L, new ScmResourceCounts(9, 3, 13, 14, 15, 16)));
 
             List<SyncResourceState> resources = provider.resources(ref, CONNECTION_ID);
 
             SyncResourceState resource = resources.get(0);
             assertThat(resource.counts())
-                .extracting(SyncResourceCount::key, SyncResourceCount::count)
-                .containsExactly(
-                    tuple("issues", 9L),
-                    tuple("pullRequests", 3L),
-                    tuple("issueComments", 13L),
-                    tuple("reviews", 14L),
-                    tuple("reviewComments", 15L),
-                    tuple("commits", 16L)
-                );
+                    .extracting(SyncResourceCount::key, SyncResourceCount::count)
+                    .containsExactly(
+                            tuple("issues", 9L),
+                            tuple("pullRequests", 3L),
+                            tuple("issueComments", 13L),
+                            tuple("reviews", 14L),
+                            tuple("reviewComments", 15L),
+                            tuple("commits", 16L));
             // Headline is issues + merge requests only; the notes/commit counts must not leak in.
             assertThat(resource.itemCount()).isEqualTo(12L);
         }
@@ -432,9 +407,8 @@ class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
             Instant repoSyncedAt = Instant.parse("2026-07-15T03:00:00Z");
             repo.setLastSyncAt(repoSyncedAt);
             when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenReturn(List.of(repo));
-            when(countReader.countsByRepositoryId(List.of(503L))).thenReturn(
-                Map.of(503L, new ScmResourceCounts(9, 3, 13, 14, 15, 16))
-            );
+            when(countReader.countsByRepositoryId(List.of(503L)))
+                    .thenReturn(Map.of(503L, new ScmResourceCounts(9, 3, 13, 14, 15, 16)));
 
             List<SyncResourceState> resources = provider.resources(ref, CONNECTION_ID);
             SyncResourceState resource = resources.get(0);
@@ -452,7 +426,8 @@ class GitlabConnectionSyncStateProviderTest extends BaseUnitTest {
             // The nested classes have no independent sync phase and therefore no watermark column of
             // their own. They stay null — "not tracked" — rather than borrowing a sibling's timestamp
             // and asserting a per-class freshness nobody measured.
-            assertThat(resource.counts().subList(2, 6)).allSatisfy(count -> assertThat(count.lastSyncedAt()).isNull());
+            assertThat(resource.counts().subList(2, 6))
+                    .allSatisfy(count -> assertThat(count.lastSyncedAt()).isNull());
         }
 
         private RepositoryToMonitor monitor(long id, String nameWithOwner) {

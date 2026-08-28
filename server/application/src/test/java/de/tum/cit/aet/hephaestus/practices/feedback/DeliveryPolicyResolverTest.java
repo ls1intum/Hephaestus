@@ -17,76 +17,63 @@ class DeliveryPolicyResolverTest extends BaseUnitTest {
         assertThat(result.allowed()).isTrue();
         assertThat(result.suppressionReason()).isNull();
         assertThat(result.checks())
-            .extracting(DeliveryPolicyResolver.CheckResult::check)
-            .containsExactly(DeliveryPolicyCheck.values());
+                .extracting(DeliveryPolicyResolver.CheckResult::check)
+                .containsExactly(DeliveryPolicyCheck.values());
         assertThat(result.checks()).allMatch(check -> check.status() == DeliveryPolicyCheckStatus.PASSED);
     }
 
     @Test
     void firstDenialWinsAndLeavesACompleteTrace() {
         DeliveryPolicyResolver.Facts facts = new DeliveryPolicyResolver.Facts(
-            FactAnswer.PASSES,
-            true,
-            FactAnswer.PASSES,
-            FactAnswer.PASSES,
-            FactAnswer.PASSES,
-            FactAnswer.DENIES,
-            FactAnswer.DENIES,
-            FactAnswer.DENIES,
-            FeedbackSuppressionReason.ARTIFACT_CLOSED
-        );
+                FactAnswer.PASSES,
+                true,
+                FactAnswer.PASSES,
+                FactAnswer.PASSES,
+                FactAnswer.PASSES,
+                FactAnswer.DENIES,
+                FactAnswer.DENIES,
+                FactAnswer.DENIES,
+                FeedbackSuppressionReason.ARTIFACT_CLOSED);
 
         DeliveryPolicyResolver.Result result = DeliveryPolicyResolver.resolve(facts);
 
         assertThat(result.suppressionReason()).isEqualTo(FeedbackSuppressionReason.PRACTICE_REQUIRES_APPROVAL);
         assertThat(result.checks())
-            .extracting(DeliveryPolicyResolver.CheckResult::status)
-            .containsExactly(
-                DeliveryPolicyCheckStatus.PASSED,
-                DeliveryPolicyCheckStatus.PASSED,
-                DeliveryPolicyCheckStatus.PASSED,
-                DeliveryPolicyCheckStatus.PASSED,
-                DeliveryPolicyCheckStatus.PASSED,
-                DeliveryPolicyCheckStatus.DENIED,
-                DeliveryPolicyCheckStatus.NOT_REACHED,
-                DeliveryPolicyCheckStatus.NOT_REACHED
-            );
+                .extracting(DeliveryPolicyResolver.CheckResult::status)
+                .containsExactly(
+                        DeliveryPolicyCheckStatus.PASSED,
+                        DeliveryPolicyCheckStatus.PASSED,
+                        DeliveryPolicyCheckStatus.PASSED,
+                        DeliveryPolicyCheckStatus.PASSED,
+                        DeliveryPolicyCheckStatus.PASSED,
+                        DeliveryPolicyCheckStatus.DENIED,
+                        DeliveryPolicyCheckStatus.NOT_REACHED,
+                        DeliveryPolicyCheckStatus.NOT_REACHED);
     }
 
     @Test
     void shouldKeepConsentAndArtifactStateAsIndependentVetoes() {
-        DeliveryPolicyResolver.Facts optedOut = factsWith(
-            FactAnswer.PASSES,
-            FactAnswer.DENIES,
-            FactAnswer.PASSES,
-            null
-        );
+        DeliveryPolicyResolver.Facts optedOut =
+                factsWith(FactAnswer.PASSES, FactAnswer.DENIES, FactAnswer.PASSES, null);
         DeliveryPolicyResolver.Facts closed = factsWith(
-            FactAnswer.PASSES,
-            FactAnswer.PASSES,
-            FactAnswer.DENIES,
-            FeedbackSuppressionReason.ARTIFACT_CLOSED
-        );
+                FactAnswer.PASSES, FactAnswer.PASSES, FactAnswer.DENIES, FeedbackSuppressionReason.ARTIFACT_CLOSED);
 
-        assertThat(DeliveryPolicyResolver.resolve(optedOut).suppressionReason()).isEqualTo(
-            FeedbackSuppressionReason.RECIPIENT_OPTED_OUT
-        );
-        assertThat(DeliveryPolicyResolver.resolve(closed).suppressionReason()).isEqualTo(
-            FeedbackSuppressionReason.ARTIFACT_CLOSED
-        );
+        assertThat(DeliveryPolicyResolver.resolve(optedOut).suppressionReason())
+                .isEqualTo(FeedbackSuppressionReason.RECIPIENT_OPTED_OUT);
+        assertThat(DeliveryPolicyResolver.resolve(closed).suppressionReason())
+                .isEqualTo(FeedbackSuppressionReason.ARTIFACT_CLOSED);
     }
 
     @Test
     void notApplicableChecksDoNotInterruptResolution() {
         DeliveryPolicyResolver.Result result = DeliveryPolicyResolver.resolve(
-            factsWith(FactAnswer.NOT_APPLICABLE, FactAnswer.NOT_APPLICABLE, FactAnswer.PASSES, null)
-        );
+                factsWith(FactAnswer.NOT_APPLICABLE, FactAnswer.NOT_APPLICABLE, FactAnswer.PASSES, null));
 
         assertThat(result.allowed()).isTrue();
         assertThat(result.checks())
-            .filteredOn(check -> check.status() == DeliveryPolicyCheckStatus.NOT_APPLICABLE)
-            .extracting(DeliveryPolicyResolver.CheckResult::check)
-            .containsExactly(DeliveryPolicyCheck.PRACTICE_AUTHORITY, DeliveryPolicyCheck.RECIPIENT_CONSENT);
+                .filteredOn(check -> check.status() == DeliveryPolicyCheckStatus.NOT_APPLICABLE)
+                .extracting(DeliveryPolicyResolver.CheckResult::check)
+                .containsExactly(DeliveryPolicyCheck.PRACTICE_AUTHORITY, DeliveryPolicyCheck.RECIPIENT_CONSENT);
     }
 
     @Test
@@ -107,18 +94,18 @@ class DeliveryPolicyResolverTest extends BaseUnitTest {
             Arrays.fill(checks, FactAnswer.PASSES);
             checks[denied] = FactAnswer.DENIES;
             DeliveryPolicyResolver.Facts facts = new DeliveryPolicyResolver.Facts(
-                checks[0],
-                checks[1] == FactAnswer.PASSES,
-                checks[2],
-                checks[3],
-                checks[4],
-                checks[5],
-                checks[6],
-                checks[7],
-                null
-            );
+                    checks[0],
+                    checks[1] == FactAnswer.PASSES,
+                    checks[2],
+                    checks[3],
+                    checks[4],
+                    checks[5],
+                    checks[6],
+                    checks[7],
+                    null);
 
-            assertThat(DeliveryPolicyResolver.resolve(facts).suppressionReason()).isEqualTo(expected[denied]);
+            assertThat(DeliveryPolicyResolver.resolve(facts).suppressionReason())
+                    .isEqualTo(expected[denied]);
         }
     }
 
@@ -127,21 +114,19 @@ class DeliveryPolicyResolverTest extends BaseUnitTest {
     }
 
     private static DeliveryPolicyResolver.Facts factsWith(
-        FactAnswer authority,
-        FactAnswer consent,
-        FactAnswer artifact,
-        @Nullable FeedbackSuppressionReason artifactReason
-    ) {
+            FactAnswer authority,
+            FactAnswer consent,
+            FactAnswer artifact,
+            @Nullable FeedbackSuppressionReason artifactReason) {
         return new DeliveryPolicyResolver.Facts(
-            FactAnswer.PASSES,
-            true,
-            FactAnswer.PASSES,
-            FactAnswer.PASSES,
-            FactAnswer.PASSES,
-            authority,
-            consent,
-            artifact,
-            artifactReason
-        );
+                FactAnswer.PASSES,
+                true,
+                FactAnswer.PASSES,
+                FactAnswer.PASSES,
+                FactAnswer.PASSES,
+                authority,
+                consent,
+                artifact,
+                artifactReason);
     }
 }

@@ -61,10 +61,9 @@ public class WorkspaceMembership {
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("workspaceId")
     @JoinColumn(
-        name = "workspace_id",
-        nullable = false,
-        foreignKey = @ForeignKey(name = "fk_workspace_membership_workspace")
-    )
+            name = "workspace_id",
+            nullable = false,
+            foreignKey = @ForeignKey(name = "fk_workspace_membership_workspace"))
     @ToString.Exclude
     private Workspace workspace;
 

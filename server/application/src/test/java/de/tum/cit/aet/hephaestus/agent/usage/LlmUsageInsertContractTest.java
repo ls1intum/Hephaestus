@@ -69,9 +69,8 @@ class LlmUsageInsertContractTest extends BaseUnitTest {
 
     /** Column list and VALUES list of {@code INSERT INTO … (cols) VALUES (vals)}. */
     private static final Pattern INSERT_SHAPE = Pattern.compile(
-        "INSERT INTO llm_usage_event\\s*\\((?<columns>[^)]*)\\)\\s*VALUES\\s*\\((?<values>.*?)\\)\\s*ON CONFLICT",
-        Pattern.DOTALL
-    );
+            "INSERT INTO llm_usage_event\\s*\\((?<columns>[^)]*)\\)\\s*VALUES\\s*\\((?<values>.*?)\\)\\s*ON CONFLICT",
+            Pattern.DOTALL);
 
     /** A SpEL parameter of the form {@code :#{#event.someAccessor()}}. */
     private static final Pattern VALUE_ACCESSOR = Pattern.compile(":#\\{#event\\.(?<accessor>\\w+)\\(\\)}");
@@ -80,27 +79,24 @@ class LlmUsageInsertContractTest extends BaseUnitTest {
      * A column added or removed by raw SQL rather than by a Liquibase {@code addColumn}/{@code dropColumn}
      * tag — invisible to the reader below, so it has to stop the build rather than skew the expectation.
      */
-    private static final Pattern RAW_SQL_COLUMN_CHANGE = Pattern.compile(
-        "(?i)alter\\s+table\\s+(?:\\w+\\.)?" + TABLE + "\\s+(?:add|drop)\\s+column"
-    );
+    private static final Pattern RAW_SQL_COLUMN_CHANGE =
+            Pattern.compile("(?i)alter\\s+table\\s+(?:\\w+\\.)?" + TABLE + "\\s+(?:add|drop)\\s+column");
 
     @Test
     @DisplayName("the native insert carries every column the table has — no column can be added to one alone")
     void insertCoversEveryColumnTheTableHas() {
         assertThat(insertColumns())
-            .as(
-                "a column the table has but the insert omits is written NULL (or defaulted) on every append, " +
-                    "silently, for as long as it stays missing"
-            )
-            .containsExactlyInAnyOrderElementsOf(committedTableColumns());
+                .as("a column the table has but the insert omits is written NULL (or defaulted) on every append, "
+                        + "silently, for as long as it stays missing")
+                .containsExactlyInAnyOrderElementsOf(committedTableColumns());
     }
 
     @Test
     @DisplayName("the entity maps every column the table has, and none the table does not")
     void entityMapsExactlyTheColumnsTheTableHas() {
         assertThat(mappedColumnsOf(LlmUsageEvent.class))
-            .as("a mapped column the table does not have fails at the first read of the ledger, in production")
-            .containsExactlyInAnyOrderElementsOf(committedTableColumns());
+                .as("a mapped column the table does not have fails at the first read of the ledger, in production")
+                .containsExactlyInAnyOrderElementsOf(committedTableColumns());
     }
 
     @Test
@@ -110,19 +106,15 @@ class LlmUsageInsertContractTest extends BaseUnitTest {
         List<String> accessors = valueAccessors();
 
         assertThat(accessors)
-            .as("a column list and a VALUES list of different lengths does not reach PostgreSQL at all")
-            .hasSameSizeAs(columns);
+                .as("a column list and a VALUES list of different lengths does not reach PostgreSQL at all")
+                .hasSameSizeAs(columns);
         for (int i = 0; i < columns.size(); i++) {
             assertThat(columnNameOf(accessors.get(i)))
-                .as(
-                    "value %d is bound to column '%s' but reads %s#%s — two same-typed columns swapped " +
-                        "this way write real money into the wrong place and nothing else would notice",
-                    i + 1,
-                    columns.get(i),
-                    LlmUsageInsert.class.getSimpleName(),
-                    accessors.get(i)
-                )
-                .isEqualTo(columns.get(i));
+                    .as(
+                            "value %d is bound to column '%s' but reads %s#%s — two same-typed columns swapped "
+                                    + "this way write real money into the wrong place and nothing else would notice",
+                            i + 1, columns.get(i), LlmUsageInsert.class.getSimpleName(), accessors.get(i))
+                    .isEqualTo(columns.get(i));
         }
     }
 
@@ -130,12 +122,12 @@ class LlmUsageInsertContractTest extends BaseUnitTest {
     @DisplayName("the insert record carries no component the insert does not write")
     void everyRecordComponentIsWritten() {
         Set<String> components = Arrays.stream(LlmUsageInsert.class.getRecordComponents())
-            .map(RecordComponent::getName)
-            .collect(Collectors.toCollection(LinkedHashSet::new));
+                .map(RecordComponent::getName)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
 
         assertThat(new LinkedHashSet<>(valueAccessors()))
-            .as("an unused component is a value the recorder computes and the ledger throws away")
-            .containsExactlyInAnyOrderElementsOf(components);
+                .as("an unused component is a value the recorder computes and the ledger throws away")
+                .containsExactlyInAnyOrderElementsOf(components);
     }
 
     /**
@@ -149,8 +141,8 @@ class LlmUsageInsertContractTest extends BaseUnitTest {
             applyChangelog(changelog, columns);
         }
         assertThat(columns)
-            .as("no committed changelog creates %s — the reader above is looking in the wrong place", TABLE)
-            .isNotEmpty();
+                .as("no committed changelog creates %s — the reader above is looking in the wrong place", TABLE)
+                .isNotEmpty();
         return columns;
     }
 
@@ -176,8 +168,8 @@ class LlmUsageInsertContractTest extends BaseUnitTest {
             throw new AssertionError("the committed changelogs must be readable from the classpath", e);
         }
         return Arrays.stream(found)
-            .sorted(Comparator.comparing(resource -> Objects.requireNonNull(resource.getFilename())))
-            .toList();
+                .sorted(Comparator.comparing(resource -> Objects.requireNonNull(resource.getFilename())))
+                .toList();
     }
 
     private static void applyChangelog(Resource changelog, Set<String> columns) {
@@ -187,14 +179,14 @@ class LlmUsageInsertContractTest extends BaseUnitTest {
         } catch (IOException e) {
             throw new AssertionError("cannot read changelog " + changelog.getFilename(), e);
         }
-        assertThat(RAW_SQL_COLUMN_CHANGE.matcher(new String(bytes, StandardCharsets.UTF_8)).find())
-            .as(
-                "%s changes a %s column with raw SQL; this reader only understands Liquibase's own " +
-                    "addColumn/dropColumn tags, so express the change with those",
-                changelog.getFilename(),
-                TABLE
-            )
-            .isFalse();
+        assertThat(RAW_SQL_COLUMN_CHANGE
+                        .matcher(new String(bytes, StandardCharsets.UTF_8))
+                        .find())
+                .as(
+                        "%s changes a %s column with raw SQL; this reader only understands Liquibase's own "
+                                + "addColumn/dropColumn tags, so express the change with those",
+                        changelog.getFilename(), TABLE)
+                .isFalse();
 
         NodeList elements = parse(bytes, changelog).getElementsByTagName("*");
         for (int i = 0; i < elements.getLength(); i++) {
@@ -266,12 +258,10 @@ class LlmUsageInsertContractTest extends BaseUnitTest {
                 // one shape every strategy maps to itself, so that is the shape an undeclared name has
                 // to have — anything else declares @Column(name = "…") and says so.
                 assertThat(field.getName())
-                    .as(
-                        "%s#%s must declare @Column(name = \"…\"): its column name is strategy-dependent",
-                        entity.getSimpleName(),
-                        field.getName()
-                    )
-                    .matches("[a-z]+");
+                        .as(
+                                "%s#%s must declare @Column(name = \"…\"): its column name is strategy-dependent",
+                                entity.getSimpleName(), field.getName())
+                        .matches("[a-z]+");
                 columns.add(field.getName());
             }
         }
@@ -280,33 +270,30 @@ class LlmUsageInsertContractTest extends BaseUnitTest {
 
     private static Set<String> insertColumns() {
         return Arrays.stream(insertShape().group("columns").split(","))
-            .map(String::trim)
-            .filter(name -> !name.isEmpty())
-            .collect(Collectors.toCollection(LinkedHashSet::new));
+                .map(String::trim)
+                .filter(name -> !name.isEmpty())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     private static List<String> valueAccessors() {
         Matcher matcher = VALUE_ACCESSOR.matcher(insertShape().group("values"));
-        return matcher
-            .results()
-            .map(result -> result.group(1))
-            .toList();
+        return matcher.results().map(result -> result.group(1)).toList();
     }
 
     private static Matcher insertShape() {
         Query query;
         try {
-            query = LlmUsageEventRepository.class.getMethod("insertIfAbsent", LlmUsageInsert.class).getAnnotation(
-                Query.class
-            );
+            query = LlmUsageEventRepository.class
+                    .getMethod("insertIfAbsent", LlmUsageInsert.class)
+                    .getAnnotation(Query.class);
         } catch (NoSuchMethodException e) {
             throw new AssertionError("insertIfAbsent is the ledger's only append path; it must exist", e);
         }
         Objects.requireNonNull(query, "the append must stay a native @Query INSERT — see this class's Javadoc");
         Matcher matcher = INSERT_SHAPE.matcher(query.value());
         assertThat(matcher.find())
-            .as("the append must stay INSERT INTO llm_usage_event (…) VALUES (…) ON CONFLICT …")
-            .isTrue();
+                .as("the append must stay INSERT INTO llm_usage_event (…) VALUES (…) ON CONFLICT …")
+                .isTrue();
         return matcher;
     }
 
@@ -317,8 +304,8 @@ class LlmUsageInsertContractTest extends BaseUnitTest {
      */
     private static String columnNameOf(String component) {
         return component
-            .replaceAll("([a-z0-9])([A-Z])", "$1_$2")
-            .replaceAll("([a-zA-Z])([0-9])", "$1_$2")
-            .toLowerCase(Locale.ROOT);
+                .replaceAll("([a-z0-9])([A-Z])", "$1_$2")
+                .replaceAll("([a-zA-Z])([0-9])", "$1_$2")
+                .toLowerCase(Locale.ROOT);
     }
 }

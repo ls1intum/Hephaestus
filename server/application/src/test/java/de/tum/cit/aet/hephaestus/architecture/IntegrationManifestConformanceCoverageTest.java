@@ -22,7 +22,7 @@ class IntegrationManifestConformanceCoverageTest extends HephaestusArchitectureT
 
     private static final String MANIFEST = "de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest";
     private static final String CONTRACT_TEST =
-        "de.tum.cit.aet.hephaestus.integration.core.conformance.IntegrationManifestContractTest";
+            "de.tum.cit.aet.hephaestus.integration.core.conformance.IntegrationManifestContractTest";
 
     @Test
     void everyShippedManifestHasAContractTest() {
@@ -33,19 +33,18 @@ class IntegrationManifestConformanceCoverageTest extends HephaestusArchitectureT
         untested.removeIf(manifest -> tested.contains(expectedTestName(manifest)));
 
         assertThat(untested)
-            .as(
-                "Add a %s subclass named <Manifest>ContractTest. Boot validation only ever sees the " +
-                    "manifests the running configuration enabled; the suite sees all of them.",
-                CONTRACT_TEST
-            )
-            .isEmpty();
+                .as(
+                        "Add a %s subclass named <Manifest>ContractTest. Boot validation only ever sees the "
+                                + "manifests the running configuration enabled; the suite sees all of them.",
+                        CONTRACT_TEST)
+                .isEmpty();
     }
 
     @Test
     void theFixtureManifestIsHeldToTheSameContract() {
         assertThat(contractTestedManifestSimpleNames())
-            .as("the synthetic integration must pass the suite it exists to validate")
-            .contains("FixtureManifestContractTest");
+                .as("the synthetic integration must pass the suite it exists to validate")
+                .contains("FixtureManifestContractTest");
     }
 
     @Test
@@ -55,30 +54,21 @@ class IntegrationManifestConformanceCoverageTest extends HephaestusArchitectureT
     }
 
     private static Set<String> shippedManifests() {
-        return classes
-            .stream()
-            .filter(javaClass -> !javaClass.isInterface() && !javaClass.getModifiers().contains(JavaModifier.ABSTRACT))
-            .filter(javaClass ->
-                javaClass
-                    .getAllRawInterfaces()
-                    .stream()
-                    .anyMatch(i -> i.getName().equals(MANIFEST))
-            )
-            .map(JavaClass::getSimpleName)
-            .collect(Collectors.toCollection(TreeSet::new));
+        return classes.stream()
+                .filter(javaClass ->
+                        !javaClass.isInterface() && !javaClass.getModifiers().contains(JavaModifier.ABSTRACT))
+                .filter(javaClass -> javaClass.getAllRawInterfaces().stream()
+                        .anyMatch(i -> i.getName().equals(MANIFEST)))
+                .map(JavaClass::getSimpleName)
+                .collect(Collectors.toCollection(TreeSet::new));
     }
 
     private static Set<String> contractTestedManifestSimpleNames() {
-        return classesWithTests
-            .stream()
-            .filter(javaClass ->
-                javaClass
-                    .getAllRawSuperclasses()
-                    .stream()
-                    .anyMatch(s -> s.getName().equals(CONTRACT_TEST))
-            )
-            .map(JavaClass::getSimpleName)
-            .collect(Collectors.toCollection(TreeSet::new));
+        return classesWithTests.stream()
+                .filter(javaClass -> javaClass.getAllRawSuperclasses().stream()
+                        .anyMatch(s -> s.getName().equals(CONTRACT_TEST)))
+                .map(JavaClass::getSimpleName)
+                .collect(Collectors.toCollection(TreeSet::new));
     }
 
     private static String expectedTestName(String manifestSimpleName) {

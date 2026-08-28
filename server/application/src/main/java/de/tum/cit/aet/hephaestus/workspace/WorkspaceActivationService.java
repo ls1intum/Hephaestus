@@ -54,15 +54,14 @@ public class WorkspaceActivationService {
     private final AsyncTaskExecutor monitoringExecutor;
 
     public WorkspaceActivationService(
-        NatsConnectionProperties natsProperties,
-        SyncSchedulerProperties syncSchedulerProperties,
-        WorkspaceRepository workspaceRepository,
-        ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
-        WorkspaceScopeFilter workspaceScopeFilter,
-        ConnectionService connectionService,
-        List<WorkspaceDataSyncTrigger> dataSyncTriggerList,
-        @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
-    ) {
+            NatsConnectionProperties natsProperties,
+            SyncSchedulerProperties syncSchedulerProperties,
+            WorkspaceRepository workspaceRepository,
+            ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
+            WorkspaceScopeFilter workspaceScopeFilter,
+            ConnectionService connectionService,
+            List<WorkspaceDataSyncTrigger> dataSyncTriggerList,
+            @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor) {
         this.natsProperties = natsProperties;
         this.syncSchedulerProperties = syncSchedulerProperties;
         this.workspaceRepository = workspaceRepository;
@@ -94,10 +93,9 @@ public class WorkspaceActivationService {
             prepared.add(ensureWorkspaceMetadata(workspace));
         }
 
-        List<Workspace> workspacesToActivate = prepared
-            .stream()
-            .filter(workspace -> !shouldSkipActivation(workspace))
-            .toList();
+        List<Workspace> workspacesToActivate = prepared.stream()
+                .filter(workspace -> !shouldSkipActivation(workspace))
+                .toList();
 
         if (workspacesToActivate.isEmpty()) {
             log.info("No workspaces to activate after filtering");
@@ -106,29 +104,27 @@ public class WorkspaceActivationService {
 
         log.info("Activating workspaces: count={}", workspacesToActivate.size());
 
-        List<CompletableFuture<Void>> activationFutures = workspacesToActivate
-            .stream()
-            .map(workspace ->
-                CompletableFuture.runAsync(() -> activateWorkspace(workspace), monitoringExecutor).exceptionally(ex -> {
-                    // Catches errors outside activateWorkspace itself, e.g. thread pool rejection.
-                    log.error(
-                        "Unexpected error during workspace activation: workspaceId={}, accountLogin={}",
-                        workspace.getId(),
-                        workspace.getAccountLogin(),
-                        ex
-                    );
-                    return null;
-                })
-            )
-            .toList();
+        List<CompletableFuture<Void>> activationFutures = workspacesToActivate.stream()
+                .map(workspace -> CompletableFuture.runAsync(() -> activateWorkspace(workspace), monitoringExecutor)
+                        .exceptionally(ex -> {
+                            // Catches errors outside activateWorkspace itself, e.g. thread pool rejection.
+                            log.error(
+                                    "Unexpected error during workspace activation: workspaceId={}, accountLogin={}",
+                                    workspace.getId(),
+                                    workspace.getAccountLogin(),
+                                    ex);
+                            return null;
+                        }))
+                .toList();
 
-        CompletableFuture.allOf(activationFutures.toArray(CompletableFuture[]::new)).whenComplete((result, ex) -> {
-            if (ex != null) {
-                log.error("Workspace activation completed with errors", ex);
-            } else {
-                log.info("Completed workspace activations: count={}", workspacesToActivate.size());
-            }
-        });
+        CompletableFuture.allOf(activationFutures.toArray(CompletableFuture[]::new))
+                .whenComplete((result, ex) -> {
+                    if (ex != null) {
+                        log.error("Workspace activation completed with errors", ex);
+                    } else {
+                        log.info("Completed workspace activations: count={}", workspacesToActivate.size());
+                    }
+                });
     }
 
     /**
@@ -141,10 +137,9 @@ public class WorkspaceActivationService {
     private boolean shouldSkipActivation(Workspace workspace) {
         if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE) {
             log.info(
-                "Skipped workspace activation: reason=notActive, workspaceId={}, status={}",
-                workspace.getId(),
-                workspace.getStatus()
-            );
+                    "Skipped workspace activation: reason=notActive, workspaceId={}, status={}",
+                    workspace.getId(),
+                    workspace.getStatus());
             return true;
         }
 
@@ -155,14 +150,13 @@ public class WorkspaceActivationService {
         }
         return switch (providerKind.get()) {
             case GITHUB -> {
-                if (
-                    connectionService.findActiveGitHubPatConfig(workspace.getId()).isPresent() &&
-                    !hasBearerToken(workspace.getId(), IntegrationKind.GITHUB)
-                ) {
+                if (connectionService
+                                .findActiveGitHubPatConfig(workspace.getId())
+                                .isPresent()
+                        && !hasBearerToken(workspace.getId(), IntegrationKind.GITHUB)) {
                     log.info(
-                        "Skipped workspace activation: reason=patModeWithoutToken, workspaceId={}",
-                        workspace.getId()
-                    );
+                            "Skipped workspace activation: reason=patModeWithoutToken, workspaceId={}",
+                            workspace.getId());
                     yield true;
                 }
                 yield false;
@@ -170,9 +164,8 @@ public class WorkspaceActivationService {
             case GITLAB -> {
                 if (!hasBearerToken(workspace.getId(), IntegrationKind.GITLAB)) {
                     log.info(
-                        "Skipped workspace activation: reason=gitlabPatModeWithoutToken, workspaceId={}",
-                        workspace.getId()
-                    );
+                            "Skipped workspace activation: reason=gitlabPatModeWithoutToken, workspaceId={}",
+                            workspace.getId());
                     yield true;
                 }
                 yield false;
@@ -183,19 +176,18 @@ public class WorkspaceActivationService {
 
     private boolean hasBearerToken(long workspaceId, IntegrationKind kind) {
         return connectionService
-            .findActiveBearerToken(workspaceId, kind)
-            .map(b -> b.token() != null && !b.token().isBlank())
-            .orElse(false);
+                .findActiveBearerToken(workspaceId, kind)
+                .map(b -> b.token() != null && !b.token().isBlank())
+                .orElse(false);
     }
 
     /** Activate a single workspace: run startup sync, then start its NATS consumer scope. */
     public void activateWorkspace(Workspace workspace) {
         if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE) {
             log.debug(
-                "Skipped workspace activation: reason=notActive, workspaceId={}, status={}",
-                workspace.getId(),
-                workspace.getStatus()
-            );
+                    "Skipped workspace activation: reason=notActive, workspaceId={}, status={}",
+                    workspace.getId(),
+                    workspace.getStatus());
             return;
         }
 
@@ -209,22 +201,21 @@ public class WorkspaceActivationService {
 
             // Set workspace context for the sync operations (enables MDC logging).
             Long installationId = connectionService
-                .findActiveGitHubAppConfig(workspace.getId())
-                .map(ConnectionConfig.GitHubAppConfig::installationId)
-                .orElse(null);
+                    .findActiveGitHubAppConfig(workspace.getId())
+                    .map(ConnectionConfig.GitHubAppConfig::installationId)
+                    .orElse(null);
             WorkspaceContext workspaceContext = WorkspaceContext.fromWorkspace(workspace, Set.of(), installationId);
             WorkspaceContextHolder.setContext(workspaceContext);
             try {
                 IntegrationKind kind = connectionService
-                    .findActiveProviderKind(workspace.getId())
-                    .orElse(IntegrationKind.GITHUB);
+                        .findActiveProviderKind(workspace.getId())
+                        .orElse(IntegrationKind.GITHUB);
                 WorkspaceDataSyncTrigger trigger = dataSyncTriggers.get(kind);
                 if (trigger == null) {
                     log.debug(
-                        "Skipped startup sync: reason=noTriggerForKind, workspaceId={}, kind={}",
-                        workspace.getId(),
-                        kind
-                    );
+                            "Skipped startup sync: reason=noTriggerForKind, workspaceId={}, kind={}",
+                            workspace.getId(),
+                            kind);
                 } else {
                     trigger.syncAllRepositories(workspace.getId());
                 }
@@ -234,12 +225,11 @@ public class WorkspaceActivationService {
                 // Continue to start the NATS consumer so webhook events can still be processed;
                 // entities missing from the failed sync are handled via NAK/retry.
                 log.error(
-                    "Failed monitoring on startup: workspaceId={}, accountLogin={}, error={}",
-                    workspace.getId(),
-                    workspace.getAccountLogin(),
-                    e.getMessage(),
-                    e
-                );
+                        "Failed monitoring on startup: workspaceId={}, accountLogin={}, error={}",
+                        workspace.getId(),
+                        workspace.getAccountLogin(),
+                        e.getMessage(),
+                        e);
             } finally {
                 WorkspaceContextHolder.clearContext();
             }
@@ -268,14 +258,12 @@ public class WorkspaceActivationService {
     /** Derives an account login for legacy workspaces from their first monitored repo's owner. */
     @Nullable
     String deriveAccountLogin(Workspace workspace) {
-        String repoOwner = workspace
-            .getRepositoriesToMonitor()
-            .stream()
-            .map(RepositoryToMonitor::getNameWithOwner)
-            .map(this::extractOwner)
-            .filter(Objects::nonNull)
-            .findFirst()
-            .orElse(null);
+        String repoOwner = workspace.getRepositoriesToMonitor().stream()
+                .map(RepositoryToMonitor::getNameWithOwner)
+                .map(this::extractOwner)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
 
         if (repoOwner != null && !repoOwner.isBlank()) {
             return Objects.requireNonNull(repoOwner);

@@ -26,60 +26,48 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 @WorkspaceAgnostic("Pull requests scoped through repository_id -> repository.workspace_id")
 public interface PullRequestRepository extends JpaRepository<PullRequest, Long> {
-    @Query(
-        """
+    @Query("""
         SELECT p
         FROM PullRequest p
         LEFT JOIN FETCH p.author
         LEFT JOIN FETCH p.repository
         LEFT JOIN FETCH p.milestone
         WHERE p.repository.id = :repositoryId AND p.number = :number
-        """
-    )
+        """)
     Optional<PullRequest> findByRepositoryIdAndNumber(
-        @Param("repositoryId") long repositoryId,
-        @Param("number") int number
-    );
+            @Param("repositoryId") long repositoryId, @Param("number") int number);
 
     /** Pull request by id with assignees eagerly fetched, for access after the Hibernate session closes. */
-    @Query(
-        """
+    @Query("""
         SELECT p FROM PullRequest p
         LEFT JOIN FETCH p.assignees
         WHERE p.id = :id
-        """
-    )
+        """)
     Optional<PullRequest> findByIdWithAssignees(@Param("id") Long id);
 
     /** Pull request by id with assignees and repository eagerly fetched, for access outside the original session (async listeners, scheduled tasks). */
-    @Query(
-        """
+    @Query("""
         SELECT p FROM PullRequest p
         LEFT JOIN FETCH p.assignees
         LEFT JOIN FETCH p.repository
         WHERE p.id = :id
-        """
-    )
+        """)
     Optional<PullRequest> findByIdWithAssigneesAndRepository(@Param("id") Long id);
 
     /** Pull request by id with repository eagerly fetched, for passing across transaction boundaries (e.g. logging nameWithOwner). */
-    @Query(
-        """
+    @Query("""
         SELECT p FROM PullRequest p
         LEFT JOIN FETCH p.repository
         WHERE p.id = :id
-        """
-    )
+        """)
     Optional<PullRequest> findByIdWithRepository(@Param("id") Long id);
 
-    @Query(
-        """
+    @Query("""
         SELECT p FROM PullRequest p
         LEFT JOIN FETCH p.author
         LEFT JOIN FETCH p.repository
         WHERE p.id = :id
-        """
-    )
+        """)
     Optional<PullRequest> findByIdWithAuthorAndRepository(@Param("id") Long id);
 
     /**
@@ -97,8 +85,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
      * @param id the pull request ID
      * @return the pull request with all gate associations loaded, or empty if not found
      */
-    @Query(
-        """
+    @Query("""
         SELECT DISTINCT p FROM PullRequest p
         LEFT JOIN FETCH p.labels
         LEFT JOIN FETCH p.assignees
@@ -106,8 +93,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
         LEFT JOIN FETCH p.author
         LEFT JOIN FETCH p.mergedBy
         WHERE p.id = :id
-        """
-    )
+        """)
     Optional<PullRequest> findByIdWithAllForGate(@Param("id") Long id);
 
     /**
@@ -129,14 +115,10 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
      * @param pageable the cap (newest N) — caller supplies {@code PageRequest.of(0, cap)}
      * @return newest-first pull requests for the repository
      */
-    @Query(
-        "SELECT p FROM PullRequest p LEFT JOIN FETCH p.author LEFT JOIN FETCH p.milestone " +
-            "WHERE p.repository.id = :repositoryId ORDER BY p.number DESC"
-    )
+    @Query("SELECT p FROM PullRequest p LEFT JOIN FETCH p.author LEFT JOIN FETCH p.milestone "
+            + "WHERE p.repository.id = :repositoryId ORDER BY p.number DESC")
     List<PullRequest> findPullRequestInventoryByRepositoryId(
-        @Param("repositoryId") long repositoryId,
-        Pageable pageable
-    );
+            @Param("repositoryId") long repositoryId, Pageable pageable);
 
     /**
      * Streams all pull requests belonging to a repository. Must be consumed within a try-with-resources
@@ -160,8 +142,7 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO issue (
             native_id, provider_id, number, title, body, state, state_reason, html_url, is_locked,
             closed_at, comments_count, last_sync_at, created_at, updated_at,
@@ -220,42 +201,39 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
             -- a quoted range it never finds the end of, and the whole ApplicationContext fails to
             -- start. NativeQueryCommentArchTest enforces this.
             deleted_at = NULL
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int upsertCore(
-        @Param("nativeId") Long nativeId,
-        @Param("providerId") Long providerId,
-        @Param("number") int number,
-        @Param("title") String title,
-        @Param("body") @Nullable String body,
-        @Param("state") String state,
-        @Param("stateReason") @Nullable String stateReason,
-        @Param("htmlUrl") @Nullable String htmlUrl,
-        @Param("isLocked") @Nullable Boolean isLocked,
-        @Param("closedAt") @Nullable Instant closedAt,
-        @Param("commentsCount") @Nullable Integer commentsCount,
-        @Param("lastSyncAt") Instant lastSyncAt,
-        @Param("createdAt") @Nullable Instant createdAt,
-        @Param("updatedAt") @Nullable Instant updatedAt,
-        @Param("authorId") @Nullable Long authorId,
-        @Param("repositoryId") Long repositoryId,
-        @Param("milestoneId") @Nullable Long milestoneId,
-        @Param("mergedAt") @Nullable Instant mergedAt,
-        @Param("isDraft") boolean isDraft,
-        @Param("isMerged") boolean isMerged,
-        @Param("commits") @Nullable Integer commits,
-        @Param("additions") @Nullable Integer additions,
-        @Param("deletions") @Nullable Integer deletions,
-        @Param("changedFiles") @Nullable Integer changedFiles,
-        @Param("reviewDecision") @Nullable String reviewDecision,
-        @Param("mergeStateStatus") @Nullable String mergeStateStatus,
-        @Param("mergeable") @Nullable Boolean mergeable,
-        @Param("headRefName") @Nullable String headRefName,
-        @Param("baseRefName") @Nullable String baseRefName,
-        @Param("headRefOid") @Nullable String headRefOid,
-        @Param("baseRefOid") @Nullable String baseRefOid,
-        @Param("mergedById") @Nullable Long mergedById,
-        @Param("mergeCommitSha") @Nullable String mergeCommitSha
-    );
+            @Param("nativeId") Long nativeId,
+            @Param("providerId") Long providerId,
+            @Param("number") int number,
+            @Param("title") String title,
+            @Param("body") @Nullable String body,
+            @Param("state") String state,
+            @Param("stateReason") @Nullable String stateReason,
+            @Param("htmlUrl") @Nullable String htmlUrl,
+            @Param("isLocked") @Nullable Boolean isLocked,
+            @Param("closedAt") @Nullable Instant closedAt,
+            @Param("commentsCount") @Nullable Integer commentsCount,
+            @Param("lastSyncAt") Instant lastSyncAt,
+            @Param("createdAt") @Nullable Instant createdAt,
+            @Param("updatedAt") @Nullable Instant updatedAt,
+            @Param("authorId") @Nullable Long authorId,
+            @Param("repositoryId") Long repositoryId,
+            @Param("milestoneId") @Nullable Long milestoneId,
+            @Param("mergedAt") @Nullable Instant mergedAt,
+            @Param("isDraft") boolean isDraft,
+            @Param("isMerged") boolean isMerged,
+            @Param("commits") @Nullable Integer commits,
+            @Param("additions") @Nullable Integer additions,
+            @Param("deletions") @Nullable Integer deletions,
+            @Param("changedFiles") @Nullable Integer changedFiles,
+            @Param("reviewDecision") @Nullable String reviewDecision,
+            @Param("mergeStateStatus") @Nullable String mergeStateStatus,
+            @Param("mergeable") @Nullable Boolean mergeable,
+            @Param("headRefName") @Nullable String headRefName,
+            @Param("baseRefName") @Nullable String baseRefName,
+            @Param("headRefOid") @Nullable String headRefOid,
+            @Param("baseRefOid") @Nullable String baseRefOid,
+            @Param("mergedById") @Nullable Long mergedById,
+            @Param("mergeCommitSha") @Nullable String mergeCommitSha);
 }

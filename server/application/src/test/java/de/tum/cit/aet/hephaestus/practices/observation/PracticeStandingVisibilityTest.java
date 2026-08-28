@@ -9,7 +9,6 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
@@ -19,7 +18,6 @@ import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingDTO;
-import de.tum.cit.aet.hephaestus.practices.observation.dto.PracticeStandingObservationDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.PracticeTrendService;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.TrendProperties;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
@@ -77,39 +75,39 @@ class PracticeStandingVisibilityTest extends BaseUnitTest {
         when(currentDeveloperLookup.currentDeveloperId()).thenReturn(Optional.of(USER_ID));
         when(clock.instant()).thenReturn(NOW);
         lenient()
-            .when(workspaceReviewDefaultsProvider.forWorkspace(WORKSPACE_ID))
-            .thenReturn(WorkspaceReviewDefaults.UNSET);
+                .when(workspaceReviewDefaultsProvider.forWorkspace(WORKSPACE_ID))
+                .thenReturn(WorkspaceReviewDefaults.UNSET);
         lenient()
-            .when(visibilityPolicy.permitsAll(eq(WORKSPACE_ID), any(), eq(SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)))
-            .thenAnswer(invocation -> {
-                Collection<Observation> batch = invocation.getArgument(1);
-                return batch.stream().map(Observation::getId).collect(Collectors.toSet());
-            });
+                .when(visibilityPolicy.permitsAll(
+                        eq(WORKSPACE_ID), any(), eq(SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)))
+                .thenAnswer(invocation -> {
+                    Collection<Observation> batch = invocation.getArgument(1);
+                    return batch.stream().map(Observation::getId).collect(Collectors.toSet());
+                });
         practiceStandingService = new PracticeStandingService(
-            observationRepository,
-            feedbackObservationRepository,
-            currentDeveloperLookup,
-            visibilityPolicy,
-            practiceRepository,
-            workspaceReviewDefaultsProvider,
-            new PracticeTrendService(new TrendProperties(), clock),
-            clock
-        );
+                observationRepository,
+                feedbackObservationRepository,
+                currentDeveloperLookup,
+                visibilityPolicy,
+                practiceRepository,
+                workspaceReviewDefaultsProvider,
+                new PracticeTrendService(new TrendProperties(), clock),
+                clock);
     }
 
     private Observation bad(Practice practice, @org.jspecify.annotations.Nullable Severity severity) {
         return Observation.builder()
-            .id(UUID.randomUUID())
-            .practice(practice)
-            .artifactKind(ArtifactKinds.PULL_REQUEST)
-            .artifactId(42L)
-            .observedAt(NOW.minusSeconds(3600))
-            .agentJobId(new UUID(0L, 42L))
-            .summary("a problem")
-            .presence(Presence.ABSENT)
-            .assessment(Assessment.BAD)
-            .severity(severity)
-            .build();
+                .id(UUID.randomUUID())
+                .practice(practice)
+                .artifactKind(ArtifactKinds.PULL_REQUEST)
+                .artifactId(42L)
+                .observedAt(NOW.minusSeconds(3600))
+                .agentJobId(new UUID(0L, 42L))
+                .summary("a problem")
+                .presence(Presence.ABSENT)
+                .assessment(Assessment.BAD)
+                .severity(severity)
+                .build();
     }
 
     private static Practice practice(String slug) {
@@ -124,18 +122,12 @@ class PracticeStandingVisibilityTest extends BaseUnitTest {
     void withholdsObservationRejectedByFeedbackVisibilityPolicy() {
         Practice practice = practice("robust-error-handling");
         Observation observation = bad(practice, Severity.MAJOR);
-        when(
-            observationRepository.findRecentByDeveloperAndWorkspace(
-                eq(USER_ID),
-                eq(WORKSPACE_ID),
-                any(Instant.class),
-                anyBoolean(),
-                any(Pageable.class)
-            )
-        ).thenReturn(List.of(observation));
-        when(
-            visibilityPolicy.permitsAll(WORKSPACE_ID, List.of(observation), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)
-        ).thenReturn(Set.of());
+        when(observationRepository.findRecentByDeveloperAndWorkspace(
+                        eq(USER_ID), eq(WORKSPACE_ID), any(Instant.class), anyBoolean(), any(Pageable.class)))
+                .thenReturn(List.of(observation));
+        when(visibilityPolicy.permitsAll(
+                        WORKSPACE_ID, List.of(observation), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+                .thenReturn(Set.of());
 
         assertThat(practiceStandingService.getStandings(WORKSPACE_ID)).isEmpty();
         verifyNoInteractions(feedbackObservationRepository);
@@ -149,28 +141,17 @@ class PracticeStandingVisibilityTest extends BaseUnitTest {
         practice.setName("Handling failure robustly");
         practice.setCriteria("ordinary criteria"); // not a defect-detector
 
-        when(
-            observationRepository.findRecentByDeveloperAndWorkspace(
-                eq(USER_ID),
-                eq(WORKSPACE_ID),
-                any(Instant.class),
-                anyBoolean(),
-                any(Pageable.class)
-            )
-        ).thenReturn(List.of(bad(practice, null), bad(practice, Severity.CRITICAL)));
-        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any())).thenReturn(
-            List.of()
-        );
+        when(observationRepository.findRecentByDeveloperAndWorkspace(
+                        eq(USER_ID), eq(WORKSPACE_ID), any(Instant.class), anyBoolean(), any(Pageable.class)))
+                .thenReturn(List.of(bad(practice, null), bad(practice, Severity.CRITICAL)));
+        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any()))
+                .thenReturn(List.of());
 
         List<PracticeStandingDTO> standings = practiceStandingService.getStandings(WORKSPACE_ID);
 
         assertThat(standings).hasSize(1);
-        List<Severity> order = standings
-            .get(0)
-            .toWorkOn()
-            .stream()
-            .map(i -> i.severity())
-            .toList();
+        List<Severity> order =
+                standings.get(0).toWorkOn().stream().map(i -> i.severity()).toList();
         // CRITICAL leads; the null-severity item sorts last (treated as least-severe).
         assertThat(order).containsExactly(Severity.CRITICAL, null);
     }
@@ -191,31 +172,24 @@ class PracticeStandingVisibilityTest extends BaseUnitTest {
 
     private Observation strength(Practice practice, Presence presence) {
         return Observation.builder()
-            .id(UUID.randomUUID())
-            .practice(practice)
-            .artifactKind(ArtifactKinds.PULL_REQUEST)
-            .artifactId(42L)
-            .observedAt(NOW.minusSeconds(3600))
-            .agentJobId(new UUID(0L, 42L))
-            .summary("nothing swallowed on the paths you added")
-            .presence(presence)
-            .assessment(Assessment.GOOD)
-            .build();
+                .id(UUID.randomUUID())
+                .practice(practice)
+                .artifactKind(ArtifactKinds.PULL_REQUEST)
+                .artifactId(42L)
+                .observedAt(NOW.minusSeconds(3600))
+                .agentJobId(new UUID(0L, 42L))
+                .summary("nothing swallowed on the paths you added")
+                .presence(presence)
+                .assessment(Assessment.GOOD)
+                .build();
     }
 
     private void feeds(Observation... observations) {
-        when(
-            observationRepository.findRecentByDeveloperAndWorkspace(
-                eq(USER_ID),
-                eq(WORKSPACE_ID),
-                any(Instant.class),
-                anyBoolean(),
-                any(Pageable.class)
-            )
-        ).thenReturn(List.of(observations));
-        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any())).thenReturn(
-            List.of()
-        );
+        when(observationRepository.findRecentByDeveloperAndWorkspace(
+                        eq(USER_ID), eq(WORKSPACE_ID), any(Instant.class), anyBoolean(), any(Pageable.class)))
+                .thenReturn(List.of(observations));
+        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any()))
+                .thenReturn(List.of());
     }
 
     @Test

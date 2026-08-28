@@ -44,15 +44,14 @@ public class AuthSessionService {
     private final AuthMetrics metrics;
 
     public AuthSessionService(
-        JwtPrincipalFactory principalFactory,
-        IssuedJwtRepository issuedJwtRepository,
-        AccountRepository accountRepository,
-        HephaestusJwtIssuer jwtIssuer,
-        AuthEventLogger authEventLogger,
-        AuthProperties properties,
-        Clock clock,
-        AuthMetrics metrics
-    ) {
+            JwtPrincipalFactory principalFactory,
+            IssuedJwtRepository issuedJwtRepository,
+            AccountRepository accountRepository,
+            HephaestusJwtIssuer jwtIssuer,
+            AuthEventLogger authEventLogger,
+            AuthProperties properties,
+            Clock clock,
+            AuthMetrics metrics) {
         this.principalFactory = principalFactory;
         this.issuedJwtRepository = issuedJwtRepository;
         this.accountRepository = accountRepository;
@@ -67,7 +66,10 @@ public class AuthSessionService {
     @Transactional
     public void logout(Long accountId, UUID jti, HttpServletResponse response) {
         issuedJwtRepository.revoke(jti, clock.instant(), IssuedJwt.RevokedReason.LOGOUT);
-        authEventLogger.event(AuthEvent.EventType.LOGOUT, AuthEvent.Result.SUCCESS).account(accountId).record();
+        authEventLogger
+                .event(AuthEvent.EventType.LOGOUT, AuthEvent.Result.SUCCESS)
+                .account(accountId)
+                .record();
         clearCookie(response);
     }
 
@@ -78,20 +80,18 @@ public class AuthSessionService {
      * controller reads them off {@code CurrentAccount}.
      */
     public record RefreshContext(
-        @Nullable Long impersonatorId,
-        @Nullable Instant impersonationExpiresAt,
-        @Nullable Instant sessionExpiresAt
-    ) {}
+            @Nullable Long impersonatorId,
+            @Nullable Instant impersonationExpiresAt,
+            @Nullable Instant sessionExpiresAt) {}
 
     /** Rotate: revoke the presenting token, mint a fresh one (preserving impersonation), set cookie. */
     @Transactional
     public void refresh(
-        Long accountId,
-        UUID jti,
-        RefreshContext context,
-        HttpServletRequest request,
-        HttpServletResponse response
-    ) {
+            Long accountId,
+            UUID jti,
+            RefreshContext context,
+            HttpServletRequest request,
+            HttpServletResponse response) {
         Long impersonatorId = context.impersonatorId();
         Instant impersonationExpiresAt = context.impersonationExpiresAt();
         Instant sessionExpiresAt = context.sessionExpiresAt();
@@ -124,38 +124,29 @@ public class AuthSessionService {
                 // Ordinary (non-impersonation) rotation — carry the absolute session ceiling forward so
                 // the rotated token is re-capped at it (OWASP absolute timeout; impersonation uses imp_exp).
                 token = jwtIssuer.issue(
-                    principalFactory.forAccountId(accountId),
-                    null,
-                    null,
-                    sessionExpiresAt,
-                    request
-                );
+                        principalFactory.forAccountId(accountId), null, null, sessionExpiresAt, request);
                 authEventLogger
-                    .event(AuthEvent.EventType.TOKEN_REFRESH, AuthEvent.Result.SUCCESS)
-                    .account(accountId)
-                    .record();
+                        .event(AuthEvent.EventType.TOKEN_REFRESH, AuthEvent.Result.SUCCESS)
+                        .account(accountId)
+                        .record();
             } else if (impersonationExpired(impersonationExpiresAt)) {
                 // Impersonation time-box reached: auto-exit to the operator (mint an operator token
                 // with NO act claim) rather than renewing the impersonation forever via silent refresh.
                 token = jwtIssuer.issue(principalFactory.forAccountId(impersonatorId), null, request);
                 authEventLogger
-                    .event(AuthEvent.EventType.IMPERSONATION_END, AuthEvent.Result.SUCCESS)
-                    .account(accountId)
-                    .actingAccount(impersonatorId)
-                    .details("{\"reason\":\"EXPIRED\"}")
-                    .record();
+                        .event(AuthEvent.EventType.IMPERSONATION_END, AuthEvent.Result.SUCCESS)
+                        .account(accountId)
+                        .actingAccount(impersonatorId)
+                        .details("{\"reason\":\"EXPIRED\"}")
+                        .record();
             } else {
                 // Impersonation rotation: re-cap the new token at the same imp_exp ceiling.
                 token = jwtIssuer.issue(
-                    principalFactory.forAccountId(accountId),
-                    impersonatorId,
-                    impersonationExpiresAt,
-                    request
-                );
+                        principalFactory.forAccountId(accountId), impersonatorId, impersonationExpiresAt, request);
                 authEventLogger
-                    .event(AuthEvent.EventType.TOKEN_REFRESH, AuthEvent.Result.SUCCESS)
-                    .account(accountId)
-                    .record();
+                        .event(AuthEvent.EventType.TOKEN_REFRESH, AuthEvent.Result.SUCCESS)
+                        .account(accountId)
+                        .record();
             }
             setCookie(response, token);
             metrics.recordRefreshResult(AuthMetrics.RefreshResult.SUCCESS);
@@ -212,11 +203,7 @@ public class AuthSessionService {
         // The negative-cache decoder re-checks every ACTIVE token against the DB, so the bulk revoke
         // takes effect on all pods within DB visibility lag — no per-jti cache eviction needed.
         issuedJwtRepository.revokeAllForAccountExcept(
-            accountId,
-            currentJti,
-            clock.instant(),
-            RevokedReason.SIGN_OUT_EVERYWHERE
-        );
+                accountId, currentJti, clock.instant(), RevokedReason.SIGN_OUT_EVERYWHERE);
     }
 
     public void clearCookie(HttpServletResponse response) {

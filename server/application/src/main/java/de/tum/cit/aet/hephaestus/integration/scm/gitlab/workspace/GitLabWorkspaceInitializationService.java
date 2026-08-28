@@ -95,22 +95,21 @@ public class GitLabWorkspaceInitializationService {
     private final AsyncTaskExecutor monitoringExecutor;
 
     public GitLabWorkspaceInitializationService(
-        WorkspaceRepository workspaceRepository,
-        OrganizationRepository organizationRepository,
-        RepositoryToMonitorRepository repositoryToMonitorRepository,
-        RepositoryRepository repositoryRepository,
-        NatsConnectionProperties natsProperties,
-        SyncSchedulerProperties syncSchedulerProperties,
-        ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
-        SyncTargetProvider syncTargetProvider,
-        ObjectProvider<GitLabSyncServiceHolder> gitLabSyncServiceHolderProvider,
-        ObjectProvider<GitLabWebhookService> gitLabWebhookServiceProvider,
-        ObjectProvider<GitLabRateLimitTracker> rateLimitTrackerProvider,
-        ObjectProvider<GitLabWorkspaceDataSyncTrigger> dataSyncTriggerProvider,
-        ConnectionService connectionService,
-        GitLabWorkspaceLinkService workspaceLinkService,
-        @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
-    ) {
+            WorkspaceRepository workspaceRepository,
+            OrganizationRepository organizationRepository,
+            RepositoryToMonitorRepository repositoryToMonitorRepository,
+            RepositoryRepository repositoryRepository,
+            NatsConnectionProperties natsProperties,
+            SyncSchedulerProperties syncSchedulerProperties,
+            ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
+            SyncTargetProvider syncTargetProvider,
+            ObjectProvider<GitLabSyncServiceHolder> gitLabSyncServiceHolderProvider,
+            ObjectProvider<GitLabWebhookService> gitLabWebhookServiceProvider,
+            ObjectProvider<GitLabRateLimitTracker> rateLimitTrackerProvider,
+            ObjectProvider<GitLabWorkspaceDataSyncTrigger> dataSyncTriggerProvider,
+            ConnectionService connectionService,
+            GitLabWorkspaceLinkService workspaceLinkService,
+            @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor) {
         this.workspaceRepository = workspaceRepository;
         this.organizationRepository = organizationRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
@@ -139,20 +138,16 @@ public class GitLabWorkspaceInitializationService {
                 Workspace workspace = workspaceRepository.findById(workspaceId).orElse(null);
                 if (workspace == null) {
                     log.warn(
-                        "Skipped async GitLab initialization: reason=workspaceNotFound, workspaceId={}",
-                        workspaceId
-                    );
+                            "Skipped async GitLab initialization: reason=workspaceNotFound, workspaceId={}",
+                            workspaceId);
                     return;
                 }
 
                 // Set workspace context for entire lifecycle (init + sync + NATS).
                 // initialize() checks contextOwner and won't double-set/clear.
                 // GitLab workspaces never have a GitHub App installation id.
-                WorkspaceContext context = WorkspaceContext.fromWorkspace(
-                    workspace,
-                    Set.of(),
-                    /* installationId */ null
-                );
+                WorkspaceContext context =
+                        WorkspaceContext.fromWorkspace(workspace, Set.of(), /* installationId */ null);
                 WorkspaceContextHolder.setContext(context);
                 try {
                     dataSyncTriggerProvider.getObject().syncAllRepositories(workspaceId);
@@ -190,9 +185,9 @@ public class GitLabWorkspaceInitializationService {
         }
 
         boolean hasToken = connectionService
-            .findActiveBearerToken(workspace.getId(), IntegrationKind.GITLAB)
-            .map(b -> b.token() != null && !b.token().isBlank())
-            .orElse(false);
+                .findActiveBearerToken(workspace.getId(), IntegrationKind.GITLAB)
+                .map(b -> b.token() != null && !b.token().isBlank())
+                .orElse(false);
         if (!hasToken) {
             log.warn("Skipped GitLab initialization: reason=missingToken, workspaceId={}", workspace.getId());
             return;
@@ -213,10 +208,9 @@ public class GitLabWorkspaceInitializationService {
         }
         try {
             log.info(
-                "Starting GitLab workspace initialization: workspaceId={}, accountLogin={}",
-                workspace.getId(),
-                LoggingUtils.sanitizeForLog(workspace.getAccountLogin())
-            );
+                    "Starting GitLab workspace initialization: workspaceId={}, accountLogin={}",
+                    workspace.getId(),
+                    LoggingUtils.sanitizeForLog(workspace.getAccountLogin()));
 
             // Phase 0: Token rotation + webhook registration
             setupWebhook(workspace);
@@ -235,10 +229,9 @@ public class GitLabWorkspaceInitializationService {
             }
 
             log.info(
-                "Completed GitLab workspace initialization: workspaceId={}, repos={}",
-                workspace.getId(),
-                syncedRepos.size()
-            );
+                    "Completed GitLab workspace initialization: workspaceId={}, repos={}",
+                    workspace.getId(),
+                    syncedRepos.size());
         } finally {
             if (contextOwner) {
                 WorkspaceContextHolder.clearContext();
@@ -266,16 +259,14 @@ public class GitLabWorkspaceInitializationService {
             var webhookResult = webhookService.registerWebhook(workspace);
             if (webhookResult.registered()) {
                 log.info(
-                    "Webhook setup: workspaceId={}, registered=true, webhookId={}",
-                    workspace.getId(),
-                    webhookResult.webhookId()
-                );
+                        "Webhook setup: workspaceId={}, registered=true, webhookId={}",
+                        workspace.getId(),
+                        webhookResult.webhookId());
             } else {
                 log.warn(
-                    "Webhook setup: workspaceId={}, registered=false, reason={}",
-                    workspace.getId(),
-                    LoggingUtils.sanitizeForLog(webhookResult.failureReason())
-                );
+                        "Webhook setup: workspaceId={}, registered=false, reason={}",
+                        workspace.getId(),
+                        LoggingUtils.sanitizeForLog(webhookResult.failureReason()));
             }
         } catch (Exception e) {
             log.warn("Webhook registration failed (non-fatal): workspaceId={}", workspace.getId(), e);
@@ -293,9 +284,8 @@ public class GitLabWorkspaceInitializationService {
 
         if (syncService == null) {
             log.warn(
-                "Skipped GitLab project discovery: reason=syncServiceUnavailable, workspaceId={}",
-                workspace.getId()
-            );
+                    "Skipped GitLab project discovery: reason=syncServiceUnavailable, workspaceId={}",
+                    workspace.getId());
             return Collections.emptyList();
         }
 
@@ -304,22 +294,18 @@ public class GitLabWorkspaceInitializationService {
             // git_provider row instead of falling back to the global default (which silently fuses
             // cross-instance identities under gitlab.com).
             String serverUrl = connectionService
-                .findActiveGitLabConfig(workspace.getId())
-                .map(ConnectionConfig.GitLabConfig::serverUrl)
-                .orElse(null);
-            GitLabSyncResult result = syncService.syncGroupProjects(
-                workspace.getId(),
-                workspace.getAccountLogin(),
-                serverUrl
-            );
+                    .findActiveGitLabConfig(workspace.getId())
+                    .map(ConnectionConfig.GitLabConfig::serverUrl)
+                    .orElse(null);
+            GitLabSyncResult result =
+                    syncService.syncGroupProjects(workspace.getId(), workspace.getAccountLogin(), serverUrl);
             log.info(
-                "GitLab project discovery: workspaceId={}, status={}, synced={}, failed={}, pages={}",
-                workspace.getId(),
-                result.status(),
-                result.synced().size(),
-                result.projectsSkipped(),
-                result.pagesCompleted()
-            );
+                    "GitLab project discovery: workspaceId={}, status={}, synced={}, failed={}, pages={}",
+                    workspace.getId(),
+                    result.status(),
+                    result.synced().size(),
+                    result.projectsSkipped(),
+                    result.pagesCompleted());
             return result.synced();
         } catch (Exception e) {
             log.error("Failed GitLab project discovery: workspaceId={}", workspace.getId(), e);
@@ -338,11 +324,9 @@ public class GitLabWorkspaceInitializationService {
      * @return number of newly created monitors
      */
     public int ensureRepositoryMonitors(Workspace workspace, List<Repository> syncedRepos) {
-        Set<String> existing = repositoryToMonitorRepository
-            .findByWorkspaceId(workspace.getId())
-            .stream()
-            .map(RepositoryToMonitor::getNameWithOwner)
-            .collect(Collectors.toSet());
+        Set<String> existing = repositoryToMonitorRepository.findByWorkspaceId(workspace.getId()).stream()
+                .map(RepositoryToMonitor::getNameWithOwner)
+                .collect(Collectors.toSet());
 
         int created = 0;
         for (Repository repo : syncedRepos) {
@@ -358,11 +342,10 @@ public class GitLabWorkspaceInitializationService {
         }
         if (created > 0) {
             log.info(
-                "Created repository monitors: workspaceId={}, created={}, total={}",
-                workspace.getId(),
-                created,
-                syncedRepos.size()
-            );
+                    "Created repository monitors: workspaceId={}, created={}, total={}",
+                    workspace.getId(),
+                    created,
+                    syncedRepos.size());
         }
         return created;
     }
@@ -393,9 +376,7 @@ public class GitLabWorkspaceInitializationService {
         var gitLabServices = gitLabSyncServiceHolderProvider.getIfAvailable();
         if (gitLabServices == null) {
             log.debug(
-                "Skipped GitLab full data sync: reason=syncServicesUnavailable, workspaceId={}",
-                workspace.getId()
-            );
+                    "Skipped GitLab full data sync: reason=syncServicesUnavailable, workspaceId={}", workspace.getId());
             return;
         }
         String accountLogin = workspace.getAccountLogin();
@@ -406,23 +387,19 @@ public class GitLabWorkspaceInitializationService {
         var memberSyncService = gitLabServices.getGroupMemberSyncService();
         if (memberSyncService != null) {
             organizationRepository
-                .findByLoginIgnoreCaseAndProvider_Type(accountLogin, IdentityProviderType.GITLAB)
-                .ifPresent(org -> {
-                    try {
-                        int membersSynced = memberSyncService.syncGroupMemberships(
-                            workspace.getId(),
-                            accountLogin,
-                            org
-                        );
-                        log.info(
-                            "GitLab membership sync: workspaceId={}, membersSynced={}",
-                            workspace.getId(),
-                            membersSynced
-                        );
-                    } catch (Exception e) {
-                        log.warn("Failed membership sync: workspaceId={}", workspace.getId(), e);
-                    }
-                });
+                    .findByLoginIgnoreCaseAndProvider_Type(accountLogin, IdentityProviderType.GITLAB)
+                    .ifPresent(org -> {
+                        try {
+                            int membersSynced =
+                                    memberSyncService.syncGroupMemberships(workspace.getId(), accountLogin, org);
+                            log.info(
+                                    "GitLab membership sync: workspaceId={}, membersSynced={}",
+                                    workspace.getId(),
+                                    membersSynced);
+                        } catch (Exception e) {
+                            log.warn("Failed membership sync: workspaceId={}", workspace.getId(), e);
+                        }
+                    });
         }
 
         // Sync issue types (org-level, lightweight)
@@ -449,24 +426,19 @@ public class GitLabWorkspaceInitializationService {
             var milestoneSyncService = gitLabServices.getMilestoneSyncService();
             if (milestoneSyncService != null) {
                 try {
-                    SyncResult groupMilestoneResult = milestoneSyncService.syncMilestonesForGroup(
-                        workspace.getId(),
-                        accountLogin,
-                        repos
-                    );
+                    SyncResult groupMilestoneResult =
+                            milestoneSyncService.syncMilestonesForGroup(workspace.getId(), accountLogin, repos);
                     log.info(
-                        "GitLab group milestone sync: workspaceId={}, group={}, written={}",
-                        workspace.getId(),
-                        LoggingUtils.sanitizeForLog(accountLogin),
-                        groupMilestoneResult.count()
-                    );
+                            "GitLab group milestone sync: workspaceId={}, group={}, written={}",
+                            workspace.getId(),
+                            LoggingUtils.sanitizeForLog(accountLogin),
+                            groupMilestoneResult.count());
                 } catch (Exception e) {
                     log.warn(
-                        "Failed GitLab group milestone sync: workspaceId={}, group={}",
-                        workspace.getId(),
-                        LoggingUtils.sanitizeForLog(accountLogin),
-                        e
-                    );
+                            "Failed GitLab group milestone sync: workspaceId={}, group={}",
+                            workspace.getId(),
+                            LoggingUtils.sanitizeForLog(accountLogin),
+                            e);
                 }
             }
 
@@ -485,11 +457,10 @@ public class GitLabWorkspaceInitializationService {
                         commitMrLinker.linkCommits(workspace.getId(), repo, null);
                     } catch (Exception e) {
                         log.warn(
-                            "Failed commit→MR linking (second pass): workspaceId={}, repo={}",
-                            workspace.getId(),
-                            repo.getNameWithOwner(),
-                            e
-                        );
+                                "Failed commit→MR linking (second pass): workspaceId={}, repo={}",
+                                workspace.getId(),
+                                repo.getNameWithOwner(),
+                                e);
                     }
                 }
             }
@@ -530,12 +501,11 @@ public class GitLabWorkspaceInitializationService {
      * best-effort: a repository already in progress always finishes its own phases.
      */
     private void syncGitLabRepositories(
-        Workspace workspace,
-        GitLabSyncServiceHolder gitLabServices,
-        List<Repository> repos,
-        List<Repository> commitLinkTargets,
-        BooleanSupplier cancelled
-    ) {
+            Workspace workspace,
+            GitLabSyncServiceHolder gitLabServices,
+            List<Repository> repos,
+            List<Repository> commitLinkTargets,
+            BooleanSupplier cancelled) {
         var labelSyncService = gitLabServices.getLabelSyncService();
         var milestoneSyncService = gitLabServices.getMilestoneSyncService();
         var issueSyncService = gitLabServices.getIssueSyncService();
@@ -547,40 +517,34 @@ public class GitLabWorkspaceInitializationService {
         // Map nameWithOwner → sync target id so each phase can stamp its per-repo watermark
         // via the SPI. Mirrors GitlabDataSyncScheduler.syncRepositories — without this the
         // initial sync left every watermark column NULL until the first cron run.
-        Map<String, Long> syncTargetIdsByNameWithOwner = repositoryToMonitorRepository
-            .findByWorkspaceId(workspace.getId())
-            .stream()
-            .collect(Collectors.toMap(RepositoryToMonitor::getNameWithOwner, RepositoryToMonitor::getId, (a, b) -> a));
+        Map<String, Long> syncTargetIdsByNameWithOwner =
+                repositoryToMonitorRepository.findByWorkspaceId(workspace.getId()).stream()
+                        .collect(Collectors.toMap(
+                                RepositoryToMonitor::getNameWithOwner, RepositoryToMonitor::getId, (a, b) -> a));
 
         GitLabRateLimitTracker rateLimitTracker = rateLimitTrackerProvider.getIfAvailable();
         Instant cooldownThreshold = Instant.now().minusSeconds(syncSchedulerProperties.cooldownMinutes() * 60L);
 
-        int totalLabels = 0,
-            totalMilestones = 0,
-            totalIssues = 0,
-            totalMRs = 0;
-        int totalCollaborators = 0,
-            totalCommits = 0;
+        int totalLabels = 0, totalMilestones = 0, totalIssues = 0, totalMRs = 0;
+        int totalCollaborators = 0, totalCommits = 0;
         int skippedCooldown = 0;
 
         for (Repository repo : repos) {
             if (cancelled.getAsBoolean()) {
                 log.info(
-                    "GitLab repo sync cancelled: workspaceId={}, reposDone={}, reposTotal={}",
-                    workspace.getId(),
-                    commitLinkTargets.size(),
-                    repos.size()
-                );
+                        "GitLab repo sync cancelled: workspaceId={}, reposDone={}, reposTotal={}",
+                        workspace.getId(),
+                        commitLinkTargets.size(),
+                        repos.size());
                 break;
             }
 
             // Rate limit gate: block if remaining budget is critical
             if (rateLimitTracker != null && rateLimitTracker.isCritical(workspace.getId())) {
                 log.info(
-                    "Rate limit critical, waiting: workspaceId={}, remaining={}",
-                    workspace.getId(),
-                    rateLimitTracker.getRemaining(workspace.getId())
-                );
+                        "Rate limit critical, waiting: workspaceId={}, remaining={}",
+                        workspace.getId(),
+                        rateLimitTracker.getRemaining(workspace.getId()));
                 try {
                     rateLimitTracker.waitIfNeeded(workspace.getId());
                 } catch (InterruptedException e) {
@@ -600,7 +564,8 @@ public class GitLabWorkspaceInitializationService {
             Long rtmId = syncTargetIdsByNameWithOwner.get(repo.getNameWithOwner());
 
             // Cooldown: skip labels/milestones/collaborators if recently synced
-            boolean skipSlowChanging = repo.getLastSyncAt() != null && repo.getLastSyncAt().isAfter(cooldownThreshold);
+            boolean skipSlowChanging =
+                    repo.getLastSyncAt() != null && repo.getLastSyncAt().isAfter(cooldownThreshold);
             if (skipSlowChanging) {
                 skippedCooldown++;
             }
@@ -617,11 +582,10 @@ public class GitLabWorkspaceInitializationService {
                     }
                 } catch (Exception e) {
                     log.warn(
-                        "Failed label sync: workspaceId={}, repo={}",
-                        workspace.getId(),
-                        repo.getNameWithOwner(),
-                        e
-                    );
+                            "Failed label sync: workspaceId={}, repo={}",
+                            workspace.getId(),
+                            repo.getNameWithOwner(),
+                            e);
                 }
             }
             if (!skipSlowChanging && milestoneSyncService != null) {
@@ -633,11 +597,10 @@ public class GitLabWorkspaceInitializationService {
                     }
                 } catch (Exception e) {
                     log.warn(
-                        "Failed milestone sync: workspaceId={}, repo={}",
-                        workspace.getId(),
-                        repo.getNameWithOwner(),
-                        e
-                    );
+                            "Failed milestone sync: workspaceId={}, repo={}",
+                            workspace.getId(),
+                            repo.getNameWithOwner(),
+                            e);
                 }
             }
             if (issueSyncService != null) {
@@ -650,11 +613,10 @@ public class GitLabWorkspaceInitializationService {
                     }
                 } catch (Exception e) {
                     log.warn(
-                        "Failed issue sync: workspaceId={}, repo={}",
-                        workspace.getId(),
-                        repo.getNameWithOwner(),
-                        e
-                    );
+                            "Failed issue sync: workspaceId={}, repo={}",
+                            workspace.getId(),
+                            repo.getNameWithOwner(),
+                            e);
                 }
             }
             if (mrSyncService != null) {
@@ -678,11 +640,10 @@ public class GitLabWorkspaceInitializationService {
                     }
                 } catch (Exception e) {
                     log.warn(
-                        "Failed collaborator sync: workspaceId={}, repo={}",
-                        workspace.getId(),
-                        repo.getNameWithOwner(),
-                        e
-                    );
+                            "Failed collaborator sync: workspaceId={}, repo={}",
+                            workspace.getId(),
+                            repo.getNameWithOwner(),
+                            e);
                 }
             }
             // Prefer JGit backfill (provides diff stats + file changes);
@@ -693,11 +654,10 @@ public class GitLabWorkspaceInitializationService {
                     totalCommits += r.count();
                 } catch (Exception e) {
                     log.warn(
-                        "Failed commit backfill: workspaceId={}, repo={}",
-                        workspace.getId(),
-                        repo.getNameWithOwner(),
-                        e
-                    );
+                            "Failed commit backfill: workspaceId={}, repo={}",
+                            workspace.getId(),
+                            repo.getNameWithOwner(),
+                            e);
                 }
             } else if (commitSyncService != null) {
                 try {
@@ -705,11 +665,10 @@ public class GitLabWorkspaceInitializationService {
                     totalCommits += r.count();
                 } catch (Exception e) {
                     log.warn(
-                        "Failed commit sync: workspaceId={}, repo={}",
-                        workspace.getId(),
-                        repo.getNameWithOwner(),
-                        e
-                    );
+                            "Failed commit sync: workspaceId={}, repo={}",
+                            workspace.getId(),
+                            repo.getNameWithOwner(),
+                            e);
                 }
             }
 
@@ -727,34 +686,29 @@ public class GitLabWorkspaceInitializationService {
         }
 
         log.info(
-            "GitLab repo sync complete: workspaceId={}, repos={}, labels={}, milestones={}, issues={}, mrs={}, " +
-                "collaborators={}, commits={}, cooldownSkipped={}",
-            workspace.getId(),
-            repos.size(),
-            totalLabels,
-            totalMilestones,
-            totalIssues,
-            totalMRs,
-            totalCollaborators,
-            totalCommits,
-            skippedCooldown
-        );
+                "GitLab repo sync complete: workspaceId={}, repos={}, labels={}, milestones={}, issues={}, mrs={}, "
+                        + "collaborators={}, commits={}, cooldownSkipped={}",
+                workspace.getId(),
+                repos.size(),
+                totalLabels,
+                totalMilestones,
+                totalIssues,
+                totalMRs,
+                totalCollaborators,
+                totalCommits,
+                skippedCooldown);
     }
 
     /**
      * Post-repo sync: sub-issues and issue dependencies.
      */
     private void syncGitLabPostRepo(
-        Workspace workspace,
-        GitLabSyncServiceHolder gitLabServices,
-        List<Repository> repos
-    ) {
+            Workspace workspace, GitLabSyncServiceHolder gitLabServices, List<Repository> repos) {
         var subIssueSync = gitLabServices.getSubIssueSyncService();
         var depSync = gitLabServices.getIssueDependencySyncService();
         if (subIssueSync == null && depSync == null) return;
 
-        int totalSubIssues = 0,
-            totalDeps = 0;
+        int totalSubIssues = 0, totalDeps = 0;
         for (Repository repo : repos) {
             if (subIssueSync != null) {
                 try {
@@ -762,11 +716,10 @@ public class GitLabWorkspaceInitializationService {
                     totalSubIssues += r.count();
                 } catch (Exception e) {
                     log.warn(
-                        "Failed sub-issue sync: workspaceId={}, repo={}",
-                        workspace.getId(),
-                        repo.getNameWithOwner(),
-                        e
-                    );
+                            "Failed sub-issue sync: workspaceId={}, repo={}",
+                            workspace.getId(),
+                            repo.getNameWithOwner(),
+                            e);
                 }
             }
             if (depSync != null) {
@@ -775,21 +728,19 @@ public class GitLabWorkspaceInitializationService {
                     totalDeps += r.count();
                 } catch (Exception e) {
                     log.warn(
-                        "Failed dependency sync: workspaceId={}, repo={}",
-                        workspace.getId(),
-                        repo.getNameWithOwner(),
-                        e
-                    );
+                            "Failed dependency sync: workspaceId={}, repo={}",
+                            workspace.getId(),
+                            repo.getNameWithOwner(),
+                            e);
                 }
             }
         }
         if (totalSubIssues > 0 || totalDeps > 0) {
             log.info(
-                "GitLab post-repo sync: workspaceId={}, subIssues={}, deps={}",
-                workspace.getId(),
-                totalSubIssues,
-                totalDeps
-            );
+                    "GitLab post-repo sync: workspaceId={}, subIssues={}, deps={}",
+                    workspace.getId(),
+                    totalSubIssues,
+                    totalDeps);
         }
     }
 

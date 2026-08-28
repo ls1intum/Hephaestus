@@ -28,15 +28,14 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitLabIssueEventDTO(
-    @JsonProperty("object_kind") String objectKind,
-    @JsonProperty("event_type") String eventType,
-    @Nullable GitLabWebhookUser user,
-    @Nullable GitLabWebhookProject project,
-    @JsonProperty("object_attributes") @Nullable ObjectAttributes objectAttributes,
-    @Nullable List<GitLabWebhookLabel> labels,
-    @Nullable List<GitLabWebhookUser> assignees,
-    @JsonProperty("changes") @Nullable Changes changes
-) {
+        @JsonProperty("object_kind") String objectKind,
+        @JsonProperty("event_type") String eventType,
+        @Nullable GitLabWebhookUser user,
+        @Nullable GitLabWebhookProject project,
+        @JsonProperty("object_attributes") @Nullable ObjectAttributes objectAttributes,
+        @Nullable List<GitLabWebhookLabel> labels,
+        @Nullable List<GitLabWebhookUser> assignees,
+        @JsonProperty("changes") @Nullable Changes changes) {
     /**
      * The {@code changes} diff GitLab sends on an {@code action=update} event. We only care about the
      * label delta — GitLab has no dedicated "labeled" action, so label changes arrive here.
@@ -46,9 +45,8 @@ public record GitLabIssueEventDTO(
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record LabelsChange(
-        @Nullable List<GitLabWebhookLabel> previous,
-        @Nullable List<GitLabWebhookLabel> current
-    ) {}
+            @Nullable List<GitLabWebhookLabel> previous,
+            @Nullable List<GitLabWebhookLabel> current) {}
 
     /**
      * Labels newly added in this update (current minus previous, keyed by id). Empty when the update
@@ -60,19 +58,18 @@ public record GitLabIssueEventDTO(
             return List.of();
         }
         List<GitLabWebhookLabel> previous = changes.labels().previous();
-        Set<Long> previousIds =
-            previous == null
+        Set<Long> previousIds = previous == null
                 ? Set.of()
-                : previous.stream().map(GitLabWebhookLabel::id).filter(Objects::nonNull).collect(Collectors.toSet());
-        return changes
-            .labels()
-            .current()
-            .stream()
-            // A current label with a null id is treated as added: GitLab's changes.labels diff reliably carries
-            // ids, so this branch is defensive only and deliberately favours over-firing IssueLabeled (better to
-            // re-trigger detection than silently miss a real add) over under-firing on a malformed payload.
-            .filter(label -> label.id() == null || !previousIds.contains(label.id()))
-            .toList();
+                : previous.stream()
+                        .map(GitLabWebhookLabel::id)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet());
+        return changes.labels().current().stream()
+                // A current label with a null id is treated as added: GitLab's changes.labels diff reliably carries
+                // ids, so this branch is defensive only and deliberately favours over-firing IssueLabeled (better to
+                // re-trigger detection than silently miss a real add) over under-firing on a malformed payload.
+                .filter(label -> label.id() == null || !previousIds.contains(label.id()))
+                .toList();
     }
 
     /**
@@ -80,21 +77,20 @@ public record GitLabIssueEventDTO(
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record ObjectAttributes(
-        @Nullable Long id,
-        @Nullable Integer iid,
-        @Nullable String title,
-        @Nullable String description,
-        @Nullable String state,
-        @Nullable String action,
-        boolean confidential,
-        @JsonProperty("author_id") @Nullable Long authorId,
-        @JsonProperty("assignee_id") @Nullable Long assigneeId,
-        @JsonProperty("milestone_id") @Nullable Long milestoneId,
-        @JsonProperty("created_at") @Nullable String createdAt,
-        @JsonProperty("updated_at") @Nullable String updatedAt,
-        @JsonProperty("closed_at") @Nullable String closedAt,
-        @Nullable String url
-    ) {}
+            @Nullable Long id,
+            @Nullable Integer iid,
+            @Nullable String title,
+            @Nullable String description,
+            @Nullable String state,
+            @Nullable String action,
+            boolean confidential,
+            @JsonProperty("author_id") @Nullable Long authorId,
+            @JsonProperty("assignee_id") @Nullable Long assigneeId,
+            @JsonProperty("milestone_id") @Nullable Long milestoneId,
+            @JsonProperty("created_at") @Nullable String createdAt,
+            @JsonProperty("updated_at") @Nullable String updatedAt,
+            @JsonProperty("closed_at") @Nullable String closedAt,
+            @Nullable String url) {}
 
     public boolean isConfidential() {
         return objectAttributes != null && objectAttributes.confidential();

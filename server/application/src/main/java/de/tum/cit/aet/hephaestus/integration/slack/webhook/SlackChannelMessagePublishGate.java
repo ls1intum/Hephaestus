@@ -20,10 +20,10 @@ public class SlackChannelMessagePublishGate implements WebhookPublishGate {
     private final boolean conversationIngestEnabled;
 
     public SlackChannelMessagePublishGate(
-        SlackWorkspaceResolver workspaceResolver,
-        SlackChannelConsentGate consentGate,
-        @Value("${hephaestus.integration.slack.conversation-ingest.enabled:true}") boolean conversationIngestEnabled
-    ) {
+            SlackWorkspaceResolver workspaceResolver,
+            SlackChannelConsentGate consentGate,
+            @Value("${hephaestus.integration.slack.conversation-ingest.enabled:true}")
+                    boolean conversationIngestEnabled) {
         this.workspaceResolver = workspaceResolver;
         this.consentGate = consentGate;
         this.conversationIngestEnabled = conversationIngestEnabled;
@@ -56,10 +56,10 @@ public class SlackChannelMessagePublishGate implements WebhookPublishGate {
             return Decision.drop("slack-channel-message-missing-team-or-channel");
         }
         return workspaceResolver
-            .resolveWorkspaceId(teamId)
-            .filter(workspaceId -> consentGate.ingestAllowed(workspaceId, channelId))
-            .map(_workspaceId -> Decision.allow())
-            .orElseGet(() -> Decision.drop("slack-channel-not-active"));
+                .resolveWorkspaceId(teamId)
+                .filter(workspaceId -> consentGate.ingestAllowed(workspaceId, channelId))
+                .map(_workspaceId -> Decision.allow())
+                .orElseGet(() -> Decision.drop("slack-channel-not-active"));
     }
 
     private static boolean isChannelMessage(JsonNode event) {

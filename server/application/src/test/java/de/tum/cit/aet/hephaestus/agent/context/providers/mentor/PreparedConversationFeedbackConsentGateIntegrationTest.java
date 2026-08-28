@@ -12,7 +12,6 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
 import de.tum.cit.aet.hephaestus.core.settings.InstanceSettingsService;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
@@ -80,13 +79,10 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
         databaseTestUtils.cleanDatabase();
         var settings = instanceSettingsService.get();
         instanceSettingsService.updateSilentMode(
-            false,
-            null,
-            null,
-            EntityTagPrecondition.parse("\"" + settings.getVersion() + "\"")
-        );
+                false, null, null, EntityTagPrecondition.parse("\"" + settings.getVersion() + "\""));
         setUpWorkspaceAndRecipient("conv-consent-gate-test");
-        when(accountPreferencesQuery.practiceFeedbackDeliveryEnabled(recipient.getId())).thenReturn(true);
+        when(accountPreferencesQuery.practiceFeedbackDeliveryEnabled(recipient.getId()))
+                .thenReturn(true);
         practice = new Practice();
         practice.setBindings(PracticeTestEvidence.bindings(ArtifactKinds.CONVERSATION_THREAD));
         practice.setAutomatedReviewPolicy(PracticeTestEvidence.conversationThread());
@@ -114,19 +110,11 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
         saveConversationObservation(job, "occ-paused", pausedThreadId);
         saveConversationObservation(job, "occ-revoked", revokedThreadId);
         preparer.prepare(
-            job.getId(),
-            workspace.getId(),
-            List.of(activeObs),
-            List.of(conversationUnit(List.of(activeObs)))
-        );
+                job.getId(), workspace.getId(), List.of(activeObs), List.of(conversationUnit(List.of(activeObs))));
 
-        assertThat(
-            feedbackObservationRepository.findPreparedConversationFactsForRecipient(
-                workspace.getId(),
-                recipient.getId(),
-                PageRequest.of(0, 10)
-            )
-        ).hasSize(1);
+        assertThat(feedbackObservationRepository.findPreparedConversationFactsForRecipient(
+                        workspace.getId(), recipient.getId(), PageRequest.of(0, 10)))
+                .hasSize(1);
 
         JsonNode root = contribute();
 
@@ -134,7 +122,8 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
 
         JsonNode arr = root.get("preparedConversationFeedback");
         assertThat(arr).hasSize(1);
-        assertThat(arr.get(0).get("observationId").asString()).isEqualTo(activeObs.getId().toString());
+        assertThat(arr.get(0).get("observationId").asString())
+                .isEqualTo(activeObs.getId().toString());
         assertThat(arr.get(0).get("artifactKind").asString()).isEqualTo("chat.conversation_thread");
         assertThat(arr.get(0).get("artifactId").asLong()).isEqualTo(activeThreadId);
         assertThat(root.get("totalPrepared").asInt()).isEqualTo(1);
@@ -156,7 +145,8 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
         JsonNode root = contribute();
         JsonNode arr = root.get("preparedConversationFeedback");
         assertThat(arr).hasSize(1);
-        assertThat(arr.get(0).get("observationId").asString()).isEqualTo(prObs.getId().toString());
+        assertThat(arr.get(0).get("observationId").asString())
+                .isEqualTo(prObs.getId().toString());
         assertThat(arr.get(0).get("artifactKind").asString()).isEqualTo("scm.pull_request");
     }
 
@@ -166,22 +156,14 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
         AgentJob job = newJob();
         Observation observation = saveConversationObservation(job, "occ-paused", threadId);
         preparer.prepare(
-            job.getId(),
-            workspace.getId(),
-            List.of(observation),
-            List.of(conversationUnit(List.of(observation)))
-        );
+                job.getId(), workspace.getId(), List.of(observation), List.of(conversationUnit(List.of(observation))));
         workspace.getReviewSettings().setDeliveryStatus(PracticeDeliveryStatus.PAUSED);
         workspaceRepository.saveAndFlush(workspace);
 
         assertThat(contribute().get("preparedConversationFeedback")).isEmpty();
-        assertThat(
-            feedbackObservationRepository.findPreparedConversationFactsForRecipient(
-                workspace.getId(),
-                recipient.getId(),
-                PageRequest.of(0, 10)
-            )
-        ).isEmpty();
+        assertThat(feedbackObservationRepository.findPreparedConversationFactsForRecipient(
+                        workspace.getId(), recipient.getId(), PageRequest.of(0, 10)))
+                .isEmpty();
     }
 
     @Test
@@ -224,54 +206,43 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
         AgentJob job = newJob();
         savePullRequestObservation(job, "occ-composed", 4242L);
         List<Observation> admitted = router.admit(
-            observationRepository.findByAgentJobId(job.getId()),
-            workspace.getId(),
-            RoutingContext.author()
-        );
+                observationRepository.findByAgentJobId(job.getId()), workspace.getId(), RoutingContext.author());
         preparer.prepare(
-            job.getId(),
-            workspace.getId(),
-            admitted,
-            List.of(
-                new ComposedFeedbackUnit(
-                    FeedbackChannel.IN_CHAT,
-                    practice.getSlug(),
-                    List.of(admitted.getFirst().getId().toString()),
-                    ComposedFeedbackUnit.Action.NEW,
-                    null,
-                    null,
-                    "The test arrives after the review",
-                    null,
-                    null,
-                    new ComposedFeedbackUnit.ConversationBrief(
-                        "On !18, !20 and !22 the test landed a push after the review comment.",
-                        "Writing the test last is what leaves the review to find the gap.",
-                        "On !18, !20 and !22 the test arrived a push later.",
-                        "They name a check they could run before pushing.",
-                        null
-                    ),
-                    null
-                )
-            )
-        );
+                job.getId(),
+                workspace.getId(),
+                admitted,
+                List.of(new ComposedFeedbackUnit(
+                        FeedbackChannel.IN_CHAT,
+                        practice.getSlug(),
+                        List.of(admitted.getFirst().getId().toString()),
+                        ComposedFeedbackUnit.Action.NEW,
+                        null,
+                        null,
+                        "The test arrives after the review",
+                        null,
+                        null,
+                        new ComposedFeedbackUnit.ConversationBrief(
+                                "On !18, !20 and !22 the test landed a push after the review comment.",
+                                "Writing the test last is what leaves the review to find the gap.",
+                                "On !18, !20 and !22 the test arrived a push later.",
+                                "They name a check they could run before pushing.",
+                                null),
+                        null)));
 
         JsonNode item = contribute().get("preparedConversationFeedback").get(0);
         assertThat(item.has("body")).isFalse();
         assertThat(item.get("topic").asString()).isEqualTo("The test arrives after the review");
-        assertThat(item.get("evidence").get("citations").get(0).get("quote").asString()).isEqualTo("example");
+        assertThat(item.get("evidence").get("citations").get(0).get("quote").asString())
+                .isEqualTo("example");
         JsonNode notes = item.get("notes");
-        assertThat(notes.get("situation").asString()).isEqualTo(
-            "On !18, !20 and !22 the test landed a push after the review comment."
-        );
-        assertThat(notes.get("capability").asString()).isEqualTo(
-            "Writing the test last is what leaves the review to find the gap."
-        );
-        assertThat(notes.get("evidenceSummary").asString()).isEqualTo(
-            "On !18, !20 and !22 the test arrived a push later."
-        );
-        assertThat(notes.get("inConversationSignal").asString()).isEqualTo(
-            "They name a check they could run before pushing."
-        );
+        assertThat(notes.get("situation").asString())
+                .isEqualTo("On !18, !20 and !22 the test landed a push after the review comment.");
+        assertThat(notes.get("capability").asString())
+                .isEqualTo("Writing the test last is what leaves the review to find the gap.");
+        assertThat(notes.get("evidenceSummary").asString())
+                .isEqualTo("On !18, !20 and !22 the test arrived a push later.");
+        assertThat(notes.get("inConversationSignal").asString())
+                .isEqualTo("They name a check they could run before pushing.");
 
         // The same surface, prepared with nothing composed: no notes key at all, on that item alone.
         AgentJob uncomposed = newJob();
@@ -285,35 +256,28 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
 
     private ComposedFeedbackUnit conversationUnit(List<Observation> observations) {
         return new ComposedFeedbackUnit(
-            FeedbackChannel.IN_CHAT,
-            practice.getSlug(),
-            observations
-                .stream()
-                .map(o -> o.getId().toString())
-                .toList(),
-            ComposedFeedbackUnit.Action.NEW,
-            null,
-            null,
-            "Test practice",
-            null,
-            null,
-            new ComposedFeedbackUnit.ConversationBrief(
-                "The practice recurred.",
-                "Recognize the decision point.",
-                "The observations show the same pattern.",
-                "They can explain the decision in their own words.",
-                null
-            ),
-            null
-        );
+                FeedbackChannel.IN_CHAT,
+                practice.getSlug(),
+                observations.stream().map(o -> o.getId().toString()).toList(),
+                ComposedFeedbackUnit.Action.NEW,
+                null,
+                null,
+                "Test practice",
+                null,
+                null,
+                new ComposedFeedbackUnit.ConversationBrief(
+                        "The practice recurred.",
+                        "Recognize the decision point.",
+                        "The observations show the same pattern.",
+                        "They can explain the decision in their own words.",
+                        null),
+                null);
     }
 
     private JsonNode contribute() {
         Map<String, byte[]> files = new HashMap<>();
         contentSource.contribute(
-            new ContextRequest.MentorChatRequest(workspace.getId(), recipient.getId(), UUID.randomUUID()),
-            files
-        );
+                new ContextRequest.MentorChatRequest(workspace.getId(), recipient.getId(), UUID.randomUUID()), files);
         return objectMapper.readTree(files.get(PreparedConversationFeedbackContentSource.OUTPUT_KEY));
     }
 
@@ -334,26 +298,25 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
     private Observation saveObservation(AgentJob job, String occurrenceKey, String artifactKind, long artifactId) {
         UUID id = UUID.randomUUID();
         observationRepository.insertIfAbsent(
-            id,
-            occurrenceKey,
-            job.getId(),
-            practice.getId(),
-            practice.getCurrentRevision().getId(),
-            artifactKind,
-            artifactId,
-            recipient.getId(),
-            "Observation title",
-            "ABSENT",
-            "BAD",
-            "MAJOR",
-            artifactKind.equals("chat.conversation_thread")
-                ? "{\"citations\":[{\"sourceKind\":\"slack.conversation.thread\",\"artifactPath\":\"inputs/context/thread.json\",\"path\":\"Slack thread\",\"startLine\":1,\"endLine\":1,\"quote\":\"example\",\"quoteRedacted\":false}]}"
-                : "{\"citations\":[{\"sourceKind\":\"scm.pull-request.core\",\"artifactPath\":\"inputs/context/pull-request.json\",\"path\":\"pull-request.json\",\"startLine\":1,\"endLine\":1,\"quote\":\"example\",\"quoteRedacted\":false}]}",
-            null,
-            null,
-            Instant.now(),
-            "LIVE"
-        );
+                id,
+                occurrenceKey,
+                job.getId(),
+                practice.getId(),
+                practice.getCurrentRevision().getId(),
+                artifactKind,
+                artifactId,
+                recipient.getId(),
+                "Observation title",
+                "ABSENT",
+                "BAD",
+                "MAJOR",
+                artifactKind.equals("chat.conversation_thread")
+                        ? "{\"citations\":[{\"sourceKind\":\"slack.conversation.thread\",\"artifactPath\":\"inputs/context/thread.json\",\"path\":\"Slack thread\",\"startLine\":1,\"endLine\":1,\"quote\":\"example\",\"quoteRedacted\":false}]}"
+                        : "{\"citations\":[{\"sourceKind\":\"scm.pull-request.core\",\"artifactPath\":\"inputs/context/pull-request.json\",\"path\":\"pull-request.json\",\"startLine\":1,\"endLine\":1,\"quote\":\"example\",\"quoteRedacted\":false}]}",
+                null,
+                null,
+                Instant.now(),
+                "LIVE");
         return observationRepository.findById(id).orElseThrow();
     }
 }

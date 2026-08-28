@@ -78,8 +78,7 @@ class FeedbackSupersessionIntegrationTest extends BaseIntegrationTest {
         // A workspace of its own per test: every read below is workspace-scoped, so rows another test
         // left behind are invisible and no instance-wide clean is needed.
         workspace = workspaceRepository.save(
-            WorkspaceTestFixtures.activeWorkspace("supersede-" + SLUG_SEQUENCE.incrementAndGet())
-        );
+                WorkspaceTestFixtures.activeWorkspace("supersede-" + SLUG_SEQUENCE.incrementAndGet()));
         threadKey = FeedbackThreadKey.forPractice(PRACTICE, RECIPIENT, FeedbackChannel.IN_APP);
     }
 
@@ -114,24 +113,24 @@ class FeedbackSupersessionIntegrationTest extends BaseIntegrationTest {
         }
 
         List<Feedback> thread = onThread();
-        assertThat(thread).as("the card that was waiting, plus one replacement per run").hasSize(RACERS + 1);
+        assertThat(thread)
+                .as("the card that was waiting, plus one replacement per run")
+                .hasSize(RACERS + 1);
         assertThat(state(queued)).isEqualTo(FeedbackDeliveryState.SUPERSEDED);
         assertThat(thread)
-            .filteredOn(card -> card.getDeliveryState() == FeedbackDeliveryState.PREPARED)
-            .as("one habit, one live card — the pile is what supersession exists to prevent")
-            .hasSize(1);
+                .filteredOn(card -> card.getDeliveryState() == FeedbackDeliveryState.PREPARED)
+                .as("one habit, one live card — the pile is what supersession exists to prevent")
+                .hasSize(1);
         assertThat(dispositions)
-            .filteredOn(disposition -> disposition == FeedbackSupersession.Disposition.SUPERSEDED)
-            .as("each run retires the card it found, and no card is retired twice")
-            .hasSize(RACERS);
+                .filteredOn(disposition -> disposition == FeedbackSupersession.Disposition.SUPERSEDED)
+                .as("each run retires the card it found, and no card is retired twice")
+                .hasSize(RACERS);
         assertThat(thread)
-            .filteredOn(card -> card.getDeliveryState() == FeedbackDeliveryState.SUPERSEDED)
-            .allSatisfy(retired ->
-                assertThat(thread)
-                    .filteredOn(card -> retired.getId().equals(card.getReplacesId()))
-                    .as("every retirement has exactly one successor, and the chain never forks")
-                    .hasSize(1)
-            );
+                .filteredOn(card -> card.getDeliveryState() == FeedbackDeliveryState.SUPERSEDED)
+                .allSatisfy(retired -> assertThat(thread)
+                        .filteredOn(card -> retired.getId().equals(card.getReplacesId()))
+                        .as("every retirement has exactly one successor, and the chain never forks")
+                        .hasSize(1));
     }
 
     /**
@@ -154,9 +153,8 @@ class FeedbackSupersessionIntegrationTest extends BaseIntegrationTest {
             Future<Integer> read = contenders.submit(() -> {
                 atTheLine.countDown();
                 go.await(PATIENCE_SECONDS, TimeUnit.SECONDS);
-                return transactionTemplate.execute(status ->
-                    feedbackRepository.markInAppDelivered(workspace.getId(), queued, Instant.now())
-                );
+                return transactionTemplate.execute(
+                        status -> feedbackRepository.markInAppDelivered(workspace.getId(), queued, Instant.now()));
             });
             Future<FeedbackSupersession.Disposition> replace = contenders.submit(replacement(0, atTheLine, go));
             assertThat(atTheLine.await(PATIENCE_SECONDS, TimeUnit.SECONDS)).isTrue();
@@ -169,17 +167,18 @@ class FeedbackSupersessionIntegrationTest extends BaseIntegrationTest {
 
         boolean supersessionWon = disposition == FeedbackSupersession.Disposition.SUPERSEDED;
         assertThat(readWon ^ supersessionWon)
-            .as("exactly one of the two claimed the card: %s", readWon ? "the reader" : "the replacement")
-            .isTrue();
-        assertThat(state(queued)).isEqualTo(
-            readWon ? FeedbackDeliveryState.DELIVERED : FeedbackDeliveryState.SUPERSEDED
-        );
+                .as("exactly one of the two claimed the card: %s", readWon ? "the reader" : "the replacement")
+                .isTrue();
+        assertThat(state(queued))
+                .isEqualTo(readWon ? FeedbackDeliveryState.DELIVERED : FeedbackDeliveryState.SUPERSEDED);
         if (readWon) {
             assertThat(disposition)
-                .as("a card that was read is followed, not rewritten")
-                .isEqualTo(FeedbackSupersession.Disposition.CONTINUED);
+                    .as("a card that was read is followed, not rewritten")
+                    .isEqualTo(FeedbackSupersession.Disposition.CONTINUED);
         }
-        assertThat(onThread()).as("whoever won, the words the run composed still reached the developer").hasSize(2);
+        assertThat(onThread())
+                .as("whoever won, the words the run composed still reached the developer")
+                .hasSize(2);
     }
 
     /**
@@ -191,11 +190,11 @@ class FeedbackSupersessionIntegrationTest extends BaseIntegrationTest {
     @DisplayName("a card that has been read is followed rather than replaced")
     void aCardThatWasReadIsFollowedRatherThanReplaced() {
         UUID read = queuedCard("The card they opened").getId();
-        assertThat(feedbackRepository.markInAppDelivered(workspace.getId(), read, Instant.now())).isEqualTo(1);
+        assertThat(feedbackRepository.markInAppDelivered(workspace.getId(), read, Instant.now()))
+                .isEqualTo(1);
 
-        FeedbackSupersession.Outcome outcome = transactionTemplate.execute(status ->
-            supersession.supersede(workspace.getId(), RECIPIENT, FeedbackChannel.IN_APP, threadKey)
-        );
+        FeedbackSupersession.Outcome outcome = transactionTemplate.execute(
+                status -> supersession.supersede(workspace.getId(), RECIPIENT, FeedbackChannel.IN_APP, threadKey));
 
         assertThat(outcome.disposition()).isEqualTo(FeedbackSupersession.Disposition.CONTINUED);
         assertThat(outcome.replacesId()).isEqualTo(read);
@@ -213,9 +212,8 @@ class FeedbackSupersessionIntegrationTest extends BaseIntegrationTest {
     void aWithheldHeadIsNotFollowed() {
         card("The card that was never sent", FeedbackDeliveryState.SUPPRESSED, FeedbackSuppressionReason.VOLUME_CAPPED);
 
-        FeedbackSupersession.Outcome outcome = transactionTemplate.execute(status ->
-            supersession.supersede(workspace.getId(), RECIPIENT, FeedbackChannel.IN_APP, threadKey)
-        );
+        FeedbackSupersession.Outcome outcome = transactionTemplate.execute(
+                status -> supersession.supersede(workspace.getId(), RECIPIENT, FeedbackChannel.IN_APP, threadKey));
 
         assertThat(outcome.disposition()).isEqualTo(FeedbackSupersession.Disposition.NEW);
         assertThat(outcome.replacesId()).isNull();
@@ -224,9 +222,8 @@ class FeedbackSupersessionIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("a first card on a thread claims nothing and does not fail")
     void aFirstCardOnAThreadClaimsNothing() {
-        FeedbackSupersession.Outcome outcome = transactionTemplate.execute(status ->
-            supersession.supersede(workspace.getId(), RECIPIENT, FeedbackChannel.IN_APP, threadKey)
-        );
+        FeedbackSupersession.Outcome outcome = transactionTemplate.execute(
+                status -> supersession.supersede(workspace.getId(), RECIPIENT, FeedbackChannel.IN_APP, threadKey));
 
         assertThat(outcome.disposition()).isEqualTo(FeedbackSupersession.Disposition.NEW);
         assertThat(outcome.replacesId()).isNull();
@@ -237,25 +234,16 @@ class FeedbackSupersessionIntegrationTest extends BaseIntegrationTest {
      * in-app lane has, and the reason a lost claim never leaves a retirement standing alone.
      */
     private Callable<FeedbackSupersession.Disposition> replacement(
-        int racer,
-        CountDownLatch atTheLine,
-        CountDownLatch go
-    ) {
+            int racer, CountDownLatch atTheLine, CountDownLatch go) {
         return () -> {
             atTheLine.countDown();
             go.await(PATIENCE_SECONDS, TimeUnit.SECONDS);
             return transactionTemplate.execute(status -> {
-                FeedbackSupersession.Outcome outcome = supersession.supersede(
-                    workspace.getId(),
-                    RECIPIENT,
-                    FeedbackChannel.IN_APP,
-                    threadKey
-                );
-                feedbackRepository.save(
-                    cardBuilder("Replacement " + racer, FeedbackDeliveryState.PREPARED, null)
+                FeedbackSupersession.Outcome outcome =
+                        supersession.supersede(workspace.getId(), RECIPIENT, FeedbackChannel.IN_APP, threadKey);
+                feedbackRepository.save(cardBuilder("Replacement " + racer, FeedbackDeliveryState.PREPARED, null)
                         .replacesId(outcome.replacesId())
-                        .build()
-                );
+                        .build());
                 return outcome.disposition();
             });
         };
@@ -271,39 +259,37 @@ class FeedbackSupersessionIntegrationTest extends BaseIntegrationTest {
 
     /** Each card takes a job of its own, since {@code (agent_job_id, position)} is one unit's identity. */
     private Feedback.FeedbackBuilder cardBuilder(
-        String body,
-        FeedbackDeliveryState state,
-        @Nullable FeedbackSuppressionReason reason
-    ) {
+            String body, FeedbackDeliveryState state, @Nullable FeedbackSuppressionReason reason) {
         AgentJob job = new AgentJob();
         job.setWorkspace(workspace);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         job.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
         job = agentJobRepository.save(job);
         return Feedback.builder()
-            .agentJobId(job.getId())
-            .workspaceId(workspace.getId())
-            .recipientUserId(RECIPIENT)
-            .aboutUserId(RECIPIENT)
-            .channel(FeedbackChannel.IN_APP)
-            .position(FeedbackLedgerRecorder.IN_APP_UNIT_ORDINAL_BASE)
-            .deliveryState(state)
-            .suppressionReason(reason)
-            .body(body)
-            .source(FeedbackSource.AGENT)
-            .threadKey(threadKey)
-            .createdAt(Instant.now());
+                .agentJobId(job.getId())
+                .workspaceId(workspace.getId())
+                .recipientUserId(RECIPIENT)
+                .aboutUserId(RECIPIENT)
+                .channel(FeedbackChannel.IN_APP)
+                .position(FeedbackLedgerRecorder.IN_APP_UNIT_ORDINAL_BASE)
+                .deliveryState(state)
+                .suppressionReason(reason)
+                .body(body)
+                .source(FeedbackSource.AGENT)
+                .threadKey(threadKey)
+                .createdAt(Instant.now());
     }
 
     private List<Feedback> onThread() {
-        return feedbackRepository
-            .findAll()
-            .stream()
-            .filter(card -> workspace.getId().equals(card.getWorkspaceId()))
-            .toList();
+        return feedbackRepository.findAll().stream()
+                .filter(card -> workspace.getId().equals(card.getWorkspaceId()))
+                .toList();
     }
 
     private FeedbackDeliveryState state(UUID id) {
-        return feedbackRepository.findByIdAndWorkspaceId(id, workspace.getId()).orElseThrow().getDeliveryState();
+        return feedbackRepository
+                .findByIdAndWorkspaceId(id, workspace.getId())
+                .orElseThrow()
+                .getDeliveryState();
     }
 }

@@ -17,8 +17,7 @@ public interface FeedbackPlacementRepository extends JpaRepository<FeedbackPlace
     List<FeedbackPlacement> findByFeedbackId(UUID feedbackId);
 
     @Modifying
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO feedback_placement (
             id, feedback_id, placement_type, anchor_kind, anchor_path, anchor_start_line,
             anchor_end_line, anchor_side, posted_comment_ref, created_at
@@ -28,25 +27,21 @@ public interface FeedbackPlacementRepository extends JpaRepository<FeedbackPlace
             :#{#placement.anchorEndLine()}, :#{#placement.anchorSide()},
             :#{#placement.postedCommentRef()}, CURRENT_TIMESTAMP
         ) ON CONFLICT (feedback_id, posted_comment_ref) DO NOTHING
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int insertProviderPlacementIfAbsent(@Param("placement") ProviderPlacement placement);
 
     record ProviderPlacement(
-        UUID id,
-        UUID feedbackId,
-        String placementType,
-        @Nullable String anchorKind,
-        @Nullable String anchorPath,
-        @Nullable Integer anchorStartLine,
-        @Nullable Integer anchorEndLine,
-        @Nullable String anchorSide,
-        String postedCommentRef
-    ) {}
+            UUID id,
+            UUID feedbackId,
+            String placementType,
+            @Nullable String anchorKind,
+            @Nullable String anchorPath,
+            @Nullable Integer anchorStartLine,
+            @Nullable Integer anchorEndLine,
+            @Nullable String anchorSide,
+            String postedCommentRef) {}
 
-    @Query(
-        """
+    @Query("""
         SELECT p FROM FeedbackPlacement p
         WHERE p.feedback.threadKey = :threadKey
           AND p.feedback.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.DELIVERED
@@ -54,12 +49,10 @@ public interface FeedbackPlacementRepository extends JpaRepository<FeedbackPlace
           AND p.postedCommentRef IS NOT NULL
         ORDER BY p.feedback.createdAt DESC
         LIMIT 1
-        """
-    )
+        """)
     Optional<FeedbackPlacement> findLatestDeliveredSummary(@Param("threadKey") String threadKey);
 
-    @Query(
-        value = """
+    @Query(value = """
         SELECT fp.*
         FROM feedback_placement fp
         WHERE fp.feedback_id = :feedbackId
@@ -74,8 +67,6 @@ public interface FeedbackPlacementRepository extends JpaRepository<FeedbackPlace
                  fp.anchor_end_line NULLS FIRST,
                  fp.created_at,
                  fp.id
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     List<FeedbackPlacement> findByFeedbackIdInDisplayOrder(@Param("feedbackId") UUID feedbackId);
 }

@@ -23,14 +23,13 @@ class WebhookPayloadSizeFilterTest extends BaseUnitTest {
     private static final long MAX = 1024;
 
     private final WebhookProperties properties = new WebhookProperties(
-        null,
-        null,
-        new WebhookProperties.TokenRotation(7, 90),
-        new WebhookProperties.Publish(Duration.ofSeconds(9), 5, Duration.ofMillis(200)),
-        WebhookPropertiesFixture.stream(),
-        new WebhookProperties.Shutdown(Duration.ofSeconds(15)),
-        new WebhookProperties.Http(MAX)
-    );
+            null,
+            null,
+            new WebhookProperties.TokenRotation(7, 90),
+            new WebhookProperties.Publish(Duration.ofSeconds(9), 5, Duration.ofMillis(200)),
+            WebhookPropertiesFixture.stream(),
+            new WebhookProperties.Shutdown(Duration.ofSeconds(15)),
+            new WebhookProperties.Http(MAX));
 
     private final MeterRegistry meters = new SimpleMeterRegistry();
     private final WebhookPayloadSizeFilter filter = new WebhookPayloadSizeFilter(properties, meters);
@@ -100,13 +99,14 @@ class WebhookPayloadSizeFilterTest extends BaseUnitTest {
     }
 
     private void assertCounter(String provider, String reason, double expected) {
-        io.micrometer.core.instrument.Counter counter = meters
-            .find("webhook.rejected")
-            .tag("provider", provider)
-            .tag("reason", reason)
-            .counter();
+        io.micrometer.core.instrument.Counter counter = meters.find("webhook.rejected")
+                .tag("provider", provider)
+                .tag("reason", reason)
+                .counter();
         double actual = counter == null ? 0.0 : counter.count();
-        assertThat(actual).as("webhook.rejected{provider=%s, reason=%s}", provider, reason).isEqualTo(expected);
+        assertThat(actual)
+                .as("webhook.rejected{provider=%s, reason=%s}", provider, reason)
+                .isEqualTo(expected);
     }
 
     @Test

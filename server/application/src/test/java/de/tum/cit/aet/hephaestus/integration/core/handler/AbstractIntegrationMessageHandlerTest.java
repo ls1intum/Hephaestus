@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.integration.core.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -46,14 +45,14 @@ class AbstractIntegrationMessageHandlerTest extends BaseUnitTest {
         deserializer = mock(NatsMessageDeserializer.class);
         transactionTemplate = mock(TransactionTemplate.class);
         lenient()
-            .doAnswer(invocation -> {
-                @SuppressWarnings("unchecked")
-                Consumer<TransactionStatus> callback = invocation.getArgument(0);
-                callback.accept(null);
-                return null;
-            })
-            .when(transactionTemplate)
-            .executeWithoutResult(any());
+                .doAnswer(invocation -> {
+                    @SuppressWarnings("unchecked")
+                    Consumer<TransactionStatus> callback = invocation.getArgument(0);
+                    callback.accept(null);
+                    return null;
+                })
+                .when(transactionTemplate)
+                .executeWithoutResult(any());
         capturedPayload = new AtomicReference<>();
     }
 
@@ -109,8 +108,8 @@ class AbstractIntegrationMessageHandlerTest extends BaseUnitTest {
         when(deserializer.deserialize(msg, String.class)).thenThrow(new IOException("bad json"));
 
         assertThatThrownBy(() -> handler.onMessage(msg))
-            .isInstanceOf(PayloadParsingException.class)
-            .hasMessageContaining("Payload parsing failed");
+                .isInstanceOf(PayloadParsingException.class)
+                .hasMessageContaining("Payload parsing failed");
     }
 
     @Test
@@ -126,15 +125,14 @@ class AbstractIntegrationMessageHandlerTest extends BaseUnitTest {
         when(deserializer.deserialize(msg, String.class)).thenReturn("payload");
 
         assertThatThrownBy(() -> handler.onMessage(msg))
-            .isInstanceOf(RuntimeException.class)
-            .hasMessage("boom");
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("boom");
     }
 
     @Test
     void blankEventType_rejected() {
-        assertThatThrownBy(() -> new TestHandler(IntegrationKind.GITHUB, "  ")).isInstanceOf(
-            IllegalArgumentException.class
-        );
+        assertThatThrownBy(() -> new TestHandler(IntegrationKind.GITHUB, "  "))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -145,8 +143,8 @@ class AbstractIntegrationMessageHandlerTest extends BaseUnitTest {
     @Test
     void eventTypeWithTrailingDot_rejected() {
         assertThatThrownBy(() -> new TestHandler(IntegrationKind.GITHUB, "repository."))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("last segment");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("last segment");
     }
 
     private class TestHandler extends AbstractIntegrationMessageHandler<String> {

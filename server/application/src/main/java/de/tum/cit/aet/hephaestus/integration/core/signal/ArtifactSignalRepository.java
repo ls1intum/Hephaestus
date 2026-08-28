@@ -22,8 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, UUID> {
     /** @return 1 when this call created the row, 0 when it was already there */
     @Modifying
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO artifact_signal (
             id, workspace_id, artifact_kind, artifact_id, signal_name, revision,
             occurred_at, discovered_via, state, state_changed_at
@@ -32,16 +31,13 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
             :#{#key.signalName().value()}, :#{#key.revision().value()},
             :occurredAt, :discoveredVia, 'RECORDED', :now
         ) ON CONFLICT (workspace_id, artifact_kind, artifact_id, signal_name, revision) DO NOTHING
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int insertIfAbsent(
-        @Param("key") SignalKey key,
-        @Param("id") UUID id,
-        @Param("occurredAt") Instant occurredAt,
-        @Param("discoveredVia") String discoveredVia,
-        @Param("now") Instant now
-    );
+            @Param("key") SignalKey key,
+            @Param("id") UUID id,
+            @Param("occurredAt") Instant occurredAt,
+            @Param("discoveredVia") String discoveredVia,
+            @Param("now") Instant now);
 
     /**
      * Takes over a row that was merely observed and never decided on, so a reconciliation pass that ran
@@ -51,8 +47,7 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
      * @return 1 when this call now owns the signal, 0 when someone already decided it
      */
     @Modifying
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO artifact_signal (
             id, workspace_id, artifact_kind, artifact_id, signal_name, revision,
             occurred_at, discovered_via, state, state_changed_at, requested_by_user_id
@@ -66,17 +61,14 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
             state_changed_at = EXCLUDED.state_changed_at,
             requested_by_user_id = EXCLUDED.requested_by_user_id
         WHERE artifact_signal.state = 'RECORDED'
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int insertOrClaimUndecided(
-        @Param("key") SignalKey key,
-        @Param("id") UUID id,
-        @Param("occurredAt") Instant occurredAt,
-        @Param("discoveredVia") String discoveredVia,
-        @Param("now") Instant now,
-        @Param("requestedByUserId") @Nullable Long requestedByUserId
-    );
+            @Param("key") SignalKey key,
+            @Param("id") UUID id,
+            @Param("occurredAt") Instant occurredAt,
+            @Param("discoveredVia") String discoveredVia,
+            @Param("now") Instant now,
+            @Param("requestedByUserId") @Nullable Long requestedByUserId);
 
     /**
      * The artifact half of the limit on hand-requested reviews. The workspace's ordinary cooldown cannot
@@ -84,32 +76,26 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
      * signal, and a request occupies a phase of its own, so it never lands in the same lane as the
      * lifecycle review it repeats. Counts asks, not reviews — a refused ask is the one worth damping.
      */
-    @Query(
-        "SELECT COUNT(s) > 0 FROM ArtifactSignal s WHERE s.workspace.id = :workspaceId" +
-            " AND s.artifactKind = :artifactKind AND s.artifactId = :artifactId" +
-            " AND s.discoveredVia = de.tum.cit.aet.hephaestus.integration.core.signal.DiscoveredVia.MANUAL" +
-            " AND s.occurredAt >= :since"
-    )
+    @Query("SELECT COUNT(s) > 0 FROM ArtifactSignal s WHERE s.workspace.id = :workspaceId"
+            + " AND s.artifactKind = :artifactKind AND s.artifactId = :artifactId"
+            + " AND s.discoveredVia = de.tum.cit.aet.hephaestus.integration.core.signal.DiscoveredVia.MANUAL"
+            + " AND s.occurredAt >= :since")
     boolean existsManualRequestSince(
-        @Param("workspaceId") Long workspaceId,
-        @Param("artifactKind") String artifactKind,
-        @Param("artifactId") Long artifactId,
-        @Param("since") Instant since
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("artifactKind") String artifactKind,
+            @Param("artifactId") Long artifactId,
+            @Param("since") Instant since);
 
     /**
      * Takes a collection because one person is several SCM identities; counting per identity would hand a
      * linked account one allowance per provider, which is the same person asking twice as often.
      */
-    @Query(
-        "SELECT COUNT(s) FROM ArtifactSignal s WHERE s.workspace.id = :workspaceId" +
-            " AND s.requestedByUserId IN :requesterIds AND s.occurredAt >= :since"
-    )
+    @Query("SELECT COUNT(s) FROM ArtifactSignal s WHERE s.workspace.id = :workspaceId"
+            + " AND s.requestedByUserId IN :requesterIds AND s.occurredAt >= :since")
     long countRequestsBySince(
-        @Param("workspaceId") Long workspaceId,
-        @Param("requesterIds") Collection<Long> requesterIds,
-        @Param("since") Instant since
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("requesterIds") Collection<Long> requesterIds,
+            @Param("since") Instant since);
 
     /**
      * The state predicate makes this an arbitration rather than a blind overwrite: without it a late
@@ -119,8 +105,7 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
      * @return rows updated (0 or 1); 0 means the signal was not where the caller left it.
      */
     @Modifying
-    @Query(
-        value = """
+    @Query(value = """
         UPDATE artifact_signal
         SET state = 'TRIGGERED', state_reason = NULL, job_id = :jobId, state_changed_at = :now
         WHERE workspace_id = :#{#key.workspaceId()}
@@ -129,9 +114,7 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
           AND signal_name = :#{#key.signalName().value()}
           AND revision = :#{#key.revision().value()}
           AND state IN ('RECORDED', 'PENDING')
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int markTriggered(@Param("key") SignalKey key, @Param("jobId") UUID jobId, @Param("now") Instant now);
 
     /**
@@ -145,8 +128,7 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
      * @return rows updated (0 or 1); 0 means the signal was not where the caller left it.
      */
     @Modifying
-    @Query(
-        value = """
+    @Query(value = """
         UPDATE artifact_signal
         SET state = :state,
             state_reason = :stateReason,
@@ -157,15 +139,12 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
           AND signal_name = :#{#key.signalName().value()}
           AND revision = :#{#key.revision().value()}
           AND state IN ('RECORDED', 'PENDING')
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int markRefused(
-        @Param("key") SignalKey key,
-        @Param("state") String state,
-        @Param("stateReason") String stateReason,
-        @Param("now") Instant now
-    );
+            @Param("key") SignalKey key,
+            @Param("state") String state,
+            @Param("stateReason") String stateReason,
+            @Param("now") Instant now);
 
     /**
      * Claims the batch before any of it is re-offered, which is what makes {@link #findRetryablePending}'s
@@ -181,13 +160,10 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
     @WorkspaceAgnostic("The reaper re-offers refused signals for every workspace on one instance")
     @Transactional
     @Modifying
-    @Query(
-        value = """
+    @Query(value = """
         UPDATE artifact_signal SET last_attempted_at = :now
         WHERE id IN (:ids) AND state = 'PENDING'
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int claimPendingForRetry(@Param("ids") List<UUID> ids, @Param("now") Instant now);
 
     /**
@@ -196,26 +172,21 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
      * returning the same rows.
      */
     @WorkspaceAgnostic("The reaper re-offers refused signals for every workspace on one instance")
-    @Query(
-        "SELECT s FROM ArtifactSignal s JOIN FETCH s.workspace" +
-            " WHERE s.state = de.tum.cit.aet.hephaestus.integration.core.signal.SignalState.PENDING" +
-            " AND COALESCE(s.lastAttemptedAt, s.stateChangedAt) < :retryBefore" +
-            " ORDER BY COALESCE(s.lastAttemptedAt, s.stateChangedAt) ASC, s.id ASC"
-    )
+    @Query("SELECT s FROM ArtifactSignal s JOIN FETCH s.workspace"
+            + " WHERE s.state = de.tum.cit.aet.hephaestus.integration.core.signal.SignalState.PENDING"
+            + " AND COALESCE(s.lastAttemptedAt, s.stateChangedAt) < :retryBefore"
+            + " ORDER BY COALESCE(s.lastAttemptedAt, s.stateChangedAt) ASC, s.id ASC")
     List<ArtifactSignal> findRetryablePending(@Param("retryBefore") Instant retryBefore, Pageable pageable);
 
     /** @return how many signals lapsed */
     @WorkspaceAgnostic("The reaper re-offers refused signals for every workspace on one instance")
     @Transactional
     @Modifying
-    @Query(
-        value = """
+    @Query(value = """
         UPDATE artifact_signal
         SET state = 'LAPSED', state_reason = 'PENDING_DEADLINE_EXCEEDED', state_changed_at = :now
         WHERE state = 'PENDING' AND state_changed_at < :deadline
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int lapseStalePending(@Param("deadline") Instant deadline, @Param("now") Instant now);
 
     /**
@@ -223,37 +194,33 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
      * artifact — a repository belongs to a workspace through a monitor mapping rather than a column — so
      * an id the caller does not own comes back empty here, and a 404 rather than a title.
      */
-    @Query(
-        "SELECT s FROM ArtifactSignal s WHERE s.workspace.id = :workspaceId" +
-            " AND s.artifactKind = :artifactKind AND s.artifactId = :artifactId" +
-            " ORDER BY s.occurredAt ASC, s.signalName ASC"
-    )
+    @Query("SELECT s FROM ArtifactSignal s WHERE s.workspace.id = :workspaceId"
+            + " AND s.artifactKind = :artifactKind AND s.artifactId = :artifactId"
+            + " ORDER BY s.occurredAt ASC, s.signalName ASC")
     List<ArtifactSignal> findForArtifact(
-        @Param("workspaceId") Long workspaceId,
-        @Param("artifactKind") String artifactKind,
-        @Param("artifactId") Long artifactId
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("artifactKind") String artifactKind,
+            @Param("artifactId") Long artifactId);
 
     /**
      * One row per artifact this workspace was in a position to say something about — including,
      * deliberately, the ones it said nothing about, which no job-derived listing can show.
      */
     @Query(
-        value = "SELECT s.artifactKind AS artifactKind, s.artifactId AS artifactId," +
-            " MAX(s.occurredAt) AS lastSignalAt, COUNT(s) AS signalCount," +
-            " SUM(CASE WHEN s.state = de.tum.cit.aet.hephaestus.integration.core.signal.SignalState.TRIGGERED" +
-            " THEN 1 ELSE 0 END) AS reviewedSignalCount" +
-            " FROM ArtifactSignal s WHERE s.workspace.id = :workspaceId" +
-            " AND (:artifactKind IS NULL OR s.artifactKind = :artifactKind)" +
-            " GROUP BY s.artifactKind, s.artifactId ORDER BY MAX(s.occurredAt) DESC, s.artifactId DESC",
-        countQuery = "SELECT COUNT(DISTINCT CONCAT(s.artifactKind, ':', s.artifactId)) FROM ArtifactSignal s" +
-            " WHERE s.workspace.id = :workspaceId AND (:artifactKind IS NULL OR s.artifactKind = :artifactKind)"
-    )
+            value = "SELECT s.artifactKind AS artifactKind, s.artifactId AS artifactId,"
+                    + " MAX(s.occurredAt) AS lastSignalAt, COUNT(s) AS signalCount,"
+                    + " SUM(CASE WHEN s.state = de.tum.cit.aet.hephaestus.integration.core.signal.SignalState.TRIGGERED"
+                    + " THEN 1 ELSE 0 END) AS reviewedSignalCount"
+                    + " FROM ArtifactSignal s WHERE s.workspace.id = :workspaceId"
+                    + " AND (:artifactKind IS NULL OR s.artifactKind = :artifactKind)"
+                    + " GROUP BY s.artifactKind, s.artifactId ORDER BY MAX(s.occurredAt) DESC, s.artifactId DESC",
+            countQuery =
+                    "SELECT COUNT(DISTINCT CONCAT(s.artifactKind, ':', s.artifactId)) FROM ArtifactSignal s"
+                            + " WHERE s.workspace.id = :workspaceId AND (:artifactKind IS NULL OR s.artifactKind = :artifactKind)")
     Page<SignalledArtifactRow> findSignalledArtifacts(
-        @Param("workspaceId") Long workspaceId,
-        @Param("artifactKind") @Nullable String artifactKind,
-        Pageable pageable
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("artifactKind") @Nullable String artifactKind,
+            Pageable pageable);
 
     /**
      * Evidence against a dormancy claim, which is otherwise derived from which integrations are
@@ -265,20 +232,20 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
      * ({@link SignalKey#artifactKind()}), so a signal a practice of this kind can watch is never recorded
      * under another kind.
      */
-    @Query(
-        "SELECT DISTINCT s.signalName FROM ArtifactSignal s" +
-            " WHERE s.workspace.id = :workspaceId AND s.artifactKind = :artifactKind"
-    )
+    @Query("SELECT DISTINCT s.signalName FROM ArtifactSignal s"
+            + " WHERE s.workspace.id = :workspaceId AND s.artifactKind = :artifactKind")
     List<String> findRecordedSignalNames(
-        @Param("workspaceId") Long workspaceId,
-        @Param("artifactKind") String artifactKind
-    );
+            @Param("workspaceId") Long workspaceId, @Param("artifactKind") String artifactKind);
 
     interface SignalledArtifactRow {
         String getArtifactKind();
+
         Long getArtifactId();
+
         Instant getLastSignalAt();
+
         long getSignalCount();
+
         long getReviewedSignalCount();
     }
 }

@@ -33,17 +33,14 @@ public class AdminConfigAuditController {
 
     @GetMapping
     @Operation(
-        summary = "List admin configuration changes across workspaces (paged, newest first)",
-        operationId = "adminListConfigAuditEvents"
-    )
+            summary = "List admin configuration changes across workspaces (paged, newest first)",
+            operationId = "adminListConfigAuditEvents")
     public ResponseEntity<Page<ConfigAuditEntryViewDTO>> list(
-        @RequestParam(required = false) @Nullable Long workspaceId,
-        @RequestParam(defaultValue = "0") int page,
-        @RequestParam(defaultValue = "50") int size,
-        @ParameterObject ConfigAuditFilterParams filter
-    ) {
-        return ResponseEntity.ok(
-            configAuditQuery.listForAdmin(workspaceId, filter.toFilter(), ConfigAuditFilterParams.pageable(page, size))
-        );
+            @RequestParam(required = false) @Nullable Long workspaceId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size,
+            @ParameterObject ConfigAuditFilterParams filter) {
+        return ResponseEntity.ok(configAuditQuery.listForAdmin(
+                workspaceId, filter.toFilter(), ConfigAuditFilterParams.pageable(page, size)));
     }
 }

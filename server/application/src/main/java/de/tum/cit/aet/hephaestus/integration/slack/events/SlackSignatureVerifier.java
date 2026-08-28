@@ -27,8 +27,7 @@ public class SlackSignatureVerifier {
         this.configured = signingSecret != null && !signingSecret.isBlank();
         if (!configured) {
             throw new IllegalStateException(
-                "Slack integration is enabled but hephaestus.integration.slack.signing-secret is blank"
-            );
+                    "Slack integration is enabled but hephaestus.integration.slack.signing-secret is blank");
         }
         this.signingSecret = configured ? signingSecret.getBytes(StandardCharsets.UTF_8) : new byte[0];
     }
@@ -38,11 +37,7 @@ public class SlackSignatureVerifier {
     }
 
     public Verification check(
-        @Nullable String timestamp,
-        @Nullable String signature,
-        byte@Nullable [] rawBody,
-        long nowEpochSeconds
-    ) {
+            @Nullable String timestamp, @Nullable String signature, byte @Nullable [] rawBody, long nowEpochSeconds) {
         if (!configured || timestamp == null || signature == null || rawBody == null) {
             return Verification.missingSignature();
         }
@@ -63,9 +58,7 @@ public class SlackSignatureVerifier {
             byte[] digest = mac.doFinal(rawBody);
             String expected = "v0=" + HexFormat.of().formatHex(digest);
             boolean valid = MessageDigest.isEqual(
-                expected.getBytes(StandardCharsets.UTF_8),
-                signature.getBytes(StandardCharsets.UTF_8)
-            );
+                    expected.getBytes(StandardCharsets.UTF_8), signature.getBytes(StandardCharsets.UTF_8));
             return valid ? Verification.valid() : Verification.invalid();
         } catch (Exception e) {
             return Verification.invalid();
@@ -73,11 +66,7 @@ public class SlackSignatureVerifier {
     }
 
     public boolean verify(
-        @Nullable String timestamp,
-        @Nullable String signature,
-        byte@Nullable [] rawBody,
-        long nowEpochSeconds
-    ) {
+            @Nullable String timestamp, @Nullable String signature, byte @Nullable [] rawBody, long nowEpochSeconds) {
         return check(timestamp, signature, rawBody, nowEpochSeconds).status() == Verification.Status.VALID;
     }
 

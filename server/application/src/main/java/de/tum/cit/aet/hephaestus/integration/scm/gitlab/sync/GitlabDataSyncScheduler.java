@@ -107,18 +107,17 @@ public class GitlabDataSyncScheduler {
     private final GitLabDeletionSweepService deletionSweepService;
 
     public GitlabDataSyncScheduler(
-        SyncTargetProvider syncTargetProvider,
-        SyncContextProvider syncContextProvider,
-        OrganizationRepository organizationRepository,
-        RepositoryRepository repositoryRepository,
-        ObjectProvider<GitLabSyncServiceHolder> syncServiceHolderProvider,
-        ObjectProvider<GitLabRateLimitTracker> rateLimitTrackerProvider,
-        SyncSchedulerProperties syncSchedulerProperties,
-        @Qualifier("monitoringExecutor") Executor monitoringExecutor,
-        ConnectionRepository connectionRepository,
-        SyncJobService syncJobService,
-        GitLabDeletionSweepService deletionSweepService
-    ) {
+            SyncTargetProvider syncTargetProvider,
+            SyncContextProvider syncContextProvider,
+            OrganizationRepository organizationRepository,
+            RepositoryRepository repositoryRepository,
+            ObjectProvider<GitLabSyncServiceHolder> syncServiceHolderProvider,
+            ObjectProvider<GitLabRateLimitTracker> rateLimitTrackerProvider,
+            SyncSchedulerProperties syncSchedulerProperties,
+            @Qualifier("monitoringExecutor") Executor monitoringExecutor,
+            ConnectionRepository connectionRepository,
+            SyncJobService syncJobService,
+            GitLabDeletionSweepService deletionSweepService) {
         this.syncTargetProvider = syncTargetProvider;
         this.syncContextProvider = syncContextProvider;
         this.organizationRepository = organizationRepository;
@@ -135,9 +134,8 @@ public class GitlabDataSyncScheduler {
     @PostConstruct
     void logSyncConfiguration() {
         log.info(
-            "GitLab incremental sync config: cron={} (syncs groups, memberships, labels, milestones, issues, MRs, teams)",
-            syncSchedulerProperties.cron()
-        );
+                "GitLab incremental sync config: cron={} (syncs groups, memberships, labels, milestones, issues, MRs, teams)",
+                syncSchedulerProperties.cron());
     }
 
     /**
@@ -159,37 +157,31 @@ public class GitlabDataSyncScheduler {
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger failureCount = new AtomicInteger(0);
 
-        CompletableFuture<?>[] futures = sessions
-            .stream()
-            .map(session ->
-                CompletableFuture.runAsync(() -> syncScopeWithJobRecording(session), monitoringExecutor).whenComplete(
-                    (result, error) -> {
-                        if (error != null) {
-                            failureCount.incrementAndGet();
-                        } else {
-                            successCount.incrementAndGet();
-                        }
-                    }
-                )
-            )
-            .toArray(CompletableFuture[]::new);
+        CompletableFuture<?>[] futures = sessions.stream()
+                .map(session -> CompletableFuture.runAsync(() -> syncScopeWithJobRecording(session), monitoringExecutor)
+                        .whenComplete((result, error) -> {
+                            if (error != null) {
+                                failureCount.incrementAndGet();
+                            } else {
+                                successCount.incrementAndGet();
+                            }
+                        }))
+                .toArray(CompletableFuture[]::new);
 
         try {
             CompletableFuture.allOf(futures).get();
             log.info(
-                "Completed scheduled GitLab sync: workspaceCount={}, successful={}, failed={}",
-                sessions.size(),
-                successCount.get(),
-                failureCount.get()
-            );
+                    "Completed scheduled GitLab sync: workspaceCount={}, successful={}, failed={}",
+                    sessions.size(),
+                    successCount.get(),
+                    failureCount.get());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.warn(
-                "GitLab sync interrupted: workspaceCount={}, successful={}, failed={}",
-                sessions.size(),
-                successCount.get(),
-                failureCount.get()
-            );
+                    "GitLab sync interrupted: workspaceCount={}, successful={}, failed={}",
+                    sessions.size(),
+                    successCount.get(),
+                    failureCount.get());
         } catch (ExecutionException e) {
             log.error("Unexpected error during scheduled GitLab sync", e);
         }
@@ -203,12 +195,11 @@ public class GitlabDataSyncScheduler {
      * {@code RECONCILIATION} run.
      */
     public void syncWorkspaceNow(long workspaceId, SyncExecutionHandle handle, SyncJobType type) {
-        SyncSession session = syncTargetProvider
-            .getSyncSessions(IntegrationKind.GITLAB)
-            .stream()
-            .filter(candidate -> candidate.scopeId().equals(workspaceId))
-            .findFirst()
-            .orElseThrow(() -> new IllegalStateException("No active GitLab sync scope for workspace " + workspaceId));
+        SyncSession session = syncTargetProvider.getSyncSessions(IntegrationKind.GITLAB).stream()
+                .filter(candidate -> candidate.scopeId().equals(workspaceId))
+                .findFirst()
+                .orElseThrow(
+                        () -> new IllegalStateException("No active GitLab sync scope for workspace " + workspaceId));
         syncScope(session, handle, type);
     }
 
@@ -227,11 +218,8 @@ public class GitlabDataSyncScheduler {
      */
     private void syncScopeWithJobRecording(SyncSession session) {
         Optional<Connection> connection =
-            connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                session.scopeId(),
-                IntegrationKind.GITLAB,
-                IntegrationState.ACTIVE
-            );
+                connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                        session.scopeId(), IntegrationKind.GITLAB, IntegrationState.ACTIVE);
         if (connection.isEmpty()) {
             syncScope(session);
             return;
@@ -239,22 +227,19 @@ public class GitlabDataSyncScheduler {
 
         try {
             syncJobService.run(
-                new SyncJobRequest(
-                    session.scopeId(),
-                    connection.get().getId(),
-                    IntegrationKind.GITLAB,
-                    SyncJobType.RECONCILIATION,
-                    SyncJobTrigger.SCHEDULED,
-                    null
-                ),
-                handle -> syncScope(session, handle, SyncJobType.RECONCILIATION)
-            );
+                    new SyncJobRequest(
+                            session.scopeId(),
+                            connection.get().getId(),
+                            IntegrationKind.GITLAB,
+                            SyncJobType.RECONCILIATION,
+                            SyncJobTrigger.SCHEDULED,
+                            null),
+                    handle -> syncScope(session, handle, SyncJobType.RECONCILIATION));
         } catch (SyncJobConflictException e) {
             log.info(
-                "Skipped scheduled GitLab sync, already an active sync job: scopeId={}, connectionId={}",
-                session.scopeId(),
-                connection.get().getId()
-            );
+                    "Skipped scheduled GitLab sync, already an active sync job: scopeId={}, connectionId={}",
+                    session.scopeId(),
+                    connection.get().getId());
         }
     }
 
@@ -359,26 +344,19 @@ public class GitlabDataSyncScheduler {
     }
 
     private void syncGroupProjects(
-        GitLabSyncServiceHolder services,
-        SyncSession session,
-        @Nullable SyncExecutionHandle handle
-    ) {
+            GitLabSyncServiceHolder services, SyncSession session, @Nullable SyncExecutionHandle handle) {
         GitLabGroupSyncService groupSync = services.getGroupSyncService();
         if (groupSync == null) return;
 
         try {
-            GitLabSyncResult result = groupSync.syncGroupProjects(
-                session.scopeId(),
-                session.accountLogin(),
-                session.serverUrl()
-            );
+            GitLabSyncResult result =
+                    groupSync.syncGroupProjects(session.scopeId(), session.accountLogin(), session.serverUrl());
             log.info(
-                "GitLab group project sync: scopeId={}, status={}, synced={}, pages={}",
-                session.scopeId(),
-                result.status(),
-                result.synced().size(),
-                result.pagesCompleted()
-            );
+                    "GitLab group project sync: scopeId={}, status={}, synced={}, pages={}",
+                    session.scopeId(),
+                    result.status(),
+                    result.synced().size(),
+                    result.pagesCompleted());
 
             // Stale repo cleanup: only when sync completed normally
             if (result.status() == GitLabSyncResult.Status.COMPLETED) {
@@ -401,26 +379,22 @@ public class GitlabDataSyncScheduler {
         Long providerId = getGitLabProviderId(session.accountLogin());
         if (providerId == null) return;
 
-        Set<Long> syncedNativeIds = result.synced().stream().map(Repository::getNativeId).collect(Collectors.toSet());
+        Set<Long> syncedNativeIds =
+                result.synced().stream().map(Repository::getNativeId).collect(Collectors.toSet());
 
         List<Repository> existingRepos = repositoryRepository.findAllByOrganization_LoginIgnoreCaseAndProviderId(
-            session.accountLogin(),
-            providerId
-        );
+                session.accountLogin(), providerId);
 
         int removed = 0;
         for (Repository repo : existingRepos) {
-            if (
-                repo.getProvider() != null &&
-                Objects.requireNonNull(repo.getProvider().getId()).equals(providerId) &&
-                !syncedNativeIds.contains(repo.getNativeId())
-            ) {
+            if (repo.getProvider() != null
+                    && Objects.requireNonNull(repo.getProvider().getId()).equals(providerId)
+                    && !syncedNativeIds.contains(repo.getNativeId())) {
                 log.info(
-                    "Removing stale repository: repoId={}, name={}, nativeId={}",
-                    repo.getId(),
-                    sanitizeForLog(repo.getNameWithOwner()),
-                    repo.getNativeId()
-                );
+                        "Removing stale repository: repoId={}, name={}, nativeId={}",
+                        repo.getId(),
+                        sanitizeForLog(repo.getNameWithOwner()),
+                        repo.getNativeId());
                 repositoryRepository.delete(repo);
                 removed++;
             }
@@ -451,20 +425,19 @@ public class GitlabDataSyncScheduler {
             try {
                 Repository repo = null;
                 if (target.nativeId() != null) {
-                    repo = repositoryRepository.findByNativeIdAndProviderId(target.nativeId(), providerId).orElse(null);
+                    repo = repositoryRepository
+                            .findByNativeIdAndProviderId(target.nativeId(), providerId)
+                            .orElse(null);
                 }
                 if (repo == null) {
                     // Legacy row with no captured id yet — resolve by (still-current) name to capture it.
                     repo = repositoryRepository
-                        .findByNameWithOwnerAndProviderId(target.repositoryNameWithOwner(), providerId)
-                        .orElse(null);
+                            .findByNameWithOwnerAndProviderId(target.repositoryNameWithOwner(), providerId)
+                            .orElse(null);
                 }
                 if (repo != null && repo.getNativeId() != null) {
                     syncTargetProvider.reconcileSyncTargetIdentity(
-                        target.id(),
-                        repo.getNativeId(),
-                        repo.getNameWithOwner()
-                    );
+                            target.id(), repo.getNativeId(), repo.getNameWithOwner());
                 }
             } catch (Exception e) {
                 log.debug("Skipped monitor identity reconcile: syncTargetId={}, error={}", target.id(), e.getMessage());
@@ -473,20 +446,17 @@ public class GitlabDataSyncScheduler {
     }
 
     private void syncGroupMembers(
-        GitLabSyncServiceHolder services,
-        SyncSession session,
-        @Nullable SyncExecutionHandle handle
-    ) {
+            GitLabSyncServiceHolder services, SyncSession session, @Nullable SyncExecutionHandle handle) {
         GitLabGroupMemberSyncService memberSync = services.getGroupMemberSyncService();
         if (memberSync == null) return;
 
         try {
             organizationRepository
-                .findByLoginIgnoreCaseAndProvider_Type(session.accountLogin(), IdentityProviderType.GITLAB)
-                .ifPresent(org -> {
-                    int count = memberSync.syncGroupMemberships(session.scopeId(), session.accountLogin(), org);
-                    log.info("GitLab membership sync: scopeId={}, membersSynced={}", session.scopeId(), count);
-                });
+                    .findByLoginIgnoreCaseAndProvider_Type(session.accountLogin(), IdentityProviderType.GITLAB)
+                    .ifPresent(org -> {
+                        int count = memberSync.syncGroupMemberships(session.scopeId(), session.accountLogin(), org);
+                        log.info("GitLab membership sync: scopeId={}, membersSynced={}", session.scopeId(), count);
+                    });
         } catch (Exception e) {
             log.error("Failed GitLab membership sync: scopeId={}", session.scopeId(), e);
             reportWarning(handle);
@@ -494,10 +464,7 @@ public class GitlabDataSyncScheduler {
     }
 
     private void syncIssueTypes(
-        GitLabSyncServiceHolder services,
-        SyncSession session,
-        @Nullable SyncExecutionHandle handle
-    ) {
+            GitLabSyncServiceHolder services, SyncSession session, @Nullable SyncExecutionHandle handle) {
         GitLabIssueTypeSyncService issueTypeSync = services.getIssueTypeSyncService();
         if (issueTypeSync == null) return;
 
@@ -517,10 +484,7 @@ public class GitlabDataSyncScheduler {
      * milestones, leaving the {@code milestone} table largely empty on fresh syncs.
      */
     private void syncGroupMilestones(
-        GitLabSyncServiceHolder services,
-        SyncSession session,
-        @Nullable SyncExecutionHandle handle
-    ) {
+            GitLabSyncServiceHolder services, SyncSession session, @Nullable SyncExecutionHandle handle) {
         GitLabMilestoneSyncService milestoneSync = services.getMilestoneSyncService();
         if (milestoneSync == null) return;
 
@@ -537,27 +501,22 @@ public class GitlabDataSyncScheduler {
         try {
             SyncResult result = milestoneSync.syncMilestonesForGroup(session.scopeId(), session.accountLogin(), repos);
             log.info(
-                "GitLab group milestone sync: scopeId={}, group={}, written={}",
-                session.scopeId(),
-                sanitizeForLog(session.accountLogin()),
-                result.count()
-            );
+                    "GitLab group milestone sync: scopeId={}, group={}, written={}",
+                    session.scopeId(),
+                    sanitizeForLog(session.accountLogin()),
+                    result.count());
         } catch (Exception e) {
             log.error(
-                "Failed GitLab group milestone sync: scopeId={}, group={}",
-                session.scopeId(),
-                sanitizeForLog(session.accountLogin()),
-                e
-            );
+                    "Failed GitLab group milestone sync: scopeId={}, group={}",
+                    session.scopeId(),
+                    sanitizeForLog(session.accountLogin()),
+                    e);
             reportWarning(handle);
         }
     }
 
     private void syncRepositories(
-        GitLabSyncServiceHolder services,
-        SyncSession session,
-        @Nullable SyncExecutionHandle handle
-    ) {
+            GitLabSyncServiceHolder services, SyncSession session, @Nullable SyncExecutionHandle handle) {
         GitLabLabelSyncService labelSync = services.getLabelSyncService();
         GitLabMilestoneSyncService milestoneSync = services.getMilestoneSyncService();
         GitLabIssueSyncService issueSync = services.getIssueSyncService();
@@ -584,18 +543,16 @@ public class GitlabDataSyncScheduler {
 
         // Map nameWithOwner → sync target id from the session so each phase can write
         // its per-repo watermark via the SPI without reaching into workspace internals.
-        Map<String, Long> syncTargetIdsByNameWithOwner = session
-            .syncTargets()
-            .stream()
-            .collect(Collectors.toMap(SyncTarget::repositoryNameWithOwner, SyncTarget::id, (a, b) -> a));
+        Map<String, Long> syncTargetIdsByNameWithOwner = session.syncTargets().stream()
+                .collect(Collectors.toMap(SyncTarget::repositoryNameWithOwner, SyncTarget::id, (a, b) -> a));
 
         GitLabRateLimitTracker rateLimitTracker = rateLimitTrackerProvider.getIfAvailable();
         int totalLabels = 0,
-            totalMilestones = 0,
-            totalIssues = 0,
-            totalMRs = 0,
-            totalCollaborators = 0,
-            totalCommits = 0;
+                totalMilestones = 0,
+                totalIssues = 0,
+                totalMRs = 0,
+                totalCollaborators = 0,
+                totalCommits = 0;
         int reposProcessed = 0;
         int totalRepos = repos.size();
 
@@ -604,21 +561,19 @@ public class GitlabDataSyncScheduler {
             // job stops before the next repo rather than mid-repository.
             if (handle != null && handle.isCancellationRequested()) {
                 log.info(
-                    "GitLab scheduled sync cancelled between repositories: scopeId={}, reposProcessed={}, reposRemaining={}",
-                    session.scopeId(),
-                    reposProcessed,
-                    totalRepos - reposProcessed
-                );
+                        "GitLab scheduled sync cancelled between repositories: scopeId={}, reposProcessed={}, reposRemaining={}",
+                        session.scopeId(),
+                        reposProcessed,
+                        totalRepos - reposProcessed);
                 break;
             }
 
             // Wait for rate limit if critical
             if (rateLimitTracker != null && rateLimitTracker.isCritical(session.scopeId())) {
                 log.info(
-                    "Rate limit critical, waiting: scopeId={}, remaining={}",
-                    session.scopeId(),
-                    rateLimitTracker.getRemaining(session.scopeId())
-                );
+                        "Rate limit critical, waiting: scopeId={}, remaining={}",
+                        session.scopeId(),
+                        rateLimitTracker.getRemaining(session.scopeId()));
                 try {
                     rateLimitTracker.waitIfNeeded(session.scopeId());
                 } catch (InterruptedException e) {
@@ -668,11 +623,10 @@ public class GitlabDataSyncScheduler {
                     }
                 } catch (Exception e) {
                     log.warn(
-                        "Failed milestone sync: scopeId={}, repo={}",
-                        session.scopeId(),
-                        repo.getNameWithOwner(),
-                        e
-                    );
+                            "Failed milestone sync: scopeId={}, repo={}",
+                            session.scopeId(),
+                            repo.getNameWithOwner(),
+                            e);
                     reportWarning(handle);
                 }
             }
@@ -723,11 +677,10 @@ public class GitlabDataSyncScheduler {
                     }
                 } catch (Exception e) {
                     log.warn(
-                        "Failed collaborator sync: scopeId={}, repo={}",
-                        session.scopeId(),
-                        repo.getNameWithOwner(),
-                        e
-                    );
+                            "Failed collaborator sync: scopeId={}, repo={}",
+                            session.scopeId(),
+                            repo.getNameWithOwner(),
+                            e);
                     reportWarning(handle);
                 }
             }
@@ -740,11 +693,10 @@ public class GitlabDataSyncScheduler {
                     totalCommits += r.count();
                 } catch (Exception e) {
                     log.warn(
-                        "Failed commit backfill: scopeId={}, repo={}",
-                        session.scopeId(),
-                        repo.getNameWithOwner(),
-                        e
-                    );
+                            "Failed commit backfill: scopeId={}, repo={}",
+                            session.scopeId(),
+                            repo.getNameWithOwner(),
+                            e);
                     reportWarning(handle);
                 }
             } else if (commitSync != null) {
@@ -769,18 +721,16 @@ public class GitlabDataSyncScheduler {
             reposProcessed++;
             if (handle != null) {
                 handle.progress(
-                    reposProcessed,
-                    totalRepos,
-                    // Just the repository — "N of M" is already the progress bar's own reading
-                    // (unitsCompleted/unitsTotal travel on the same record).
-                    SyncProgress.ofResource(
-                        SyncPhase.REPOSITORIES,
-                        "Syncing " + repo.getNameWithOwner(),
-                        repo.getNameWithOwner(),
                         reposProcessed,
-                        totalRepos
-                    )
-                );
+                        totalRepos,
+                        // Just the repository — "N of M" is already the progress bar's own reading
+                        // (unitsCompleted/unitsTotal travel on the same record).
+                        SyncProgress.ofResource(
+                                SyncPhase.REPOSITORIES,
+                                "Syncing " + repo.getNameWithOwner(),
+                                repo.getNameWithOwner(),
+                                reposProcessed,
+                                totalRepos));
             }
         }
 
@@ -798,34 +748,29 @@ public class GitlabDataSyncScheduler {
                     commitMrLinker.linkCommits(session.scopeId(), repo, repoUpdatedAfter);
                 } catch (Exception e) {
                     log.warn(
-                        "Failed commit→MR linking (second pass): scopeId={}, repo={}",
-                        session.scopeId(),
-                        repo.getNameWithOwner(),
-                        e
-                    );
+                            "Failed commit→MR linking (second pass): scopeId={}, repo={}",
+                            session.scopeId(),
+                            repo.getNameWithOwner(),
+                            e);
                     reportWarning(handle);
                 }
             }
         }
 
         log.info(
-            "GitLab repo sync complete: scopeId={}, repos={}, labels={}, milestones={}, issues={}, mrs={}, collaborators={}, commits={}",
-            session.scopeId(),
-            repos.size(),
-            totalLabels,
-            totalMilestones,
-            totalIssues,
-            totalMRs,
-            totalCollaborators,
-            totalCommits
-        );
+                "GitLab repo sync complete: scopeId={}, repos={}, labels={}, milestones={}, issues={}, mrs={}, collaborators={}, commits={}",
+                session.scopeId(),
+                repos.size(),
+                totalLabels,
+                totalMilestones,
+                totalIssues,
+                totalMRs,
+                totalCollaborators,
+                totalCommits);
     }
 
     private void syncPostRepo(
-        GitLabSyncServiceHolder services,
-        SyncSession session,
-        @Nullable SyncExecutionHandle handle
-    ) {
+            GitLabSyncServiceHolder services, SyncSession session, @Nullable SyncExecutionHandle handle) {
         GitLabSubIssueSyncService subIssueSync = services.getSubIssueSyncService();
         GitLabIssueDependencySyncService depSync = services.getIssueDependencySyncService();
 
@@ -833,8 +778,7 @@ public class GitlabDataSyncScheduler {
 
         List<Repository> repos = repositoryRepository.findAllByWorkspaceMonitors(session.scopeId());
 
-        int totalSubIssues = 0,
-            totalDeps = 0;
+        int totalSubIssues = 0, totalDeps = 0;
 
         for (Repository repo : repos) {
             if (subIssueSync != null) {
@@ -843,11 +787,10 @@ public class GitlabDataSyncScheduler {
                     totalSubIssues += r.count();
                 } catch (Exception e) {
                     log.warn(
-                        "Failed sub-issue sync: scopeId={}, repo={}",
-                        session.scopeId(),
-                        repo.getNameWithOwner(),
-                        e
-                    );
+                            "Failed sub-issue sync: scopeId={}, repo={}",
+                            session.scopeId(),
+                            repo.getNameWithOwner(),
+                            e);
                     reportWarning(handle);
                 }
             }
@@ -857,11 +800,10 @@ public class GitlabDataSyncScheduler {
                     totalDeps += r.count();
                 } catch (Exception e) {
                     log.warn(
-                        "Failed dependency sync: scopeId={}, repo={}",
-                        session.scopeId(),
-                        repo.getNameWithOwner(),
-                        e
-                    );
+                            "Failed dependency sync: scopeId={}, repo={}",
+                            session.scopeId(),
+                            repo.getNameWithOwner(),
+                            e);
                     reportWarning(handle);
                 }
             }
@@ -869,19 +811,15 @@ public class GitlabDataSyncScheduler {
 
         if (totalSubIssues > 0 || totalDeps > 0) {
             log.info(
-                "GitLab post-repo sync: scopeId={}, subIssues={}, dependencies={}",
-                session.scopeId(),
-                totalSubIssues,
-                totalDeps
-            );
+                    "GitLab post-repo sync: scopeId={}, subIssues={}, dependencies={}",
+                    session.scopeId(),
+                    totalSubIssues,
+                    totalDeps);
         }
     }
 
     private void syncTeams(
-        GitLabSyncServiceHolder services,
-        SyncSession session,
-        @Nullable SyncExecutionHandle handle
-    ) {
+            GitLabSyncServiceHolder services, SyncSession session, @Nullable SyncExecutionHandle handle) {
         GitLabTeamSyncService teamSync = services.getTeamSyncService();
         if (teamSync == null) return;
 
@@ -906,8 +844,8 @@ public class GitlabDataSyncScheduler {
      */
     private @Nullable Long getGitLabProviderId(String accountLogin) {
         return organizationRepository
-            .findByLoginIgnoreCaseAndProvider_Type(accountLogin, IdentityProviderType.GITLAB)
-            .map(org -> org.getProvider() != null ? org.getProvider().getId() : null)
-            .orElse(null);
+                .findByLoginIgnoreCaseAndProvider_Type(accountLogin, IdentityProviderType.GITLAB)
+                .map(org -> org.getProvider() != null ? org.getProvider().getId() : null)
+                .orElse(null);
     }
 }

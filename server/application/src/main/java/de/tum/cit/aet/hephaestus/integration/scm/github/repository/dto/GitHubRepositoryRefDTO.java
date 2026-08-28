@@ -14,14 +14,13 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubRepositoryRefDTO(
-    @JsonProperty("id") @Nullable Long id,
-    @JsonProperty("node_id") String nodeId,
-    @JsonProperty("name") String name,
-    @JsonProperty("full_name") String fullName,
-    @JsonProperty("private") boolean isPrivate,
-    @JsonProperty("html_url") @Nullable String htmlUrl,
-    @JsonProperty("default_branch") @Nullable String defaultBranch
-) {
+        @JsonProperty("id") @Nullable Long id,
+        @JsonProperty("node_id") String nodeId,
+        @JsonProperty("name") String name,
+        @JsonProperty("full_name") String fullName,
+        @JsonProperty("private") boolean isPrivate,
+        @JsonProperty("html_url") @Nullable String htmlUrl,
+        @JsonProperty("default_branch") @Nullable String defaultBranch) {
     /**
      * Creates a GitHubRepositoryRefDTO from a GraphQL GHRepository model.
      * <p>
@@ -38,13 +37,13 @@ public record GitHubRepositoryRefDTO(
         }
 
         return new GitHubRepositoryRefDTO(
-            repository.getDatabaseId() != null ? repository.getDatabaseId().longValue() : null,
-            repository.getId(),
-            repository.getName(),
-            repository.getNameWithOwner(),
-            repository.getIsPrivate(),
-            uriToString(repository.getUrl()),
-            null // defaultBranch not available in GraphQL GHRepository
-        );
+                repository.getDatabaseId() != null ? repository.getDatabaseId().longValue() : null,
+                repository.getId(),
+                repository.getName(),
+                repository.getNameWithOwner(),
+                repository.getIsPrivate(),
+                uriToString(repository.getUrl()),
+                null // defaultBranch not available in GraphQL GHRepository
+                );
     }
 }

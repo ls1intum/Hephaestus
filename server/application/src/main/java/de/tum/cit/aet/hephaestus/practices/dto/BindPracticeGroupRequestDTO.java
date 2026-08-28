@@ -5,11 +5,9 @@ import org.jspecify.annotations.Nullable;
 
 @Schema(description = "Request to move a practice to a group or Unassigned")
 public record BindPracticeGroupRequestDTO(
-    @Schema(
-        description = "Destination group slug; omit or set to null for Unassigned",
-        nullable = true,
-        example = "review-ready-work"
-    )
-    @Nullable
-    String groupSlug
-) {}
+        @Schema(
+                description = "Destination group slug; omit or set to null for Unassigned",
+                nullable = true,
+                example = "review-ready-work")
+        @Nullable
+        String groupSlug) {}

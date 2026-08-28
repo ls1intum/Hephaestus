@@ -33,33 +33,38 @@ class GitlabMrResolver {
 
     MrInfo resolve(long scopeId, String projectPath, int mrIid) {
         ClientGraphQlResponse response = gitLabProvider
-            .forScope(scopeId)
-            .documentName("GetMergeRequestGlobalId")
-            .variable("fullPath", projectPath)
-            .variable("iid", String.valueOf(mrIid))
-            .execute()
-            .block(GRAPHQL_TIMEOUT);
+                .forScope(scopeId)
+                .documentName("GetMergeRequestGlobalId")
+                .variable("fullPath", projectPath)
+                .variable("iid", String.valueOf(mrIid))
+                .execute()
+                .block(GRAPHQL_TIMEOUT);
 
         if (response == null) {
             throw new FeedbackDeliveryException("Null response resolving MR info: " + projectPath + "!" + mrIid);
         }
 
-        String globalId = Objects.requireNonNull(response).field("project.mergeRequest.id").getValue();
+        String globalId = Objects.requireNonNull(response)
+                .field("project.mergeRequest.id")
+                .getValue();
         if (globalId == null) {
             List<?> errors = Objects.requireNonNull(response).getErrors();
-            throw new FeedbackDeliveryException(
-                "MR not found via GraphQL: " +
-                    projectPath +
-                    "!" +
-                    mrIid +
-                    (errors.isEmpty() ? "" : ", errors=" + errors)
-            );
+            throw new FeedbackDeliveryException("MR not found via GraphQL: " + projectPath
+                    + "!"
+                    + mrIid
+                    + (errors.isEmpty() ? "" : ", errors=" + errors));
         }
 
         // diffRefs may be null if the MR has no diffs yet
-        String baseSha = Objects.requireNonNull(response).field("project.mergeRequest.diffRefs.baseSha").getValue();
-        String headSha = Objects.requireNonNull(response).field("project.mergeRequest.diffRefs.headSha").getValue();
-        String startSha = Objects.requireNonNull(response).field("project.mergeRequest.diffRefs.startSha").getValue();
+        String baseSha = Objects.requireNonNull(response)
+                .field("project.mergeRequest.diffRefs.baseSha")
+                .getValue();
+        String headSha = Objects.requireNonNull(response)
+                .field("project.mergeRequest.diffRefs.headSha")
+                .getValue();
+        String startSha = Objects.requireNonNull(response)
+                .field("project.mergeRequest.diffRefs.startSha")
+                .getValue();
 
         return new MrInfo(globalId, baseSha, headSha, startSha);
     }
@@ -75,8 +80,7 @@ class GitlabMrResolver {
         int bangIdx = subjectExternalId.lastIndexOf('!');
         if (bangIdx <= 0 || bangIdx == subjectExternalId.length() - 1) {
             throw new FeedbackDeliveryException(
-                "Invalid GitLab MR subjectExternalId (expected project/path!iid): " + subjectExternalId
-            );
+                    "Invalid GitLab MR subjectExternalId (expected project/path!iid): " + subjectExternalId);
         }
         String projectPath = subjectExternalId.substring(0, bangIdx);
         int iid;
@@ -84,9 +88,7 @@ class GitlabMrResolver {
             iid = Integer.parseInt(subjectExternalId.substring(bangIdx + 1));
         } catch (NumberFormatException e) {
             throw new FeedbackDeliveryException(
-                "Invalid GitLab MR subjectExternalId — iid must be integer: " + subjectExternalId,
-                e
-            );
+                    "Invalid GitLab MR subjectExternalId — iid must be integer: " + subjectExternalId, e);
         }
         return new MrCoordinates(projectPath, iid);
     }
@@ -98,12 +100,12 @@ class GitlabMrResolver {
      */
     String resolveIssueGid(long scopeId, String projectPath, int issueIid) {
         ClientGraphQlResponse response = gitLabProvider
-            .forScope(scopeId)
-            .documentName("GetIssueGlobalId")
-            .variable("fullPath", projectPath)
-            .variable("iid", String.valueOf(issueIid))
-            .execute()
-            .block(GRAPHQL_TIMEOUT);
+                .forScope(scopeId)
+                .documentName("GetIssueGlobalId")
+                .variable("fullPath", projectPath)
+                .variable("iid", String.valueOf(issueIid))
+                .execute()
+                .block(GRAPHQL_TIMEOUT);
 
         if (response == null) {
             throw new FeedbackDeliveryException("Null response resolving issue gid: " + projectPath + "#" + issueIid);
@@ -111,13 +113,10 @@ class GitlabMrResolver {
         String gid = Objects.requireNonNull(response).field("project.issue.id").getValue();
         if (gid == null) {
             List<?> errors = Objects.requireNonNull(response).getErrors();
-            throw new FeedbackDeliveryException(
-                "Issue not found via GraphQL: " +
-                    projectPath +
-                    "#" +
-                    issueIid +
-                    (errors.isEmpty() ? "" : ", errors=" + errors)
-            );
+            throw new FeedbackDeliveryException("Issue not found via GraphQL: " + projectPath
+                    + "#"
+                    + issueIid
+                    + (errors.isEmpty() ? "" : ", errors=" + errors));
         }
         return gid;
     }
@@ -130,23 +129,23 @@ class GitlabMrResolver {
         int hashIdx = subjectExternalId.lastIndexOf('#');
         if (hashIdx <= 0 || hashIdx == subjectExternalId.length() - 1) {
             throw new FeedbackDeliveryException(
-                "Invalid GitLab issue subjectExternalId (expected project/path#iid): " + subjectExternalId
-            );
+                    "Invalid GitLab issue subjectExternalId (expected project/path#iid): " + subjectExternalId);
         }
         try {
             return new MrCoordinates(
-                subjectExternalId.substring(0, hashIdx),
-                Integer.parseInt(subjectExternalId.substring(hashIdx + 1))
-            );
+                    subjectExternalId.substring(0, hashIdx),
+                    Integer.parseInt(subjectExternalId.substring(hashIdx + 1)));
         } catch (NumberFormatException e) {
             throw new FeedbackDeliveryException(
-                "Invalid GitLab issue subjectExternalId — iid must be integer: " + subjectExternalId,
-                e
-            );
+                    "Invalid GitLab issue subjectExternalId — iid must be integer: " + subjectExternalId, e);
         }
     }
 
-    record MrInfo(String globalId, @Nullable String baseSha, @Nullable String headSha, @Nullable String startSha) {}
+    record MrInfo(
+            String globalId,
+            @Nullable String baseSha,
+            @Nullable String headSha,
+            @Nullable String startSha) {}
 
     record MrCoordinates(String projectPath, int iid) {}
 }

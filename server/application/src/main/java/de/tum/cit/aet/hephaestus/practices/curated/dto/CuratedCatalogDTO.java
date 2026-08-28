@@ -5,9 +5,10 @@ import java.util.List;
 import org.jspecify.annotations.NonNull;
 
 public record CuratedCatalogDTO(
-    @NonNull @Schema(description = "Strong entity tag to send in If-Match when reordering this catalog") String etag,
-    @NonNull Boolean customOrder,
-    @NonNull CuratedCatalogSummaryDTO summary,
-    @NonNull List<CuratedGroupDTO> groups,
-    @NonNull List<CuratedPracticeSummaryDTO> practices
-) {}
+        @NonNull @Schema(description = "Strong entity tag to send in If-Match when reordering this catalog")
+        String etag,
+
+        @NonNull Boolean customOrder,
+        @NonNull CuratedCatalogSummaryDTO summary,
+        @NonNull List<CuratedGroupDTO> groups,
+        @NonNull List<CuratedPracticeSummaryDTO> practices) {}

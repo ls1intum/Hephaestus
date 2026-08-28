@@ -8,7 +8,6 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -45,9 +44,8 @@ class DefaultMentorReadinessQueryTest extends BaseUnitTest {
         binding.setId(10L);
         binding.setPurpose(AgentPurpose.MENTOR);
         binding.setEnabled(true);
-        when(agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.MENTOR)).thenReturn(
-            Optional.of(binding)
-        );
+        when(agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.MENTOR))
+                .thenReturn(Optional.of(binding));
         when(llmModelResolver.isAvailable(binding)).thenReturn(true);
 
         assertThat(query.isReady(1L)).isTrue();
@@ -60,9 +58,8 @@ class DefaultMentorReadinessQueryTest extends BaseUnitTest {
 
     @Test
     void shouldNotReportReadyWhenMentorIsUnconfigured() {
-        when(agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.MENTOR)).thenReturn(
-            Optional.empty()
-        );
+        when(agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.MENTOR))
+                .thenReturn(Optional.empty());
         assertThat(query.isReady(1L)).isFalse();
     }
 
@@ -72,9 +69,8 @@ class DefaultMentorReadinessQueryTest extends BaseUnitTest {
         binding.setId(10L);
         binding.setPurpose(AgentPurpose.MENTOR);
         binding.setEnabled(true);
-        when(agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.MENTOR)).thenReturn(
-            Optional.of(binding)
-        );
+        when(agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.MENTOR))
+                .thenReturn(Optional.of(binding));
         when(llmModelResolver.isAvailable(binding)).thenReturn(false);
 
         assertThat(query.isReady(1L)).isFalse();
@@ -86,9 +82,8 @@ class DefaultMentorReadinessQueryTest extends BaseUnitTest {
         disabled.setId(10L);
         disabled.setPurpose(AgentPurpose.MENTOR);
         disabled.setEnabled(false);
-        when(agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.MENTOR)).thenReturn(
-            Optional.of(disabled)
-        );
+        when(agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.MENTOR))
+                .thenReturn(Optional.of(disabled));
 
         assertThat(query.isReady(1L)).isFalse();
     }

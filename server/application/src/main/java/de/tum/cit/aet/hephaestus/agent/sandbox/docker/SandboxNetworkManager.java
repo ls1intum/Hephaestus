@@ -38,10 +38,7 @@ public class SandboxNetworkManager {
      * @param hostnameSupplier provides the container HOSTNAME fallback (testable seam)
      */
     SandboxNetworkManager(
-        DockerNetworkOperations networkOps,
-        SandboxProperties properties,
-        Supplier<String> hostnameSupplier
-    ) {
+            DockerNetworkOperations networkOps, SandboxProperties properties, Supplier<String> hostnameSupplier) {
         this.networkOps = networkOps;
         this.properties = properties;
         this.hostnameSupplier = hostnameSupplier;
@@ -73,11 +70,9 @@ public class SandboxNetworkManager {
     public @Nullable String connectAppServer(String networkId) {
         String containerId = resolveAppServerContainerId();
         if (containerId == null || containerId.isBlank()) {
-            log.warn(
-                "Cannot determine app-server container ID — app server is likely running on the host, " +
-                    "not in Docker. Agent containers will use host.docker.internal to reach the LLM proxy. " +
-                    "Set hephaestus.sandbox.app-server-container-id to suppress this warning."
-            );
+            log.warn("Cannot determine app-server container ID — app server is likely running on the host, "
+                    + "not in Docker. Agent containers will use host.docker.internal to reach the LLM proxy. "
+                    + "Set hephaestus.sandbox.app-server-container-id to suppress this warning.");
             return null;
         }
         String ip = networkOps.connectToNetwork(networkId, containerId);

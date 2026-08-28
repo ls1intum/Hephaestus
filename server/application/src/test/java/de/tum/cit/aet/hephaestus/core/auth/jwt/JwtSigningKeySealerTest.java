@@ -37,7 +37,7 @@ class JwtSigningKeySealerTest extends BaseUnitTest {
 
     @Test
     void sealedBlob_hasVersionByteAndNonce() {
-        byte[] sealed = enabledSealer().seal(new byte[] { 1, 2, 3, 4 });
+        byte[] sealed = enabledSealer().seal(new byte[] {1, 2, 3, 4});
 
         assertThat(sealed[0]).isEqualTo(JwtSigningKeySealer.FORMAT_VERSION_V1);
         // version(1) + nonce(12) + ciphertext(4) + tag(16) = 33
@@ -47,7 +47,7 @@ class JwtSigningKeySealerTest extends BaseUnitTest {
     @Test
     void seal_usesFreshNoncePerCall() {
         JwtSigningKeySealer sealer = enabledSealer();
-        byte[] plaintext = new byte[] { 9, 9, 9, 9 };
+        byte[] plaintext = new byte[] {9, 9, 9, 9};
 
         byte[] a = sealer.seal(plaintext);
         byte[] b = sealer.seal(plaintext);
@@ -60,19 +60,19 @@ class JwtSigningKeySealerTest extends BaseUnitTest {
     @Test
     void unseal_rejectsTamperedCiphertext() {
         JwtSigningKeySealer sealer = enabledSealer();
-        byte[] sealed = sealer.seal(new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 });
+        byte[] sealed = sealer.seal(new byte[] {1, 2, 3, 4, 5, 6, 7, 8});
         // Flip a bit in the ciphertext region (after version + nonce).
         sealed[1 + 12 + 1] ^= 0x01;
 
         assertThatThrownBy(() -> sealer.unseal(sealed))
-            .isInstanceOf(EncryptionException.class)
-            .hasMessageContaining("unsealing failed");
+                .isInstanceOf(EncryptionException.class)
+                .hasMessageContaining("unsealing failed");
     }
 
     @Test
     void unseal_rejectsTamperedNonce() {
         JwtSigningKeySealer sealer = enabledSealer();
-        byte[] sealed = sealer.seal(new byte[] { 1, 2, 3, 4, 5, 6, 7, 8 });
+        byte[] sealed = sealer.seal(new byte[] {1, 2, 3, 4, 5, 6, 7, 8});
         sealed[1] ^= 0x01; // mutate first nonce byte
 
         assertThatThrownBy(() -> sealer.unseal(sealed)).isInstanceOf(EncryptionException.class);
@@ -87,22 +87,22 @@ class JwtSigningKeySealerTest extends BaseUnitTest {
         JwtSigningKeySealer sealer = enabledSealer();
         byte[] tenantScopedAad = "workspace:42:credential_bundle".getBytes(StandardCharsets.UTF_8);
 
-        byte[] sealedUnderForeignAad = sealer.seal(new byte[] { 7, 7, 7, 7 }, tenantScopedAad);
+        byte[] sealedUnderForeignAad = sealer.seal(new byte[] {7, 7, 7, 7}, tenantScopedAad);
 
         assertThatThrownBy(() -> sealer.unseal(sealedUnderForeignAad))
-            .isInstanceOf(EncryptionException.class)
-            .hasMessageContaining("unsealing failed");
+                .isInstanceOf(EncryptionException.class)
+                .hasMessageContaining("unsealing failed");
     }
 
     @Test
     void unseal_rejectsWrongVersionByte() {
         JwtSigningKeySealer sealer = enabledSealer();
-        byte[] sealed = sealer.seal(new byte[] { 1, 2, 3, 4 });
+        byte[] sealed = sealer.seal(new byte[] {1, 2, 3, 4});
         sealed[0] = 0x02; // unsupported version
 
         assertThatThrownBy(() -> sealer.unseal(sealed))
-            .isInstanceOf(EncryptionException.class)
-            .hasMessageContaining("Unsupported sealed JWT key version");
+                .isInstanceOf(EncryptionException.class)
+                .hasMessageContaining("Unsupported sealed JWT key version");
     }
 
     @Test
@@ -110,14 +110,14 @@ class JwtSigningKeySealerTest extends BaseUnitTest {
         JwtSigningKeySealer sealer = enabledSealer();
 
         assertThatThrownBy(() -> sealer.unseal(new byte[0]))
-            .isInstanceOf(EncryptionException.class)
-            .hasMessageContaining("too short");
+                .isInstanceOf(EncryptionException.class)
+                .hasMessageContaining("too short");
 
         // version + partial nonce, no ciphertext/tag
-        byte[] tooShort = new byte[] { JwtSigningKeySealer.FORMAT_VERSION_V1, 0, 0, 0 };
+        byte[] tooShort = new byte[] {JwtSigningKeySealer.FORMAT_VERSION_V1, 0, 0, 0};
         assertThatThrownBy(() -> sealer.unseal(tooShort))
-            .isInstanceOf(EncryptionException.class)
-            .hasMessageContaining("too short");
+                .isInstanceOf(EncryptionException.class)
+                .hasMessageContaining("too short");
     }
 
     @Test
@@ -125,10 +125,10 @@ class JwtSigningKeySealerTest extends BaseUnitTest {
         JwtSigningKeySealer sealer = new JwtSigningKeySealer((String) null, "dev");
 
         assertThat(sealer.isEnabled()).isFalse();
-        assertThatThrownBy(() -> sealer.seal(new byte[] { 1 }))
-            .isInstanceOf(EncryptionException.class)
-            .hasMessageContaining("not enabled");
-        assertThatThrownBy(() -> sealer.unseal(new byte[] { 1 })).isInstanceOf(EncryptionException.class);
+        assertThatThrownBy(() -> sealer.seal(new byte[] {1}))
+                .isInstanceOf(EncryptionException.class)
+                .hasMessageContaining("not enabled");
+        assertThatThrownBy(() -> sealer.unseal(new byte[] {1})).isInstanceOf(EncryptionException.class);
     }
 
     @Test
@@ -139,15 +139,15 @@ class JwtSigningKeySealerTest extends BaseUnitTest {
     @Test
     void prod_missingKey_failsFast() {
         assertThatThrownBy(() -> new JwtSigningKeySealer((String) null, "prod"))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("required in production");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("required in production");
     }
 
     @Test
     void rejectsNon32CharKey() {
         assertThatThrownBy(() -> new JwtSigningKeySealer("too-short", "dev"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("32 characters");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("32 characters");
     }
 
     @Test

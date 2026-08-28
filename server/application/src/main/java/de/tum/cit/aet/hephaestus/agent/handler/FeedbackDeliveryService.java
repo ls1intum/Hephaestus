@@ -40,15 +40,14 @@ class FeedbackDeliveryService {
     private final AgentJobRepository agentJobRepository;
 
     FeedbackDeliveryService(
-        PullRequestCommentPoster commentPoster,
-        PracticeFeedbackDeliveryPolicy deliveryPolicy,
-        PracticeReviewProperties reviewProperties,
-        FeedbackLedgerRecorder feedbackLedgerRecorder,
-        ObservationTrendService observationTrendService,
-        PracticeFeedbackCommentFormatter commentFormatter,
-        PracticeFeedbackDispatchService dispatchService,
-        AgentJobRepository agentJobRepository
-    ) {
+            PullRequestCommentPoster commentPoster,
+            PracticeFeedbackDeliveryPolicy deliveryPolicy,
+            PracticeReviewProperties reviewProperties,
+            FeedbackLedgerRecorder feedbackLedgerRecorder,
+            ObservationTrendService observationTrendService,
+            PracticeFeedbackCommentFormatter commentFormatter,
+            PracticeFeedbackDispatchService dispatchService,
+            AgentJobRepository agentJobRepository) {
         this.commentPoster = commentPoster;
         this.deliveryPolicy = deliveryPolicy;
         this.reviewProperties = reviewProperties;
@@ -64,10 +63,9 @@ class FeedbackDeliveryService {
     }
 
     void recordProposal(
-        AgentJob job,
-        @Nullable DeliveryContent delivery,
-        List<PracticeDetectionResultParser.ValidatedObservation> observations
-    ) {
+            AgentJob job,
+            @Nullable DeliveryContent delivery,
+            List<PracticeDetectionResultParser.ValidatedObservation> observations) {
         feedbackLedgerRecorder.recordProposal(job, delivery, observations);
     }
 
@@ -95,12 +93,8 @@ class FeedbackDeliveryService {
             return;
         }
 
-        PracticeFeedbackDeliveryPolicy.Decision<PullRequest> decision = deliveryPolicy.evaluatePullRequest(
-            job,
-            DeliveryPolicyStage.AUTOMATIC,
-            null,
-            contributingPracticeSlugs
-        );
+        PracticeFeedbackDeliveryPolicy.Decision<PullRequest> decision =
+                deliveryPolicy.evaluatePullRequest(job, DeliveryPolicyStage.AUTOMATIC, null, contributingPracticeSlugs);
         if (!decision.allowed()) {
             FeedbackSuppressionReason reason = decision.refusal();
             if (reason != null) recordGateSuppressed(job, delivery, reason);
@@ -108,16 +102,16 @@ class FeedbackDeliveryService {
         }
 
         TrendDelta trend = reviewProperties.progressFooter()
-            ? observationTrendService
-                  .computeForTarget(ArtifactKinds.PULL_REQUEST, decision.target().getId(), job.getWorkspace().getId())
-                  .orElse(null)
-            : null;
+                ? observationTrendService
+                        .computeForTarget(
+                                ArtifactKinds.PULL_REQUEST,
+                                decision.target().getId(),
+                                job.getWorkspace().getId())
+                        .orElse(null)
+                : null;
         DeliveryContent providerPackage = providerPackage(job, delivery, trend);
-        PracticeFeedbackDispatchService.Result result = dispatchService.dispatchAutomaticPackage(
-            job,
-            providerPackage,
-            contributingPracticeSlugs
-        );
+        PracticeFeedbackDispatchService.Result result =
+                dispatchService.dispatchAutomaticPackage(job, providerPackage, contributingPracticeSlugs);
         FeedbackDispatch dispatch = dispatchService.automaticPackage(job);
         if (isTerminal(dispatch.getState())) projectAutomaticPackage(job, dispatch);
 
@@ -139,52 +133,29 @@ class FeedbackDeliveryService {
 
             if (dispatch.getState() == FeedbackDispatchState.SENT) {
                 feedbackLedgerRecorder.record(
-                    job,
-                    delivery,
-                    artifactKind,
-                    signals,
-                    dispatch.getDeliveredExternalRef(),
-                    inlineDelivered
-                );
+                        job, delivery, artifactKind, signals, dispatch.getDeliveredExternalRef(), inlineDelivered);
                 reconcileJob(dispatch, DeliveryStatus.DELIVERED);
                 return;
             }
             if (dispatch.getState() == FeedbackDispatchState.SUPPRESSED) {
                 FeedbackSuppressionReason reason = FeedbackSuppressionReason.valueOf(
-                    java.util.Objects.requireNonNull(dispatch.getSuppressionReason())
-                );
+                        java.util.Objects.requireNonNull(dispatch.getSuppressionReason()));
                 if (!summaryDelivered && !inlineDelivered) {
                     feedbackLedgerRecorder.recordSuppressedUnit(job, delivery, reason);
                     reconcileJob(dispatch, DeliveryStatus.DELIVERED);
                     return;
                 }
                 feedbackLedgerRecorder.recordWithoutConversation(
-                    job,
-                    delivery,
-                    artifactKind,
-                    signals,
-                    dispatch.getDeliveredExternalRef(),
-                    inlineDelivered
-                );
+                        job, delivery, artifactKind, signals, dispatch.getDeliveredExternalRef(), inlineDelivered);
                 feedbackLedgerRecorder.recordSuppressedRemainder(
-                    job,
-                    delivery,
-                    reason,
-                    missingInlineKeys(delivery, signals)
-                );
+                        job, delivery, reason, missingInlineKeys(delivery, signals));
                 reconcileJob(dispatch, DeliveryStatus.DELIVERED);
                 return;
             }
             if (dispatch.getState() == FeedbackDispatchState.FAILED) {
                 if (summaryDelivered || inlineDelivered) {
                     feedbackLedgerRecorder.recordWithoutConversation(
-                        job,
-                        delivery,
-                        artifactKind,
-                        signals,
-                        dispatch.getDeliveredExternalRef(),
-                        inlineDelivered
-                    );
+                            job, delivery, artifactKind, signals, dispatch.getDeliveredExternalRef(), inlineDelivered);
                 } else {
                     feedbackLedgerRecorder.recordUndelivered(job, delivery);
                 }
@@ -195,11 +166,7 @@ class FeedbackDeliveryService {
 
     private void reconcileJob(FeedbackDispatch dispatch, DeliveryStatus status) {
         agentJobRepository.reconcileDispatchDeliveryStatus(
-            dispatch.getAgentJobId(),
-            dispatch.getWorkspaceId(),
-            status,
-            dispatch.getDeliveredExternalRef()
-        );
+                dispatch.getAgentJobId(), dispatch.getWorkspaceId(), status, dispatch.getDeliveredExternalRef());
     }
 
     private DeliveryContent providerPackage(AgentJob job, DeliveryContent delivery, @Nullable TrendDelta trend) {
@@ -213,27 +180,22 @@ class FeedbackDeliveryService {
     }
 
     private static List<String> missingInlineKeys(DeliveryContent delivery, List<DeliveredSignal> signals) {
-        Set<String> delivered = signals
-            .stream()
-            .filter(signal -> signal.disposition() != Disposition.FAILED)
-            .map(DeliveredSignal::recurrenceKey)
-            .filter(java.util.Objects::nonNull)
-            .collect(Collectors.toSet());
-        return delivery
-            .diffNotes()
-            .stream()
-            .map(PracticeDetectionResultParser.DiffNote::recurrenceKey)
-            .filter(java.util.Objects::nonNull)
-            .filter(key -> !delivered.contains(key))
-            .toList();
+        Set<String> delivered = signals.stream()
+                .filter(signal -> signal.disposition() != Disposition.FAILED)
+                .map(DeliveredSignal::recurrenceKey)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+        return delivery.diffNotes().stream()
+                .map(PracticeDetectionResultParser.DiffNote::recurrenceKey)
+                .filter(java.util.Objects::nonNull)
+                .filter(key -> !delivered.contains(key))
+                .toList();
     }
 
     private static boolean isTerminal(FeedbackDispatchState state) {
-        return (
-            state == FeedbackDispatchState.SENT ||
-            state == FeedbackDispatchState.SUPPRESSED ||
-            state == FeedbackDispatchState.FAILED
-        );
+        return (state == FeedbackDispatchState.SENT
+                || state == FeedbackDispatchState.SUPPRESSED
+                || state == FeedbackDispatchState.FAILED);
     }
 
     private static ArtifactKind artifactKind(AgentJob job) {
@@ -247,11 +209,10 @@ class FeedbackDeliveryService {
             feedbackLedgerRecorder.recordSuppressedUnit(job, delivery, reason);
         } catch (RuntimeException exception) {
             log.warn(
-                "Gate-suppressed ledger record failed: jobId={}, reason={}, error={}",
-                job.getId(),
-                reason,
-                exception.getMessage()
-            );
+                    "Gate-suppressed ledger record failed: jobId={}, reason={}, error={}",
+                    job.getId(),
+                    reason,
+                    exception.getMessage());
         }
     }
 }

@@ -76,30 +76,34 @@ class AuthSessionServiceTest extends BaseUnitTest {
 
         lenient().when(properties.cookieName()).thenReturn("__Host-HEPHAESTUS_AT");
         lenient()
-            .when(principalFactory.forAccountId(ACCOUNT_ID))
-            .thenReturn(new JwtPrincipal(ACCOUNT_ID, "alice", null, Set.of()));
+                .when(principalFactory.forAccountId(ACCOUNT_ID))
+                .thenReturn(new JwtPrincipal(ACCOUNT_ID, "alice", null, Set.of()));
 
         service = new AuthSessionService(
-            principalFactory,
-            issuedJwtRepository,
-            accountRepository,
-            jwtIssuer,
-            eventLogger,
-            properties,
-            clock,
-            new AuthMetrics(meterRegistry)
-        );
+                principalFactory,
+                issuedJwtRepository,
+                accountRepository,
+                jwtIssuer,
+                eventLogger,
+                properties,
+                clock,
+                new AuthMetrics(meterRegistry));
     }
 
     private double refreshResult(String tag) {
-        var counter = meterRegistry.find("auth.token.refresh.result").tag("result", tag).counter();
+        var counter = meterRegistry
+                .find("auth.token.refresh.result")
+                .tag("result", tag)
+                .counter();
         return counter == null ? 0.0 : counter.count();
     }
 
     /** Asserts the access cookie was cleared on a session-ending path: present with empty value + maxAge=0. */
     private static void assertCookieCleared(MockHttpServletResponse response) {
         jakarta.servlet.http.Cookie cookie = response.getCookie("__Host-HEPHAESTUS_AT");
-        assertThat(cookie).as("session-ending path must clear the access cookie").isNotNull();
+        assertThat(cookie)
+                .as("session-ending path must clear the access cookie")
+                .isNotNull();
         assertThat(cookie.getMaxAge()).isZero();
         assertThat(cookie.getValue()).isEmpty();
     }
@@ -119,10 +123,9 @@ class AuthSessionServiceTest extends BaseUnitTest {
     }
 
     private static AuthSessionService.RefreshContext ctx(
-        @Nullable Long impersonatorId,
-        @Nullable Instant impersonationExpiresAt,
-        @Nullable Instant sessionExpiresAt
-    ) {
+            @Nullable Long impersonatorId,
+            @Nullable Instant impersonationExpiresAt,
+            @Nullable Instant sessionExpiresAt) {
         return new AuthSessionService.RefreshContext(impersonatorId, impersonationExpiresAt, sessionExpiresAt);
     }
 
@@ -145,23 +148,23 @@ class AuthSessionServiceTest extends BaseUnitTest {
     void refresh_whenImpersonationTimeBoxExpired_autoExitsToOperator() {
         UUID jti = UUID.randomUUID();
         long operatorId = 7L;
-        when(issuedJwtRepository.revoke(eq(jti), any(), eq(IssuedJwt.RevokedReason.ROTATE))).thenReturn(1);
+        when(issuedJwtRepository.revoke(eq(jti), any(), eq(IssuedJwt.RevokedReason.ROTATE)))
+                .thenReturn(1);
         when(accountRepository.findById(ACCOUNT_ID)).thenReturn(Optional.of(activeAccount()));
         JwtPrincipal operatorPrincipal = new JwtPrincipal(operatorId, "operator", null, Set.of("app_admin"));
         when(principalFactory.forAccountId(operatorId)).thenReturn(operatorPrincipal);
-        when(jwtIssuer.issue(any(), any(), any())).thenReturn(
-            new HephaestusJwtIssuer.Token("op-token", UUID.randomUUID(), NOW.plus(Duration.ofMinutes(15)))
-        );
+        when(jwtIssuer.issue(any(), any(), any()))
+                .thenReturn(
+                        new HephaestusJwtIssuer.Token("op-token", UUID.randomUUID(), NOW.plus(Duration.ofMinutes(15))));
 
         // imp_exp already in the past → the time-box is reached: refresh must auto-exit to the operator
         // (operator token, NO act claim) rather than silently renewing the impersonation forever.
         service.refresh(
-            ACCOUNT_ID,
-            jti,
-            ctx(operatorId, NOW.minus(Duration.ofSeconds(1)), null),
-            mock(HttpServletRequest.class),
-            new MockHttpServletResponse()
-        );
+                ACCOUNT_ID,
+                jti,
+                ctx(operatorId, NOW.minus(Duration.ofSeconds(1)), null),
+                mock(HttpServletRequest.class),
+                new MockHttpServletResponse());
 
         assertThat(refreshResult("success")).isEqualTo(1.0);
         // Operator token minted via the 3-arg overload (no impersonator), for the OPERATOR principal —
@@ -180,20 +183,19 @@ class AuthSessionServiceTest extends BaseUnitTest {
         UUID jti = UUID.randomUUID();
         long operatorId = 7L;
         Instant ceiling = NOW.plus(Duration.ofMinutes(30));
-        when(issuedJwtRepository.revoke(eq(jti), any(), eq(IssuedJwt.RevokedReason.ROTATE))).thenReturn(1);
+        when(issuedJwtRepository.revoke(eq(jti), any(), eq(IssuedJwt.RevokedReason.ROTATE)))
+                .thenReturn(1);
         when(accountRepository.findById(ACCOUNT_ID)).thenReturn(Optional.of(activeAccount()));
-        when(jwtIssuer.issue(any(), eq(operatorId), eq(ceiling), any())).thenReturn(
-            new HephaestusJwtIssuer.Token("imp-token", UUID.randomUUID(), ceiling)
-        );
+        when(jwtIssuer.issue(any(), eq(operatorId), eq(ceiling), any()))
+                .thenReturn(new HephaestusJwtIssuer.Token("imp-token", UUID.randomUUID(), ceiling));
 
         // imp_exp still in the future → keep impersonating, but re-cap the new token at the SAME ceiling.
         service.refresh(
-            ACCOUNT_ID,
-            jti,
-            ctx(operatorId, ceiling, null),
-            mock(HttpServletRequest.class),
-            new MockHttpServletResponse()
-        );
+                ACCOUNT_ID,
+                jti,
+                ctx(operatorId, ceiling, null),
+                mock(HttpServletRequest.class),
+                new MockHttpServletResponse());
 
         assertThat(refreshResult("success")).isEqualTo(1.0);
         // Re-minted via the 4-arg (time-boxed) overload, act preserved, capped at the unchanged ceiling.
@@ -208,7 +210,8 @@ class AuthSessionServiceTest extends BaseUnitTest {
     void refresh_whenConditionalRevokeAffectsZeroRows_recordsNoopAndDoesNotReMint() {
         UUID jti = UUID.randomUUID();
         // A concurrent refresh/logout already rotated this jti — the conditional UPDATE matches 0 rows.
-        when(issuedJwtRepository.revoke(eq(jti), any(), eq(IssuedJwt.RevokedReason.ROTATE))).thenReturn(0);
+        when(issuedJwtRepository.revoke(eq(jti), any(), eq(IssuedJwt.RevokedReason.ROTATE)))
+                .thenReturn(0);
 
         MockHttpServletResponse response = new MockHttpServletResponse();
         service.refresh(ACCOUNT_ID, jti, ctx(null, null, null), mock(HttpServletRequest.class), response);
@@ -223,7 +226,8 @@ class AuthSessionServiceTest extends BaseUnitTest {
     @Test
     void refresh_whenAccountNotActive_recordsSuspendedAndDoesNotReMint() {
         UUID jti = UUID.randomUUID();
-        when(issuedJwtRepository.revoke(eq(jti), any(), eq(IssuedJwt.RevokedReason.ROTATE))).thenReturn(1);
+        when(issuedJwtRepository.revoke(eq(jti), any(), eq(IssuedJwt.RevokedReason.ROTATE)))
+                .thenReturn(1);
         Account suspended = activeAccount();
         suspended.setStatus(Account.Status.SUSPENDED);
         when(accountRepository.findById(ACCOUNT_ID)).thenReturn(Optional.of(suspended));
@@ -240,16 +244,12 @@ class AuthSessionServiceTest extends BaseUnitTest {
     @Test
     void refresh_whenAccountMissing_recordsSuspended() {
         UUID jti = UUID.randomUUID();
-        when(issuedJwtRepository.revoke(eq(jti), any(), eq(IssuedJwt.RevokedReason.ROTATE))).thenReturn(1);
+        when(issuedJwtRepository.revoke(eq(jti), any(), eq(IssuedJwt.RevokedReason.ROTATE)))
+                .thenReturn(1);
         when(accountRepository.findById(ACCOUNT_ID)).thenReturn(Optional.empty());
 
         service.refresh(
-            ACCOUNT_ID,
-            jti,
-            ctx(null, null, null),
-            mock(HttpServletRequest.class),
-            new MockHttpServletResponse()
-        );
+                ACCOUNT_ID, jti, ctx(null, null, null), mock(HttpServletRequest.class), new MockHttpServletResponse());
 
         assertThat(refreshResult("suspended")).isEqualTo(1.0);
     }
@@ -257,13 +257,11 @@ class AuthSessionServiceTest extends BaseUnitTest {
     @Test
     void refresh_whenReMintSucceeds_recordsSuccessAndSetsCookie() {
         UUID jti = UUID.randomUUID();
-        when(issuedJwtRepository.revoke(eq(jti), any(), eq(IssuedJwt.RevokedReason.ROTATE))).thenReturn(1);
+        when(issuedJwtRepository.revoke(eq(jti), any(), eq(IssuedJwt.RevokedReason.ROTATE)))
+                .thenReturn(1);
         when(accountRepository.findById(ACCOUNT_ID)).thenReturn(Optional.of(activeAccount()));
-        HephaestusJwtIssuer.Token token = new HephaestusJwtIssuer.Token(
-            "fresh-token",
-            UUID.randomUUID(),
-            NOW.plus(Duration.ofMinutes(15))
-        );
+        HephaestusJwtIssuer.Token token =
+                new HephaestusJwtIssuer.Token("fresh-token", UUID.randomUUID(), NOW.plus(Duration.ofMinutes(15)));
         when(jwtIssuer.issue(any(), any(), any(), any(), any())).thenReturn(token);
 
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -282,21 +280,19 @@ class AuthSessionServiceTest extends BaseUnitTest {
     @Test
     void refresh_whenReMintThrows_recordsErrorAndPropagates() {
         UUID jti = UUID.randomUUID();
-        when(issuedJwtRepository.revoke(eq(jti), any(), eq(IssuedJwt.RevokedReason.ROTATE))).thenReturn(1);
+        when(issuedJwtRepository.revoke(eq(jti), any(), eq(IssuedJwt.RevokedReason.ROTATE)))
+                .thenReturn(1);
         when(accountRepository.findById(ACCOUNT_ID)).thenReturn(Optional.of(activeAccount()));
-        when(jwtIssuer.issue(any(), any(), any(), any(), any())).thenThrow(
-            new IllegalStateException("signing key unavailable")
-        );
+        when(jwtIssuer.issue(any(), any(), any(), any(), any()))
+                .thenThrow(new IllegalStateException("signing key unavailable"));
 
-        assertThatThrownBy(() ->
-            service.refresh(
-                ACCOUNT_ID,
-                jti,
-                ctx(null, null, null),
-                mock(HttpServletRequest.class),
-                new MockHttpServletResponse()
-            )
-        ).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> service.refresh(
+                        ACCOUNT_ID,
+                        jti,
+                        ctx(null, null, null),
+                        mock(HttpServletRequest.class),
+                        new MockHttpServletResponse()))
+                .isInstanceOf(IllegalStateException.class);
 
         assertThat(refreshResult("error")).isEqualTo(1.0);
         assertThat(refreshResult("success")).isZero();

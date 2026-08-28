@@ -33,10 +33,10 @@ class ImpersonationGuardTest extends BaseUnitTest {
 
     private void authenticate(boolean impersonating) {
         Jwt.Builder builder = Jwt.withTokenValue("t")
-            .header("alg", "ES256")
-            .subject("1")
-            .issuedAt(Instant.EPOCH)
-            .expiresAt(Instant.EPOCH.plusSeconds(900));
+                .header("alg", "ES256")
+                .subject("1")
+                .issuedAt(Instant.EPOCH)
+                .expiresAt(Instant.EPOCH.plusSeconds(900));
         if (impersonating) {
             builder.claim("act", Map.of("sub", "99"));
         }
@@ -54,7 +54,7 @@ class ImpersonationGuardTest extends BaseUnitTest {
             request.addHeader(ImpersonationGuard.ALLOW_WRITES_HEADER, "true");
         }
         MockHttpServletResponse response = new MockHttpServletResponse();
-        boolean[] proceeded = { false };
+        boolean[] proceeded = {false};
         guard.doFilter(request, response, (req, res) -> proceeded[0] = true);
         return new Outcome(proceeded[0], response.getStatus(), response.getContentAsString());
     }
@@ -85,7 +85,8 @@ class ImpersonationGuardTest extends BaseUnitTest {
     @Test
     void allowsLifecycleEscapeEndpointsUnderImpersonationWithoutHeader() throws Exception {
         // The fix: an operator must always be able to escape a read-only impersonation session.
-        assertThat(run("POST", "/auth/impersonate:exit", true, false).proceeded()).isTrue();
+        assertThat(run("POST", "/auth/impersonate:exit", true, false).proceeded())
+                .isTrue();
         assertThat(run("POST", "/auth/logout", true, false).proceeded()).isTrue();
         assertThat(run("POST", "/auth/refresh", true, false).proceeded()).isTrue();
     }

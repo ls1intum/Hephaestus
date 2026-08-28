@@ -34,24 +34,21 @@ public final class NatsTestContainer {
     @SuppressWarnings("resource") // Closed by the JVM shutdown hook.
     private static GenericContainer<?> createContainer() {
         GenericContainer<?> newContainer = new GenericContainer<>(IMAGE)
-            .withCommand("-js")
-            .withExposedPorts(CLIENT_PORT)
-            .waitingFor(Wait.forLogMessage(".*Server is ready.*", 1));
+                .withCommand("-js")
+                .withExposedPorts(CLIENT_PORT)
+                .waitingFor(Wait.forLogMessage(".*Server is ready.*", 1));
 
         newContainer.start();
         LOGGER.info(
-            "Started NATS JetStream Testcontainer: server=nats://{}:{}",
-            newContainer.getHost(),
-            newContainer.getMappedPort(CLIENT_PORT)
-        );
+                "Started NATS JetStream Testcontainer: server=nats://{}:{}",
+                newContainer.getHost(),
+                newContainer.getMappedPort(CLIENT_PORT));
 
-        Runtime.getRuntime().addShutdownHook(
-            new Thread(() -> {
-                if (newContainer.isRunning()) {
-                    newContainer.stop();
-                }
-            })
-        );
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            if (newContainer.isRunning()) {
+                newContainer.stop();
+            }
+        }));
         return newContainer;
     }
 }

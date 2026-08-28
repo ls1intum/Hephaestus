@@ -42,13 +42,13 @@ class StaleAuthCookieEvictionIntegrationTest extends RealAuthIntegrationTest {
     @Test
     void staleCookieDoesNotBlockPublicEndpointAndIsCleared() {
         var result = webTestClient
-            .get()
-            .uri("/identity-providers")
-            .header(HttpHeaders.COOKIE, cookieName + "=not-a-valid-jwt")
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .returnResult(Void.class);
+                .get()
+                .uri("/identity-providers")
+                .header(HttpHeaders.COOKIE, cookieName + "=not-a-valid-jwt")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .returnResult(Void.class);
 
         // The dead cookie is cleared so the browser stops resending it — self-healing. A clear is an
         // empty value with a non-positive Max-Age (Tomcat may serialise it as Max-Age=0 or as a past
@@ -57,8 +57,8 @@ class StaleAuthCookieEvictionIntegrationTest extends RealAuthIntegrationTest {
         assertThat(cleared).as("stale cookie must be cleared").isNotNull();
         assertThat(cleared.getValue()).as("clearing cookie has an empty value").isEmpty();
         assertThat(cleared.getMaxAge())
-            .as("clearing cookie is not kept alive")
-            .isLessThanOrEqualTo(java.time.Duration.ZERO);
+                .as("clearing cookie is not kept alive")
+                .isLessThanOrEqualTo(java.time.Duration.ZERO);
     }
 
     @Test
@@ -66,30 +66,32 @@ class StaleAuthCookieEvictionIntegrationTest extends RealAuthIntegrationTest {
         // The eviction must NOT silently authenticate: a protected endpoint still rejects the request
         // (401 = the correct "logged out" signal the SPA expects, not a 500 bad-token error).
         webTestClient
-            .get()
-            .uri("/user")
-            .header(HttpHeaders.COOKIE, cookieName + "=not-a-valid-jwt")
-            .exchange()
-            .expectStatus()
-            .isUnauthorized();
+                .get()
+                .uri("/user")
+                .header(HttpHeaders.COOKIE, cookieName + "=not-a-valid-jwt")
+                .exchange()
+                .expectStatus()
+                .isUnauthorized();
     }
 
     @Test
     void validCookieIsUntouchedAndStillAuthenticates() {
         Account account = accountRepository.save(new Account("Valid Vera"));
-        String token = jwtIssuer.issue(principalFactory.forAccount(account), null, null).value();
+        String token = jwtIssuer
+                .issue(principalFactory.forAccount(account), null, null)
+                .value();
 
         var result = webTestClient
-            .get()
-            .uri("/user")
-            .header(HttpHeaders.COOKIE, cookieName + "=" + token)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .returnResult(Void.class);
+                .get()
+                .uri("/user")
+                .header(HttpHeaders.COOKIE, cookieName + "=" + token)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .returnResult(Void.class);
 
         assertThat(result.getResponseCookies().getFirst(cookieName))
-            .as("a valid cookie is left untouched (no clearing Set-Cookie)")
-            .isNull();
+                .as("a valid cookie is left untouched (no clearing Set-Cookie)")
+                .isNull();
     }
 }

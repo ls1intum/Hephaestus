@@ -25,12 +25,11 @@ import org.jspecify.annotations.Nullable;
  */
 @Entity
 @Table(
-    name = "slack_monitored_channel",
-    uniqueConstraints = @UniqueConstraint(
-        name = "uk_slack_monitored_channel",
-        columnNames = { "workspace_id", "slack_channel_id" }
-    )
-)
+        name = "slack_monitored_channel",
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uk_slack_monitored_channel",
+                        columnNames = {"workspace_id", "slack_channel_id"}))
 @Getter
 @Setter
 @NoArgsConstructor

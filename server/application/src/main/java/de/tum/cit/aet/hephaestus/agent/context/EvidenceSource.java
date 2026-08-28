@@ -27,12 +27,10 @@ public interface EvidenceSource extends ContentSource {
         contributeSelected(request, selectedKinds, files);
         Set<SourceKind> capturedKinds = new HashSet<>(sourceKinds());
         capturedKinds.retainAll(selectedKinds);
-        Map<SourceKind, SourceContentState> contentStates =
-            capturedKinds.size() == 1
+        Map<SourceKind, SourceContentState> contentStates = capturedKinds.size() == 1
                 ? Map.of(
-                      capturedKinds.iterator().next(),
-                      files.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY
-                  )
+                        capturedKinds.iterator().next(),
+                        files.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY)
                 : Map.of();
         return new EvidenceContribution(files, Map.of(), Map.of(), Map.of(), Map.of(), contentStates);
     }

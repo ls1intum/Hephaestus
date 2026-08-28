@@ -5,10 +5,8 @@ import org.jspecify.annotations.Nullable;
 
 @Schema(description = "Update instance-wide LLM governance settings (all fields optional)")
 public record UpdateInstanceLlmSettingsRequestDTO(
-    @Nullable
-    @Schema(description = "Comma/newline-delimited egress host allowlist; blank clears it")
-    String allowedEgressHosts,
-    @Nullable
-    @Schema(description = "Whether workspaces may register their own LLM connections")
-    Boolean allowWorkspaceConnections
-) {}
+        @Nullable @Schema(description = "Comma/newline-delimited egress host allowlist; blank clears it")
+        String allowedEgressHosts,
+
+        @Nullable @Schema(description = "Whether workspaces may register their own LLM connections")
+        Boolean allowWorkspaceConnections) {}

@@ -40,18 +40,16 @@ public class GitLabMergeRequestMessageHandler extends AbstractIntegrationMessage
     private final GitLabWebhookContextResolver contextResolver;
 
     GitLabMergeRequestMessageHandler(
-        GitLabMergeRequestProcessor mergeRequestProcessor,
-        GitLabWebhookContextResolver contextResolver,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            GitLabMergeRequestProcessor mergeRequestProcessor,
+            GitLabWebhookContextResolver contextResolver,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITLAB,
-            GitLabEventType.MERGE_REQUEST.getValue(),
-            GitLabMergeRequestEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITLAB,
+                GitLabEventType.MERGE_REQUEST.getValue(),
+                GitLabMergeRequestEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.mergeRequestProcessor = mergeRequestProcessor;
         this.contextResolver = contextResolver;
     }
@@ -69,7 +67,9 @@ public class GitLabMergeRequestMessageHandler extends AbstractIntegrationMessage
         }
 
         if (event.isConfidential()) {
-            log.debug("Skipped confidential merge request event: iid={}", event.objectAttributes().iid());
+            log.debug(
+                    "Skipped confidential merge request event: iid={}",
+                    event.objectAttributes().iid());
             return;
         }
 
@@ -82,11 +82,10 @@ public class GitLabMergeRequestMessageHandler extends AbstractIntegrationMessage
         GitLabEventAction action = event.actionType();
 
         log.info(
-            "Processing merge request event: projectPath={}, iid={}, action={}",
-            safeProjectPath,
-            event.objectAttributes().iid(),
-            action
-        );
+                "Processing merge request event: projectPath={}, iid={}, action={}",
+                safeProjectPath,
+                event.objectAttributes().iid(),
+                action);
 
         ProcessingContext context = contextResolver.resolve(projectPath, action.getValue(), "merge request");
         if (context == null) {
@@ -100,11 +99,9 @@ public class GitLabMergeRequestMessageHandler extends AbstractIntegrationMessage
             case MERGE -> mergeRequestProcessor.processMerged(event, context);
             case APPROVED -> mergeRequestProcessor.processApproved(event, context);
             case UNAPPROVED -> mergeRequestProcessor.processUnapproved(event, context);
-            case APPROVAL, UNAPPROVAL -> log.debug(
-                "Skipped group-level approval rule event: projectPath={}, action={}",
-                safeProjectPath,
-                action
-            );
+            case APPROVAL, UNAPPROVAL ->
+                log.debug(
+                        "Skipped group-level approval rule event: projectPath={}, action={}", safeProjectPath, action);
             default -> log.debug("Unhandled merge request action: projectPath={}, action={}", safeProjectPath, action);
         }
     }

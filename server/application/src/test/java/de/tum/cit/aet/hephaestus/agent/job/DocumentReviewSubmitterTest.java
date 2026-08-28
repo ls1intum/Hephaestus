@@ -50,12 +50,8 @@ class DocumentReviewSubmitterTest extends BaseUnitTest {
     private static final long WORKSPACE_ID = 3L;
     private static final long DOCUMENT_ID = 77L;
     private static final SignalName PUBLISHED = SignalName.of("docs.document.published");
-    private static final SignalKey KEY = new SignalKey(
-        WORKSPACE_ID,
-        DOCUMENT_ID,
-        PUBLISHED,
-        SignalRevision.ofContentDigest("Runbook", "hash-a")
-    );
+    private static final SignalKey KEY =
+            new SignalKey(WORKSPACE_ID, DOCUMENT_ID, PUBLISHED, SignalRevision.ofContentDigest("Runbook", "hash-a"));
 
     @Mock
     private AgentJobService agentJobService;
@@ -87,21 +83,15 @@ class DocumentReviewSubmitterTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         lenient()
-            .doAnswer(invocation -> {
-                Consumer<Object> settle = invocation.getArgument(0);
-                settle.accept(null);
-                return null;
-            })
-            .when(transactionTemplate)
-            .executeWithoutResult(any());
+                .doAnswer(invocation -> {
+                    Consumer<Object> settle = invocation.getArgument(0);
+                    settle.accept(null);
+                    return null;
+                })
+                .when(transactionTemplate)
+                .executeWithoutResult(any());
         submitter = new DocumentReviewSubmitter(
-            agentJobService,
-            documentProjection,
-            workspaceRepository,
-            gate,
-            signalRecorder,
-            transactionTemplate
-        );
+                agentJobService, documentProjection, workspaceRepository, gate, signalRecorder, transactionTemplate);
         workspace = new Workspace();
         workspace.setId(WORKSPACE_ID);
     }
@@ -116,22 +106,20 @@ class DocumentReviewSubmitterTest extends BaseUnitTest {
     void submitsADocumentReview() {
         givenWorkspace();
         givenDocument(document(42L));
-        when(gate.evaluateSignal(workspace, PUBLISHED, TriggerMode.AUTO, new ReviewSubject(42L, true))).thenReturn(
-            automaticDetection(workspace, List.of())
-        );
+        when(gate.evaluateSignal(workspace, PUBLISHED, TriggerMode.AUTO, new ReviewSubject(42L, true)))
+                .thenReturn(automaticDetection(workspace, List.of()));
 
         submitter.onDocumentSignal(KEY, DiscoveredVia.EVENT);
 
-        ArgumentCaptor<DocumentReviewSubmissionRequest> request = ArgumentCaptor.forClass(
-            DocumentReviewSubmissionRequest.class
-        );
-        verify(agentJobService).submit(
-            eq(WORKSPACE_ID),
-            eq(AgentJobType.DOCUMENT_REVIEW),
-            request.capture(),
-            eq(KEY),
-            any(GateDecision.Detect.class)
-        );
+        ArgumentCaptor<DocumentReviewSubmissionRequest> request =
+                ArgumentCaptor.forClass(DocumentReviewSubmissionRequest.class);
+        verify(agentJobService)
+                .submit(
+                        eq(WORKSPACE_ID),
+                        eq(AgentJobType.DOCUMENT_REVIEW),
+                        request.capture(),
+                        eq(KEY),
+                        any(GateDecision.Detect.class));
         assertThat(request.getValue().documentId()).isEqualTo(DOCUMENT_ID);
         assertThat(request.getValue().aboutUserId()).isEqualTo(42L);
         assertThat(request.getValue().signal()).isEqualTo(PUBLISHED);
@@ -146,9 +134,8 @@ class DocumentReviewSubmitterTest extends BaseUnitTest {
     void resubmitCarriesTheLedgersDiscoveryMode() {
         givenWorkspace();
         givenDocument(document(42L));
-        when(gate.evaluateSignal(workspace, PUBLISHED, TriggerMode.AUTO, new ReviewSubject(42L, true))).thenReturn(
-            automaticDetection(workspace, List.of())
-        );
+        when(gate.evaluateSignal(workspace, PUBLISHED, TriggerMode.AUTO, new ReviewSubject(42L, true)))
+                .thenReturn(automaticDetection(workspace, List.of()));
         ArtifactSignal signal = new ArtifactSignal();
         signal.setWorkspace(workspace);
         signal.setArtifactKind(ArtifactKinds.DOCUMENT.value());
@@ -159,16 +146,15 @@ class DocumentReviewSubmitterTest extends BaseUnitTest {
 
         submitter.resubmit(signal);
 
-        ArgumentCaptor<DocumentReviewSubmissionRequest> request = ArgumentCaptor.forClass(
-            DocumentReviewSubmissionRequest.class
-        );
-        verify(agentJobService).submit(
-            eq(WORKSPACE_ID),
-            eq(AgentJobType.DOCUMENT_REVIEW),
-            request.capture(),
-            any(),
-            any(GateDecision.Detect.class)
-        );
+        ArgumentCaptor<DocumentReviewSubmissionRequest> request =
+                ArgumentCaptor.forClass(DocumentReviewSubmissionRequest.class);
+        verify(agentJobService)
+                .submit(
+                        eq(WORKSPACE_ID),
+                        eq(AgentJobType.DOCUMENT_REVIEW),
+                        request.capture(),
+                        any(),
+                        any(GateDecision.Detect.class));
         assertThat(request.getValue().observationOrigin()).isEqualTo(ObservationOrigin.BACKFILL);
     }
 
@@ -212,9 +198,9 @@ class DocumentReviewSubmitterTest extends BaseUnitTest {
     void recordsTheGatesReason() {
         givenWorkspace();
         givenDocument(document(42L));
-        when(gate.evaluateSignal(workspace, PUBLISHED, TriggerMode.AUTO, new ReviewSubject(42L, true))).thenReturn(
-            new GateDecision.Skip("every practice bound to this signal is off", SignalStateReason.PRACTICE_AUTONOMY_OFF)
-        );
+        when(gate.evaluateSignal(workspace, PUBLISHED, TriggerMode.AUTO, new ReviewSubject(42L, true)))
+                .thenReturn(new GateDecision.Skip(
+                        "every practice bound to this signal is off", SignalStateReason.PRACTICE_AUTONOMY_OFF));
 
         submitter.onDocumentSignal(KEY, DiscoveredVia.EVENT);
 
@@ -242,23 +228,22 @@ class DocumentReviewSubmitterTest extends BaseUnitTest {
 
     private static ProjectedDocument document(@Nullable Long createdByMemberId) {
         return new ProjectedDocument(
-            "engineering",
-            "runbook",
-            "Runbook",
-            "# Runbook",
-            false,
-            null,
-            null,
-            "Alice",
-            "outline-alice",
-            createdByMemberId,
-            "Bob",
-            "outline-bob",
-            99L,
-            List.of(),
-            false,
-            "Engineering"
-        );
+                "engineering",
+                "runbook",
+                "Runbook",
+                "# Runbook",
+                false,
+                null,
+                null,
+                "Alice",
+                "outline-alice",
+                createdByMemberId,
+                "Bob",
+                "outline-bob",
+                99L,
+                List.of(),
+                false,
+                "Engineering");
     }
 
     private static ProjectedDocument tombstone() {

@@ -22,7 +22,8 @@ import tools.jackson.databind.ObjectMapper;
 class JsonlStdoutPumpTest extends BaseUnitTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    // Built at runtime \u2014 Java's pre-lexer would translate a \\u2028 escape into a real line terminator and break the source.
+    // Built at runtime \u2014 Java's pre-lexer would translate a \\u2028 escape into a real line terminator and break
+    // the source.
     private static final String LINE_SEP = Character.toString(0x2028);
     private static final String PARA_SEP = Character.toString(0x2029);
     private static final int LINE_CAP = 1024;
@@ -40,23 +41,21 @@ class JsonlStdoutPumpTest extends BaseUnitTest {
         List<Integer> bytes = new ArrayList<>();
         AtomicInteger eofCalls = new AtomicInteger();
         JsonlStdoutPump pump = new JsonlStdoutPump(
-            UUID.randomUUID(),
-            new StringReader(input),
-            MAPPER,
-            (frame, wireBytes) -> {
-                frames.add(frame);
-                bytes.add(wireBytes);
-            },
-            ec -> eofCalls.incrementAndGet(),
-            () -> 0,
-            parseErrors,
-            lineCap,
-            Map.of()
-        );
+                UUID.randomUUID(),
+                new StringReader(input),
+                MAPPER,
+                (frame, wireBytes) -> {
+                    frames.add(frame);
+                    bytes.add(wireBytes);
+                },
+                ec -> eofCalls.incrementAndGet(),
+                () -> 0,
+                parseErrors,
+                lineCap,
+                Map.of());
         pump.start();
-        await()
-            .atMost(Duration.ofSeconds(5))
-            .untilAsserted(() -> assertThat(eofCalls.get()).isEqualTo(1));
+        await().atMost(Duration.ofSeconds(5))
+                .untilAsserted(() -> assertThat(eofCalls.get()).isEqualTo(1));
         return new Captured(frames, bytes, eofCalls);
     }
 
@@ -127,11 +126,7 @@ class JsonlStdoutPumpTest extends BaseUnitTest {
         // BufferedReader.readLine splits on CR; our \n-only pump must not. (Jackson is lenient with trailing
         // content after the first complete value — up to one frame may parse, but never two.)
         Captured c = runPump("{\"a\":1}\r{\"b\":2}\n");
-        long bFrames = c
-            .frames()
-            .stream()
-            .filter(n -> n.has("b"))
-            .count();
+        long bFrames = c.frames().stream().filter(n -> n.has("b")).count();
         assertThat(bFrames).as("\\r must not produce a second frame").isZero();
     }
 

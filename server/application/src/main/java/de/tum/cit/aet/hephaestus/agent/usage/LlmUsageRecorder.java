@@ -29,31 +29,27 @@ public class LlmUsageRecorder {
     private final MeterRegistry meterRegistry;
 
     public LlmUsageRecorder(
-        LlmUsageEventRepository usageRepository,
-        LlmBudgetService budgetService,
-        MeterRegistry meterRegistry
-    ) {
+            LlmUsageEventRepository usageRepository, LlmBudgetService budgetService, MeterRegistry meterRegistry) {
         this.usageRepository = usageRepository;
         this.budgetService = budgetService;
         this.meterRegistry = meterRegistry;
     }
 
     public record LlmUsageSample(
-        LlmUsageJobType jobType,
-        LlmUsageSourceType sourceType,
-        UUID sourceId,
-        int sourceAttempt,
-        @Nullable String model,
-        long inputTokens,
-        long outputTokens,
-        long cacheReadTokens,
-        long cacheWriteTokens,
-        long reasoningTokens,
-        int totalCalls,
-        LlmPriceSnapshot price,
-        UsageProvenance provenance,
-        Instant occurredAt
-    ) {}
+            LlmUsageJobType jobType,
+            LlmUsageSourceType sourceType,
+            UUID sourceId,
+            int sourceAttempt,
+            @Nullable String model,
+            long inputTokens,
+            long outputTokens,
+            long cacheReadTokens,
+            long cacheWriteTokens,
+            long reasoningTokens,
+            int totalCalls,
+            LlmPriceSnapshot price,
+            UsageProvenance provenance,
+            Instant occurredAt) {}
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void record(Long workspaceId, LlmUsageSample sample) {
@@ -69,42 +65,34 @@ public class LlmUsageRecorder {
 
     /** A rate the frozen price is missing cannot be charged, so the whole event stops being priced. */
     private static boolean isPricedWithARateMissing(LlmUsageSample sample, LlmPriceSnapshot price) {
-        return (
-            price.pricingState() == PricingState.PRICED &&
-            ((sample.inputTokens() > 0 && price.per1mInputUsd() == null) ||
-                (sample.outputTokens() > 0 && price.per1mOutputUsd() == null) ||
-                (sample.cacheReadTokens() > 0 && price.per1mCacheReadUsd() == null) ||
-                (sample.cacheWriteTokens() > 0 && price.per1mCacheWriteUsd() == null))
-        );
+        return (price.pricingState() == PricingState.PRICED
+                && ((sample.inputTokens() > 0 && price.per1mInputUsd() == null)
+                        || (sample.outputTokens() > 0 && price.per1mOutputUsd() == null)
+                        || (sample.cacheReadTokens() > 0 && price.per1mCacheReadUsd() == null)
+                        || (sample.cacheWriteTokens() > 0 && price.per1mCacheWriteUsd() == null)));
     }
 
     /** Keeps the frozen rates: they still say what the attempt would have cost. */
     private static LlmPriceSnapshot asUnpriced(LlmPriceSnapshot price) {
         return new LlmPriceSnapshot(
-            price.fundingSource(),
-            PricingState.UNPRICED,
-            price.appliedPriceId(),
-            price.appliedWorkspaceModelId(),
-            price.per1mInputUsd(),
-            price.per1mOutputUsd(),
-            price.per1mCacheReadUsd(),
-            price.per1mCacheWriteUsd()
-        );
+                price.fundingSource(),
+                PricingState.UNPRICED,
+                price.appliedPriceId(),
+                price.appliedWorkspaceModelId(),
+                price.per1mInputUsd(),
+                price.per1mOutputUsd(),
+                price.per1mCacheReadUsd(),
+                price.per1mCacheWriteUsd());
     }
 
     private boolean persist(Long workspaceId, LlmUsageSample sample, LlmPriceSnapshot quoted) {
         // A PRICED snapshot missing a rate would silently cost the tokens it does have a rate for.
         LlmPriceSnapshot price = isPricedWithARateMissing(sample, quoted) ? asUnpriced(quoted) : quoted;
         LlmPriceSnapshot.Cost computed = price.calculateCost(
-            sample.inputTokens(),
-            sample.outputTokens(),
-            sample.cacheReadTokens(),
-            sample.cacheWriteTokens()
-        );
+                sample.inputTokens(), sample.outputTokens(), sample.cacheReadTokens(), sample.cacheWriteTokens());
         BigDecimal cost = computed.usd();
         reportClamp(sample, computed);
-        int inserted = usageRepository.insertIfAbsent(
-            new LlmUsageInsert(
+        int inserted = usageRepository.insertIfAbsent(new LlmUsageInsert(
                 UUID.randomUUID(),
                 workspaceId,
                 sample.jobType().name(),
@@ -128,16 +116,13 @@ public class LlmUsageRecorder {
                 price.per1mOutputUsd(),
                 price.per1mCacheReadUsd(),
                 price.per1mCacheWriteUsd(),
-                sample.provenance().name()
-            )
-        );
+                sample.provenance().name()));
         if (inserted == 0) {
             log.debug(
-                "LLM usage already recorded for sourceType={}, sourceId={}, sourceAttempt={}",
-                sample.sourceType(),
-                sample.sourceId(),
-                sample.sourceAttempt()
-            );
+                    "LLM usage already recorded for sourceType={}, sourceId={}, sourceAttempt={}",
+                    sample.sourceType(),
+                    sample.sourceId(),
+                    sample.sourceAttempt());
             return false;
         }
         if (price.pricingState() == PricingState.UNPRICED) {
@@ -156,14 +141,15 @@ public class LlmUsageRecorder {
             return;
         }
         log.warn(
-            "LLM cost clamped to fit the ledger column: clamp={}, storedUsd={}, sourceType={}, sourceId={}, sourceAttempt={}",
-            computed.clamp(),
-            computed.usd(),
-            sample.sourceType(),
-            sample.sourceId(),
-            sample.sourceAttempt()
-        );
-        meterRegistry.counter("llm.usage.cost.clamped", "direction", clampTag(computed.clamp())).increment();
+                "LLM cost clamped to fit the ledger column: clamp={}, storedUsd={}, sourceType={}, sourceId={}, sourceAttempt={}",
+                computed.clamp(),
+                computed.usd(),
+                sample.sourceType(),
+                sample.sourceId(),
+                sample.sourceAttempt());
+        meterRegistry
+                .counter("llm.usage.cost.clamped", "direction", clampTag(computed.clamp()))
+                .increment();
     }
 
     private static String clampTag(LlmPriceSnapshot.CostClamp clamp) {
@@ -171,12 +157,10 @@ public class LlmUsageRecorder {
     }
 
     private void registerBudgetAlert(Long workspaceId, LlmPriceSnapshot price, @Nullable BigDecimal cost) {
-        if (
-            price.fundingSource() != FundingSource.INSTANCE ||
-            price.pricingState() != PricingState.PRICED ||
-            cost == null ||
-            cost.signum() <= 0
-        ) {
+        if (price.fundingSource() != FundingSource.INSTANCE
+                || price.pricingState() != PricingState.PRICED
+                || cost == null
+                || cost.signum() <= 0) {
             return;
         }
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
@@ -203,16 +187,14 @@ public class LlmUsageRecorder {
         if (budget == null || monthToDate == null) {
             return;
         }
-        boolean crossedNow =
-            LlmBudgetService.capReached(monthToDate, budget) &&
-            !LlmBudgetService.capReached(monthToDate.subtract(eventCost), budget);
+        boolean crossedNow = LlmBudgetService.capReached(monthToDate, budget)
+                && !LlmBudgetService.capReached(monthToDate.subtract(eventCost), budget);
         if (crossedNow) {
             log.warn(
-                "Workspace LLM budget exhausted: workspaceId={}, budgetUsd={}, monthToDateUsd={}",
-                workspaceId,
-                budget,
-                monthToDate
-            );
+                    "Workspace LLM budget exhausted: workspaceId={}, budgetUsd={}, monthToDateUsd={}",
+                    workspaceId,
+                    budget,
+                    monthToDate);
             meterRegistry.counter("llm.budget.exhausted").increment();
         }
     }

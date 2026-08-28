@@ -49,7 +49,10 @@ public class AuthAuditController {
     }
 
     /** A human-readable account identity. {@code displayName}/{@code email} are null for deleted accounts. */
-    public record AccountRefDTO(@NonNull Long id, @Nullable String displayName, @Nullable String email) {}
+    public record AccountRefDTO(
+            @NonNull Long id,
+            @Nullable String displayName,
+            @Nullable String email) {}
 
     /**
      * Optional query-param filters for the list/export endpoints, bound as a flattened
@@ -57,13 +60,16 @@ public class AuthAuditController {
      * optional; an absent field means "no constraint on that dimension".
      */
     public record AuditFilterParams(
-        @RequestParam(required = false) @Nullable Long accountId,
-        @RequestParam(required = false) @Nullable Long actingAccountId,
-        @RequestParam(required = false) @Nullable List<AuthEvent.EventType> eventType,
-        @RequestParam(required = false) @Nullable List<AuthEvent.Result> result,
-        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) @Nullable Instant from,
-        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) @Nullable Instant to
-    ) {
+            @RequestParam(required = false) @Nullable Long accountId,
+            @RequestParam(required = false) @Nullable Long actingAccountId,
+            @RequestParam(required = false) @Nullable List<AuthEvent.EventType> eventType,
+            @RequestParam(required = false) @Nullable List<AuthEvent.Result> result,
+
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) @Nullable
+            Instant from,
+
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) @Nullable
+            Instant to) {
         AuthAuditService.Filter toFilter() {
             return new AuthAuditService.Filter(accountId, actingAccountId, eventType, result, from, to);
         }
@@ -71,30 +77,28 @@ public class AuthAuditController {
 
     /** One audit row, flattened for the admin viewer. */
     public record AuthEventViewDTO(
-        @NonNull Long id,
-        @NonNull Instant occurredAt,
-        @NonNull String eventType,
-        @NonNull String result,
-        @Nullable Long accountId,
-        @Nullable Long actingAccountId,
-        // Resolved identities for accountId / actingAccountId (null when the account no longer exists);
-        // the raw ids stay for back-compat and so deleted-account rows are still attributable by id.
-        @Nullable AccountRefDTO account,
-        @Nullable AccountRefDTO actor,
-        @Nullable String failureReason,
-        @Nullable Long workspaceId,
-        @Nullable String ipAddress,
-        @Nullable String userAgent,
-        @Nullable String details
-    ) {}
+            @NonNull Long id,
+            @NonNull Instant occurredAt,
+            @NonNull String eventType,
+            @NonNull String result,
+            @Nullable Long accountId,
+            @Nullable Long actingAccountId,
+            // Resolved identities for accountId / actingAccountId (null when the account no longer exists);
+            // the raw ids stay for back-compat and so deleted-account rows are still attributable by id.
+            @Nullable AccountRefDTO account,
+            @Nullable AccountRefDTO actor,
+            @Nullable String failureReason,
+            @Nullable Long workspaceId,
+            @Nullable String ipAddress,
+            @Nullable String userAgent,
+            @Nullable String details) {}
 
     @GetMapping
     @Operation(summary = "List auth audit events (paged, newest first)", operationId = "adminListAuthEvents")
     public ResponseEntity<Page<AuthEventViewDTO>> list(
-        @RequestParam(defaultValue = "0") int page,
-        @RequestParam(defaultValue = "50") int size,
-        @ParameterObject AuditFilterParams filter
-    ) {
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size,
+            @ParameterObject AuditFilterParams filter) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
         // The query carries its own ORDER BY occurred_at DESC; keep the Pageable sort empty.
@@ -106,42 +110,39 @@ public class AuthAuditController {
 
     @GetMapping(value = "/export", produces = "text/csv")
     @Operation(
-        summary = "Export the filtered audit log as CSV (newest first, capped)",
-        operationId = "adminExportAuthEvents"
-    )
+            summary = "Export the filtered audit log as CSV (newest first, capped)",
+            operationId = "adminExportAuthEvents")
     public ResponseEntity<String> export(@ParameterObject AuditFilterParams filter) {
         AuthAuditService.AuditPage data = authAuditService.list(filter.toFilter(), PageRequest.of(0, EXPORT_MAX_ROWS));
         var identities = data.identities();
         StringBuilder csv = new StringBuilder();
         csv.append(
-            "occurred_at_utc,event_type,result,account_id,account_name,account_email," +
-                "acting_account_id,actor_name,actor_email,failure_reason,workspace_id,ip_address,user_agent,details\n"
-        );
+                "occurred_at_utc,event_type,result,account_id,account_name,account_email,"
+                        + "acting_account_id,actor_name,actor_email,failure_reason,workspace_id,ip_address,user_agent,details\n");
         for (AuthEvent e : data.events().getContent()) {
             AuthAuditService.AccountRef account = AuthAuditService.refOf(e.getAccountId(), identities);
             AuthAuditService.AccountRef actor = AuthAuditService.refOf(e.getActingAccountId(), identities);
             appendCsvRow(
-                csv,
-                e.getId().getOccurredAt().toString(),
-                e.getEventType().name(),
-                e.getResult().name(),
-                str(e.getAccountId()),
-                account == null ? "" : account.displayName(),
-                account == null ? "" : account.email(),
-                str(e.getActingAccountId()),
-                actor == null ? "" : actor.displayName(),
-                actor == null ? "" : actor.email(),
-                e.getFailureReason(),
-                str(e.getWorkspaceId()),
-                e.getIpInet(),
-                e.getUserAgent(),
-                e.getDetails()
-            );
+                    csv,
+                    e.getId().getOccurredAt().toString(),
+                    e.getEventType().name(),
+                    e.getResult().name(),
+                    str(e.getAccountId()),
+                    account == null ? "" : account.displayName(),
+                    account == null ? "" : account.email(),
+                    str(e.getActingAccountId()),
+                    actor == null ? "" : actor.displayName(),
+                    actor == null ? "" : actor.email(),
+                    e.getFailureReason(),
+                    str(e.getWorkspaceId()),
+                    e.getIpInet(),
+                    e.getUserAgent(),
+                    e.getDetails());
         }
         return ResponseEntity.ok()
-            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"audit-log.csv\"")
-            .contentType(MediaType.parseMediaType("text/csv"))
-            .body(csv.toString());
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"audit-log.csv\"")
+                .contentType(MediaType.parseMediaType("text/csv"))
+                .body(csv.toString());
     }
 
     private static String str(@Nullable Long value) {
@@ -165,27 +166,28 @@ public class AuthAuditController {
             if (!value.isEmpty() && "=+-@\t\r".indexOf(value.charAt(0)) >= 0) {
                 value = "'" + value;
             }
-            out.append('"').append(value.replace("\"", "\"\"").replace("\r\n", " ").replace('\n', ' ')).append('"');
+            out.append('"')
+                    .append(value.replace("\"", "\"\"").replace("\r\n", " ").replace('\n', ' '))
+                    .append('"');
         }
         out.append('\n');
     }
 
     private static AuthEventViewDTO toView(AuthEvent e, Map<Long, AuthAuditService.AccountRef> identities) {
         return new AuthEventViewDTO(
-            e.getId().getId(),
-            e.getId().getOccurredAt(),
-            e.getEventType().name(),
-            e.getResult().name(),
-            e.getAccountId(),
-            e.getActingAccountId(),
-            toRef(AuthAuditService.refOf(e.getAccountId(), identities)),
-            toRef(AuthAuditService.refOf(e.getActingAccountId(), identities)),
-            e.getFailureReason(),
-            e.getWorkspaceId(),
-            e.getIpInet(),
-            e.getUserAgent(),
-            e.getDetails()
-        );
+                e.getId().getId(),
+                e.getId().getOccurredAt(),
+                e.getEventType().name(),
+                e.getResult().name(),
+                e.getAccountId(),
+                e.getActingAccountId(),
+                toRef(AuthAuditService.refOf(e.getAccountId(), identities)),
+                toRef(AuthAuditService.refOf(e.getActingAccountId(), identities)),
+                e.getFailureReason(),
+                e.getWorkspaceId(),
+                e.getIpInet(),
+                e.getUserAgent(),
+                e.getDetails());
     }
 
     private static @Nullable AccountRefDTO toRef(AuthAuditService.@Nullable AccountRef ref) {

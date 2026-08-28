@@ -50,12 +50,11 @@ public class SlackWeeklyLeaderboardTask implements LeaderboardNotificationTask {
     private final ApplicationEventPublisher eventPublisher;
 
     public SlackWeeklyLeaderboardTask(
-        ApplicationProperties applicationProperties,
-        LeaderboardService leaderboardService,
-        ConnectionService connectionService,
-        LeaderboardScheduleResolver scheduleResolver,
-        ApplicationEventPublisher eventPublisher
-    ) {
+            ApplicationProperties applicationProperties,
+            LeaderboardService leaderboardService,
+            ConnectionService connectionService,
+            LeaderboardScheduleResolver scheduleResolver,
+            ApplicationEventPublisher eventPublisher) {
         this.applicationProperties = applicationProperties;
         this.leaderboardService = leaderboardService;
         this.connectionService = connectionService;
@@ -86,7 +85,8 @@ public class SlackWeeklyLeaderboardTask implements LeaderboardNotificationTask {
             return;
         }
 
-        Optional<String> team = Optional.ofNullable(slackConfig.get().teamLabel()).filter(t -> !t.isBlank());
+        Optional<String> team =
+                Optional.ofNullable(slackConfig.get().teamLabel()).filter(t -> !t.isBlank());
         LeaderboardScheduleResolver.CycleWindow window = scheduleResolver.previousCycleWindow(workspace);
         List<LeaderboardEntryDTO> topEntries = fetchTopEntries(workspace, window, team);
         if (topEntries.isEmpty()) {
@@ -94,8 +94,7 @@ public class SlackWeeklyLeaderboardTask implements LeaderboardNotificationTask {
             return;
         }
 
-        eventPublisher.publishEvent(
-            new LeaderboardDigestReadyEvent(
+        eventPublisher.publishEvent(new LeaderboardDigestReadyEvent(
                 workspaceId,
                 workspace.getWorkspaceSlug(),
                 channelId,
@@ -104,34 +103,26 @@ public class SlackWeeklyLeaderboardTask implements LeaderboardNotificationTask {
                 window.after(),
                 window.before(),
                 topEntries,
-                normalizeBaseUrl(Objects.requireNonNull(applicationProperties.hostUrl()))
-            )
-        );
+                normalizeBaseUrl(Objects.requireNonNull(applicationProperties.hostUrl()))));
     }
 
     private List<LeaderboardEntryDTO> fetchTopEntries(
-        Workspace workspace,
-        LeaderboardScheduleResolver.CycleWindow window,
-        Optional<String> team
-    ) {
+            Workspace workspace, LeaderboardScheduleResolver.CycleWindow window, Optional<String> team) {
         var leaderboard = leaderboardService.createLeaderboard(
-            workspace,
-            window.after(),
-            window.before(),
-            team.orElse("all"),
-            LeaderboardSortType.SCORE,
-            LeaderboardMode.INDIVIDUAL
-        );
+                workspace,
+                window.after(),
+                window.before(),
+                team.orElse("all"),
+                LeaderboardSortType.SCORE,
+                LeaderboardMode.INDIVIDUAL);
         var top3 = leaderboard.subList(0, Math.min(3, leaderboard.size()));
         log.debug(
-            "Fetched top reviewers: workspaceId={}, userCount={}, users={}",
-            workspace.getId(),
-            top3.size(),
-            top3
-                .stream()
-                .map(entry -> entry.user() != null ? entry.user().name() : "<team>")
-                .toList()
-        );
+                "Fetched top reviewers: workspaceId={}, userCount={}, users={}",
+                workspace.getId(),
+                top3.size(),
+                top3.stream()
+                        .map(entry -> entry.user() != null ? entry.user().name() : "<team>")
+                        .toList());
         return top3;
     }
 

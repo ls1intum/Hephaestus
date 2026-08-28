@@ -57,11 +57,10 @@ public class HephaestusJwtIssuer {
     private final Clock clock;
 
     public HephaestusJwtIssuer(
-        JwtSigningKeyService keyService,
-        IssuedJwtRepository issuedJwtRepository,
-        AuthProperties properties,
-        Clock clock
-    ) {
+            JwtSigningKeyService keyService,
+            IssuedJwtRepository issuedJwtRepository,
+            AuthProperties properties,
+            Clock clock) {
         this.keyService = keyService;
         this.issuedJwtRepository = issuedJwtRepository;
         this.properties = properties;
@@ -95,11 +94,10 @@ public class HephaestusJwtIssuer {
      */
     @Transactional
     public Token issue(
-        JwtPrincipal principal,
-        @Nullable Long impersonatorId,
-        @Nullable Instant impersonationExpiresAt,
-        @Nullable HttpServletRequest request
-    ) {
+            JwtPrincipal principal,
+            @Nullable Long impersonatorId,
+            @Nullable Instant impersonationExpiresAt,
+            @Nullable HttpServletRequest request) {
         return issueToken(principal, impersonatorId, impersonationExpiresAt, null, request);
     }
 
@@ -112,22 +110,20 @@ public class HephaestusJwtIssuer {
      */
     @Transactional
     public Token issue(
-        JwtPrincipal principal,
-        @Nullable Long impersonatorId,
-        @Nullable Instant impersonationExpiresAt,
-        @Nullable Instant sessionExpiresAt,
-        @Nullable HttpServletRequest request
-    ) {
+            JwtPrincipal principal,
+            @Nullable Long impersonatorId,
+            @Nullable Instant impersonationExpiresAt,
+            @Nullable Instant sessionExpiresAt,
+            @Nullable HttpServletRequest request) {
         return issueToken(principal, impersonatorId, impersonationExpiresAt, sessionExpiresAt, request);
     }
 
     private Token issueToken(
-        JwtPrincipal principal,
-        @Nullable Long impersonatorId,
-        @Nullable Instant impersonationExpiresAt,
-        @Nullable Instant sessionExpiresAt,
-        @Nullable HttpServletRequest request
-    ) {
+            JwtPrincipal principal,
+            @Nullable Long impersonatorId,
+            @Nullable Instant impersonationExpiresAt,
+            @Nullable Instant sessionExpiresAt,
+            @Nullable HttpServletRequest request) {
         Instant now = clock.instant();
         Instant expiresAt = now.plus(properties.accessTtl());
         if (impersonationExpiresAt != null && impersonationExpiresAt.isBefore(expiresAt)) {
@@ -139,14 +135,14 @@ public class HephaestusJwtIssuer {
         UUID jti = UUID.randomUUID();
         JWK signingKey = keyService.currentSigningKey();
         JwtClaimsSet.Builder claims = JwtClaimsSet.builder()
-            .issuer(properties.issuer().toString())
-            .subject(String.valueOf(principal.accountId()))
-            .audience(List.of(properties.audience()))
-            .id(jti.toString())
-            .issuedAt(now)
-            .expiresAt(expiresAt)
-            .claim("preferred_username", principal.login())
-            .claim("roles", List.copyOf(principal.roles()));
+                .issuer(properties.issuer().toString())
+                .subject(String.valueOf(principal.accountId()))
+                .audience(List.of(properties.audience()))
+                .id(jti.toString())
+                .issuedAt(now)
+                .expiresAt(expiresAt)
+                .claim("preferred_username", principal.login())
+                .claim("roles", List.copyOf(principal.roles()));
         if (principal.givenName() != null) {
             claims.claim("given_name", principal.givenName());
         }
@@ -162,7 +158,9 @@ public class HephaestusJwtIssuer {
             // Absolute session ceiling (epoch seconds), constant across refreshes (OWASP absolute timeout).
             claims.claim("session_exp", sessionExpiresAt.getEpochSecond());
         }
-        JwsHeader header = JwsHeader.with(SignatureAlgorithm.ES256).keyId(signingKey.getKeyID()).build();
+        JwsHeader header = JwsHeader.with(SignatureAlgorithm.ES256)
+                .keyId(signingKey.getKeyID())
+                .build();
         Jwt jwt = encoder.encode(JwtEncoderParameters.from(header, claims.build()));
 
         IssuedJwt row = new IssuedJwt(jti, principal.accountId(), expiresAt);

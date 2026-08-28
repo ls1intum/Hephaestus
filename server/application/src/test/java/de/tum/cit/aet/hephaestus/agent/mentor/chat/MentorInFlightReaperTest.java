@@ -49,8 +49,8 @@ class MentorInFlightReaperTest extends BaseUnitTest {
         assertThatCode(reaper::reap).doesNotThrowAnyException();
         verify(accounting).account(third);
         assertThat(meterRegistry.counter("mentor.in_flight.reaper.failure").count())
-            .as("a lost write must be counted, not swallowed — it means a turn is staying stuck")
-            .isEqualTo(1.0);
+                .as("a lost write must be counted, not swallowed — it means a turn is staying stuck")
+                .isEqualTo(1.0);
     }
 
     @Test
@@ -86,14 +86,15 @@ class MentorInFlightReaperTest extends BaseUnitTest {
 
         SchedulerLock lock = reap.getAnnotation(SchedulerLock.class);
 
-        assertThat(lock).as("an unlocked money-writing sweep double-runs on every multi-replica deploy").isNotNull();
+        assertThat(lock)
+                .as("an unlocked money-writing sweep double-runs on every multi-replica deploy")
+                .isNotNull();
         assertThat(lock.name()).isEqualTo("mentor-in-flight-reaper");
         assertThat(lock.lockAtMostFor())
-            .as(
-                "without its own bound the sweep falls back to ShedLockConfig's 30-minute default, so a crashed pod " +
-                    "holds the lock across far more of this two-minute sweep's ticks than its own runtime warrants"
-            )
-            .isNotBlank();
+                .as(
+                        "without its own bound the sweep falls back to ShedLockConfig's 30-minute default, so a crashed pod "
+                                + "holds the lock across far more of this two-minute sweep's ticks than its own runtime warrants")
+                .isNotBlank();
     }
 
     @Test
@@ -101,20 +102,18 @@ class MentorInFlightReaperTest extends BaseUnitTest {
     void shouldNeverReapWithinTheConfigurableTimeoutCeiling() {
         Duration longestPossibleTurn = Duration.ofSeconds(AgentBindingLimits.MAX_TIMEOUT_SECONDS);
 
-        MentorInFlightReaper defaultWindow = reaperWith(
-            new MentorInFlightAccounting(chatMessageRepository, usageRecorder)
-        );
+        MentorInFlightReaper defaultWindow =
+                reaperWith(new MentorInFlightAccounting(chatMessageRepository, usageRecorder));
         MentorInFlightReaper misconfigured = new MentorInFlightReaper(
-            chatMessageRepository,
-            new MentorInFlightAccounting(chatMessageRepository, usageRecorder),
-            meterRegistry,
-            Duration.ofMinutes(1)
-        );
+                chatMessageRepository,
+                new MentorInFlightAccounting(chatMessageRepository, usageRecorder),
+                meterRegistry,
+                Duration.ofMinutes(1));
 
         assertThat(defaultWindow.window()).isGreaterThan(longestPossibleTurn);
         assertThat(misconfigured.window())
-            .as("a window under the timeout ceiling reaps turns that are still streaming")
-            .isGreaterThan(longestPossibleTurn);
+                .as("a window under the timeout ceiling reaps turns that are still streaming")
+                .isGreaterThan(longestPossibleTurn);
     }
 
     private MentorInFlightReaper reaperWith(MentorInFlightAccounting accounting) {

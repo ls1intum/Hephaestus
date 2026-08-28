@@ -17,10 +17,8 @@ import java.util.Set;
 final class ScmEventSources {
 
     static final EventTypeKey GITHUB_PULL_REQUEST = new EventTypeKey(IntegrationKind.GITHUB, "repository.pull_request");
-    static final EventTypeKey GITHUB_PULL_REQUEST_REVIEW = new EventTypeKey(
-        IntegrationKind.GITHUB,
-        "repository.pull_request_review"
-    );
+    static final EventTypeKey GITHUB_PULL_REQUEST_REVIEW =
+            new EventTypeKey(IntegrationKind.GITHUB, "repository.pull_request_review");
     static final EventTypeKey GITHUB_ISSUES = new EventTypeKey(IntegrationKind.GITHUB, "repository.issues");
 
     static final EventTypeKey GITLAB_MERGE_REQUEST = new EventTypeKey(IntegrationKind.GITLAB, "merge_request");

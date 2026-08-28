@@ -25,7 +25,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.commit.GitLabCommitMergeRequestLinker;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.repository.dto.GitLabPushEventDTO;
@@ -99,22 +98,21 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
         transactionTemplate = mock(TransactionTemplate.class);
         // Lenient: not all tests trigger transactional execution (e.g., getEventType, nonPushSubject)
         lenient()
-            .doAnswer(invocation -> {
-                @SuppressWarnings("unchecked")
-                Consumer<TransactionStatus> callback = invocation.getArgument(0);
-                callback.accept(null);
-                return null;
-            })
-            .when(transactionTemplate)
-            .executeWithoutResult(any());
+                .doAnswer(invocation -> {
+                    @SuppressWarnings("unchecked")
+                    Consumer<TransactionStatus> callback = invocation.getArgument(0);
+                    callback.accept(null);
+                    return null;
+                })
+                .when(transactionTemplate)
+                .executeWithoutResult(any());
 
         GitLabProperties properties = new GitLabProperties(
-            DEFAULT_SERVER_URL,
-            Duration.ofSeconds(30),
-            Duration.ofSeconds(60),
-            Duration.ofMillis(200),
-            Duration.ofMinutes(5)
-        );
+                DEFAULT_SERVER_URL,
+                Duration.ofSeconds(30),
+                Duration.ofSeconds(60),
+                Duration.ofMillis(200),
+                Duration.ofMinutes(5));
 
         gitLabProvider = new IdentityProvider();
         gitLabProvider.setId(PROVIDER_ID);
@@ -123,26 +121,25 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
 
         // Default: provider lookup succeeds
         lenient()
-            .when(gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITLAB, DEFAULT_SERVER_URL))
-            .thenReturn(Optional.of(gitLabProvider));
+                .when(gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITLAB, DEFAULT_SERVER_URL))
+                .thenReturn(Optional.of(gitLabProvider));
 
         handler = new GitLabPushMessageHandler(
-            projectProcessor,
-            organizationRepository,
-            repositoryRepository,
-            commitRepository,
-            gitProviderRepository,
-            properties,
-            gitRepositoryManager,
-            tokenService,
-            authorResolver,
-            scopeIdResolver,
-            syncTargetProvider,
-            eventPublisher,
-            commitMergeRequestLinker,
-            deserializer,
-            transactionTemplate
-        );
+                projectProcessor,
+                organizationRepository,
+                repositoryRepository,
+                commitRepository,
+                gitProviderRepository,
+                properties,
+                gitRepositoryManager,
+                tokenService,
+                authorResolver,
+                scopeIdResolver,
+                syncTargetProvider,
+                eventPublisher,
+                commitMergeRequestLinker,
+                deserializer,
+                transactionTemplate);
     }
 
     @Test
@@ -153,26 +150,24 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
     @Test
     void validPushEvent_upsertsProject() throws IOException {
         var projectInfo = new GitLabPushEventDTO.ProjectInfo(
-            246765L,
-            "demo-repository",
-            "Demo repo",
-            "https://gitlab.lrz.de/hephaestustest/demo-repository",
-            "HephaestusTest",
-            "hephaestustest/demo-repository",
-            "main",
-            0
-        );
+                246765L,
+                "demo-repository",
+                "Demo repo",
+                "https://gitlab.lrz.de/hephaestustest/demo-repository",
+                "HephaestusTest",
+                "hephaestustest/demo-repository",
+                "main",
+                0);
         var pushEvent = new GitLabPushEventDTO(
-            "push",
-            "refs/heads/main",
-            "9c5dedd52046bb5213189afc25f75e608a98d462",
-            "a4bf10d93a2d136f1db911b6f1c03d26d835a44f",
-            "a4bf10d93a2d136f1db911b6f1c03d26d835a44f",
-            246765L,
-            projectInfo,
-            3,
-            null
-        );
+                "push",
+                "refs/heads/main",
+                "9c5dedd52046bb5213189afc25f75e608a98d462",
+                "a4bf10d93a2d136f1db911b6f1c03d26d835a44f",
+                "a4bf10d93a2d136f1db911b6f1c03d26d835a44f",
+                246765L,
+                projectInfo,
+                3,
+                null);
 
         Repository repo = new Repository();
         repo.setId(246765L);
@@ -182,9 +177,8 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
         Organization org = new Organization();
         org.setId(1L);
         org.setLogin("hephaestustest");
-        when(organizationRepository.findByLoginIgnoreCaseAndProviderId("hephaestustest", PROVIDER_ID)).thenReturn(
-            Optional.of(org)
-        );
+        when(organizationRepository.findByLoginIgnoreCaseAndProviderId("hephaestustest", PROVIDER_ID))
+                .thenReturn(Optional.of(org));
 
         Message msg = mockMessage("gitlab.hephaestustest.demo-repository.push", pushEvent);
         handler.onMessage(msg);
@@ -197,26 +191,17 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
     @Test
     void branchDeletion_skipsProcessing() throws IOException {
         var projectInfo = new GitLabPushEventDTO.ProjectInfo(
-            1L,
-            "proj",
-            null,
-            "https://gitlab.com/org/proj",
-            null,
-            "org/proj",
-            "main",
-            0
-        );
+                1L, "proj", null, "https://gitlab.com/org/proj", null, "org/proj", "main", 0);
         var pushEvent = new GitLabPushEventDTO(
-            "push",
-            "refs/heads/feature-branch",
-            "abc123",
-            "0000000000000000000000000000000000000000", // branch deletion
-            null,
-            1L,
-            projectInfo,
-            0,
-            null
-        );
+                "push",
+                "refs/heads/feature-branch",
+                "abc123",
+                "0000000000000000000000000000000000000000", // branch deletion
+                null,
+                1L,
+                projectInfo,
+                0,
+                null);
 
         Message msg = mockMessage("gitlab.org.proj.push", pushEvent);
         handler.onMessage(msg);
@@ -227,16 +212,15 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
     @Test
     void nullProject_skipsProcessing() throws IOException {
         var pushEvent = new GitLabPushEventDTO(
-            "push",
-            "refs/heads/main",
-            "before",
-            "after",
-            "after",
-            null,
-            null, // null project
-            0,
-            null
-        );
+                "push",
+                "refs/heads/main",
+                "before",
+                "after",
+                "after",
+                null,
+                null, // null project
+                0,
+                null);
 
         Message msg = mockMessage("gitlab.org.proj.push", pushEvent);
         handler.onMessage(msg);
@@ -247,26 +231,9 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
     @Test
     void processorReturnsNull_logsWarning() throws IOException {
         var projectInfo = new GitLabPushEventDTO.ProjectInfo(
-            1L,
-            "proj",
-            null,
-            "https://gitlab.com/org/proj",
-            null,
-            "org/proj",
-            "main",
-            0
-        );
-        var pushEvent = new GitLabPushEventDTO(
-            "push",
-            "refs/heads/main",
-            "before",
-            "after",
-            "after",
-            1L,
-            projectInfo,
-            1,
-            null
-        );
+                1L, "proj", null, "https://gitlab.com/org/proj", null, "org/proj", "main", 0);
+        var pushEvent =
+                new GitLabPushEventDTO("push", "refs/heads/main", "before", "after", "after", 1L, projectInfo, 1, null);
 
         when(projectProcessor.processPushEvent(projectInfo, gitLabProvider)).thenReturn(null);
 
@@ -288,16 +255,15 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
         when(scopeIdResolver.findScopeIdByRepositoryName("org/proj")).thenReturn(Optional.of(7L));
 
         var pushEvent = new GitLabPushEventDTO(
-            "push",
-            "refs/heads/main",
-            "before",
-            "after",
-            "after",
-            42L,
-            projectInfo,
-            3, // three commits in push
-            null
-        );
+                "push",
+                "refs/heads/main",
+                "before",
+                "after",
+                "after",
+                42L,
+                projectInfo,
+                3, // three commits in push
+                null);
 
         Message msg = mockMessage("gitlab.org.proj.push", pushEvent);
         handler.onMessage(msg);
@@ -351,9 +317,8 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
 
             Organization org = new Organization();
             org.setId(42L);
-            when(organizationRepository.findByLoginIgnoreCaseAndProviderId("org", PROVIDER_ID)).thenReturn(
-                Optional.of(org)
-            );
+            when(organizationRepository.findByLoginIgnoreCaseAndProviderId("org", PROVIDER_ID))
+                    .thenReturn(Optional.of(org));
 
             Message msg = mockMessage("gitlab.org.proj.push", createPushEvent(projectInfo));
             handler.onMessage(msg);
@@ -369,9 +334,8 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
 
             var projectInfo = createProjectInfo(1L, "org/proj");
             when(projectProcessor.processPushEvent(projectInfo, gitLabProvider)).thenReturn(repo);
-            when(organizationRepository.findByLoginIgnoreCaseAndProviderId("org", PROVIDER_ID)).thenReturn(
-                Optional.empty()
-            );
+            when(organizationRepository.findByLoginIgnoreCaseAndProviderId("org", PROVIDER_ID))
+                    .thenReturn(Optional.empty());
 
             Message msg = mockMessage("gitlab.org.proj.push", createPushEvent(projectInfo));
             handler.onMessage(msg);
@@ -393,9 +357,8 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
             Organization org = new Organization();
             org.setId(42L);
             // Should look up "org/team/subteam" (immediate parent)
-            when(organizationRepository.findByLoginIgnoreCaseAndProviderId("org/team/subteam", PROVIDER_ID)).thenReturn(
-                Optional.of(org)
-            );
+            when(organizationRepository.findByLoginIgnoreCaseAndProviderId("org/team/subteam", PROVIDER_ID))
+                    .thenReturn(Optional.of(org));
 
             Message msg = mockMessage("gitlab.org.team.subteam.project.push", createPushEvent(projectInfo));
             handler.onMessage(msg);
@@ -432,12 +395,14 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
         @Test
         @DisplayName("nested org/team/project")
         void nestedPath() {
-            assertThat(GitLabPushMessageHandler.extractGroupPath("org/team/project")).isEqualTo("org/team");
+            assertThat(GitLabPushMessageHandler.extractGroupPath("org/team/project"))
+                    .isEqualTo("org/team");
         }
 
         @Test
         void deeplyNested() {
-            assertThat(GitLabPushMessageHandler.extractGroupPath("a/b/c/d/project")).isEqualTo("a/b/c/d");
+            assertThat(GitLabPushMessageHandler.extractGroupPath("a/b/c/d/project"))
+                    .isEqualTo("a/b/c/d");
         }
 
         @Test
@@ -465,29 +430,12 @@ class GitLabPushMessageHandlerTest extends BaseUnitTest {
 
     private GitLabPushEventDTO.ProjectInfo createProjectInfo(Long id, String pathWithNamespace) {
         return new GitLabPushEventDTO.ProjectInfo(
-            id,
-            "proj",
-            null,
-            "https://gitlab.com/" + pathWithNamespace,
-            null,
-            pathWithNamespace,
-            "main",
-            0
-        );
+                id, "proj", null, "https://gitlab.com/" + pathWithNamespace, null, pathWithNamespace, "main", 0);
     }
 
     private GitLabPushEventDTO createPushEvent(GitLabPushEventDTO.ProjectInfo projectInfo) {
         return new GitLabPushEventDTO(
-            "push",
-            "refs/heads/main",
-            "before",
-            "after",
-            "after",
-            projectInfo.id(),
-            projectInfo,
-            1,
-            null
-        );
+                "push", "refs/heads/main", "before", "after", "after", projectInfo.id(), projectInfo, 1, null);
     }
 
     private Message mockMessage(String subject, GitLabPushEventDTO event) throws IOException {

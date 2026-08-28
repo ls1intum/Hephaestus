@@ -26,11 +26,10 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.git")
 public record GitRepositoryProperties(
-    @DefaultValue("false") boolean enabled,
-    @DefaultValue("20000") @Min(1) int treeMaxFiles,
-    @DefaultValue("32MB") @NotNull DataSize treeMaxTotalSize,
-    @DefaultValue("10MB") @NotNull DataSize treeMaxFileSize
-) {
+        @DefaultValue("false") boolean enabled,
+        @DefaultValue("20000") @Min(1) int treeMaxFiles,
+        @DefaultValue("32MB") @NotNull DataSize treeMaxTotalSize,
+        @DefaultValue("10MB") @NotNull DataSize treeMaxFileSize) {
     /**
      * Bean Validation has no comparison constraint between two properties, so the ordering the bounds
      * have to satisfy is checked here — the same place {@code AgentProperties} checks its durations.
@@ -38,23 +37,20 @@ public record GitRepositoryProperties(
     public GitRepositoryProperties {
         if (treeMaxTotalSize == null || treeMaxTotalSize.toBytes() <= 0) {
             throw new IllegalArgumentException(
-                "hephaestus.git.tree-max-total-size (GIT_TREE_MAX_TOTAL_SIZE) must be positive, got: " +
-                    treeMaxTotalSize
-            );
+                    "hephaestus.git.tree-max-total-size (GIT_TREE_MAX_TOTAL_SIZE) must be positive, got: "
+                            + treeMaxTotalSize);
         }
         if (treeMaxFileSize == null || treeMaxFileSize.toBytes() <= 0) {
             throw new IllegalArgumentException(
-                "hephaestus.git.tree-max-file-size (GIT_TREE_MAX_FILE_SIZE) must be positive, got: " + treeMaxFileSize
-            );
+                    "hephaestus.git.tree-max-file-size (GIT_TREE_MAX_FILE_SIZE) must be positive, got: "
+                            + treeMaxFileSize);
         }
         if (treeMaxFileSize.toBytes() > treeMaxTotalSize.toBytes()) {
-            throw new IllegalArgumentException(
-                "hephaestus.git.tree-max-file-size (GIT_TREE_MAX_FILE_SIZE) must be <= " +
-                    "hephaestus.git.tree-max-total-size (GIT_TREE_MAX_TOTAL_SIZE), got: " +
-                    treeMaxFileSize +
-                    " > " +
-                    treeMaxTotalSize
-            );
+            throw new IllegalArgumentException("hephaestus.git.tree-max-file-size (GIT_TREE_MAX_FILE_SIZE) must be <= "
+                    + "hephaestus.git.tree-max-total-size (GIT_TREE_MAX_TOTAL_SIZE), got: "
+                    + treeMaxFileSize
+                    + " > "
+                    + treeMaxTotalSize);
         }
     }
 }

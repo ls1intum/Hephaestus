@@ -37,13 +37,13 @@ public class SlackOAuthClient {
     private final String clientSecret;
 
     public SlackOAuthClient(
-        @Value("${hephaestus.integration.slack.client-id:}") String clientId,
-        @Value("${hephaestus.integration.slack.client-secret:}") String clientSecret,
-        @Value("${hephaestus.integration.slack.api-base:https://slack.com}") String apiBase
-    ) {
+            @Value("${hephaestus.integration.slack.client-id:}") String clientId,
+            @Value("${hephaestus.integration.slack.client-secret:}") String clientSecret,
+            @Value("${hephaestus.integration.slack.api-base:https://slack.com}") String apiBase) {
         this.clientId = clientId == null ? "" : clientId;
         this.clientSecret = clientSecret == null ? "" : clientSecret;
-        this.restClient = RestClient.builder().baseUrl(stripTrailingSlash(apiBase)).build();
+        this.restClient =
+                RestClient.builder().baseUrl(stripTrailingSlash(apiBase)).build();
     }
 
     /**
@@ -66,12 +66,12 @@ public class SlackOAuthClient {
         OAuthV2Access response;
         try {
             response = restClient
-                .post()
-                .uri(TOKEN_ENDPOINT)
-                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                .body(body)
-                .retrieve()
-                .body(OAuthV2Access.class);
+                    .post()
+                    .uri(TOKEN_ENDPOINT)
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .body(body)
+                    .retrieve()
+                    .body(OAuthV2Access.class);
         } catch (RestClientException e) {
             log.warn("Slack oauth.v2.access transport failure: {}", e.getClass().getSimpleName());
             throw new SlackOAuthException("transport_failure", e);
@@ -110,12 +110,12 @@ public class SlackOAuthClient {
         AuthRevoke response;
         try {
             response = restClient
-                .post()
-                .uri("/api/auth.revoke")
-                .header("Authorization", "Bearer " + botToken)
-                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                .retrieve()
-                .body(AuthRevoke.class);
+                    .post()
+                    .uri("/api/auth.revoke")
+                    .header("Authorization", "Bearer " + botToken)
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .retrieve()
+                    .body(AuthRevoke.class);
         } catch (RestClientException e) {
             throw new SlackOAuthException("transport_failure", e);
         }
@@ -133,18 +133,21 @@ public class SlackOAuthClient {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record AuthRevoke(@JsonProperty("ok") boolean ok, @JsonProperty("error") @Nullable String error) {}
+    public record AuthRevoke(
+            @JsonProperty("ok") boolean ok,
+            @JsonProperty("error") @Nullable String error) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record OAuthV2Access(
-        @JsonProperty("ok") boolean ok,
-        @JsonProperty("error") @Nullable String error,
-        @JsonProperty("access_token") @Nullable String accessToken,
-        @JsonProperty("team") @Nullable Team team,
-        @JsonProperty("expires_in") @Nullable Integer expiresIn,
-        @JsonProperty("refresh_token") @Nullable String refreshToken
-    ) {
+            @JsonProperty("ok") boolean ok,
+            @JsonProperty("error") @Nullable String error,
+            @JsonProperty("access_token") @Nullable String accessToken,
+            @JsonProperty("team") @Nullable Team team,
+            @JsonProperty("expires_in") @Nullable Integer expiresIn,
+            @JsonProperty("refresh_token") @Nullable String refreshToken) {
         @JsonIgnoreProperties(ignoreUnknown = true)
-        public record Team(@JsonProperty("id") @Nullable String id, @JsonProperty("name") @Nullable String name) {}
+        public record Team(
+                @JsonProperty("id") @Nullable String id,
+                @JsonProperty("name") @Nullable String name) {}
     }
 }

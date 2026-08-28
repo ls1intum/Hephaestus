@@ -12,13 +12,12 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubIssueTypeDTO(
-    @JsonProperty("id") @Nullable Long id,
-    @JsonProperty("node_id") @Nullable String nodeId,
-    @JsonProperty("name") String name,
-    @JsonProperty("description") @Nullable String description,
-    @JsonProperty("color") @Nullable String color,
-    @JsonProperty("is_enabled") Boolean isEnabled
-) {
+        @JsonProperty("id") @Nullable Long id,
+        @JsonProperty("node_id") @Nullable String nodeId,
+        @JsonProperty("name") String name,
+        @JsonProperty("description") @Nullable String description,
+        @JsonProperty("color") @Nullable String color,
+        @JsonProperty("is_enabled") Boolean isEnabled) {
     /**
      * Get the node ID, preferring nodeId for REST, id for GraphQL.
      */
@@ -43,12 +42,11 @@ public record GitHubIssueTypeDTO(
             return null;
         }
         return new GitHubIssueTypeDTO(
-            null,
-            issueType.getId(),
-            issueType.getName(),
-            issueType.getDescription(),
-            issueType.getColor() != null ? issueType.getColor().name().toLowerCase() : null,
-            issueType.getIsEnabled()
-        );
+                null,
+                issueType.getId(),
+                issueType.getName(),
+                issueType.getDescription(),
+                issueType.getColor() != null ? issueType.getColor().name().toLowerCase() : null,
+                issueType.getIsEnabled());
     }
 }

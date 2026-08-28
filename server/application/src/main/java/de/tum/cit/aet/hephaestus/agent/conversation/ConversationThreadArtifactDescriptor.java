@@ -24,17 +24,14 @@ import org.springframework.stereotype.Component;
 @Component
 public class ConversationThreadArtifactDescriptor implements ArtifactDescriptor {
 
-    private static final List<Signal> SIGNALS = List.of(
-        new Signal(
+    private static final List<Signal> SIGNALS = List.of(new Signal(
             ChatSignals.CONVERSATION_THREAD_SETTLED,
             "Discussion settled",
             Set.of(),
             // What is new about a settled thread is what was said in it, and a thread has no commits at
             // all — the same reason an issue's signals key on a content digest.
             RevisionScheme.CONTENT_DIGEST,
-            true
-        )
-    );
+            true));
 
     @Override
     public ArtifactKind kind() {
@@ -72,12 +69,9 @@ public class ConversationThreadArtifactDescriptor implements ArtifactDescriptor 
     /** A thread is one room. What was decided in another one, or in a call, is not in it. */
     @Override
     public List<ReviewLimitation> reviewLimitations() {
-        return List.of(
-            new ReviewLimitation(
+        return List.of(new ReviewLimitation(
                 "PRIVATE_CONTEXT_NOT_OBSERVED",
-                "The captured thread does not include decisions or context shared outside the conversation."
-            )
-        );
+                "The captured thread does not include decisions or context shared outside the conversation."));
     }
 
     @Override

@@ -42,8 +42,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Slf4j
 @Component
 public class GitHubProjectStatusUpdateMessageHandler
-    extends AbstractIntegrationMessageHandler<GitHubProjectStatusUpdateEventDTO>
-{
+        extends AbstractIntegrationMessageHandler<GitHubProjectStatusUpdateEventDTO> {
 
     private final ProjectRepository projectRepository;
     private final GitHubProjectStatusUpdateProcessor statusUpdateProcessor;
@@ -52,21 +51,19 @@ public class GitHubProjectStatusUpdateMessageHandler
     private final SyncSchedulerProperties syncSchedulerProperties;
 
     GitHubProjectStatusUpdateMessageHandler(
-        ProjectRepository projectRepository,
-        GitHubProjectStatusUpdateProcessor statusUpdateProcessor,
-        ScopeIdResolver scopeIdResolver,
-        IdentityProviderRepository gitProviderRepository,
-        SyncSchedulerProperties syncSchedulerProperties,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            ProjectRepository projectRepository,
+            GitHubProjectStatusUpdateProcessor statusUpdateProcessor,
+            ScopeIdResolver scopeIdResolver,
+            IdentityProviderRepository gitProviderRepository,
+            SyncSchedulerProperties syncSchedulerProperties,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITHUB,
-            "organization." + GitHubEventType.PROJECTS_V2_STATUS_UPDATE.getValue(),
-            GitHubProjectStatusUpdateEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITHUB,
+                "organization." + GitHubEventType.PROJECTS_V2_STATUS_UPDATE.getValue(),
+                GitHubProjectStatusUpdateEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.projectRepository = projectRepository;
         this.statusUpdateProcessor = statusUpdateProcessor;
         this.scopeIdResolver = scopeIdResolver;
@@ -84,9 +81,8 @@ public class GitHubProjectStatusUpdateMessageHandler
 
     @Override
     protected void handleEvent(GitHubProjectStatusUpdateEventDTO event) {
-        GitHubEventAction.ProjectV2StatusUpdate action = GitHubEventAction.ProjectV2StatusUpdate.fromString(
-            event.action()
-        );
+        GitHubEventAction.ProjectV2StatusUpdate action =
+                GitHubEventAction.ProjectV2StatusUpdate.fromString(event.action());
 
         var payload = event.statusUpdate();
         if (payload == null) {
@@ -105,37 +101,34 @@ public class GitHubProjectStatusUpdateMessageHandler
         String ownerIdentifier = event.getOwnerIdentifier();
 
         log.debug(
-            "Received projects_v2_status_update event: action={}, nodeId={}, ownerType={}, owner={}",
-            event.action(),
-            payload.nodeId() != null ? sanitizeForLog(payload.nodeId()) : "unknown",
-            ownerType,
-            ownerIdentifier != null ? sanitizeForLog(ownerIdentifier) : "unknown"
-        );
+                "Received projects_v2_status_update event: action={}, nodeId={}, ownerType={}, owner={}",
+                event.action(),
+                payload.nodeId() != null ? sanitizeForLog(payload.nodeId()) : "unknown",
+                ownerType,
+                ownerIdentifier != null ? sanitizeForLog(ownerIdentifier) : "unknown");
 
         // Resolve scope based on owner type
         Long scopeId = resolveScopeId(event, ownerType);
         if (scopeId == null) {
             log.debug(
-                "Skipped projects_v2_status_update event: reason=noAssociatedScope, ownerType={}, owner={}",
-                ownerType,
-                sanitizeForLog(ownerIdentifier)
-            );
+                    "Skipped projects_v2_status_update event: reason=noAssociatedScope, ownerType={}, owner={}",
+                    ownerType,
+                    sanitizeForLog(ownerIdentifier));
             return;
         }
 
         Project project = projectRepository.findByNodeId(projectNodeId).orElse(null);
         if (project == null) {
             log.warn(
-                "Skipped projects_v2_status_update event: reason=projectNotFound, projectNodeId={}, action={}",
-                sanitizeForLog(projectNodeId),
-                event.action()
-            );
+                    "Skipped projects_v2_status_update event: reason=projectNotFound, projectNodeId={}, action={}",
+                    sanitizeForLog(projectNodeId),
+                    event.action());
             return;
         }
 
         IdentityProvider gitHubProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseThrow(() -> new IllegalStateException("GitHub provider not configured"));
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseThrow(() -> new IllegalStateException("GitHub provider not configured"));
         ProcessingContext context = ProcessingContext.forWebhook(scopeId, gitHubProvider, event.action());
 
         switch (action) {
@@ -161,18 +154,17 @@ public class GitHubProjectStatusUpdateMessageHandler
         Instant updatedAt = parseInstant(payload.updatedAt());
 
         return new GitHubProjectStatusUpdateDTO(
-            payload.id(),
-            payload.id(), // databaseId same as id for webhooks
-            payload.nodeId(),
-            payload.body(),
-            payload.bodyHtml(),
-            startDate,
-            targetDate,
-            payload.status(),
-            payload.creator(),
-            createdAt,
-            updatedAt
-        );
+                payload.id(),
+                payload.id(), // databaseId same as id for webhooks
+                payload.nodeId(),
+                payload.body(),
+                payload.bodyHtml(),
+                startDate,
+                targetDate,
+                payload.status(),
+                payload.creator(),
+                createdAt,
+                updatedAt);
     }
 
     /**
@@ -222,14 +214,16 @@ public class GitHubProjectStatusUpdateMessageHandler
     private @Nullable Long resolveScopeId(GitHubProjectStatusUpdateEventDTO event, Project.OwnerType ownerType) {
         return switch (ownerType) {
             case ORGANIZATION -> {
-                String orgLogin = event.organization() != null ? event.organization().login() : null;
+                String orgLogin =
+                        event.organization() != null ? event.organization().login() : null;
                 if (orgLogin == null) {
                     yield null;
                 }
                 yield scopeIdResolver.findScopeIdByOrgLogin(orgLogin).orElse(null);
             }
             case REPOSITORY -> {
-                String repoFullName = event.repository() != null ? event.repository().fullName() : null;
+                String repoFullName =
+                        event.repository() != null ? event.repository().fullName() : null;
                 if (repoFullName == null) {
                     yield null;
                 }
@@ -239,9 +233,8 @@ public class GitHubProjectStatusUpdateMessageHandler
                 // User-level projects are not associated with a monitored workspace
                 // Log at info level since this is a known limitation
                 log.info(
-                    "User-owned project status update detected - not currently supported: sender={}",
-                    event.sender() != null ? sanitizeForLog(event.sender().login()) : "unknown"
-                );
+                        "User-owned project status update detected - not currently supported: sender={}",
+                        event.sender() != null ? sanitizeForLog(event.sender().login()) : "unknown");
                 yield null;
             }
         };

@@ -54,14 +54,13 @@ public class SyncStatusService {
     private final List<IntegrationSyncRunner> runners;
 
     public SyncStatusService(
-        ConnectionAdminService connectionAdminService,
-        SyncJobService syncJobService,
-        SyncJobRepository syncJobRepository,
-        ConnectionActivityRepository connectionActivityRepository,
-        @Qualifier("syncJobExecutor") AsyncTaskExecutor taskExecutor,
-        List<ConnectionSyncStateProvider> providers,
-        List<IntegrationSyncRunner> runners
-    ) {
+            ConnectionAdminService connectionAdminService,
+            SyncJobService syncJobService,
+            SyncJobRepository syncJobRepository,
+            ConnectionActivityRepository connectionActivityRepository,
+            @Qualifier("syncJobExecutor") AsyncTaskExecutor taskExecutor,
+            List<ConnectionSyncStateProvider> providers,
+            List<IntegrationSyncRunner> runners) {
         this.connectionAdminService = connectionAdminService;
         this.syncJobService = syncJobService;
         this.syncJobRepository = syncJobRepository;
@@ -80,10 +79,7 @@ public class SyncStatusService {
     }
 
     private static <T> @Nullable T resolveSingle(
-        List<T> beans,
-        Function<T, IntegrationKind> kindOf,
-        IntegrationKind kind
-    ) {
+            List<T> beans, Function<T, IntegrationKind> kindOf, IntegrationKind kind) {
         T match = null;
         for (T bean : beans) {
             if (kindOf.apply(bean) == kind) {
@@ -105,56 +101,45 @@ public class SyncStatusService {
         IntegrationSyncRunner runner = runnerFor(connection.getKind());
         boolean backfillSupported = runner != null && runner.supportsBackfill();
         ConnectionSyncDetails providerDetails =
-            provider == null ? ConnectionSyncDetails.empty() : provider.describe(ref, connectionId);
+                provider == null ? ConnectionSyncDetails.empty() : provider.describe(ref, connectionId);
         Optional<ConnectionActivity> activity = connectionActivityRepository.findById(connectionId);
         List<SyncResourceState> resources = provider == null ? List.of() : provider.resources(ref, connectionId);
 
         Optional<SyncJob> activeJob = syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
-            connectionId,
-            SyncJobStatus.ACTIVE
-        );
+                connectionId, SyncJobStatus.ACTIVE);
         Optional<SyncJob> lastFinishedJob = syncJobRepository.findFirstByConnection_IdAndStatusInOrderByFinishedAtDesc(
-            connectionId,
-            SyncJobStatus.TERMINAL
-        );
+                connectionId, SyncJobStatus.TERMINAL);
         Optional<SyncJob> lastSuccessfulJob =
-            syncJobRepository.findFirstByConnection_IdAndStatusInOrderByFinishedAtDesc(
-                connectionId,
-                SyncJobStatus.SUCCESSFUL
-            );
+                syncJobRepository.findFirstByConnection_IdAndStatusInOrderByFinishedAtDesc(
+                        connectionId, SyncJobStatus.SUCCESSFUL);
 
-        long erroredResources = resources
-            .stream()
-            .filter(r -> r.lastError() != null)
-            .count();
+        long erroredResources =
+                resources.stream().filter(r -> r.lastError() != null).count();
         ResourceCountsDTO resourceCounts = rollUp(resources, erroredResources, providerDetails.syncInterval());
-        ConnectionHealth health = deriveHealth(
-            connection,
-            lastFinishedJob,
-            erroredResources,
-            providerDetails.vendorHealthDegraded()
-        );
+        ConnectionHealth health =
+                deriveHealth(connection, lastFinishedJob, erroredResources, providerDetails.vendorHealthDegraded());
 
         return new ConnectionSyncStatusDTO(
-            connection.getId(),
-            connection.getKind(),
-            connection.getState(),
-            health,
-            lastSuccessfulJob.map(SyncJob::getFinishedAt).orElse(null),
-            activeJob.map(SyncJobDTO::from).orElse(null),
-            lastFinishedJob.map(SyncJobDTO::from).orElse(null),
-            providerDetails.nextScheduledSyncAt(),
-            // The same cadence the stale rollup above judges against. Sent so the client can make the
-            // per-resource judgement the rollup only makes in aggregate; null stays null, so a client
-            // that can't know the cadence declines to judge rather than guessing one.
-            providerDetails.syncInterval() == null ? null : providerDetails.syncInterval().toSeconds(),
-            providerDetails.webhookRegistered(),
-            activity.map(ConnectionActivity::getLastEventAt).orElse(null),
-            providerDetails.rateLimit() == null ? null : RateLimitSnapshotDTO.from(providerDetails.rateLimit()),
-            backfillSupported,
-            providerDetails.backfill() == null ? null : BackfillSummaryDTO.from(providerDetails.backfill()),
-            resourceCounts
-        );
+                connection.getId(),
+                connection.getKind(),
+                connection.getState(),
+                health,
+                lastSuccessfulJob.map(SyncJob::getFinishedAt).orElse(null),
+                activeJob.map(SyncJobDTO::from).orElse(null),
+                lastFinishedJob.map(SyncJobDTO::from).orElse(null),
+                providerDetails.nextScheduledSyncAt(),
+                // The same cadence the stale rollup above judges against. Sent so the client can make the
+                // per-resource judgement the rollup only makes in aggregate; null stays null, so a client
+                // that can't know the cadence declines to judge rather than guessing one.
+                providerDetails.syncInterval() == null
+                        ? null
+                        : providerDetails.syncInterval().toSeconds(),
+                providerDetails.webhookRegistered(),
+                activity.map(ConnectionActivity::getLastEventAt).orElse(null),
+                providerDetails.rateLimit() == null ? null : RateLimitSnapshotDTO.from(providerDetails.rateLimit()),
+                backfillSupported,
+                providerDetails.backfill() == null ? null : BackfillSummaryDTO.from(providerDetails.backfill()),
+                resourceCounts);
     }
 
     /**
@@ -170,24 +155,17 @@ public class SyncStatusService {
      * also stale) — they are counted independently and must not be summed into "total".
      */
     private static ResourceCountsDTO rollUp(
-        List<SyncResourceState> resources,
-        long erroredResources,
-        @Nullable Duration syncInterval
-    ) {
-        long pending = resources
-            .stream()
-            .filter(r -> r.lastSyncedAt() == null)
-            .count();
+            List<SyncResourceState> resources, long erroredResources, @Nullable Duration syncInterval) {
+        long pending = resources.stream().filter(r -> r.lastSyncedAt() == null).count();
 
         // No known cadence → no staleness judgement. Guessing a default would either flag healthy
         // resources or hide real ones, and both are worse than the UI simply not making the claim.
         long stale = 0;
         if (syncInterval != null && !syncInterval.isZero() && !syncInterval.isNegative()) {
             Instant staleBefore = Instant.now().minus(syncInterval.multipliedBy(STALE_CADENCE_MULTIPLE));
-            stale = resources
-                .stream()
-                .filter(r -> r.lastSyncedAt() != null && r.lastSyncedAt().isBefore(staleBefore))
-                .count();
+            stale = resources.stream()
+                    .filter(r -> r.lastSyncedAt() != null && r.lastSyncedAt().isBefore(staleBefore))
+                    .count();
         }
 
         return new ResourceCountsDTO((long) resources.size(), erroredResources, pending, stale);
@@ -199,14 +177,16 @@ public class SyncStatusService {
         if (provider == null) {
             return List.of();
         }
-        return provider.resources(connection.toRef(), connectionId).stream().map(SyncResourceStateDTO::from).toList();
+        return provider.resources(connection.toRef(), connectionId).stream()
+                .map(SyncResourceStateDTO::from)
+                .toList();
     }
 
     public Page<SyncJobDTO> getJobs(Long workspaceId, long connectionId, Pageable pageable) {
         connectionAdminService.findInWorkspaceOrThrow(workspaceId, connectionId);
         return syncJobRepository
-            .findByConnection_IdAndWorkspace_Id(connectionId, workspaceId, pageable)
-            .map(SyncJobDTO::from);
+                .findByConnection_IdAndWorkspace_Id(connectionId, workspaceId, pageable)
+                .map(SyncJobDTO::from);
     }
 
     public record TriggerOutcome(SyncJobDTO job, boolean created) {}
@@ -220,21 +200,15 @@ public class SyncStatusService {
      *                                     doesn't support {@code BACKFILL} (409)
      */
     public TriggerOutcome triggerSync(
-        long workspaceId,
-        long connectionId,
-        SyncJobType type,
-        @Nullable Long triggeredByUserId
-    ) {
+            long workspaceId, long connectionId, SyncJobType type, @Nullable Long triggeredByUserId) {
         Connection connection = connectionAdminService.findInWorkspaceOrThrow(workspaceId, connectionId);
         if (connection.getState() != IntegrationState.ACTIVE) {
             throw new SyncStateConflictException(
-                "Cannot trigger sync: connection " +
-                    connectionId +
-                    " is not ACTIVE (state=" +
-                    connection.getState() +
-                    ")",
-                Map.of("connectionId", connectionId, "connectionState", connection.getState())
-            );
+                    "Cannot trigger sync: connection " + connectionId
+                            + " is not ACTIVE (state="
+                            + connection.getState()
+                            + ")",
+                    Map.of("connectionId", connectionId, "connectionState", connection.getState()));
         }
         // Only RECONCILIATION and BACKFILL are client-triggerable. INITIAL is lifecycle-owned: it runs
         // once when a Connection goes ACTIVE and deliberately skips the deletion sweep (a mirror being
@@ -243,9 +217,8 @@ public class SyncStatusService {
         // as an allowlist, so any future non-client type is rejected by default rather than by omission.
         if (type != SyncJobType.RECONCILIATION && type != SyncJobType.BACKFILL) {
             throw new SyncStateConflictException(
-                "Cannot trigger a " + type + " sync: only RECONCILIATION and BACKFILL are client-triggerable",
-                Map.of("requestedType", type)
-            );
+                    "Cannot trigger a " + type + " sync: only RECONCILIATION and BACKFILL are client-triggerable",
+                    Map.of("requestedType", type));
         }
 
         IntegrationSyncRunner runner = runnerFor(connection.getKind());
@@ -255,26 +228,16 @@ public class SyncStatusService {
 
         IntegrationRef ref = connection.toRef();
         try {
-            SyncJobService.Started started = syncJobService.beginJob(
-                new SyncJobRequest(
-                    workspaceId,
-                    connectionId,
-                    connection.getKind(),
-                    type,
-                    SyncJobTrigger.MANUAL,
-                    triggeredByUserId
-                )
-            );
+            SyncJobService.Started started = syncJobService.beginJob(new SyncJobRequest(
+                    workspaceId, connectionId, connection.getKind(), type, SyncJobTrigger.MANUAL, triggeredByUserId));
             try {
-                taskExecutor.execute(() ->
-                    syncJobService.executeBody(started, handle -> {
-                        if (type == SyncJobType.BACKFILL) {
-                            runner.backfill(ref, handle);
-                        } else {
-                            runner.reconcile(ref, handle, type);
-                        }
-                    })
-                );
+                taskExecutor.execute(() -> syncJobService.executeBody(started, handle -> {
+                    if (type == SyncJobType.BACKFILL) {
+                        runner.backfill(ref, handle);
+                    } else {
+                        runner.reconcile(ref, handle, type);
+                    }
+                }));
             } catch (TaskRejectedException e) {
                 // The row was created but no body will run — finalize it so it doesn't hold the slot.
                 syncJobService.failStarted(started, "Sync dispatch rejected (executor saturated)");
@@ -287,22 +250,19 @@ public class SyncStatusService {
             if (e.activeJob().getType() != type) {
                 SyncJob active = e.activeJob();
                 throw new SyncStateConflictException(
-                    "Cannot start " +
-                        type +
-                        " sync: a " +
-                        active.getType() +
-                        " sync is already running for connection " +
-                        connectionId,
-                    Map.of(
-                        "conflictingJobId",
-                        active.getId(),
-                        "conflictingJobType",
-                        active.getType(),
-                        "conflictingJobStatus",
-                        active.getStatus()
-                    ),
-                    e
-                );
+                        "Cannot start " + type
+                                + " sync: a "
+                                + active.getType()
+                                + " sync is already running for connection "
+                                + connectionId,
+                        Map.of(
+                                "conflictingJobId",
+                                active.getId(),
+                                "conflictingJobType",
+                                active.getType(),
+                                "conflictingJobStatus",
+                                active.getStatus()),
+                        e);
             }
             return new TriggerOutcome(SyncJobDTO.from(e.activeJob()), false);
         }
@@ -317,15 +277,14 @@ public class SyncStatusService {
         // Validate the (workspace, connection) scope BEFORE mutating anything — a job id that exists
         // but belongs to a different connection must 404, not have its cancel flag flipped first.
         syncJobRepository
-            .findByIdAndWorkspace_Id(jobId, workspaceId)
-            .filter(j -> j.getConnection().getId() == connectionId)
-            .orElseThrow(() -> new EntityNotFoundException("SyncJob", jobId));
+                .findByIdAndWorkspace_Id(jobId, workspaceId)
+                .filter(j -> j.getConnection().getId() == connectionId)
+                .orElseThrow(() -> new EntityNotFoundException("SyncJob", jobId));
 
         syncJobService.requestCancel(workspaceId, jobId);
 
-        SyncJob job = syncJobRepository
-            .findById(jobId)
-            .orElseThrow(() -> new EntityNotFoundException("SyncJob", jobId));
+        SyncJob job =
+                syncJobRepository.findById(jobId).orElseThrow(() -> new EntityNotFoundException("SyncJob", jobId));
         return SyncJobDTO.from(job);
     }
 
@@ -339,35 +298,32 @@ public class SyncStatusService {
         // A workspace runs at most one SCM at a time, so once one is LIVE we hide the sibling SCM kind.
         // But an UNINSTALLED SCM must NOT keep hiding the alternative — otherwise the admin can never
         // switch vendors after disconnecting one. Only an active (non-UNINSTALLED) SCM narrows the list.
-        IntegrationKind activeScm = connections
-            .stream()
-            .filter(c -> c.getKind().family() == IntegrationFamily.SCM && c.getState() != IntegrationState.UNINSTALLED)
-            .map(Connection::getKind)
-            .findFirst()
-            .orElse(null);
+        IntegrationKind activeScm = connections.stream()
+                .filter(c ->
+                        c.getKind().family() == IntegrationFamily.SCM && c.getState() != IntegrationState.UNINSTALLED)
+                .map(Connection::getKind)
+                .findFirst()
+                .orElse(null);
 
         IntegrationManifestRegistry manifests = connectionAdminService.manifests();
-        return manifests
-            .registeredKinds()
-            .stream()
-            .sorted()
-            .filter(kind -> activeScm == null || kind.family() != IntegrationFamily.SCM || kind == activeScm)
-            .map(kind -> {
-                Connection c = byKind.get(kind);
-                boolean connected = c != null && c.getState() != IntegrationState.UNINSTALLED;
-                String displayName = manifests
-                    .manifestFor(kind)
-                    .map(IntegrationManifest::displayName)
-                    .orElse(kind.name());
-                return new IntegrationCatalogEntryDTO(
-                    kind,
-                    displayName,
-                    connected,
-                    c == null ? null : c.getId(),
-                    c == null ? null : c.getState()
-                );
-            })
-            .toList();
+        return manifests.registeredKinds().stream()
+                .sorted()
+                .filter(kind -> activeScm == null || kind.family() != IntegrationFamily.SCM || kind == activeScm)
+                .map(kind -> {
+                    Connection c = byKind.get(kind);
+                    boolean connected = c != null && c.getState() != IntegrationState.UNINSTALLED;
+                    String displayName = manifests
+                            .manifestFor(kind)
+                            .map(IntegrationManifest::displayName)
+                            .orElse(kind.name());
+                    return new IntegrationCatalogEntryDTO(
+                            kind,
+                            displayName,
+                            connected,
+                            c == null ? null : c.getId(),
+                            c == null ? null : c.getState());
+                })
+                .toList();
     }
 
     private static Connection preferred(Connection current, Connection candidate) {
@@ -384,29 +340,26 @@ public class SyncStatusService {
      * ACTIVE folds in the last finished job's outcome, errored resources, and vendor-reported degradation.
      */
     private static ConnectionHealth deriveHealth(
-        Connection connection,
-        Optional<SyncJob> lastFinishedJob,
-        long erroredResources,
-        boolean vendorHealthDegraded
-    ) {
+            Connection connection,
+            Optional<SyncJob> lastFinishedJob,
+            long erroredResources,
+            boolean vendorHealthDegraded) {
         return switch (connection.getState()) {
             case PENDING -> ConnectionHealth.PENDING;
             // UNINSTALLED has no further transitions and is not independently modeled in the 5-value
             // health enum — closest semantic is SUSPENDED ("not usable right now").
             case SUSPENDED, UNINSTALLED -> ConnectionHealth.SUSPENDED;
             case ACTIVE -> {
-                if (
-                    lastFinishedJob
+                if (lastFinishedJob
                         .map(SyncJob::getStatus)
                         .filter(s -> s == SyncJobStatus.FAILED)
-                        .isPresent()
-                ) {
+                        .isPresent()) {
                     yield ConnectionHealth.FAILED;
                 }
                 boolean warningsJob = lastFinishedJob
-                    .map(SyncJob::getStatus)
-                    .filter(s -> s == SyncJobStatus.SUCCEEDED_WITH_WARNINGS)
-                    .isPresent();
+                        .map(SyncJob::getStatus)
+                        .filter(s -> s == SyncJobStatus.SUCCEEDED_WITH_WARNINGS)
+                        .isPresent();
                 if (erroredResources > 0 || warningsJob || vendorHealthDegraded) {
                     yield ConnectionHealth.DEGRADED;
                 }

@@ -35,12 +35,13 @@ class AgentRuntimeBoundaryTest extends HephaestusArchitectureTest {
         @DisplayName("agent.runtime must not depend on agent.practice or agent.mentor")
         void runtimeIndependentOfDomains() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage(RUNTIME)
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage(PRACTICE, MENTOR)
-                .because("agent.runtime is the shared Pi kernel reused by both domains — it must stay role-agnostic");
+                    .that()
+                    .resideInAPackage(RUNTIME)
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAnyPackage(PRACTICE, MENTOR)
+                    .because(
+                            "agent.runtime is the shared Pi kernel reused by both domains — it must stay role-agnostic");
             rule.check(classes);
         }
     }
@@ -52,12 +53,12 @@ class AgentRuntimeBoundaryTest extends HephaestusArchitectureTest {
         @DisplayName("agent.task must not depend on agent.practice or agent.mentor")
         void taskIndependentOfDomains() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage(TASK)
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage(PRACTICE, MENTOR)
-                .because("Task envelope types are wire-format primitives; they must not pull in domain handlers");
+                    .that()
+                    .resideInAPackage(TASK)
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAnyPackage(PRACTICE, MENTOR)
+                    .because("Task envelope types are wire-format primitives; they must not pull in domain handlers");
             rule.check(classes);
         }
     }
@@ -68,11 +69,11 @@ class AgentRuntimeBoundaryTest extends HephaestusArchitectureTest {
         @Test
         void providersInProviderPackage() {
             ArchRule rule = classes()
-                .that()
-                .implement("de.tum.cit.aet.hephaestus.agent.context.ContentSource")
-                .should()
-                .resideInAPackage(CONTEXT_PROVIDERS)
-                .because("Provider implementations must live next to each other for discovery and arch hygiene");
+                    .that()
+                    .implement("de.tum.cit.aet.hephaestus.agent.context.ContentSource")
+                    .should()
+                    .resideInAPackage(CONTEXT_PROVIDERS)
+                    .because("Provider implementations must live next to each other for discovery and arch hygiene");
             rule.check(classes);
         }
     }
@@ -84,11 +85,12 @@ class AgentRuntimeBoundaryTest extends HephaestusArchitectureTest {
         @DisplayName("PiRunnerProfile implementations reside in agent.practice or agent.mentor")
         void profilesInDomainPackages() {
             ArchRule rule = classes()
-                .that()
-                .implement("de.tum.cit.aet.hephaestus.agent.runtime.PiRunnerProfile")
-                .should()
-                .resideInAnyPackage(PRACTICE, MENTOR)
-                .because("Each runner kind owns its profile next to its adapter; the kernel sees only the interface");
+                    .that()
+                    .implement("de.tum.cit.aet.hephaestus.agent.runtime.PiRunnerProfile")
+                    .should()
+                    .resideInAnyPackage(PRACTICE, MENTOR)
+                    .because(
+                            "Each runner kind owns its profile next to its adapter; the kernel sees only the interface");
             rule.check(classes);
         }
     }
@@ -100,17 +102,15 @@ class AgentRuntimeBoundaryTest extends HephaestusArchitectureTest {
         @DisplayName("agent.context (excluding providers) must not depend on agent.practice or agent.mentor")
         void contextCoreIndependentOfDomains() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage(CONTEXT)
-                .and()
-                .resideOutsideOfPackage(CONTEXT_PROVIDERS)
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage(PRACTICE, MENTOR)
-                .because(
-                    "Context orchestration is shared across job types; only the providers under " +
-                        "agent.context.providers may take domain-specific dependencies."
-                );
+                    .that()
+                    .resideInAPackage(CONTEXT)
+                    .and()
+                    .resideOutsideOfPackage(CONTEXT_PROVIDERS)
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAnyPackage(PRACTICE, MENTOR)
+                    .because("Context orchestration is shared across job types; only the providers under "
+                            + "agent.context.providers may take domain-specific dependencies.");
             rule.check(classes);
         }
     }

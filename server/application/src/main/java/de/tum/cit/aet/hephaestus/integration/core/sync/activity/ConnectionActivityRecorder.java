@@ -56,12 +56,11 @@ public class ConnectionActivityRecorder {
     private final ConcurrentHashMap<Long, Instant> lastWriteAtByConnection = new ConcurrentHashMap<>();
 
     public ConnectionActivityRecorder(
-        ConnectionRepository connectionRepository,
-        ConnectionActivityRepository activityRepository,
-        ApplicationEventPublisher eventPublisher,
-        Clock clock,
-        TransactionTemplate transactionTemplate
-    ) {
+            ConnectionRepository connectionRepository,
+            ConnectionActivityRepository activityRepository,
+            ApplicationEventPublisher eventPublisher,
+            Clock clock,
+            TransactionTemplate transactionTemplate) {
         this.connectionRepository = connectionRepository;
         this.activityRepository = activityRepository;
         this.eventPublisher = eventPublisher;
@@ -79,12 +78,11 @@ public class ConnectionActivityRecorder {
             transactionTemplate.executeWithoutResult(status -> doRecord(workspaceId, kind, eventType));
         } catch (Exception e) {
             log.warn(
-                "Failed to record connection activity: workspaceId={}, kind={}, eventType={}",
-                workspaceId,
-                kind,
-                sanitizeForLog(eventType),
-                e
-            );
+                    "Failed to record connection activity: workspaceId={}, kind={}, eventType={}",
+                    workspaceId,
+                    kind,
+                    sanitizeForLog(eventType),
+                    e);
         }
     }
 
@@ -125,8 +123,7 @@ public class ConnectionActivityRecorder {
             throw e;
         }
         eventPublisher.publishEvent(
-            new SyncStateChangedEvent(workspaceId, connectionId, kind, SyncStateChangedEvent.Scope.ACTIVITY)
-        );
+                new SyncStateChangedEvent(workspaceId, connectionId, kind, SyncStateChangedEvent.Scope.ACTIVITY));
     }
 
     private @Nullable Long resolveConnectionId(long workspaceId, IntegrationKind kind) {
@@ -136,13 +133,13 @@ public class ConnectionActivityRecorder {
             return cached;
         }
         return connectionRepository
-            .findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(workspaceId, kind, IntegrationState.ACTIVE)
-            .map(Connection::getId)
-            .map(id -> {
-                connectionIdCache.put(key, id);
-                return id;
-            })
-            .orElse(null);
+                .findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(workspaceId, kind, IntegrationState.ACTIVE)
+                .map(Connection::getId)
+                .map(id -> {
+                    connectionIdCache.put(key, id);
+                    return id;
+                })
+                .orElse(null);
     }
 
     /**

@@ -55,6 +55,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
     /** A valid Base64-URL token (43 chars, 256 bits). */
     private static final String VALID_TOKEN = "dGVzdC10b2tlbi0xMjM0NTY3ODkwMTIzNDU2Nzg5MDE";
+
     private static final String VALID_TOKEN_HASH = AgentJob.computeTokenHash(VALID_TOKEN);
 
     @BeforeEach
@@ -136,7 +137,8 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         void shouldRejectHostname() {
             // Hostnames must be rejected before InetAddress.getByName() to prevent DNS resolution
             assertThat(JobTokenAuthenticationFilter.isPrivateIp("localhost")).isFalse();
-            assertThat(JobTokenAuthenticationFilter.isPrivateIp("internal.corp")).isFalse();
+            assertThat(JobTokenAuthenticationFilter.isPrivateIp("internal.corp"))
+                    .isFalse();
         }
     }
 
@@ -171,17 +173,17 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         @Test
         void shouldExtractFromBearerAuth() throws Exception {
             var job = createRunningJob();
-            when(
-                agentJobRepository.findByJobTokenHashAndStatus(eq(VALID_TOKEN_HASH), eq(AgentJobStatus.RUNNING))
-            ).thenReturn(Optional.of(job));
+            when(agentJobRepository.findByJobTokenHashAndStatus(eq(VALID_TOKEN_HASH), eq(AgentJobStatus.RUNNING)))
+                    .thenReturn(Optional.of(job));
 
             var authCapture = new AtomicReference<Authentication>();
             doAnswer(invocation -> {
-                authCapture.set(Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()));
-                return null;
-            })
-                .when(filterChain)
-                .doFilter(any(), any());
+                        authCapture.set(Objects.requireNonNull(
+                                SecurityContextHolder.getContext().getAuthentication()));
+                        return null;
+                    })
+                    .when(filterChain)
+                    .doFilter(any(), any());
 
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
@@ -225,9 +227,8 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
         @Test
         void shouldReturn401WhenNoRunningJobFound() throws Exception {
-            when(agentJobRepository.findByJobTokenHashAndStatus(any(), eq(AgentJobStatus.RUNNING))).thenReturn(
-                Optional.empty()
-            );
+            when(agentJobRepository.findByJobTokenHashAndStatus(any(), eq(AgentJobStatus.RUNNING)))
+                    .thenReturn(Optional.empty());
 
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
@@ -241,14 +242,12 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
         @Test
         @DisplayName(
-            "a job with no config snapshot (should be impossible in prod — column is NOT NULL) is refused, not NPE'd"
-        )
+                "a job with no config snapshot (should be impossible in prod — column is NOT NULL) is refused, not NPE'd")
         void shouldReturn401WhenJobHasNoConfigSnapshot() throws Exception {
             var job = new AgentJob();
             job.setJobToken(VALID_TOKEN);
-            when(
-                agentJobRepository.findByJobTokenHashAndStatus(eq(VALID_TOKEN_HASH), eq(AgentJobStatus.RUNNING))
-            ).thenReturn(Optional.of(job));
+            when(agentJobRepository.findByJobTokenHashAndStatus(eq(VALID_TOKEN_HASH), eq(AgentJobStatus.RUNNING)))
+                    .thenReturn(Optional.of(job));
 
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
@@ -262,7 +261,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
 
         @ParameterizedTest(name = "Authorization: [{0}]")
-        @ValueSource(strings = { "Bearer ", "Bearer    " })
+        @ValueSource(strings = {"Bearer ", "Bearer    "})
         void shouldReturn401ForABearerHeaderWithNoToken(String header) throws Exception {
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
@@ -288,11 +287,8 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         void shouldIgnoreProviderKeyWhenBearerIsPresent() throws Exception {
             var job = createRunningJob();
 
-            Authentication installed = authenticateAndCaptureAuthentication(
-                job,
-                "Bearer " + VALID_TOKEN,
-                "provider-key-must-be-ignored"
-            );
+            Authentication installed =
+                    authenticateAndCaptureAuthentication(job, "Bearer " + VALID_TOKEN, "provider-key-must-be-ignored");
 
             assertThatTheChainRanAsTheJob(installed, job);
         }
@@ -310,20 +306,17 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
 
         private Authentication authenticateAndCaptureAuthentication(
-            AgentJob job,
-            String authorizationHeader,
-            @Nullable String providerKeyHeader
-        ) throws Exception {
-            when(
-                agentJobRepository.findByJobTokenHashAndStatus(eq(VALID_TOKEN_HASH), eq(AgentJobStatus.RUNNING))
-            ).thenReturn(Optional.of(job));
+                AgentJob job, String authorizationHeader, @Nullable String providerKeyHeader) throws Exception {
+            when(agentJobRepository.findByJobTokenHashAndStatus(eq(VALID_TOKEN_HASH), eq(AgentJobStatus.RUNNING)))
+                    .thenReturn(Optional.of(job));
             var authCapture = new AtomicReference<Authentication>();
             doAnswer(invocation -> {
-                authCapture.set(Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()));
-                return null;
-            })
-                .when(filterChain)
-                .doFilter(any(), any());
+                        authCapture.set(Objects.requireNonNull(
+                                SecurityContextHolder.getContext().getAuthentication()));
+                        return null;
+                    })
+                    .when(filterChain)
+                    .doFilter(any(), any());
 
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
@@ -341,23 +334,21 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         @Test
         void shouldClearContextOnFilterChainException() throws Exception {
             var job = createRunningJob();
-            when(
-                agentJobRepository.findByJobTokenHashAndStatus(eq(VALID_TOKEN_HASH), eq(AgentJobStatus.RUNNING))
-            ).thenReturn(Optional.of(job));
+            when(agentJobRepository.findByJobTokenHashAndStatus(eq(VALID_TOKEN_HASH), eq(AgentJobStatus.RUNNING)))
+                    .thenReturn(Optional.of(job));
             doAnswer(invocation -> {
-                throw new jakarta.servlet.ServletException("Simulated failure");
-            })
-                .when(filterChain)
-                .doFilter(any(), any());
+                        throw new jakarta.servlet.ServletException("Simulated failure");
+                    })
+                    .when(filterChain)
+                    .doFilter(any(), any());
 
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
             request.addHeader("Authorization", "Bearer " + VALID_TOKEN);
             var response = new MockHttpServletResponse();
 
-            assertThatThrownBy(() -> filter.doFilterInternal(request, response, filterChain)).isInstanceOf(
-                jakarta.servlet.ServletException.class
-            );
+            assertThatThrownBy(() -> filter.doFilterInternal(request, response, filterChain))
+                    .isInstanceOf(jakarta.servlet.ServletException.class);
 
             assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
         }
@@ -395,28 +386,21 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
         @Test
         void aMentorRegistryTokenAuthenticatesWhenNoJobMatches() throws Exception {
-            when(agentJobRepository.findByJobTokenHashAndStatus(any(), eq(AgentJobStatus.RUNNING))).thenReturn(
-                Optional.empty()
-            );
+            when(agentJobRepository.findByJobTokenHashAndStatus(any(), eq(AgentJobStatus.RUNNING)))
+                    .thenReturn(Optional.empty());
             String mentorToken = mentorRegistry.mint(
-                UUID.randomUUID(),
-                new MentorProxyCredentialRegistry.Route(
-                    "openai-completions",
-                    "https://api.openai.com",
-                    null,
-                    null,
-                    null,
-                    null
-                )
-            );
+                    UUID.randomUUID(),
+                    new MentorProxyCredentialRegistry.Route(
+                            "openai-completions", "https://api.openai.com", null, null, null, null));
 
             var authCapture = new AtomicReference<Authentication>();
             doAnswer(invocation -> {
-                authCapture.set(Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()));
-                return null;
-            })
-                .when(filterChain)
-                .doFilter(any(), any());
+                        authCapture.set(Objects.requireNonNull(
+                                SecurityContextHolder.getContext().getAuthentication()));
+                        return null;
+                    })
+                    .when(filterChain)
+                    .doFilter(any(), any());
 
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
@@ -435,9 +419,8 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
         @Test
         void aTokenMatchingNeitherJobNorMentorRegistryIsRefused() throws Exception {
-            when(agentJobRepository.findByJobTokenHashAndStatus(any(), eq(AgentJobStatus.RUNNING))).thenReturn(
-                Optional.empty()
-            );
+            when(agentJobRepository.findByJobTokenHashAndStatus(any(), eq(AgentJobStatus.RUNNING)))
+                    .thenReturn(Optional.empty());
 
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
@@ -472,8 +455,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         @Test
         @DisplayName("prices the calls the attempt has already made with the rates frozen at admission")
         void theRoutingPricesWhatTheAttemptHasAlreadySpent() throws Exception {
-            var job = createRunningJob(
-                new LlmPriceSnapshot(
+            var job = createRunningJob(new LlmPriceSnapshot(
                     FundingSource.INSTANCE,
                     PricingState.PRICED,
                     1L,
@@ -481,9 +463,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
                     new BigDecimal("10"),
                     new BigDecimal("30"),
                     new BigDecimal("1"),
-                    new BigDecimal("2")
-                )
-            );
+                    new BigDecimal("2")));
             job.setLlmTotalInputTokens(1_000_000);
             job.setLlmTotalOutputTokens(100_000);
 
@@ -505,16 +485,16 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
 
         private ProxyRouting authenticateAndCaptureRouting(AgentJob job) throws Exception {
-            when(
-                agentJobRepository.findByJobTokenHashAndStatus(eq(VALID_TOKEN_HASH), eq(AgentJobStatus.RUNNING))
-            ).thenReturn(Optional.of(job));
+            when(agentJobRepository.findByJobTokenHashAndStatus(eq(VALID_TOKEN_HASH), eq(AgentJobStatus.RUNNING)))
+                    .thenReturn(Optional.of(job));
             var authCapture = new AtomicReference<Authentication>();
             doAnswer(invocation -> {
-                authCapture.set(Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()));
-                return null;
-            })
-                .when(filterChain)
-                .doFilter(any(), any());
+                        authCapture.set(Objects.requireNonNull(
+                                SecurityContextHolder.getContext().getAuthentication()));
+                        return null;
+                    })
+                    .when(filterChain)
+                    .doFilter(any(), any());
 
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
@@ -536,22 +516,21 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         var job = new AgentJob();
         job.setJobToken(VALID_TOKEN);
         ConfigSnapshot snapshot = new ConfigSnapshot(
-            ConfigSnapshot.SCHEMA_VERSION,
-            "openai-completions",
-            "https://api.openai.com/v1",
-            "gpt-5-mini",
-            null,
-            null,
-            null,
-            false,
-            null,
-            null,
-            null,
-            null,
-            600,
-            false,
-            price
-        );
+                ConfigSnapshot.SCHEMA_VERSION,
+                "openai-completions",
+                "https://api.openai.com/v1",
+                "gpt-5-mini",
+                null,
+                null,
+                null,
+                false,
+                null,
+                null,
+                null,
+                null,
+                600,
+                false,
+                price);
         job.setConfigSnapshot(snapshot.toJson(objectMapper));
         job.setId(java.util.UUID.randomUUID());
         Workspace workspace = new Workspace();
@@ -603,16 +582,16 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
         @Test
         void theSameTokenInTheHeaderDoesAuthenticate() throws Exception {
-            when(
-                agentJobRepository.findByJobTokenHashAndStatus(eq(VALID_TOKEN_HASH), eq(AgentJobStatus.RUNNING))
-            ).thenReturn(Optional.of(createRunningJob()));
+            when(agentJobRepository.findByJobTokenHashAndStatus(eq(VALID_TOKEN_HASH), eq(AgentJobStatus.RUNNING)))
+                    .thenReturn(Optional.of(createRunningJob()));
             var authInsideChain = new AtomicReference<Authentication>();
             doAnswer(invocation -> {
-                authInsideChain.set(Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()));
-                return null;
-            })
-                .when(filterChain)
-                .doFilter(any(), any());
+                        authInsideChain.set(Objects.requireNonNull(
+                                SecurityContextHolder.getContext().getAuthentication()));
+                        return null;
+                    })
+                    .when(filterChain)
+                    .doFilter(any(), any());
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
             request.addHeader("Authorization", "Bearer " + VALID_TOKEN);

@@ -13,13 +13,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 @WorkspaceAgnostic(
-    "Workspace-scoped via custom queries that all include workspaceId; PK-only DML allowed for delete/save"
-)
+        "Workspace-scoped via custom queries that all include workspaceId; PK-only DML allowed for delete/save")
 public interface PracticeGroupRepository extends JpaRepository<PracticeGroup, Long> {
     List<PracticeGroup> findByWorkspaceIdOrderByDisplayOrderAscNameAsc(Long workspaceId);
+
     List<PracticeGroup> findByWorkspaceIdAndVisibleInPracticeDashboardsTrueOrderByDisplayOrderAscNameAsc(
-        Long workspaceId
-    );
+            Long workspaceId);
+
     Optional<PracticeGroup> findByWorkspaceIdAndSlug(Long workspaceId, String slug);
 
     boolean existsByWorkspaceIdAndSlug(Long workspaceId, String slug);

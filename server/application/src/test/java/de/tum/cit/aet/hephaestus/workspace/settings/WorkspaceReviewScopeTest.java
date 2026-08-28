@@ -25,11 +25,7 @@ class WorkspaceReviewScopeTest extends BaseUnitTest {
     @Test
     void selectedEmptyMeansNobodyOnEitherAxis() {
         WorkspaceReviewScope scope = new WorkspaceReviewScope(
-            ReviewRepositoryMode.SELECTED,
-            ReviewPersonMode.SELECTED,
-            List.of(),
-            List.of()
-        );
+                ReviewRepositoryMode.SELECTED, ReviewPersonMode.SELECTED, List.of(), List.of());
 
         assertThat(scope.admits("owner/repo", "main", 7L)).isFalse();
         assertThat(scope.admitsRepository("owner/repo", "main")).isFalse();
@@ -38,10 +34,8 @@ class WorkspaceReviewScopeTest extends BaseUnitTest {
 
     @Test
     void repositoryAndPersonSelectionsAreIntersected() {
-        WorkspaceReviewScope scope = selected(
-            List.of(new ReviewRepositoryTarget("owner/repo", List.of())),
-            List.of(7L)
-        );
+        WorkspaceReviewScope scope =
+                selected(List.of(new ReviewRepositoryTarget("owner/repo", List.of())), List.of(7L));
 
         assertThat(scope.admits("owner/repo", "any", 7L)).isTrue();
         assertThat(scope.admits("other/repo", "any", 7L)).isFalse();
@@ -51,11 +45,7 @@ class WorkspaceReviewScopeTest extends BaseUnitTest {
     @Test
     void allRepositoriesCanBeCombinedWithSelectedPeople() {
         WorkspaceReviewScope scope = new WorkspaceReviewScope(
-            ReviewRepositoryMode.ALL_MONITORED,
-            ReviewPersonMode.SELECTED,
-            List.of(),
-            List.of(7L)
-        );
+                ReviewRepositoryMode.ALL_MONITORED, ReviewPersonMode.SELECTED, List.of(), List.of(7L));
 
         assertThat(scope.admits("any/repository", "any-branch", 7L)).isTrue();
         assertThat(scope.admits("any/repository", "any-branch", 8L)).isFalse();
@@ -64,11 +54,10 @@ class WorkspaceReviewScopeTest extends BaseUnitTest {
     @Test
     void selectedRepositoriesCanBeCombinedWithAllEligiblePeople() {
         WorkspaceReviewScope scope = new WorkspaceReviewScope(
-            ReviewRepositoryMode.SELECTED,
-            ReviewPersonMode.ALL_ELIGIBLE,
-            List.of(new ReviewRepositoryTarget("owner/repo", List.of())),
-            List.of()
-        );
+                ReviewRepositoryMode.SELECTED,
+                ReviewPersonMode.ALL_ELIGIBLE,
+                List.of(new ReviewRepositoryTarget("owner/repo", List.of())),
+                List.of());
 
         assertThat(scope.admits("owner/repo", "any-branch", 7L)).isTrue();
         assertThat(scope.admits("other/repo", "any-branch", 7L)).isFalse();
@@ -77,13 +66,11 @@ class WorkspaceReviewScopeTest extends BaseUnitTest {
     @Test
     void exactBaseBranchesAreScopedPerRepository() {
         WorkspaceReviewScope scope = selected(
-            List.of(
-                new ReviewRepositoryTarget("owner/api", List.of("main", "release")),
-                new ReviewRepositoryTarget("owner/web", List.of("develop")),
-                new ReviewRepositoryTarget("owner/docs", List.of())
-            ),
-            List.of(7L)
-        );
+                List.of(
+                        new ReviewRepositoryTarget("owner/api", List.of("main", "release")),
+                        new ReviewRepositoryTarget("owner/web", List.of("develop")),
+                        new ReviewRepositoryTarget("owner/docs", List.of())),
+                List.of(7L));
 
         assertThat(scope.admits("owner/api", "main", 7L)).isTrue();
         assertThat(scope.admits("owner/api", "develop", 7L)).isFalse();
@@ -94,10 +81,8 @@ class WorkspaceReviewScopeTest extends BaseUnitTest {
 
     @Test
     void issueCoverageIgnoresPullRequestBranchRestrictions() {
-        WorkspaceReviewScope scope = selected(
-            List.of(new ReviewRepositoryTarget("owner/api", List.of("main"))),
-            List.of(7L)
-        );
+        WorkspaceReviewScope scope =
+                selected(List.of(new ReviewRepositoryTarget("owner/api", List.of("main"))), List.of(7L));
 
         assertThat(scope.admits("owner/api", null, 7L, false)).isTrue();
         assertThat(scope.admits("owner/api", null, 7L, true)).isFalse();
@@ -105,16 +90,10 @@ class WorkspaceReviewScopeTest extends BaseUnitTest {
 
     @Test
     void repositoryTargetsCanonicalizeBranchesAndPeople() {
-        ReviewRepositoryTarget target = new ReviewRepositoryTarget(
-            " owner/repo ",
-            Arrays.asList(" main ", "main", "develop")
-        );
+        ReviewRepositoryTarget target =
+                new ReviewRepositoryTarget(" owner/repo ", Arrays.asList(" main ", "main", "develop"));
         WorkspaceReviewScope scope = new WorkspaceReviewScope(
-            ReviewRepositoryMode.SELECTED,
-            ReviewPersonMode.SELECTED,
-            List.of(target),
-            Arrays.asList(7L, 7L)
-        );
+                ReviewRepositoryMode.SELECTED, ReviewPersonMode.SELECTED, List.of(target), Arrays.asList(7L, 7L));
 
         assertThat(scope.repositories()).containsExactly(target);
         assertThat(target.baseBranches()).containsExactly("develop", "main");
@@ -123,17 +102,12 @@ class WorkspaceReviewScopeTest extends BaseUnitTest {
 
     @Test
     void missingPolicyAxesAreRejectedInsteadOfWidened() {
-        assertThatThrownBy(() ->
-            MAPPER.readValue(
-                """
+        assertThatThrownBy(() -> MAPPER.readValue("""
                 {"personMode":"SELECTED","repositories":[],"personUserIds":[]}
-                """,
-                WorkspaceReviewScope.class
-            )
-        ).hasRootCauseMessage("repositoryMode");
-        assertThatThrownBy(() ->
-            MAPPER.readValue("{\"nameWithOwner\":\"owner/repo\"}", ReviewRepositoryTarget.class)
-        ).hasRootCauseMessage("baseBranches");
+                """, WorkspaceReviewScope.class))
+                .hasRootCauseMessage("repositoryMode");
+        assertThatThrownBy(() -> MAPPER.readValue("{\"nameWithOwner\":\"owner/repo\"}", ReviewRepositoryTarget.class))
+                .hasRootCauseMessage("baseBranches");
     }
 
     @Test
@@ -141,32 +115,23 @@ class WorkspaceReviewScopeTest extends BaseUnitTest {
         ReviewRepositoryTarget first = new ReviewRepositoryTarget("owner/repo", List.of("main"));
         ReviewRepositoryTarget second = new ReviewRepositoryTarget("owner/repo", List.of("develop"));
 
-        assertThatThrownBy(() ->
-            new WorkspaceReviewScope(
-                ReviewRepositoryMode.SELECTED,
-                ReviewPersonMode.SELECTED,
-                List.of(first, second),
-                List.of(7L)
-            )
-        ).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new WorkspaceReviewScope(
+                        ReviewRepositoryMode.SELECTED, ReviewPersonMode.SELECTED, List.of(first, second), List.of(7L)))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void malformedRepositoryTargetsAreRejectedAtTheDomainBoundary() {
-        assertThatThrownBy(() -> new ReviewRepositoryTarget(" ", List.of())).isInstanceOf(
-            IllegalArgumentException.class
-        );
-        assertThatThrownBy(() -> new ReviewRepositoryTarget("owner/repo", List.of("x".repeat(256)))).isInstanceOf(
-            IllegalArgumentException.class
-        );
+        assertThatThrownBy(() -> new ReviewRepositoryTarget(" ", List.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ReviewRepositoryTarget("owner/repo", List.of("x".repeat(256))))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void roundTripsThroughJsonWithExplicitModes() {
-        WorkspaceReviewScope scope = selected(
-            List.of(new ReviewRepositoryTarget("owner/repo", List.of("main"))),
-            List.of(7L)
-        );
+        WorkspaceReviewScope scope =
+                selected(List.of(new ReviewRepositoryTarget("owner/repo", List.of("main"))), List.of(7L));
 
         String json = MAPPER.writeValueAsString(scope);
 

@@ -43,14 +43,13 @@ class PracticeRevisionTest extends BaseUnitTest {
         assertThat(revision.getWhyItMatters()).isEqualTo("Prevents rework");
         assertThat(revision.getWhatGoodLooksLike()).isEqualTo("A concrete suggestion");
         assertThat(revision)
-            .extracting(
-                PracticeRevision::getGroupSlug,
-                PracticeRevision::getGroupName,
-                PracticeRevision::getGroupDescription,
-                PracticeRevision::getGroupIcon,
-                PracticeRevision::getGroupColor
-            )
-            .containsExactly("review-quality", "Review quality", "Review work", "MessageSquare", "cyan");
+                .extracting(
+                        PracticeRevision::getGroupSlug,
+                        PracticeRevision::getGroupName,
+                        PracticeRevision::getGroupDescription,
+                        PracticeRevision::getGroupIcon,
+                        PracticeRevision::getGroupColor)
+                .containsExactly("review-quality", "Review quality", "Review work", "MessageSquare", "cyan");
         assertThat(revision.getReviewRuleFingerprint()).hasSize(67).startsWith("v3:");
     }
 }

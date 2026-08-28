@@ -47,15 +47,14 @@ class SilentModeGraphQlInterceptorTest extends BaseUnitTest {
         ClientGraphQlRequest request = request("mutation UpdateThing { updateThing { id } }");
         when(request.getOperationName()).thenReturn("UpdateThing");
         doThrow(new OutboundEgressSuppressedException("test"))
-            .when(egressGuard)
-            .requireDeliveryAllowed("scm.graphql.UpdateThing");
+                .when(egressGuard)
+                .requireDeliveryAllowed("scm.graphql.UpdateThing");
         SilentModeGraphQlInterceptor interceptor = new SilentModeGraphQlInterceptor(egressGuard);
         ExchangeFunction transport = mock(ExchangeFunction.class);
         when(chain.next(request)).thenReturn(httpExchange(interceptor, transport));
 
-        assertThatThrownBy(() -> interceptor.intercept(request, chain).block()).isInstanceOf(
-            OutboundEgressSuppressedException.class
-        );
+        assertThatThrownBy(() -> interceptor.intercept(request, chain).block())
+                .isInstanceOf(OutboundEgressSuppressedException.class);
         verify(transport, never()).exchange(org.mockito.ArgumentMatchers.any());
     }
 
@@ -64,19 +63,18 @@ class SilentModeGraphQlInterceptorTest extends BaseUnitTest {
         ClientGraphQlRequest request = request("mutation UpdateThing { updateThing { id } }");
         when(request.getOperationName()).thenReturn("UpdateThing");
         doNothing()
-            .doThrow(new OutboundEgressSuppressedException("test"))
-            .when(egressGuard)
-            .requireDeliveryAllowed("scm.graphql.UpdateThing");
+                .doThrow(new OutboundEgressSuppressedException("test"))
+                .when(egressGuard)
+                .requireDeliveryAllowed("scm.graphql.UpdateThing");
         SilentModeGraphQlInterceptor interceptor = new SilentModeGraphQlInterceptor(egressGuard);
         ExchangeFunction transport = mock(ExchangeFunction.class);
-        when(transport.exchange(org.mockito.ArgumentMatchers.any())).thenReturn(
-            Mono.error(new IllegalStateException())
-        );
-        when(chain.next(request)).thenReturn(httpExchange(interceptor, transport).retry(1));
+        when(transport.exchange(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(Mono.error(new IllegalStateException()));
+        when(chain.next(request))
+                .thenReturn(httpExchange(interceptor, transport).retry(1));
 
-        assertThatThrownBy(() -> interceptor.intercept(request, chain).block()).isInstanceOf(
-            OutboundEgressSuppressedException.class
-        );
+        assertThatThrownBy(() -> interceptor.intercept(request, chain).block())
+                .isInstanceOf(OutboundEgressSuppressedException.class);
         verify(egressGuard, times(2)).requireDeliveryAllowed("scm.graphql.UpdateThing");
         verify(transport).exchange(org.mockito.ArgumentMatchers.any());
     }
@@ -94,9 +92,8 @@ class SilentModeGraphQlInterceptorTest extends BaseUnitTest {
 
     @Test
     void shouldAllowSelectedQueryFromMultiOperationDocument() {
-        ClientGraphQlRequest request = request(
-            "query ReadThing { thing { id } } mutation UpdateThing { updateThing { id } }"
-        );
+        ClientGraphQlRequest request =
+                request("query ReadThing { thing { id } } mutation UpdateThing { updateThing { id } }");
         when(request.getOperationName()).thenReturn("ReadThing");
         SilentModeGraphQlInterceptor interceptor = new SilentModeGraphQlInterceptor(egressGuard);
         when(chain.next(request)).thenReturn(httpExchange(interceptor, Mono.just(mock(ClientResponse.class))));
@@ -113,20 +110,14 @@ class SilentModeGraphQlInterceptorTest extends BaseUnitTest {
     }
 
     private static Mono<ClientGraphQlResponse> httpExchange(
-        SilentModeGraphQlInterceptor interceptor,
-        Mono<ClientResponse> response
-    ) {
+            SilentModeGraphQlInterceptor interceptor, Mono<ClientResponse> response) {
         return httpExchange(interceptor, ignored -> response);
     }
 
     private static Mono<ClientGraphQlResponse> httpExchange(
-        SilentModeGraphQlInterceptor interceptor,
-        ExchangeFunction transport
-    ) {
-        ClientRequest request = ClientRequest.create(
-            HttpMethod.POST,
-            URI.create("https://example.test/graphql")
-        ).build();
+            SilentModeGraphQlInterceptor interceptor, ExchangeFunction transport) {
+        ClientRequest request = ClientRequest.create(HttpMethod.POST, URI.create("https://example.test/graphql"))
+                .build();
         return interceptor.httpAttemptFilter().filter(request, transport).thenReturn(mock(ClientGraphQlResponse.class));
     }
 }

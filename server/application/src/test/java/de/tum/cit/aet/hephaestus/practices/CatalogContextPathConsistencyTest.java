@@ -26,22 +26,24 @@ class CatalogContextPathConsistencyTest extends BaseUnitTest {
 
     /** Workspace-relative files the ContentSources actually write under {@code inputs/context/}. */
     private static final Set<String> REAL_CONTEXT_FILES = Set.of(
-        "metadata.json",
-        "comments.json",
-        "diff.patch",
-        "diff_summary.md",
-        "diff_stat.txt",
-        "issue_summary.md",
-        // The two raw SQL-only graph projections (the agent cannot get these from the mounted worktree):
-        "linked_work_items.json", // LinkedWorkItemContentSource.OUTPUT_FILE — resolved linked-issue rows
-        "review_threads.json", // ReviewThreadContentSource — review-decision/thread rows
-        "general_comments.json", // GeneralReviewCommentContentSource — conversation-tab (non-inline) MR review notes
-        "project_inventory.json", // WorkspaceInventoryContentSource.OUTPUT_FILE — whole-project issue/PR index
-        "conversation_thread.json", // ConversationThreadContentSource — the ordered human turns of one settled Slack thread
-        "document.md" // DocumentContentSource.OUTPUT_KEY — the one mirrored wiki document a review is about
-        // These must never appear: test_presence.json + branch_graph.json are worktree-derived Transforms,
-        // not content; acceptance_criteria.json is emitted by no provider.
-    );
+            "metadata.json",
+            "comments.json",
+            "diff.patch",
+            "diff_summary.md",
+            "diff_stat.txt",
+            "issue_summary.md",
+            // The two raw SQL-only graph projections (the agent cannot get these from the mounted worktree):
+            "linked_work_items.json", // LinkedWorkItemContentSource.OUTPUT_FILE — resolved linked-issue rows
+            "review_threads.json", // ReviewThreadContentSource — review-decision/thread rows
+            "general_comments.json", // GeneralReviewCommentContentSource — conversation-tab (non-inline) MR review
+            // notes
+            "project_inventory.json", // WorkspaceInventoryContentSource.OUTPUT_FILE — whole-project issue/PR index
+            "conversation_thread.json", // ConversationThreadContentSource — the ordered human turns of one settled
+            // Slack thread
+            "document.md" // DocumentContentSource.OUTPUT_KEY — the one mirrored wiki document a review is about
+            // These must never appear: test_presence.json + branch_graph.json are worktree-derived Transforms,
+            // not content; acceptance_criteria.json is emitted by no provider.
+            );
 
     private static final Pattern CONTEXT_PATH = Pattern.compile("inputs/context/([a-z_]+\\.[a-z]+)");
 
@@ -51,30 +53,31 @@ class CatalogContextPathConsistencyTest extends BaseUnitTest {
         String catalogue = readCatalogue();
 
         assertThat(catalogue)
-            .as("the dead pre-rename prefix 'context/target/' must never reappear in the catalogue")
-            .doesNotContain("context/target/");
+                .as("the dead pre-rename prefix 'context/target/' must never reappear in the catalogue")
+                .doesNotContain("context/target/");
 
         Set<String> cited = new TreeSet<>();
         Matcher m = CONTEXT_PATH.matcher(catalogue);
         while (m.find()) {
             cited.add(m.group(1));
         }
-        assertThat(cited).as("catalogue should cite at least the enrichment context files").isNotEmpty();
+        assertThat(cited)
+                .as("catalogue should cite at least the enrichment context files")
+                .isNotEmpty();
         assertThat(REAL_CONTEXT_FILES)
-            .as(
-                "every inputs/context/<file> the catalogue cites must be a file a ContentSource emits — cited=%s",
-                cited
-            )
-            .containsAll(cited);
+                .as(
+                        "every inputs/context/<file> the catalogue cites must be a file a ContentSource emits — cited=%s",
+                        cited)
+                .containsAll(cited);
     }
 
     private static String readCatalogue() throws IOException {
-        try (
-            InputStream in = CatalogContextPathConsistencyTest.class.getClassLoader().getResourceAsStream(
-                "practices/default-catalog.json"
-            )
-        ) {
-            assertThat(in).as("practices/default-catalog.json must be on the classpath").isNotNull();
+        try (InputStream in = CatalogContextPathConsistencyTest.class
+                .getClassLoader()
+                .getResourceAsStream("practices/default-catalog.json")) {
+            assertThat(in)
+                    .as("practices/default-catalog.json must be on the classpath")
+                    .isNotNull();
             return new String(in.readAllBytes(), StandardCharsets.UTF_8);
         }
     }

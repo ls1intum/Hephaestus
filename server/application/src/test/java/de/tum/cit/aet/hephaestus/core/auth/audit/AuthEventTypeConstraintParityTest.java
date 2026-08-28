@@ -35,9 +35,8 @@ class AuthEventTypeConstraintParityTest {
 
     /** The `event_type IN ( … )` list of the most recently defined CHECK wins, as replays apply in order. */
     private static final Pattern CHECK_CONSTRAINT = Pattern.compile(
-        "ADD\\s+CONSTRAINT\\s+ck_auth_event_event_type\\s+CHECK\\s*\\(\\s*event_type\\s+IN\\s*\\((.*?)\\)\\s*\\)",
-        Pattern.DOTALL | Pattern.CASE_INSENSITIVE
-    );
+            "ADD\\s+CONSTRAINT\\s+ck_auth_event_event_type\\s+CHECK\\s*\\(\\s*event_type\\s+IN\\s*\\((.*?)\\)\\s*\\)",
+            Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
 
     private static final Pattern QUOTED = Pattern.compile("'([A-Z_]+)'");
 
@@ -45,19 +44,17 @@ class AuthEventTypeConstraintParityTest {
     void everyEventTypeConstantIsAdmittedByTheDatabaseConstraint() throws IOException {
         Set<String> admitted = admittedByLatestConstraint();
         Set<String> declared = Arrays.stream(AuthEvent.EventType.values())
-            .map(Enum::name)
-            .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+                .map(Enum::name)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
 
         assertThat(admitted)
-            .as("no changelog defines ck_auth_event_event_type — has the constraint been renamed?")
-            .isNotEmpty();
+                .as("no changelog defines ck_auth_event_event_type — has the constraint been renamed?")
+                .isNotEmpty();
         assertThat(declared)
-            .as(
-                "these AuthEvent.EventType constants are not admitted by ck_auth_event_event_type, so writing " +
-                    "one would be rejected by Postgres and the audited action would commit unaudited — widen the " +
-                    "CHECK in a new changelog"
-            )
-            .isSubsetOf(admitted);
+                .as("these AuthEvent.EventType constants are not admitted by ck_auth_event_event_type, so writing "
+                        + "one would be rejected by Postgres and the audited action would commit unaudited — widen the "
+                        + "CHECK in a new changelog")
+                .isSubsetOf(admitted);
     }
 
     /**

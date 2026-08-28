@@ -34,19 +34,17 @@ public class GitHubMemberMessageHandler extends AbstractIntegrationMessageHandle
     private final RepositoryCollaboratorRepository collaboratorRepository;
 
     GitHubMemberMessageHandler(
-        ProcessingContextFactory contextFactory,
-        GitHubUserProcessor userProcessor,
-        RepositoryCollaboratorRepository collaboratorRepository,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            ProcessingContextFactory contextFactory,
+            GitHubUserProcessor userProcessor,
+            RepositoryCollaboratorRepository collaboratorRepository,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITHUB,
-            "repository." + GitHubEventType.MEMBER.getValue(),
-            GitHubMemberEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITHUB,
+                "repository." + GitHubEventType.MEMBER.getValue(),
+                GitHubMemberEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.contextFactory = contextFactory;
         this.userProcessor = userProcessor;
         this.collaboratorRepository = collaboratorRepository;
@@ -62,11 +60,10 @@ public class GitHubMemberMessageHandler extends AbstractIntegrationMessageHandle
         }
 
         log.debug(
-            "Received member event: action={}, userLogin={}, repoName={}",
-            event.action(),
-            sanitizeForLog(memberDto.login()),
-            event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
-        );
+                "Received member event: action={}, userLogin={}, repoName={}",
+                event.action(),
+                sanitizeForLog(memberDto.login()),
+                event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown");
 
         ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);
         if (context == null) {
@@ -92,9 +89,8 @@ public class GitHubMemberMessageHandler extends AbstractIntegrationMessageHandle
     private void handleCollaboratorAdded(Repository repository, User user, GitHubMemberEventDTO event) {
         // Extract permission from event changes
         String permissionValue = event.getPermission();
-        RepositoryCollaborator.Permission permission = RepositoryCollaborator.Permission.fromGitHubValue(
-            permissionValue
-        );
+        RepositoryCollaborator.Permission permission =
+                RepositoryCollaborator.Permission.fromGitHubValue(permissionValue);
 
         // Check if collaborator already exists
         var existingCollaborator = collaboratorRepository.findByRepositoryIdAndUserId(repository.getId(), user.getId());
@@ -105,21 +101,19 @@ public class GitHubMemberMessageHandler extends AbstractIntegrationMessageHandle
             collaborator.updatePermission(permission);
             collaboratorRepository.save(collaborator);
             log.info(
-                "Updated collaborator permission: userLogin={}, repoName={}, permission={}",
-                sanitizeForLog(user.getLogin()),
-                sanitizeForLog(repository.getNameWithOwner()),
-                permission
-            );
+                    "Updated collaborator permission: userLogin={}, repoName={}, permission={}",
+                    sanitizeForLog(user.getLogin()),
+                    sanitizeForLog(repository.getNameWithOwner()),
+                    permission);
         } else {
             // Create new collaborator
             RepositoryCollaborator collaborator = new RepositoryCollaborator(repository, user, permission);
             collaboratorRepository.save(collaborator);
             log.info(
-                "Added collaborator: userLogin={}, repoName={}, permission={}",
-                sanitizeForLog(user.getLogin()),
-                sanitizeForLog(repository.getNameWithOwner()),
-                permission
-            );
+                    "Added collaborator: userLogin={}, repoName={}, permission={}",
+                    sanitizeForLog(user.getLogin()),
+                    sanitizeForLog(repository.getNameWithOwner()),
+                    permission);
         }
     }
 
@@ -129,16 +123,14 @@ public class GitHubMemberMessageHandler extends AbstractIntegrationMessageHandle
         if (existingCollaborator.isPresent()) {
             collaboratorRepository.delete(existingCollaborator.get());
             log.info(
-                "Removed collaborator: userLogin={}, repoName={}",
-                sanitizeForLog(user.getLogin()),
-                sanitizeForLog(repository.getNameWithOwner())
-            );
+                    "Removed collaborator: userLogin={}, repoName={}",
+                    sanitizeForLog(user.getLogin()),
+                    sanitizeForLog(repository.getNameWithOwner()));
         } else {
             log.debug(
-                "Skipped collaborator removal: reason=notFound, userLogin={}, repoName={}",
-                sanitizeForLog(user.getLogin()),
-                sanitizeForLog(repository.getNameWithOwner())
-            );
+                    "Skipped collaborator removal: reason=notFound, userLogin={}, repoName={}",
+                    sanitizeForLog(user.getLogin()),
+                    sanitizeForLog(repository.getNameWithOwner()));
         }
     }
 }

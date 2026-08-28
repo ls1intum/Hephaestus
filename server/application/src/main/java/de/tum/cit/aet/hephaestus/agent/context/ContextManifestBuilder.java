@@ -53,9 +53,7 @@ public class ContextManifestBuilder {
     static final String AUTOMATED_REVIEW_READINESS_REPORT_FILE = "automated-review-readiness-report.json";
 
     public record PreparedAutomatedReviewReadiness(
-        List<Practice> readyPractices,
-        AutomatedReviewReadinessReport report
-    ) {
+            List<Practice> readyPractices, AutomatedReviewReadinessReport report) {
         public PreparedAutomatedReviewReadiness {
             readyPractices = List.copyOf(readyPractices);
             Objects.requireNonNull(report, "report");
@@ -63,55 +61,50 @@ public class ContextManifestBuilder {
     }
 
     public record CaptureMetadata(
-        Map<SourceKind, SourceCompleteness> reportedCompleteness,
-        Map<SourceKind, SourceContentState> reportedContentStates,
-        Map<SourceKind, String> immutableIdentities,
-        Map<SourceKind, Instant> observedAt,
-        Map<SourceKind, Instant> sourceEffectiveAt,
-        Map<SourceKind, SourceCaptureState> stateOverrides,
-        /** Per source, what its capture could not include; empty for a source that captured it all. */
-        Map<SourceKind, List<String>> captureLimitations,
-        Set<SourceKind> attemptedKinds
-    ) {
-        public CaptureMetadata(
-            Map<SourceKind, SourceCompleteness> reportedCompleteness,
-            Map<SourceKind, String> immutableIdentities,
-            Map<SourceKind, Instant> observedAt,
-            Map<SourceKind, Instant> sourceEffectiveAt,
-            Map<SourceKind, SourceCaptureState> stateOverrides,
-            Set<SourceKind> attemptedKinds
-        ) {
-            this(
-                reportedCompleteness,
-                Map.of(),
-                immutableIdentities,
-                observedAt,
-                sourceEffectiveAt,
-                stateOverrides,
-                Map.of(),
-                attemptedKinds
-            );
-        }
-
-        public CaptureMetadata(
             Map<SourceKind, SourceCompleteness> reportedCompleteness,
             Map<SourceKind, SourceContentState> reportedContentStates,
             Map<SourceKind, String> immutableIdentities,
             Map<SourceKind, Instant> observedAt,
             Map<SourceKind, Instant> sourceEffectiveAt,
             Map<SourceKind, SourceCaptureState> stateOverrides,
-            Set<SourceKind> attemptedKinds
-        ) {
+            /** Per source, what its capture could not include; empty for a source that captured it all. */
+            Map<SourceKind, List<String>> captureLimitations,
+            Set<SourceKind> attemptedKinds) {
+        public CaptureMetadata(
+                Map<SourceKind, SourceCompleteness> reportedCompleteness,
+                Map<SourceKind, String> immutableIdentities,
+                Map<SourceKind, Instant> observedAt,
+                Map<SourceKind, Instant> sourceEffectiveAt,
+                Map<SourceKind, SourceCaptureState> stateOverrides,
+                Set<SourceKind> attemptedKinds) {
             this(
-                reportedCompleteness,
-                reportedContentStates,
-                immutableIdentities,
-                observedAt,
-                sourceEffectiveAt,
-                stateOverrides,
-                Map.of(),
-                attemptedKinds
-            );
+                    reportedCompleteness,
+                    Map.of(),
+                    immutableIdentities,
+                    observedAt,
+                    sourceEffectiveAt,
+                    stateOverrides,
+                    Map.of(),
+                    attemptedKinds);
+        }
+
+        public CaptureMetadata(
+                Map<SourceKind, SourceCompleteness> reportedCompleteness,
+                Map<SourceKind, SourceContentState> reportedContentStates,
+                Map<SourceKind, String> immutableIdentities,
+                Map<SourceKind, Instant> observedAt,
+                Map<SourceKind, Instant> sourceEffectiveAt,
+                Map<SourceKind, SourceCaptureState> stateOverrides,
+                Set<SourceKind> attemptedKinds) {
+            this(
+                    reportedCompleteness,
+                    reportedContentStates,
+                    immutableIdentities,
+                    observedAt,
+                    sourceEffectiveAt,
+                    stateOverrides,
+                    Map.of(),
+                    attemptedKinds);
         }
     }
 
@@ -123,13 +116,12 @@ public class ContextManifestBuilder {
     private final Clock clock;
 
     public ContextManifestBuilder(
-        ContentAddressedStore cas,
-        FabricLayout layout,
-        JsonMapper objectMapper,
-        ArtifactSourceCatalogRegistry catalogs,
-        PracticeSubjectEvaluator subjectEvaluator,
-        Clock clock
-    ) {
+            ContentAddressedStore cas,
+            FabricLayout layout,
+            JsonMapper objectMapper,
+            ArtifactSourceCatalogRegistry catalogs,
+            PracticeSubjectEvaluator subjectEvaluator,
+            Clock clock) {
         this.cas = cas;
         this.layout = layout;
         this.objectMapper = objectMapper;
@@ -153,23 +145,21 @@ public class ContextManifestBuilder {
 
     /** For captures held entirely in memory, which is every source but the repository tree. */
     public ArtifactSourceManifest augment(
-        Map<String, byte[]> files,
-        Map<String, SourceKind> pathKinds,
-        String jobId,
-        EvidencePlan plan,
-        CaptureMetadata metadata
-    ) {
+            Map<String, byte[]> files,
+            Map<String, SourceKind> pathKinds,
+            String jobId,
+            EvidencePlan plan,
+            CaptureMetadata metadata) {
         return augment(files, Map.of(), pathKinds, jobId, plan, metadata);
     }
 
     public ArtifactSourceManifest augment(
-        Map<String, byte[]> files,
-        Map<String, java.nio.file.Path> filesOnDisk,
-        Map<String, SourceKind> pathKinds,
-        String jobId,
-        EvidencePlan plan,
-        CaptureMetadata metadata
-    ) {
+            Map<String, byte[]> files,
+            Map<String, java.nio.file.Path> filesOnDisk,
+            Map<String, SourceKind> pathKinds,
+            String jobId,
+            EvidencePlan plan,
+            CaptureMetadata metadata) {
         Instant capturedAt = clock.instant();
         Set<SourceKind> applicableSources = stagedSources(plan);
         // The manifest enumerates the applicable sources and nothing else, so a fact reported for a
@@ -186,38 +176,32 @@ public class ContextManifestBuilder {
         reported.removeAll(applicableSources);
         if (!reported.isEmpty()) {
             throw new IllegalArgumentException(
-                "Capture reports sources that do not apply to " + plan.artifactKind() + ": " + reported
-            );
+                    "Capture reports sources that do not apply to " + plan.artifactKind() + ": " + reported);
         }
-        List<SourceCapture> captures = applicableSources
-            .stream()
-            .sorted()
-            .map(kind ->
-                capture(
-                    kind,
-                    files,
-                    filesOnDisk,
-                    pathKinds,
-                    plan,
-                    capturedAt,
-                    metadata.reportedCompleteness(),
-                    metadata.reportedContentStates(),
-                    metadata.immutableIdentities(),
-                    metadata.observedAt(),
-                    metadata.sourceEffectiveAt(),
-                    metadata.stateOverrides(),
-                    metadata.captureLimitations(),
-                    metadata.attemptedKinds()
-                )
-            )
-            .toList();
+        List<SourceCapture> captures = applicableSources.stream()
+                .sorted()
+                .map(kind -> capture(
+                        kind,
+                        files,
+                        filesOnDisk,
+                        pathKinds,
+                        plan,
+                        capturedAt,
+                        metadata.reportedCompleteness(),
+                        metadata.reportedContentStates(),
+                        metadata.immutableIdentities(),
+                        metadata.observedAt(),
+                        metadata.sourceEffectiveAt(),
+                        metadata.stateOverrides(),
+                        metadata.captureLimitations(),
+                        metadata.attemptedKinds()))
+                .toList();
         ArtifactSourceManifest manifest = new ArtifactSourceManifest(
-            plan.contractVersion(),
-            catalogs.catalogDigest(),
-            plan.artifactKind().value(),
-            capturedAt,
-            captures
-        );
+                plan.contractVersion(),
+                catalogs.catalogDigest(),
+                plan.artifactKind().value(),
+                capturedAt,
+                captures);
         try {
             byte[] internalBytes = objectMapper.writeValueAsBytes(manifest);
             persistInternalManifest(jobId, internalBytes);
@@ -241,36 +225,30 @@ public class ContextManifestBuilder {
      * read. No source is dropped because no practice asked for it.
      */
     Set<SourceKind> stagedSources(EvidencePlan plan) {
-        return catalogs.requireSourcesFor(plan.contractVersion(), plan.artifactKind().value());
+        return catalogs.requireSourcesFor(
+                plan.contractVersion(), plan.artifactKind().value());
     }
 
     public PreparedAutomatedReviewReadiness prepareAutomatedReviewReadiness(
-        ArtifactSourceManifest manifest,
-        List<Practice> practices,
-        String jobId,
-        Instant temporalAnchor,
-        @Nullable SignalName signal,
-        Map<String, byte[]> staged
-    ) {
-        AutomatedReviewReadinessResult result = checkAutomatedReviewReadiness(
-            manifest,
-            practices,
-            temporalAnchor,
-            signal,
-            staged
-        );
+            ArtifactSourceManifest manifest,
+            List<Practice> practices,
+            String jobId,
+            Instant temporalAnchor,
+            @Nullable SignalName signal,
+            Map<String, byte[]> staged) {
+        AutomatedReviewReadinessResult result =
+                checkAutomatedReviewReadiness(manifest, practices, temporalAnchor, signal, staged);
         if (result.decisions().isEmpty()) {
             throw new IllegalArgumentException("Cannot persist an empty automated-review readiness report");
         }
         Instant decidedAt = result.decisions().getFirst().decidedAt();
         AutomatedReviewReadinessReport report = new AutomatedReviewReadinessReport(
-            manifest.contractVersion(),
-            manifest.catalogDigest(),
-            manifest.artifactKind(),
-            manifest.capturedAt(),
-            decidedAt,
-            result.decisions()
-        );
+                manifest.contractVersion(),
+                manifest.catalogDigest(),
+                manifest.artifactKind(),
+                manifest.capturedAt(),
+                decidedAt,
+                result.decisions());
         persistInternalJson(jobId, AUTOMATED_REVIEW_READINESS_REPORT_FILE, objectMapper.writeValueAsBytes(report));
         return new PreparedAutomatedReviewReadiness(result.readyPractices(), report);
     }
@@ -281,9 +259,7 @@ public class ContextManifestBuilder {
      * question and can flip a verdict that was correct when it was made.
      */
     public AutomatedReviewReadinessResult checkAutomatedReviewReadinessAsOfNow(
-        ArtifactSourceManifest manifest,
-        List<Practice> practices
-    ) {
+            ArtifactSourceManifest manifest, List<Practice> practices) {
         return checkAutomatedReviewReadiness(manifest, practices, clock.instant(), null, Map.of());
     }
 
@@ -293,11 +269,10 @@ public class ContextManifestBuilder {
      * replay, a test — that holds a manifest but not the capture it describes.
      */
     public AutomatedReviewReadinessResult checkAutomatedReviewReadiness(
-        ArtifactSourceManifest manifest,
-        List<Practice> practices,
-        Instant temporalAnchor,
-        @Nullable SignalName signal
-    ) {
+            ArtifactSourceManifest manifest,
+            List<Practice> practices,
+            Instant temporalAnchor,
+            @Nullable SignalName signal) {
         return checkAutomatedReviewReadiness(manifest, practices, temporalAnchor, signal, Map.of());
     }
 
@@ -308,40 +283,30 @@ public class ContextManifestBuilder {
      *               means "not supplied", which leaves every subject undecided and every practice asked
      */
     public AutomatedReviewReadinessResult checkAutomatedReviewReadiness(
-        ArtifactSourceManifest manifest,
-        List<Practice> practices,
-        Instant temporalAnchor,
-        @Nullable SignalName signal,
-        Map<String, byte[]> staged
-    ) {
+            ArtifactSourceManifest manifest,
+            List<Practice> practices,
+            Instant temporalAnchor,
+            @Nullable SignalName signal,
+            Map<String, byte[]> staged) {
         Objects.requireNonNull(temporalAnchor, "temporalAnchor");
         Objects.requireNonNull(staged, "staged");
         // A manifest recorded under a source contract this runtime no longer ships is unreplayable
         // rather than invalid: the recorded decision remains correct for the evidence it was made on.
         // Declining to re-derive a readiness result is correct; failing as though the evidence were
         // malformed is not.
-        if (
-            !catalogs.current().version().equals(manifest.contractVersion()) ||
-            !catalogs.catalogDigest().equals(manifest.catalogDigest())
-        ) {
-            throw new UnreplayableEvidenceException(
-                "Manifest references source contract " +
-                    manifest.contractVersion() +
-                    " (digest " +
-                    manifest.catalogDigest() +
-                    "), which this runtime no longer ships"
-            );
+        if (!catalogs.current().version().equals(manifest.contractVersion())
+                || !catalogs.catalogDigest().equals(manifest.catalogDigest())) {
+            throw new UnreplayableEvidenceException("Manifest references source contract " + manifest.contractVersion()
+                    + " (digest "
+                    + manifest.catalogDigest()
+                    + "), which this runtime no longer ships");
         }
         Set<SourceKind> expectedKinds = catalogs.requireSourcesFor(manifest.contractVersion(), manifest.artifactKind());
-        Set<SourceKind> capturedKinds = manifest
-            .sources()
-            .stream()
-            .map(SourceCapture::kind)
-            .collect(java.util.stream.Collectors.toSet());
+        Set<SourceKind> capturedKinds =
+                manifest.sources().stream().map(SourceCapture::kind).collect(java.util.stream.Collectors.toSet());
         if (!capturedKinds.equals(expectedKinds)) {
             throw new IllegalArgumentException(
-                "Manifest source captures do not match the sources its artifact kind applies to"
-            );
+                    "Manifest source captures do not match the sources its artifact kind applies to");
         }
         Map<SourceKind, SourceCapture> captures = new HashMap<>();
         manifest.sources().forEach(capture -> captures.put(capture.kind(), capture));
@@ -353,26 +318,20 @@ public class ContextManifestBuilder {
             if (requirements == null) {
                 throw new IllegalArgumentException("Practice has no evidence requirements: " + practice.getSlug());
             }
-            if (
-                !requirements.sourceContractVersion().equals(manifest.contractVersion()) ||
-                !practice.getArtifactKind().value().equals(manifest.artifactKind())
-            ) {
+            if (!requirements.sourceContractVersion().equals(manifest.contractVersion())
+                    || !practice.getArtifactKind().value().equals(manifest.artifactKind())) {
                 throw new IllegalArgumentException(
-                    "Practice evidence contract does not match manifest: " + practice.getSlug()
-                );
+                        "Practice evidence contract does not match manifest: " + practice.getSlug());
             }
             List<AutomatedReviewReadinessReason> decisionReasons = new ArrayList<>();
             switch (requirements.automatedReview().mode()) {
                 case NONE -> decisionReasons.add(AutomatedReviewReadinessReason.NO_AUTOMATED_REVIEW);
-                case LANGUAGE_MODEL -> {
-                }
+                case LANGUAGE_MODEL -> {}
             }
             switch (requirements.automatedReview().evidenceSufficiency()) {
-                case DECLARED_EVIDENCE_INSUFFICIENT -> decisionReasons.add(
-                    AutomatedReviewReadinessReason.DECLARED_EVIDENCE_INSUFFICIENT
-                );
-                case SUFFICIENT_WHEN_REQUIREMENTS_MET, NONE -> {
-                }
+                case DECLARED_EVIDENCE_INSUFFICIENT ->
+                    decisionReasons.add(AutomatedReviewReadinessReason.DECLARED_EVIDENCE_INSUFFICIENT);
+                case SUFFICIENT_WHEN_REQUIREMENTS_MET, NONE -> {}
             }
             List<SourceReadinessCheck> sourceChecks = new ArrayList<>();
             // Only the bindings this occasion matched speak here, and within them only the sources the
@@ -385,14 +344,13 @@ public class ContextManifestBuilder {
                 }
                 // How strictly the capture must have gone is the source's answer, not the practice's:
                 // stating it per practice is only a way for two practices to disagree about one source.
-                RequiredCaptureQuality quality = catalogs
-                    .requireSource(manifest.contractVersion(), need.sourceKind())
-                    .requiredQuality();
+                RequiredCaptureQuality quality = catalogs.requireSource(manifest.contractVersion(), need.sourceKind())
+                        .requiredQuality();
                 SourceCapture capture = captures.get(need.sourceKind());
                 SourceCaptureState.Available available =
-                    capture != null && capture.state() instanceof SourceCaptureState.Available captured
-                        ? captured
-                        : null;
+                        capture != null && capture.state() instanceof SourceCaptureState.Available captured
+                                ? captured
+                                : null;
                 List<SourceReadinessReason> reasons = new ArrayList<>();
                 if (available == null) {
                     // Absence is the whole answer. Incompleteness and emptiness are facts ABOUT a
@@ -404,49 +362,42 @@ public class ContextManifestBuilder {
                     // statement about the claim rather than about the source: a review that asserts
                     // something is absent cannot be satisfied by a fragment that merely does not
                     // contain it.
-                    boolean demandsComplete = quality.demandsComplete() || need.stance().demandsCompleteCapture();
-                    if (demandsComplete && available.completeness() != SourceCompleteness.COMPLETE) reasons.add(
-                        SourceReadinessReason.SOURCE_INCOMPLETE
-                    );
-                    if (quality.demandsContent() && available.content() != SourceContentState.NON_EMPTY) reasons.add(
-                        SourceReadinessReason.SOURCE_EMPTY
-                    );
+                    boolean demandsComplete =
+                            quality.demandsComplete() || need.stance().demandsCompleteCapture();
+                    if (demandsComplete && available.completeness() != SourceCompleteness.COMPLETE)
+                        reasons.add(SourceReadinessReason.SOURCE_INCOMPLETE);
+                    if (quality.demandsContent() && available.content() != SourceContentState.NON_EMPTY)
+                        reasons.add(SourceReadinessReason.SOURCE_EMPTY);
                 }
-                sourceChecks.add(
-                    new SourceReadinessCheck(
+                sourceChecks.add(new SourceReadinessCheck(
                         need.sourceKind(),
                         manifest.contractVersion(),
                         checkedAt,
                         temporalAnchor,
                         reasons.isEmpty(),
-                        reasons
-                    )
-                );
+                        reasons));
             }
             // The subject is asked about last, and only of a practice that would otherwise be asked.
             // "We could not read what this needs" outranks "there was nothing of this kind here",
             // because a capture we could not read cannot establish the second: judging the subject over
             // it would dress an instrument failure up as a fact about somebody's work.
-            boolean readableAndDeclared =
-                decisionReasons.isEmpty() && sourceChecks.stream().allMatch(SourceReadinessCheck::meetsRequirements);
+            boolean readableAndDeclared = decisionReasons.isEmpty()
+                    && sourceChecks.stream().allMatch(SourceReadinessCheck::meetsRequirements);
             PracticeSubjectCheck subjectCheck = readableAndDeclared
-                ? subjectEvaluator.evaluate(
-                      PracticeBinding.subjectFor(practice.getBindings(), signal),
-                      manifest,
-                      staged
-                  )
-                : null;
+                    ? subjectEvaluator.evaluate(
+                            PracticeBinding.subjectFor(practice.getBindings(), signal), manifest, staged)
+                    : null;
             if (subjectCheck != null && subjectCheck.absent()) {
                 decisionReasons.add(AutomatedReviewReadinessReason.SUBJECT_NOT_IN_THE_WORK);
             }
             AutomatedReviewReadinessDecision decision = new AutomatedReviewReadinessDecision(
-                practice.getSlug(),
-                checkedAt,
-                decisionReasons.isEmpty() && sourceChecks.stream().allMatch(SourceReadinessCheck::meetsRequirements),
-                decisionReasons,
-                sourceChecks,
-                subjectCheck
-            );
+                    practice.getSlug(),
+                    checkedAt,
+                    decisionReasons.isEmpty()
+                            && sourceChecks.stream().allMatch(SourceReadinessCheck::meetsRequirements),
+                    decisionReasons,
+                    sourceChecks,
+                    subjectCheck);
             decisions.add(decision);
             if (decision.ready()) ready.add(practice);
         }
@@ -454,21 +405,20 @@ public class ContextManifestBuilder {
     }
 
     private SourceCapture capture(
-        SourceKind kind,
-        Map<String, byte[]> files,
-        Map<String, java.nio.file.Path> filesOnDisk,
-        Map<String, SourceKind> pathKinds,
-        EvidencePlan plan,
-        Instant capturedAt,
-        Map<SourceKind, SourceCompleteness> reportedCompleteness,
-        Map<SourceKind, SourceContentState> reportedContentStates,
-        Map<SourceKind, String> immutableIdentities,
-        Map<SourceKind, Instant> observedAt,
-        Map<SourceKind, Instant> sourceEffectiveAt,
-        Map<SourceKind, SourceCaptureState> stateOverrides,
-        Map<SourceKind, List<String>> captureLimitations,
-        Set<SourceKind> attemptedKinds
-    ) {
+            SourceKind kind,
+            Map<String, byte[]> files,
+            Map<String, java.nio.file.Path> filesOnDisk,
+            Map<String, SourceKind> pathKinds,
+            EvidencePlan plan,
+            Instant capturedAt,
+            Map<SourceKind, SourceCompleteness> reportedCompleteness,
+            Map<SourceKind, SourceContentState> reportedContentStates,
+            Map<SourceKind, String> immutableIdentities,
+            Map<SourceKind, Instant> observedAt,
+            Map<SourceKind, Instant> sourceEffectiveAt,
+            Map<SourceKind, SourceCaptureState> stateOverrides,
+            Map<SourceKind, List<String>> captureLimitations,
+            Set<SourceKind> attemptedKinds) {
         ArtifactSourceContract contract = catalogs.requireSource(plan.contractVersion(), kind);
         SourceCaptureState override = stateOverrides.get(kind);
         if (override != null) {
@@ -477,41 +427,31 @@ public class ContextManifestBuilder {
         if (!attemptedKinds.contains(kind)) {
             return missingCapture(contract, new SourceCaptureState.Unavailable(SourceAbsenceReason.NO_PROVIDER));
         }
-        List<SourceArtifact> artifacts = pathKinds
-            .entrySet()
-            .stream()
-            .filter(entry -> entry.getValue().equals(kind))
-            .sorted(Map.Entry.comparingByKey())
-            .map(entry -> artifact(entry.getKey(), files.get(entry.getKey()), filesOnDisk.get(entry.getKey())))
-            .toList();
+        List<SourceArtifact> artifacts = pathKinds.entrySet().stream()
+                .filter(entry -> entry.getValue().equals(kind))
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> artifact(entry.getKey(), files.get(entry.getKey()), filesOnDisk.get(entry.getKey())))
+                .toList();
         if (artifacts.isEmpty() && !contract.completenessPolicy().supportsEmpty()) {
             return missingCapture(contract, new SourceCaptureState.Unavailable(SourceAbsenceReason.EMPTY_NOT_VALID));
         }
-        SourceCompleteness completeness = reportedCompleteness.getOrDefault(
-            kind,
-            inferredCompleteness(contract, artifacts, files)
-        );
-        if (
-            (completeness == SourceCompleteness.COMPLETE && !contract.completenessPolicy().supportsComplete()) ||
-            (completeness == SourceCompleteness.PARTIAL && !contract.completenessPolicy().supportsPartial())
-        ) {
+        SourceCompleteness completeness =
+                reportedCompleteness.getOrDefault(kind, inferredCompleteness(contract, artifacts, files));
+        if ((completeness == SourceCompleteness.COMPLETE
+                        && !contract.completenessPolicy().supportsComplete())
+                || (completeness == SourceCompleteness.PARTIAL
+                        && !contract.completenessPolicy().supportsPartial())) {
             throw new IllegalStateException(
-                kind + " reported completeness forbidden by its source contract: " + completeness
-            );
+                    kind + " reported completeness forbidden by its source contract: " + completeness);
         }
         SourceContentState content = reportedContentStates.getOrDefault(
-            kind,
-            artifacts.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY
-        );
-        if (content == SourceContentState.EMPTY && !contract.completenessPolicy().supportsEmpty()) {
+                kind, artifacts.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY);
+        if (content == SourceContentState.EMPTY
+                && !contract.completenessPolicy().supportsEmpty()) {
             throw new IllegalStateException(kind + " reported EMPTY although its source contract forbids it");
         }
         SourceCaptureFacts facts = new SourceCaptureFacts(
-            capturedAt,
-            sourceEffectiveAt.get(kind),
-            observedAt.get(kind),
-            immutableIdentities.get(kind)
-        );
+                capturedAt, sourceEffectiveAt.get(kind), observedAt.get(kind), immutableIdentities.get(kind));
         List<String> limitations = captureLimitations.getOrDefault(kind, List.of());
         // A collector that named an omission and still reported COMPLETE is contradicting itself; the
         // completeness is the claim a practice acts on, so the omission is what has to win.
@@ -519,10 +459,7 @@ public class ContextManifestBuilder {
             throw new IllegalStateException(kind + " reported COMPLETE while naming what it omitted: " + limitations);
         }
         return new SourceCapture(
-            kind,
-            new SourceCaptureState.Available(content, completeness, facts, limitations),
-            artifacts
-        );
+                kind, new SourceCaptureState.Available(content, completeness, facts, limitations), artifacts);
     }
 
     private static SourceCapture missingCapture(ArtifactSourceContract contract, SourceCaptureState state) {
@@ -534,49 +471,46 @@ public class ContextManifestBuilder {
     }
 
     private SourceCompleteness inferredCompleteness(
-        ArtifactSourceContract contract,
-        List<SourceArtifact> artifacts,
-        Map<String, byte[]> files
-    ) {
+            ArtifactSourceContract contract, List<SourceArtifact> artifacts, Map<String, byte[]> files) {
         if (artifacts.isEmpty()) {
             if (!contract.completenessPolicy().supportsEmpty()) return SourceCompleteness.UNKNOWN;
             if (contract.completenessPolicy().supportsComplete()) return SourceCompleteness.COMPLETE;
             if (contract.completenessPolicy().supportsPartial()) return SourceCompleteness.PARTIAL;
             return SourceCompleteness.UNKNOWN;
         }
-        List<Boolean> truncationMarkers = artifacts
-            .stream()
-            .map(artifact -> truncationMarker(files.get(artifact.path())))
-            .flatMap(Optional::stream)
-            .toList();
+        List<Boolean> truncationMarkers = artifacts.stream()
+                .map(artifact -> truncationMarker(files.get(artifact.path())))
+                .flatMap(Optional::stream)
+                .toList();
         if (truncationMarkers.stream().anyMatch(Boolean.TRUE::equals)) {
             return SourceCompleteness.PARTIAL;
         }
         // Every artifact must have said it was untruncated. One marker among several unmarked files
         // is not evidence about the unmarked ones, and COMPLETE is the claim a practice requires.
-        if (truncationMarkers.size() == artifacts.size() && contract.completenessPolicy().supportsComplete()) {
+        if (truncationMarkers.size() == artifacts.size()
+                && contract.completenessPolicy().supportsComplete()) {
             return SourceCompleteness.COMPLETE;
         }
         return contract.completenessPolicy().supportsPartial()
-            ? SourceCompleteness.PARTIAL
-            : SourceCompleteness.UNKNOWN;
+                ? SourceCompleteness.PARTIAL
+                : SourceCompleteness.UNKNOWN;
     }
 
-    private Optional<Boolean> truncationMarker(byte@Nullable [] bytes) {
+    private Optional<Boolean> truncationMarker(byte @Nullable [] bytes) {
         if (bytes == null || bytes.length == 0 || bytes[0] != '{') {
             return Optional.empty();
         }
         try {
             JsonNode node = objectMapper.readTree(bytes);
             return node.has("truncated") && node.path("truncated").isBoolean()
-                ? Optional.of(node.path("truncated").asBoolean())
-                : Optional.empty();
+                    ? Optional.of(node.path("truncated").asBoolean())
+                    : Optional.empty();
         } catch (RuntimeException ignored) {
             return Optional.empty();
         }
     }
 
-    private SourceArtifact artifact(String path, byte@Nullable [] bytes, java.nio.file.@Nullable Path onDisk) {
+    private SourceArtifact artifact(String path, byte @Nullable [] bytes, java.nio.file.@Nullable Path onDisk) {
         if (onDisk != null) {
             try {
                 return new SourceArtifact(path, mediaType(path), cas.put(onDisk), java.nio.file.Files.size(onDisk));
@@ -623,11 +557,10 @@ public class ContextManifestBuilder {
         try {
             Files.write(temporary, bytes);
             Files.move(
-                temporary,
-                dir.resolve(fileName),
-                StandardCopyOption.ATOMIC_MOVE,
-                StandardCopyOption.REPLACE_EXISTING
-            );
+                    temporary,
+                    dir.resolve(fileName),
+                    StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING);
         } finally {
             Files.deleteIfExists(temporary);
         }

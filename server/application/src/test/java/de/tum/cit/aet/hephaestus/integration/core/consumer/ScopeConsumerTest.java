@@ -11,14 +11,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.nats.client.ConsumerContext;
-import io.nats.client.JetStreamApiException;
 import io.nats.client.Message;
 import io.nats.client.MessageConsumer;
 import io.nats.client.MessageHandler;
 import io.nats.client.StreamContext;
 import io.nats.client.api.ConsumerConfiguration;
 import io.nats.client.api.ConsumerInfo;
-import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -42,58 +40,50 @@ class ScopeConsumerTest {
     private static final String STREAM = "github";
     private static final String CONSUMER_NAME = "hephaestus-scope-7";
     private static final long SCOPE_ID = 7L;
-    private static final String[] SUBJECTS = new String[] { "github.acme.repo.>" };
+    private static final String[] SUBJECTS = new String[] {"github.acme.repo.>"};
 
     @Nested
     class ConstructorArgs {
 
         @Test
         void rejectsNullStreamName() {
-            assertThatThrownBy(() ->
-                new ScopeConsumer(
-                    SCOPE_ID,
-                    CONSUMER_NAME,
-                    null,
-                    mock(ConsumerContext.class),
-                    mock(StreamContext.class),
-                    SUBJECTS,
-                    msg -> {}
-                )
-            )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("streamName");
+            assertThatThrownBy(() -> new ScopeConsumer(
+                            SCOPE_ID,
+                            CONSUMER_NAME,
+                            null,
+                            mock(ConsumerContext.class),
+                            mock(StreamContext.class),
+                            SUBJECTS,
+                            msg -> {}))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("streamName");
         }
 
         @Test
         void rejectsBlankConsumerName() {
-            assertThatThrownBy(() ->
-                new ScopeConsumer(
-                    SCOPE_ID,
-                    "  ",
-                    STREAM,
-                    mock(ConsumerContext.class),
-                    mock(StreamContext.class),
-                    SUBJECTS,
-                    msg -> {}
-                )
-            ).isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> new ScopeConsumer(
+                            SCOPE_ID,
+                            "  ",
+                            STREAM,
+                            mock(ConsumerContext.class),
+                            mock(StreamContext.class),
+                            SUBJECTS,
+                            msg -> {}))
+                    .isInstanceOf(IllegalArgumentException.class);
         }
 
         @Test
         void rejectsNullMessageHandler() {
-            assertThatThrownBy(() ->
-                new ScopeConsumer(
-                    SCOPE_ID,
-                    CONSUMER_NAME,
-                    STREAM,
-                    mock(ConsumerContext.class),
-                    mock(StreamContext.class),
-                    SUBJECTS,
-                    null
-                )
-            )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("messageHandler");
+            assertThatThrownBy(() -> new ScopeConsumer(
+                            SCOPE_ID,
+                            CONSUMER_NAME,
+                            STREAM,
+                            mock(ConsumerContext.class),
+                            mock(StreamContext.class),
+                            SUBJECTS,
+                            null))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("messageHandler");
         }
     }
 
@@ -107,14 +97,7 @@ class ScopeConsumerTest {
             when(ctx.consume(any(MessageHandler.class))).thenReturn(subscription);
 
             ScopeConsumer consumer = new ScopeConsumer(
-                SCOPE_ID,
-                CONSUMER_NAME,
-                STREAM,
-                ctx,
-                mock(StreamContext.class),
-                SUBJECTS,
-                msg -> {}
-            );
+                    SCOPE_ID, CONSUMER_NAME, STREAM, ctx, mock(StreamContext.class), SUBJECTS, msg -> {});
             consumer.start();
             consumer.start();
 
@@ -132,14 +115,7 @@ class ScopeConsumerTest {
             when(ctx.consume(any(MessageHandler.class))).thenReturn(subscription);
 
             ScopeConsumer consumer = new ScopeConsumer(
-                SCOPE_ID,
-                CONSUMER_NAME,
-                STREAM,
-                ctx,
-                mock(StreamContext.class),
-                SUBJECTS,
-                msg -> {}
-            );
+                    SCOPE_ID, CONSUMER_NAME, STREAM, ctx, mock(StreamContext.class), SUBJECTS, msg -> {});
             consumer.start();
             consumer.stop();
             consumer.stop();
@@ -164,20 +140,12 @@ class ScopeConsumerTest {
             int[] observedOrder = new int[3];
 
             ScopeConsumer consumer = new ScopeConsumer(
-                SCOPE_ID,
-                CONSUMER_NAME,
-                STREAM,
-                ctx,
-                mock(StreamContext.class),
-                SUBJECTS,
-                msg -> {
-                    int idx = order.getAndIncrement();
-                    observedOrder[idx] = Integer.parseInt(
-                        msg.getSubject().substring(msg.getSubject().lastIndexOf('.') + 1)
-                    );
-                    done.countDown();
-                }
-            );
+                    SCOPE_ID, CONSUMER_NAME, STREAM, ctx, mock(StreamContext.class), SUBJECTS, msg -> {
+                        int idx = order.getAndIncrement();
+                        observedOrder[idx] = Integer.parseInt(
+                                msg.getSubject().substring(msg.getSubject().lastIndexOf('.') + 1));
+                        done.countDown();
+                    });
             consumer.start();
 
             // Simulate three messages arriving in order via the captured callback.
@@ -186,7 +154,9 @@ class ScopeConsumerTest {
             callback.onMessage(messageWithSubject("github.acme.repo.2"));
             callback.onMessage(messageWithSubject("github.acme.repo.3"));
 
-            assertThat(done.await(2, TimeUnit.SECONDS)).as("dispatch loop drained the queue in time").isTrue();
+            assertThat(done.await(2, TimeUnit.SECONDS))
+                    .as("dispatch loop drained the queue in time")
+                    .isTrue();
             assertThat(observedOrder).containsExactly(1, 2, 3);
 
             consumer.stop();
@@ -201,19 +171,12 @@ class ScopeConsumerTest {
 
             CountDownLatch survivedFailure = new CountDownLatch(1);
             ScopeConsumer consumer = new ScopeConsumer(
-                SCOPE_ID,
-                CONSUMER_NAME,
-                STREAM,
-                ctx,
-                mock(StreamContext.class),
-                SUBJECTS,
-                msg -> {
-                    if (msg.getSubject().endsWith(".boom")) {
-                        throw new RuntimeException("simulated handler failure");
-                    }
-                    survivedFailure.countDown();
-                }
-            );
+                    SCOPE_ID, CONSUMER_NAME, STREAM, ctx, mock(StreamContext.class), SUBJECTS, msg -> {
+                        if (msg.getSubject().endsWith(".boom")) {
+                            throw new RuntimeException("simulated handler failure");
+                        }
+                        survivedFailure.countDown();
+                    });
             consumer.start();
 
             MessageHandler callback = handlerCaptor.getValue();
@@ -221,8 +184,8 @@ class ScopeConsumerTest {
             callback.onMessage(messageWithSubject("github.acme.repo.ok"));
 
             assertThat(survivedFailure.await(2, TimeUnit.SECONDS))
-                .as("loop survived the first handler failure and delivered the next message")
-                .isTrue();
+                    .as("loop survived the first handler failure and delivered the next message")
+                    .isTrue();
 
             consumer.stop();
         }
@@ -236,14 +199,13 @@ class ScopeConsumerTest {
 
             AtomicInteger handlerInvocations = new AtomicInteger();
             ScopeConsumer consumer = new ScopeConsumer(
-                SCOPE_ID,
-                CONSUMER_NAME,
-                STREAM,
-                ctx,
-                mock(StreamContext.class),
-                SUBJECTS,
-                msg -> handlerInvocations.incrementAndGet()
-            );
+                    SCOPE_ID,
+                    CONSUMER_NAME,
+                    STREAM,
+                    ctx,
+                    mock(StreamContext.class),
+                    SUBJECTS,
+                    msg -> handlerInvocations.incrementAndGet());
             consumer.start();
             consumer.stop();
 
@@ -263,21 +225,15 @@ class ScopeConsumerTest {
             CountDownLatch releaseHandler = new CountDownLatch(1);
             CountDownLatch stopped = new CountDownLatch(1);
             ScopeConsumer consumer = new ScopeConsumer(
-                SCOPE_ID,
-                CONSUMER_NAME,
-                STREAM,
-                ctx,
-                mock(StreamContext.class),
-                SUBJECTS,
-                msg -> {
-                    handlerStarted.countDown();
-                    while (releaseHandler.getCount() > 0) {
-                        try {
-                            releaseHandler.await();
-                        } catch (InterruptedException ignored) {}
-                    }
-                }
-            );
+                    SCOPE_ID, CONSUMER_NAME, STREAM, ctx, mock(StreamContext.class), SUBJECTS, msg -> {
+                        handlerStarted.countDown();
+                        while (releaseHandler.getCount() > 0) {
+                            try {
+                                releaseHandler.await();
+                            } catch (InterruptedException ignored) {
+                            }
+                        }
+                    });
             consumer.start();
             handlerCaptor.getValue().onMessage(messageWithSubject("github.acme.repo.in-flight"));
             assertThat(handlerStarted.await(2, TimeUnit.SECONDS)).isTrue();
@@ -303,15 +259,8 @@ class ScopeConsumerTest {
             MessageConsumer subscription = mock(MessageConsumer.class);
             when(ctx.consume(any(MessageHandler.class))).thenReturn(subscription);
 
-            ScopeConsumer consumer = new ScopeConsumer(
-                SCOPE_ID,
-                CONSUMER_NAME,
-                STREAM,
-                ctx,
-                streamCtx,
-                SUBJECTS,
-                msg -> {}
-            );
+            ScopeConsumer consumer =
+                    new ScopeConsumer(SCOPE_ID, CONSUMER_NAME, STREAM, ctx, streamCtx, SUBJECTS, msg -> {});
             consumer.start();
             consumer.updateSubjects(SUBJECTS.clone());
 
@@ -331,17 +280,10 @@ class ScopeConsumerTest {
             MessageConsumer subscription = mock(MessageConsumer.class);
             when(ctx.consume(any(MessageHandler.class))).thenReturn(subscription);
 
-            ScopeConsumer consumer = new ScopeConsumer(
-                SCOPE_ID,
-                CONSUMER_NAME,
-                STREAM,
-                ctx,
-                streamCtx,
-                SUBJECTS,
-                msg -> {}
-            );
+            ScopeConsumer consumer =
+                    new ScopeConsumer(SCOPE_ID, CONSUMER_NAME, STREAM, ctx, streamCtx, SUBJECTS, msg -> {});
             consumer.start();
-            consumer.updateSubjects(new String[] { "github.acme.other.>" });
+            consumer.updateSubjects(new String[] {"github.acme.other.>"});
 
             verify(streamCtx, times(1)).createOrUpdateConsumer(any());
             // The old subscription was closed and a new one attached.

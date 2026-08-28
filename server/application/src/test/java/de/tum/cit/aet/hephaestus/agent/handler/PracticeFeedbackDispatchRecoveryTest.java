@@ -52,20 +52,12 @@ class PracticeFeedbackDispatchRecoveryTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         recovery = new PracticeFeedbackDispatchRecovery(
-            dispatches,
-            jobs,
-            feedback,
-            service,
-            ledgerRecorder,
-            feedbackDeliveryService
-        );
-        lenient()
-            .when(service.projectRecovered(any(), any()))
-            .thenAnswer(invocation -> {
-                Runnable projection = invocation.getArgument(1);
-                projection.run();
-                return true;
-            });
+                dispatches, jobs, feedback, service, ledgerRecorder, feedbackDeliveryService);
+        lenient().when(service.projectRecovered(any(), any())).thenAnswer(invocation -> {
+            Runnable projection = invocation.getArgument(1);
+            projection.run();
+            return true;
+        });
     }
 
     @Test
@@ -101,11 +93,7 @@ class PracticeFeedbackDispatchRecoveryTest extends BaseUnitTest {
     @Test
     void anUnprojectedAutomaticPackageUsesThePackageProjector() {
         FeedbackDispatch dispatch = dispatch(
-            FeedbackDispatchDestination.AUTOMATIC_REVIEW_PACKAGE,
-            null,
-            FeedbackDispatchState.SENT,
-            "provider-42"
-        );
+                FeedbackDispatchDestination.AUTOMATIC_REVIEW_PACKAGE, null, FeedbackDispatchState.SENT, "provider-42");
         AgentJob job = job();
         when(dispatches.findUnprojectedTerminal(any(), any())).thenReturn(List.of(dispatch));
         when(jobs.findByIdAndWorkspaceId(dispatch.getAgentJobId(), 7L)).thenReturn(Optional.of(job));
@@ -121,21 +109,19 @@ class PracticeFeedbackDispatchRecoveryTest extends BaseUnitTest {
         UUID dispatchId = UUID.randomUUID();
         UUID jobId = UUID.randomUUID();
         FeedbackDispatch candidate = dispatch(
-            dispatchId,
-            jobId,
-            FeedbackDispatchDestination.AUTOMATIC_REVIEW_PACKAGE,
-            null,
-            FeedbackDispatchState.UNCERTAIN,
-            null
-        );
+                dispatchId,
+                jobId,
+                FeedbackDispatchDestination.AUTOMATIC_REVIEW_PACKAGE,
+                null,
+                FeedbackDispatchState.UNCERTAIN,
+                null);
         FeedbackDispatch terminal = dispatch(
-            dispatchId,
-            jobId,
-            FeedbackDispatchDestination.AUTOMATIC_REVIEW_PACKAGE,
-            null,
-            FeedbackDispatchState.SENT,
-            "provider-42"
-        );
+                dispatchId,
+                jobId,
+                FeedbackDispatchDestination.AUTOMATIC_REVIEW_PACKAGE,
+                null,
+                FeedbackDispatchState.SENT,
+                "provider-42");
         AgentJob job = job();
         job.setId(jobId);
         when(dispatches.findRecoverable(any(), anyInt(), any())).thenReturn(List.of(candidate));
@@ -154,11 +140,10 @@ class PracticeFeedbackDispatchRecoveryTest extends BaseUnitTest {
     void anUnprojectedTerminalApprovalIsReconciledAfterRestart() {
         UUID feedbackId = UUID.randomUUID();
         FeedbackDispatch dispatch = dispatch(
-            FeedbackDispatchDestination.APPROVED_REVIEW_PACKAGE,
-            feedbackId,
-            FeedbackDispatchState.SENT,
-            "provider-42"
-        );
+                FeedbackDispatchDestination.APPROVED_REVIEW_PACKAGE,
+                feedbackId,
+                FeedbackDispatchState.SENT,
+                "provider-42");
         AgentJob job = job();
         var unit = mock(de.tum.cit.aet.hephaestus.practices.feedback.Feedback.class);
         when(dispatches.findUnprojectedTerminal(any(), any())).thenReturn(List.of(dispatch));
@@ -182,48 +167,45 @@ class PracticeFeedbackDispatchRecoveryTest extends BaseUnitTest {
     }
 
     private static FeedbackDispatch dispatch(
-        FeedbackDispatchDestination destination,
-        @Nullable UUID feedbackId,
-        FeedbackDispatchState state,
-        @Nullable String externalRef
-    ) {
+            FeedbackDispatchDestination destination,
+            @Nullable UUID feedbackId,
+            FeedbackDispatchState state,
+            @Nullable String externalRef) {
         return dispatch(UUID.randomUUID(), UUID.randomUUID(), destination, feedbackId, state, externalRef);
     }
 
     private static FeedbackDispatch dispatch(
-        UUID id,
-        UUID jobId,
-        FeedbackDispatchDestination destination,
-        @Nullable UUID feedbackId,
-        FeedbackDispatchState state,
-        @Nullable String externalRef
-    ) {
+            UUID id,
+            UUID jobId,
+            FeedbackDispatchDestination destination,
+            @Nullable UUID feedbackId,
+            FeedbackDispatchState state,
+            @Nullable String externalRef) {
         var mapper = JsonMapper.builder().build();
         return new FeedbackDispatch(
-            id,
-            "dispatch:" + id,
-            7L,
-            jobId,
-            feedbackId,
-            destination,
-            state,
-            "body",
-            mapper.valueToTree(List.of("practice")),
-            mapper.valueToTree(new PracticeDetectionResultParser.DeliveryContent("body", List.of(), List.of())),
-            mapper.valueToTree(List.of()),
-            false,
-            externalRef,
-            null,
-            null,
-            Instant.now(),
-            1,
-            null,
-            null,
-            null,
-            null,
-            null,
-            Instant.now(),
-            Instant.now()
-        );
+                id,
+                "dispatch:" + id,
+                7L,
+                jobId,
+                feedbackId,
+                destination,
+                state,
+                "body",
+                mapper.valueToTree(List.of("practice")),
+                mapper.valueToTree(new PracticeDetectionResultParser.DeliveryContent("body", List.of(), List.of())),
+                mapper.valueToTree(List.of()),
+                false,
+                externalRef,
+                null,
+                null,
+                Instant.now(),
+                1,
+                null,
+                null,
+                null,
+                null,
+                null,
+                Instant.now(),
+                Instant.now());
     }
 }

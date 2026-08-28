@@ -42,13 +42,12 @@ public class GitHubDiscussionCommentProcessor extends BaseGitHubProcessor {
     private final ApplicationEventPublisher eventPublisher;
 
     public GitHubDiscussionCommentProcessor(
-        UserRepository userRepository,
-        LabelRepository labelRepository,
-        MilestoneRepository milestoneRepository,
-        GitHubUserProcessor gitHubUserProcessor,
-        DiscussionCommentRepository commentRepository,
-        ApplicationEventPublisher eventPublisher
-    ) {
+            UserRepository userRepository,
+            LabelRepository labelRepository,
+            MilestoneRepository milestoneRepository,
+            GitHubUserProcessor gitHubUserProcessor,
+            DiscussionCommentRepository commentRepository,
+            ApplicationEventPublisher eventPublisher) {
         super(userRepository, labelRepository, milestoneRepository, gitHubUserProcessor);
         this.commentRepository = commentRepository;
         this.eventPublisher = eventPublisher;
@@ -64,10 +63,7 @@ public class GitHubDiscussionCommentProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public @Nullable DiscussionComment process(
-        GitHubDiscussionCommentDTO dto,
-        Discussion discussion,
-        ProcessingContext context
-    ) {
+            GitHubDiscussionCommentDTO dto, Discussion discussion, ProcessingContext context) {
         Long dbId = dto.getDatabaseId();
         if (dbId == null) {
             log.warn("Skipped discussion comment processing: reason=missingDatabaseId");
@@ -127,23 +123,15 @@ public class GitHubDiscussionCommentProcessor extends BaseGitHubProcessor {
         // Publish domain events
         Long discussionId = Objects.requireNonNull(discussion.getId());
         if (isNew) {
-            eventPublisher.publishEvent(
-                new ScmDomainEvent.DiscussionCommentCreated(
-                    ScmEventPayload.DiscussionCommentData.from(comment),
-                    discussionId,
-                    EventContext.from(context)
-                )
-            );
+            eventPublisher.publishEvent(new ScmDomainEvent.DiscussionCommentCreated(
+                    ScmEventPayload.DiscussionCommentData.from(comment), discussionId, EventContext.from(context)));
             log.debug("Created discussion comment: commentId={}", dbId);
         } else if (!changedFields.isEmpty()) {
-            eventPublisher.publishEvent(
-                new ScmDomainEvent.DiscussionCommentEdited(
+            eventPublisher.publishEvent(new ScmDomainEvent.DiscussionCommentEdited(
                     ScmEventPayload.DiscussionCommentData.from(comment),
                     discussionId,
                     changedFields,
-                    EventContext.from(context)
-                )
-            );
+                    EventContext.from(context)));
             log.debug("Updated discussion comment: commentId={}, changedFields={}", dbId, changedFields);
         }
 
@@ -168,23 +156,24 @@ public class GitHubDiscussionCommentProcessor extends BaseGitHubProcessor {
         }
 
         commentRepository
-            .findByNativeIdAndProviderId(dbId, Objects.requireNonNull(context.providerId()))
-            .ifPresent(comment -> {
-                Long discussionId = comment.getDiscussion() != null ? comment.getDiscussion().getId() : null;
+                .findByNativeIdAndProviderId(dbId, Objects.requireNonNull(context.providerId()))
+                .ifPresent(comment -> {
+                    Long discussionId = comment.getDiscussion() != null
+                            ? comment.getDiscussion().getId()
+                            : null;
 
-                // CRITICAL: Remove from parent Discussion's collection BEFORE deleting
-                // to prevent TransientObjectException with orphanRemoval=true
-                Discussion parentDiscussion = comment.getDiscussion();
-                if (parentDiscussion != null) {
-                    parentDiscussion.getComments().remove(comment);
-                }
+                    // CRITICAL: Remove from parent Discussion's collection BEFORE deleting
+                    // to prevent TransientObjectException with orphanRemoval=true
+                    Discussion parentDiscussion = comment.getDiscussion();
+                    if (parentDiscussion != null) {
+                        parentDiscussion.getComments().remove(comment);
+                    }
 
-                commentRepository.delete(comment);
-                eventPublisher.publishEvent(
-                    new ScmDomainEvent.DiscussionCommentDeleted(dbId, discussionId, EventContext.from(context))
-                );
-                log.info("Deleted discussion comment: commentId={}", dbId);
-            });
+                    commentRepository.delete(comment);
+                    eventPublisher.publishEvent(new ScmDomainEvent.DiscussionCommentDeleted(
+                            dbId, discussionId, EventContext.from(context)));
+                    log.info("Deleted discussion comment: commentId={}", dbId);
+                });
     }
 
     /**

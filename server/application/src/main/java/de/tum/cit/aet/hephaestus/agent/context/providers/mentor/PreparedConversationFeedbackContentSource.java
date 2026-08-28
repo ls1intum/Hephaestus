@@ -51,15 +51,14 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
     private final FeedbackRepository feedbackRepository;
 
     public PreparedConversationFeedbackContentSource(
-        FeedbackObservationRepository feedbackObservationRepository,
-        ConversationConsentGate consentGate,
-        ObjectMapper objectMapper,
-        ObservationRepository observationRepository,
-        ObservationVisibilityPolicy visibilityPolicy,
-        AgentJobRepository agentJobRepository,
-        PracticeFeedbackDeliveryPolicy deliveryPolicy,
-        FeedbackRepository feedbackRepository
-    ) {
+            FeedbackObservationRepository feedbackObservationRepository,
+            ConversationConsentGate consentGate,
+            ObjectMapper objectMapper,
+            ObservationRepository observationRepository,
+            ObservationVisibilityPolicy visibilityPolicy,
+            AgentJobRepository agentJobRepository,
+            PracticeFeedbackDeliveryPolicy deliveryPolicy,
+            FeedbackRepository feedbackRepository) {
         this.feedbackObservationRepository = feedbackObservationRepository;
         this.consentGate = consentGate;
         this.objectMapper = objectMapper;
@@ -86,19 +85,13 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
         MentorChatRequest req = (MentorChatRequest) request;
         long workspaceId = req.workspaceId();
         List<PreparedConversationFact> prepared =
-            feedbackObservationRepository.findPreparedConversationFactsForRecipient(
-                workspaceId,
-                req.developerId(),
-                PageRequest.of(0, MAX_CANDIDATES)
-            );
+                feedbackObservationRepository.findPreparedConversationFactsForRecipient(
+                        workspaceId, req.developerId(), PageRequest.of(0, MAX_CANDIDATES));
 
         Set<Long> activeThreadIds = consentGate.activeThreadIds(workspaceId, conversationThreadIds(prepared));
         Map<UUID, Observation> observations = observationsById(workspaceId, prepared);
         Set<UUID> visible = visibilityPolicy.permitsAll(
-            workspaceId,
-            observations.values(),
-            SourceUsePurpose.CONVERSATIONAL_MENTORING
-        );
+                workspaceId, observations.values(), SourceUsePurpose.CONVERSATIONAL_MENTORING);
 
         ObjectNode root = objectMapper.createObjectNode();
 
@@ -110,31 +103,28 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
             if (!visible.contains(fact.getObservationId())) {
                 continue;
             }
-            if (
-                ArtifactKinds.CONVERSATION_THREAD.equals(fact.getArtifactKind()) &&
-                (fact.getArtifactId() == null || !activeThreadIds.contains(fact.getArtifactId()))
-            ) {
+            if (ArtifactKinds.CONVERSATION_THREAD.equals(fact.getArtifactKind())
+                    && (fact.getArtifactId() == null || !activeThreadIds.contains(fact.getArtifactId()))) {
                 continue;
             }
-            AgentJob job = agentJobRepository.findByIdAndWorkspaceId(fact.getAgentJobId(), workspaceId).orElse(null);
+            AgentJob job = agentJobRepository
+                    .findByIdAndWorkspaceId(fact.getAgentJobId(), workspaceId)
+                    .orElse(null);
             if (job == null) {
                 feedbackRepository.markPreparedSuppressed(
-                    fact.getFeedbackId(),
-                    workspaceId,
-                    FeedbackSuppressionReason.ARTIFACT_GONE.name()
-                );
+                        fact.getFeedbackId(), workspaceId, FeedbackSuppressionReason.ARTIFACT_GONE.name());
                 continue;
             }
             var decision = deliveryPolicy.evaluateRepositoryless(
-                job,
-                DeliveryPolicyStage.EGRESS,
-                fact.getFeedbackId(),
-                DeliveryPolicySurface.CONVERSATION,
-                req.developerId(),
-                Set.of(fact.getPracticeSlug())
-            );
+                    job,
+                    DeliveryPolicyStage.EGRESS,
+                    fact.getFeedbackId(),
+                    DeliveryPolicySurface.CONVERSATION,
+                    req.developerId(),
+                    Set.of(fact.getPracticeSlug()));
             if (!decision.allowed()) {
-                feedbackRepository.markPreparedSuppressed(fact.getFeedbackId(), workspaceId, decision.refusal().name());
+                feedbackRepository.markPreparedSuppressed(
+                        fact.getFeedbackId(), workspaceId, decision.refusal().name());
                 continue;
             }
             ObjectNode node = arr.addObject();

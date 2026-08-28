@@ -47,10 +47,9 @@ public class GithubSummaryChannel implements SummaryChannel {
     private final OutboundEgressGuard egressGuard;
 
     public GithubSummaryChannel(
-        GitHubGraphQlClientProvider gitHubProvider,
-        GithubPrNodeIdResolver prNodeIdResolver,
-        OutboundEgressGuard egressGuard
-    ) {
+            GitHubGraphQlClientProvider gitHubProvider,
+            GithubPrNodeIdResolver prNodeIdResolver,
+            OutboundEgressGuard egressGuard) {
         this.gitHubProvider = gitHubProvider;
         this.prNodeIdResolver = prNodeIdResolver;
         this.egressGuard = egressGuard;
@@ -93,8 +92,7 @@ public class GithubSummaryChannel implements SummaryChannel {
         long scopeId = target.ref().workspaceId();
         if (gitHubProvider.isRateLimitCritical(scopeId)) {
             throw new FeedbackDeliveryException(
-                "GitHub rate limit critical — skipping summary post for scope " + scopeId
-            );
+                    "GitHub rate limit critical — skipping summary post for scope " + scopeId);
         }
 
         String subject = target.subjectExternalId();
@@ -103,11 +101,10 @@ public class GithubSummaryChannel implements SummaryChannel {
             String issueNodeId = prNodeIdResolver.resolveIssue(scopeId, issue.owner(), issue.name(), issue.number());
             String commentNodeId = createComment(scopeId, issueNodeId, content.externalBody());
             log.info(
-                "Posted GitHub issue comment: workspaceId={}, issueNodeId={}, commentId={}",
-                scopeId,
-                issueNodeId,
-                commentNodeId
-            );
+                    "Posted GitHub issue comment: workspaceId={}, issueNodeId={}, commentId={}",
+                    scopeId,
+                    issueNodeId,
+                    commentNodeId);
             return new SummaryHandle(commentNodeId);
         }
 
@@ -115,11 +112,10 @@ public class GithubSummaryChannel implements SummaryChannel {
         String prNodeId = prNodeIdResolver.resolve(scopeId, pr.owner(), pr.name(), pr.number());
         String commentNodeId = createComment(scopeId, prNodeId, content.externalBody());
         log.info(
-            "Posted GitHub PR comment: workspaceId={}, prNodeId={}, commentId={}",
-            scopeId,
-            prNodeId,
-            commentNodeId
-        );
+                "Posted GitHub PR comment: workspaceId={}, prNodeId={}, commentId={}",
+                scopeId,
+                prNodeId,
+                commentNodeId);
         return new SummaryHandle(commentNodeId);
     }
 
@@ -137,8 +133,7 @@ public class GithubSummaryChannel implements SummaryChannel {
         long scopeId = target.ref().workspaceId();
         if (externalId == null || externalId.isBlank()) {
             throw new FeedbackDeliveryException(
-                "Cannot edit a GitHub comment in place: external comment id is missing"
-            );
+                    "Cannot edit a GitHub comment in place: external comment id is missing");
         }
         if (gitHubProvider.isRateLimitCritical(scopeId)) {
             return UpdateOutcome.transientFailure("GitHub rate limit critical for scope " + scopeId);
@@ -148,12 +143,12 @@ public class GithubSummaryChannel implements SummaryChannel {
         try {
             egressGuard.requireDeliveryAllowed("github.update-summary");
             response = gitHubProvider
-                .forScope(scopeId)
-                .documentName("UpdateIssueComment")
-                .variable("id", externalId)
-                .variable("body", content.externalBody())
-                .execute()
-                .block(GRAPHQL_TIMEOUT);
+                    .forScope(scopeId)
+                    .documentName("UpdateIssueComment")
+                    .variable("id", externalId)
+                    .variable("body", content.externalBody())
+                    .execute()
+                    .block(GRAPHQL_TIMEOUT);
         } catch (OutboundEgressSuppressedException e) {
             throw e;
         } catch (RuntimeException e) {
@@ -168,18 +163,17 @@ public class GithubSummaryChannel implements SummaryChannel {
         // A DELETED comment surfaces as a top-level GraphQL error (the node id resolves to nothing). A NOT_FOUND
         // is GONE (re-post); any other error is TRANSIENT (keep the prior summary, do not double-post).
         if (response.getErrors() != null && !response.getErrors().isEmpty()) {
-            List<String> errors = response
-                .getErrors()
-                .stream()
-                .map(e -> e.getMessage())
-                .filter(Objects::nonNull)
-                .toList();
+            List<String> errors = response.getErrors().stream()
+                    .map(e -> e.getMessage())
+                    .filter(Objects::nonNull)
+                    .toList();
             return looksGone(errors)
-                ? UpdateOutcome.gone("GitHub updateIssueComment: " + errors)
-                : UpdateOutcome.transientFailure("GitHub updateIssueComment failed: " + errors);
+                    ? UpdateOutcome.gone("GitHub updateIssueComment: " + errors)
+                    : UpdateOutcome.transientFailure("GitHub updateIssueComment failed: " + errors);
         }
 
-        String commentNodeId = response.field("updateIssueComment.issueComment.id").getValue();
+        String commentNodeId =
+                response.field("updateIssueComment.issueComment.id").getValue();
         if (commentNodeId == null) {
             // Neither confirmed gone nor returned an id — transient, don't double-post.
             return UpdateOutcome.transientFailure("No comment id in updateIssueComment response");
@@ -227,23 +221,24 @@ public class GithubSummaryChannel implements SummaryChannel {
         for (int page = 0; page < EXISTING_SUMMARY_SEARCH_PAGE_BUDGET; page++) {
             try {
                 ClientGraphQlResponse response = gitHubProvider
-                    .forScope(scopeId)
-                    .documentName(documentName)
-                    .variable("owner", owner)
-                    .variable("name", name)
-                    .variable("number", number)
-                    .variable("last", EXISTING_SUMMARY_SEARCH_PAGE_SIZE)
-                    .variable("before", cursor)
-                    .execute()
-                    .block(GRAPHQL_TIMEOUT);
-                if (response == null || (response.getErrors() != null && !response.getErrors().isEmpty())) {
+                        .forScope(scopeId)
+                        .documentName(documentName)
+                        .variable("owner", owner)
+                        .variable("name", name)
+                        .variable("number", number)
+                        .variable("last", EXISTING_SUMMARY_SEARCH_PAGE_SIZE)
+                        .variable("before", cursor)
+                        .execute()
+                        .block(GRAPHQL_TIMEOUT);
+                if (response == null
+                        || (response.getErrors() != null
+                                && !response.getErrors().isEmpty())) {
                     return ExistingSummaryLookup.unknown();
                 }
                 gitHubProvider.trackRateLimit(scopeId, response);
 
-                GHIssueCommentConnection connection = response
-                    .field(commentsPath)
-                    .toEntity(GHIssueCommentConnection.class);
+                GHIssueCommentConnection connection =
+                        response.field(commentsPath).toEntity(GHIssueCommentConnection.class);
                 if (connection == null) {
                     return ExistingSummaryLookup.unknown();
                 }
@@ -266,10 +261,9 @@ public class GithubSummaryChannel implements SummaryChannel {
                 }
             } catch (RuntimeException e) {
                 log.debug(
-                    "Existing-summary dedup lookup failed (treated as unknown, not absent): scopeId={}, error={}",
-                    scopeId,
-                    e.getMessage()
-                );
+                        "Existing-summary dedup lookup failed (treated as unknown, not absent): scopeId={}, error={}",
+                        scopeId,
+                        e.getMessage());
                 return ExistingSummaryLookup.unknown();
             }
         }
@@ -278,18 +272,14 @@ public class GithubSummaryChannel implements SummaryChannel {
 
     /** Conservative NOT_FOUND heuristic: GitHub signals a deleted comment via a free-text top-level error. */
     static boolean looksGone(List<String> errors) {
-        return errors
-            .stream()
-            .filter(Objects::nonNull)
-            .map(e -> e.toLowerCase(Locale.ROOT))
-            .anyMatch(
-                e ->
-                    e.contains("not found") ||
-                    e.contains("does not exist") ||
-                    e.contains("could not be found") ||
-                    e.contains("couldn't be found") ||
-                    e.contains("could not resolve")
-            );
+        return errors.stream()
+                .filter(Objects::nonNull)
+                .map(e -> e.toLowerCase(Locale.ROOT))
+                .anyMatch(e -> e.contains("not found")
+                        || e.contains("does not exist")
+                        || e.contains("could not be found")
+                        || e.contains("couldn't be found")
+                        || e.contains("could not resolve"));
     }
 
     /** A GitHub issue subject is the distinct {@code owner/repo/issues/N} form (see formatIssueSubjectId). */
@@ -301,8 +291,7 @@ public class GithubSummaryChannel implements SummaryChannel {
     static IssueCoordinates parseIssueSubjectExternalId(String subjectExternalId) {
         if (subjectExternalId == null || !subjectExternalId.matches(".+/issues/\\d+")) {
             throw new FeedbackDeliveryException(
-                "Invalid GitHub issue subjectExternalId (expected owner/repo/issues/number): " + subjectExternalId
-            );
+                    "Invalid GitHub issue subjectExternalId (expected owner/repo/issues/number): " + subjectExternalId);
         }
         int marker = subjectExternalId.lastIndexOf("/issues/");
         String repoFullName = subjectExternalId.substring(0, marker);
@@ -310,8 +299,7 @@ public class GithubSummaryChannel implements SummaryChannel {
         String[] parts = repoFullName.split("/", 2);
         if (parts.length != 2) {
             throw new FeedbackDeliveryException(
-                "Invalid GitHub issue subjectExternalId (expected owner/repo/issues/number): " + subjectExternalId
-            );
+                    "Invalid GitHub issue subjectExternalId (expected owner/repo/issues/number): " + subjectExternalId);
         }
         return new IssueCoordinates(parts[0], parts[1], number);
     }
@@ -321,12 +309,12 @@ public class GithubSummaryChannel implements SummaryChannel {
     private String createComment(long scopeId, String subjectId, String body) {
         egressGuard.requireDeliveryAllowed("github.post-summary");
         ClientGraphQlResponse response = gitHubProvider
-            .forScope(scopeId)
-            .documentName("AddPullRequestComment")
-            .variable("subjectId", subjectId)
-            .variable("body", body)
-            .execute()
-            .block(GRAPHQL_TIMEOUT);
+                .forScope(scopeId)
+                .documentName("AddPullRequestComment")
+                .variable("subjectId", subjectId)
+                .variable("body", body)
+                .execute()
+                .block(GRAPHQL_TIMEOUT);
 
         if (response == null) {
             throw new FeedbackDeliveryException("Null response from AddPullRequestComment mutation");
@@ -355,25 +343,21 @@ public class GithubSummaryChannel implements SummaryChannel {
         int hashIdx = subjectExternalId.lastIndexOf('#');
         if (hashIdx <= 0 || hashIdx == subjectExternalId.length() - 1) {
             throw new FeedbackDeliveryException(
-                "Invalid GitHub PR subjectExternalId (expected owner/repo#number): " + subjectExternalId
-            );
+                    "Invalid GitHub PR subjectExternalId (expected owner/repo#number): " + subjectExternalId);
         }
         String repoFullName = subjectExternalId.substring(0, hashIdx);
         String numberPart = subjectExternalId.substring(hashIdx + 1);
         String[] parts = repoFullName.split("/", 2);
         if (parts.length != 2) {
             throw new FeedbackDeliveryException(
-                "Invalid GitHub PR subjectExternalId (expected owner/repo#number): " + subjectExternalId
-            );
+                    "Invalid GitHub PR subjectExternalId (expected owner/repo#number): " + subjectExternalId);
         }
         int number;
         try {
             number = Integer.parseInt(numberPart);
         } catch (NumberFormatException e) {
             throw new FeedbackDeliveryException(
-                "Invalid GitHub PR subjectExternalId — number must be integer: " + subjectExternalId,
-                e
-            );
+                    "Invalid GitHub PR subjectExternalId — number must be integer: " + subjectExternalId, e);
         }
         return new PrCoordinates(parts[0], parts[1], number);
     }

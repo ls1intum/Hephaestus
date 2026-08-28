@@ -29,19 +29,17 @@ public class GitHubSubIssuesMessageHandler extends AbstractIntegrationMessageHan
     private final GitHubSubIssueSyncService subIssueSyncService;
 
     GitHubSubIssuesMessageHandler(
-        ProcessingContextFactory contextFactory,
-        GitHubIssueProcessor issueProcessor,
-        GitHubSubIssueSyncService subIssueSyncService,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            ProcessingContextFactory contextFactory,
+            GitHubIssueProcessor issueProcessor,
+            GitHubSubIssueSyncService subIssueSyncService,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITHUB,
-            "repository." + GitHubEventType.SUB_ISSUES.getValue(),
-            GitHubSubIssuesEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITHUB,
+                "repository." + GitHubEventType.SUB_ISSUES.getValue(),
+                GitHubSubIssuesEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.contextFactory = contextFactory;
         this.issueProcessor = issueProcessor;
         this.subIssueSyncService = subIssueSyncService;
@@ -58,12 +56,11 @@ public class GitHubSubIssuesMessageHandler extends AbstractIntegrationMessageHan
         }
 
         log.debug(
-            "Received sub_issues event: action={}, parentIssueNumber={}, subIssueNumber={}, repoName={}",
-            event.action(),
-            parentIssueDto.number(),
-            subIssueDto.number(),
-            event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown"
-        );
+                "Received sub_issues event: action={}, parentIssueNumber={}, subIssueNumber={}, repoName={}",
+                event.action(),
+                parentIssueDto.number(),
+                subIssueDto.number(),
+                event.repository() != null ? sanitizeForLog(event.repository().fullName()) : "unknown");
 
         ProcessingContext context = contextFactory.forWebhookEvent(event).orElse(null);
         if (context == null) {

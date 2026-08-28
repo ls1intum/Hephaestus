@@ -7,6 +7,7 @@ import org.jspecify.annotations.NonNull;
 
 @Schema(description = "Request to add a practice to the instance catalog")
 public record CreateCuratedPracticeRequestDTO(
-    @NonNull @CuratedSlug @Schema(example = "pr-description-quality") String slug,
-    @NonNull @NotNull @Valid CuratedPracticeRequestDTO definition
-) {}
+        @NonNull @CuratedSlug @Schema(example = "pr-description-quality")
+        String slug,
+
+        @NonNull @NotNull @Valid CuratedPracticeRequestDTO definition) {}

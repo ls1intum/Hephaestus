@@ -31,7 +31,8 @@ public final class XpSystem {
             return 1;
         }
         if (totalXP >= 1_000_000) {
-            return LEVEL_CAP; // sanity guard as 1 mio xp is equivalent to roughly level 167 (which shouldn't be reachable anyway)
+            return LEVEL_CAP; // sanity guard as 1 mio xp is equivalent to roughly level 167 (which shouldn't be
+            // reachable anyway)
         }
 
         // 1. Approximate level using inverse of the dominant power term to get close

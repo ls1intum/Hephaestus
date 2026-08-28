@@ -19,8 +19,7 @@ public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispat
     Optional<FeedbackDispatch> findByIdAndWorkspaceId(UUID id, Long workspaceId);
 
     @Modifying
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO feedback_dispatch (
             id, destination_key, workspace_id, agent_job_id, feedback_id, destination, state, body,
             practice_slugs, package_content, delivered_placements,
@@ -33,14 +32,11 @@ public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispat
           FROM agent_job j
          WHERE j.id = :#{#command.agentJobId()} AND j.workspace_id = :#{#command.workspaceId()}
         ON CONFLICT (destination_key) DO NOTHING
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int insertIfAbsent(@Param("command") FeedbackDispatchInsert command);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(
-        value = """
+    @Query(value = """
         UPDATE feedback_dispatch
            SET state = 'CLAIMED', lease_owner = :owner, lease_expires_at = :leaseUntil,
                attempt_count = attempt_count + 1,
@@ -50,45 +46,35 @@ public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispat
            AND (state IN ('PENDING', 'UNCERTAIN')
                 OR (state = 'CLAIMED' AND lease_expires_at < CURRENT_TIMESTAMP))
            AND next_attempt_at <= CURRENT_TIMESTAMP
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int claim(
-        @Param("id") UUID id,
-        @Param("workspaceId") Long workspaceId,
-        @Param("owner") String owner,
-        @Param("leaseUntil") Instant leaseUntil,
-        @Param("maxAttempts") int maxAttempts
-    );
+            @Param("id") UUID id,
+            @Param("workspaceId") Long workspaceId,
+            @Param("owner") String owner,
+            @Param("leaseUntil") Instant leaseUntil,
+            @Param("maxAttempts") int maxAttempts);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(
-        value = """
+    @Query(value = """
         UPDATE feedback_dispatch SET write_started = TRUE, updated_at = CURRENT_TIMESTAMP
          WHERE id = :id AND workspace_id = :workspaceId AND state = 'CLAIMED'
            AND lease_owner = :owner AND write_started = FALSE
            AND lease_expires_at > CURRENT_TIMESTAMP
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int beginWrite(@Param("id") UUID id, @Param("workspaceId") Long workspaceId, @Param("owner") String owner);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(
-        value = """
+    @Query(value = """
         UPDATE feedback_dispatch SET state = :#{#completion.state()}, delivered_external_ref = :#{#completion.externalRef()},
                lease_owner = NULL, lease_expires_at = NULL, next_attempt_at = :#{#completion.nextAttemptAt()},
                last_error = :#{#completion.error()}, suppression_reason = :#{#completion.suppressionReason()},
                delivered_placements = CAST(:#{#completion.deliveredPlacements()} AS jsonb),
                updated_at = CURRENT_TIMESTAMP
          WHERE id = :#{#completion.id()} AND workspace_id = :#{#completion.workspaceId()} AND state = 'CLAIMED' AND lease_owner = :#{#completion.owner()}
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int finish(@Param("completion") FeedbackDispatchCompletion completion);
 
-    @Query(
-        """
+    @Query("""
         SELECT d FROM FeedbackDispatch d
         WHERE d.nextAttemptAt <= :now
           AND (d.attemptCount < :maxAttempts OR d.writeStarted = true)
@@ -97,16 +83,11 @@ public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispat
                OR (d.state = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState.CLAIMED
                    AND d.leaseExpiresAt < :now))
         ORDER BY d.updatedAt ASC
-        """
-    )
+        """)
     List<FeedbackDispatch> findRecoverable(
-        @Param("now") Instant now,
-        @Param("maxAttempts") int maxAttempts,
-        Pageable pageable
-    );
+            @Param("now") Instant now, @Param("maxAttempts") int maxAttempts, Pageable pageable);
 
-    @Query(
-        """
+    @Query("""
         SELECT d FROM FeedbackDispatch d
         WHERE d.attemptCount >= :maxAttempts
           AND d.writeStarted = false
@@ -115,16 +96,11 @@ public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispat
             OR (d.state = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState.CLAIMED
                 AND d.leaseExpiresAt < :now))
         ORDER BY d.updatedAt ASC
-        """
-    )
+        """)
     List<FeedbackDispatch> findExhausted(
-        @Param("now") Instant now,
-        @Param("maxAttempts") int maxAttempts,
-        Pageable pageable
-    );
+            @Param("now") Instant now, @Param("maxAttempts") int maxAttempts, Pageable pageable);
 
-    @Query(
-        """
+    @Query("""
         SELECT d FROM FeedbackDispatch d
         WHERE d.projectedAt IS NULL
           AND (d.projectionOwner IS NULL OR d.projectionExpiresAt < :now)
@@ -132,94 +108,78 @@ public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispat
                           de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState.SUPPRESSED,
                           de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState.FAILED)
         ORDER BY d.updatedAt ASC
-        """
-    )
+        """)
     List<FeedbackDispatch> findUnprojectedTerminal(@Param("now") Instant now, Pageable pageable);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(
-        value = """
+    @Query(value = """
         UPDATE feedback_dispatch
            SET projection_owner = :owner, projection_expires_at = :leaseUntil, updated_at = CURRENT_TIMESTAMP
          WHERE id = :id AND workspace_id = :workspaceId AND projected_at IS NULL
            AND state IN ('SENT', 'SUPPRESSED', 'FAILED')
            AND (projection_owner IS NULL OR projection_expires_at < CURRENT_TIMESTAMP)
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int claimProjection(
-        @Param("id") UUID id,
-        @Param("workspaceId") Long workspaceId,
-        @Param("owner") String owner,
-        @Param("leaseUntil") Instant leaseUntil
-    );
+            @Param("id") UUID id,
+            @Param("workspaceId") Long workspaceId,
+            @Param("owner") String owner,
+            @Param("leaseUntil") Instant leaseUntil);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(
-        value = """
+    @Query(value = """
         UPDATE feedback_dispatch
            SET projection_owner = :owner, projection_expires_at = :leaseUntil, updated_at = CURRENT_TIMESTAMP
          WHERE destination_key = :destinationKey AND workspace_id = :workspaceId AND projected_at IS NULL
            AND state IN ('SENT', 'SUPPRESSED', 'FAILED')
            AND (projection_owner IS NULL OR projection_expires_at < CURRENT_TIMESTAMP)
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int claimProjectionByKey(
-        @Param("destinationKey") String destinationKey,
-        @Param("workspaceId") Long workspaceId,
-        @Param("owner") String owner,
-        @Param("leaseUntil") Instant leaseUntil
-    );
+            @Param("destinationKey") String destinationKey,
+            @Param("workspaceId") Long workspaceId,
+            @Param("owner") String owner,
+            @Param("leaseUntil") Instant leaseUntil);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(
-        value = "UPDATE feedback_dispatch SET projected_at = CURRENT_TIMESTAMP, projection_owner = NULL, " +
-            "projection_expires_at = NULL, " +
-            "body = CASE WHEN state IN ('SENT', 'SUPPRESSED') THEN '' ELSE body END, " +
-            "practice_slugs = CASE WHEN state IN ('SENT', 'SUPPRESSED') THEN '[]'::jsonb ELSE practice_slugs END, " +
-            "package_content = CASE WHEN state IN ('SENT', 'SUPPRESSED') THEN '{}'::jsonb ELSE package_content END, " +
-            "updated_at = CURRENT_TIMESTAMP " +
-            "WHERE id = :id AND workspace_id = :workspaceId AND projected_at IS NULL " +
-            "AND projection_owner = :owner AND state IN ('SENT', 'SUPPRESSED', 'FAILED')",
-        nativeQuery = true
-    )
+            value = "UPDATE feedback_dispatch SET projected_at = CURRENT_TIMESTAMP, projection_owner = NULL, "
+                    + "projection_expires_at = NULL, "
+                    + "body = CASE WHEN state IN ('SENT', 'SUPPRESSED') THEN '' ELSE body END, "
+                    + "practice_slugs = CASE WHEN state IN ('SENT', 'SUPPRESSED') THEN '[]'::jsonb ELSE practice_slugs END, "
+                    + "package_content = CASE WHEN state IN ('SENT', 'SUPPRESSED') THEN '{}'::jsonb ELSE package_content END, "
+                    + "updated_at = CURRENT_TIMESTAMP "
+                    + "WHERE id = :id AND workspace_id = :workspaceId AND projected_at IS NULL "
+                    + "AND projection_owner = :owner AND state IN ('SENT', 'SUPPRESSED', 'FAILED')",
+            nativeQuery = true)
     int markProjected(@Param("id") UUID id, @Param("workspaceId") Long workspaceId, @Param("owner") String owner);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(
-        value = "UPDATE feedback_dispatch SET projected_at = CURRENT_TIMESTAMP, projection_owner = NULL, " +
-            "projection_expires_at = NULL, " +
-            "body = CASE WHEN state IN ('SENT', 'SUPPRESSED') THEN '' ELSE body END, " +
-            "practice_slugs = CASE WHEN state IN ('SENT', 'SUPPRESSED') THEN '[]'::jsonb ELSE practice_slugs END, " +
-            "package_content = CASE WHEN state IN ('SENT', 'SUPPRESSED') THEN '{}'::jsonb ELSE package_content END, " +
-            "updated_at = CURRENT_TIMESTAMP " +
-            "WHERE destination_key = :destinationKey AND workspace_id = :workspaceId AND projected_at IS NULL " +
-            "AND projection_owner = :owner AND state IN ('SENT', 'SUPPRESSED', 'FAILED')",
-        nativeQuery = true
-    )
+            value = "UPDATE feedback_dispatch SET projected_at = CURRENT_TIMESTAMP, projection_owner = NULL, "
+                    + "projection_expires_at = NULL, "
+                    + "body = CASE WHEN state IN ('SENT', 'SUPPRESSED') THEN '' ELSE body END, "
+                    + "practice_slugs = CASE WHEN state IN ('SENT', 'SUPPRESSED') THEN '[]'::jsonb ELSE practice_slugs END, "
+                    + "package_content = CASE WHEN state IN ('SENT', 'SUPPRESSED') THEN '{}'::jsonb ELSE package_content END, "
+                    + "updated_at = CURRENT_TIMESTAMP "
+                    + "WHERE destination_key = :destinationKey AND workspace_id = :workspaceId AND projected_at IS NULL "
+                    + "AND projection_owner = :owner AND state IN ('SENT', 'SUPPRESSED', 'FAILED')",
+            nativeQuery = true)
     int markProjectedByKey(
-        @Param("destinationKey") String destinationKey,
-        @Param("workspaceId") Long workspaceId,
-        @Param("owner") String owner
-    );
+            @Param("destinationKey") String destinationKey,
+            @Param("workspaceId") Long workspaceId,
+            @Param("owner") String owner);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(
-        value = """
+    @Query(value = """
         UPDATE feedback_dispatch
            SET state = 'FAILED', lease_owner = NULL, lease_expires_at = NULL,
                last_error = :error, updated_at = CURRENT_TIMESTAMP
          WHERE id = :id AND workspace_id = :workspaceId
            AND state NOT IN ('SENT', 'SUPPRESSED', 'FAILED')
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int fail(@Param("id") UUID id, @Param("workspaceId") Long workspaceId, @Param("error") @Nullable String error);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(
-        value = """
+    @Query(value = """
         UPDATE feedback_dispatch
            SET state = 'PENDING', attempt_count = 0, next_attempt_at = CURRENT_TIMESTAMP,
                lease_owner = NULL, lease_expires_at = NULL, last_error = NULL,
@@ -227,23 +187,18 @@ public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispat
                updated_at = CURRENT_TIMESTAMP
          WHERE agent_job_id = :jobId AND workspace_id = :workspaceId
            AND destination = 'AUTOMATIC_REVIEW_PACKAGE' AND state = 'FAILED'
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int resetFailedAutomaticPackage(@Param("jobId") UUID jobId, @Param("workspaceId") Long workspaceId);
 
     @Modifying
-    @Query(
-        value = """
+    @Query(value = """
         DELETE FROM feedback_dispatch dispatch
         USING agent_job job
         WHERE dispatch.workspace_id = :workspaceId
           AND job.workspace_id = dispatch.workspace_id
           AND job.id = dispatch.agent_job_id
           AND job.artifact_kind IN ('scm.pull_request', 'scm.issue')
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int deleteScmArtifactDispatches(@Param("workspaceId") long workspaceId);
 
     @Modifying

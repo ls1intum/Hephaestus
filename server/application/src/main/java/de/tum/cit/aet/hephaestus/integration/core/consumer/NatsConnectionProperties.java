@@ -21,17 +21,15 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.sync.nats")
 public record NatsConnectionProperties(
-    @DefaultValue("false") boolean enabled,
-    @Nullable String server,
-    @Nullable String durableConsumerName,
-    @Valid Consumer consumer
-) {
-    public NatsConnectionProperties(
-        boolean enabled,
+        @DefaultValue("false") boolean enabled,
         @Nullable String server,
         @Nullable String durableConsumerName,
-        @Nullable Consumer consumer
-    ) {
+        @Valid Consumer consumer) {
+    public NatsConnectionProperties(
+            boolean enabled,
+            @Nullable String server,
+            @Nullable String durableConsumerName,
+            @Nullable Consumer consumer) {
         if (enabled && (server == null || server.isBlank())) {
             throw new IllegalStateException("hephaestus.sync.nats.server must be set when enabled=true");
         }
@@ -42,5 +40,7 @@ public record NatsConnectionProperties(
     }
 
     /** Connection-side knobs shared between the consumer fleet and the publisher. */
-    public record Consumer(@DurationUnit(ChronoUnit.SECONDS) @DefaultValue("60s") Duration requestTimeout) {}
+    public record Consumer(
+            @DurationUnit(ChronoUnit.SECONDS) @DefaultValue("60s")
+            Duration requestTimeout) {}
 }

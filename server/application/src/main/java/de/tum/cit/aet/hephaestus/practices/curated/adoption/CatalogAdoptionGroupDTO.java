@@ -5,7 +5,6 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 public record CatalogAdoptionGroupDTO(
-    @NonNull CatalogGroupDisposition disposition,
-    @Nullable String slug,
-    @Nullable CuratedGroupRequestDTO definition
-) {}
+        @NonNull CatalogGroupDisposition disposition,
+        @Nullable String slug,
+        @Nullable CuratedGroupRequestDTO definition) {}

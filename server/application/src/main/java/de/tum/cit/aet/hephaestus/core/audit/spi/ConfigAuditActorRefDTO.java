@@ -11,4 +11,5 @@ import org.jspecify.annotations.Nullable;
  * simple name minus the {@code DTO} suffix, so two {@code AccountRefDTO} records would collide and one
  * would be silently dropped from the spec.
  */
-public record ConfigAuditActorRefDTO(Long id, @Nullable String displayName, @Nullable String email) {}
+public record ConfigAuditActorRefDTO(
+        Long id, @Nullable String displayName, @Nullable String email) {}

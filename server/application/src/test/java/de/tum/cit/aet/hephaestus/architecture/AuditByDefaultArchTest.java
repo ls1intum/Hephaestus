@@ -31,27 +31,22 @@ class AuditByDefaultArchTest extends HephaestusArchitectureTest {
 
     @Test
     void everyAdminMutationEndpointDeclaresItsAuditStatus() {
-        List<String> undeclared = classes
-            .stream()
-            .filter(AuditByDefaultArchTest::isController)
-            .flatMap(c -> c.getMethods().stream())
-            .filter(AuditByDefaultArchTest::isMutation)
-            .filter(AuditByDefaultArchTest::isAdminGated)
-            .filter(m -> !m.isAnnotatedWith(Audited.class) && !m.isAnnotatedWith(AuditExempt.class))
-            .map(m -> m.getOwner().getSimpleName() + "." + m.getName())
-            .sorted()
-            .toList();
+        List<String> undeclared = classes.stream()
+                .filter(AuditByDefaultArchTest::isController)
+                .flatMap(c -> c.getMethods().stream())
+                .filter(AuditByDefaultArchTest::isMutation)
+                .filter(AuditByDefaultArchTest::isAdminGated)
+                .filter(m -> !m.isAnnotatedWith(Audited.class) && !m.isAnnotatedWith(AuditExempt.class))
+                .map(m -> m.getOwner().getSimpleName() + "." + m.getName())
+                .sorted()
+                .toList();
 
-        assertThat(undeclared)
-            .as(
-                """
+        assertThat(undeclared).as("""
                 These admin mutation endpoints declare neither @Audited nor @AuditExempt. Decide: if the \
                 action changes configuration or access, record it on the audit trail and mark it \
                 @Audited(ledger = …, type = "…"); if it genuinely should not be recorded, mark it \
                 @AuditExempt(reason="…"). An undeclared admin action is how an audit trail silently \
-                develops holes."""
-            )
-            .isEmpty();
+                develops holes.""").isEmpty();
     }
 
     /**
@@ -61,46 +56,35 @@ class AuditByDefaultArchTest extends HephaestusArchitectureTest {
      */
     @Test
     void everyAuditedTypeIsAConstantOfItsLedgersVocabulary() {
-        List<String> malformed = classes
-            .stream()
-            .filter(AuditByDefaultArchTest::isController)
-            .flatMap(c -> c.getMethods().stream())
-            .flatMap(m ->
-                m
-                    .tryGetAnnotationOfType(Audited.class)
-                    .stream()
-                    .flatMap(a ->
-                        malformedReason(a.ledger(), a.type())
-                            .map(reason -> m.getOwner().getSimpleName() + "." + m.getName() + ": " + reason)
-                            .stream()
-                    )
-            )
-            .sorted()
-            .toList();
+        List<String> malformed = classes.stream()
+                .filter(AuditByDefaultArchTest::isController)
+                .flatMap(c -> c.getMethods().stream())
+                .flatMap(m -> m.tryGetAnnotationOfType(Audited.class).stream()
+                        .flatMap(a -> malformedReason(a.ledger(), a.type())
+                                .map(reason -> m.getOwner().getSimpleName() + "." + m.getName() + ": " + reason)
+                                .stream()))
+                .sorted()
+                .toList();
 
-        assertThat(malformed)
-            .as(
-                """
+        assertThat(malformed).as("""
                 These @Audited declarations name a row type their ledger does not have. `type` must be a \
                 constant of the ledger's vocabulary (see AuditLedger), and is left off only for a ledger \
-                that has no vocabulary at all."""
-            )
-            .isEmpty();
+                that has no vocabulary at all.""").isEmpty();
     }
 
     private static Optional<String> malformedReason(AuditLedger ledger, String type) {
         Set<String> vocabulary = ledger.vocabulary();
         if (type.isEmpty()) {
             return vocabulary.isEmpty()
-                ? Optional.empty()
-                : Optional.of(ledger + " rows are typed — name the constant, e.g. type = \"X\"");
+                    ? Optional.empty()
+                    : Optional.of(ledger + " rows are typed — name the constant, e.g. type = \"X\"");
         }
         if (vocabulary.isEmpty()) {
             return Optional.of(ledger + " types its rows with a free string, so '" + type + "' names nothing");
         }
         return vocabulary.contains(type)
-            ? Optional.empty()
-            : Optional.of("'" + type + "' is not a constant of the " + ledger + " vocabulary");
+                ? Optional.empty()
+                : Optional.of("'" + type + "' is not a constant of the " + ledger + " vocabulary");
     }
 
     /**
@@ -113,22 +97,17 @@ class AuditByDefaultArchTest extends HephaestusArchitectureTest {
      */
     @Test
     void auditDeclarationsMatchTheCallGraph() {
-        List<String> contradictions = classes
-            .stream()
-            .filter(AuditByDefaultArchTest::isController)
-            .flatMap(c -> c.getMethods().stream())
-            .map(AuditByDefaultArchTest::contradiction)
-            .flatMap(Optional::stream)
-            .sorted()
-            .toList();
+        List<String> contradictions = classes.stream()
+                .filter(AuditByDefaultArchTest::isController)
+                .flatMap(c -> c.getMethods().stream())
+                .map(AuditByDefaultArchTest::contradiction)
+                .flatMap(Optional::stream)
+                .sorted()
+                .toList();
 
-        assertThat(contradictions)
-            .as(
-                """
+        assertThat(contradictions).as("""
                 These endpoints' audit declarations contradict what they actually do. Either wire the \
-                producer, or change the declaration to say what is true."""
-            )
-            .isEmpty();
+                producer, or change the declaration to say what is true.""").isEmpty();
     }
 
     private static Optional<String> contradiction(JavaMethod method) {
@@ -137,10 +116,9 @@ class AuditByDefaultArchTest extends HephaestusArchitectureTest {
         if (method.isAnnotatedWith(AuditExempt.class) && records) {
             return Optional.of(name + " is @AuditExempt but reaches ConfigAuditPort.record");
         }
-        boolean namesEntityType = method
-            .tryGetAnnotationOfType(Audited.class)
-            .map(a -> a.ledger() == AuditLedger.CONFIG_AUDIT)
-            .orElse(false);
+        boolean namesEntityType = method.tryGetAnnotationOfType(Audited.class)
+                .map(a -> a.ledger() == AuditLedger.CONFIG_AUDIT)
+                .orElse(false);
         if (namesEntityType && !records) {
             return Optional.of(name + " is @Audited but reaches no recorder");
         }
@@ -156,7 +134,8 @@ class AuditByDefaultArchTest extends HephaestusArchitectureTest {
         }
         for (JavaMethodCall call : method.getMethodCallsFromSelf()) {
             JavaClass target = call.getTargetOwner();
-            if (target.getName().equals(ConfigAuditPort.class.getName()) && call.getName().equals("record")) {
+            if (target.getName().equals(ConfigAuditPort.class.getName())
+                    && call.getName().equals("record")) {
                 return true;
             }
             if (!target.getPackageName().startsWith("de.tum.cit.aet.hephaestus")) {
@@ -176,19 +155,15 @@ class AuditByDefaultArchTest extends HephaestusArchitectureTest {
     static boolean isController(JavaClass clazz) {
         // Meta-annotated too: @WorkspaceScopedController composes @RestController, and every
         // workspace-admin surface uses it.
-        return (
-            clazz.isAnnotatedWith(org.springframework.web.bind.annotation.RestController.class) ||
-            clazz.isMetaAnnotatedWith(org.springframework.web.bind.annotation.RestController.class)
-        );
+        return (clazz.isAnnotatedWith(org.springframework.web.bind.annotation.RestController.class)
+                || clazz.isMetaAnnotatedWith(org.springframework.web.bind.annotation.RestController.class));
     }
 
     static boolean isMutation(JavaMethod method) {
-        return (
-            method.isAnnotatedWith(PostMapping.class) ||
-            method.isAnnotatedWith(PutMapping.class) ||
-            method.isAnnotatedWith(PatchMapping.class) ||
-            method.isAnnotatedWith(DeleteMapping.class)
-        );
+        return (method.isAnnotatedWith(PostMapping.class)
+                || method.isAnnotatedWith(PutMapping.class)
+                || method.isAnnotatedWith(PatchMapping.class)
+                || method.isAnnotatedWith(DeleteMapping.class));
     }
 
     /**
@@ -196,37 +171,27 @@ class AuditByDefaultArchTest extends HephaestusArchitectureTest {
      * controller. Class-level gates count, since some controllers declare the gate once on the class.
      */
     static boolean isAdminGated(JavaMethod method) {
-        return (
-            hasWorkspaceAdminGate(method) ||
-            hasWorkspaceAdminGate(method.getOwner()) ||
-            isInstanceAdminGated(method) ||
-            isInstanceAdminGated(method.getOwner())
-        );
+        return (hasWorkspaceAdminGate(method)
+                || hasWorkspaceAdminGate(method.getOwner())
+                || isInstanceAdminGated(method)
+                || isInstanceAdminGated(method.getOwner()));
     }
 
     private static boolean hasWorkspaceAdminGate(
-        com.tngtech.archunit.core.domain.properties.HasAnnotations<?> element
-    ) {
-        return element
-            .getAnnotations()
-            .stream()
-            .map(a -> a.getRawType().getSimpleName())
-            .anyMatch(n -> n.equals("RequireAtLeastWorkspaceAdmin") || n.equals("RequireWorkspaceOwner"));
+            com.tngtech.archunit.core.domain.properties.HasAnnotations<?> element) {
+        return element.getAnnotations().stream()
+                .map(a -> a.getRawType().getSimpleName())
+                .anyMatch(n -> n.equals("RequireAtLeastWorkspaceAdmin") || n.equals("RequireWorkspaceOwner"));
     }
 
     private static boolean isInstanceAdminGated(com.tngtech.archunit.core.domain.properties.HasAnnotations<?> element) {
         // Meta-annotated too, matching isController: a composed @InstanceAdmin annotation would
         // otherwise take its endpoints out of the rule entirely.
-        return element
-            .tryGetAnnotationOfType(PreAuthorize.class)
-            .or(() ->
-                element
-                    .getAnnotations()
-                    .stream()
-                    .flatMap(a -> a.getRawType().tryGetAnnotationOfType(PreAuthorize.class).stream())
-                    .findFirst()
-            )
-            .map(a -> a.value().contains(INSTANCE_ADMIN_AUTHORITY))
-            .orElse(false);
+        return element.tryGetAnnotationOfType(PreAuthorize.class)
+                .or(() -> element.getAnnotations().stream()
+                        .flatMap(a -> a.getRawType().tryGetAnnotationOfType(PreAuthorize.class).stream())
+                        .findFirst())
+                .map(a -> a.value().contains(INSTANCE_ADMIN_AUTHORITY))
+                .orElse(false);
     }
 }

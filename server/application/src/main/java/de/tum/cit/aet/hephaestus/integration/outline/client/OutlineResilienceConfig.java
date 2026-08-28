@@ -41,22 +41,15 @@ public class OutlineResilienceConfig {
     @Bean
     public CircuitBreaker outlineRestApiCircuitBreaker(CircuitBreakerRegistry registry) {
         CircuitBreaker breaker = registry.circuitBreaker(OUTLINE_REST);
-        breaker
-            .getEventPublisher()
-            .onStateTransition(event ->
-                log.warn(
-                    "Circuit breaker state transition: breakerName={}, fromState={}, toState={}",
-                    event.getCircuitBreakerName(),
-                    event.getStateTransition().getFromState(),
-                    event.getStateTransition().getToState()
-                )
-            )
-            .onCallNotPermitted(event ->
-                log.warn(
-                    "Circuit breaker rejected call: breakerName={}, reason=circuit_open",
-                    event.getCircuitBreakerName()
-                )
-            );
+        breaker.getEventPublisher()
+                .onStateTransition(event -> log.warn(
+                        "Circuit breaker state transition: breakerName={}, fromState={}, toState={}",
+                        event.getCircuitBreakerName(),
+                        event.getStateTransition().getFromState(),
+                        event.getStateTransition().getToState()))
+                .onCallNotPermitted(event -> log.warn(
+                        "Circuit breaker rejected call: breakerName={}, reason=circuit_open",
+                        event.getCircuitBreakerName()));
         log.info("Initialized circuit breaker: name={}", OUTLINE_REST);
         return breaker;
     }
@@ -72,28 +65,26 @@ public class OutlineResilienceConfig {
     public Retry outlineRestApiRetry() {
         IntervalFunction backoff = IntervalFunction.ofExponentialRandomBackoff(RETRY_BASE_DELAY, 2.0, 0.5);
         RetryConfig config = RetryConfig.custom()
-            .maxAttempts(RETRY_MAX_ATTEMPTS)
-            .intervalBiFunction((attempt, outcome) -> {
-                Throwable failure = outcome.isLeft() ? outcome.getLeft() : null;
-                if (failure instanceof OutlineRateLimitedException rle && rle.getRetryAfter() != null) {
-                    return Math.min(rle.getRetryAfter().toMillis(), RETRY_AFTER_CAP.toMillis());
-                }
-                return backoff.apply(attempt);
-            })
-            .retryOnException(t -> t instanceof OutlineApiException oae && oae.isRetryable())
-            .build();
+                .maxAttempts(RETRY_MAX_ATTEMPTS)
+                .intervalBiFunction((attempt, outcome) -> {
+                    Throwable failure = outcome.isLeft() ? outcome.getLeft() : null;
+                    if (failure instanceof OutlineRateLimitedException rle && rle.getRetryAfter() != null) {
+                        return Math.min(rle.getRetryAfter().toMillis(), RETRY_AFTER_CAP.toMillis());
+                    }
+                    return backoff.apply(attempt);
+                })
+                .retryOnException(t -> t instanceof OutlineApiException oae && oae.isRetryable())
+                .build();
         Retry retry = Retry.of(OUTLINE_REST, config);
-        retry
-            .getEventPublisher()
-            .onRetry(event ->
-                log.warn(
-                    "Outline API retry: name={}, attempt={}, waitMs={}, lastError={}",
-                    OUTLINE_REST,
-                    event.getNumberOfRetryAttempts(),
-                    event.getWaitInterval().toMillis(),
-                    event.getLastThrowable() == null ? "n/a" : event.getLastThrowable().toString()
-                )
-            );
+        retry.getEventPublisher()
+                .onRetry(event -> log.warn(
+                        "Outline API retry: name={}, attempt={}, waitMs={}, lastError={}",
+                        OUTLINE_REST,
+                        event.getNumberOfRetryAttempts(),
+                        event.getWaitInterval().toMillis(),
+                        event.getLastThrowable() == null
+                                ? "n/a"
+                                : event.getLastThrowable().toString()));
         log.info("Initialized retry: name={}", OUTLINE_REST);
         return retry;
     }

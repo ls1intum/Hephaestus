@@ -60,12 +60,11 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
     private IdentityProviderRepository gitProviderRepository;
 
     private final GitLabProperties gitLabProperties = new GitLabProperties(
-        "https://gitlab.com",
-        Duration.ofSeconds(30),
-        Duration.ofSeconds(60),
-        Duration.ofMillis(10),
-        Duration.ofMinutes(5)
-    );
+            "https://gitlab.com",
+            Duration.ofSeconds(30),
+            Duration.ofSeconds(60),
+            Duration.ofMillis(10),
+            Duration.ofMinutes(5));
 
     private GitLabProjectSyncService service;
 
@@ -73,22 +72,21 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
     void setUp() {
         IdentityProvider gitLabProvider = TestEntities.gitProvider(TEST_PROVIDER_ID, IdentityProviderType.GITLAB);
         lenient()
-            .when(gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.com"))
-            .thenReturn(Optional.of(gitLabProvider));
+                .when(gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.com"))
+                .thenReturn(Optional.of(gitLabProvider));
 
         // Default: responseHandler.handle() returns CONTINUE (valid response)
         lenient()
-            .when(responseHandler.handle(any(), anyString(), any()))
-            .thenReturn(new HandleResult(HandleResult.Action.CONTINUE, null));
+                .when(responseHandler.handle(any(), anyString(), any()))
+                .thenReturn(new HandleResult(HandleResult.Action.CONTINUE, null));
 
         service = new GitLabProjectSyncService(
-            graphQlClientProvider,
-            responseHandler,
-            projectProcessor,
-            groupProcessor,
-            gitLabProperties,
-            gitProviderRepository
-        );
+                graphQlClientProvider,
+                responseHandler,
+                projectProcessor,
+                groupProcessor,
+                gitLabProperties,
+                gitProviderRepository);
     }
 
     @Nested
@@ -111,34 +109,33 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
         @Test
         void successfulSync_returnsRepositoryWithGroup() {
             var groupData = new GitLabGroupResponse(
-                "gid://gitlab/Group/42",
-                "my-org",
-                "My Org",
-                null,
-                "https://gitlab.com/my-org",
-                null,
-                "public",
-                null
-            );
+                    "gid://gitlab/Group/42",
+                    "my-org",
+                    "My Org",
+                    null,
+                    "https://gitlab.com/my-org",
+                    null,
+                    "public",
+                    null);
             var projectData = new GitLabProjectResponse(
-                "gid://gitlab/Project/123",
-                "my-org/my-project",
-                "my-project",
-                "https://gitlab.com/my-org/my-project",
-                "Description",
-                "public",
-                false,
-                "2024-01-15T10:30:00Z",
-                null,
-                groupData,
-                new GitLabProjectResponse.RepositoryInfo("main")
-            );
+                    "gid://gitlab/Project/123",
+                    "my-org/my-project",
+                    "my-project",
+                    "https://gitlab.com/my-org/my-project",
+                    "Description",
+                    "public",
+                    false,
+                    "2024-01-15T10:30:00Z",
+                    null,
+                    groupData,
+                    new GitLabProjectResponse.RepositoryInfo("main"));
 
             mockGraphQlProjectResponse(projectData);
 
             Organization org = new Organization();
             org.setId(42L);
-            when(groupProcessor.process(any(GitLabGroupResponse.class), anyLong())).thenReturn(org);
+            when(groupProcessor.process(any(GitLabGroupResponse.class), anyLong()))
+                    .thenReturn(org);
 
             Repository repo = new Repository();
             repo.setId(123L);
@@ -158,18 +155,17 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
         @Test
         void projectWithoutGroup_syncsWithNullOrg() {
             var projectData = new GitLabProjectResponse(
-                "gid://gitlab/Project/456",
-                "user/personal-project",
-                "personal-project",
-                "https://gitlab.com/user/personal-project",
-                null,
-                "private",
-                false,
-                null,
-                null,
-                null, // no group
-                null
-            );
+                    "gid://gitlab/Project/456",
+                    "user/personal-project",
+                    "personal-project",
+                    "https://gitlab.com/user/personal-project",
+                    null,
+                    "private",
+                    false,
+                    null,
+                    null,
+                    null, // no group
+                    null);
 
             mockGraphQlProjectResponse(projectData);
 
@@ -204,9 +200,8 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
             lenient().when(invalidResponse.getErrors()).thenReturn(List.of());
 
             // Override the default CONTINUE with ABORT for this invalid response
-            when(responseHandler.handle(eq(invalidResponse), anyString(), any())).thenReturn(
-                new HandleResult(HandleResult.Action.ABORT, null)
-            );
+            when(responseHandler.handle(eq(invalidResponse), anyString(), any()))
+                    .thenReturn(new HandleResult(HandleResult.Action.ABORT, null));
 
             HttpGraphQlClient.RequestSpec requestSpec = mock(HttpGraphQlClient.RequestSpec.class);
             when(client.documentName(anyString())).thenReturn(requestSpec);
@@ -222,28 +217,26 @@ class GitLabProjectSyncServiceTest extends BaseUnitTest {
         @Test
         void groupProcessorReturnsNull_abortsSync() {
             var groupData = new GitLabGroupResponse(
-                "gid://gitlab/Group/42",
-                "my-org",
-                "My Org",
-                null,
-                "https://gitlab.com/my-org",
-                null,
-                "public",
-                null
-            );
+                    "gid://gitlab/Group/42",
+                    "my-org",
+                    "My Org",
+                    null,
+                    "https://gitlab.com/my-org",
+                    null,
+                    "public",
+                    null);
             var projectData = new GitLabProjectResponse(
-                "gid://gitlab/Project/789",
-                "my-org/proj",
-                "proj",
-                "https://gitlab.com/my-org/proj",
-                null,
-                "public",
-                false,
-                null,
-                null,
-                groupData,
-                null
-            );
+                    "gid://gitlab/Project/789",
+                    "my-org/proj",
+                    "proj",
+                    "https://gitlab.com/my-org/proj",
+                    null,
+                    "public",
+                    false,
+                    null,
+                    null,
+                    groupData,
+                    null);
 
             mockGraphQlProjectResponse(projectData);
             when(groupProcessor.process(any(), anyLong())).thenReturn(null); // group processor rejects

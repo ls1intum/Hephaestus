@@ -30,9 +30,8 @@ import org.junit.jupiter.api.Test;
 class ContentSourceContractTest extends BaseUnitTest {
 
     private static final Path PROVIDERS_DIR = resolveDir(
-        "src/main/java/de/tum/cit/aet/hephaestus/agent/context/providers",
-        "server/application/src/main/java/de/tum/cit/aet/hephaestus/agent/context/providers"
-    );
+            "src/main/java/de/tum/cit/aet/hephaestus/agent/context/providers",
+            "server/application/src/main/java/de/tum/cit/aet/hephaestus/agent/context/providers");
 
     @Test
     @DisplayName("no SCM content provider names a practice slug — connectors carry no practice-dependent logic")
@@ -44,13 +43,11 @@ class ContentSourceContractTest extends BaseUnitTest {
             String src = Files.readString(provider, StandardCharsets.UTF_8);
             for (String slug : slugs) {
                 assertThat(src)
-                    .as(
-                        "%s names the practice '%s' — a connector must not encode practice-dependent logic " +
-                            "(move it to the precompute script or the agent)",
-                        provider.getFileName(),
-                        slug
-                    )
-                    .doesNotContain(slug);
+                        .as(
+                                "%s names the practice '%s' — a connector must not encode practice-dependent logic "
+                                        + "(move it to the precompute script or the agent)",
+                                provider.getFileName(), slug)
+                        .doesNotContain(slug);
             }
         }
     }
@@ -58,14 +55,11 @@ class ContentSourceContractTest extends BaseUnitTest {
     @Test
     @DisplayName("the deleted worktree-derived feature providers must not return")
     void deletedFeatureProvidersStayDeleted() {
-        for (String banned : List.of(
-            "TestPresenceContentSource",
-            "BranchGraphContentSource",
-            "AcceptanceCriteriaContentSource"
-        )) {
+        for (String banned :
+                List.of("TestPresenceContentSource", "BranchGraphContentSource", "AcceptanceCriteriaContentSource")) {
             assertThat(PROVIDERS_DIR.resolve(banned + ".java"))
-                .as("%s was deleted as worktree-derived Transform (or never built) — it must not reappear", banned)
-                .doesNotExist();
+                    .as("%s was deleted as worktree-derived Transform (or never built) — it must not reappear", banned)
+                    .doesNotExist();
         }
     }
 
@@ -79,19 +73,18 @@ class ContentSourceContractTest extends BaseUnitTest {
             String src = Files.readString(provider, StandardCharsets.UTF_8);
             for (String bannedAggregate : List.of("changesRequestedUnaddressed", "countUnaddressedChangesRequested")) {
                 assertThat(src)
-                    .as(
-                        "%s re-introduces the derived '%s' aggregate — emit raw rows, let the agent judge",
-                        provider.getFileName(),
-                        bannedAggregate
-                    )
-                    .doesNotContain(bannedAggregate);
+                        .as(
+                                "%s re-introduces the derived '%s' aggregate — emit raw rows, let the agent judge",
+                                provider.getFileName(), bannedAggregate)
+                        .doesNotContain(bannedAggregate);
             }
         }
     }
 
     private static List<Path> scmProviderSources() throws IOException {
         try (Stream<Path> walk = Files.list(PROVIDERS_DIR)) {
-            return walk.filter(p -> p.getFileName().toString().endsWith("ContentSource.java")).toList();
+            return walk.filter(p -> p.getFileName().toString().endsWith("ContentSource.java"))
+                    .toList();
         }
     }
 
@@ -99,11 +92,9 @@ class ContentSourceContractTest extends BaseUnitTest {
 
     private static Set<String> practiceSlugs() throws IOException {
         Set<String> slugs = new TreeSet<>();
-        try (
-            InputStream in = ContentSourceContractTest.class.getClassLoader().getResourceAsStream(
-                "practices/default-catalog.json"
-            )
-        ) {
+        try (InputStream in = ContentSourceContractTest.class
+                .getClassLoader()
+                .getResourceAsStream("practices/default-catalog.json")) {
             String cat = new String(in.readAllBytes(), StandardCharsets.UTF_8);
             Matcher m = SLUG.matcher(cat);
             while (m.find()) {

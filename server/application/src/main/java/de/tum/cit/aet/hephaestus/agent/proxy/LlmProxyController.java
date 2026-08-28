@@ -65,12 +65,11 @@ class LlmProxyController {
     private final ProxyAccounting accounting;
 
     LlmProxyController(
-        WebClient llmProxyWebClient,
-        LlmModelResolver llmModelResolver,
-        EgressPolicy egressPolicy,
-        ObjectMapper objectMapper,
-        ProxyAccounting accounting
-    ) {
+            WebClient llmProxyWebClient,
+            LlmModelResolver llmModelResolver,
+            EgressPolicy egressPolicy,
+            ObjectMapper objectMapper,
+            ProxyAccounting accounting) {
         this.webClient = llmProxyWebClient;
         this.resolver = llmModelResolver;
         this.egressPolicy = egressPolicy;
@@ -78,14 +77,13 @@ class LlmProxyController {
         this.accounting = accounting;
     }
 
-    @PostMapping({ "/chat/completions", "/responses" })
+    @PostMapping({"/chat/completions", "/responses"})
     @WorkspaceAgnostic("Authenticated sandbox token carries and constrains the workspace route")
     public @Nullable ResponseEntity<?> proxy(
-        HttpServletRequest request,
-        HttpServletResponse response,
-        @RequestHeader HttpHeaders incomingHeaders,
-        @RequestBody(required = false) byte[] body
-    ) {
+            HttpServletRequest request,
+            HttpServletResponse response,
+            @RequestHeader HttpHeaders incomingHeaders,
+            @RequestBody(required = false) byte[] body) {
         ProxyRouting routing = authenticatedRouting();
         ResponseEntity<String> rejected = validateSafeSurface(request, routing, body);
         if (rejected != null) return rejected;
@@ -103,11 +101,7 @@ class LlmProxyController {
     }
 
     private @Nullable ResponseEntity<?> forward(
-        ProxyRouting routing,
-        HttpServletResponse response,
-        HttpHeaders incomingHeaders,
-        byte[] body
-    ) {
+            ProxyRouting routing, HttpServletResponse response, HttpHeaders incomingHeaders, byte[] body) {
         // With no attempt there is no row to accumulate onto, so a served call's tokens would reach
         // neither the ledger nor the cap that reads it.
         ProxyRouting.BilledAttempt attempt = routing.attempt();
@@ -122,14 +116,9 @@ class LlmProxyController {
             return ResponseEntity.status(429).body(budgetReachedMessage(routing.connectionScope()));
         }
 
-        LlmModelResolver.ProxyCredential credential = resolver.resolveProxyCredential(
-            new LlmModelResolver.ConnectionRef(
-                routing.connectionScope(),
-                routing.connectionId(),
-                routing.modelId(),
-                routing.workspaceId()
-            )
-        );
+        LlmModelResolver.ProxyCredential credential =
+                resolver.resolveProxyCredential(new LlmModelResolver.ConnectionRef(
+                        routing.connectionScope(), routing.connectionId(), routing.modelId(), routing.workspaceId()));
         if (credential == null) {
             incrementErrors(routing.apiProtocol());
             return ResponseEntity.status(502).body("The configured model is not available");
@@ -165,27 +154,24 @@ class LlmProxyController {
             if (rejectedOurUsageRequest(upstream, prepared)) {
                 // Asking for usage is OUR addition, so refusing it must cost the caller nothing.
                 log.info(
-                    "Upstream rejected stream_options.include_usage for principal {}; retrying without it — " +
-                        "this call's tokens will not be metered",
-                    routing.principalDescription()
-                );
+                        "Upstream rejected stream_options.include_usage for principal {}; retrying without it — "
+                                + "this call's tokens will not be metered",
+                        routing.principalDescription());
                 accounting.recordStreamUsageUnsupported(routing.apiProtocol());
                 upstream = callUpstream(upstreamUri, upstreamHeaders, prepared.withoutUsageRequestOrBody());
             }
         } catch (WebClientRequestException e) {
             log.warn(
-                "LLM upstream unreachable for principal {}: reason={}",
-                routing.principalDescription(),
-                e.getClass().getSimpleName()
-            );
+                    "LLM upstream unreachable for principal {}: reason={}",
+                    routing.principalDescription(),
+                    e.getClass().getSimpleName());
             incrementErrors(routing.apiProtocol());
             return ResponseEntity.status(502).body("Upstream provider unreachable");
         } catch (Exception e) {
             log.warn(
-                "LLM upstream request failed for principal {}: reason={}",
-                routing.principalDescription(),
-                e.getClass().getSimpleName()
-            );
+                    "LLM upstream request failed for principal {}: reason={}",
+                    routing.principalDescription(),
+                    e.getClass().getSimpleName());
             incrementErrors(routing.apiProtocol());
             return ResponseEntity.status(502).body("Upstream request failed");
         }
@@ -198,12 +184,7 @@ class LlmProxyController {
         if (upstream.sseBody() != null) {
             ProxyStreamUsageTap tap = served ? new ProxyStreamUsageTap(objectMapper, responsesProtocol) : null;
             ProxyStreamingUtils.streamSseToResponse(
-                upstream.sseBody(),
-                upstream.headers(),
-                response,
-                upstream.status(),
-                tap
-            );
+                    upstream.sseBody(), upstream.headers(), response, upstream.status(), tap);
             if (tap != null) {
                 accounting.recordUsage(attempt, tap.observed());
             }
@@ -213,20 +194,22 @@ class LlmProxyController {
         if (upstream.body() != null && served) {
             accounting.recordUsage(attempt, upstream.body(), responsesProtocol);
         }
-        return ResponseEntity.status(upstream.status()).headers(upstream.headers()).body(upstream.body());
+        return ResponseEntity.status(upstream.status())
+                .headers(upstream.headers())
+                .body(upstream.body());
     }
 
     private @Nullable UpstreamResult callUpstream(URI uri, HttpHeaders upstreamHeaders, byte[] outgoingBody) {
         return webClient
-            .method(HttpMethod.POST)
-            .uri(uri)
-            .headers(headers -> {
-                headers.clear();
-                headers.addAll(upstreamHeaders);
-            })
-            .bodyValue(outgoingBody)
-            .exchangeToMono(ProxyStreamingUtils::consumeResponse)
-            .block(BLOCK_TIMEOUT);
+                .method(HttpMethod.POST)
+                .uri(uri)
+                .headers(headers -> {
+                    headers.clear();
+                    headers.addAll(upstreamHeaders);
+                })
+                .bodyValue(outgoingBody)
+                .exchangeToMono(ProxyStreamingUtils::consumeResponse)
+                .block(BLOCK_TIMEOUT);
     }
 
     /** Narrow on purpose: a blanket retry on 4xx would double every bad request the runner makes. */
@@ -238,25 +221,24 @@ class LlmProxyController {
     }
 
     private @Nullable ResponseEntity<String> validateSafeSurface(
-        HttpServletRequest request,
-        ProxyRouting routing,
-        byte[] body
-    ) {
-        if (!"POST".equals(request.getMethod())) return ResponseEntity.status(405).body("Method not allowed");
-        if (request.getQueryString() != null) return ResponseEntity.badRequest().body(
-            "Query parameters are not allowed"
-        );
+            HttpServletRequest request, ProxyRouting routing, byte[] body) {
+        if (!"POST".equals(request.getMethod()))
+            return ResponseEntity.status(405).body("Method not allowed");
+        if (request.getQueryString() != null)
+            return ResponseEntity.badRequest().body("Query parameters are not allowed");
 
-        String expectedPath = switch (routing.apiProtocol()) {
-            case COMPLETIONS_PROTOCOL -> COMPLETIONS_PROXY_PATH;
-            case RESPONSES_PROTOCOL -> RESPONSES_PROXY_PATH;
-            default -> null;
-        };
+        String expectedPath =
+                switch (routing.apiProtocol()) {
+                    case COMPLETIONS_PROTOCOL -> COMPLETIONS_PROXY_PATH;
+                    case RESPONSES_PROTOCOL -> RESPONSES_PROXY_PATH;
+                    default -> null;
+                };
         if (expectedPath == null || !expectedPath.equals(request.getRequestURI())) {
             return ResponseEntity.status(404).body("Not found");
         }
         if (body == null || body.length == 0) return ResponseEntity.badRequest().body("Request body is required");
-        if (body.length > MAX_REQUEST_BODY_SIZE) return ResponseEntity.status(413).body("Request body too large");
+        if (body.length > MAX_REQUEST_BODY_SIZE)
+            return ResponseEntity.status(413).body("Request body too large");
         try {
             if (!objectMapper.readTree(body).isObject()) {
                 return ResponseEntity.badRequest().body("Request body must be a JSON object");
@@ -271,7 +253,7 @@ class LlmProxyController {
      * @param withoutUsageRequest the body as the caller sent it; {@code null} when we added nothing, so
      *     a rejection is the caller's own and there is nothing to retry
      */
-    record PreparedBody(byte[] body, byte@Nullable [] withoutUsageRequest) {
+    record PreparedBody(byte[] body, byte @Nullable [] withoutUsageRequest) {
         byte[] withoutUsageRequestOrBody() {
             return withoutUsageRequest != null ? withoutUsageRequest : body;
         }
@@ -293,12 +275,10 @@ class LlmProxyController {
             JsonNode tree = objectMapper.readTree(body);
             if (!tree.isObject()) return null;
             ObjectNode object = (ObjectNode) tree;
-            if (
-                usesProviderHostedTool(object.get("tools")) ||
-                object.has("web_search_options") ||
-                object.has("audio") ||
-                !isTextOnlyModality(object.get("modalities"))
-            ) return null;
+            if (usesProviderHostedTool(object.get("tools"))
+                    || object.has("web_search_options")
+                    || object.has("audio")
+                    || !isTextOnlyModality(object.get("modalities"))) return null;
             object.put("model", upstreamModelId);
             object.remove("service_tier");
             if (!includeStreamingUsage || !object.path("stream").asBoolean(false)) {
@@ -306,8 +286,9 @@ class LlmProxyController {
             }
             byte[] asSent = objectMapper.writeValueAsBytes(object);
             JsonNode existing = object.get("stream_options");
-            ObjectNode options =
-                existing != null && existing.isObject() ? (ObjectNode) existing : object.putObject("stream_options");
+            ObjectNode options = existing != null && existing.isObject()
+                    ? (ObjectNode) existing
+                    : object.putObject("stream_options");
             options.put("include_usage", true);
             byte[] withUsage = objectMapper.writeValueAsBytes(object);
             boolean weAddedTheFlag = !Arrays.equals(asSent, withUsage);
@@ -328,10 +309,10 @@ class LlmProxyController {
     }
 
     private static boolean isTextOnlyModality(JsonNode modalities) {
-        return (
-            modalities == null ||
-            (modalities.isArray() && modalities.size() == 1 && "text".equals(modalities.get(0).asString()))
-        );
+        return (modalities == null
+                || (modalities.isArray()
+                        && modalities.size() == 1
+                        && "text".equals(modalities.get(0).asString())));
     }
 
     HttpHeaders buildUpstreamHeaders(HttpHeaders incomingHeaders, LlmModelResolver.ProxyCredential credential) {
@@ -353,11 +334,12 @@ class LlmProxyController {
     }
 
     static URI buildUpstreamUri(String baseUrl, String apiProtocol) {
-        String suffix = switch (apiProtocol) {
-            case COMPLETIONS_PROTOCOL -> "/chat/completions";
-            case RESPONSES_PROTOCOL -> "/responses";
-            default -> throw new IllegalArgumentException("Unsupported API protocol");
-        };
+        String suffix =
+                switch (apiProtocol) {
+                    case COMPLETIONS_PROTOCOL -> "/chat/completions";
+                    case RESPONSES_PROTOCOL -> "/responses";
+                    default -> throw new IllegalArgumentException("Unsupported API protocol");
+                };
         return URI.create(baseUrl.strip().replaceAll("/+$", "") + suffix);
     }
 
@@ -372,8 +354,8 @@ class LlmProxyController {
     /** Names WHICH purse stopped the call, because the two have different remedies. */
     private static String budgetReachedMessage(@Nullable FundingSource fundingSource) {
         return fundingSource == FundingSource.WORKSPACE
-            ? "Own-provider budget reached. Paused until an admin raises the cap or the month rolls over."
-            : "Shared-model budget reached. Paused until an admin raises the budget or the month rolls over.";
+                ? "Own-provider budget reached. Paused until an admin raises the cap or the month rolls over."
+                : "Shared-model budget reached. Paused until an admin raises the budget or the month rolls over.";
     }
 
     private void incrementErrors(String apiProtocol) {

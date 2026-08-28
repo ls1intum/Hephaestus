@@ -35,6 +35,7 @@ public class AgentImageContractVerifier {
 
     /** Informational labels quoted back in a drift report, because they name what actually differs. */
     private static final String BUN_VERSION_LABEL = "hephaestus.agent.bun-version";
+
     private static final String PI_VERSION_LABEL = "hephaestus.agent.pi-version";
 
     public enum Outcome {
@@ -58,7 +59,9 @@ public class AgentImageContractVerifier {
 
     public Outcome verify(String image) {
         Outcome outcome = evaluate(image);
-        meterRegistry.counter(METRIC, "outcome", outcome.name().toLowerCase(Locale.ROOT)).increment();
+        meterRegistry
+                .counter(METRIC, "outcome", outcome.name().toLowerCase(Locale.ROOT))
+                .increment();
         return outcome;
     }
 
@@ -72,24 +75,22 @@ public class AgentImageContractVerifier {
         int expected = SandboxLayout.RUNTIME_CONTRACT_VERSION;
         if (declared == null) {
             log.error(
-                "Agent image {} declares no {} label, so it predates the runtime contract this server stages " +
-                    "for (v{}). It cannot be a build matching this server. See docs/admin/agent-image-digests.md.",
-                image,
-                SandboxLayout.RUNTIME_CONTRACT_LABEL,
-                expected
-            );
+                    "Agent image {} declares no {} label, so it predates the runtime contract this server stages "
+                            + "for (v{}). It cannot be a build matching this server. See docs/admin/agent-image-digests.md.",
+                    image,
+                    SandboxLayout.RUNTIME_CONTRACT_LABEL,
+                    expected);
             return Outcome.UNLABELLED;
         }
         if (!declared.equals(Integer.toString(expected))) {
             log.error(
-                "Agent image {} implements runtime contract v{} but this server stages for v{} (image bun={}, pi={}). " +
-                    "Practice reviews and mentor sessions in this image will fail. See docs/admin/agent-image-digests.md.",
-                image,
-                declared,
-                expected,
-                labels.get().getOrDefault(BUN_VERSION_LABEL, "unknown"),
-                labels.get().getOrDefault(PI_VERSION_LABEL, "unknown")
-            );
+                    "Agent image {} implements runtime contract v{} but this server stages for v{} (image bun={}, pi={}). "
+                            + "Practice reviews and mentor sessions in this image will fail. See docs/admin/agent-image-digests.md.",
+                    image,
+                    declared,
+                    expected,
+                    labels.get().getOrDefault(BUN_VERSION_LABEL, "unknown"),
+                    labels.get().getOrDefault(PI_VERSION_LABEL, "unknown"));
             return Outcome.MISMATCH;
         }
         log.info("Agent image {} implements runtime contract v{}.", image, expected);

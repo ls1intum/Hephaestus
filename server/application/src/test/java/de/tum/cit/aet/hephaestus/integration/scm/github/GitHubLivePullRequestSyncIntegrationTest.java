@@ -62,16 +62,14 @@ class GitHubLivePullRequestSyncIntegrationTest extends AbstractGitHubLiveSyncInt
         String prTitle = "IT pull request " + nextEphemeralSlug("pr");
         String prBody = "Live integration PR created at " + Instant.now();
         var createdPR = fixtureService.createPullRequest(
-            repoInfo.nodeId(),
-            prTitle,
-            prBody,
-            branchName,
-            defaultBranch(repoInfo)
-        );
+                repoInfo.nodeId(), prTitle, prBody, branchName, defaultBranch(repoInfo));
 
         // 4. Sync repository first
-        repositorySyncService.syncRepository(workspace.getId(), repository.fullName(), githubProvider).orElseThrow();
-        var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
+        repositorySyncService
+                .syncRepository(workspace.getId(), repository.fullName(), githubProvider)
+                .orElseThrow();
+        var localRepo =
+                repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
 
         // 5. Sync pull requests
         SyncResult syncResult = pullRequestSyncService.syncForRepository(workspace.getId(), localRepo.getId());
@@ -81,8 +79,8 @@ class GitHubLivePullRequestSyncIntegrationTest extends AbstractGitHubLiveSyncInt
         assertThat(syncResult.count()).isGreaterThanOrEqualTo(1);
 
         PullRequest storedPR = pullRequestRepository
-            .findByRepositoryIdAndNumber(localRepo.getId(), createdPR.number())
-            .orElseThrow();
+                .findByRepositoryIdAndNumber(localRepo.getId(), createdPR.number())
+                .orElseThrow();
 
         assertThat(storedPR.getTitle()).isEqualTo(prTitle);
         assertThat(storedPR.getBody()).isEqualTo(prBody);
@@ -98,8 +96,11 @@ class GitHubLivePullRequestSyncIntegrationTest extends AbstractGitHubLiveSyncInt
         var prArtifacts = createPullRequestWithReview(repository);
 
         // 2. Sync repository first
-        repositorySyncService.syncRepository(workspace.getId(), repository.fullName(), githubProvider).orElseThrow();
-        var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
+        repositorySyncService
+                .syncRepository(workspace.getId(), repository.fullName(), githubProvider)
+                .orElseThrow();
+        var localRepo =
+                repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
 
         // 3. Sync pull requests
         SyncResult syncResult = pullRequestSyncService.syncForRepository(workspace.getId(), localRepo.getId());
@@ -108,8 +109,8 @@ class GitHubLivePullRequestSyncIntegrationTest extends AbstractGitHubLiveSyncInt
 
         // 4. Verify PR is synced
         PullRequest storedPR = pullRequestRepository
-            .findByRepositoryIdAndNumber(localRepo.getId(), prArtifacts.pullRequestNumber())
-            .orElseThrow();
+                .findByRepositoryIdAndNumber(localRepo.getId(), prArtifacts.pullRequestNumber())
+                .orElseThrow();
 
         assertThat(storedPR.getTitle()).isEqualTo(prArtifacts.pullRequestTitle());
         assertThat(storedPR.getNumber()).isEqualTo(prArtifacts.pullRequestNumber());
@@ -118,23 +119,25 @@ class GitHubLivePullRequestSyncIntegrationTest extends AbstractGitHubLiveSyncInt
         reviewSyncService.syncForPullRequest(workspace.getId(), storedPR);
 
         // 6. Verify reviews are synced
-        List<PullRequestReview> reviews = pullRequestReviewRepository
-            .findAll()
-            .stream()
-            .filter(r -> r.getPullRequest() != null && r.getPullRequest().getId().equals(storedPR.getId()))
-            .toList();
+        List<PullRequestReview> reviews = pullRequestReviewRepository.findAll().stream()
+                .filter(r ->
+                        r.getPullRequest() != null && r.getPullRequest().getId().equals(storedPR.getId()))
+                .toList();
 
         // Reviews should now be synced from the separate sync call
-        assertThat(reviews).anyMatch(
-            r ->
-                r.getId().equals(prArtifacts.reviewId()) ||
-                (r.getBody() != null &&
-                    r
-                        .getBody()
-                        .contains(
-                            prArtifacts.reviewBody().substring(0, Math.min(20, prArtifacts.reviewBody().length()))
-                        ))
-        );
+        assertThat(reviews)
+                .anyMatch(r -> r.getId().equals(prArtifacts.reviewId())
+                        || (r.getBody() != null
+                                && r.getBody()
+                                        .contains(prArtifacts
+                                                .reviewBody()
+                                                .substring(
+                                                        0,
+                                                        Math.min(
+                                                                20,
+                                                                prArtifacts
+                                                                        .reviewBody()
+                                                                        .length())))));
     }
 
     @Test
@@ -149,12 +152,7 @@ class GitHubLivePullRequestSyncIntegrationTest extends AbstractGitHubLiveSyncInt
         fixtureService.createCommitOnBranch(repository.fullName(), branchName1, "Add file 1", "file1.txt", "Content 1");
         String prTitle1 = "IT PR " + nextEphemeralSlug("pr1");
         var pr1 = fixtureService.createPullRequest(
-            repoInfo.nodeId(),
-            prTitle1,
-            "First PR",
-            branchName1,
-            defaultBranch(repoInfo)
-        );
+                repoInfo.nodeId(), prTitle1, "First PR", branchName1, defaultBranch(repoInfo));
 
         // 3. Create second PR
         String branchName2 = "feature-" + nextEphemeralSlug("branch2");
@@ -162,16 +160,14 @@ class GitHubLivePullRequestSyncIntegrationTest extends AbstractGitHubLiveSyncInt
         fixtureService.createCommitOnBranch(repository.fullName(), branchName2, "Add file 2", "file2.txt", "Content 2");
         String prTitle2 = "IT PR " + nextEphemeralSlug("pr2");
         var pr2 = fixtureService.createPullRequest(
-            repoInfo.nodeId(),
-            prTitle2,
-            "Second PR",
-            branchName2,
-            defaultBranch(repoInfo)
-        );
+                repoInfo.nodeId(), prTitle2, "Second PR", branchName2, defaultBranch(repoInfo));
 
         // 4. Sync repository first
-        repositorySyncService.syncRepository(workspace.getId(), repository.fullName(), githubProvider).orElseThrow();
-        var localRepo = repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
+        repositorySyncService
+                .syncRepository(workspace.getId(), repository.fullName(), githubProvider)
+                .orElseThrow();
+        var localRepo =
+                repositoryRepository.findByNameWithOwner(repository.fullName()).orElseThrow();
 
         // 5. Sync pull requests
         SyncResult syncResult = pullRequestSyncService.syncForRepository(workspace.getId(), localRepo.getId());
@@ -181,13 +177,13 @@ class GitHubLivePullRequestSyncIntegrationTest extends AbstractGitHubLiveSyncInt
         assertThat(syncResult.count()).isGreaterThanOrEqualTo(2);
 
         PullRequest storedPR1 = pullRequestRepository
-            .findByRepositoryIdAndNumber(localRepo.getId(), pr1.number())
-            .orElseThrow();
+                .findByRepositoryIdAndNumber(localRepo.getId(), pr1.number())
+                .orElseThrow();
         assertThat(storedPR1.getTitle()).isEqualTo(prTitle1);
 
         PullRequest storedPR2 = pullRequestRepository
-            .findByRepositoryIdAndNumber(localRepo.getId(), pr2.number())
-            .orElseThrow();
+                .findByRepositoryIdAndNumber(localRepo.getId(), pr2.number())
+                .orElseThrow();
         assertThat(storedPR2.getTitle()).isEqualTo(prTitle2);
     }
 

@@ -73,7 +73,7 @@ public class PiResultParser {
         return new AgentResult(success, output, usage);
     }
 
-    AgentResult.@Nullable LlmUsage parseUsage(byte@Nullable [] usageFile) {
+    AgentResult.@Nullable LlmUsage parseUsage(byte @Nullable [] usageFile) {
         if (usageFile == null || usageFile.length == 0) {
             return null;
         }
@@ -83,38 +83,42 @@ public class PiResultParser {
             if (totalCalls <= 0) {
                 return null;
             }
-            String model = usageNode.path("model").isString() ? usageNode.path("model").asString() : null;
-            Integer inputTokens = usageNode.has("inputTokens") ? usageNode.path("inputTokens").asInt(0) : null;
-            Integer outputTokens = usageNode.has("outputTokens") ? usageNode.path("outputTokens").asInt(0) : null;
+            String model =
+                    usageNode.path("model").isString() ? usageNode.path("model").asString() : null;
+            Integer inputTokens =
+                    usageNode.has("inputTokens") ? usageNode.path("inputTokens").asInt(0) : null;
+            Integer outputTokens = usageNode.has("outputTokens")
+                    ? usageNode.path("outputTokens").asInt(0)
+                    : null;
             Integer cacheReadTokens = usageNode.has("cacheReadTokens")
-                ? usageNode.path("cacheReadTokens").asInt(0)
-                : null;
+                    ? usageNode.path("cacheReadTokens").asInt(0)
+                    : null;
             Integer cacheWriteTokens = usageNode.has("cacheWriteTokens")
-                ? usageNode.path("cacheWriteTokens").asInt(0)
-                : null;
+                    ? usageNode.path("cacheWriteTokens").asInt(0)
+                    : null;
             // Populated from the responses-path shape's `output_tokens_details.reasoning_tokens` when the
             // upstream model reports it; absent for chat/completions-only models.
             Integer reasoningTokens = usageNode.has("reasoningTokens")
-                ? usageNode.path("reasoningTokens").asInt(0)
-                : null;
-            Double costUsd = usageNode.has("costUsd") ? usageNode.path("costUsd").asDouble(0.0) : null;
+                    ? usageNode.path("reasoningTokens").asInt(0)
+                    : null;
+            Double costUsd =
+                    usageNode.has("costUsd") ? usageNode.path("costUsd").asDouble(0.0) : null;
             return new AgentResult.LlmUsage(
-                model,
-                inputTokens,
-                outputTokens,
-                reasoningTokens,
-                cacheReadTokens,
-                cacheWriteTokens,
-                costUsd,
-                totalCalls
-            );
+                    model,
+                    inputTokens,
+                    outputTokens,
+                    reasoningTokens,
+                    cacheReadTokens,
+                    cacheWriteTokens,
+                    costUsd,
+                    totalCalls);
         } catch (JacksonException e) {
             recordFailure("usage", e);
             return null;
         }
     }
 
-    void addRunnerDebug(Map<String, Object> output, byte@Nullable [] runnerDebugFile) {
+    void addRunnerDebug(Map<String, Object> output, byte @Nullable [] runnerDebugFile) {
         if (runnerDebugFile == null || runnerDebugFile.length == 0) {
             return;
         }
@@ -130,7 +134,7 @@ public class PiResultParser {
      * read off the job. Best-effort like its siblings: a malformed payload costs the surfaces one cycle's
      * messages and costs the review nothing.
      */
-    void addComposedFeedback(Map<String, Object> output, byte@Nullable [] feedbackFile) {
+    void addComposedFeedback(Map<String, Object> output, byte @Nullable [] feedbackFile) {
         if (feedbackFile == null || feedbackFile.length == 0) {
             return;
         }
@@ -141,7 +145,7 @@ public class PiResultParser {
         }
     }
 
-    void addWatchdogState(Map<String, Object> output, byte@Nullable [] watchdogFile) {
+    void addWatchdogState(Map<String, Object> output, byte @Nullable [] watchdogFile) {
         if (watchdogFile == null || watchdogFile.length == 0) {
             return;
         }
@@ -152,7 +156,7 @@ public class PiResultParser {
         }
     }
 
-    byte@Nullable [] buildResultFromReviewState(byte@Nullable [] reviewStateFile) {
+    byte @Nullable [] buildResultFromReviewState(byte @Nullable [] reviewStateFile) {
         if (reviewStateFile == null || reviewStateFile.length == 0) {
             return null;
         }
@@ -181,17 +185,15 @@ public class PiResultParser {
             char c = json.charAt(i);
             if (c == '\\' && i + 1 < json.length()) {
                 char next = json.charAt(i + 1);
-                if (
-                    next == '"' ||
-                    next == '\\' ||
-                    next == '/' ||
-                    next == 'b' ||
-                    next == 'f' ||
-                    next == 'n' ||
-                    next == 'r' ||
-                    next == 't' ||
-                    next == 'u'
-                ) {
+                if (next == '"'
+                        || next == '\\'
+                        || next == '/'
+                        || next == 'b'
+                        || next == 'f'
+                        || next == 'n'
+                        || next == 'r'
+                        || next == 't'
+                        || next == 'u') {
                     sb.append(c);
                 } else {
                     continue;
@@ -215,9 +217,8 @@ public class PiResultParser {
                 break;
             }
             attempts++;
-            try (
-                var parser = objectMapper.tokenStreamFactory().createParser(chars, bracePos, chars.length - bracePos)
-            ) {
+            try (var parser =
+                    objectMapper.tokenStreamFactory().createParser(chars, bracePos, chars.length - bracePos)) {
                 JsonNode node = objectMapper.readTree(parser);
                 if (node != null && node.isObject() && observationsNode(node) != null) {
                     return objectMapper.writeValueAsString(node);

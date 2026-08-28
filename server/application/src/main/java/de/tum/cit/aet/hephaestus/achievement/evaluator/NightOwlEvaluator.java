@@ -46,11 +46,7 @@ public class NightOwlEvaluator implements AchievementEvaluator {
         Instant windowEnd = event.occurredAt();
 
         long count = activityEventRepository.countByActorIdAndEventTypeInWindow(
-            actorId,
-            ActivityEventType.COMMIT_CREATED.name(),
-            windowStart,
-            windowEnd
-        );
+                actorId, ActivityEventType.COMMIT_CREATED.name(), windowStart, windowEnd);
 
         if (count >= REQUIRED_NIGHT_COMMITS) {
             userAchievement.setProgressData(new BinaryAchievementProgress(true));

@@ -90,22 +90,14 @@ class LlmAdmissionServiceTest extends BaseUnitTest {
     @Test
     void freezesAuthoritativeInstancePriceAtAdmission() {
         WorkspaceAgentBinding binding = binding(AgentPurpose.PRACTICE_REVIEW);
-        when(bindingRepository.findByWorkspaceIdAndPurposeForUpdate(30L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
-            Optional.of(binding)
-        );
+        when(bindingRepository.findByWorkspaceIdAndPurposeForUpdate(30L, AgentPurpose.PRACTICE_REVIEW))
+                .thenReturn(Optional.of(binding));
         when(modelRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(instanceModel(binding)));
         ResolvedLlmModel resolved = new ResolvedLlmModel(
-            "https://api.example/v1",
-            "openai-responses",
-            "gpt-authoritative",
-            null,
-            null,
-            false
-        );
+                "https://api.example/v1", "openai-responses", "gpt-authoritative", null, null, false);
         when(resolver.resolve(binding)).thenReturn(resolved);
-        when(resolver.connectionRef(binding)).thenReturn(
-            new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 10L, 20L, 30L)
-        );
+        when(resolver.connectionRef(binding))
+                .thenReturn(new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 10L, 20L, 30L));
         LlmModelPrice price = new LlmModelPrice();
         price.setId(40L);
         price.setPricingMode(PricingMode.PRICED);
@@ -130,23 +122,19 @@ class LlmAdmissionServiceTest extends BaseUnitTest {
     @Test
     void freezesTheWorkspacesOwnPriceAndFundingSourceForABoundByoModel() {
         WorkspaceAgentBinding binding = byoBinding();
-        when(bindingRepository.findByWorkspaceIdAndPurposeForUpdate(30L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
-            Optional.of(binding)
-        );
+        when(bindingRepository.findByWorkspaceIdAndPurposeForUpdate(30L, AgentPurpose.PRACTICE_REVIEW))
+                .thenReturn(Optional.of(binding));
         // The row lock the instance arm takes on llm_model is taken on workspace_llm_model here, and
         // it is scoped to the owning workspace: a model id alone must not be admissible cross-tenant.
-        when(workspaceModelRepository.findByIdAndWorkspaceIdForUpdate(21L, 30L)).thenReturn(
-            Optional.of(workspaceModel(binding))
-        );
-        when(resolver.resolve(binding)).thenReturn(
-            new ResolvedLlmModel("https://byo.example/v1", "openai-responses", "byo-model", null, null, false)
-        );
-        when(resolver.connectionRef(binding)).thenReturn(
-            new LlmModelResolver.ConnectionRef(FundingSource.WORKSPACE, 11L, 21L, 30L)
-        );
-        when(workspaceModelRepository.findByIdAndWorkspaceId(21L, 30L)).thenReturn(
-            Optional.of(workspaceModel(binding))
-        );
+        when(workspaceModelRepository.findByIdAndWorkspaceIdForUpdate(21L, 30L))
+                .thenReturn(Optional.of(workspaceModel(binding)));
+        when(resolver.resolve(binding))
+                .thenReturn(new ResolvedLlmModel(
+                        "https://byo.example/v1", "openai-responses", "byo-model", null, null, false));
+        when(resolver.connectionRef(binding))
+                .thenReturn(new LlmModelResolver.ConnectionRef(FundingSource.WORKSPACE, 11L, 21L, 30L));
+        when(workspaceModelRepository.findByIdAndWorkspaceId(21L, 30L))
+                .thenReturn(Optional.of(workspaceModel(binding)));
 
         AdmittedLlmModel admitted = service.admit(binding);
 
@@ -168,33 +156,28 @@ class LlmAdmissionServiceTest extends BaseUnitTest {
     void refusesToAdmitAModelWhosePriceIsUnknown() {
         WorkspaceAgentBinding binding = byoBinding();
         workspaceModel(binding).setPricingMode(PricingMode.UNPRICED);
-        when(bindingRepository.findByWorkspaceIdAndPurposeForUpdate(30L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
-            Optional.of(binding)
-        );
-        when(workspaceModelRepository.findByIdAndWorkspaceIdForUpdate(21L, 30L)).thenReturn(
-            Optional.of(workspaceModel(binding))
-        );
-        when(resolver.resolve(binding)).thenReturn(
-            new ResolvedLlmModel("https://byo.example/v1", "openai-responses", "byo-model", null, null, false)
-        );
-        when(resolver.connectionRef(binding)).thenReturn(
-            new LlmModelResolver.ConnectionRef(FundingSource.WORKSPACE, 11L, 21L, 30L)
-        );
-        when(workspaceModelRepository.findByIdAndWorkspaceId(21L, 30L)).thenReturn(
-            Optional.of(workspaceModel(binding))
-        );
+        when(bindingRepository.findByWorkspaceIdAndPurposeForUpdate(30L, AgentPurpose.PRACTICE_REVIEW))
+                .thenReturn(Optional.of(binding));
+        when(workspaceModelRepository.findByIdAndWorkspaceIdForUpdate(21L, 30L))
+                .thenReturn(Optional.of(workspaceModel(binding)));
+        when(resolver.resolve(binding))
+                .thenReturn(new ResolvedLlmModel(
+                        "https://byo.example/v1", "openai-responses", "byo-model", null, null, false));
+        when(resolver.connectionRef(binding))
+                .thenReturn(new LlmModelResolver.ConnectionRef(FundingSource.WORKSPACE, 11L, 21L, 30L));
+        when(workspaceModelRepository.findByIdAndWorkspaceId(21L, 30L))
+                .thenReturn(Optional.of(workspaceModel(binding)));
 
         assertThatThrownBy(() -> service.admit(binding))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("no usable price");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("no usable price");
     }
 
     @Test
     void rejectsBeforePricingWhenBoundModelIsUnavailable() {
         WorkspaceAgentBinding binding = binding(AgentPurpose.MENTOR);
-        when(bindingRepository.findByWorkspaceIdAndPurposeForUpdate(30L, AgentPurpose.MENTOR)).thenReturn(
-            Optional.of(binding)
-        );
+        when(bindingRepository.findByWorkspaceIdAndPurposeForUpdate(30L, AgentPurpose.MENTOR))
+                .thenReturn(Optional.of(binding));
         when(modelRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(instanceModel(binding)));
         when(resolver.resolve(binding)).thenThrow(new IllegalStateException("model revoked"));
 
@@ -206,9 +189,8 @@ class LlmAdmissionServiceTest extends BaseUnitTest {
     void rejectsADisabledBindingWithoutResolvingOrPricingIt() {
         WorkspaceAgentBinding binding = binding(AgentPurpose.MENTOR);
         binding.setEnabled(false);
-        when(bindingRepository.findByWorkspaceIdAndPurposeForUpdate(30L, AgentPurpose.MENTOR)).thenReturn(
-            Optional.of(binding)
-        );
+        when(bindingRepository.findByWorkspaceIdAndPurposeForUpdate(30L, AgentPurpose.MENTOR))
+                .thenReturn(Optional.of(binding));
 
         assertThatThrownBy(() -> service.admit(binding)).isInstanceOf(IllegalStateException.class);
         verifyNoInteractions(resolver, priceRepository);

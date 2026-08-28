@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -100,26 +99,24 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         GitLabProperties properties = new GitLabProperties(
-            "https://gitlab.lrz.de",
-            Duration.ofSeconds(30),
-            Duration.ofSeconds(60),
-            Duration.ofMillis(200),
-            Duration.ofMinutes(5)
-        );
+                "https://gitlab.lrz.de",
+                Duration.ofSeconds(30),
+                Duration.ofSeconds(60),
+                Duration.ofMillis(200),
+                Duration.ofMinutes(5));
 
         processor = new GitLabIssueProcessor(
-            gitLabUserService,
-            issueRepository,
-            milestoneRepository,
-            issueTypeRepository,
-            userRepository,
-            labelRepository,
-            repositoryRepository,
-            scopeIdResolver,
-            repositoryScopeFilter,
-            properties,
-            eventPublisher
-        );
+                gitLabUserService,
+                issueRepository,
+                milestoneRepository,
+                issueTypeRepository,
+                userRepository,
+                labelRepository,
+                repositoryRepository,
+                scopeIdResolver,
+                repositoryScopeFilter,
+                properties,
+                eventPublisher);
 
         gitLabProvider = new IdentityProvider();
         gitLabProvider.setId(PROVIDER_ID);
@@ -133,33 +130,10 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
 
         // Default: upsertCore succeeds
         lenient()
-            .when(
-                issueRepository.upsertCore(
-                    anyLong(),
-                    anyLong(),
-                    anyInt(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    anyLong(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any(),
-                    any()
-                )
-            )
-            .thenReturn(1);
+                .when(issueRepository.upsertCore(
+                        anyLong(), anyLong(), anyInt(), any(), any(), any(), any(), any(), any(), any(), any(), any(),
+                        any(), any(), any(), anyLong(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(1);
 
         // upsertUser is void — no stubbing needed
     }
@@ -175,30 +149,10 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             Issue result = processor.process(event, ctx);
 
             assertThat(result).isNull();
-            verify(issueRepository, never()).upsertCore(
-                anyLong(),
-                anyLong(),
-                anyInt(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                anyLong(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any()
-            );
+            verify(issueRepository, never())
+                    .upsertCore(
+                            anyLong(), anyLong(), anyInt(), any(), any(), any(), any(), any(), any(), any(), any(),
+                            any(), any(), any(), any(), anyLong(), any(), any(), any(), any(), any(), any());
         }
 
         @Test
@@ -206,9 +160,8 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             // Public → confidential flip: the previously-mirrored public row must be tombstoned so it
             // drops out of every live query.
             GitLabIssueEventDTO event = createEvent("update", "opened", true);
-            when(
-                issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(eq(REPO_ID), eq(List.of(ISSUE_IID)), any())
-            ).thenReturn(1);
+            when(issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(eq(REPO_ID), eq(List.of(ISSUE_IID)), any()))
+                    .thenReturn(1);
 
             boolean purged = processor.purgeConfidential(event, createContext());
 
@@ -219,9 +172,8 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         @Test
         void purgeConfidentialIsNoopWhenNothingStored() {
             GitLabIssueEventDTO event = createEvent("update", "opened", true);
-            when(
-                issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(eq(REPO_ID), eq(List.of(ISSUE_IID)), any())
-            ).thenReturn(0);
+            when(issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(eq(REPO_ID), eq(List.of(ISSUE_IID)), any()))
+                    .thenReturn(0);
 
             boolean purged = processor.purgeConfidential(event, createContext());
 
@@ -231,55 +183,34 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         @Test
         void processFromSyncSkipsConfidential() {
             var syncData = new GitLabIssueProcessor.SyncIssueData(
-                "gid://gitlab/Issue/422296",
-                "5",
-                "Title",
-                "desc",
-                "opened",
-                true,
-                "https://example.com",
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                0,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
+                    "gid://gitlab/Issue/422296",
+                    "5",
+                    "Title",
+                    "desc",
+                    "opened",
+                    true,
+                    "https://example.com",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    0,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
             Issue result = processor.processFromSync(syncData, testRepo, 1L);
 
             assertThat(result).isNull();
-            verify(issueRepository, never()).upsertCore(
-                anyLong(),
-                anyLong(),
-                anyInt(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                anyLong(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any()
-            );
+            verify(issueRepository, never())
+                    .upsertCore(
+                            anyLong(), anyLong(), anyInt(), any(), any(), any(), any(), any(), any(), any(), any(),
+                            any(), any(), any(), any(), anyLong(), any(), any(), any(), any(), any(), any());
         }
     }
 
@@ -290,108 +221,108 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         void openedMapsToOpen() {
             Issue issue = createIssueEntity();
             when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
-                .thenReturn(Optional.empty())
-                .thenReturn(Optional.of(issue));
+                    .thenReturn(Optional.empty())
+                    .thenReturn(Optional.of(issue));
 
             GitLabIssueEventDTO event = createEvent("open", "opened", false);
             processor.process(event, createContext());
 
-            verify(issueRepository).upsertCore(
-                eq(RAW_ISSUE_ID),
-                eq(PROVIDER_ID),
-                eq(ISSUE_IID),
-                any(),
-                any(),
-                eq("OPEN"),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                eq(REPO_ID),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any()
-            );
+            verify(issueRepository)
+                    .upsertCore(
+                            eq(RAW_ISSUE_ID),
+                            eq(PROVIDER_ID),
+                            eq(ISSUE_IID),
+                            any(),
+                            any(),
+                            eq("OPEN"),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            eq(REPO_ID),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any());
         }
 
         @Test
         void closedMapsToClosed() {
             Issue issue = createIssueEntity();
             when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
-                .thenReturn(Optional.empty())
-                .thenReturn(Optional.of(issue));
+                    .thenReturn(Optional.empty())
+                    .thenReturn(Optional.of(issue));
 
             GitLabIssueEventDTO event = createEvent("close", "closed", false);
             processor.process(event, createContext());
 
-            verify(issueRepository).upsertCore(
-                eq(RAW_ISSUE_ID),
-                eq(PROVIDER_ID),
-                eq(ISSUE_IID),
-                any(),
-                any(),
-                eq("CLOSED"),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                eq(REPO_ID),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any()
-            );
+            verify(issueRepository)
+                    .upsertCore(
+                            eq(RAW_ISSUE_ID),
+                            eq(PROVIDER_ID),
+                            eq(ISSUE_IID),
+                            any(),
+                            any(),
+                            eq("CLOSED"),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            eq(REPO_ID),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any());
         }
 
         @Test
         void nullStateDefaultsToOpen() {
             Issue issue = createIssueEntity();
             when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
-                .thenReturn(Optional.empty())
-                .thenReturn(Optional.of(issue));
+                    .thenReturn(Optional.empty())
+                    .thenReturn(Optional.of(issue));
 
             GitLabIssueEventDTO event = createEvent("open", null, false);
             processor.process(event, createContext());
 
-            verify(issueRepository).upsertCore(
-                eq(RAW_ISSUE_ID),
-                eq(PROVIDER_ID),
-                eq(ISSUE_IID),
-                any(),
-                any(),
-                eq("OPEN"),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                eq(REPO_ID),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any()
-            );
+            verify(issueRepository)
+                    .upsertCore(
+                            eq(RAW_ISSUE_ID),
+                            eq(PROVIDER_ID),
+                            eq(ISSUE_IID),
+                            any(),
+                            any(),
+                            eq("OPEN"),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            eq(REPO_ID),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any());
         }
     }
 
@@ -404,11 +335,12 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             // First call: check if exists → empty (new issue)
             // Second call: after upsert → find the issue
             when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
-                .thenReturn(Optional.empty())
-                .thenReturn(Optional.of(issue));
+                    .thenReturn(Optional.empty())
+                    .thenReturn(Optional.of(issue));
 
             User author = createUserEntity();
-            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID))).thenReturn(author);
+            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID)))
+                    .thenReturn(author);
 
             GitLabIssueEventDTO event = createEvent("open", "opened", false);
             Issue result = processor.process(event, createContext());
@@ -416,40 +348,17 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             assertThat(result).isNotNull();
             assertThat(result.getProvider()).isEqualTo(gitLabProvider);
 
-            ArgumentCaptor<ScmDomainEvent.IssueCreated> eventCaptor = ArgumentCaptor.forClass(
-                ScmDomainEvent.IssueCreated.class
-            );
+            ArgumentCaptor<ScmDomainEvent.IssueCreated> eventCaptor =
+                    ArgumentCaptor.forClass(ScmDomainEvent.IssueCreated.class);
             verify(eventPublisher).publishEvent(eventCaptor.capture());
         }
 
         @Test
         void processMissingIdSkips() {
             var attrs = new GitLabIssueEventDTO.ObjectAttributes(
-                null,
-                null,
-                "Title",
-                "desc",
-                "opened",
-                "open",
-                false,
-                18024L,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
-            GitLabIssueEventDTO event = new GitLabIssueEventDTO(
-                "issue",
-                "issue",
-                createUser(),
-                createProject(),
-                attrs,
-                null,
-                null,
-                null
-            );
+                    null, null, "Title", "desc", "opened", "open", false, 18024L, null, null, null, null, null, null);
+            GitLabIssueEventDTO event =
+                    new GitLabIssueEventDTO("issue", "issue", createUser(), createProject(), attrs, null, null, null);
 
             Issue result = processor.process(event, createContext());
 
@@ -460,11 +369,12 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         void processClosedPublishesEvent() {
             Issue issue = createIssueEntity();
             when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
-                .thenReturn(Optional.of(issue))
-                .thenReturn(Optional.of(issue));
+                    .thenReturn(Optional.of(issue))
+                    .thenReturn(Optional.of(issue));
 
             User author = createUserEntity();
-            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID))).thenReturn(author);
+            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID)))
+                    .thenReturn(author);
 
             GitLabIssueEventDTO event = createEvent("close", "closed", false);
             Issue result = processor.processClosed(event, createContext());
@@ -481,11 +391,12 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         void processReopenedPublishesEvent() {
             Issue issue = createIssueEntity();
             when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
-                .thenReturn(Optional.of(issue))
-                .thenReturn(Optional.of(issue));
+                    .thenReturn(Optional.of(issue))
+                    .thenReturn(Optional.of(issue));
 
             User author = createUserEntity();
-            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID))).thenReturn(author);
+            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID)))
+                    .thenReturn(author);
 
             GitLabIssueEventDTO event = createEvent("reopen", "opened", false);
             Issue result = processor.processReopened(event, createContext());
@@ -505,20 +416,17 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         void publishesIssueLabeledForEachAddedLabel() {
             Issue issue = createIssueEntity();
             when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
-                .thenReturn(Optional.of(issue))
-                .thenReturn(Optional.of(issue));
-            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID))).thenReturn(
-                createUserEntity()
-            );
+                    .thenReturn(Optional.of(issue))
+                    .thenReturn(Optional.of(issue));
+            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID)))
+                    .thenReturn(createUserEntity());
             when(issueRepository.save(any(Issue.class))).thenReturn(issue);
             Label bug = new Label();
             bug.setName("bug");
             when(labelRepository.findByRepositoryIdAndName(REPO_ID, "bug")).thenReturn(Optional.of(bug));
 
             processor.processUpdated(
-                createUpdateEventWithAddedLabel(new GitLabWebhookLabel(99L, "bug", "#ff0000")),
-                createContext()
-            );
+                    createUpdateEventWithAddedLabel(new GitLabWebhookLabel(99L, "bug", "#ff0000")), createContext());
 
             ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
             verify(eventPublisher, Mockito.atLeastOnce()).publishEvent(captor.capture());
@@ -529,11 +437,10 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         void noLabelChangePublishesNoIssueLabeled() {
             Issue issue = createIssueEntity();
             when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
-                .thenReturn(Optional.of(issue))
-                .thenReturn(Optional.of(issue));
-            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID))).thenReturn(
-                createUserEntity()
-            );
+                    .thenReturn(Optional.of(issue))
+                    .thenReturn(Optional.of(issue));
+            when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID)))
+                    .thenReturn(createUserEntity());
 
             // An ordinary title/description edit (no changes.labels) must not trigger label-based detection.
             processor.processUpdated(createUpdateEventWithAddedLabel(null), createContext());
@@ -549,91 +456,90 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         void processFromSyncCreatesIssue() {
             Issue issue = createIssueEntity();
             when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
-                .thenReturn(Optional.empty())
-                .thenReturn(Optional.of(issue));
+                    .thenReturn(Optional.empty())
+                    .thenReturn(Optional.of(issue));
 
             User author = createUserEntity();
-            when(gitLabUserService.findOrCreateUser(any(GitLabUserLookup.class), eq(PROVIDER_ID))).thenReturn(author);
+            when(gitLabUserService.findOrCreateUser(any(GitLabUserLookup.class), eq(PROVIDER_ID)))
+                    .thenReturn(author);
 
             var syncData = new GitLabIssueProcessor.SyncIssueData(
-                "gid://gitlab/Issue/422296",
-                "5",
-                "Feature: Add user authentication",
-                "Implement OAuth2 authentication flow",
-                "opened",
-                false,
-                "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/5",
-                "2026-01-31T18:03:35Z",
-                "2026-01-31T18:03:35Z",
-                null,
-                "gid://gitlab/User/18024",
-                "ga84xah",
-                "Felix Dietrich",
-                "https://gitlab.lrz.de/uploads/avatar.png",
-                "https://gitlab.lrz.de/ga84xah",
-                0,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
+                    "gid://gitlab/Issue/422296",
+                    "5",
+                    "Feature: Add user authentication",
+                    "Implement OAuth2 authentication flow",
+                    "opened",
+                    false,
+                    "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/5",
+                    "2026-01-31T18:03:35Z",
+                    "2026-01-31T18:03:35Z",
+                    null,
+                    "gid://gitlab/User/18024",
+                    "ga84xah",
+                    "Felix Dietrich",
+                    "https://gitlab.lrz.de/uploads/avatar.png",
+                    "https://gitlab.lrz.de/ga84xah",
+                    0,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
             Issue result = processor.processFromSync(syncData, testRepo, 1L);
 
             assertThat(result).isNotNull();
             assertThat(result.getProvider()).isEqualTo(gitLabProvider);
 
-            verify(issueRepository).upsertCore(
-                eq(RAW_ISSUE_ID),
-                eq(PROVIDER_ID),
-                eq(ISSUE_IID),
-                any(),
-                any(),
-                eq("OPEN"),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                eq(REPO_ID),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any()
-            );
+            verify(issueRepository)
+                    .upsertCore(
+                            eq(RAW_ISSUE_ID),
+                            eq(PROVIDER_ID),
+                            eq(ISSUE_IID),
+                            any(),
+                            any(),
+                            eq("OPEN"),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            eq(REPO_ID),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any());
         }
 
         @Test
         void processFromSyncInvalidGlobalId() {
             var syncData = new GitLabIssueProcessor.SyncIssueData(
-                "invalid-id",
-                "5",
-                "Title",
-                null,
-                "opened",
-                false,
-                "https://example.com",
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                0,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
+                    "invalid-id",
+                    "5",
+                    "Title",
+                    null,
+                    "opened",
+                    false,
+                    "https://example.com",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    0,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
             Issue result = processor.processFromSync(syncData, testRepo, 1L);
 
             assertThat(result).isNull();
@@ -642,28 +548,27 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         @Test
         void processFromSyncInvalidIid() {
             var syncData = new GitLabIssueProcessor.SyncIssueData(
-                "gid://gitlab/Issue/422296",
-                "not-a-number",
-                "Title",
-                null,
-                "opened",
-                false,
-                "https://example.com",
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                0,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
+                    "gid://gitlab/Issue/422296",
+                    "not-a-number",
+                    "Title",
+                    null,
+                    "opened",
+                    false,
+                    "https://example.com",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    0,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
             Issue result = processor.processFromSync(syncData, testRepo, 1L);
 
             assertThat(result).isNull();
@@ -673,37 +578,35 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         void processFromSyncPublishesCreatedEvent() {
             Issue issue = createIssueEntity();
             when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
-                .thenReturn(Optional.empty())
-                .thenReturn(Optional.of(issue));
+                    .thenReturn(Optional.empty())
+                    .thenReturn(Optional.of(issue));
 
             var syncData = new GitLabIssueProcessor.SyncIssueData(
-                "gid://gitlab/Issue/422296",
-                "5",
-                "Title",
-                null,
-                "opened",
-                false,
-                "https://example.com",
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                0,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
+                    "gid://gitlab/Issue/422296",
+                    "5",
+                    "Title",
+                    null,
+                    "opened",
+                    false,
+                    "https://example.com",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    0,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
             processor.processFromSync(syncData, testRepo, 1L);
 
-            ArgumentCaptor<ScmDomainEvent.IssueCreated> eventCaptor = ArgumentCaptor.forClass(
-                ScmDomainEvent.IssueCreated.class
-            );
+            ArgumentCaptor<ScmDomainEvent.IssueCreated> eventCaptor =
+                    ArgumentCaptor.forClass(ScmDomainEvent.IssueCreated.class);
             verify(eventPublisher).publishEvent(eventCaptor.capture());
         }
 
@@ -711,8 +614,8 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         void processFromSyncLinksMilestone() {
             Issue issue = createIssueEntity();
             when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
-                .thenReturn(Optional.empty())
-                .thenReturn(Optional.of(issue));
+                    .thenReturn(Optional.empty())
+                    .thenReturn(Optional.of(issue));
 
             Milestone milestone = new Milestone();
             milestone.setId(42L);
@@ -720,146 +623,143 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             when(milestoneRepository.findByNumberAndRepositoryId(3, REPO_ID)).thenReturn(Optional.of(milestone));
 
             var syncData = new GitLabIssueProcessor.SyncIssueData(
-                "gid://gitlab/Issue/422296",
-                "5",
-                "Title",
-                null,
-                "opened",
-                false,
-                "https://example.com",
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                0,
-                null,
-                null,
-                3,
-                null,
-                null
-            );
+                    "gid://gitlab/Issue/422296",
+                    "5",
+                    "Title",
+                    null,
+                    "opened",
+                    false,
+                    "https://example.com",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    0,
+                    null,
+                    null,
+                    3,
+                    null,
+                    null);
             processor.processFromSync(syncData, testRepo, 1L);
 
-            verify(issueRepository).upsertCore(
-                eq(RAW_ISSUE_ID),
-                eq(PROVIDER_ID),
-                eq(ISSUE_IID),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                eq(REPO_ID),
-                eq(42L),
-                any(),
-                any(),
-                any(),
-                any(),
-                any()
-            );
+            verify(issueRepository)
+                    .upsertCore(
+                            eq(RAW_ISSUE_ID),
+                            eq(PROVIDER_ID),
+                            eq(ISSUE_IID),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            eq(REPO_ID),
+                            eq(42L),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any());
         }
 
         @Test
         void processFromSyncMilestoneNotFound() {
             Issue issue = createIssueEntity();
             when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
-                .thenReturn(Optional.empty())
-                .thenReturn(Optional.of(issue));
+                    .thenReturn(Optional.empty())
+                    .thenReturn(Optional.of(issue));
 
             when(milestoneRepository.findByNumberAndRepositoryId(99, REPO_ID)).thenReturn(Optional.empty());
 
             var syncData = new GitLabIssueProcessor.SyncIssueData(
-                "gid://gitlab/Issue/422296",
-                "5",
-                "Title",
-                null,
-                "opened",
-                false,
-                "https://example.com",
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                0,
-                null,
-                null,
-                99,
-                null,
-                null
-            );
+                    "gid://gitlab/Issue/422296",
+                    "5",
+                    "Title",
+                    null,
+                    "opened",
+                    false,
+                    "https://example.com",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    0,
+                    null,
+                    null,
+                    99,
+                    null,
+                    null);
             processor.processFromSync(syncData, testRepo, 1L);
 
-            verify(issueRepository).upsertCore(
-                eq(RAW_ISSUE_ID),
-                eq(PROVIDER_ID),
-                eq(ISSUE_IID),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                eq(REPO_ID),
-                eq((Long) null),
-                any(),
-                any(),
-                any(),
-                any(),
-                any()
-            );
+            verify(issueRepository)
+                    .upsertCore(
+                            eq(RAW_ISSUE_ID),
+                            eq(PROVIDER_ID),
+                            eq(ISSUE_IID),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            eq(REPO_ID),
+                            eq((Long) null),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any());
         }
 
         @Test
         void processFromSyncNullMilestoneIid() {
             Issue issue = createIssueEntity();
             when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
-                .thenReturn(Optional.empty())
-                .thenReturn(Optional.of(issue));
+                    .thenReturn(Optional.empty())
+                    .thenReturn(Optional.of(issue));
 
             var syncData = new GitLabIssueProcessor.SyncIssueData(
-                "gid://gitlab/Issue/422296",
-                "5",
-                "Title",
-                null,
-                "opened",
-                false,
-                "https://example.com",
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                0,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
+                    "gid://gitlab/Issue/422296",
+                    "5",
+                    "Title",
+                    null,
+                    "opened",
+                    false,
+                    "https://example.com",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    0,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
             processor.processFromSync(syncData, testRepo, 1L);
 
             verify(milestoneRepository, never()).findByNumberAndRepositoryId(anyInt(), anyLong());
@@ -870,32 +770,31 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             Issue issue = createIssueEntity();
             // Issue already exists
             when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, ISSUE_IID))
-                .thenReturn(Optional.of(issue))
-                .thenReturn(Optional.of(issue));
+                    .thenReturn(Optional.of(issue))
+                    .thenReturn(Optional.of(issue));
 
             var syncData = new GitLabIssueProcessor.SyncIssueData(
-                "gid://gitlab/Issue/422296",
-                "5",
-                "Title",
-                null,
-                "opened",
-                false,
-                "https://example.com",
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                0,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
+                    "gid://gitlab/Issue/422296",
+                    "5",
+                    "Title",
+                    null,
+                    "opened",
+                    false,
+                    "https://example.com",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    0,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
             processor.processFromSync(syncData, testRepo, 1L);
 
             verify(eventPublisher, never()).publishEvent(any());
@@ -904,109 +803,107 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         @Test
         void shouldMapCompletedStateReasonWhenClosedWithNoOtherSignal() {
             var syncData = new GitLabIssueProcessor.SyncIssueData(
-                "gid://gitlab/Issue/422296",
-                "5",
-                "Title",
-                null,
-                "closed",
-                false,
-                "https://example.com",
-                null,
-                null,
-                "2026-02-01T10:00:00Z",
-                null,
-                null,
-                null,
-                null,
-                null,
-                0,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
+                    "gid://gitlab/Issue/422296",
+                    "5",
+                    "Title",
+                    null,
+                    "closed",
+                    false,
+                    "https://example.com",
+                    null,
+                    null,
+                    "2026-02-01T10:00:00Z",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    0,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
 
             processor.processFromSync(syncData, testRepo, 1L);
 
-            verify(issueRepository).upsertCore(
-                eq(RAW_ISSUE_ID),
-                eq(PROVIDER_ID),
-                eq(ISSUE_IID),
-                any(),
-                any(),
-                eq("CLOSED"),
-                eq("COMPLETED"),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                eq(REPO_ID),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any()
-            );
+            verify(issueRepository)
+                    .upsertCore(
+                            eq(RAW_ISSUE_ID),
+                            eq(PROVIDER_ID),
+                            eq(ISSUE_IID),
+                            any(),
+                            any(),
+                            eq("CLOSED"),
+                            eq("COMPLETED"),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            eq(REPO_ID),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any());
         }
 
         @Test
         void shouldMapDuplicateStateReasonWhenClosedAsDuplicateOfPresent() {
             var syncData = new GitLabIssueProcessor.SyncIssueData(
-                "gid://gitlab/Issue/422296",
-                "5",
-                "Title",
-                null,
-                "closed",
-                false,
-                "https://example.com",
-                null,
-                null,
-                "2026-02-01T10:00:00Z",
-                null,
-                null,
-                null,
-                null,
-                null,
-                0,
-                null,
-                null,
-                null,
-                null,
-                "gid://gitlab/Issue/999"
-            );
+                    "gid://gitlab/Issue/422296",
+                    "5",
+                    "Title",
+                    null,
+                    "closed",
+                    false,
+                    "https://example.com",
+                    null,
+                    null,
+                    "2026-02-01T10:00:00Z",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    0,
+                    null,
+                    null,
+                    null,
+                    null,
+                    "gid://gitlab/Issue/999");
 
             processor.processFromSync(syncData, testRepo, 1L);
 
-            verify(issueRepository).upsertCore(
-                eq(RAW_ISSUE_ID),
-                eq(PROVIDER_ID),
-                eq(ISSUE_IID),
-                any(),
-                any(),
-                eq("CLOSED"),
-                eq("DUPLICATE"),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                eq(REPO_ID),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any()
-            );
+            verify(issueRepository)
+                    .upsertCore(
+                            eq(RAW_ISSUE_ID),
+                            eq(PROVIDER_ID),
+                            eq(ISSUE_IID),
+                            any(),
+                            any(),
+                            eq("CLOSED"),
+                            eq("DUPLICATE"),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            eq(REPO_ID),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any());
         }
 
         @Test
@@ -1018,60 +915,58 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             IssueType taskType = new IssueType();
             taskType.setId("gid://gitlab/IssueType/1");
 
-            when(issueTypeRepository.findByOrganizationIdAndNameIgnoreCase(42L, "Task")).thenReturn(
-                Optional.of(taskType)
-            );
+            when(issueTypeRepository.findByOrganizationIdAndNameIgnoreCase(42L, "Task"))
+                    .thenReturn(Optional.of(taskType));
 
             var syncData = new GitLabIssueProcessor.SyncIssueData(
-                "gid://gitlab/Issue/422296",
-                "5",
-                "Title",
-                null,
-                "opened",
-                false,
-                "https://example.com",
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                0,
-                null,
-                null,
-                null,
-                "TASK",
-                null
-            );
+                    "gid://gitlab/Issue/422296",
+                    "5",
+                    "Title",
+                    null,
+                    "opened",
+                    false,
+                    "https://example.com",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    0,
+                    null,
+                    null,
+                    null,
+                    "TASK",
+                    null);
 
             processor.processFromSync(syncData, testRepo, 1L);
 
-            verify(issueRepository).upsertCore(
-                eq(RAW_ISSUE_ID),
-                eq(PROVIDER_ID),
-                eq(ISSUE_IID),
-                any(),
-                any(),
-                eq("OPEN"),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                eq(REPO_ID),
-                any(),
-                eq("gid://gitlab/IssueType/1"),
-                any(),
-                any(),
-                any(),
-                any()
-            );
+            verify(issueRepository)
+                    .upsertCore(
+                            eq(RAW_ISSUE_ID),
+                            eq(PROVIDER_ID),
+                            eq(ISSUE_IID),
+                            any(),
+                            any(),
+                            eq("OPEN"),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            eq(REPO_ID),
+                            any(),
+                            eq("gid://gitlab/IssueType/1"),
+                            any(),
+                            any(),
+                            any(),
+                            any());
         }
 
         @Test
@@ -1085,37 +980,36 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
 
             IssueType testCaseType = new IssueType();
             testCaseType.setId("gid://gitlab/IssueType/7");
-            when(issueTypeRepository.findByOrganizationIdAndNameIgnoreCase(42L, "Test Case")).thenReturn(
-                Optional.of(testCaseType)
-            );
+            when(issueTypeRepository.findByOrganizationIdAndNameIgnoreCase(42L, "Test Case"))
+                    .thenReturn(Optional.of(testCaseType));
 
             processor.processFromSync(syncDataWithType("TEST_CASE"), testRepo, 1L);
 
             verify(issueTypeRepository).findByOrganizationIdAndNameIgnoreCase(42L, "Test Case");
-            verify(issueRepository).upsertCore(
-                eq(RAW_ISSUE_ID),
-                eq(PROVIDER_ID),
-                eq(ISSUE_IID),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                eq(REPO_ID),
-                any(),
-                eq("gid://gitlab/IssueType/7"),
-                any(),
-                any(),
-                any(),
-                any()
-            );
+            verify(issueRepository)
+                    .upsertCore(
+                            eq(RAW_ISSUE_ID),
+                            eq(PROVIDER_ID),
+                            eq(ISSUE_IID),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            eq(REPO_ID),
+                            any(),
+                            eq("gid://gitlab/IssueType/7"),
+                            any(),
+                            any(),
+                            any(),
+                            any());
         }
 
         @Test
@@ -1127,40 +1021,40 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             organization.setId(99L);
             testRepo.setOrganization(organization);
 
-            when(issueTypeRepository.findByOrganizationIdAndNameIgnoreCase(99L, "Task")).thenReturn(Optional.empty());
+            when(issueTypeRepository.findByOrganizationIdAndNameIgnoreCase(99L, "Task"))
+                    .thenReturn(Optional.empty());
             IssueType providerScoped = new IssueType();
             providerScoped.setId("gid://gitlab/IssueType/global-1");
-            when(issueTypeRepository.findFirstByOrganizationProviderAndNameIgnoreCase(99L, "Task")).thenReturn(
-                Optional.of(providerScoped)
-            );
+            when(issueTypeRepository.findFirstByOrganizationProviderAndNameIgnoreCase(99L, "Task"))
+                    .thenReturn(Optional.of(providerScoped));
 
             processor.processFromSync(syncDataWithType("TASK"), testRepo, 1L);
 
             verify(issueTypeRepository).findFirstByOrganizationProviderAndNameIgnoreCase(99L, "Task");
-            verify(issueRepository).upsertCore(
-                eq(RAW_ISSUE_ID),
-                eq(PROVIDER_ID),
-                eq(ISSUE_IID),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                eq(REPO_ID),
-                any(),
-                eq("gid://gitlab/IssueType/global-1"),
-                any(),
-                any(),
-                any(),
-                any()
-            );
+            verify(issueRepository)
+                    .upsertCore(
+                            eq(RAW_ISSUE_ID),
+                            eq(PROVIDER_ID),
+                            eq(ISSUE_IID),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            eq(REPO_ID),
+                            any(),
+                            eq("gid://gitlab/IssueType/global-1"),
+                            any(),
+                            any(),
+                            any(),
+                            any());
         }
 
         @Test
@@ -1171,57 +1065,56 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
 
             processor.processFromSync(syncDataWithType("TASK"), testRepo, 1L);
 
-            verify(issueRepository).upsertCore(
-                eq(RAW_ISSUE_ID),
-                eq(PROVIDER_ID),
-                eq(ISSUE_IID),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                any(),
-                eq(REPO_ID),
-                any(),
-                eq((String) null),
-                any(),
-                any(),
-                any(),
-                any()
-            );
+            verify(issueRepository)
+                    .upsertCore(
+                            eq(RAW_ISSUE_ID),
+                            eq(PROVIDER_ID),
+                            eq(ISSUE_IID),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            any(),
+                            eq(REPO_ID),
+                            any(),
+                            eq((String) null),
+                            any(),
+                            any(),
+                            any(),
+                            any());
         }
 
         /** A minimal sync payload carrying the given GraphQL issue-type enum (e.g. {@code TASK}). */
         private GitLabIssueProcessor.SyncIssueData syncDataWithType(String typeName) {
             return new GitLabIssueProcessor.SyncIssueData(
-                "gid://gitlab/Issue/422296",
-                "5",
-                "Title",
-                null,
-                "opened",
-                false,
-                "https://example.com",
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                0,
-                null,
-                null,
-                null,
-                typeName,
-                null
-            );
+                    "gid://gitlab/Issue/422296",
+                    "5",
+                    "Title",
+                    null,
+                    "opened",
+                    false,
+                    "https://example.com",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    0,
+                    null,
+                    null,
+                    null,
+                    typeName,
+                    null);
         }
     }
 
@@ -1251,84 +1144,77 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
 
     private GitLabIssueEventDTO createEvent(String action, @Nullable String state, boolean confidential) {
         var attrs = new GitLabIssueEventDTO.ObjectAttributes(
-            RAW_ISSUE_ID,
-            ISSUE_IID,
-            "Feature: Add user authentication",
-            "Implement OAuth2 authentication flow",
-            state,
-            action,
-            confidential,
-            RAW_USER_ID,
-            null,
-            null,
-            "2026-01-31 19:03:35 +0100",
-            "2026-01-31 19:03:35 +0100",
-            null,
-            "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/5"
-        );
+                RAW_ISSUE_ID,
+                ISSUE_IID,
+                "Feature: Add user authentication",
+                "Implement OAuth2 authentication flow",
+                state,
+                action,
+                confidential,
+                RAW_USER_ID,
+                null,
+                null,
+                "2026-01-31 19:03:35 +0100",
+                "2026-01-31 19:03:35 +0100",
+                null,
+                "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/5");
         return new GitLabIssueEventDTO(
-            "issue",
-            confidential ? "confidential_issue" : "issue",
-            createUser(),
-            createProject(),
-            attrs,
-            List.of(new GitLabWebhookLabel(85907L, "enhancement", "#a2eeef")),
-            null,
-            null
-        );
+                "issue",
+                confidential ? "confidential_issue" : "issue",
+                createUser(),
+                createProject(),
+                attrs,
+                List.of(new GitLabWebhookLabel(85907L, "enhancement", "#a2eeef")),
+                null,
+                null);
     }
 
     /** An {@code action=update} event whose {@code changes.labels} diff adds the given label (null = none). */
     private GitLabIssueEventDTO createUpdateEventWithAddedLabel(@Nullable GitLabWebhookLabel addedLabel) {
         var attrs = new GitLabIssueEventDTO.ObjectAttributes(
-            RAW_ISSUE_ID,
-            ISSUE_IID,
-            "Feature: Add user authentication",
-            "Implement OAuth2 authentication flow",
-            "opened",
-            "update",
-            false,
-            RAW_USER_ID,
-            null,
-            null,
-            "2026-01-31 19:03:35 +0100",
-            "2026-01-31 19:03:35 +0100",
-            null,
-            "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/5"
-        );
-        var changes =
-            addedLabel == null
+                RAW_ISSUE_ID,
+                ISSUE_IID,
+                "Feature: Add user authentication",
+                "Implement OAuth2 authentication flow",
+                "opened",
+                "update",
+                false,
+                RAW_USER_ID,
+                null,
+                null,
+                "2026-01-31 19:03:35 +0100",
+                "2026-01-31 19:03:35 +0100",
+                null,
+                "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/5");
+        var changes = addedLabel == null
                 ? null
                 : new GitLabIssueEventDTO.Changes(new GitLabIssueEventDTO.LabelsChange(List.of(), List.of(addedLabel)));
         return new GitLabIssueEventDTO(
-            "issue",
-            "issue",
-            createUser(),
-            createProject(),
-            attrs,
-            addedLabel == null ? List.of() : List.of(addedLabel),
-            null,
-            changes
-        );
+                "issue",
+                "issue",
+                createUser(),
+                createProject(),
+                attrs,
+                addedLabel == null ? List.of() : List.of(addedLabel),
+                null,
+                changes);
     }
 
     private GitLabWebhookUser createUser() {
         return new GitLabWebhookUser(
-            RAW_USER_ID,
-            "ga84xah",
-            "Felix Dietrich",
-            "https://gitlab.lrz.de/uploads/-/system/user/avatar/18024/avatar.png",
-            null
-        );
+                RAW_USER_ID,
+                "ga84xah",
+                "Felix Dietrich",
+                "https://gitlab.lrz.de/uploads/-/system/user/avatar/18024/avatar.png",
+                null);
     }
 
     private GitLabWebhookProject createProject() {
         return new GitLabWebhookProject(
-            246765L,
-            "demo-repository",
-            "https://gitlab.lrz.de/hephaestustest/demo-repository",
-            "hephaestustest/demo-repository"
-        );
+                246765L,
+                "demo-repository",
+                "https://gitlab.lrz.de/hephaestustest/demo-repository",
+                "hephaestustest/demo-repository");
     }
 
     /**
@@ -1339,9 +1225,7 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
     class AddedLabelsDelta {
 
         private GitLabIssueEventDTO eventWithLabelChange(
-            @Nullable List<GitLabWebhookLabel> previous,
-            List<GitLabWebhookLabel> current
-        ) {
+                @Nullable List<GitLabWebhookLabel> previous, List<GitLabWebhookLabel> current) {
             var changes = new GitLabIssueEventDTO.Changes(new GitLabIssueEventDTO.LabelsChange(previous, current));
             return new GitLabIssueEventDTO("issue", "issue", null, null, null, List.of(), null, changes);
         }
@@ -1352,7 +1236,8 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             var label1 = new GitLabWebhookLabel(1L, "bug", "#ff0000");
             var label2 = new GitLabWebhookLabel(2L, "feature", "#00ff00");
 
-            var added = eventWithLabelChange(List.of(label1), List.of(label1, label2)).addedLabels();
+            var added = eventWithLabelChange(List.of(label1), List.of(label1, label2))
+                    .addedLabels();
 
             assertThat(added).extracting(GitLabWebhookLabel::id).containsExactly(2L);
         }

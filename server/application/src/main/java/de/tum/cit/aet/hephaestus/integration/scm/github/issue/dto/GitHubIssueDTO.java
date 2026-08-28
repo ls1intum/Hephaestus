@@ -29,28 +29,27 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubIssueDTO(
-    @JsonProperty("id") @Nullable Long id,
-    @JsonProperty("database_id") @Nullable Long databaseId,
-    @JsonProperty("node_id") @Nullable String nodeId,
-    @JsonProperty("number") int number,
-    @JsonProperty("title") @Nullable String title,
-    @JsonProperty("body") @Nullable String body,
-    @JsonProperty("state") @Nullable String state,
-    @JsonProperty("state_reason") @Nullable String stateReason,
-    @JsonProperty("html_url") @Nullable String htmlUrl,
-    @JsonProperty("comments") int commentsCount,
-    @JsonProperty("created_at") @Nullable Instant createdAt,
-    @JsonProperty("updated_at") @Nullable Instant updatedAt,
-    @JsonProperty("closed_at") @Nullable Instant closedAt,
-    @JsonProperty("locked") boolean locked,
-    @JsonProperty("user") @Nullable GitHubUserDTO author,
-    @JsonProperty("assignees") @Nullable List<GitHubUserDTO> assignees,
-    @JsonProperty("labels") @Nullable List<GitHubLabelDTO> labels,
-    @JsonProperty("milestone") @Nullable GitHubMilestoneDTO milestone,
-    @JsonProperty("type") @Nullable GitHubIssueTypeDTO issueType,
-    @JsonProperty("repository") @Nullable GitHubRepositoryRefDTO repository,
-    @JsonProperty("pull_request") @Nullable PullRequestRef pullRequest
-) {
+        @JsonProperty("id") @Nullable Long id,
+        @JsonProperty("database_id") @Nullable Long databaseId,
+        @JsonProperty("node_id") @Nullable String nodeId,
+        @JsonProperty("number") int number,
+        @JsonProperty("title") @Nullable String title,
+        @JsonProperty("body") @Nullable String body,
+        @JsonProperty("state") @Nullable String state,
+        @JsonProperty("state_reason") @Nullable String stateReason,
+        @JsonProperty("html_url") @Nullable String htmlUrl,
+        @JsonProperty("comments") int commentsCount,
+        @JsonProperty("created_at") @Nullable Instant createdAt,
+        @JsonProperty("updated_at") @Nullable Instant updatedAt,
+        @JsonProperty("closed_at") @Nullable Instant closedAt,
+        @JsonProperty("locked") boolean locked,
+        @JsonProperty("user") @Nullable GitHubUserDTO author,
+        @JsonProperty("assignees") @Nullable List<GitHubUserDTO> assignees,
+        @JsonProperty("labels") @Nullable List<GitHubLabelDTO> labels,
+        @JsonProperty("milestone") @Nullable GitHubMilestoneDTO milestone,
+        @JsonProperty("type") @Nullable GitHubIssueTypeDTO issueType,
+        @JsonProperty("repository") @Nullable GitHubRepositoryRefDTO repository,
+        @JsonProperty("pull_request") @Nullable PullRequestRef pullRequest) {
     /**
      * Returns true if this issue is actually a pull request.
      * GitHub REST API includes a pull_request field when the issue is a PR.
@@ -64,7 +63,9 @@ public record GitHubIssueDTO(
      * GitHub REST API includes this field in issue webhooks when the issue is actually a PR.
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record PullRequestRef(@JsonProperty("url") String url, @JsonProperty("html_url") String htmlUrl) {}
+    public record PullRequestRef(
+            @JsonProperty("url") String url,
+            @JsonProperty("html_url") String htmlUrl) {}
 
     /**
      * Get the database ID, preferring databaseId over id for GraphQL responses.
@@ -92,28 +93,28 @@ public record GitHubIssueDTO(
         }
 
         return new GitHubIssueDTO(
-            null,
-            toLong(issue.getFullDatabaseId()),
-            issue.getId(),
-            issue.getNumber(),
-            issue.getTitle(),
-            issue.getBody(),
-            convertState(issue.getState()),
-            convertStateReason(issue.getStateReason()),
-            uriToString(issue.getUrl()),
-            issue.getComments() != null ? issue.getComments().getTotalCount() : 0,
-            toInstant(issue.getCreatedAt()),
-            toInstant(issue.getUpdatedAt()),
-            toInstant(issue.getClosedAt()),
-            Boolean.TRUE.equals(issue.getLocked()),
-            GitHubUserDTO.fromActor(issue.getAuthor()),
-            extractAssignees(issue.getAssignees(), "Issue #" + issue.getNumber()),
-            GitHubLabelDTO.fromLabelConnection(issue.getLabels(), "Issue #" + issue.getNumber()),
-            GitHubMilestoneDTO.fromMilestone(issue.getMilestone()),
-            GitHubIssueTypeDTO.fromIssueType(issue.getIssueType()),
-            null, // repository
-            null // pullRequest - GraphQL issues are never PRs
-        );
+                null,
+                toLong(issue.getFullDatabaseId()),
+                issue.getId(),
+                issue.getNumber(),
+                issue.getTitle(),
+                issue.getBody(),
+                convertState(issue.getState()),
+                convertStateReason(issue.getStateReason()),
+                uriToString(issue.getUrl()),
+                issue.getComments() != null ? issue.getComments().getTotalCount() : 0,
+                toInstant(issue.getCreatedAt()),
+                toInstant(issue.getUpdatedAt()),
+                toInstant(issue.getClosedAt()),
+                Boolean.TRUE.equals(issue.getLocked()),
+                GitHubUserDTO.fromActor(issue.getAuthor()),
+                extractAssignees(issue.getAssignees(), "Issue #" + issue.getNumber()),
+                GitHubLabelDTO.fromLabelConnection(issue.getLabels(), "Issue #" + issue.getNumber()),
+                GitHubMilestoneDTO.fromMilestone(issue.getMilestone()),
+                GitHubIssueTypeDTO.fromIssueType(issue.getIssueType()),
+                null, // repository
+                null // pullRequest - GraphQL issues are never PRs
+                );
     }
 
     /**
@@ -136,28 +137,28 @@ public record GitHubIssueDTO(
         }
 
         return new GitHubIssueDTO(
-            null,
-            toLong(issue.getFullDatabaseId()),
-            issue.getId(),
-            issue.getNumber(),
-            issue.getTitle(),
-            issue.getBody(),
-            convertState(issue.getState()),
-            convertStateReason(issue.getStateReason()),
-            uriToString(issue.getUrl()),
-            issue.getComments() != null ? issue.getComments().getTotalCount() : 0,
-            toInstant(issue.getCreatedAt()),
-            toInstant(issue.getUpdatedAt()),
-            toInstant(issue.getClosedAt()),
-            Boolean.TRUE.equals(issue.getLocked()),
-            GitHubUserDTO.fromActor(issue.getAuthor()),
-            extractAssignees(issue.getAssignees(), "Issue #" + issue.getNumber()),
-            GitHubLabelDTO.fromLabelConnection(issue.getLabels(), "Issue #" + issue.getNumber()),
-            GitHubMilestoneDTO.fromMilestone(issue.getMilestone()),
-            GitHubIssueTypeDTO.fromIssueType(issue.getIssueType()),
-            GitHubRepositoryRefDTO.fromRepository(issue.getRepository()),
-            null // pullRequest - GraphQL issues are never PRs
-        );
+                null,
+                toLong(issue.getFullDatabaseId()),
+                issue.getId(),
+                issue.getNumber(),
+                issue.getTitle(),
+                issue.getBody(),
+                convertState(issue.getState()),
+                convertStateReason(issue.getStateReason()),
+                uriToString(issue.getUrl()),
+                issue.getComments() != null ? issue.getComments().getTotalCount() : 0,
+                toInstant(issue.getCreatedAt()),
+                toInstant(issue.getUpdatedAt()),
+                toInstant(issue.getClosedAt()),
+                Boolean.TRUE.equals(issue.getLocked()),
+                GitHubUserDTO.fromActor(issue.getAuthor()),
+                extractAssignees(issue.getAssignees(), "Issue #" + issue.getNumber()),
+                GitHubLabelDTO.fromLabelConnection(issue.getLabels(), "Issue #" + issue.getNumber()),
+                GitHubMilestoneDTO.fromMilestone(issue.getMilestone()),
+                GitHubIssueTypeDTO.fromIssueType(issue.getIssueType()),
+                GitHubRepositoryRefDTO.fromRepository(issue.getRepository()),
+                null // pullRequest - GraphQL issues are never PRs
+                );
     }
 
     // CONVERSION HELPERS
@@ -190,12 +191,10 @@ public record GitHubIssueDTO(
         if (connection == null || connection.getNodes() == null) {
             return Collections.emptyList();
         }
-        List<GitHubUserDTO> result = connection
-            .getNodes()
-            .stream()
-            .map(GitHubUserDTO::fromUser)
-            .filter(Objects::nonNull)
-            .toList();
+        List<GitHubUserDTO> result = connection.getNodes().stream()
+                .map(GitHubUserDTO::fromUser)
+                .filter(Objects::nonNull)
+                .toList();
         GraphQlConnectionOverflowDetector.check("assignees", result.size(), connection.getTotalCount(), context);
         return result;
     }

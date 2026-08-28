@@ -51,11 +51,10 @@ public class WorkspaceMembershipService {
     private final ConfigAuditPort configAudit;
 
     public WorkspaceMembershipService(
-        WorkspaceMembershipRepository workspaceMembershipRepository,
-        WorkspaceRepository workspaceRepository,
-        EntityManager entityManager,
-        ConfigAuditPort configAudit
-    ) {
+            WorkspaceMembershipRepository workspaceMembershipRepository,
+            WorkspaceRepository workspaceRepository,
+            EntityManager entityManager,
+            ConfigAuditPort configAudit) {
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.workspaceRepository = workspaceRepository;
         this.entityManager = entityManager;
@@ -68,7 +67,8 @@ public class WorkspaceMembershipService {
             return Collections.emptyMap();
         }
 
-        Set<Long> userIds = users.stream().map(User::getId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Set<Long> userIds =
+                users.stream().map(User::getId).filter(Objects::nonNull).collect(Collectors.toSet());
 
         if (userIds.isEmpty()) {
             return Collections.emptyMap();
@@ -78,11 +78,10 @@ public class WorkspaceMembershipService {
             return userIds.stream().collect(Collectors.toMap(id -> id, id -> POINTS_DEFAULT));
         }
 
-        Set<Long> existingUserIds = workspaceMembershipRepository
-            .findAllByWorkspace_IdAndUser_IdIn(workspaceId, userIds)
-            .stream()
-            .map(member -> member.getUser().getId())
-            .collect(Collectors.toSet());
+        Set<Long> existingUserIds =
+                workspaceMembershipRepository.findAllByWorkspace_IdAndUser_IdIn(workspaceId, userIds).stream()
+                        .map(member -> member.getUser().getId())
+                        .collect(Collectors.toSet());
 
         for (User user : users) {
             Long userId = user.getId();
@@ -90,17 +89,13 @@ public class WorkspaceMembershipService {
                 continue;
             }
             workspaceMembershipRepository.insertIfAbsent(
-                workspaceId,
-                userId,
-                WorkspaceMembership.WorkspaceRole.MEMBER.name(),
-                POINTS_DEFAULT
-            );
+                    workspaceId, userId, WorkspaceMembership.WorkspaceRole.MEMBER.name(), POINTS_DEFAULT);
         }
 
-        Map<Long, Integer> leaguePointsByUserId = workspaceMembershipRepository
-            .findAllByWorkspace_IdAndUser_IdIn(workspaceId, userIds)
-            .stream()
-            .collect(Collectors.toMap(member -> member.getUser().getId(), WorkspaceMembership::getLeaguePoints));
+        Map<Long, Integer> leaguePointsByUserId =
+                workspaceMembershipRepository.findAllByWorkspace_IdAndUser_IdIn(workspaceId, userIds).stream()
+                        .collect(Collectors.toMap(
+                                member -> member.getUser().getId(), WorkspaceMembership::getLeaguePoints));
 
         for (Long userId : userIds) {
             leaguePointsByUserId.putIfAbsent(userId, POINTS_DEFAULT);
@@ -124,12 +119,12 @@ public class WorkspaceMembershipService {
         }
 
         WorkspaceMembership member = workspaceMembershipRepository
-            .findByWorkspace_IdAndUser_Id(workspaceId, user.getId())
-            .orElseGet(() -> {
-                WorkspaceMembership created = createMembershipInternal(workspace, user);
-                created.setLeaguePoints(POINTS_DEFAULT);
-                return workspaceMembershipRepository.save(created);
-            });
+                .findByWorkspace_IdAndUser_Id(workspaceId, user.getId())
+                .orElseGet(() -> {
+                    WorkspaceMembership created = createMembershipInternal(workspace, user);
+                    created.setLeaguePoints(POINTS_DEFAULT);
+                    return workspaceMembershipRepository.save(created);
+                });
         return member.getLeaguePoints();
     }
 
@@ -146,16 +141,15 @@ public class WorkspaceMembershipService {
         Workspace workspace = workspaceRepository.findById(workspaceId).orElse(null);
         if (workspace == null) {
             log.debug(
-                "Skipped league point update: reason=workspaceNotFound, userLogin={}, workspaceId={}",
-                user.getLogin(),
-                workspaceId
-            );
+                    "Skipped league point update: reason=workspaceNotFound, userLogin={}, workspaceId={}",
+                    user.getLogin(),
+                    workspaceId);
             return;
         }
 
         WorkspaceMembership member = workspaceMembershipRepository
-            .findByWorkspace_IdAndUser_Id(workspaceId, user.getId())
-            .orElseGet(() -> createMembershipInternal(workspace, user));
+                .findByWorkspace_IdAndUser_Id(workspaceId, user.getId())
+                .orElseGet(() -> createMembershipInternal(workspace, user));
         member.setLeaguePoints(newPoints);
         workspaceMembershipRepository.save(member);
     }
@@ -221,20 +215,15 @@ public class WorkspaceMembershipService {
                 continue;
             }
             inserted += workspaceMembershipRepository.insertIfAbsent(
-                workspaceId,
-                userId,
-                WorkspaceMembership.WorkspaceRole.MEMBER.name(),
-                POINTS_DEFAULT
-            );
+                    workspaceId, userId, WorkspaceMembership.WorkspaceRole.MEMBER.name(), POINTS_DEFAULT);
         }
 
         if (inserted > 0) {
             log.info(
-                "Ensured workspace memberships from team graph: workspaceId={}, considered={}, created={}",
-                workspaceId,
-                userIds.size(),
-                inserted
-            );
+                    "Ensured workspace memberships from team graph: workspaceId={}, considered={}, created={}",
+                    workspaceId,
+                    userIds.size(),
+                    inserted);
         }
         return inserted;
     }
@@ -246,13 +235,12 @@ public class WorkspaceMembershipService {
         }
 
         Map<Long, WorkspaceMembership.WorkspaceRole> normalizedRoles =
-            desiredRoles == null ? Collections.<Long, WorkspaceMembership.WorkspaceRole>emptyMap() : desiredRoles;
+                desiredRoles == null ? Collections.<Long, WorkspaceMembership.WorkspaceRole>emptyMap() : desiredRoles;
 
         List<WorkspaceMembership> existingMembers = workspaceMembershipRepository.findByWorkspace_Id(workspace.getId());
-        Map<Long, WorkspaceMembership> existingByUserId = existingMembers
-            .stream()
-            .filter(member -> member.getUser() != null && member.getUser().getId() != null)
-            .collect(Collectors.toMap(member -> member.getUser().getId(), Function.identity()));
+        Map<Long, WorkspaceMembership> existingByUserId = existingMembers.stream()
+                .filter(member -> member.getUser() != null && member.getUser().getId() != null)
+                .collect(Collectors.toMap(member -> member.getUser().getId(), Function.identity()));
 
         Set<Long> desiredUserIds = new HashSet<>(normalizedRoles.keySet());
 
@@ -265,19 +253,17 @@ public class WorkspaceMembershipService {
             if (userId == null) {
                 continue;
             }
-            WorkspaceMembership.WorkspaceRole desiredRole = Optional.ofNullable(entry.getValue()).orElse(
-                WorkspaceMembership.WorkspaceRole.MEMBER
-            );
+            WorkspaceMembership.WorkspaceRole desiredRole =
+                    Optional.ofNullable(entry.getValue()).orElse(WorkspaceMembership.WorkspaceRole.MEMBER);
             WorkspaceMembership existing = existingByUserId.get(userId);
             if (existing == null) {
                 // Use find() instead of getReference() to avoid lazy EntityNotFoundException
                 User user = entityManager.find(User.class, userId);
                 if (user == null) {
                     log.warn(
-                        "Skipped workspace membership creation: reason=userNotFound, userId={}, workspaceId={}",
-                        userId,
-                        workspace.getId()
-                    );
+                            "Skipped workspace membership creation: reason=userNotFound, userId={}, workspaceId={}",
+                            userId,
+                            workspace.getId());
                     continue;
                 }
                 WorkspaceMembership member = createMembershipInternal(workspace, user, desiredRole);
@@ -285,24 +271,19 @@ public class WorkspaceMembershipService {
                 toCreate.add(member);
             } else if (existing.getRole() != desiredRole) {
                 var beforeSync = new WorkspaceAuditSnapshots.RoleSnapshot(
-                    existing.getRole() == null ? null : existing.getRole().name(),
-                    existing.isHidden()
-                );
+                        existing.getRole() == null ? null : existing.getRole().name(), existing.isHidden());
                 existing.setRole(desiredRole);
                 toUpdate.add(existing);
                 // Recorded with a SYSTEM actor: a role can change without an admin ever touching this
                 // instance, and "when did X become ADMIN" must not answer confidently from the
                 // admin-initiated rows alone. Creates and deletions are deliberately not recorded —
                 // see ConfigAuditEntityType.WORKSPACE_ROLE for that boundary.
-                configAudit.record(
-                    ConfigAuditEntry.updated(
+                configAudit.record(ConfigAuditEntry.updated(
                         ConfigAuditEntityType.WORKSPACE_ROLE,
                         userId,
                         workspace.getId(),
                         beforeSync,
-                        new WorkspaceAuditSnapshots.RoleSnapshot(desiredRole.name(), existing.isHidden())
-                    )
-                );
+                        new WorkspaceAuditSnapshots.RoleSnapshot(desiredRole.name(), existing.isHidden())));
             }
         }
 
@@ -317,10 +298,9 @@ public class WorkspaceMembershipService {
             // the row would lose that signal on re-creation and silently un-hide the user.
             if (member.isHidden()) {
                 log.debug(
-                    "Preserved hidden workspace membership during sync: workspaceId={}, userId={}",
-                    workspace.getId(),
-                    memberUserId
-                );
+                        "Preserved hidden workspace membership during sync: workspaceId={}, userId={}",
+                        workspace.getId(),
+                        memberUserId);
                 continue;
             }
             toDelete.add(member);
@@ -339,10 +319,7 @@ public class WorkspaceMembershipService {
 
     @Transactional
     public WorkspaceMembership createMembership(
-        Workspace workspace,
-        Long userId,
-        WorkspaceMembership.WorkspaceRole role
-    ) {
+            Workspace workspace, Long userId, WorkspaceMembership.WorkspaceRole role) {
         if (workspace == null || workspace.getId() == null) {
             throw new IllegalArgumentException("Workspace must not be null and must have an ID");
         }
@@ -356,14 +333,11 @@ public class WorkspaceMembershipService {
         }
 
         // Check if membership already exists
-        Optional<WorkspaceMembership> existing = workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(
-            workspace.getId(),
-            userId
-        );
+        Optional<WorkspaceMembership> existing =
+                workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(workspace.getId(), userId);
         if (existing.isPresent()) {
             throw new IllegalArgumentException(
-                "Membership already exists for workspace " + workspace.getId() + " and user " + userId
-            );
+                    "Membership already exists for workspace " + workspace.getId() + " and user " + userId);
         }
 
         WorkspaceMembership membership = new WorkspaceMembership();
@@ -388,8 +362,8 @@ public class WorkspaceMembershipService {
     @Transactional
     public WorkspaceMembership assignRole(Long workspaceId, Long userId, WorkspaceMembership.WorkspaceRole role) {
         Workspace workspace = workspaceRepository
-            .findById(workspaceId)
-            .orElseThrow(() -> new IllegalArgumentException("Workspace not found"));
+                .findById(workspaceId)
+                .orElseThrow(() -> new IllegalArgumentException("Workspace not found"));
 
         var membershipOpt = workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(workspaceId, userId);
 
@@ -397,19 +371,14 @@ public class WorkspaceMembershipService {
             // Update existing membership
             WorkspaceMembership membership = membershipOpt.get();
             var beforeRole = new WorkspaceAuditSnapshots.RoleSnapshot(
-                membership.getRole() == null ? null : membership.getRole().name(),
-                membership.isHidden()
-            );
+                    membership.getRole() == null ? null : membership.getRole().name(), membership.isHidden());
             membership.setRole(role);
-            configAudit.record(
-                ConfigAuditEntry.updated(
+            configAudit.record(ConfigAuditEntry.updated(
                     ConfigAuditEntityType.WORKSPACE_ROLE,
                     userId,
                     workspaceId,
                     beforeRole,
-                    new WorkspaceAuditSnapshots.RoleSnapshot(role.name(), membership.isHidden())
-                )
-            );
+                    new WorkspaceAuditSnapshots.RoleSnapshot(role.name(), membership.isHidden())));
             log.info("Updated membership role: userId={}, workspaceId={}, role={}", userId, workspaceId, role);
             return workspaceMembershipRepository.save(membership);
         } else {
@@ -421,14 +390,11 @@ public class WorkspaceMembershipService {
 
             WorkspaceMembership membership = createMembershipInternal(workspace, user, role);
             membership.setLeaguePoints(POINTS_DEFAULT);
-            configAudit.record(
-                ConfigAuditEntry.created(
+            configAudit.record(ConfigAuditEntry.created(
                     ConfigAuditEntityType.WORKSPACE_ROLE,
                     userId,
                     workspaceId,
-                    new WorkspaceAuditSnapshots.RoleSnapshot(role.name(), membership.isHidden())
-                )
-            );
+                    new WorkspaceAuditSnapshots.RoleSnapshot(role.name(), membership.isHidden())));
             log.info("Created membership: userId={}, workspaceId={}, role={}", userId, workspaceId, role);
             return workspaceMembershipRepository.save(membership);
         }
@@ -443,17 +409,14 @@ public class WorkspaceMembershipService {
     @Transactional
     public void removeMembership(Long workspaceId, Long userId) {
         var membership = workspaceMembershipRepository
-            .findByWorkspace_IdAndUser_Id(workspaceId, userId)
-            .orElseThrow(() -> new IllegalArgumentException("Workspace membership not found"));
+                .findByWorkspace_IdAndUser_Id(workspaceId, userId)
+                .orElseThrow(() -> new IllegalArgumentException("Workspace membership not found"));
 
         var beforeRole = new WorkspaceAuditSnapshots.RoleSnapshot(
-            membership.getRole() == null ? null : membership.getRole().name(),
-            membership.isHidden()
-        );
+                membership.getRole() == null ? null : membership.getRole().name(), membership.isHidden());
         workspaceMembershipRepository.delete(membership);
         configAudit.record(
-            ConfigAuditEntry.deleted(ConfigAuditEntityType.WORKSPACE_ROLE, userId, workspaceId, beforeRole)
-        );
+                ConfigAuditEntry.deleted(ConfigAuditEntityType.WORKSPACE_ROLE, userId, workspaceId, beforeRole));
         log.info("Removed membership: userId={}, workspaceId={}", userId, workspaceId);
     }
 
@@ -462,10 +425,7 @@ public class WorkspaceMembershipService {
     }
 
     private WorkspaceMembership createMembershipInternal(
-        Workspace workspace,
-        User user,
-        WorkspaceMembership.WorkspaceRole role
-    ) {
+            Workspace workspace, User user, WorkspaceMembership.WorkspaceRole role) {
         WorkspaceMembership member = new WorkspaceMembership();
         member.setWorkspace(workspace);
         member.setUser(user);
@@ -487,27 +447,23 @@ public class WorkspaceMembershipService {
     @Transactional
     public WorkspaceMembership updateMemberVisibility(Long workspaceId, Long userId, boolean hidden) {
         WorkspaceMembership membership = workspaceMembershipRepository
-            .findByWorkspace_IdAndUser_Id(workspaceId, userId)
-            .orElseThrow(() -> new IllegalArgumentException("Workspace membership not found"));
+                .findByWorkspace_IdAndUser_Id(workspaceId, userId)
+                .orElseThrow(() -> new IllegalArgumentException("Workspace membership not found"));
         var before = new WorkspaceAuditSnapshots.RoleSnapshot(
-            membership.getRole() == null ? null : membership.getRole().name(),
-            membership.isHidden()
-        );
+                membership.getRole() == null ? null : membership.getRole().name(), membership.isHidden());
         membership.setHidden(hidden);
         // Not cosmetic: syncWorkspaceMembers deliberately preserves hidden memberships, so this flag
         // decides whether a member keeps workspace access after leaving the upstream org.
-        configAudit.record(
-            ConfigAuditEntry.updated(
+        configAudit.record(ConfigAuditEntry.updated(
                 ConfigAuditEntityType.WORKSPACE_ROLE,
                 userId,
                 workspaceId,
                 before,
                 new WorkspaceAuditSnapshots.RoleSnapshot(
-                    membership.getRole() == null ? null : membership.getRole().name(),
-                    hidden
-                )
-            )
-        );
+                        membership.getRole() == null
+                                ? null
+                                : membership.getRole().name(),
+                        hidden)));
         return workspaceMembershipRepository.save(membership);
     }
 
@@ -535,8 +491,8 @@ public class WorkspaceMembershipService {
     @Transactional(readOnly = true)
     public WorkspaceMembership getMembership(Long workspaceId, Long userId) {
         return workspaceMembershipRepository
-            .findByWorkspace_IdAndUser_Id(workspaceId, userId)
-            .orElseThrow(() -> new IllegalArgumentException("Workspace membership not found"));
+                .findByWorkspace_IdAndUser_Id(workspaceId, userId)
+                .orElseThrow(() -> new IllegalArgumentException("Workspace membership not found"));
     }
 
     /**
@@ -576,9 +532,7 @@ public class WorkspaceMembershipService {
             return false;
         }
         long ownerCount = workspaceMembershipRepository.countByWorkspace_IdAndRole(
-            workspaceId,
-            WorkspaceMembership.WorkspaceRole.OWNER
-        );
+                workspaceId, WorkspaceMembership.WorkspaceRole.OWNER);
         return ownerCount <= 1;
     }
 }

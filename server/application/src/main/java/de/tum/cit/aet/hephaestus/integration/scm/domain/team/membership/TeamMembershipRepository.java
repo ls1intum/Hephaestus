@@ -44,12 +44,10 @@ public interface TeamMembershipRepository extends JpaRepository<TeamMembership, 
      * @param organization the root group full path (e.g., {@code "ase/introcourse"})
      * @return distinct user IDs of all members of teams under that root group
      */
-    @Query(
-        """
+    @Query("""
             SELECT DISTINCT tm.user.id
             FROM TeamMembership tm
             WHERE LOWER(tm.team.organization) = LOWER(:organization)
-        """
-    )
+        """)
     Set<Long> findDistinctUserIdsByTeamOrganizationIgnoreCase(@Param("organization") String organization);
 }

@@ -38,11 +38,10 @@ public class PracticeSignalCoverage {
     private final WorkspaceReviewDefaultsProvider workspaceDefaults;
 
     public PracticeSignalCoverage(
-        SignalCoverage coverage,
-        PracticeSignalOptions signalOptions,
-        PracticeRepository practices,
-        WorkspaceReviewDefaultsProvider workspaceDefaults
-    ) {
+            SignalCoverage coverage,
+            PracticeSignalOptions signalOptions,
+            PracticeRepository practices,
+            WorkspaceReviewDefaultsProvider workspaceDefaults) {
         this.coverage = coverage;
         this.signalOptions = signalOptions;
         this.practices = practices;
@@ -65,16 +64,13 @@ public class PracticeSignalCoverage {
         for (SignalName signal : offeredSignals()) {
             offered++;
             if (!compiled.contains(signal) && raisedByAnIngestedEvent(signal)) {
-                violations.add(
-                    signal + " can be bound to but no integration declares it raises it — the option would never fire"
-                );
+                violations.add(signal
+                        + " can be bound to but no integration declares it raises it — the option would never fire");
             }
         }
         if (!violations.isEmpty()) {
-            throw new IllegalStateException(
-                "Practice signal vocabulary is not covered by any integration:\n  - " +
-                    String.join("\n  - ", violations)
-            );
+            throw new IllegalStateException("Practice signal vocabulary is not covered by any integration:\n  - "
+                    + String.join("\n  - ", violations));
         }
         log.info("Practice signal vocabulary covered: {} signal(s)", offered);
     }
@@ -90,9 +86,11 @@ public class PracticeSignalCoverage {
     public List<DormantBinding> dormantBindings(long workspaceId) {
         Set<SignalName> connected = coverage.connectedCoverage(workspaceId);
         List<DormantBinding> dormant = new ArrayList<>();
-        PracticeAutonomy workspaceDefault = workspaceDefaults.forWorkspace(workspaceId).defaultAutonomy();
+        PracticeAutonomy workspaceDefault =
+                workspaceDefaults.forWorkspace(workspaceId).defaultAutonomy();
         for (Practice practice : practices.findByWorkspaceId(workspaceId)) {
-            if (!AutonomyResolver.effectiveAutonomyOf(practice, workspaceDefault).admitsReview()) {
+            if (!AutonomyResolver.effectiveAutonomyOf(practice, workspaceDefault)
+                    .admitsReview()) {
                 continue;
             }
             Set<SignalName> bound = signalsOf(practice);

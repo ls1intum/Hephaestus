@@ -29,9 +29,9 @@ class SlackSubjectRoundTripTest extends BaseUnitTest {
         String producerSubject = DERIVER.subjectFor(payload);
 
         assertThat(producerSubject).isEqualTo(expectedSubject);
-        assertThat(producerSubject).startsWith(
-            ConsumerSubjectMath.streamNameFor(IntegrationKind.SLACK).orElseThrow() + "."
-        );
+        assertThat(producerSubject)
+                .startsWith(
+                        ConsumerSubjectMath.streamNameFor(IntegrationKind.SLACK).orElseThrow() + ".");
         assertThat(ConsumerSubjectMath.kindFromSubjectPrefix(producerSubject)).contains(IntegrationKind.SLACK);
         assertThat(PARSER.parse(producerSubject)).isEqualTo(expectedKey);
         assertThat(producerSubject.split("\\.", -1)).hasSize(4);
@@ -48,8 +48,7 @@ class SlackSubjectRoundTripTest extends BaseUnitTest {
         // The per-workspace filter must agree with the deriver's publish-side sanitisation (dots -> ~),
         // so a filter built from the stored team id always matches the subjects the receiver publishes.
         JsonNode payload = MAPPER.readTree(
-            "{\"type\":\"event_callback\",\"team_id\":\"T.dotted\",\"event\":{\"type\":\"message\",\"channel_type\":\"channel\",\"channel\":\"C1\"}}"
-        );
+                "{\"type\":\"event_callback\",\"team_id\":\"T.dotted\",\"event\":{\"type\":\"message\",\"channel_type\":\"channel\",\"channel\":\"C1\"}}");
         String subject = DERIVER.deriveSubject(payload, java.util.Map.of());
         String filterPrefix = ConsumerSubjectMath.teamFilter("slack", "T.dotted");
         assertThat(filterPrefix).isEqualTo("slack.T~dotted.>");
@@ -59,54 +58,44 @@ class SlackSubjectRoundTripTest extends BaseUnitTest {
     @Test
     void dedupUsesSlackEventIdBeforeHashFallback() {
         JsonNode payload = MAPPER.readTree(
-            "{\"type\":\"event_callback\",\"team_id\":\"T1\",\"event_id\":\"Ev9\",\"event\":{\"type\":\"message\",\"channel_type\":\"channel\",\"channel\":\"C1\"}}"
-        );
+                "{\"type\":\"event_callback\",\"team_id\":\"T1\",\"event_id\":\"Ev9\",\"event\":{\"type\":\"message\",\"channel_type\":\"channel\",\"channel\":\"C1\"}}");
 
         assertThat(DERIVER.dedupIdFor(payload)).isEqualTo("slack-Ev9");
     }
 
     static Stream<Arguments> events() {
         return Stream.of(
-            Arguments.of(
-                "{\"type\":\"event_callback\",\"team_id\":\"T1\",\"event\":{\"type\":\"message\",\"channel_type\":\"channel\",\"channel\":\"C1\",\"ts\":\"100.1\"}}",
-                "slack.T1.C1.message",
-                new EventTypeKey(IntegrationKind.SLACK, "message")
-            ),
-            Arguments.of(
-                "{\"type\":\"event_callback\",\"team_id\":\"T.dotted\",\"event\":{\"type\":\"message\",\"channel_type\":\"group\",\"channel\":\"G.dotted\",\"ts\":\"100.1\"}}",
-                "slack.T~dotted.G~dotted.message",
-                new EventTypeKey(IntegrationKind.SLACK, "message")
-            ),
-            Arguments.of(
-                "{\"type\":\"event_callback\",\"team_id\":\"T1\",\"event\":{\"type\":\"message\",\"channel_type\":\"im\",\"channel\":\"D1\",\"user\":\"U1\"}}",
-                "slack.T1.U1.message_im",
-                new EventTypeKey(IntegrationKind.SLACK, "message_im")
-            ),
-            Arguments.of(
-                "{\"type\":\"event_callback\",\"team_id\":\"T1\",\"event\":{\"type\":\"app_home_opened\",\"user\":\"U1\"}}",
-                "slack.T1.U1.app_home_opened",
-                new EventTypeKey(IntegrationKind.SLACK, "app_home_opened")
-            ),
-            Arguments.of(
-                "{\"type\":\"event_callback\",\"team_id\":\"T1\",\"event\":{\"type\":\"app_context_changed\",\"user\":\"U1\",\"context\":{\"entities\":[{\"type\":\"slack#/types/channel_id\",\"value\":\"C1\"}]}}}",
-                "slack.T1.C1.app_context_changed",
-                new EventTypeKey(IntegrationKind.SLACK, "app_context_changed")
-            ),
-            Arguments.of(
-                "{\"type\":\"event_callback\",\"team_id\":\"T1\",\"event\":{\"type\":\"member_joined_channel\",\"channel\":\"C1\",\"user\":\"U1\"}}",
-                "slack.T1.C1.member_joined_channel",
-                new EventTypeKey(IntegrationKind.SLACK, "member_joined_channel")
-            ),
-            Arguments.of(
-                "{\"type\":\"event_callback\",\"team_id\":\"T1\",\"event\":{\"type\":\"app_uninstalled\"}}",
-                "slack.T1.workspace.app_uninstalled",
-                new EventTypeKey(IntegrationKind.SLACK, "app_uninstalled")
-            ),
-            Arguments.of(
-                "{\"type\":\"event_callback\",\"team_id\":\"T1\",\"event\":{\"type\":\"tokens_revoked\"}}",
-                "slack.T1.workspace.tokens_revoked",
-                new EventTypeKey(IntegrationKind.SLACK, "tokens_revoked")
-            )
-        );
+                Arguments.of(
+                        "{\"type\":\"event_callback\",\"team_id\":\"T1\",\"event\":{\"type\":\"message\",\"channel_type\":\"channel\",\"channel\":\"C1\",\"ts\":\"100.1\"}}",
+                        "slack.T1.C1.message",
+                        new EventTypeKey(IntegrationKind.SLACK, "message")),
+                Arguments.of(
+                        "{\"type\":\"event_callback\",\"team_id\":\"T.dotted\",\"event\":{\"type\":\"message\",\"channel_type\":\"group\",\"channel\":\"G.dotted\",\"ts\":\"100.1\"}}",
+                        "slack.T~dotted.G~dotted.message",
+                        new EventTypeKey(IntegrationKind.SLACK, "message")),
+                Arguments.of(
+                        "{\"type\":\"event_callback\",\"team_id\":\"T1\",\"event\":{\"type\":\"message\",\"channel_type\":\"im\",\"channel\":\"D1\",\"user\":\"U1\"}}",
+                        "slack.T1.U1.message_im",
+                        new EventTypeKey(IntegrationKind.SLACK, "message_im")),
+                Arguments.of(
+                        "{\"type\":\"event_callback\",\"team_id\":\"T1\",\"event\":{\"type\":\"app_home_opened\",\"user\":\"U1\"}}",
+                        "slack.T1.U1.app_home_opened",
+                        new EventTypeKey(IntegrationKind.SLACK, "app_home_opened")),
+                Arguments.of(
+                        "{\"type\":\"event_callback\",\"team_id\":\"T1\",\"event\":{\"type\":\"app_context_changed\",\"user\":\"U1\",\"context\":{\"entities\":[{\"type\":\"slack#/types/channel_id\",\"value\":\"C1\"}]}}}",
+                        "slack.T1.C1.app_context_changed",
+                        new EventTypeKey(IntegrationKind.SLACK, "app_context_changed")),
+                Arguments.of(
+                        "{\"type\":\"event_callback\",\"team_id\":\"T1\",\"event\":{\"type\":\"member_joined_channel\",\"channel\":\"C1\",\"user\":\"U1\"}}",
+                        "slack.T1.C1.member_joined_channel",
+                        new EventTypeKey(IntegrationKind.SLACK, "member_joined_channel")),
+                Arguments.of(
+                        "{\"type\":\"event_callback\",\"team_id\":\"T1\",\"event\":{\"type\":\"app_uninstalled\"}}",
+                        "slack.T1.workspace.app_uninstalled",
+                        new EventTypeKey(IntegrationKind.SLACK, "app_uninstalled")),
+                Arguments.of(
+                        "{\"type\":\"event_callback\",\"team_id\":\"T1\",\"event\":{\"type\":\"tokens_revoked\"}}",
+                        "slack.T1.workspace.tokens_revoked",
+                        new EventTypeKey(IntegrationKind.SLACK, "tokens_revoked")));
     }
 }

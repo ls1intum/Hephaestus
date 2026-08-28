@@ -52,15 +52,15 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
         persistUser("admin");
 
         ProblemDetail problem = webTestClient
-            .get()
-            .uri("/workspaces/{workspaceSlug}/context-echo", "INVALID-SLUG")
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isBadRequest()
-            .expectBody(ProblemDetail.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces/{workspaceSlug}/context-echo", "INVALID-SLUG")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isBadRequest()
+                .expectBody(ProblemDetail.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(problem).isNotNull();
         assertThat(problem.getDetail()).contains("Invalid workspace slug");
@@ -74,12 +74,12 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
         Workspace workspace = createWorkspace("beta-space", "Beta", "beta", AccountType.ORG, workspaceOwner);
 
         webTestClient
-            .get()
-            .uri("/workspaces/{workspaceSlug}/context-echo", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .get()
+                .uri("/workspaces/{workspaceSlug}/context-echo", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isForbidden();
     }
 
     @Test
@@ -94,21 +94,21 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
         // createWorkspace seeds an OWNER membership; strip it so the workspace is genuinely
         // zero-membership — the exact org-sync-churn / admin-only-seeded state A5 guards against.
         workspaceMembershipRepository.deleteAll(workspaceMembershipRepository.findByWorkspace_Id(workspace.getId()));
-        assertThat(workspaceMembershipRepository.findByWorkspace_Id(workspace.getId())).isEmpty();
+        assertThat(workspaceMembershipRepository.findByWorkspace_Id(workspace.getId()))
+                .isEmpty();
 
         webTestClient
-            .get()
-            .uri("/workspaces/{workspaceSlug}/context-echo", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .get()
+                .uri("/workspaces/{workspaceSlug}/context-echo", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isForbidden();
 
-        assertThat(
-            workspaceMembershipRepository.findByWorkspace_IdAndUser_IdIn(workspace.getId(), Set.of(visitor.getId()))
-        )
-            .as("auto-seed disabled must not create a membership")
-            .isEmpty();
+        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndUser_IdIn(
+                        workspace.getId(), Set.of(visitor.getId())))
+                .as("auto-seed disabled must not create a membership")
+                .isEmpty();
     }
 
     @Test
@@ -139,12 +139,12 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
         workspaceRepository.save(workspace);
 
         webTestClient
-            .get()
-            .uri("/workspaces/{workspaceSlug}/context-echo", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+                .get()
+                .uri("/workspaces/{workspaceSlug}/context-echo", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNotFound();
     }
 
     @Test
@@ -155,9 +155,8 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
         Workspace second = createWorkspace("delta-space", "Delta", "delta", AccountType.ORG, owner);
 
         WorkspaceEchoControllers.WorkspaceContextSnapshot firstResponse = requestContextEcho(first.getWorkspaceSlug());
-        WorkspaceEchoControllers.WorkspaceContextSnapshot secondResponse = requestContextEcho(
-            second.getWorkspaceSlug()
-        );
+        WorkspaceEchoControllers.WorkspaceContextSnapshot secondResponse =
+                requestContextEcho(second.getWorkspaceSlug());
 
         assertThat(firstResponse.contextSlug()).isEqualTo(first.getWorkspaceSlug());
         assertThat(secondResponse.contextSlug()).isEqualTo(second.getWorkspaceSlug());
@@ -175,12 +174,12 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
         workspaceRepository.save(workspace);
 
         webTestClient
-            .get()
-            .uri("/workspaces/{workspaceSlug}/context-echo", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+                .get()
+                .uri("/workspaces/{workspaceSlug}/context-echo", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNotFound();
     }
 
     @Test
@@ -194,15 +193,15 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
         workspaceRepository.save(workspace);
 
         WorkspaceDTO response = webTestClient
-            .get()
-            .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(WorkspaceDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces/{workspaceSlug}", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(WorkspaceDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(response).isNotNull();
         assertThat(response.workspaceSlug()).isEqualTo(workspace.getWorkspaceSlug());
@@ -221,14 +220,14 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
         workspaceService.updatePublicVisibility(workspace.getWorkspaceSlug(), true);
 
         WorkspaceEchoControllers.WorkspaceContextSnapshot response = webTestClient
-            .get()
-            .uri("/workspaces/{workspaceSlug}/context-echo", workspace.getWorkspaceSlug())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(WorkspaceEchoControllers.WorkspaceContextSnapshot.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces/{workspaceSlug}/context-echo", workspace.getWorkspaceSlug())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(WorkspaceEchoControllers.WorkspaceContextSnapshot.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(response).isNotNull();
         assertThat(response.contextSlug()).isEqualTo(workspace.getWorkspaceSlug());
@@ -242,11 +241,11 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
         workspaceService.updatePublicVisibility(workspace.getWorkspaceSlug(), false);
 
         webTestClient
-            .get()
-            .uri("/workspaces/{workspaceSlug}/context-echo", workspace.getWorkspaceSlug())
-            .exchange()
-            .expectStatus()
-            .isUnauthorized();
+                .get()
+                .uri("/workspaces/{workspaceSlug}/context-echo", workspace.getWorkspaceSlug())
+                .exchange()
+                .expectStatus()
+                .isUnauthorized();
     }
 
     @Test
@@ -267,16 +266,16 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
         workspaceRepository.save(workspace);
 
         webTestClient
-            .get()
-            .uri("/workspaces/{workspaceSlug}/context-echo?foo=bar", "old-space")
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isPermanentRedirect()
-            .expectHeader()
-            .valueEquals(HttpHeaders.LOCATION, "/workspaces/new-space/context-echo?foo=bar")
-            .expectBody()
-            .isEmpty();
+                .get()
+                .uri("/workspaces/{workspaceSlug}/context-echo?foo=bar", "old-space")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isPermanentRedirect()
+                .expectHeader()
+                .valueEquals(HttpHeaders.LOCATION, "/workspaces/new-space/context-echo?foo=bar")
+                .expectBody()
+                .isEmpty();
     }
 
     @Test
@@ -297,18 +296,18 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
         workspaceRepository.save(workspace);
 
         webTestClient
-            .post()
-            .uri("/workspaces/{workspaceSlug}/context-echo?payload=yes", "old-space-post")
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue("{\"hello\":true}")
-            .exchange()
-            .expectStatus()
-            .isPermanentRedirect()
-            .expectHeader()
-            .valueEquals(HttpHeaders.LOCATION, "/workspaces/new-space-post/context-echo?payload=yes")
-            .expectBody()
-            .isEmpty();
+                .post()
+                .uri("/workspaces/{workspaceSlug}/context-echo?payload=yes", "old-space-post")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"hello\":true}")
+                .exchange()
+                .expectStatus()
+                .isPermanentRedirect()
+                .expectHeader()
+                .valueEquals(HttpHeaders.LOCATION, "/workspaces/new-space-post/context-echo?payload=yes")
+                .expectBody()
+                .isEmpty();
     }
 
     @Test
@@ -327,11 +326,11 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
         workspaceRepository.save(workspace);
 
         webTestClient
-            .get()
-            .uri("/workspaces/{workspaceSlug}/context-echo", "secret-space")
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+                .get()
+                .uri("/workspaces/{workspaceSlug}/context-echo", "secret-space")
+                .exchange()
+                .expectStatus()
+                .isNotFound();
     }
 
     @Test
@@ -351,28 +350,28 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
         workspaceRepository.save(workspace);
 
         webTestClient
-            .get()
-            .uri("/workspaces/{workspaceSlug}/context-echo", "old-expired")
-            .exchange()
-            .expectStatus()
-            .isEqualTo(HttpStatus.GONE)
-            .expectBody(ProblemDetail.class)
-            .value(problem -> {
-                assertThat(problem.getTitle()).containsIgnoringCase("expired");
-            });
+                .get()
+                .uri("/workspaces/{workspaceSlug}/context-echo", "old-expired")
+                .exchange()
+                .expectStatus()
+                .isEqualTo(HttpStatus.GONE)
+                .expectBody(ProblemDetail.class)
+                .value(problem -> {
+                    assertThat(problem.getTitle()).containsIgnoringCase("expired");
+                });
     }
 
     private WorkspaceEchoControllers.WorkspaceContextSnapshot requestContextEcho(String slug) {
         WorkspaceEchoControllers.WorkspaceContextSnapshot response = webTestClient
-            .get()
-            .uri("/workspaces/{workspaceSlug}/context-echo", slug)
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(WorkspaceEchoControllers.WorkspaceContextSnapshot.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/workspaces/{workspaceSlug}/context-echo", slug)
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(WorkspaceEchoControllers.WorkspaceContextSnapshot.class)
+                .returnResult()
+                .getResponseBody();
 
         return Objects.requireNonNull(response, "Expected workspace context payload");
     }

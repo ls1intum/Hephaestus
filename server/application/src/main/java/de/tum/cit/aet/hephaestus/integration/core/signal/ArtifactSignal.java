@@ -33,13 +33,12 @@ import org.jspecify.annotations.Nullable;
  */
 @Entity
 @Table(
-    name = "artifact_signal",
-    indexes = { @Index(name = "idx_artifact_signal_state_changed", columnList = "state, state_changed_at") },
-    uniqueConstraints = @UniqueConstraint(
-        name = "uq_artifact_signal",
-        columnNames = { "workspace_id", "artifact_kind", "artifact_id", "signal_name", "revision" }
-    )
-)
+        name = "artifact_signal",
+        indexes = {@Index(name = "idx_artifact_signal_state_changed", columnList = "state, state_changed_at")},
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uq_artifact_signal",
+                        columnNames = {"workspace_id", "artifact_kind", "artifact_id", "signal_name", "revision"}))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -55,10 +54,9 @@ public class ArtifactSignal {
     @NonNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
-        name = "workspace_id",
-        nullable = false,
-        foreignKey = @ForeignKey(name = "fk_artifact_signal_workspace")
-    )
+            name = "workspace_id",
+            nullable = false,
+            foreignKey = @ForeignKey(name = "fk_artifact_signal_workspace"))
     @ToString.Exclude
     private Workspace workspace;
 

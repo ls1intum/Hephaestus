@@ -14,14 +14,12 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
-    @Query(
-        """
+    @Query("""
             SELECT u
             FROM User u
             WHERE u.login ILIKE :login
             ORDER BY u.id
-        """
-    )
+        """)
     List<User> findAllByLogin(@Param("login") String login);
 
     /**
@@ -32,24 +30,20 @@ public interface UserRepository extends JpaRepository<User, Long> {
         return users.isEmpty() ? Optional.empty() : Optional.of(users.get(0));
     }
 
-    @Query(
-        """
+    @Query("""
             SELECT u
             FROM User u
             WHERE u.login ILIKE :login
               AND u.provider.id = :providerId
-        """
-    )
+        """)
     Optional<User> findByLoginAndProviderId(@Param("login") String login, @Param("providerId") Long providerId);
 
-    @Query(
-        """
+    @Query("""
             SELECT u
             FROM User u
             WHERE u.email ILIKE :email
             ORDER BY u.id
-        """
-    )
+        """)
     List<User> findAllByEmail(@Param("email") String email);
 
     /**
@@ -60,14 +54,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
         return users.isEmpty() ? Optional.empty() : Optional.of(users.get(0));
     }
 
-    @Query(
-        """
+    @Query("""
             SELECT u
             FROM User u
             WHERE u.email ILIKE :email
               AND u.provider.id = :providerId
-        """
-    )
+        """)
     Optional<User> findByEmailAndProviderId(@Param("email") String email, @Param("providerId") Long providerId);
 
     /**
@@ -78,16 +70,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * the GitLab-synced {@code User.name} field ("Firstname Lastname"). The resolver
      * only acts when exactly one candidate is returned so the match stays deterministic.
      */
-    @Query(
-        """
+    @Query("""
             SELECT u
             FROM User u
             WHERE LOWER(u.name) = LOWER(:name)
               AND u.provider.id = :providerId
               AND u.type = 'USER'
             ORDER BY u.id
-        """
-    )
+        """)
     List<User> findAllByNameAndProviderId(@Param("name") String name, @Param("providerId") Long providerId);
 
     /**
@@ -97,57 +87,47 @@ public interface UserRepository extends JpaRepository<User, Long> {
      *
      * @see #findAllByNameAndProviderId
      */
-    @Query(
-        """
+    @Query("""
             SELECT u
             FROM User u
             WHERE LOWER(u.name) = LOWER(:name)
               AND u.type = 'USER'
             ORDER BY u.id
-        """
-    )
+        """)
     List<User> findAllByName(@Param("name") String name);
 
-    @Query(
-        """
+    @Query("""
             SELECT DISTINCT u
             FROM User u
             LEFT JOIN FETCH u.mergedPullRequests mpr
             WHERE LOWER(u.login) = LOWER(:login)
-        """
-    )
+        """)
     Optional<User> findByLoginWithEagerMergedPullRequests(@Param("login") String login);
 
-    @Query(
-        """
+    @Query("""
             SELECT u
             FROM User u
             WHERE u.type = 'USER'
-        """
-    )
+        """)
     List<User> findAllHuman();
 
-    @Query(
-        """
+    @Query("""
             SELECT DISTINCT u
             FROM User u
             JOIN FETCH u.teamMemberships m
             JOIN FETCH m.team t
             WHERE u.type = 'USER'
-        """
-    )
+        """)
     List<User> findAllHumanInTeams();
 
-    @Query(
-        """
+    @Query("""
             SELECT DISTINCT u
             FROM User u
             JOIN u.teamMemberships m
             JOIN m.team t
             WHERE t.id IN :teamIds
             AND u.type = 'USER'
-        """
-    )
+        """)
     List<User> findAllByTeamIds(@Param("teamIds") Collection<Long> teamIds);
 
     default List<User> findAllByTeamId(Long teamId) {
@@ -183,9 +163,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * @return true if the lock was acquired, false if another transaction holds it
      */
     @Query(
-        value = "SELECT pg_try_advisory_xact_lock(hashtext(CONCAT(:providerId\\:\\:text, ':', LOWER(:login))))",
-        nativeQuery = true
-    )
+            value = "SELECT pg_try_advisory_xact_lock(hashtext(CONCAT(:providerId\\:\\:text, ':', LOWER(:login))))",
+            nativeQuery = true)
     boolean tryAcquireLoginLock(@Param("login") String login, @Param("providerId") Long providerId);
 
     /**
@@ -195,9 +174,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * to prevent cross-scope race conditions.
      */
     @Query(
-        value = "SELECT pg_advisory_xact_lock(hashtext(CONCAT(:providerId\\:\\:text, ':', LOWER(:login))))",
-        nativeQuery = true
-    )
+            value = "SELECT pg_advisory_xact_lock(hashtext(CONCAT(:providerId\\:\\:text, ':', LOWER(:login))))",
+            nativeQuery = true)
     void acquireLoginLock(@Param("login") String login, @Param("providerId") Long providerId);
 
     /**
@@ -205,20 +183,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * on the same provider) by setting their login to {@code RENAMED_<their_id>}.
      */
     @Modifying
-    @Query(
-        value = """
+    @Query(value = """
         UPDATE "user" SET login = 'RENAMED_' || id
         WHERE LOWER("user".login) = LOWER(:login)
           AND "user".native_id != :nativeId
           AND "user".provider_id = :providerId
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     void freeLoginConflicts(
-        @Param("login") String login,
-        @Param("nativeId") Long nativeId,
-        @Param("providerId") Long providerId
-    );
+            @Param("login") String login, @Param("nativeId") Long nativeId, @Param("providerId") Long providerId);
 
     /**
      * Insert or update a user via {@code INSERT ... ON CONFLICT (provider_id, native_id) DO UPDATE}.
@@ -228,8 +200,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * The {@code id} column is auto-generated on insert. On conflict, the existing row is updated.
      */
     @Modifying
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO "user" (native_id, provider_id, login, name, avatar_url, html_url, type, email, created_at, updated_at)
         VALUES (:nativeId, :providerId, :login, :name, :avatarUrl, :htmlUrl, :type, :email, :createdAt, :updatedAt)
         ON CONFLICT (provider_id, native_id) DO UPDATE SET
@@ -241,21 +212,18 @@ public interface UserRepository extends JpaRepository<User, Long> {
             email = COALESCE(EXCLUDED.email, "user".email),
             created_at = COALESCE(EXCLUDED.created_at, "user".created_at),
             updated_at = COALESCE(EXCLUDED.updated_at, "user".updated_at)
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     void upsertUser(
-        @Param("nativeId") Long nativeId,
-        @Param("providerId") Long providerId,
-        @Param("login") String login,
-        @Param("name") @Nullable String name,
-        @Param("avatarUrl") @Nullable String avatarUrl,
-        @Param("htmlUrl") @Nullable String htmlUrl,
-        @Param("type") String type,
-        @Param("email") @Nullable String email,
-        @Param("createdAt") @Nullable Instant createdAt,
-        @Param("updatedAt") @Nullable Instant updatedAt
-    );
+            @Param("nativeId") Long nativeId,
+            @Param("providerId") Long providerId,
+            @Param("login") String login,
+            @Param("name") @Nullable String name,
+            @Param("avatarUrl") @Nullable String avatarUrl,
+            @Param("htmlUrl") @Nullable String htmlUrl,
+            @Param("type") String type,
+            @Param("email") @Nullable String email,
+            @Param("createdAt") @Nullable Instant createdAt,
+            @Param("updatedAt") @Nullable Instant updatedAt);
 
     /**
      * Backfills the email for a single user only when the current value is NULL.

@@ -28,22 +28,14 @@ class CurrentThreadHistoryContentSourceTest extends BaseUnitTest {
     @Test
     void contributesCurrentThreadMessagesInOrder() throws Exception {
         UUID threadId = UUID.randomUUID();
-        ChatMessage user = message(
-            ChatMessage.Role.USER,
-            "What was my first message?",
-            Instant.parse("2026-01-01T00:00:00Z")
-        );
+        ChatMessage user =
+                message(ChatMessage.Role.USER, "What was my first message?", Instant.parse("2026-01-01T00:00:00Z"));
         ChatMessage assistant = message(
-            ChatMessage.Role.ASSISTANT,
-            "You first asked about PR #12.",
-            Instant.parse("2026-01-01T00:00:02Z")
-        );
+                ChatMessage.Role.ASSISTANT, "You first asked about PR #12.", Instant.parse("2026-01-01T00:00:02Z"));
         when(chatMessageRepository.findContextMessages(1L, 2L, threadId, null)).thenReturn(List.of(user, assistant));
 
-        CurrentThreadHistoryContentSource source = new CurrentThreadHistoryContentSource(
-            chatMessageRepository,
-            objectMapper
-        );
+        CurrentThreadHistoryContentSource source =
+                new CurrentThreadHistoryContentSource(chatMessageRepository, objectMapper);
         Map<String, byte[]> files = new HashMap<>();
         source.contribute(new ContextRequest.MentorChatRequest(1L, 2L, threadId), files);
 
@@ -62,25 +54,21 @@ class CurrentThreadHistoryContentSourceTest extends BaseUnitTest {
     void omitsLeakedInternalAnalysisFromAssistantHistory() throws Exception {
         UUID threadId = UUID.randomUUID();
         ChatMessage assistant = message(
-            ChatMessage.Role.ASSISTANT,
-            List.of(
-                "User wants to see Slack messages in context. We need to fetch it.",
-                "I see two recent Slack threads in the data."
-            ),
-            Instant.parse("2026-01-01T00:00:00Z")
-        );
+                ChatMessage.Role.ASSISTANT,
+                List.of(
+                        "User wants to see Slack messages in context. We need to fetch it.",
+                        "I see two recent Slack threads in the data."),
+                Instant.parse("2026-01-01T00:00:00Z"));
         when(chatMessageRepository.findContextMessages(1L, 2L, threadId, null)).thenReturn(List.of(assistant));
 
-        CurrentThreadHistoryContentSource source = new CurrentThreadHistoryContentSource(
-            chatMessageRepository,
-            objectMapper
-        );
+        CurrentThreadHistoryContentSource source =
+                new CurrentThreadHistoryContentSource(chatMessageRepository, objectMapper);
         Map<String, byte[]> files = new HashMap<>();
         source.contribute(new ContextRequest.MentorChatRequest(1L, 2L, threadId), files);
 
         JsonNode messages = objectMapper
-            .readTree(files.get(CurrentThreadHistoryContentSource.OUTPUT_KEY))
-            .get("messages");
+                .readTree(files.get(CurrentThreadHistoryContentSource.OUTPUT_KEY))
+                .get("messages");
         assertThat(messages).hasSize(1);
         assertThat(messages.get(0).get("text").asString()).isEqualTo("I see two recent Slack threads in the data.");
     }

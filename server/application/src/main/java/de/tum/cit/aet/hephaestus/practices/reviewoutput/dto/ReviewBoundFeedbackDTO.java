@@ -13,27 +13,31 @@ import org.jspecify.annotations.Nullable;
 
 @Schema(description = "Feedback composed from an observation")
 public record ReviewBoundFeedbackDTO(
-    @NonNull UUID feedbackId,
-    @NonNull @Schema(description = "Whether the observation led the feedback or reinforced it") EvidenceRole role,
-    @NonNull UUID agentJobId,
-    @NonNull FeedbackChannel channel,
-    @NonNull FeedbackDeliveryState deliveryState,
-    @Schema(description = "Why delivery stopped; set on withheld or terminally partial feedback")
-    @Nullable
-    FeedbackSuppressionReason suppressionReason,
-    @NonNull Instant createdAt,
-    @Schema(description = "When the message was placed; null if it was not delivered") @Nullable Instant deliveredAt
-) {
+        @NonNull UUID feedbackId,
+
+        @NonNull @Schema(description = "Whether the observation led the feedback or reinforced it")
+        EvidenceRole role,
+
+        @NonNull UUID agentJobId,
+        @NonNull FeedbackChannel channel,
+        @NonNull FeedbackDeliveryState deliveryState,
+
+        @Schema(description = "Why delivery stopped; set on withheld or terminally partial feedback") @Nullable
+        FeedbackSuppressionReason suppressionReason,
+
+        @NonNull Instant createdAt,
+
+        @Schema(description = "When the message was placed; null if it was not delivered") @Nullable
+        Instant deliveredAt) {
     public static ReviewBoundFeedbackDTO from(BoundFeedbackUnit row) {
         return new ReviewBoundFeedbackDTO(
-            row.getFeedbackId(),
-            row.getRole(),
-            row.getAgentJobId(),
-            row.getChannel(),
-            row.getDeliveryState(),
-            row.getSuppressionReason(),
-            row.getCreatedAt(),
-            row.getDeliveredAt()
-        );
+                row.getFeedbackId(),
+                row.getRole(),
+                row.getAgentJobId(),
+                row.getChannel(),
+                row.getDeliveryState(),
+                row.getSuppressionReason(),
+                row.getCreatedAt(),
+                row.getDeliveredAt());
     }
 }

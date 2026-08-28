@@ -8,31 +8,28 @@ import org.jspecify.annotations.Nullable;
 
 /** Selecting specific repositories or people with an empty selection admits nobody. A selected repository without branches admits all its branches. */
 public record WorkspaceReviewScope(
-    @NonNull @NotNull ReviewRepositoryMode repositoryMode,
-    @NonNull @NotNull ReviewPersonMode personMode,
-    @NonNull @NotNull @Valid List<ReviewRepositoryTarget> repositories,
-    @NonNull @NotNull List<Long> personUserIds
-) {
+        @NonNull @NotNull ReviewRepositoryMode repositoryMode,
+        @NonNull @NotNull ReviewPersonMode personMode,
+        @NonNull @NotNull @Valid List<ReviewRepositoryTarget> repositories,
+        @NonNull @NotNull List<Long> personUserIds) {
     public static final WorkspaceReviewScope ALL = new WorkspaceReviewScope(
-        ReviewRepositoryMode.ALL_MONITORED,
-        ReviewPersonMode.ALL_ELIGIBLE,
-        List.of(),
-        List.of()
-    );
+            ReviewRepositoryMode.ALL_MONITORED, ReviewPersonMode.ALL_ELIGIBLE, List.of(), List.of());
 
     public WorkspaceReviewScope {
         java.util.Objects.requireNonNull(repositoryMode, "repositoryMode");
         java.util.Objects.requireNonNull(personMode, "personMode");
         repositories = List.copyOf(java.util.Objects.requireNonNull(repositories, "repositories"));
-        long repositoryNames = repositories.stream().map(ReviewRepositoryTarget::nameWithOwner).distinct().count();
+        long repositoryNames = repositories.stream()
+                .map(ReviewRepositoryTarget::nameWithOwner)
+                .distinct()
+                .count();
         if (repositoryNames != repositories.size()) {
             throw new IllegalArgumentException("A repository may appear only once in review coverage");
         }
-        personUserIds = java.util.Objects.requireNonNull(personUserIds, "personUserIds")
-            .stream()
-            .distinct()
-            .sorted()
-            .toList();
+        personUserIds = java.util.Objects.requireNonNull(personUserIds, "personUserIds").stream()
+                .distinct()
+                .sorted()
+                .toList();
     }
 
     public boolean admitsRepository(@Nullable String nameWithOwner, @Nullable String baseBranch) {
@@ -40,22 +37,15 @@ public record WorkspaceReviewScope(
     }
 
     public boolean admitsRepository(
-        @Nullable String nameWithOwner,
-        @Nullable String baseBranch,
-        boolean branchRestrictionsApply
-    ) {
+            @Nullable String nameWithOwner, @Nullable String baseBranch, boolean branchRestrictionsApply) {
         if (repositoryMode == ReviewRepositoryMode.ALL_MONITORED) {
             return true;
         }
-        return repositories
-            .stream()
-            .filter(selection -> selection.nameWithOwner().equals(nameWithOwner))
-            .anyMatch(
-                selection ->
-                    !branchRestrictionsApply ||
-                    selection.baseBranches().isEmpty() ||
-                    (baseBranch != null && selection.baseBranches().contains(baseBranch))
-            );
+        return repositories.stream()
+                .filter(selection -> selection.nameWithOwner().equals(nameWithOwner))
+                .anyMatch(selection -> !branchRestrictionsApply
+                        || selection.baseBranches().isEmpty()
+                        || (baseBranch != null && selection.baseBranches().contains(baseBranch)));
     }
 
     public boolean admitsPerson(@Nullable Long userId) {
@@ -67,11 +57,10 @@ public record WorkspaceReviewScope(
     }
 
     public boolean admits(
-        @Nullable String nameWithOwner,
-        @Nullable String baseBranch,
-        @Nullable Long userId,
-        boolean branchRestrictionsApply
-    ) {
+            @Nullable String nameWithOwner,
+            @Nullable String baseBranch,
+            @Nullable Long userId,
+            boolean branchRestrictionsApply) {
         return admitsRepository(nameWithOwner, baseBranch, branchRestrictionsApply) && admitsPerson(userId);
     }
 }

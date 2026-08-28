@@ -83,12 +83,10 @@ class ActivityEventListenerTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         // Set up default XP values for the mock
-        when(experiencePointCalculator.getXpPullRequestOpened()).thenReturn(
-            ExperiencePointCalculator.XP_PULL_REQUEST_OPENED
-        );
-        when(experiencePointCalculator.getXpPullRequestMerged()).thenReturn(
-            ExperiencePointCalculator.XP_PULL_REQUEST_MERGED
-        );
+        when(experiencePointCalculator.getXpPullRequestOpened())
+                .thenReturn(ExperiencePointCalculator.XP_PULL_REQUEST_OPENED);
+        when(experiencePointCalculator.getXpPullRequestMerged())
+                .thenReturn(ExperiencePointCalculator.XP_PULL_REQUEST_MERGED);
         when(experiencePointCalculator.getXpReviewComment()).thenReturn(ExperiencePointCalculator.XP_REVIEW_COMMENT);
         when(experiencePointCalculator.getXpPullRequestReady()).thenReturn(0.5);
         when(experiencePointCalculator.getXpIssueCreated()).thenReturn(0.25);
@@ -98,17 +96,16 @@ class ActivityEventListenerTest extends BaseUnitTest {
         when(experiencePointCalculator.getXpDiscussionCommentCreated()).thenReturn(0.25);
 
         listener = new ActivityEventListener(
-            activityEventService,
-            activityEventRepository,
-            experiencePointCalculator,
-            reviewRepository,
-            pullRequestRepository,
-            issueCommentRepository,
-            reviewThreadRepository,
-            userRepository,
-            repositoryRepository,
-            issueRepository
-        );
+                activityEventService,
+                activityEventRepository,
+                experiencePointCalculator,
+                reviewRepository,
+                pullRequestRepository,
+                issueCommentRepository,
+                reviewThreadRepository,
+                userRepository,
+                repositoryRepository,
+                issueRepository);
 
         testUser = new User();
         testUser.setId(100L);
@@ -135,16 +132,16 @@ class ActivityEventListenerTest extends BaseUnitTest {
 
             listener.onPullRequestCreated(event);
 
-            verify(activityEventService).record(
-                eq(42L),
-                eq(ActivityEventType.PULL_REQUEST_OPENED),
-                any(Instant.class),
-                eq(testUser),
-                eq(testRepository),
-                eq(ActivityTargetType.PULL_REQUEST),
-                eq(1L),
-                eq(ExperiencePointCalculator.XP_PULL_REQUEST_OPENED)
-            );
+            verify(activityEventService)
+                    .record(
+                            eq(42L),
+                            eq(ActivityEventType.PULL_REQUEST_OPENED),
+                            any(Instant.class),
+                            eq(testUser),
+                            eq(testRepository),
+                            eq(ActivityTargetType.PULL_REQUEST),
+                            eq(1L),
+                            eq(ExperiencePointCalculator.XP_PULL_REQUEST_OPENED));
             // Verify no findById was called (N+1 fix)
             verify(userRepository).getReferenceById(100L);
             verify(repositoryRepository).getReferenceById(200L);
@@ -176,16 +173,16 @@ class ActivityEventListenerTest extends BaseUnitTest {
 
             listener.onPullRequestMerged(event);
 
-            verify(activityEventService).record(
-                eq(42L),
-                eq(ActivityEventType.PULL_REQUEST_MERGED),
-                any(Instant.class),
-                eq(testUser),
-                eq(testRepository),
-                eq(ActivityTargetType.PULL_REQUEST),
-                eq(2L),
-                eq(ExperiencePointCalculator.XP_PULL_REQUEST_MERGED)
-            );
+            verify(activityEventService)
+                    .record(
+                            eq(42L),
+                            eq(ActivityEventType.PULL_REQUEST_MERGED),
+                            any(Instant.class),
+                            eq(testUser),
+                            eq(testRepository),
+                            eq(ActivityTargetType.PULL_REQUEST),
+                            eq(2L),
+                            eq(ExperiencePointCalculator.XP_PULL_REQUEST_MERGED));
         }
     }
 
@@ -197,34 +194,28 @@ class ActivityEventListenerTest extends BaseUnitTest {
             PullRequest pullRequest = createPullRequest(3L);
             pullRequest.setClosedAt(Instant.now());
 
-            var event = new ScmDomainEvent.PullRequestClosed(
-                createPullRequestData(pullRequest),
-                false,
-                createContext()
-            );
+            var event =
+                    new ScmDomainEvent.PullRequestClosed(createPullRequestData(pullRequest), false, createContext());
 
             listener.onPullRequestClosed(event);
 
-            verify(activityEventService).record(
-                eq(42L),
-                eq(ActivityEventType.PULL_REQUEST_CLOSED),
-                any(Instant.class),
-                eq(testUser),
-                eq(testRepository),
-                eq(ActivityTargetType.PULL_REQUEST),
-                eq(3L),
-                eq(0.0)
-            );
+            verify(activityEventService)
+                    .record(
+                            eq(42L),
+                            eq(ActivityEventType.PULL_REQUEST_CLOSED),
+                            any(Instant.class),
+                            eq(testUser),
+                            eq(testRepository),
+                            eq(ActivityTargetType.PULL_REQUEST),
+                            eq(3L),
+                            eq(0.0));
         }
 
         @Test
         @DisplayName("does nothing when pull request was merged (handled by onPullRequestMerged)")
         void noOpWhenMerged() {
             var event = new ScmDomainEvent.PullRequestClosed(
-                createPullRequestData(createPullRequest(4L)),
-                true,
-                createContext()
-            );
+                    createPullRequestData(createPullRequest(4L)), true, createContext());
 
             listener.onPullRequestClosed(event);
 
@@ -243,16 +234,16 @@ class ActivityEventListenerTest extends BaseUnitTest {
 
             listener.onPullRequestReopened(event);
 
-            verify(activityEventService).record(
-                eq(42L),
-                eq(ActivityEventType.PULL_REQUEST_REOPENED),
-                any(Instant.class),
-                eq(testUser),
-                eq(testRepository),
-                eq(ActivityTargetType.PULL_REQUEST),
-                eq(5L),
-                eq(0.0)
-            );
+            verify(activityEventService)
+                    .record(
+                            eq(42L),
+                            eq(ActivityEventType.PULL_REQUEST_REOPENED),
+                            any(Instant.class),
+                            eq(testUser),
+                            eq(testRepository),
+                            eq(ActivityTargetType.PULL_REQUEST),
+                            eq(5L),
+                            eq(0.0));
         }
     }
 
@@ -267,16 +258,17 @@ class ActivityEventListenerTest extends BaseUnitTest {
 
             listener.onPullRequestReady(event);
 
-            verify(activityEventService).record(
-                eq(42L),
-                eq(ActivityEventType.PULL_REQUEST_READY),
-                any(Instant.class),
-                eq(testUser),
-                eq(testRepository),
-                eq(ActivityTargetType.PULL_REQUEST),
-                eq(6L),
-                eq(0.5) // XP from mock
-            );
+            verify(activityEventService)
+                    .record(
+                            eq(42L),
+                            eq(ActivityEventType.PULL_REQUEST_READY),
+                            any(Instant.class),
+                            eq(testUser),
+                            eq(testRepository),
+                            eq(ActivityTargetType.PULL_REQUEST),
+                            eq(6L),
+                            eq(0.5) // XP from mock
+                            );
         }
     }
 
@@ -291,23 +283,24 @@ class ActivityEventListenerTest extends BaseUnitTest {
             review.setState(PullRequestReview.State.APPROVED);
             // Mock findById to return the single review for XP calculation
             when(reviewRepository.findById(5L)).thenReturn(Optional.of(review));
-            when(experiencePointCalculator.calculateReviewExperiencePoints(review)).thenReturn(7.5);
+            when(experiencePointCalculator.calculateReviewExperiencePoints(review))
+                    .thenReturn(7.5);
 
             var event = new ScmDomainEvent.ReviewSubmitted(createReviewData(review), createContext());
 
             listener.onReviewSubmitted(event);
 
             verify(experiencePointCalculator).calculateReviewExperiencePoints(review);
-            verify(activityEventService).record(
-                eq(42L),
-                eq(ActivityEventType.REVIEW_APPROVED),
-                any(Instant.class),
-                eq(testUser),
-                eq(testRepository),
-                eq(ActivityTargetType.REVIEW),
-                eq(5L),
-                eq(7.5)
-            );
+            verify(activityEventService)
+                    .record(
+                            eq(42L),
+                            eq(ActivityEventType.REVIEW_APPROVED),
+                            any(Instant.class),
+                            eq(testUser),
+                            eq(testRepository),
+                            eq(ActivityTargetType.REVIEW),
+                            eq(5L),
+                            eq(7.5));
         }
 
         @Test
@@ -335,16 +328,17 @@ class ActivityEventListenerTest extends BaseUnitTest {
 
             listener.onIssueCreated(event);
 
-            verify(activityEventService).record(
-                eq(42L),
-                eq(ActivityEventType.ISSUE_CREATED),
-                any(Instant.class),
-                eq(testUser),
-                eq(testRepository),
-                eq(ActivityTargetType.ISSUE),
-                eq(10L),
-                eq(0.25) // XP from mock
-            );
+            verify(activityEventService)
+                    .record(
+                            eq(42L),
+                            eq(ActivityEventType.ISSUE_CREATED),
+                            any(Instant.class),
+                            eq(testUser),
+                            eq(testRepository),
+                            eq(ActivityTargetType.ISSUE),
+                            eq(10L),
+                            eq(0.25) // XP from mock
+                            );
         }
 
         @Test
@@ -369,16 +363,17 @@ class ActivityEventListenerTest extends BaseUnitTest {
             listener.onIssueCreated(event);
 
             // Event is STILL recorded (for audit trail), but with null actor and 0 XP
-            verify(activityEventService).record(
-                eq(42L),
-                eq(ActivityEventType.ISSUE_CREATED),
-                any(Instant.class),
-                isNull(), // null actor - user deleted or bot
-                eq(testRepository),
-                eq(ActivityTargetType.ISSUE),
-                eq(14L),
-                eq(0.0) // Zero XP for unknown authors
-            );
+            verify(activityEventService)
+                    .record(
+                            eq(42L),
+                            eq(ActivityEventType.ISSUE_CREATED),
+                            any(Instant.class),
+                            isNull(), // null actor - user deleted or bot
+                            eq(testRepository),
+                            eq(ActivityTargetType.ISSUE),
+                            eq(14L),
+                            eq(0.0) // Zero XP for unknown authors
+                            );
         }
     }
 
@@ -394,27 +389,24 @@ class ActivityEventListenerTest extends BaseUnitTest {
 
             listener.onIssueClosed(event);
 
-            verify(activityEventService).record(
-                eq(42L),
-                eq(ActivityEventType.ISSUE_CLOSED),
-                any(Instant.class),
-                eq(testUser),
-                eq(testRepository),
-                eq(ActivityTargetType.ISSUE),
-                eq(12L),
-                eq(0.0)
-            );
+            verify(activityEventService)
+                    .record(
+                            eq(42L),
+                            eq(ActivityEventType.ISSUE_CLOSED),
+                            any(Instant.class),
+                            eq(testUser),
+                            eq(testRepository),
+                            eq(ActivityTargetType.ISSUE),
+                            eq(12L),
+                            eq(0.0));
         }
 
         @Test
         void skipsPullRequests() {
             PullRequest pullRequest = createPullRequest(13L);
 
-            var event = new ScmDomainEvent.IssueClosed(
-                ScmEventPayload.IssueData.from(pullRequest),
-                null,
-                createContext()
-            );
+            var event =
+                    new ScmDomainEvent.IssueClosed(ScmEventPayload.IssueData.from(pullRequest), null, createContext());
 
             listener.onIssueClosed(event);
 
@@ -433,16 +425,17 @@ class ActivityEventListenerTest extends BaseUnitTest {
             listener.onIssueClosed(event);
 
             // Event is STILL recorded (for audit trail), but with null actor
-            verify(activityEventService).record(
-                eq(42L),
-                eq(ActivityEventType.ISSUE_CLOSED),
-                any(Instant.class),
-                isNull(), // null actor - user deleted or bot
-                eq(testRepository),
-                eq(ActivityTargetType.ISSUE),
-                eq(15L),
-                eq(0.0) // Issue closure has 0 XP anyway
-            );
+            verify(activityEventService)
+                    .record(
+                            eq(42L),
+                            eq(ActivityEventType.ISSUE_CLOSED),
+                            any(Instant.class),
+                            isNull(), // null actor - user deleted or bot
+                            eq(testRepository),
+                            eq(ActivityTargetType.ISSUE),
+                            eq(15L),
+                            eq(0.0) // Issue closure has 0 XP anyway
+                            );
         }
     }
 
@@ -457,16 +450,17 @@ class ActivityEventListenerTest extends BaseUnitTest {
 
             listener.onCommitCreated(event);
 
-            verify(activityEventService).record(
-                eq(42L),
-                eq(ActivityEventType.COMMIT_CREATED),
-                any(Instant.class),
-                eq(testUser),
-                eq(testRepository),
-                eq(ActivityTargetType.COMMIT),
-                eq(20L),
-                eq(0.5) // XP from mock
-            );
+            verify(activityEventService)
+                    .record(
+                            eq(42L),
+                            eq(ActivityEventType.COMMIT_CREATED),
+                            any(Instant.class),
+                            eq(testUser),
+                            eq(testRepository),
+                            eq(ActivityTargetType.COMMIT),
+                            eq(20L),
+                            eq(0.5) // XP from mock
+                            );
         }
 
         @Test
@@ -479,16 +473,17 @@ class ActivityEventListenerTest extends BaseUnitTest {
             listener.onCommitCreated(event);
 
             // Event is STILL recorded (for audit trail), but with null actor and 0 XP
-            verify(activityEventService).record(
-                eq(42L),
-                eq(ActivityEventType.COMMIT_CREATED),
-                any(Instant.class),
-                isNull(), // null actor - user deleted or bot
-                eq(testRepository),
-                eq(ActivityTargetType.COMMIT),
-                eq(21L),
-                eq(0.0) // Zero XP for unknown authors
-            );
+            verify(activityEventService)
+                    .record(
+                            eq(42L),
+                            eq(ActivityEventType.COMMIT_CREATED),
+                            any(Instant.class),
+                            isNull(), // null actor - user deleted or bot
+                            eq(testRepository),
+                            eq(ActivityTargetType.COMMIT),
+                            eq(21L),
+                            eq(0.0) // Zero XP for unknown authors
+                            );
         }
 
         @Test
@@ -497,15 +492,14 @@ class ActivityEventListenerTest extends BaseUnitTest {
 
             RepositoryRef repoRef = new RepositoryRef(testRepository.getId(), testRepository.getName(), "test");
             EventContext contextWithNullScope = new EventContext(
-                UUID.randomUUID(),
-                Instant.now(),
-                null, // null scopeId
-                repoRef,
-                DataSource.WEBHOOK,
-                null,
-                UUID.randomUUID().toString(),
-                null
-            );
+                    UUID.randomUUID(),
+                    Instant.now(),
+                    null, // null scopeId
+                    repoRef,
+                    DataSource.WEBHOOK,
+                    null,
+                    UUID.randomUUID().toString(),
+                    null);
             var event = new ScmDomainEvent.CommitCreated(createCommitData(commit), contextWithNullScope);
 
             listener.onCommitCreated(event);
@@ -525,16 +519,17 @@ class ActivityEventListenerTest extends BaseUnitTest {
 
             listener.onDiscussionCreated(event);
 
-            verify(activityEventService).record(
-                eq(42L),
-                eq(ActivityEventType.DISCUSSION_CREATED),
-                any(Instant.class),
-                eq(testUser),
-                eq(testRepository),
-                eq(ActivityTargetType.DISCUSSION),
-                eq(30L),
-                eq(0.25) // XP from mock
-            );
+            verify(activityEventService)
+                    .record(
+                            eq(42L),
+                            eq(ActivityEventType.DISCUSSION_CREATED),
+                            any(Instant.class),
+                            eq(testUser),
+                            eq(testRepository),
+                            eq(ActivityTargetType.DISCUSSION),
+                            eq(30L),
+                            eq(0.25) // XP from mock
+                            );
         }
 
         @Test
@@ -546,16 +541,16 @@ class ActivityEventListenerTest extends BaseUnitTest {
 
             listener.onDiscussionCreated(event);
 
-            verify(activityEventService).record(
-                eq(42L),
-                eq(ActivityEventType.DISCUSSION_CREATED),
-                any(Instant.class),
-                isNull(),
-                eq(testRepository),
-                eq(ActivityTargetType.DISCUSSION),
-                eq(31L),
-                eq(0.0)
-            );
+            verify(activityEventService)
+                    .record(
+                            eq(42L),
+                            eq(ActivityEventType.DISCUSSION_CREATED),
+                            any(Instant.class),
+                            isNull(),
+                            eq(testRepository),
+                            eq(ActivityTargetType.DISCUSSION),
+                            eq(31L),
+                            eq(0.0));
         }
     }
 
@@ -567,24 +562,21 @@ class ActivityEventListenerTest extends BaseUnitTest {
             Discussion discussion = createDiscussion(32L);
             discussion.setClosedAt(Instant.now());
 
-            var event = new ScmDomainEvent.DiscussionClosed(
-                createDiscussionData(discussion),
-                "resolved",
-                createContext()
-            );
+            var event =
+                    new ScmDomainEvent.DiscussionClosed(createDiscussionData(discussion), "resolved", createContext());
 
             listener.onDiscussionClosed(event);
 
-            verify(activityEventService).record(
-                eq(42L),
-                eq(ActivityEventType.DISCUSSION_CLOSED),
-                any(Instant.class),
-                eq(testUser),
-                eq(testRepository),
-                eq(ActivityTargetType.DISCUSSION),
-                eq(32L),
-                eq(0.0)
-            );
+            verify(activityEventService)
+                    .record(
+                            eq(42L),
+                            eq(ActivityEventType.DISCUSSION_CLOSED),
+                            any(Instant.class),
+                            eq(testUser),
+                            eq(testRepository),
+                            eq(ActivityTargetType.DISCUSSION),
+                            eq(32L),
+                            eq(0.0));
         }
     }
 
@@ -599,16 +591,16 @@ class ActivityEventListenerTest extends BaseUnitTest {
 
             listener.onDiscussionReopened(event);
 
-            verify(activityEventService).record(
-                eq(42L),
-                eq(ActivityEventType.DISCUSSION_REOPENED),
-                any(Instant.class),
-                eq(testUser),
-                eq(testRepository),
-                eq(ActivityTargetType.DISCUSSION),
-                eq(33L),
-                eq(0.0)
-            );
+            verify(activityEventService)
+                    .record(
+                            eq(42L),
+                            eq(ActivityEventType.DISCUSSION_REOPENED),
+                            any(Instant.class),
+                            eq(testUser),
+                            eq(testRepository),
+                            eq(ActivityTargetType.DISCUSSION),
+                            eq(33L),
+                            eq(0.0));
         }
     }
 
@@ -624,16 +616,17 @@ class ActivityEventListenerTest extends BaseUnitTest {
 
             listener.onDiscussionAnswered(event);
 
-            verify(activityEventService).record(
-                eq(42L),
-                eq(ActivityEventType.DISCUSSION_ANSWERED),
-                any(Instant.class),
-                eq(testUser),
-                eq(testRepository),
-                eq(ActivityTargetType.DISCUSSION),
-                eq(34L),
-                eq(0.5) // XP from mock
-            );
+            verify(activityEventService)
+                    .record(
+                            eq(42L),
+                            eq(ActivityEventType.DISCUSSION_ANSWERED),
+                            any(Instant.class),
+                            eq(testUser),
+                            eq(testRepository),
+                            eq(ActivityTargetType.DISCUSSION),
+                            eq(34L),
+                            eq(0.5) // XP from mock
+                            );
         }
 
         @Test
@@ -646,16 +639,16 @@ class ActivityEventListenerTest extends BaseUnitTest {
 
             listener.onDiscussionAnswered(event);
 
-            verify(activityEventService).record(
-                eq(42L),
-                eq(ActivityEventType.DISCUSSION_ANSWERED),
-                any(Instant.class),
-                isNull(),
-                eq(testRepository),
-                eq(ActivityTargetType.DISCUSSION),
-                eq(35L),
-                eq(0.0)
-            );
+            verify(activityEventService)
+                    .record(
+                            eq(42L),
+                            eq(ActivityEventType.DISCUSSION_ANSWERED),
+                            any(Instant.class),
+                            isNull(),
+                            eq(testRepository),
+                            eq(ActivityTargetType.DISCUSSION),
+                            eq(35L),
+                            eq(0.0));
         }
     }
 
@@ -668,13 +661,13 @@ class ActivityEventListenerTest extends BaseUnitTest {
 
             listener.onDiscussionDeleted(event);
 
-            verify(activityEventService).recordDeleted(
-                eq(42L),
-                eq(ActivityEventType.DISCUSSION_DELETED),
-                any(Instant.class),
-                eq(ActivityTargetType.DISCUSSION),
-                eq(36L)
-            );
+            verify(activityEventService)
+                    .recordDeleted(
+                            eq(42L),
+                            eq(ActivityEventType.DISCUSSION_DELETED),
+                            any(Instant.class),
+                            eq(ActivityTargetType.DISCUSSION),
+                            eq(36L));
         }
     }
 
@@ -691,95 +684,85 @@ class ActivityEventListenerTest extends BaseUnitTest {
             pullRequest.setAuthor(prAuthor);
 
             when(pullRequestRepository.findById(50L)).thenReturn(Optional.of(pullRequest));
-            when(experiencePointCalculator.calculateStandaloneReviewCommentXp(any(), any(), anyInt())).thenReturn(0.5);
+            when(experiencePointCalculator.calculateStandaloneReviewCommentXp(any(), any(), anyInt()))
+                    .thenReturn(0.5);
 
             var commentData = new ScmEventPayload.ReviewCommentData(
-                77L, // id
-                "This is a substantive review comment with enough length", // body
-                "src/Main.java", // path
-                42, // line
-                "https://github.com/test/test-repo/pull/1#discussion_r77", // htmlUrl
-                null, // reviewId - null = standalone
-                100L, // authorId
-                Instant.now(), // createdAt
-                50L, // pullRequestId
-                200L // repositoryId
-            );
+                    77L, // id
+                    "This is a substantive review comment with enough length", // body
+                    "src/Main.java", // path
+                    42, // line
+                    "https://github.com/test/test-repo/pull/1#discussion_r77", // htmlUrl
+                    null, // reviewId - null = standalone
+                    100L, // authorId
+                    Instant.now(), // createdAt
+                    50L, // pullRequestId
+                    200L // repositoryId
+                    );
             var event = new ScmDomainEvent.ReviewCommentCreated(commentData, 50L, createContext());
 
             listener.onReviewCommentCreated(event);
 
             verify(pullRequestRepository).findById(50L);
             verify(experiencePointCalculator).calculateStandaloneReviewCommentXp(eq(pullRequest), eq(100L), anyInt());
-            verify(activityEventService).record(
-                eq(42L),
-                eq(ActivityEventType.REVIEW_COMMENT_CREATED),
-                any(Instant.class),
-                eq(testUser),
-                eq(testRepository),
-                eq(ActivityTargetType.REVIEW_COMMENT),
-                eq(77L),
-                eq(0.5)
-            );
+            verify(activityEventService)
+                    .record(
+                            eq(42L),
+                            eq(ActivityEventType.REVIEW_COMMENT_CREATED),
+                            any(Instant.class),
+                            eq(testUser),
+                            eq(testRepository),
+                            eq(ActivityTargetType.REVIEW_COMMENT),
+                            eq(77L),
+                            eq(0.5));
         }
 
         @Test
         void onReviewCommentCreated_linkedToReview_awardsZeroXp() {
             var commentData = new ScmEventPayload.ReviewCommentData(
-                78L, // id
-                "Some comment", // body
-                "src/Main.java", // path
-                10, // line
-                "https://github.com/test/test-repo/pull/1#discussion_r78", // htmlUrl
-                42L, // reviewId - linked to review
-                100L, // authorId
-                Instant.now(), // createdAt
-                50L, // pullRequestId
-                200L // repositoryId
-            );
+                    78L, // id
+                    "Some comment", // body
+                    "src/Main.java", // path
+                    10, // line
+                    "https://github.com/test/test-repo/pull/1#discussion_r78", // htmlUrl
+                    42L, // reviewId - linked to review
+                    100L, // authorId
+                    Instant.now(), // createdAt
+                    50L, // pullRequestId
+                    200L // repositoryId
+                    );
             var event = new ScmDomainEvent.ReviewCommentCreated(commentData, 50L, createContext());
 
             listener.onReviewCommentCreated(event);
 
             // pullRequestRepository.findById should never be called for linked comments
             verify(pullRequestRepository, never()).findById(any());
-            verify(activityEventService).record(
-                eq(42L),
-                eq(ActivityEventType.REVIEW_COMMENT_CREATED),
-                any(Instant.class),
-                eq(testUser),
-                eq(testRepository),
-                eq(ActivityTargetType.REVIEW_COMMENT),
-                eq(78L),
-                eq(0.0)
-            );
+            verify(activityEventService)
+                    .record(
+                            eq(42L),
+                            eq(ActivityEventType.REVIEW_COMMENT_CREATED),
+                            any(Instant.class),
+                            eq(testUser),
+                            eq(testRepository),
+                            eq(ActivityTargetType.REVIEW_COMMENT),
+                            eq(78L),
+                            eq(0.0));
         }
 
         @Test
         void onReviewCommentCreated_nullScopeId_skips() {
             var commentData = new ScmEventPayload.ReviewCommentData(
-                79L,
-                "body",
-                "path.java",
-                1,
-                "https://example.com/comment",
-                null,
-                100L,
-                Instant.now(),
-                50L,
-                200L
-            );
+                    79L, "body", "path.java", 1, "https://example.com/comment", null, 100L, Instant.now(), 50L, 200L);
             RepositoryRef repoRef = new RepositoryRef(testRepository.getId(), testRepository.getName(), "test");
             EventContext contextWithNullScope = new EventContext(
-                UUID.randomUUID(),
-                Instant.now(),
-                null, // null scopeId
-                repoRef,
-                DataSource.WEBHOOK,
-                null,
-                UUID.randomUUID().toString(),
-                null
-            );
+                    UUID.randomUUID(),
+                    Instant.now(),
+                    null, // null scopeId
+                    repoRef,
+                    DataSource.WEBHOOK,
+                    null,
+                    UUID.randomUUID().toString(),
+                    null);
             var event = new ScmDomainEvent.ReviewCommentCreated(commentData, 50L, contextWithNullScope);
 
             listener.onReviewCommentCreated(event);
@@ -790,17 +773,16 @@ class ActivityEventListenerTest extends BaseUnitTest {
         @Test
         void onReviewCommentCreated_nullAuthorId_skips() {
             var commentData = new ScmEventPayload.ReviewCommentData(
-                80L,
-                "body",
-                "path.java",
-                1,
-                "https://example.com/comment",
-                null, // reviewId
-                null, // authorId - null
-                Instant.now(),
-                50L,
-                200L
-            );
+                    80L,
+                    "body",
+                    "path.java",
+                    1,
+                    "https://example.com/comment",
+                    null, // reviewId
+                    null, // authorId - null
+                    Instant.now(),
+                    50L,
+                    200L);
             var event = new ScmDomainEvent.ReviewCommentCreated(commentData, 50L, createContext());
 
             listener.onReviewCommentCreated(event);
@@ -813,32 +795,32 @@ class ActivityEventListenerTest extends BaseUnitTest {
             when(pullRequestRepository.findById(999L)).thenReturn(Optional.empty());
 
             var commentData = new ScmEventPayload.ReviewCommentData(
-                81L,
-                "This comment's PR doesn't exist yet",
-                "src/Main.java",
-                1,
-                "https://example.com/comment",
-                null, // reviewId - standalone
-                100L, // authorId
-                Instant.now(),
-                999L, // pullRequestId - not found
-                200L
-            );
+                    81L,
+                    "This comment's PR doesn't exist yet",
+                    "src/Main.java",
+                    1,
+                    "https://example.com/comment",
+                    null, // reviewId - standalone
+                    100L, // authorId
+                    Instant.now(),
+                    999L, // pullRequestId - not found
+                    200L);
             var event = new ScmDomainEvent.ReviewCommentCreated(commentData, 999L, createContext());
 
             listener.onReviewCommentCreated(event);
 
             verify(pullRequestRepository).findById(999L);
-            verify(activityEventService).record(
-                eq(42L),
-                eq(ActivityEventType.REVIEW_COMMENT_CREATED),
-                any(Instant.class),
-                eq(testUser),
-                eq(testRepository),
-                eq(ActivityTargetType.REVIEW_COMMENT),
-                eq(81L),
-                eq(0.0) // Zero XP because PR not found
-            );
+            verify(activityEventService)
+                    .record(
+                            eq(42L),
+                            eq(ActivityEventType.REVIEW_COMMENT_CREATED),
+                            any(Instant.class),
+                            eq(testUser),
+                            eq(testRepository),
+                            eq(ActivityTargetType.REVIEW_COMMENT),
+                            eq(81L),
+                            eq(0.0) // Zero XP because PR not found
+                            );
         }
 
         @Test
@@ -850,20 +832,20 @@ class ActivityEventListenerTest extends BaseUnitTest {
             pullRequest.setAuthor(prAuthor);
 
             when(pullRequestRepository.findById(50L)).thenReturn(Optional.of(pullRequest));
-            when(experiencePointCalculator.calculateStandaloneReviewCommentXp(any(), any(), eq(0))).thenReturn(0.25);
+            when(experiencePointCalculator.calculateStandaloneReviewCommentXp(any(), any(), eq(0)))
+                    .thenReturn(0.25);
 
             var commentData = new ScmEventPayload.ReviewCommentData(
-                82L,
-                null, // null body
-                "src/Main.java",
-                1,
-                "https://example.com/comment",
-                null, // reviewId - standalone
-                100L,
-                Instant.now(),
-                50L,
-                200L
-            );
+                    82L,
+                    null, // null body
+                    "src/Main.java",
+                    1,
+                    "https://example.com/comment",
+                    null, // reviewId - standalone
+                    100L,
+                    Instant.now(),
+                    50L,
+                    200L);
             var event = new ScmDomainEvent.ReviewCommentCreated(commentData, 50L, createContext());
 
             listener.onReviewCommentCreated(event);
@@ -881,23 +863,23 @@ class ActivityEventListenerTest extends BaseUnitTest {
             DiscussionComment comment = createDiscussionComment(37L);
 
             var event = new ScmDomainEvent.DiscussionCommentCreated(
-                createDiscussionCommentData(comment),
-                30L, // discussionId
-                createContext()
-            );
+                    createDiscussionCommentData(comment),
+                    30L, // discussionId
+                    createContext());
 
             listener.onDiscussionCommentCreated(event);
 
-            verify(activityEventService).record(
-                eq(42L),
-                eq(ActivityEventType.DISCUSSION_COMMENT_CREATED),
-                any(Instant.class),
-                eq(testUser),
-                eq(testRepository),
-                eq(ActivityTargetType.DISCUSSION_COMMENT),
-                eq(37L),
-                eq(0.25) // XP from mock
-            );
+            verify(activityEventService)
+                    .record(
+                            eq(42L),
+                            eq(ActivityEventType.DISCUSSION_COMMENT_CREATED),
+                            any(Instant.class),
+                            eq(testUser),
+                            eq(testRepository),
+                            eq(ActivityTargetType.DISCUSSION_COMMENT),
+                            eq(37L),
+                            eq(0.25) // XP from mock
+                            );
         }
 
         @Test
@@ -906,10 +888,7 @@ class ActivityEventListenerTest extends BaseUnitTest {
             comment.setAuthor(null);
 
             var event = new ScmDomainEvent.DiscussionCommentCreated(
-                createDiscussionCommentData(comment),
-                30L,
-                createContext()
-            );
+                    createDiscussionCommentData(comment), 30L, createContext());
 
             listener.onDiscussionCommentCreated(event);
 
@@ -922,7 +901,8 @@ class ActivityEventListenerTest extends BaseUnitTest {
 
         @Test
         void backfillsCommitActorsOnReconciliation() {
-            when(activityEventRepository.backfillCommitActors(eq(200L), eq(0.5))).thenReturn(3);
+            when(activityEventRepository.backfillCommitActors(eq(200L), eq(0.5)))
+                    .thenReturn(3);
 
             var event = new ScmDomainEvent.CommitAuthorsReconciled(200L, createContext());
 
@@ -942,9 +922,8 @@ class ActivityEventListenerTest extends BaseUnitTest {
 
         @Test
         void swallowsBackfillExceptions() {
-            when(activityEventRepository.backfillCommitActors(eq(200L), anyDouble())).thenThrow(
-                new RuntimeException("db outage")
-            );
+            when(activityEventRepository.backfillCommitActors(eq(200L), anyDouble()))
+                    .thenThrow(new RuntimeException("db outage"));
 
             var event = new ScmDomainEvent.CommitAuthorsReconciled(200L, createContext());
 
@@ -1025,15 +1004,14 @@ class ActivityEventListenerTest extends BaseUnitTest {
     private EventContext createContext() {
         RepositoryRef repoRef = new RepositoryRef(testRepository.getId(), testRepository.getName(), "test");
         return new EventContext(
-            UUID.randomUUID(),
-            Instant.now(),
-            42L,
-            repoRef,
-            DataSource.WEBHOOK,
-            null,
-            UUID.randomUUID().toString(),
-            null
-        );
+                UUID.randomUUID(),
+                Instant.now(),
+                42L,
+                repoRef,
+                DataSource.WEBHOOK,
+                null,
+                UUID.randomUUID().toString(),
+                null);
     }
 
     private Discussion createDiscussion(Long id) {

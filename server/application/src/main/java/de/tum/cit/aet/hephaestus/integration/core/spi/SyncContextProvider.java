@@ -11,9 +11,8 @@ public interface SyncContextProvider {
     Runnable wrapWithContext(Runnable runnable);
 
     record SyncContext(
-        Long scopeId,
-        String slug,
-        String displayName,
-        @org.jspecify.annotations.Nullable Long installationId
-    ) {}
+            Long scopeId,
+            String slug,
+            String displayName,
+            @org.jspecify.annotations.Nullable Long installationId) {}
 }

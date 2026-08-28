@@ -33,22 +33,21 @@ class WorkspaceAdminControllerIntegrationTest extends AbstractWorkspaceIntegrati
         ensureWorkspaceMembership(ws, owner, WorkspaceRole.OWNER);
 
         List<AdminWorkspaceViewDTO> body = webTestClient
-            .get()
-            .uri("/admin/workspaces")
-            .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBodyList(AdminWorkspaceViewDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri("/admin/workspaces")
+                .headers(h -> h.setBearerAuth(ADMIN_TOKEN))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBodyList(AdminWorkspaceViewDTO.class)
+                .returnResult()
+                .getResponseBody();
 
         assertThat(body).isNotNull();
-        AdminWorkspaceViewDTO acme = body
-            .stream()
-            .filter(w -> "acme-space".equals(w.workspaceSlug()))
-            .findFirst()
-            .orElseThrow(() -> new AssertionError("seeded workspace not in the admin overview"));
+        AdminWorkspaceViewDTO acme = body.stream()
+                .filter(w -> "acme-space".equals(w.workspaceSlug()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("seeded workspace not in the admin overview"));
         assertThat(acme.displayName()).isEqualTo("Acme");
         assertThat(acme.ownerLogin()).isEqualTo("acme-owner");
         assertThat(acme.ownerAccountId()).isNull();
@@ -59,11 +58,11 @@ class WorkspaceAdminControllerIntegrationTest extends AbstractWorkspaceIntegrati
     @Test
     void nonAdminIsForbidden() {
         webTestClient
-            .get()
-            .uri("/admin/workspaces")
-            .headers(h -> h.setBearerAuth(MENTOR_TOKEN))
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .get()
+                .uri("/admin/workspaces")
+                .headers(h -> h.setBearerAuth(MENTOR_TOKEN))
+                .exchange()
+                .expectStatus()
+                .isForbidden();
     }
 }

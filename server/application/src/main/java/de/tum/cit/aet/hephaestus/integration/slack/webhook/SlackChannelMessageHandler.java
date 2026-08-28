@@ -26,10 +26,9 @@ public class SlackChannelMessageHandler extends AbstractIntegrationMessageHandle
     private final SlackIngestService ingestService;
 
     public SlackChannelMessageHandler(
-        SlackIngestService ingestService,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            SlackIngestService ingestService,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(IntegrationKind.SLACK, "message", JsonNode.class, deserializer, transactionTemplate);
         this.ingestService = ingestService;
     }
@@ -42,9 +41,8 @@ public class SlackChannelMessageHandler extends AbstractIntegrationMessageHandle
         String channelId = event.path("channel").asString("");
 
         if ("message_deleted".equals(subtype)) {
-            String deletedTs = event
-                .path("deleted_ts")
-                .asString(event.path("previous_message").path("ts").asString(""));
+            String deletedTs = event.path("deleted_ts")
+                    .asString(event.path("previous_message").path("ts").asString(""));
             ingestService.tombstoneMessage(teamId, channelId, deletedTs);
             return;
         }
@@ -54,13 +52,12 @@ public class SlackChannelMessageHandler extends AbstractIntegrationMessageHandle
                 return;
             }
             ingestService.editMessage(
-                teamId,
-                channelId,
-                changed.path("ts").asString(""),
-                changed.path("thread_ts").asString(null),
-                changed.path("user").asString(""),
-                changed.path("text").asString("")
-            );
+                    teamId,
+                    channelId,
+                    changed.path("ts").asString(""),
+                    changed.path("thread_ts").asString(null),
+                    changed.path("user").asString(""),
+                    changed.path("text").asString(""));
             return;
         }
         if (event.has("bot_id")) {
@@ -73,12 +70,11 @@ public class SlackChannelMessageHandler extends AbstractIntegrationMessageHandle
             return; // a pure upload with no comment carries no analyzable text
         }
         ingestService.ingestChannelMessage(
-            teamId,
-            channelId,
-            event.path("ts").asString(""),
-            event.path("thread_ts").asString(null),
-            event.path("user").asString(""),
-            event.path("text").asString("")
-        );
+                teamId,
+                channelId,
+                event.path("ts").asString(""),
+                event.path("thread_ts").asString(null),
+                event.path("user").asString(""),
+                event.path("text").asString(""));
     }
 }

@@ -25,9 +25,8 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.practice-review")
 public record PracticeReviewProperties(
-    @DefaultValue("false") boolean deliverToMerged,
-    @Min(0) @DefaultValue("15") int cooldownMinutes,
-    @Min(0) @DefaultValue("5") int maxRequestsPerRequesterPerHour,
-    @DefaultValue("false") boolean progressFooter,
-    @DefaultValue("false") boolean reactionSuppression
-) {}
+        @DefaultValue("false") boolean deliverToMerged,
+        @Min(0) @DefaultValue("15") int cooldownMinutes,
+        @Min(0) @DefaultValue("5") int maxRequestsPerRequesterPerHour,
+        @DefaultValue("false") boolean progressFooter,
+        @DefaultValue("false") boolean reactionSuppression) {}

@@ -27,11 +27,10 @@ public class WorkspaceAdminService {
     private final AccountIdentityQuery accountIdentityQuery;
 
     public WorkspaceAdminService(
-        WorkspaceRepository workspaceRepository,
-        WorkspaceMembershipRepository membershipRepository,
-        ConnectionService connectionService,
-        AccountIdentityQuery accountIdentityQuery
-    ) {
+            WorkspaceRepository workspaceRepository,
+            WorkspaceMembershipRepository membershipRepository,
+            ConnectionService connectionService,
+            AccountIdentityQuery accountIdentityQuery) {
         this.workspaceRepository = workspaceRepository;
         this.membershipRepository = membershipRepository;
         this.connectionService = connectionService;
@@ -45,27 +44,25 @@ public class WorkspaceAdminService {
 
     private AdminWorkspaceViewDTO toView(Workspace ws) {
         IdentityProviderType providerType = connectionService
-            .findActiveProviderKind(ws.getId())
-            .map(IdentityProviderType::from)
-            .orElse(null);
-        User owner = membershipRepository
-            .findUsersByWorkspaceIdAndRole(ws.getId(), WorkspaceRole.OWNER)
-            .stream()
-            .findFirst()
-            .orElse(null);
-        Long ownerAccountId =
-            owner != null ? accountIdentityQuery.resolveAccountIdForActor(owner.getId()).orElse(null) : null;
+                .findActiveProviderKind(ws.getId())
+                .map(IdentityProviderType::from)
+                .orElse(null);
+        User owner = membershipRepository.findUsersByWorkspaceIdAndRole(ws.getId(), WorkspaceRole.OWNER).stream()
+                .findFirst()
+                .orElse(null);
+        Long ownerAccountId = owner != null
+                ? accountIdentityQuery.resolveAccountIdForActor(owner.getId()).orElse(null)
+                : null;
         return new AdminWorkspaceViewDTO(
-            ws.getId(),
-            ws.getWorkspaceSlug(),
-            ws.getDisplayName(),
-            ws.getStatus().name(),
-            ws.getAccountLogin(),
-            providerType,
-            owner != null ? owner.getLogin() : null,
-            ownerAccountId,
-            membershipRepository.countByWorkspace_Id(ws.getId()),
-            ws.getCreatedAt()
-        );
+                ws.getId(),
+                ws.getWorkspaceSlug(),
+                ws.getDisplayName(),
+                ws.getStatus().name(),
+                ws.getAccountLogin(),
+                providerType,
+                owner != null ? owner.getLogin() : null,
+                ownerAccountId,
+                membershipRepository.countByWorkspace_Id(ws.getId()),
+                ws.getCreatedAt());
     }
 }

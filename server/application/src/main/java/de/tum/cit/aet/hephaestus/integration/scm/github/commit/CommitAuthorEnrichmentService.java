@@ -96,7 +96,7 @@ public class CommitAuthorEnrichmentService {
 
     /** Type reference for deserializing GraphQL fields as {@code Map<String, Object>} without unchecked casts. */
     private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE_REF =
-        new ParameterizedTypeReference<>() {};
+            new ParameterizedTypeReference<>() {};
 
     private final CommitRepository commitRepository;
     private final CommitAuthorResolver authorResolver;
@@ -122,29 +122,24 @@ public class CommitAuthorEnrichmentService {
      * @return the number of commits enriched
      */
     public int enrichCommitAuthors(
-        Long repositoryId,
-        String nameWithOwner,
-        @Nullable Long scopeId,
-        Long providerId,
-        @Nullable Repository repository
-    ) {
+            Long repositoryId,
+            String nameWithOwner,
+            @Nullable Long scopeId,
+            Long providerId,
+            @Nullable Repository repository) {
         // Phase 1: Find all distinct unresolved emails from the database
-        List<String> unresolvedAuthorEmails = commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(
-            repositoryId
-        );
-        List<String> unresolvedCommitterEmails = commitRepository.findDistinctUnresolvedCommitterEmailsByRepositoryId(
-            repositoryId
-        );
+        List<String> unresolvedAuthorEmails =
+                commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(repositoryId);
+        List<String> unresolvedCommitterEmails =
+                commitRepository.findDistinctUnresolvedCommitterEmailsByRepositoryId(repositoryId);
 
         // Filter out known-unresolvable emails (e.g., GitHub web-flow bot)
-        unresolvedAuthorEmails = unresolvedAuthorEmails
-            .stream()
-            .filter(e -> !UNRESOLVABLE_EMAILS.contains(e))
-            .toList();
-        unresolvedCommitterEmails = unresolvedCommitterEmails
-            .stream()
-            .filter(e -> !UNRESOLVABLE_EMAILS.contains(e))
-            .toList();
+        unresolvedAuthorEmails = unresolvedAuthorEmails.stream()
+                .filter(e -> !UNRESOLVABLE_EMAILS.contains(e))
+                .toList();
+        unresolvedCommitterEmails = unresolvedCommitterEmails.stream()
+                .filter(e -> !UNRESOLVABLE_EMAILS.contains(e))
+                .toList();
 
         if (unresolvedAuthorEmails.isEmpty() && unresolvedCommitterEmails.isEmpty()) {
             log.debug("No unresolved commit authors: repoId={}", repositoryId);
@@ -152,26 +147,20 @@ public class CommitAuthorEnrichmentService {
         }
 
         log.debug(
-            "Found unresolved emails: repoId={}, authorEmails={}, committerEmails={}",
-            repositoryId,
-            unresolvedAuthorEmails.size(),
-            unresolvedCommitterEmails.size()
-        );
+                "Found unresolved emails: repoId={}, authorEmails={}, committerEmails={}",
+                repositoryId,
+                unresolvedAuthorEmails.size(),
+                unresolvedCommitterEmails.size());
 
         // Phase 2: First pass — try resolving by email using existing DB users
-        int enrichedByEmail = enrichByEmail(
-            repositoryId,
-            unresolvedAuthorEmails,
-            unresolvedCommitterEmails,
-            providerId
-        );
+        int enrichedByEmail =
+                enrichByEmail(repositoryId, unresolvedAuthorEmails, unresolvedCommitterEmails, providerId);
 
         // Phase 3: Re-check which emails are still unresolved after email pass
-        List<String> stillUnresolvedAuthorEmails = commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(
-            repositoryId
-        );
+        List<String> stillUnresolvedAuthorEmails =
+                commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(repositoryId);
         List<String> stillUnresolvedCommitterEmails =
-            commitRepository.findDistinctUnresolvedCommitterEmailsByRepositoryId(repositoryId);
+                commitRepository.findDistinctUnresolvedCommitterEmailsByRepositoryId(repositoryId);
 
         Set<String> allStillUnresolved = new HashSet<>(stillUnresolvedAuthorEmails);
         allStillUnresolved.addAll(stillUnresolvedCommitterEmails);
@@ -181,20 +170,18 @@ public class CommitAuthorEnrichmentService {
             log.info("Enriched all commit authors via email: repoId={}, enriched={}", repositoryId, enrichedByEmail);
         } else if (scopeId == null) {
             log.debug(
-                "Skipping GitHub API enrichment: reason=noScopeId, repoId={}, remaining={}",
-                repositoryId,
-                allStillUnresolved.size()
-            );
+                    "Skipping GitHub API enrichment: reason=noScopeId, repoId={}, remaining={}",
+                    repositoryId,
+                    allStillUnresolved.size());
         } else {
             // Phase 4: Cluster remaining unresolved by email, fetch from GitHub GraphQL API
             enrichedByApi = enrichByGitHubGraphQl(
-                repositoryId,
-                nameWithOwner,
-                scopeId,
-                stillUnresolvedAuthorEmails,
-                stillUnresolvedCommitterEmails,
-                providerId
-            );
+                    repositoryId,
+                    nameWithOwner,
+                    scopeId,
+                    stillUnresolvedAuthorEmails,
+                    stillUnresolvedCommitterEmails,
+                    providerId);
         }
 
         int total = enrichedByEmail + enrichedByApi;
@@ -205,25 +192,20 @@ public class CommitAuthorEnrichmentService {
         // Must publish regardless of which phase did the work — a Phase-2-only enrichment
         // would otherwise silently fail to trigger the activity backfill.
         if (total > 0 && scopeId != null && repository != null) {
-            eventPublisher.publishEvent(
-                new ScmDomainEvent.CommitAuthorsReconciled(
+            eventPublisher.publishEvent(new ScmDomainEvent.CommitAuthorsReconciled(
                     repositoryId,
                     EventContext.forSync(
-                        scopeId,
-                        Objects.requireNonNull(RepositoryRef.from(repository)),
-                        IdentityProviderType.GITHUB
-                    )
-                )
-            );
+                            scopeId,
+                            Objects.requireNonNull(RepositoryRef.from(repository)),
+                            IdentityProviderType.GITHUB)));
         }
 
         log.info(
-            "Completed commit author enrichment: repoId={}, enrichedByEmail={}, enrichedByApi={}, total={}",
-            repositoryId,
-            enrichedByEmail,
-            enrichedByApi,
-            total
-        );
+                "Completed commit author enrichment: repoId={}, enrichedByEmail={}, enrichedByApi={}, total={}",
+                repositoryId,
+                enrichedByEmail,
+                enrichedByApi,
+                total);
         return total;
     }
 
@@ -233,11 +215,10 @@ public class CommitAuthorEnrichmentService {
      * Uses bulk update by email — one UPDATE per distinct email.
      */
     private int enrichByEmail(
-        Long repositoryId,
-        List<String> unresolvedAuthorEmails,
-        List<String> unresolvedCommitterEmails,
-        Long providerId
-    ) {
+            Long repositoryId,
+            List<String> unresolvedAuthorEmails,
+            List<String> unresolvedCommitterEmails,
+            Long providerId) {
         int enriched = 0;
 
         for (String email : unresolvedAuthorEmails) {
@@ -267,13 +248,12 @@ public class CommitAuthorEnrichmentService {
      * then bulk update all commits sharing that email.
      */
     private int enrichByGitHubGraphQl(
-        Long repositoryId,
-        String nameWithOwner,
-        Long scopeId,
-        List<String> unresolvedAuthorEmails,
-        List<String> unresolvedCommitterEmails,
-        Long providerId
-    ) {
+            Long repositoryId,
+            String nameWithOwner,
+            Long scopeId,
+            List<String> unresolvedAuthorEmails,
+            List<String> unresolvedCommitterEmails,
+            Long providerId) {
         // Collect all unique unresolved emails
         Set<String> allUnresolvedEmails = new HashSet<>(unresolvedAuthorEmails);
         allUnresolvedEmails.addAll(unresolvedCommitterEmails);
@@ -313,20 +293,14 @@ public class CommitAuthorEnrichmentService {
         List<String> validShas = new ArrayList<>(shaToEmail.keySet());
 
         log.debug(
-            "Fetching {} representative commits via GraphQL: repoId={}, repo={}",
-            validShas.size(),
-            repositoryId,
-            nameWithOwner
-        );
+                "Fetching {} representative commits via GraphQL: repoId={}, repo={}",
+                validShas.size(),
+                repositoryId,
+                nameWithOwner);
 
         // Fetch commit authors in batches via GraphQL
-        Map<String, String> emailToLogin = fetchCommitAuthorsBatched(
-            nameWithOwner,
-            scopeId,
-            validShas,
-            shaToEmail,
-            providerId
-        );
+        Map<String, String> emailToLogin =
+                fetchCommitAuthorsBatched(nameWithOwner, scopeId, validShas, shaToEmail, providerId);
 
         // Bulk update: for each email → login, resolve login → user_id,
         // then update all commits with that email
@@ -343,12 +317,11 @@ public class CommitAuthorEnrichmentService {
                 int updated = commitRepository.bulkUpdateAuthorIdByEmail(email, repositoryId, userId);
                 enriched += updated;
                 log.debug(
-                    "Enriched {} commits author via GraphQL: email={}, login={}, repoId={}",
-                    updated,
-                    email,
-                    login,
-                    repositoryId
-                );
+                        "Enriched {} commits author via GraphQL: email={}, login={}, repoId={}",
+                        updated,
+                        email,
+                        login,
+                        repositoryId);
             }
         }
 
@@ -363,12 +336,11 @@ public class CommitAuthorEnrichmentService {
                 int updated = commitRepository.bulkUpdateCommitterIdByEmail(email, repositoryId, userId);
                 enriched += updated;
                 log.debug(
-                    "Enriched {} commits committer via GraphQL: email={}, login={}, repoId={}",
-                    updated,
-                    email,
-                    login,
-                    repositoryId
-                );
+                        "Enriched {} commits committer via GraphQL: email={}, login={}, repoId={}",
+                        updated,
+                        email,
+                        login,
+                        repositoryId);
             }
         }
 
@@ -394,12 +366,7 @@ public class CommitAuthorEnrichmentService {
      * @return map from email to GitHub login
      */
     private Map<String, String> fetchCommitAuthorsBatched(
-        String nameWithOwner,
-        Long scopeId,
-        List<String> shas,
-        Map<String, String> shaToEmail,
-        Long providerId
-    ) {
+            String nameWithOwner, Long scopeId, List<String> shas, Map<String, String> shaToEmail, Long providerId) {
         Map<String, String> emailToLogin = new HashMap<>();
         Map<Long, GitHubUserDTO> usersToUpsert = new HashMap<>();
         String[] parts = nameWithOwner.split("/", 2);
@@ -417,34 +384,19 @@ public class CommitAuthorEnrichmentService {
 
             // Check rate limit before each batch
             if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                if (
-                    !graphQlSyncCoordinator.waitForRateLimitIfNeeded(
-                        scopeId,
-                        "commit author enrichment",
-                        "repo",
-                        nameWithOwner,
-                        log
-                    )
-                ) {
+                if (!graphQlSyncCoordinator.waitForRateLimitIfNeeded(
+                        scopeId, "commit author enrichment", "repo", nameWithOwner, log)) {
                     log.warn(
-                        "Aborting commit author enrichment due to rate limit: repo={}, processed={}/{}",
-                        nameWithOwner,
-                        batchStart,
-                        shas.size()
-                    );
+                            "Aborting commit author enrichment due to rate limit: repo={}, processed={}/{}",
+                            nameWithOwner,
+                            batchStart,
+                            shas.size());
                     break;
                 }
             }
 
-            Map<String, String> batchResult = fetchBatch(
-                owner,
-                repoName,
-                scopeId,
-                batch,
-                shaToEmail,
-                nameWithOwner,
-                usersToUpsert
-            );
+            Map<String, String> batchResult =
+                    fetchBatch(owner, repoName, scopeId, batch, shaToEmail, nameWithOwner, usersToUpsert);
             emailToLogin.putAll(batchResult);
         }
 
@@ -461,14 +413,13 @@ public class CommitAuthorEnrichmentService {
      * @return map from email to GitHub login for commits in this batch
      */
     private Map<String, String> fetchBatch(
-        String owner,
-        String repoName,
-        Long scopeId,
-        List<String> batch,
-        Map<String, String> shaToEmail,
-        String nameWithOwner,
-        Map<Long, GitHubUserDTO> usersToUpsert
-    ) {
+            String owner,
+            String repoName,
+            Long scopeId,
+            List<String> batch,
+            Map<String, String> shaToEmail,
+            String nameWithOwner,
+            Map<Long, GitHubUserDTO> usersToUpsert) {
         Map<String, String> emailToLogin = new HashMap<>();
         String queryString = buildBatchQuery(owner, repoName, batch);
 
@@ -480,56 +431,45 @@ public class CommitAuthorEnrichmentService {
 
                 // Execute with Mono.defer() for transport retry coverage
                 var client = graphQlClientProvider.forScope(scopeId);
-                ClientGraphQlResponse response = Mono.defer(() -> client.document(queryString).execute())
-                    .retryWhen(
-                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                            .jitter(JITTER_FACTOR)
-                            .filter(ScmTransportErrors::isTransportError)
-                            .doBeforeRetry(signal ->
-                                log.warn(
-                                    "Retrying commit enrichment after transport error: repo={}, attempt={}, error={}",
-                                    nameWithOwner,
-                                    signal.totalRetries() + 1,
-                                    signal.failure().getMessage()
-                                )
-                            )
-                    )
-                    .block(GRAPHQL_TIMEOUT);
+                ClientGraphQlResponse response = Mono.defer(
+                                () -> client.document(queryString).execute())
+                        .retryWhen(Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                                .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                                .jitter(JITTER_FACTOR)
+                                .filter(ScmTransportErrors::isTransportError)
+                                .doBeforeRetry(signal -> log.warn(
+                                        "Retrying commit enrichment after transport error: repo={}, attempt={}, error={}",
+                                        nameWithOwner,
+                                        signal.totalRetries() + 1,
+                                        signal.failure().getMessage())))
+                        .block(GRAPHQL_TIMEOUT);
 
                 // Classify GraphQL errors
                 if (response == null || !response.isValid()) {
                     ClassificationResult classification = graphQlSyncCoordinator.classifyGraphQlErrors(response);
                     if (classification != null) {
-                        if (
-                            graphQlSyncCoordinator.handleGraphQlClassification(
-                                new GraphQlClassificationContext(
-                                    classification,
-                                    retryAttempt,
-                                    MAX_RETRY_ATTEMPTS,
-                                    "commit author enrichment",
-                                    "repo",
-                                    nameWithOwner,
-                                    log
-                                )
-                            )
-                        ) {
+                        if (graphQlSyncCoordinator.handleGraphQlClassification(new GraphQlClassificationContext(
+                                classification,
+                                retryAttempt,
+                                MAX_RETRY_ATTEMPTS,
+                                "commit author enrichment",
+                                "repo",
+                                nameWithOwner,
+                                log))) {
                             retryAttempt++;
                             continue;
                         }
                         // Non-retryable — abort this batch
                         log.warn(
-                            "Aborting commit enrichment batch: repo={}, error={}",
-                            nameWithOwner,
-                            classification.message()
-                        );
+                                "Aborting commit enrichment batch: repo={}, error={}",
+                                nameWithOwner,
+                                classification.message());
                         break;
                     }
                     log.warn(
-                        "Invalid GraphQL response for commit enrichment: repo={}, errors={}",
-                        nameWithOwner,
-                        response != null ? response.getErrors() : "null"
-                    );
+                            "Invalid GraphQL response for commit enrichment: repo={}, errors={}",
+                            nameWithOwner,
+                            response != null ? response.getErrors() : "null");
                     break;
                 }
 
@@ -544,19 +484,14 @@ public class CommitAuthorEnrichmentService {
                 graphQlClientProvider.recordFailure(e);
 
                 ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
-                if (
-                    graphQlSyncCoordinator.handleGraphQlClassification(
-                        new GraphQlClassificationContext(
-                            classification,
-                            retryAttempt,
-                            MAX_RETRY_ATTEMPTS,
-                            "commit author enrichment",
-                            "repo",
-                            nameWithOwner,
-                            log
-                        )
-                    )
-                ) {
+                if (graphQlSyncCoordinator.handleGraphQlClassification(new GraphQlClassificationContext(
+                        classification,
+                        retryAttempt,
+                        MAX_RETRY_ATTEMPTS,
+                        "commit author enrichment",
+                        "repo",
+                        nameWithOwner,
+                        log))) {
                     retryAttempt++;
                     continue;
                 }
@@ -579,10 +514,18 @@ public class CommitAuthorEnrichmentService {
         StringBuilder sb = new StringBuilder();
         sb.append("query {\n");
         sb.append("  rateLimit { cost limit remaining resetAt }\n");
-        sb.append("  repository(owner: \"").append(owner).append("\", name: \"").append(repoName).append("\") {\n");
+        sb.append("  repository(owner: \"")
+                .append(owner)
+                .append("\", name: \"")
+                .append(repoName)
+                .append("\") {\n");
 
         for (int i = 0; i < shas.size(); i++) {
-            sb.append("    commit").append(i).append(": object(oid: \"").append(shas.get(i)).append("\") {\n");
+            sb.append("    commit")
+                    .append(i)
+                    .append(": object(oid: \"")
+                    .append(shas.get(i))
+                    .append("\") {\n");
             sb.append("      ... on Commit {\n");
             sb.append("        oid\n");
             sb.append("        author { user { login databaseId name email avatarUrl url createdAt updatedAt } }\n");
@@ -605,12 +548,11 @@ public class CommitAuthorEnrichmentService {
      * email to a GitHub account.
      */
     private void extractLoginsFromResponse(
-        ClientGraphQlResponse response,
-        List<String> batch,
-        Map<String, String> shaToEmail,
-        Map<String, String> emailToLogin,
-        Map<Long, GitHubUserDTO> usersToUpsert
-    ) {
+            ClientGraphQlResponse response,
+            List<String> batch,
+            Map<String, String> shaToEmail,
+            Map<String, String> emailToLogin,
+            Map<Long, GitHubUserDTO> usersToUpsert) {
         for (int i = 0; i < batch.size(); i++) {
             String sha = batch.get(i);
             String fieldPath = "repository.commit" + i;
@@ -677,15 +619,14 @@ public class CommitAuthorEnrichmentService {
             GitHubUserDTO user = null;
             if (databaseId != null) {
                 user = new GitHubUserDTO(
-                    null,
-                    databaseId,
-                    login,
-                    normalizeString(userMap.get("avatarUrl")),
-                    normalizeString(userMap.get("url")),
-                    normalizeString(userMap.get("name")),
-                    normalizeString(userMap.get("email")),
-                    inferUserType(login)
-                );
+                        null,
+                        databaseId,
+                        login,
+                        normalizeString(userMap.get("avatarUrl")),
+                        normalizeString(userMap.get("url")),
+                        normalizeString(userMap.get("name")),
+                        normalizeString(userMap.get("email")),
+                        inferUserType(login));
             }
 
             return new UserSnapshot(login, user);
@@ -709,11 +650,10 @@ public class CommitAuthorEnrichmentService {
                 processed++;
             } catch (Exception e) {
                 log.debug(
-                    "Failed to upsert user from commit enrichment: repo={}, login={}, error={}",
-                    nameWithOwner,
-                    dto.login(),
-                    e.getMessage()
-                );
+                        "Failed to upsert user from commit enrichment: repo={}, login={}, error={}",
+                        nameWithOwner,
+                        dto.login(),
+                        e.getMessage());
             }
         }
         log.debug("Upserted {} users from commit enrichment: repo={}", processed, nameWithOwner);

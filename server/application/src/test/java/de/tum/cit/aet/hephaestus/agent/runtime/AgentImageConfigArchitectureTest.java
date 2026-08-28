@@ -17,15 +17,13 @@ class AgentImageConfigArchitectureTest extends HephaestusArchitectureTest {
     @Test
     void noConfigurationDefaultMayHardCodeARegistryReference() {
         constructors()
-            .that()
-            .areDeclaredInClassesThat()
-            .areAnnotatedWith(ConfigurationProperties.class)
-            .should(new RegistryReferenceCondition())
-            .because(
-                "ADR 0031 — a compiled-in image reference cannot know which build the deployment is running, " +
-                    "so the only correct value follows the deployment's own image tag from application.yml"
-            )
-            .check(classes);
+                .that()
+                .areDeclaredInClassesThat()
+                .areAnnotatedWith(ConfigurationProperties.class)
+                .should(new RegistryReferenceCondition())
+                .because("ADR 0031 — a compiled-in image reference cannot know which build the deployment is running, "
+                        + "so the only correct value follows the deployment's own image tag from application.yml")
+                .check(classes);
     }
 
     private static final class RegistryReferenceCondition extends ArchCondition<JavaConstructor> {
@@ -37,24 +35,18 @@ class AgentImageConfigArchitectureTest extends HephaestusArchitectureTest {
         @Override
         public void check(JavaConstructor ctor, ConditionEvents events) {
             for (JavaParameter parameter : ctor.getParameters()) {
-                parameter
-                    .tryGetAnnotationOfType(DefaultValue.class)
-                    .ifPresent(dv -> {
-                        for (String value : dv.value()) {
-                            if (value.contains("ghcr.io/") || value.contains("@sha256:")) {
-                                events.add(
-                                    SimpleConditionEvent.violated(
-                                        ctor,
-                                        ctor.getFullName() +
-                                            " parameter " +
-                                            parameter.getIndex() +
-                                            " has registry-ish @DefaultValue: " +
-                                            value
-                                    )
-                                );
-                            }
+                parameter.tryGetAnnotationOfType(DefaultValue.class).ifPresent(dv -> {
+                    for (String value : dv.value()) {
+                        if (value.contains("ghcr.io/") || value.contains("@sha256:")) {
+                            events.add(SimpleConditionEvent.violated(
+                                    ctor,
+                                    ctor.getFullName() + " parameter "
+                                            + parameter.getIndex()
+                                            + " has registry-ish @DefaultValue: "
+                                            + value));
                         }
-                    });
+                    }
+                });
             }
         }
     }

@@ -22,16 +22,16 @@ public final class SyncJobHandle implements SyncExecutionHandle {
      * nothing perceptually for a job measured in minutes and triples the DB and SSE traffic.
      */
     static final long MIN_WRITE_INTERVAL_SECONDS = 2;
+
     private static final Duration MIN_WRITE_INTERVAL = Duration.ofSeconds(MIN_WRITE_INTERVAL_SECONDS);
 
     @FunctionalInterface
     interface ProgressWriter {
         void writeProgress(
-            long jobId,
-            @Nullable Integer itemsProcessed,
-            @Nullable Integer itemsTotal,
-            Map<String, Object> progressDetail
-        );
+                long jobId,
+                @Nullable Integer itemsProcessed,
+                @Nullable Integer itemsTotal,
+                Map<String, Object> progressDetail);
     }
 
     private final long jobId;
@@ -169,10 +169,7 @@ public final class SyncJobHandle implements SyncExecutionHandle {
 
     /** Immutable snapshot of the buffered triple, so the DB write happens outside {@link #writeLock}. */
     private record Write(
-        @Nullable Integer itemsProcessed,
-        @Nullable Integer itemsTotal,
-        Map<String, Object> progressDetail
-    ) {
+            @Nullable Integer itemsProcessed, @Nullable Integer itemsTotal, Map<String, Object> progressDetail) {
         void apply(ProgressWriter writer, long jobId) {
             writer.writeProgress(jobId, itemsProcessed, itemsTotal, progressDetail);
         }

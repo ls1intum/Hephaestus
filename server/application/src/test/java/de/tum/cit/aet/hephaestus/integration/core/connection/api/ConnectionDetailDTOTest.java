@@ -35,9 +35,8 @@ class ConnectionDetailDTOTest {
 
     @Test
     void outlineConfig_dropsTheWebhookSecretButKeepsTheRestOfTheConfig() {
-        Connection connection = outlineConnection(
-            new ConnectionConfig.OutlineConfig("https://o.test", "sub-1", "ENC:v2:super-secret", Set.of("documents"))
-        );
+        Connection connection = outlineConnection(new ConnectionConfig.OutlineConfig(
+                "https://o.test", "sub-1", "ENC:v2:super-secret", Set.of("documents")));
 
         ConnectionDetailDTO dto = ConnectionDetailDTO.from(connection, manifests(), mapper);
 
@@ -50,8 +49,7 @@ class ConnectionDetailDTOTest {
     @Test
     void theSerializedResponseBodyContainsNoTraceOfTheSecret() {
         Connection connection = outlineConnection(
-            new ConnectionConfig.OutlineConfig("https://o.test", "sub-1", "ENC:v2:super-secret", Set.of())
-        );
+                new ConnectionConfig.OutlineConfig("https://o.test", "sub-1", "ENC:v2:super-secret", Set.of()));
 
         String json = mapper.writeValueAsString(ConnectionDetailDTO.from(connection, manifests(), mapper));
 
@@ -64,11 +62,10 @@ class ConnectionDetailDTOTest {
         Workspace workspace = new Workspace();
         workspace.setId(7L);
         Connection connection = new Connection(
-            workspace,
-            IntegrationKind.GITHUB,
-            "100",
-            new ConnectionConfig.GitHubAppConfig(100L, "acme", null, Set.of("issues"))
-        );
+                workspace,
+                IntegrationKind.GITHUB,
+                "100",
+                new ConnectionConfig.GitHubAppConfig(100L, "acme", null, Set.of("issues")));
         stampPersistenceFields(connection);
 
         ConnectionDetailDTO dto = ConnectionDetailDTO.from(connection, manifests(), mapper);
@@ -92,22 +89,20 @@ class ConnectionDetailDTOTest {
             }
             for (RecordComponent component : components) {
                 String name = component.getName().toLowerCase(Locale.ROOT);
-                boolean secretShaped =
-                    name.contains("secret") ||
-                    name.contains("token") ||
-                    name.contains("password") ||
-                    name.contains("credential") ||
-                    name.contains("privatekey");
+                boolean secretShaped = name.contains("secret")
+                        || name.contains("token")
+                        || name.contains("password")
+                        || name.contains("credential")
+                        || name.contains("privatekey");
                 if (secretShaped && !ConnectionDetailDTO.SENSITIVE_CONFIG_KEYS.contains(name)) {
                     unregistered.add(variant.getSimpleName() + "." + component.getName());
                 }
             }
         }
         assertThat(unregistered)
-            .as(
-                "add these to ConnectionDetailDTO.SENSITIVE_CONFIG_KEYS (lowercased) — they would be served by GET /connections/{id}"
-            )
-            .isEmpty();
+                .as(
+                        "add these to ConnectionDetailDTO.SENSITIVE_CONFIG_KEYS (lowercased) — they would be served by GET /connections/{id}")
+                .isEmpty();
     }
 
     private Connection outlineConnection(ConnectionConfig config) {

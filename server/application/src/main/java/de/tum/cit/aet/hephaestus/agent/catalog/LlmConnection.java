@@ -28,9 +28,11 @@ import org.jspecify.annotations.Nullable;
  */
 @Entity
 @Table(
-    name = "llm_connection",
-    uniqueConstraints = @UniqueConstraint(name = "ux_llm_connection_slug", columnNames = { "slug" })
-)
+        name = "llm_connection",
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "ux_llm_connection_slug",
+                        columnNames = {"slug"}))
 @Getter
 @Setter
 @NoArgsConstructor

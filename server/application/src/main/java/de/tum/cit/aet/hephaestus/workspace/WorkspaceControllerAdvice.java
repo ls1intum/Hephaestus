@@ -44,106 +44,79 @@ public class WorkspaceControllerAdvice {
     @ExceptionHandler(EntityNotFoundException.class)
     ProblemDetail handleNotFound(EntityNotFoundException exception) {
         return problem(
-            HttpStatus.NOT_FOUND,
-            "Resource not found",
-            Objects.requireNonNullElse(exception.getMessage(), "Unexpected error")
-        );
+                HttpStatus.NOT_FOUND,
+                "Resource not found",
+                Objects.requireNonNullElse(exception.getMessage(), "Unexpected error"));
     }
 
-    @ExceptionHandler({ InvalidWorkspaceSlugException.class, IllegalArgumentException.class })
+    @ExceptionHandler({InvalidWorkspaceSlugException.class, IllegalArgumentException.class})
     ProblemDetail handleBadRequest(RuntimeException exception) {
         return problem(
-            HttpStatus.BAD_REQUEST,
-            "Invalid workspace request",
-            userFacingDetail(Objects.requireNonNullElse(exception.getMessage(), "Unexpected error"))
-        );
+                HttpStatus.BAD_REQUEST,
+                "Invalid workspace request",
+                userFacingDetail(Objects.requireNonNullElse(exception.getMessage(), "Unexpected error")));
     }
 
     @ExceptionHandler(WorkspaceSlugConflictException.class)
     ProblemDetail handleConflict(WorkspaceSlugConflictException exception) {
         return problem(
-            HttpStatus.CONFLICT,
-            "Workspace slug conflict",
-            userFacingDetail(Objects.requireNonNullElse(exception.getMessage(), "Unexpected error"))
-        );
+                HttpStatus.CONFLICT,
+                "Workspace slug conflict",
+                userFacingDetail(Objects.requireNonNullElse(exception.getMessage(), "Unexpected error")));
     }
 
     @ExceptionHandler(RepositoryAlreadyMonitoredException.class)
     ProblemDetail handleRepositoryConflict(RepositoryAlreadyMonitoredException exception) {
         return problem(
-            HttpStatus.CONFLICT,
-            "Repository already monitored",
-            userFacingDetail(Objects.requireNonNullElse(exception.getMessage(), "Unexpected error"))
-        );
+                HttpStatus.CONFLICT,
+                "Repository already monitored",
+                userFacingDetail(Objects.requireNonNullElse(exception.getMessage(), "Unexpected error")));
     }
 
     @ExceptionHandler(RepositoryManagementNotAllowedException.class)
     ProblemDetail handleRepositoryManagementNotAllowed(RepositoryManagementNotAllowedException exception) {
         return problem(
-            HttpStatus.BAD_REQUEST,
-            "Repository management not allowed",
-            userFacingDetail(Objects.requireNonNullElse(exception.getMessage(), "Unexpected error"))
-        );
+                HttpStatus.BAD_REQUEST,
+                "Repository management not allowed",
+                userFacingDetail(Objects.requireNonNullElse(exception.getMessage(), "Unexpected error")));
     }
 
-    @ExceptionHandler({ WorkspaceLifecycleViolationException.class, WorkspacePurgeBlockedException.class })
+    @ExceptionHandler({WorkspaceLifecycleViolationException.class, WorkspacePurgeBlockedException.class})
     ProblemDetail handleLifecycleViolation(RuntimeException exception) {
         return problem(
-            HttpStatus.CONFLICT,
-            "Workspace lifecycle violation",
-            userFacingDetail(Objects.requireNonNullElse(exception.getMessage(), "Unexpected error"))
-        );
+                HttpStatus.CONFLICT,
+                "Workspace lifecycle violation",
+                userFacingDetail(Objects.requireNonNullElse(exception.getMessage(), "Unexpected error")));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ProblemDetail handleMethodArgumentNotValid(MethodArgumentNotValidException exception) {
-        Map<String, List<String>> errors = exception
-            .getBindingResult()
-            .getFieldErrors()
-            .stream()
-            .collect(
-                Collectors.groupingBy(
-                    FieldError::getField,
-                    Collectors.mapping(FieldError::getDefaultMessage, Collectors.toList())
-                )
-            );
+        Map<String, List<String>> errors = exception.getBindingResult().getFieldErrors().stream()
+                .collect(Collectors.groupingBy(
+                        FieldError::getField, Collectors.mapping(FieldError::getDefaultMessage, Collectors.toList())));
 
         return problemWithErrors(
-            HttpStatus.BAD_REQUEST,
-            "Validation failed",
-            "Request body contains invalid fields",
-            errors
-        );
+                HttpStatus.BAD_REQUEST, "Validation failed", "Request body contains invalid fields", errors);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
     ProblemDetail handleConstraintViolation(ConstraintViolationException exception) {
-        Map<String, List<String>> errors = exception
-            .getConstraintViolations()
-            .stream()
-            .collect(
-                Collectors.groupingBy(
-                    violation -> leafProperty(violation).orElse("value"),
-                    Collectors.mapping(ConstraintViolation::getMessage, Collectors.toList())
-                )
-            );
+        Map<String, List<String>> errors = exception.getConstraintViolations().stream()
+                .collect(Collectors.groupingBy(
+                        violation -> leafProperty(violation).orElse("value"),
+                        Collectors.mapping(ConstraintViolation::getMessage, Collectors.toList())));
 
         return problemWithErrors(
-            HttpStatus.BAD_REQUEST,
-            "Validation failed",
-            "Request parameters contain invalid values",
-            errors
-        );
+                HttpStatus.BAD_REQUEST, "Validation failed", "Request parameters contain invalid values", errors);
     }
 
     @ExceptionHandler(IllegalStateException.class)
     ProblemDetail handleIllegalState(IllegalStateException exception) {
         log.error("Encountered unexpected workspace state", exception);
         return problem(
-            HttpStatus.INTERNAL_SERVER_ERROR,
-            "Workspace operation failed",
-            "The workspace request could not be completed. Please try again later."
-        );
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "Workspace operation failed",
+                "The workspace request could not be completed. Please try again later.");
     }
 
     private ProblemDetail problem(HttpStatus status, String title, String detail) {
@@ -154,11 +127,7 @@ public class WorkspaceControllerAdvice {
     }
 
     private ProblemDetail problemWithErrors(
-        HttpStatus status,
-        String title,
-        String detail,
-        Map<String, List<String>> errors
-    ) {
+            HttpStatus status, String title, String detail, Map<String, List<String>> errors) {
         ProblemDetail problem = problem(status, title, detail);
         problem.setProperty("errors", errors);
         return problem;
@@ -166,9 +135,9 @@ public class WorkspaceControllerAdvice {
 
     private String userFacingDetail(String detail) {
         return Optional.ofNullable(detail)
-            .map(LoggingUtils::sanitizeForLog)
-            .filter(s -> !s.isBlank())
-            .orElse("The workspace request could not be processed.");
+                .map(LoggingUtils::sanitizeForLog)
+                .filter(s -> !s.isBlank())
+                .orElse("The workspace request could not be processed.");
     }
 
     private Optional<String> leafProperty(ConstraintViolation<?> violation) {

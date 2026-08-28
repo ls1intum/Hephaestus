@@ -54,11 +54,10 @@ public class GitHubProjectItemFieldValueSyncService {
 
     @Transactional
     public List<String> processFieldValues(
-        @Nullable Long itemId,
-        @Nullable List<GitHubProjectFieldValueDTO> fieldValues,
-        boolean truncated,
-        @Nullable String endCursor
-    ) {
+            @Nullable Long itemId,
+            @Nullable List<GitHubProjectFieldValueDTO> fieldValues,
+            boolean truncated,
+            @Nullable String endCursor) {
         if (itemId == null) {
             return List.of();
         }
@@ -79,25 +78,23 @@ public class GitHubProjectItemFieldValueSyncService {
 
             if (!projectFieldRepository.existsById(fieldValue.fieldId())) {
                 log.debug(
-                    "Skipped field value: reason=fieldNotFound, fieldId={}, itemId={}",
-                    fieldValue.fieldId(),
-                    itemId
-                );
+                        "Skipped field value: reason=fieldNotFound, fieldId={}, itemId={}",
+                        fieldValue.fieldId(),
+                        itemId);
                 continue;
             }
 
             processedFieldIds.add(fieldValue.fieldId());
 
             projectFieldValueRepository.upsertCore(
-                itemId,
-                fieldValue.fieldId(),
-                fieldValue.textValue(),
-                fieldValue.numberValue(),
-                fieldValue.dateValue(),
-                fieldValue.singleSelectOptionId(),
-                fieldValue.iterationId(),
-                Instant.now()
-            );
+                    itemId,
+                    fieldValue.fieldId(),
+                    fieldValue.textValue(),
+                    fieldValue.numberValue(),
+                    fieldValue.dateValue(),
+                    fieldValue.singleSelectOptionId(),
+                    fieldValue.iterationId(),
+                    Instant.now());
         }
 
         if (!truncated) {
@@ -108,12 +105,11 @@ public class GitHubProjectItemFieldValueSyncService {
     }
 
     public int syncRemainingFieldValues(
-        Long scopeId,
-        @Nullable String itemNodeId,
-        @Nullable Long itemId,
-        @Nullable String startCursor,
-        List<String> initialFieldIds
-    ) {
+            Long scopeId,
+            @Nullable String itemNodeId,
+            @Nullable Long itemId,
+            @Nullable String startCursor,
+            List<String> initialFieldIds) {
         if (itemNodeId == null || itemNodeId.isBlank() || itemId == null) {
             return 0;
         }
@@ -137,10 +133,9 @@ public class GitHubProjectItemFieldValueSyncService {
             pageCount++;
             if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
-                    "Reached maximum pagination limit for item field values: itemId={}, limit={}",
-                    itemId,
-                    MAX_PAGINATION_PAGES
-                );
+                        "Reached maximum pagination limit for item field values: itemId={}, limit={}",
+                        itemId,
+                        MAX_PAGINATION_PAGES);
                 break;
             }
 
@@ -148,59 +143,42 @@ public class GitHubProjectItemFieldValueSyncService {
                 final String currentCursor = cursor;
                 final int currentPage = pageCount;
 
-                ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
-                    client
-                        .documentName(GET_PROJECT_ITEM_FIELD_VALUES_DOCUMENT)
-                        .variable("itemId", itemNodeId)
-                        .variable(
-                            "first",
-                            adaptPageSize(
-                                FIELD_VALUES_PAGINATION_SIZE,
-                                graphQlClientProvider.getRateLimitRemaining(scopeId)
-                            )
-                        )
-                        .variable("after", currentCursor)
-                        .execute()
-                )
-                    .retryWhen(
-                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                            .jitter(JITTER_FACTOR)
-                            .filter(ScmTransportErrors::isTransportError)
-                            .doBeforeRetry(signal ->
-                                log.warn(
-                                    "Retrying field values pagination after transport error: itemId={}, page={}, attempt={}, error={}",
-                                    itemId,
-                                    currentPage,
-                                    signal.totalRetries() + 1,
-                                    signal.failure().getMessage()
-                                )
-                            )
-                    )
-                    .block(timeout);
+                ClientGraphQlResponse graphQlResponse = Mono.defer(
+                                () -> client.documentName(GET_PROJECT_ITEM_FIELD_VALUES_DOCUMENT)
+                                        .variable("itemId", itemNodeId)
+                                        .variable(
+                                                "first",
+                                                adaptPageSize(
+                                                        FIELD_VALUES_PAGINATION_SIZE,
+                                                        graphQlClientProvider.getRateLimitRemaining(scopeId)))
+                                        .variable("after", currentCursor)
+                                        .execute())
+                        .retryWhen(Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                                .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                                .jitter(JITTER_FACTOR)
+                                .filter(ScmTransportErrors::isTransportError)
+                                .doBeforeRetry(signal -> log.warn(
+                                        "Retrying field values pagination after transport error: itemId={}, page={}, attempt={}, error={}",
+                                        itemId,
+                                        currentPage,
+                                        signal.totalRetries() + 1,
+                                        signal.failure().getMessage())))
+                        .block(timeout);
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
                     ClassificationResult classification = classifyGraphQlErrors(graphQlResponse);
                     if (classification != null) {
-                        if (
-                            handleClassification(
-                                classification,
-                                "field values pagination",
-                                "itemId",
-                                itemId,
-                                retryAttempt
-                            )
-                        ) {
+                        if (handleClassification(
+                                classification, "field values pagination", "itemId", itemId, retryAttempt)) {
                             retryAttempt++;
                             continue;
                         }
                         break;
                     }
                     log.warn(
-                        "Received invalid GraphQL response for item field values: itemId={}, errors={}",
-                        itemId,
-                        graphQlResponse != null ? graphQlResponse.getErrors() : "null"
-                    );
+                            "Received invalid GraphQL response for item field values: itemId={}, errors={}",
+                            itemId,
+                            graphQlResponse != null ? graphQlResponse.getErrors() : "null");
                     break;
                 }
 
@@ -212,9 +190,8 @@ public class GitHubProjectItemFieldValueSyncService {
                     }
                 }
 
-                GHProjectV2ItemFieldValueConnection fieldValuesConnection = graphQlResponse
-                    .field("node.fieldValues")
-                    .toEntity(GHProjectV2ItemFieldValueConnection.class);
+                GHProjectV2ItemFieldValueConnection fieldValuesConnection =
+                        graphQlResponse.field("node.fieldValues").toEntity(GHProjectV2ItemFieldValueConnection.class);
 
                 if (fieldValuesConnection == null || fieldValuesConnection.getNodes() == null) {
                     break;
@@ -224,12 +201,10 @@ public class GitHubProjectItemFieldValueSyncService {
                     reportedTotalCount = fieldValuesConnection.getTotalCount();
                 }
 
-                List<GitHubProjectFieldValueDTO> fieldValueDTOs = fieldValuesConnection
-                    .getNodes()
-                    .stream()
-                    .map(GitHubProjectFieldValueDTO::fromFieldValue)
-                    .filter(dto -> dto != null && dto.fieldId() != null)
-                    .toList();
+                List<GitHubProjectFieldValueDTO> fieldValueDTOs = fieldValuesConnection.getNodes().stream()
+                        .map(GitHubProjectFieldValueDTO::fromFieldValue)
+                        .filter(dto -> dto != null && dto.fieldId() != null)
+                        .toList();
 
                 transactionTemplate.executeWithoutResult(status -> {
                     if (!projectItemRepository.existsById(itemId)) {
@@ -244,25 +219,23 @@ public class GitHubProjectItemFieldValueSyncService {
                         }
                         if (!projectFieldRepository.existsById(fieldId)) {
                             log.debug(
-                                "Skipped field value: reason=fieldNotFound, fieldId={}, itemId={}",
-                                fieldValue.fieldId(),
-                                itemId
-                            );
+                                    "Skipped field value: reason=fieldNotFound, fieldId={}, itemId={}",
+                                    fieldValue.fieldId(),
+                                    itemId);
                             continue;
                         }
 
                         processedFieldIds.add(fieldId);
 
                         projectFieldValueRepository.upsertCore(
-                            itemId,
-                            fieldId,
-                            fieldValue.textValue(),
-                            fieldValue.numberValue(),
-                            fieldValue.dateValue(),
-                            fieldValue.singleSelectOptionId(),
-                            fieldValue.iterationId(),
-                            Instant.now()
-                        );
+                                itemId,
+                                fieldId,
+                                fieldValue.textValue(),
+                                fieldValue.numberValue(),
+                                fieldValue.dateValue(),
+                                fieldValue.singleSelectOptionId(),
+                                fieldValue.iterationId(),
+                                Instant.now());
                     }
                 });
 
@@ -302,12 +275,7 @@ public class GitHubProjectItemFieldValueSyncService {
         // totalSynced is the raw node count; completedNormally is false only on a page-cap/error stop.
         if (reportedTotalCount >= 0) {
             GraphQlConnectionOverflowDetector.checkPaginated(
-                "fieldValues",
-                totalSynced,
-                reportedTotalCount,
-                !completedNormally,
-                "itemId=" + itemNodeId
-            );
+                    "fieldValues", totalSynced, reportedTotalCount, !completedNormally, "itemId=" + itemNodeId);
         }
 
         if (!processedFieldIds.isEmpty() && completedNormally) {
@@ -340,14 +308,13 @@ public class GitHubProjectItemFieldValueSyncService {
         Instant updatedAt = fieldDto.updatedAt() != null ? fieldDto.updatedAt() : Instant.now();
 
         projectFieldRepository.upsertCore(
-            fieldDto.id(),
-            projectId,
-            fieldDto.name(),
-            dataType.name(),
-            fieldDto.getOptionsJson(),
-            createdAt,
-            updatedAt
-        );
+                fieldDto.id(),
+                projectId,
+                fieldDto.name(),
+                dataType.name(),
+                fieldDto.getOptionsJson(),
+                createdAt,
+                updatedAt);
     }
 
     /**
@@ -393,41 +360,30 @@ public class GitHubProjectItemFieldValueSyncService {
         }
 
         return switch (transientError.type()) {
-            case RATE_LIMIT -> ClassificationResult.rateLimited(
-                transientError.getRecommendedWait(),
-                "GraphQL rate limit: " + transientError.message()
-            );
-            case TIMEOUT, SERVER_ERROR -> ClassificationResult.of(
-                Category.RETRYABLE,
-                "GraphQL transient error: " + transientError.message()
-            );
-            case RESOURCE_LIMIT -> ClassificationResult.of(
-                Category.CLIENT_ERROR,
-                "GraphQL resource limit: " + transientError.message()
-            );
+            case RATE_LIMIT ->
+                ClassificationResult.rateLimited(
+                        transientError.getRecommendedWait(), "GraphQL rate limit: " + transientError.message());
+            case TIMEOUT, SERVER_ERROR ->
+                ClassificationResult.of(Category.RETRYABLE, "GraphQL transient error: " + transientError.message());
+            case RESOURCE_LIMIT ->
+                ClassificationResult.of(Category.CLIENT_ERROR, "GraphQL resource limit: " + transientError.message());
         };
     }
 
     private boolean handleClassification(
-        ClassificationResult classification,
-        String phase,
-        String scopeLabel,
-        Object scopeValue,
-        int retryAttempt
-    ) {
+            ClassificationResult classification, String phase, String scopeLabel, Object scopeValue, int retryAttempt) {
         Category category = classification.category();
 
         switch (category) {
             case RETRYABLE -> {
                 if (retryAttempt < MAX_RETRY_ATTEMPTS) {
                     log.warn(
-                        "Retrying {} after transient error: {}={}, attempt={}, error={}",
-                        phase,
-                        scopeLabel,
-                        scopeValue,
-                        retryAttempt + 1,
-                        classification.message()
-                    );
+                            "Retrying {} after transient error: {}={}, attempt={}, error={}",
+                            phase,
+                            scopeLabel,
+                            scopeValue,
+                            retryAttempt + 1,
+                            classification.message());
                     try {
                         ExponentialBackoff.sleep(retryAttempt + 1);
                     } catch (InterruptedException ie) {
@@ -437,25 +393,19 @@ public class GitHubProjectItemFieldValueSyncService {
                     return true;
                 }
                 log.warn(
-                    "Aborting {} after {} retries: {}={}, error={}",
-                    phase,
-                    MAX_RETRY_ATTEMPTS,
-                    scopeLabel,
-                    scopeValue,
-                    classification.message()
-                );
+                        "Aborting {} after {} retries: {}={}, error={}",
+                        phase,
+                        MAX_RETRY_ATTEMPTS,
+                        scopeLabel,
+                        scopeValue,
+                        classification.message());
                 return false;
             }
             case RATE_LIMITED -> {
                 if (retryAttempt < MAX_RETRY_ATTEMPTS && classification.suggestedWait() != null) {
                     long waitMs = Math.min(classification.suggestedWait().toMillis(), 300_000);
                     log.warn(
-                        "Rate limited during {}, waiting: {}={}, waitMs={}",
-                        phase,
-                        scopeLabel,
-                        scopeValue,
-                        waitMs
-                    );
+                            "Rate limited during {}, waiting: {}={}, waitMs={}", phase, scopeLabel, scopeValue, waitMs);
                     try {
                         Thread.sleep(waitMs);
                     } catch (InterruptedException ie) {
@@ -465,53 +415,48 @@ public class GitHubProjectItemFieldValueSyncService {
                     return true;
                 }
                 log.warn(
-                    "Aborting {} due to rate limit: {}={}, error={}",
-                    phase,
-                    scopeLabel,
-                    scopeValue,
-                    classification.message()
-                );
+                        "Aborting {} due to rate limit: {}={}, error={}",
+                        phase,
+                        scopeLabel,
+                        scopeValue,
+                        classification.message());
                 return false;
             }
             case NOT_FOUND -> {
                 log.warn(
-                    "Resource not found during {}: {}={}, error={}",
-                    phase,
-                    scopeLabel,
-                    scopeValue,
-                    classification.message()
-                );
+                        "Resource not found during {}: {}={}, error={}",
+                        phase,
+                        scopeLabel,
+                        scopeValue,
+                        classification.message());
                 return false;
             }
             case AUTH_ERROR -> {
                 log.warn(
-                    "Authentication error during {}: {}={}, error={}",
-                    phase,
-                    scopeLabel,
-                    scopeValue,
-                    classification.message()
-                );
+                        "Authentication error during {}: {}={}, error={}",
+                        phase,
+                        scopeLabel,
+                        scopeValue,
+                        classification.message());
                 return false;
             }
             case CLIENT_ERROR -> {
                 log.warn(
-                    "Client error during {}: {}={}, error={}",
-                    phase,
-                    scopeLabel,
-                    scopeValue,
-                    classification.message()
-                );
+                        "Client error during {}: {}={}, error={}",
+                        phase,
+                        scopeLabel,
+                        scopeValue,
+                        classification.message());
                 return false;
             }
             default -> {
                 log.warn(
-                    "Aborting {} due to error: {}={}, category={}, error={}",
-                    phase,
-                    scopeLabel,
-                    scopeValue,
-                    category,
-                    classification.message()
-                );
+                        "Aborting {} due to error: {}={}, category={}, error={}",
+                        phase,
+                        scopeLabel,
+                        scopeValue,
+                        category,
+                        classification.message());
                 return false;
             }
         }

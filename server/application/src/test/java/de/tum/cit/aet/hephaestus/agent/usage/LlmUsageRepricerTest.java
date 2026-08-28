@@ -61,23 +61,21 @@ class LlmUsageRepricerTest extends BaseUnitTest {
     }
 
     private static UnpricedLedgerRow row(
-        @org.jspecify.annotations.Nullable String model,
-        FundingSource funding,
-        @org.jspecify.annotations.Nullable Long appliedPriceId,
-        @org.jspecify.annotations.Nullable Long appliedWorkspaceModelId
-    ) {
+            @org.jspecify.annotations.Nullable String model,
+            FundingSource funding,
+            @org.jspecify.annotations.Nullable Long appliedPriceId,
+            @org.jspecify.annotations.Nullable Long appliedWorkspaceModelId) {
         return new UnpricedLedgerRow(
-            EVENT_ID,
-            WORKSPACE_ID,
-            model,
-            funding,
-            1_000_000L,
-            0L,
-            0L,
-            0L,
-            appliedPriceId,
-            appliedWorkspaceModelId
-        );
+                EVENT_ID,
+                WORKSPACE_ID,
+                model,
+                funding,
+                1_000_000L,
+                0L,
+                0L,
+                0L,
+                appliedPriceId,
+                appliedWorkspaceModelId);
     }
 
     private static LlmModelPrice price(PricingMode mode, @org.jspecify.annotations.Nullable BigDecimal input) {
@@ -127,12 +125,12 @@ class LlmUsageRepricerTest extends BaseUnitTest {
         LlmModel model = new LlmModel();
         model.setId(4L);
         when(modelRepository.findByUpstreamModelId("gpt-5")).thenReturn(List.of(model));
-        when(priceRepository.findByModelIdAndEffectiveToIsNull(4L)).thenReturn(
-            Optional.of(price(PricingMode.PRICED, new BigDecimal("2.00")))
-        );
+        when(priceRepository.findByModelIdAndEffectiveToIsNull(4L))
+                .thenReturn(Optional.of(price(PricingMode.PRICED, new BigDecimal("2.00"))));
         repriceSucceeds();
 
-        assertThat(repricer.reprice(row("gpt-5", FundingSource.INSTANCE, null, null))).isEqualTo(Outcome.REPRICED);
+        assertThat(repricer.reprice(row("gpt-5", FundingSource.INSTANCE, null, null)))
+                .isEqualTo(Outcome.REPRICED);
     }
 
     // Two connections may serve the same upstream id at different prices. Picking one would put a number
@@ -175,9 +173,8 @@ class LlmUsageRepricerTest extends BaseUnitTest {
     void aPartialPriceIsNotApplied() {
         when(priceRepository.findById(11L)).thenReturn(Optional.of(price(PricingMode.PRICED, null)));
 
-        assertThat(repricer.reprice(row("gpt-5", FundingSource.INSTANCE, 11L, null))).isEqualTo(
-            Outcome.STILL_UNPRICEABLE
-        );
+        assertThat(repricer.reprice(row("gpt-5", FundingSource.INSTANCE, 11L, null)))
+                .isEqualTo(Outcome.STILL_UNPRICEABLE);
     }
 
     @Test
@@ -200,9 +197,8 @@ class LlmUsageRepricerTest extends BaseUnitTest {
         when(priceRepository.findById(11L)).thenReturn(Optional.of(price(PricingMode.PRICED, new BigDecimal("3.00"))));
         when(usageRepository.applyResolvedPrice(any(), any(), any())).thenReturn(0);
 
-        assertThat(repricer.reprice(row("gpt-5", FundingSource.INSTANCE, 11L, null))).isEqualTo(
-            Outcome.STILL_UNPRICEABLE
-        );
+        assertThat(repricer.reprice(row("gpt-5", FundingSource.INSTANCE, 11L, null)))
+                .isEqualTo(Outcome.STILL_UNPRICEABLE);
     }
 
     @Test

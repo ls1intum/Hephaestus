@@ -51,8 +51,7 @@ import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequ
  * launch UX; LRU multi-flight cookie can be added if real users hit issues.
  */
 public class CookieOAuth2AuthorizationRequestRepository
-    implements AuthorizationRequestRepository<OAuth2AuthorizationRequest>
-{
+        implements AuthorizationRequestRepository<OAuth2AuthorizationRequest> {
 
     public static final String COOKIE_NAME = "__Host-OAUTH_STATE";
     private static final String AAD = "oauth2-state";
@@ -73,23 +72,21 @@ public class CookieOAuth2AuthorizationRequestRepository
      */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     record StoredAuthorizationRequest(
-        String authorizationUri,
-        String clientId,
-        String redirectUri,
-        Set<String> scopes,
-        String state,
-        String authorizationRequestUri,
-        Map<String, String> attributes,
-        Map<String, String> additionalParameters
-    ) {}
+            String authorizationUri,
+            String clientId,
+            String redirectUri,
+            Set<String> scopes,
+            String state,
+            String authorizationRequestUri,
+            Map<String, String> attributes,
+            Map<String, String> additionalParameters) {}
 
     private final SecretKeySpec key;
 
     public CookieOAuth2AuthorizationRequestRepository(byte[] aesKeyBytes) {
         if (aesKeyBytes.length != 32) {
             throw new IllegalArgumentException(
-                "AES-GCM cookie key must be 32 bytes (256-bit), got " + aesKeyBytes.length
-            );
+                    "AES-GCM cookie key must be 32 bytes (256-bit), got " + aesKeyBytes.length);
         }
         this.key = new SecretKeySpec(aesKeyBytes, "AES");
     }
@@ -112,10 +109,7 @@ public class CookieOAuth2AuthorizationRequestRepository
 
     @Override
     public void saveAuthorizationRequest(
-        OAuth2AuthorizationRequest authorizationRequest,
-        HttpServletRequest request,
-        HttpServletResponse response
-    ) {
+            OAuth2AuthorizationRequest authorizationRequest, HttpServletRequest request, HttpServletResponse response) {
         if (authorizationRequest == null) {
             clear(response);
             return;
@@ -134,9 +128,7 @@ public class CookieOAuth2AuthorizationRequestRepository
 
     @Override
     public @Nullable OAuth2AuthorizationRequest removeAuthorizationRequest(
-        HttpServletRequest request,
-        HttpServletResponse response
-    ) {
+            HttpServletRequest request, HttpServletResponse response) {
         OAuth2AuthorizationRequest loaded = loadAuthorizationRequest(request);
         if (loaded != null) {
             clear(response);
@@ -206,15 +198,14 @@ public class CookieOAuth2AuthorizationRequestRepository
         // PKCE stores code_verifier + registration_id as String attributes; the OAuth2 login flow never
         // puts non-String values in attributes/additionalParameters, so a String projection is lossless.
         StoredAuthorizationRequest stored = new StoredAuthorizationRequest(
-            req.getAuthorizationUri(),
-            req.getClientId(),
-            req.getRedirectUri(),
-            req.getScopes(),
-            req.getState(),
-            req.getAuthorizationRequestUri(),
-            stringifyValues(req.getAttributes()),
-            stringifyValues(req.getAdditionalParameters())
-        );
+                req.getAuthorizationUri(),
+                req.getClientId(),
+                req.getRedirectUri(),
+                req.getScopes(),
+                req.getState(),
+                req.getAuthorizationRequestUri(),
+                stringifyValues(req.getAttributes()),
+                stringifyValues(req.getAdditionalParameters()));
         try {
             return MAPPER.writeValueAsBytes(stored);
         } catch (Exception ex) {
@@ -231,11 +222,11 @@ public class CookieOAuth2AuthorizationRequestRepository
         }
         // Login is always the authorization-code grant (AuthSecurityConfig wires authorizationCode()).
         OAuth2AuthorizationRequest.Builder builder = OAuth2AuthorizationRequest.authorizationCode()
-            .authorizationUri(stored.authorizationUri())
-            .clientId(stored.clientId())
-            .redirectUri(stored.redirectUri())
-            .state(stored.state())
-            .authorizationRequestUri(stored.authorizationRequestUri());
+                .authorizationUri(stored.authorizationUri())
+                .clientId(stored.clientId())
+                .redirectUri(stored.redirectUri())
+                .state(stored.state())
+                .authorizationRequestUri(stored.authorizationRequestUri());
         if (stored.scopes() != null) {
             builder.scopes(stored.scopes());
         }

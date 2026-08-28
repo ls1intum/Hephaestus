@@ -49,24 +49,20 @@ public class GithubTokenRefresher implements TokenRefresher {
     @Override
     public BearerToken refresh(IntegrationRef ref, CredentialBundle source) {
         if (!(source instanceof InstallationCredential app)) {
-            throw new UnsupportedOperationException(
-                "GitHub TokenRefresher only supports InstallationCredential, got " +
-                    (source == null ? "null" : source.getClass().getSimpleName())
-            );
+            throw new UnsupportedOperationException("GitHub TokenRefresher only supports InstallationCredential, got "
+                    + (source == null ? "null" : source.getClass().getSimpleName()));
         }
         if (appTokenService == null) {
             throw new IllegalStateException(
-                "GitHubAppTokenService is not wired — cannot mint installation token for installationId=" +
-                    app.installationId()
-            );
+                    "GitHubAppTokenService is not wired — cannot mint installation token for installationId="
+                            + app.installationId());
         }
         InstallationToken minted = appTokenService.getInstallationTokenDetails(app.installationId());
         log.debug(
-            "Minted GitHub installation token for workspace={} installationId={} expiresAt={}",
-            ref == null ? null : ref.workspaceId(),
-            app.installationId(),
-            minted.expiresAt()
-        );
+                "Minted GitHub installation token for workspace={} installationId={} expiresAt={}",
+                ref == null ? null : ref.workspaceId(),
+                app.installationId(),
+                minted.expiresAt());
         return new BearerToken(minted.token(), minted.expiresAt());
     }
 }

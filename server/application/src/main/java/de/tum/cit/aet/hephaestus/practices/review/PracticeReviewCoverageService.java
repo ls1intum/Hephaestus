@@ -43,33 +43,27 @@ public class PracticeReviewCoverageService {
     private WorkspaceReviewScope readScope(Workspace workspace) {
         long workspaceId = workspace.getId();
         List<PracticeReviewRepositoryTarget> targets = repositoryTargetRepository.findByWorkspaceId(workspaceId);
-        Map<Long, RepositoryToMonitor> monitorsById = monitorRepository
-            .findByWorkspaceId(workspaceId)
-            .stream()
-            .collect(Collectors.toMap(RepositoryToMonitor::getId, Function.identity()));
-        List<ReviewRepositoryTarget> repositories = targets
-            .stream()
-            .map(target -> {
-                RepositoryToMonitor monitor = monitorsById.get(target.getRepositoryMonitorId());
-                return monitor == null
-                    ? null
-                    : new ReviewRepositoryTarget(monitor.getNameWithOwner(), target.getBaseBranches());
-            })
-            .filter(java.util.Objects::nonNull)
-            .sorted(java.util.Comparator.comparing(ReviewRepositoryTarget::nameWithOwner))
-            .toList();
-        List<Long> people = personTargetRepository
-            .findByWorkspaceId(workspaceId)
-            .stream()
-            .map(PracticeReviewPersonTarget::getUserId)
-            .sorted()
-            .toList();
+        Map<Long, RepositoryToMonitor> monitorsById = monitorRepository.findByWorkspaceId(workspaceId).stream()
+                .collect(Collectors.toMap(RepositoryToMonitor::getId, Function.identity()));
+        List<ReviewRepositoryTarget> repositories = targets.stream()
+                .map(target -> {
+                    RepositoryToMonitor monitor = monitorsById.get(target.getRepositoryMonitorId());
+                    return monitor == null
+                            ? null
+                            : new ReviewRepositoryTarget(monitor.getNameWithOwner(), target.getBaseBranches());
+                })
+                .filter(java.util.Objects::nonNull)
+                .sorted(java.util.Comparator.comparing(ReviewRepositoryTarget::nameWithOwner))
+                .toList();
+        List<Long> people = personTargetRepository.findByWorkspaceId(workspaceId).stream()
+                .map(PracticeReviewPersonTarget::getUserId)
+                .sorted()
+                .toList();
         return new WorkspaceReviewScope(
-            workspace.getReviewSettings().getRepositoryCoverageMode(),
-            workspace.getReviewSettings().getPersonCoverageMode(),
-            repositories,
-            people
-        );
+                workspace.getReviewSettings().getRepositoryCoverageMode(),
+                workspace.getReviewSettings().getPersonCoverageMode(),
+                repositories,
+                people);
     }
 
     @Transactional(readOnly = true)
@@ -79,61 +73,45 @@ public class PracticeReviewCoverageService {
 
     @Transactional(readOnly = true)
     public PracticeReviewCoveragePreviewDTO preview(
-        Workspace workspace,
-        WorkspaceReviewScope proposed,
-        int recentReviewVolume
-    ) {
+            Workspace workspace, WorkspaceReviewScope proposed, int recentReviewVolume) {
         validate(workspace.getId(), proposed);
         WorkspaceReviewScope current = readScope(workspace);
         return new PracticeReviewCoveragePreviewDTO(
-            summary(workspace, current, recentReviewVolume),
-            summary(workspace, proposed, recentReviewVolume),
-            widens(workspace.getId(), current, proposed)
-        );
+                summary(workspace, current, recentReviewVolume),
+                summary(workspace, proposed, recentReviewVolume),
+                widens(workspace.getId(), current, proposed));
     }
 
     private PracticeReviewCoverageSummaryDTO summary(
-        Workspace workspace,
-        WorkspaceReviewScope scope,
-        int recentReviewVolume
-    ) {
+            Workspace workspace, WorkspaceReviewScope scope, int recentReviewVolume) {
         int monitored = monitorRepository.findByWorkspaceId(workspace.getId()).size();
         int eligible = eligibleMemberships(workspace.getId()).size();
-        int coveredRepositories =
-            scope.repositoryMode() == ReviewRepositoryMode.ALL_MONITORED ? monitored : scope.repositories().size();
-        int coveredPeople =
-            scope.personMode() == ReviewPersonMode.ALL_ELIGIBLE ? eligible : scope.personUserIds().size();
+        int coveredRepositories = scope.repositoryMode() == ReviewRepositoryMode.ALL_MONITORED
+                ? monitored
+                : scope.repositories().size();
+        int coveredPeople = scope.personMode() == ReviewPersonMode.ALL_ELIGIBLE
+                ? eligible
+                : scope.personUserIds().size();
         return new PracticeReviewCoverageSummaryDTO(
-            coveredRepositories,
-            monitored,
-            coveredPeople,
-            eligible,
-            recentReviewVolume,
-            ESTIMATE_WINDOW_DAYS
-        );
+                coveredRepositories, monitored, coveredPeople, eligible, recentReviewVolume, ESTIMATE_WINDOW_DAYS);
     }
 
     private void validate(long workspaceId, WorkspaceReviewScope requested) {
-        Set<String> monitored = monitorRepository
-            .findByWorkspaceId(workspaceId)
-            .stream()
-            .map(RepositoryToMonitor::getNameWithOwner)
-            .collect(Collectors.toSet());
+        Set<String> monitored = monitorRepository.findByWorkspaceId(workspaceId).stream()
+                .map(RepositoryToMonitor::getNameWithOwner)
+                .collect(Collectors.toSet());
         for (ReviewRepositoryTarget repository : requested.repositories()) {
             if (!monitored.contains(repository.nameWithOwner())) {
                 throw new InvalidReviewCoverageException(
-                    "Repository is not monitored by this workspace: " + repository.nameWithOwner()
-                );
+                        "Repository is not monitored by this workspace: " + repository.nameWithOwner());
             }
         }
-        Set<Long> eligible = eligibleMemberships(workspaceId)
-            .stream()
-            .map(WorkspaceMembership::getUserId)
-            .collect(Collectors.toSet());
+        Set<Long> eligible = eligibleMemberships(workspaceId).stream()
+                .map(WorkspaceMembership::getUserId)
+                .collect(Collectors.toSet());
         if (!eligible.containsAll(requested.personUserIds())) {
             throw new InvalidReviewCoverageException(
-                "Every selected person must be an eligible linked workspace member"
-            );
+                    "Every selected person must be an eligible linked workspace member");
         }
     }
 
@@ -146,19 +124,17 @@ public class PracticeReviewCoverageService {
             if (afterRepository && !beforeRepository) return true;
             if (!afterRepository || !beforeRepository) continue;
             List<String> beforeBranches =
-                current.repositoryMode() == ReviewRepositoryMode.ALL_MONITORED || before == null
-                    ? List.of()
-                    : before.baseBranches();
+                    current.repositoryMode() == ReviewRepositoryMode.ALL_MONITORED || before == null
+                            ? List.of()
+                            : before.baseBranches();
             List<String> afterBranches =
-                proposed.repositoryMode() == ReviewRepositoryMode.ALL_MONITORED || after == null
-                    ? List.of()
-                    : after.baseBranches();
+                    proposed.repositoryMode() == ReviewRepositoryMode.ALL_MONITORED || after == null
+                            ? List.of()
+                            : after.baseBranches();
             if (!beforeBranches.isEmpty() && afterBranches.isEmpty()) return true;
-            if (
-                !beforeBranches.isEmpty() &&
-                !afterBranches.isEmpty() &&
-                afterBranches.stream().anyMatch(branch -> !beforeBranches.contains(branch))
-            ) return true;
+            if (!beforeBranches.isEmpty()
+                    && !afterBranches.isEmpty()
+                    && afterBranches.stream().anyMatch(branch -> !beforeBranches.contains(branch))) return true;
         }
         for (WorkspaceMembership membership : eligibleMemberships(workspaceId)) {
             Long userId = membership.getUserId();
@@ -168,49 +144,40 @@ public class PracticeReviewCoverageService {
     }
 
     private static @Nullable ReviewRepositoryTarget selected(WorkspaceReviewScope scope, String nameWithOwner) {
-        return scope
-            .repositories()
-            .stream()
-            .filter(repository -> repository.nameWithOwner().equals(nameWithOwner))
-            .findFirst()
-            .orElse(null);
+        return scope.repositories().stream()
+                .filter(repository -> repository.nameWithOwner().equals(nameWithOwner))
+                .findFirst()
+                .orElse(null);
     }
 
     @Transactional(readOnly = true)
     public boolean admits(
-        Workspace workspace,
-        @Nullable String repositoryNameWithOwner,
-        @Nullable String baseBranch,
-        @Nullable ReviewSubject subject
-    ) {
-        return readAssessment(workspace, repositoryNameWithOwner, baseBranch, subject, true).admitted();
+            Workspace workspace,
+            @Nullable String repositoryNameWithOwner,
+            @Nullable String baseBranch,
+            @Nullable ReviewSubject subject) {
+        return readAssessment(workspace, repositoryNameWithOwner, baseBranch, subject, true)
+                .admitted();
     }
 
     @Transactional(readOnly = true)
     public boolean admits(
-        Workspace workspace,
-        @Nullable String repositoryNameWithOwner,
-        @Nullable String baseBranch,
-        @Nullable ReviewSubject subject,
-        boolean branchRestrictionsApply
-    ) {
-        return readAssessment(
-            workspace,
-            repositoryNameWithOwner,
-            baseBranch,
-            subject,
-            branchRestrictionsApply
-        ).admitted();
+            Workspace workspace,
+            @Nullable String repositoryNameWithOwner,
+            @Nullable String baseBranch,
+            @Nullable ReviewSubject subject,
+            boolean branchRestrictionsApply) {
+        return readAssessment(workspace, repositoryNameWithOwner, baseBranch, subject, branchRestrictionsApply)
+                .admitted();
     }
 
     @Transactional(readOnly = true)
     public CoverageAssessment assess(
-        Workspace workspace,
-        @Nullable String repositoryNameWithOwner,
-        @Nullable String baseBranch,
-        @Nullable ReviewSubject subject,
-        boolean branchRestrictionsApply
-    ) {
+            Workspace workspace,
+            @Nullable String repositoryNameWithOwner,
+            @Nullable String baseBranch,
+            @Nullable ReviewSubject subject,
+            boolean branchRestrictionsApply) {
         return readAssessment(workspace, repositoryNameWithOwner, baseBranch, subject, branchRestrictionsApply);
     }
 
@@ -219,87 +186,79 @@ public class PracticeReviewCoverageService {
         WorkspaceReviewScope scope = readScope(workspace);
         ReviewSubjectStatus subjectStatus = subjectStatus(workspace, subject);
         boolean repositoryMatched = scope.repositoryMode() == ReviewRepositoryMode.ALL_MONITORED;
-        boolean personMatched =
-            subjectStatus == ReviewSubjectStatus.RESOLVED_LINKED_HUMAN &&
-            subject != null &&
-            scope.admitsPerson(subject.actorId());
+        boolean personMatched = subjectStatus == ReviewSubjectStatus.RESOLVED_LINKED_HUMAN
+                && subject != null
+                && scope.admitsPerson(subject.actorId());
         return new CoverageAssessment(
-            scope.repositoryMode(),
-            scope.personMode(),
-            subjectStatus,
-            repositoryMatched,
-            repositoryMatched,
-            personMatched,
-            repositoryMatched && personMatched
-        );
+                scope.repositoryMode(),
+                scope.personMode(),
+                subjectStatus,
+                repositoryMatched,
+                repositoryMatched,
+                personMatched,
+                repositoryMatched && personMatched);
     }
 
     private CoverageAssessment readAssessment(
-        Workspace workspace,
-        @Nullable String repositoryNameWithOwner,
-        @Nullable String baseBranch,
-        @Nullable ReviewSubject subject,
-        boolean branchRestrictionsApply
-    ) {
+            Workspace workspace,
+            @Nullable String repositoryNameWithOwner,
+            @Nullable String baseBranch,
+            @Nullable ReviewSubject subject,
+            boolean branchRestrictionsApply) {
         WorkspaceReviewScope scope = readScope(workspace);
         ReviewSubjectStatus subjectStatus = subjectStatus(workspace, subject);
 
-        ReviewRepositoryTarget selectedRepository = scope
-            .repositories()
-            .stream()
-            .filter(repository -> repository.nameWithOwner().equals(repositoryNameWithOwner))
-            .findFirst()
-            .orElse(null);
+        ReviewRepositoryTarget selectedRepository = scope.repositories().stream()
+                .filter(repository -> repository.nameWithOwner().equals(repositoryNameWithOwner))
+                .findFirst()
+                .orElse(null);
         boolean repositoryMatched =
-            scope.repositoryMode() == ReviewRepositoryMode.ALL_MONITORED || selectedRepository != null;
-        boolean branchMatched =
-            repositoryMatched &&
-            (!branchRestrictionsApply ||
-                scope.repositoryMode() == ReviewRepositoryMode.ALL_MONITORED ||
-                selectedRepository == null ||
-                selectedRepository.baseBranches().isEmpty() ||
-                (baseBranch != null && selectedRepository.baseBranches().contains(baseBranch)));
-        boolean personMatched =
-            subjectStatus == ReviewSubjectStatus.RESOLVED_LINKED_HUMAN &&
-            subject != null &&
-            scope.admitsPerson(subject.actorId());
+                scope.repositoryMode() == ReviewRepositoryMode.ALL_MONITORED || selectedRepository != null;
+        boolean branchMatched = repositoryMatched
+                && (!branchRestrictionsApply
+                        || scope.repositoryMode() == ReviewRepositoryMode.ALL_MONITORED
+                        || selectedRepository == null
+                        || selectedRepository.baseBranches().isEmpty()
+                        || (baseBranch != null
+                                && selectedRepository.baseBranches().contains(baseBranch)));
+        boolean personMatched = subjectStatus == ReviewSubjectStatus.RESOLVED_LINKED_HUMAN
+                && subject != null
+                && scope.admitsPerson(subject.actorId());
         return new CoverageAssessment(
-            scope.repositoryMode(),
-            scope.personMode(),
-            subjectStatus,
-            repositoryMatched,
-            branchMatched,
-            personMatched,
-            repositoryMatched && branchMatched && personMatched
-        );
+                scope.repositoryMode(),
+                scope.personMode(),
+                subjectStatus,
+                repositoryMatched,
+                branchMatched,
+                personMatched,
+                repositoryMatched && branchMatched && personMatched);
     }
 
     private ReviewSubjectStatus subjectStatus(Workspace workspace, @Nullable ReviewSubject subject) {
         if (subject == null || subject.actorId() == null) return ReviewSubjectStatus.MISSING;
         if (!subject.human()) return ReviewSubjectStatus.NON_HUMAN;
-        return membershipRepository.findByWorkspace_IdAndUser_Id(workspace.getId(), subject.actorId()).isPresent()
-            ? ReviewSubjectStatus.RESOLVED_LINKED_HUMAN
-            : ReviewSubjectStatus.UNLINKED;
+        return membershipRepository
+                        .findByWorkspace_IdAndUser_Id(workspace.getId(), subject.actorId())
+                        .isPresent()
+                ? ReviewSubjectStatus.RESOLVED_LINKED_HUMAN
+                : ReviewSubjectStatus.UNLINKED;
     }
 
     public record CoverageAssessment(
-        ReviewRepositoryMode repositoryMode,
-        ReviewPersonMode personMode,
-        ReviewSubjectStatus subjectStatus,
-        boolean repositoryMatched,
-        boolean branchMatched,
-        boolean personMatched,
-        boolean admitted
-    ) {}
+            ReviewRepositoryMode repositoryMode,
+            ReviewPersonMode personMode,
+            ReviewSubjectStatus subjectStatus,
+            boolean repositoryMatched,
+            boolean branchMatched,
+            boolean personMatched,
+            boolean admitted) {}
 
     @Transactional
     public void replace(Workspace workspace, WorkspaceReviewScope requested) {
         long workspaceId = workspace.getId();
         validate(workspaceId, requested);
-        Map<String, RepositoryToMonitor> monitorsByName = monitorRepository
-            .findByWorkspaceId(workspaceId)
-            .stream()
-            .collect(Collectors.toMap(RepositoryToMonitor::getNameWithOwner, Function.identity()));
+        Map<String, RepositoryToMonitor> monitorsByName = monitorRepository.findByWorkspaceId(workspaceId).stream()
+                .collect(Collectors.toMap(RepositoryToMonitor::getNameWithOwner, Function.identity()));
         Set<Long> requestedPeople = Set.copyOf(requested.personUserIds());
 
         repositoryTargetRepository.deleteByWorkspaceId(workspaceId);
@@ -308,31 +267,23 @@ public class PracticeReviewCoverageService {
         if (requested.repositoryMode() == ReviewRepositoryMode.SELECTED) {
             for (ReviewRepositoryTarget selection : requested.repositories()) {
                 RepositoryToMonitor monitor = java.util.Objects.requireNonNull(
-                    monitorsByName.get(selection.nameWithOwner()),
-                    "validated repository"
-                );
+                        monitorsByName.get(selection.nameWithOwner()), "validated repository");
                 repositoryTargetRepository.save(
-                    new PracticeReviewRepositoryTarget(workspaceId, monitor.getId(), selection.baseBranches())
-                );
+                        new PracticeReviewRepositoryTarget(workspaceId, monitor.getId(), selection.baseBranches()));
             }
         }
 
         if (requested.personMode() == ReviewPersonMode.SELECTED) {
-            personTargetRepository.saveAll(
-                requestedPeople
-                    .stream()
+            personTargetRepository.saveAll(requestedPeople.stream()
                     .map(userId -> new PracticeReviewPersonTarget(workspaceId, userId))
-                    .toList()
-            );
+                    .toList());
         }
         workspace.getReviewSettings().applyRollout(requested.repositoryMode(), requested.personMode(), null);
     }
 
     private List<WorkspaceMembership> eligibleMemberships(long workspaceId) {
-        return membershipRepository
-            .findAllWithUserByWorkspaceId(workspaceId)
-            .stream()
-            .filter(WorkspaceMembership::hasHumanUser)
-            .toList();
+        return membershipRepository.findAllWithUserByWorkspaceId(workspaceId).stream()
+                .filter(WorkspaceMembership::hasHumanUser)
+                .toList();
     }
 }

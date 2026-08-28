@@ -34,26 +34,23 @@ class PracticeReviewReadinessAdapterTest extends BaseUnitTest {
 
     @Test
     void unboundPracticeIsNotRunnable() {
-        when(bindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
-            Optional.empty()
-        );
+        when(bindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_REVIEW))
+                .thenReturn(Optional.empty());
         assertThat(checker.hasRunnableAgent(1L)).isFalse();
     }
 
     @Test
     void disabledBindingIsNotRunnable() {
-        when(bindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
-            Optional.of(binding(false))
-        );
+        when(bindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_REVIEW))
+                .thenReturn(Optional.of(binding(false)));
         assertThat(checker.hasRunnableAgent(1L)).isFalse();
     }
 
     @Test
     void enabledBindingWithRevokedModelIsNotRunnable() {
         WorkspaceAgentBinding b = binding(true);
-        when(bindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
-            Optional.of(b)
-        );
+        when(bindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_REVIEW))
+                .thenReturn(Optional.of(b));
         when(resolver.isAvailable(b)).thenReturn(false);
         assertThat(checker.hasRunnableAgent(1L)).isFalse();
     }
@@ -61,9 +58,8 @@ class PracticeReviewReadinessAdapterTest extends BaseUnitTest {
     @Test
     void enabledBindingWithAvailableModelIsRunnable() {
         WorkspaceAgentBinding b = binding(true);
-        when(bindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
-            Optional.of(b)
-        );
+        when(bindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_REVIEW))
+                .thenReturn(Optional.of(b));
         when(resolver.isAvailable(b)).thenReturn(true);
         assertThat(checker.hasRunnableAgent(1L)).isTrue();
     }

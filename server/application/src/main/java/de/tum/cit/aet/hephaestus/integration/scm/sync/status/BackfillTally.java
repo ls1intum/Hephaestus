@@ -36,6 +36,7 @@ public final class BackfillTally {
 
     /** Live checkpoint overrides from pages of the batch currently running. */
     private final Map<Long, Integer> liveIssueRemaining = new HashMap<>();
+
     private final Map<Long, Integer> livePullRequestRemaining = new HashMap<>();
 
     public BackfillTally(List<SyncTarget> targets) {
@@ -52,14 +53,12 @@ public final class BackfillTally {
         Map<Long, TargetMarks> refreshed = new HashMap<>();
         for (SyncTarget target : targets) {
             refreshed.put(
-                target.id(),
-                new TargetMarks(
-                    target.issueBackfillHighWaterMark(),
-                    target.pullRequestBackfillHighWaterMark(),
-                    target.getIssueBackfillRemaining(),
-                    target.getPullRequestBackfillRemaining()
-                )
-            );
+                    target.id(),
+                    new TargetMarks(
+                            target.issueBackfillHighWaterMark(),
+                            target.pullRequestBackfillHighWaterMark(),
+                            target.getIssueBackfillRemaining(),
+                            target.getPullRequestBackfillRemaining()));
         }
         this.marks = refreshed;
         liveIssueRemaining.clear();
@@ -127,10 +126,7 @@ public final class BackfillTally {
     }
 
     private static long phaseDone(
-        @Nullable Integer highWaterMark,
-        @Nullable Integer liveRemaining,
-        int persistedRemaining
-    ) {
+            @Nullable Integer highWaterMark, @Nullable Integer liveRemaining, int persistedRemaining) {
         if (highWaterMark == null) {
             // Uninitialized: contributes to neither side, so it cannot inflate the numerator against a
             // denominator that does not yet include it.
@@ -141,9 +137,8 @@ public final class BackfillTally {
     }
 
     private record TargetMarks(
-        @Nullable Integer issueHighWaterMark,
-        @Nullable Integer pullRequestHighWaterMark,
-        int issueRemaining,
-        int pullRequestRemaining
-    ) {}
+            @Nullable Integer issueHighWaterMark,
+            @Nullable Integer pullRequestHighWaterMark,
+            int issueRemaining,
+            int pullRequestRemaining) {}
 }

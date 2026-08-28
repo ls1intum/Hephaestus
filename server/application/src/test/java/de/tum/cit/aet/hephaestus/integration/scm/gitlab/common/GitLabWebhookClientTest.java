@@ -17,7 +17,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -91,15 +90,14 @@ class GitLabWebhookClientTest extends BaseUnitTest {
             when(requestSpec.retrieve("group")).thenReturn(retrieveSpec);
 
             GitLabGroupResponse groupResponse = new GitLabGroupResponse(
-                "gid://gitlab/Group/42",
-                "my-org",
-                "My Organization",
-                null,
-                "https://gitlab.com/my-org",
-                null,
-                "public",
-                null
-            );
+                    "gid://gitlab/Group/42",
+                    "my-org",
+                    "My Organization",
+                    null,
+                    "https://gitlab.com/my-org",
+                    null,
+                    "public",
+                    null);
             when(retrieveSpec.toEntity(GitLabGroupResponse.class)).thenReturn(Mono.just(groupResponse));
 
             GroupInfo result = webhookClient.lookupGroup(SCOPE_ID, "my-org");
@@ -123,8 +121,8 @@ class GitLabWebhookClientTest extends BaseUnitTest {
             when(retrieveSpec.toEntity(GitLabGroupResponse.class)).thenReturn(Mono.empty());
 
             assertThatThrownBy(() -> webhookClient.lookupGroup(SCOPE_ID, "nonexistent"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("not found");
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("not found");
         }
     }
 
@@ -144,27 +142,26 @@ class GitLabWebhookClientTest extends BaseUnitTest {
             Mockito.doReturn(bodySpec).when(bodySpec).header(anyString(), anyString());
             Mockito.doReturn(bodySpec).when(bodySpec).bodyValue(any());
             when(bodySpec.retrieve()).thenReturn(responseSpec);
-            when(responseSpec.bodyToMono(any(ParameterizedTypeReference.class))).thenReturn(
-                Mono.just(Map.of("id", 99, "url", "https://example.com/webhooks/gitlab"))
-            );
+            when(responseSpec.bodyToMono(any(ParameterizedTypeReference.class)))
+                    .thenReturn(Mono.just(Map.of("id", 99, "url", "https://example.com/webhooks/gitlab")));
 
             WebhookConfig config = new WebhookConfig(
-                "https://example.com/webhooks/gitlab",
-                "secret123",
-                true, // mergeRequestsEvents
-                true, // issuesEvents
-                true, // confidentialIssuesEvents
-                true, // noteEvents
-                false, // confidentialNoteEvents
-                true, // pushEvents
-                true, // tagPushEvents
-                false, // pipelineEvents
-                true, // milestoneEvents
-                true, // memberEvents
-                true, // subgroupEvents
-                true, // projectEvents
-                true // enableSslVerification
-            );
+                    "https://example.com/webhooks/gitlab",
+                    "secret123",
+                    true, // mergeRequestsEvents
+                    true, // issuesEvents
+                    true, // confidentialIssuesEvents
+                    true, // noteEvents
+                    false, // confidentialNoteEvents
+                    true, // pushEvents
+                    true, // tagPushEvents
+                    false, // pipelineEvents
+                    true, // milestoneEvents
+                    true, // memberEvents
+                    true, // subgroupEvents
+                    true, // projectEvents
+                    true // enableSslVerification
+                    );
 
             WebhookInfo result = webhookClient.registerGroupWebhook(SCOPE_ID, GROUP_ID, config);
 
@@ -188,9 +185,8 @@ class GitLabWebhookClientTest extends BaseUnitTest {
             when(uriSpec.uri(anyString(), eq(GROUP_ID), eq(99L))).thenReturn(headersSpec);
             when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
             when(headersSpec.retrieve()).thenReturn(responseSpec);
-            when(responseSpec.bodyToMono(any(ParameterizedTypeReference.class))).thenReturn(
-                Mono.just(Map.of("id", 99, "url", "https://example.com/webhooks/gitlab"))
-            );
+            when(responseSpec.bodyToMono(any(ParameterizedTypeReference.class)))
+                    .thenReturn(Mono.just(Map.of("id", 99, "url", "https://example.com/webhooks/gitlab")));
 
             Optional<WebhookInfo> result = webhookClient.getGroupWebhook(SCOPE_ID, GROUP_ID, 99L);
 
@@ -209,15 +205,9 @@ class GitLabWebhookClientTest extends BaseUnitTest {
             when(mockWebClient.get()).thenReturn(uriSpec);
             when(uriSpec.uri(anyString(), eq(GROUP_ID), eq(999L))).thenReturn(headersSpec);
             when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
-            when(headersSpec.retrieve()).thenThrow(
-                WebClientResponseException.create(
-                    404,
-                    "Not Found",
-                    HttpHeaders.EMPTY,
-                    new byte[0],
-                    StandardCharsets.UTF_8
-                )
-            );
+            when(headersSpec.retrieve())
+                    .thenThrow(WebClientResponseException.create(
+                            404, "Not Found", HttpHeaders.EMPTY, new byte[0], StandardCharsets.UTF_8));
 
             Optional<WebhookInfo> result = webhookClient.getGroupWebhook(SCOPE_ID, GROUP_ID, 999L);
 
@@ -240,14 +230,10 @@ class GitLabWebhookClientTest extends BaseUnitTest {
             when(uriSpec.uri(anyString(), eq(GROUP_ID))).thenReturn(headersSpec);
             when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
             when(headersSpec.retrieve()).thenReturn(responseSpec);
-            when(responseSpec.bodyToMono(any(ParameterizedTypeReference.class))).thenReturn(
-                Mono.just(
-                    List.of(
-                        Map.of("id", 1, "url", "https://a.com/hooks"),
-                        Map.of("id", 2, "url", "https://b.com/hooks")
-                    )
-                )
-            );
+            when(responseSpec.bodyToMono(any(ParameterizedTypeReference.class)))
+                    .thenReturn(Mono.just(List.of(
+                            Map.of("id", 1, "url", "https://a.com/hooks"),
+                            Map.of("id", 2, "url", "https://b.com/hooks"))));
 
             List<WebhookInfo> result = webhookClient.listGroupWebhooks(SCOPE_ID, GROUP_ID);
 
@@ -307,15 +293,9 @@ class GitLabWebhookClientTest extends BaseUnitTest {
             when(mockWebClient.delete()).thenReturn(uriSpec);
             when(uriSpec.uri(anyString(), eq(GROUP_ID), eq(999L))).thenReturn(headersSpec);
             when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
-            when(headersSpec.retrieve()).thenThrow(
-                WebClientResponseException.create(
-                    404,
-                    "Not Found",
-                    HttpHeaders.EMPTY,
-                    new byte[0],
-                    StandardCharsets.UTF_8
-                )
-            );
+            when(headersSpec.retrieve())
+                    .thenThrow(WebClientResponseException.create(
+                            404, "Not Found", HttpHeaders.EMPTY, new byte[0], StandardCharsets.UTF_8));
 
             // Should complete without exception (404 is treated as already deleted)
             webhookClient.deregisterGroupWebhook(SCOPE_ID, GROUP_ID, 999L);
@@ -331,19 +311,12 @@ class GitLabWebhookClientTest extends BaseUnitTest {
             when(mockWebClient.delete()).thenReturn(uriSpec);
             when(uriSpec.uri(anyString(), eq(GROUP_ID), eq(99L))).thenReturn(headersSpec);
             when(headersSpec.header(anyString(), anyString())).thenReturn(headersSpec);
-            when(headersSpec.retrieve()).thenThrow(
-                WebClientResponseException.create(
-                    500,
-                    "Internal Server Error",
-                    HttpHeaders.EMPTY,
-                    new byte[0],
-                    StandardCharsets.UTF_8
-                )
-            );
+            when(headersSpec.retrieve())
+                    .thenThrow(WebClientResponseException.create(
+                            500, "Internal Server Error", HttpHeaders.EMPTY, new byte[0], StandardCharsets.UTF_8));
 
-            assertThatThrownBy(() -> webhookClient.deregisterGroupWebhook(SCOPE_ID, GROUP_ID, 99L)).isInstanceOf(
-                WebClientResponseException.class
-            );
+            assertThatThrownBy(() -> webhookClient.deregisterGroupWebhook(SCOPE_ID, GROUP_ID, 99L))
+                    .isInstanceOf(WebClientResponseException.class);
         }
     }
 
@@ -352,22 +325,26 @@ class GitLabWebhookClientTest extends BaseUnitTest {
 
         @Test
         void shouldReturnTrueFor401() {
-            assertThat(GitLabWebhookClient.isPermissionOrNotFoundError(HttpStatus.UNAUTHORIZED)).isTrue();
+            assertThat(GitLabWebhookClient.isPermissionOrNotFoundError(HttpStatus.UNAUTHORIZED))
+                    .isTrue();
         }
 
         @Test
         void shouldReturnTrueFor403() {
-            assertThat(GitLabWebhookClient.isPermissionOrNotFoundError(HttpStatus.FORBIDDEN)).isTrue();
+            assertThat(GitLabWebhookClient.isPermissionOrNotFoundError(HttpStatus.FORBIDDEN))
+                    .isTrue();
         }
 
         @Test
         void shouldReturnTrueFor404() {
-            assertThat(GitLabWebhookClient.isPermissionOrNotFoundError(HttpStatus.NOT_FOUND)).isTrue();
+            assertThat(GitLabWebhookClient.isPermissionOrNotFoundError(HttpStatus.NOT_FOUND))
+                    .isTrue();
         }
 
         @Test
         void shouldReturnFalseFor500() {
-            assertThat(GitLabWebhookClient.isPermissionOrNotFoundError(HttpStatus.INTERNAL_SERVER_ERROR)).isFalse();
+            assertThat(GitLabWebhookClient.isPermissionOrNotFoundError(HttpStatus.INTERNAL_SERVER_ERROR))
+                    .isFalse();
         }
     }
 }

@@ -47,11 +47,10 @@ public class ChatMessageVote {
      */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
-        name = "message_id",
-        insertable = false,
-        updatable = false,
-        foreignKey = @ForeignKey(name = "fk_chat_message_vote_message")
-    )
+            name = "message_id",
+            insertable = false,
+            updatable = false,
+            foreignKey = @ForeignKey(name = "fk_chat_message_vote_message"))
     @ToString.Exclude
     @JsonIgnore
     private @Nullable ChatMessage message;

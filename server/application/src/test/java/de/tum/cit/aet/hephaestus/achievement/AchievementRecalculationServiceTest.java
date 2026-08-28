@@ -47,11 +47,7 @@ class AchievementRecalculationServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         service = new AchievementRecalculationService(
-            userAchievementRepository,
-            activityEventRepository,
-            achievementService,
-            transactionTemplate
-        );
+                userAchievementRepository, activityEventRepository, achievementService, transactionTemplate);
 
         testUser = new User();
         testUser.setId(1L);
@@ -63,15 +59,15 @@ class AchievementRecalculationServiceTest extends BaseUnitTest {
         workspace.setId(1L);
 
         return ActivityEvent.builder()
-            .actor(testUser)
-            .eventType(eventType)
-            .occurredAt(Instant.now())
-            .workspace(workspace)
-            .targetType("pull_request")
-            .targetId(100L)
-            .eventKey(eventType.name() + ":100:" + System.nanoTime())
-            .ingestedAt(Instant.now())
-            .build();
+                .actor(testUser)
+                .eventType(eventType)
+                .occurredAt(Instant.now())
+                .workspace(workspace)
+                .targetType("pull_request")
+                .targetId(100L)
+                .eventKey(eventType.name() + ":100:" + System.nanoTime())
+                .ingestedAt(Instant.now())
+                .build();
     }
 
     @Nested
@@ -84,12 +80,12 @@ class AchievementRecalculationServiceTest extends BaseUnitTest {
 
             // TransactionTemplate.executeWithoutResult -> just run the consumer
             doAnswer(invocation -> {
-                Consumer<Object> consumer = invocation.getArgument(0);
-                consumer.accept(null);
-                return null;
-            })
-                .when(transactionTemplate)
-                .executeWithoutResult(any());
+                        Consumer<Object> consumer = invocation.getArgument(0);
+                        consumer.accept(null);
+                        return null;
+                    })
+                    .when(transactionTemplate)
+                    .executeWithoutResult(any());
 
             // TransactionTemplate.execute for the slice query
             when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
@@ -100,9 +96,8 @@ class AchievementRecalculationServiceTest extends BaseUnitTest {
             });
 
             // Return a single slice with 2 events (no next page)
-            when(
-                activityEventRepository.findSliceByActorIdOrderByOccurredAtAsc(eq(1L), any(Pageable.class))
-            ).thenReturn(new SliceImpl<>(List.of(event1, event2), PageRequest.of(0, 500), false));
+            when(activityEventRepository.findSliceByActorIdOrderByOccurredAtAsc(eq(1L), any(Pageable.class)))
+                    .thenReturn(new SliceImpl<>(List.of(event1, event2), PageRequest.of(0, 500), false));
 
             service.recalculateUserInternal(testUser);
 
@@ -116,12 +111,12 @@ class AchievementRecalculationServiceTest extends BaseUnitTest {
         @Test
         void handlesEmptyHistory() {
             doAnswer(invocation -> {
-                Consumer<Object> consumer = invocation.getArgument(0);
-                consumer.accept(null);
-                return null;
-            })
-                .when(transactionTemplate)
-                .executeWithoutResult(any());
+                        Consumer<Object> consumer = invocation.getArgument(0);
+                        consumer.accept(null);
+                        return null;
+                    })
+                    .when(transactionTemplate)
+                    .executeWithoutResult(any());
 
             when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
                 var callback = invocation.getArgument(0);
@@ -130,9 +125,8 @@ class AchievementRecalculationServiceTest extends BaseUnitTest {
                 return typedCallback.doInTransaction(mock(org.springframework.transaction.TransactionStatus.class));
             });
 
-            when(
-                activityEventRepository.findSliceByActorIdOrderByOccurredAtAsc(eq(1L), any(Pageable.class))
-            ).thenReturn(new SliceImpl<>(List.of()));
+            when(activityEventRepository.findSliceByActorIdOrderByOccurredAtAsc(eq(1L), any(Pageable.class)))
+                    .thenReturn(new SliceImpl<>(List.of()));
 
             service.recalculateUserInternal(testUser);
 

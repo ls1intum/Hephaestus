@@ -80,16 +80,17 @@ public class GlobalControllerAdvice {
         // that makes a fail-closed audit trail's failure visible. The specific cause stays server-side.
         log.error("Config audit unavailable, change refused: message={}", messageOf(exception));
         return problem(
-            HttpStatus.INTERNAL_SERVER_ERROR,
-            "Change not recorded",
-            "The change was refused because it could not be written to the audit log."
-        );
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "Change not recorded",
+                "The change was refused because it could not be written to the audit log.");
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     ProblemDetail handleDataIntegrityViolation(DataIntegrityViolationException exception) {
         // Unique/FK constraint races (e.g. concurrent connection installs) → 409, not a 500.
-        log.warn("Handled data integrity violation: message={}", exception.getMostSpecificCause().getMessage());
+        log.warn(
+                "Handled data integrity violation: message={}",
+                exception.getMostSpecificCause().getMessage());
         return problem(HttpStatus.CONFLICT, "Conflict", "The request conflicts with the current resource state.");
     }
 
@@ -97,21 +98,12 @@ public class GlobalControllerAdvice {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ProblemDetail handleMethodArgumentNotValid(MethodArgumentNotValidException exception) {
-        Map<String, List<String>> errors = exception
-            .getBindingResult()
-            .getFieldErrors()
-            .stream()
-            .collect(
-                Collectors.groupingBy(
-                    FieldError::getField,
-                    Collectors.mapping(FieldError::getDefaultMessage, Collectors.toList())
-                )
-            );
+        Map<String, List<String>> errors = exception.getBindingResult().getFieldErrors().stream()
+                .collect(Collectors.groupingBy(
+                        FieldError::getField, Collectors.mapping(FieldError::getDefaultMessage, Collectors.toList())));
 
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-            HttpStatus.BAD_REQUEST,
-            "Request body contains invalid fields"
-        );
+        ProblemDetail problem =
+                ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Request body contains invalid fields");
         problem.setTitle("Validation failed");
         problem.setProperty("errors", errors);
         return problem;
@@ -119,20 +111,13 @@ public class GlobalControllerAdvice {
 
     @ExceptionHandler(ConstraintViolationException.class)
     ProblemDetail handleConstraintViolation(ConstraintViolationException exception) {
-        Map<String, List<String>> errors = exception
-            .getConstraintViolations()
-            .stream()
-            .collect(
-                Collectors.groupingBy(
-                    violation -> leafProperty(violation).orElse("value"),
-                    Collectors.mapping(ConstraintViolation::getMessage, Collectors.toList())
-                )
-            );
+        Map<String, List<String>> errors = exception.getConstraintViolations().stream()
+                .collect(Collectors.groupingBy(
+                        violation -> leafProperty(violation).orElse("value"),
+                        Collectors.mapping(ConstraintViolation::getMessage, Collectors.toList())));
 
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-            HttpStatus.BAD_REQUEST,
-            "Constraint validation failed"
-        );
+        ProblemDetail problem =
+                ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Constraint validation failed");
         problem.setTitle("Validation failed");
         problem.setProperty("errors", errors);
         return problem;
@@ -147,10 +132,9 @@ public class GlobalControllerAdvice {
         log.warn("External service request failed: uri={}, reason={}", exception.getUri(), messageOf(exception));
 
         return problem(
-            HttpStatus.SERVICE_UNAVAILABLE,
-            "Service unavailable",
-            "An upstream service is temporarily unavailable. Please try again later."
-        );
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "Service unavailable",
+                "An upstream service is temporarily unavailable. Please try again later.");
     }
 
     // FALLBACK HANDLER
@@ -160,27 +144,30 @@ public class GlobalControllerAdvice {
         // Server bug — log full SQL context server-side, sanitize client-facing message.
         log.error("Tenancy violation: unguardedTables={}", ex.unguardedTables(), ex);
         return problem(
-            HttpStatus.INTERNAL_SERVER_ERROR,
-            "Internal server error",
-            "An unexpected error occurred. Please try again later."
-        );
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "Internal server error",
+                "An unexpected error occurred. Please try again later.");
     }
 
     @ExceptionHandler(Exception.class)
     ProblemDetail handleGeneric(Exception exception) {
         // Log the full exception for debugging, but don't expose details to client
-        log.error("Caught unhandled exception: exceptionType={}", exception.getClass().getSimpleName(), exception);
+        log.error(
+                "Caught unhandled exception: exceptionType={}",
+                exception.getClass().getSimpleName(),
+                exception);
         return problem(
-            HttpStatus.INTERNAL_SERVER_ERROR,
-            "Internal server error",
-            "An unexpected error occurred. Please try again later."
-        );
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "Internal server error",
+                "An unexpected error occurred. Please try again later.");
     }
 
     // HELPER METHODS
 
     private static String messageOf(Exception exception) {
-        return exception.getMessage() != null ? exception.getMessage() : exception.getClass().getSimpleName();
+        return exception.getMessage() != null
+                ? exception.getMessage()
+                : exception.getClass().getSimpleName();
     }
 
     private static ProblemDetail problem(HttpStatus status, String title, String detail) {

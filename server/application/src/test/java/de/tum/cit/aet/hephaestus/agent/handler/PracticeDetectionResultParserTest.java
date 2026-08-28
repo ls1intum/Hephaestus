@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiscardedEntry;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ParseResult;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedObservation;
@@ -303,8 +302,8 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             assertThat(parsed.presence()).isEqualTo(Presence.INCONCLUSIVE);
             assertThat(parsed.assessment()).isNull();
             assertThat(parsed.coerceCoherence(false, false).severity())
-                .as("severity is an impact band for a defect; an undecided observation has none")
-                .isNull();
+                    .as("severity is an impact band for a defect; an undecided observation has none")
+                    .isNull();
         }
 
         @Test
@@ -332,7 +331,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
 
         @Test
         void forwardVocabularyObservations() {
-            for (Presence v : new Presence[] { Presence.PRESENT, Presence.ABSENT }) {
+            for (Presence v : new Presence[] {Presence.PRESENT, Presence.ABSENT}) {
                 ObjectNode observation = validFindingNode();
                 observation.put("presence", v.name());
                 // Non-NA presence requires a valence; pair PRESENT->GOOD, ABSENT->BAD for a coherent observation.
@@ -349,7 +348,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         void legacyObservationVocabularyIsRejected() {
             // ADR 0022: the OBSERVED/NOT_OBSERVED vocabulary is not a valid presence — it is discarded
             // exactly like any other unknown presence.
-            for (String legacy : new String[] { "OBSERVED", "NOT_OBSERVED" }) {
+            for (String legacy : new String[] {"OBSERVED", "NOT_OBSERVED"}) {
                 ObjectNode observation = validFindingNode();
                 observation.put("presence", legacy);
 
@@ -417,10 +416,10 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
 
             assertThat(result.validObservations()).isEmpty();
             assertThat(result.discarded())
-                .singleElement()
-                .satisfies(discarded ->
-                    assertThat(discarded.reason()).contains("unknown observation fields").contains("confidence")
-                );
+                    .singleElement()
+                    .satisfies(discarded -> assertThat(discarded.reason())
+                            .contains("unknown observation fields")
+                            .contains("confidence"));
         }
 
         @Test
@@ -432,10 +431,10 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
 
             assertThat(result.validObservations()).isEmpty();
             assertThat(result.discarded())
-                .singleElement()
-                .extracting(DiscardedEntry::reason)
-                .asString()
-                .contains("summary");
+                    .singleElement()
+                    .extracting(DiscardedEntry::reason)
+                    .asString()
+                    .contains("summary");
         }
 
         @Test
@@ -477,10 +476,10 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
 
             assertThat(result.validObservations()).isEmpty();
             assertThat(result.discarded())
-                .singleElement()
-                .satisfies(discarded ->
-                    assertThat(discarded.reason()).contains("unknown observation fields").contains("guidance")
-                );
+                    .singleElement()
+                    .satisfies(discarded -> assertThat(discarded.reason())
+                            .contains("unknown observation fields")
+                            .contains("guidance"));
         }
 
         @Test
@@ -494,10 +493,10 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
 
             assertThat(result.validObservations()).isEmpty();
             assertThat(result.discarded())
-                .singleElement()
-                .extracting(DiscardedEntry::reason)
-                .asString()
-                .contains("evidence");
+                    .singleElement()
+                    .extracting(DiscardedEntry::reason)
+                    .asString()
+                    .contains("evidence");
         }
 
         @Test
@@ -510,10 +509,10 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
 
             assertThat(result.validObservations()).isEmpty();
             assertThat(result.discarded())
-                .singleElement()
-                .extracting(DiscardedEntry::reason)
-                .asString()
-                .contains("evidenceRationale");
+                    .singleElement()
+                    .extracting(DiscardedEntry::reason)
+                    .asString()
+                    .contains("evidenceRationale");
         }
     }
 
@@ -567,19 +566,13 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
 
             // All three observations kept — no dedup
             assertThat(result.validObservations()).hasSize(3);
-            assertThat(
-                result
-                    .validObservations()
-                    .stream()
-                    .filter(f -> f.practiceSlug().equals("error-handling"))
-                    .count()
-            ).isEqualTo(2);
-            assertThat(
-                result
-                    .validObservations()
-                    .stream()
-                    .anyMatch(f -> f.practiceSlug().equals("code-hygiene"))
-            ).isTrue();
+            assertThat(result.validObservations().stream()
+                            .filter(f -> f.practiceSlug().equals("error-handling"))
+                            .count())
+                    .isEqualTo(2);
+            assertThat(result.validObservations().stream()
+                            .anyMatch(f -> f.practiceSlug().equals("code-hygiene")))
+                    .isTrue();
         }
     }
 
@@ -684,12 +677,9 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         private ValidatedObservation observation(Presence presence, Severity severity) {
             // Derive the valence from presence for these structural cases: PRESENT->GOOD (a strength a
             // defect-detector must not emit), ABSENT->BAD (a gap that carries a band), NA->null.
-            Assessment assessment =
-                presence == Presence.NOT_APPLICABLE
+            Assessment assessment = presence == Presence.NOT_APPLICABLE
                     ? null
-                    : presence == Presence.PRESENT
-                        ? Assessment.GOOD
-                        : Assessment.BAD;
+                    : presence == Presence.PRESENT ? Assessment.GOOD : Assessment.BAD;
             return new ValidatedObservation("p", "t", presence, assessment, severity, null, "evidenceRationale");
         }
 
@@ -750,14 +740,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             // practice that simply does not apply. It MUST persist as (ABSENT, GOOD); only its severity is
             // nulled (a coaching band is reserved for a BAD observation).
             var strength = new ValidatedObservation(
-                "p",
-                "t",
-                Presence.ABSENT,
-                Assessment.GOOD,
-                Severity.INFO,
-                null,
-                "evidenceRationale"
-            );
+                    "p", "t", Presence.ABSENT, Assessment.GOOD, Severity.INFO, null, "evidenceRationale");
             var out = strength.coerceCoherence(false, false);
             assertThat(out.presence()).isEqualTo(Presence.ABSENT);
             assertThat(out.assessment()).isEqualTo(Assessment.GOOD);
@@ -775,14 +758,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             // "you touched nothing relevant". Whether the corpus really was bounded and covered is settled
             // against the practice's EXHAUSTIVE stances in PracticeDetectionDeliveryService, not guessed here.
             var strength = new ValidatedObservation(
-                "p",
-                "t",
-                Presence.ABSENT,
-                Assessment.GOOD,
-                Severity.INFO,
-                null,
-                "evidenceRationale"
-            );
+                    "p", "t", Presence.ABSENT, Assessment.GOOD, Severity.INFO, null, "evidenceRationale");
             var out = strength.coerceCoherence(true, false);
             assertThat(out.presence()).isEqualTo(Presence.ABSENT);
             assertThat(out.assessment()).isEqualTo(Assessment.GOOD);
@@ -797,14 +773,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             // The refusal that survives, and the one that was always the real one: a PRESENT here would be
             // the defect, so endorsing it praises a good act nobody observed.
             var offContract = new ValidatedObservation(
-                "p",
-                "t",
-                Presence.PRESENT,
-                Assessment.GOOD,
-                Severity.INFO,
-                null,
-                "evidenceRationale"
-            );
+                    "p", "t", Presence.PRESENT, Assessment.GOOD, Severity.INFO, null, "evidenceRationale");
             var out = offContract.coerceCoherence(true, false);
             assertThat(out.presence()).isEqualTo(Presence.NOT_APPLICABLE);
             assertThat(out.assessment()).isNull();
@@ -816,14 +785,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         void listHelperPerSlug() {
             var dd = new ValidatedObservation("sec", "t", Presence.PRESENT, Assessment.GOOD, Severity.INFO, null, "r");
             var ok = new ValidatedObservation(
-                "style",
-                "t",
-                Presence.PRESENT,
-                Assessment.GOOD,
-                Severity.MAJOR,
-                null,
-                "r"
-            );
+                    "style", "t", Presence.PRESENT, Assessment.GOOD, Severity.MAJOR, null, "r");
             var out = PracticeDetectionResultParser.coerceCoherence(List.of(dd, ok), Set.of("sec"));
             assertThat(out.get(0).presence()).isEqualTo(Presence.NOT_APPLICABLE);
             assertThat(out.get(1).presence()).isEqualTo(Presence.PRESENT);
@@ -859,23 +821,15 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         @DisplayName("list helper: a craft slug's MAJOR is capped, a correctness slug's MAJOR survives")
         void listHelperAppliesAdvisoryCeilingBySlug() {
             var craft = new ValidatedObservation(
-                "describe-what-and-why",
-                "t",
-                Presence.ABSENT,
-                Assessment.BAD,
-                Severity.MAJOR,
-                null,
-                "r"
-            );
+                    "describe-what-and-why", "t", Presence.ABSENT, Assessment.BAD, Severity.MAJOR, null, "r");
             var correctness = new ValidatedObservation(
-                "handles-errors-instead-of-swallowing-them",
-                "t",
-                Presence.ABSENT,
-                Assessment.BAD,
-                Severity.MAJOR,
-                null,
-                "r"
-            );
+                    "handles-errors-instead-of-swallowing-them",
+                    "t",
+                    Presence.ABSENT,
+                    Assessment.BAD,
+                    Severity.MAJOR,
+                    null,
+                    "r");
             var out = PracticeDetectionResultParser.coerceCoherence(List.of(craft, correctness), Set.of());
             assertThat(out.get(0).severity()).as("craft MAJOR -> MINOR").isEqualTo(Severity.MINOR);
             assertThat(out.get(1).severity()).as("correctness MAJOR preserved").isEqualTo(Severity.MAJOR);
@@ -888,36 +842,27 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             // The defect-detector GOOD->NA coercion does not touch a BAD observation, so the advisory ceiling must
             // apply independently: (ABSENT, BAD, MAJOR) -> MINOR.
             var ddAdvisory = new ValidatedObservation(
-                "describe-what-and-why",
-                "t",
-                Presence.ABSENT,
-                Assessment.BAD,
-                Severity.MAJOR,
-                null,
-                "r"
-            );
-            var out = PracticeDetectionResultParser.coerceCoherence(
-                List.of(ddAdvisory),
-                Set.of("describe-what-and-why")
-            );
+                    "describe-what-and-why", "t", Presence.ABSENT, Assessment.BAD, Severity.MAJOR, null, "r");
+            var out =
+                    PracticeDetectionResultParser.coerceCoherence(List.of(ddAdvisory), Set.of("describe-what-and-why"));
             assertThat(out.get(0).presence()).isEqualTo(Presence.ABSENT);
             assertThat(out.get(0).assessment()).isEqualTo(Assessment.BAD);
             assertThat(out.get(0).severity())
-                .as("advisory cap applies even when the slug is a defect-detector")
-                .isEqualTo(Severity.MINOR);
+                    .as("advisory cap applies even when the slug is a defect-detector")
+                    .isEqualTo(Severity.MINOR);
         }
 
         @Test
         @DisplayName("blocking-eligible set is the curated correctness/security/data-integrity consequence class")
         void blockingEligibleSetIsPinned() {
-            assertThat(PracticeDetectionResultParser.BLOCKING_ELIGIBLE_PRACTICES).containsExactlyInAnyOrder(
-                "handles-errors-instead-of-swallowing-them",
-                "validates-inputs-and-edge-cases-at-the-boundary",
-                "avoids-unsafe-panics-and-chosen-crashes",
-                "validates-and-escapes-untrusted-input",
-                "avoids-insecure-defaults-and-over-broad-permissions",
-                "keeps-the-test-suite-honest"
-            );
+            assertThat(PracticeDetectionResultParser.BLOCKING_ELIGIBLE_PRACTICES)
+                    .containsExactlyInAnyOrder(
+                            "handles-errors-instead-of-swallowing-them",
+                            "validates-inputs-and-edge-cases-at-the-boundary",
+                            "avoids-unsafe-panics-and-chosen-crashes",
+                            "validates-and-escapes-untrusted-input",
+                            "avoids-insecure-defaults-and-over-broad-permissions",
+                            "keeps-the-test-suite-honest");
         }
     }
 }

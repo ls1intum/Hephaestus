@@ -72,15 +72,14 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         service = new FeedbackDeliveryService(
-            commentPoster,
-            deliveryPolicy,
-            new PracticeReviewProperties(false, 15, 5, false, false),
-            ledgerRecorder,
-            trendService,
-            commentFormatter,
-            dispatchService,
-            jobRepository
-        );
+                commentPoster,
+                deliveryPolicy,
+                new PracticeReviewProperties(false, 15, 5, false, false),
+                ledgerRecorder,
+                trendService,
+                commentFormatter,
+                dispatchService,
+                jobRepository);
     }
 
     @Test
@@ -94,9 +93,9 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
     void policyRefusalIsRecordedWithoutCreatingADispatch() {
         AgentJob job = job();
         DeliveryContent delivery = delivery();
-        when(
-            deliveryPolicy.evaluatePullRequest(job, DeliveryPolicyStage.AUTOMATIC, null, Set.of("practice"))
-        ).thenReturn(PracticeFeedbackDeliveryPolicy.Decision.suppressed(FeedbackSuppressionReason.RECIPIENT_OPTED_OUT));
+        when(deliveryPolicy.evaluatePullRequest(job, DeliveryPolicyStage.AUTOMATIC, null, Set.of("practice")))
+                .thenReturn(PracticeFeedbackDeliveryPolicy.Decision.suppressed(
+                        FeedbackSuppressionReason.RECIPIENT_OPTED_OUT));
 
         service.deliverFeedback(job, delivery, Set.of("practice"));
 
@@ -110,9 +109,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         DeliveryContent delivery = delivery();
         allow(job, Set.of("practice"));
         when(commentFormatter.format("Summary", job)).thenReturn("Formatted summary");
-        when(dispatchService.dispatchAutomaticPackage(eq(job), any(), eq(Set.of("practice")))).thenReturn(
-            PracticeFeedbackDispatchService.Result.sent("summary-1")
-        );
+        when(dispatchService.dispatchAutomaticPackage(eq(job), any(), eq(Set.of("practice"))))
+                .thenReturn(PracticeFeedbackDispatchService.Result.sent("summary-1"));
         FeedbackDispatch dispatch = dispatchState(FeedbackDispatchState.SENT);
         when(dispatchService.automaticPackage(job)).thenReturn(dispatch);
 
@@ -130,15 +128,14 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         AgentJob job = job();
         allow(job, Set.of());
         when(commentFormatter.format("Summary", job)).thenReturn("Formatted summary");
-        when(dispatchService.dispatchAutomaticPackage(eq(job), any(), eq(Set.of()))).thenReturn(
-            PracticeFeedbackDispatchService.Result.uncertain()
-        );
+        when(dispatchService.dispatchAutomaticPackage(eq(job), any(), eq(Set.of())))
+                .thenReturn(PracticeFeedbackDispatchService.Result.uncertain());
         FeedbackDispatch dispatch = dispatchState(FeedbackDispatchState.UNCERTAIN);
         when(dispatchService.automaticPackage(job)).thenReturn(dispatch);
 
         assertThatThrownBy(() -> service.deliverFeedback(job, delivery()))
-            .isInstanceOf(JobDeliveryException.class)
-            .hasMessageContaining("awaiting reconciliation");
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("awaiting reconciliation");
     }
 
     @Test
@@ -151,87 +148,52 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
         service.projectAutomaticPackage(job, dispatch);
 
-        verify(ledgerRecorder).record(
-            job,
-            delivery,
-            ArtifactKinds.PULL_REQUEST,
-            List.of(signal),
-            "dispatch-summary",
-            true
-        );
-        verify(jobRepository).reconcileDispatchDeliveryStatus(
-            job.getId(),
-            WORKSPACE_ID,
-            DeliveryStatus.DELIVERED,
-            "dispatch-summary"
-        );
+        verify(ledgerRecorder)
+                .record(job, delivery, ArtifactKinds.PULL_REQUEST, List.of(signal), "dispatch-summary", true);
+        verify(jobRepository)
+                .reconcileDispatchDeliveryStatus(
+                        job.getId(), WORKSPACE_ID, DeliveryStatus.DELIVERED, "dispatch-summary");
     }
 
     @Test
     void fullySuppressedProjectionRecordsOneSuppressedUnit() {
         AgentJob job = job();
         FeedbackDispatch dispatch = projectableDispatch(
-            FeedbackDispatchState.SUPPRESSED,
-            null,
-            FeedbackSuppressionReason.WORKSPACE_DELIVERY_PAUSED
-        );
+                FeedbackDispatchState.SUPPRESSED, null, FeedbackSuppressionReason.WORKSPACE_DELIVERY_PAUSED);
         DeliveryContent delivery = delivery();
         project(dispatch, delivery, List.of());
 
         service.projectAutomaticPackage(job, dispatch);
 
         verify(ledgerRecorder).recordSuppressedUnit(job, delivery, FeedbackSuppressionReason.WORKSPACE_DELIVERY_PAUSED);
-        verify(ledgerRecorder, never()).recordWithoutConversation(
-            any(),
-            any(),
-            any(),
-            any(),
-            nullable(String.class),
-            anyBoolean()
-        );
-        verify(jobRepository).reconcileDispatchDeliveryStatus(
-            job.getId(),
-            WORKSPACE_ID,
-            DeliveryStatus.DELIVERED,
-            null
-        );
+        verify(ledgerRecorder, never())
+                .recordWithoutConversation(any(), any(), any(), any(), nullable(String.class), anyBoolean());
+        verify(jobRepository)
+                .reconcileDispatchDeliveryStatus(job.getId(), WORKSPACE_ID, DeliveryStatus.DELIVERED, null);
     }
 
     @Test
     void partiallySuppressedProjectionKeepsDeliveredPlacementsAndNamesTheRemainder() {
         AgentJob job = job();
         FeedbackDispatch dispatch = projectableDispatch(
-            FeedbackDispatchState.SUPPRESSED,
-            "summary-1",
-            FeedbackSuppressionReason.WORKSPACE_DELIVERY_PAUSED
-        );
+                FeedbackDispatchState.SUPPRESSED, "summary-1", FeedbackSuppressionReason.WORKSPACE_DELIVERY_PAUSED);
         DeliveryContent delivery = new DeliveryContent(
-            "Summary",
-            List.of(
-                new DiffNote("src/One.java", 10, null, "One", "inline-1"),
-                new DiffNote("src/Two.java", 20, null, "Two", "inline-2")
-            ),
-            List.of()
-        );
+                "Summary",
+                List.of(
+                        new DiffNote("src/One.java", 10, null, "One", "inline-1"),
+                        new DiffNote("src/Two.java", 20, null, "Two", "inline-2")),
+                List.of());
         DeliveredSignal delivered = signal("inline-1", "note-1");
         project(dispatch, delivery, List.of(delivered));
 
         service.projectAutomaticPackage(job, dispatch);
 
-        verify(ledgerRecorder).recordWithoutConversation(
-            job,
-            delivery,
-            ArtifactKinds.PULL_REQUEST,
-            List.of(delivered),
-            "summary-1",
-            true
-        );
-        verify(ledgerRecorder).recordSuppressedRemainder(
-            job,
-            delivery,
-            FeedbackSuppressionReason.WORKSPACE_DELIVERY_PAUSED,
-            List.of("inline-2")
-        );
+        verify(ledgerRecorder)
+                .recordWithoutConversation(
+                        job, delivery, ArtifactKinds.PULL_REQUEST, List.of(delivered), "summary-1", true);
+        verify(ledgerRecorder)
+                .recordSuppressedRemainder(
+                        job, delivery, FeedbackSuppressionReason.WORKSPACE_DELIVERY_PAUSED, List.of("inline-2"));
     }
 
     @Test
@@ -253,9 +215,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         FeedbackDispatch dispatch = projectableDispatch(FeedbackDispatchState.SENT, "summary-1", null);
         DeliveryContent delivery = delivery();
         when(dispatchService.findAutomaticPackage(job)).thenReturn(Optional.of(dispatch));
-        when(dispatchService.recover(dispatch, job)).thenReturn(
-            PracticeFeedbackDispatchService.Result.sent("summary-1")
-        );
+        when(dispatchService.recover(dispatch, job))
+                .thenReturn(PracticeFeedbackDispatchService.Result.sent("summary-1"));
         when(dispatchService.automaticPackage(job)).thenReturn(dispatch);
         project(dispatch, delivery, List.of());
 
@@ -266,9 +227,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
     }
 
     private void allow(AgentJob job, Set<String> practices) {
-        when(deliveryPolicy.evaluatePullRequest(job, DeliveryPolicyStage.AUTOMATIC, null, practices)).thenReturn(
-            PracticeFeedbackDeliveryPolicy.Decision.allowed(new PullRequest())
-        );
+        when(deliveryPolicy.evaluatePullRequest(job, DeliveryPolicyStage.AUTOMATIC, null, practices))
+                .thenReturn(PracticeFeedbackDeliveryPolicy.Decision.allowed(new PullRequest()));
     }
 
     private void project(FeedbackDispatch dispatch, DeliveryContent delivery, List<DeliveredSignal> signals) {
@@ -287,10 +247,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
     }
 
     private FeedbackDispatch projectableDispatch(
-        FeedbackDispatchState state,
-        @Nullable String externalRef,
-        @Nullable FeedbackSuppressionReason reason
-    ) {
+            FeedbackDispatchState state, @Nullable String externalRef, @Nullable FeedbackSuppressionReason reason) {
         FeedbackDispatch dispatch = dispatchState(state);
         when(dispatch.getDeliveredExternalRef()).thenReturn(externalRef);
         if (reason != null) when(dispatch.getSuppressionReason()).thenReturn(reason.name());
@@ -315,19 +272,15 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
     private DeliveryContent delivery() {
         return new DeliveryContent(
-            "Summary",
-            List.of(new DiffNote("src/App.java", 10, null, "Inline", "inline-1")),
-            List.of()
-        );
+                "Summary", List.of(new DiffNote("src/App.java", 10, null, "Inline", "inline-1")), List.of());
     }
 
     private DeliveredSignal signal(String recurrenceKey, String externalRef) {
         return new DeliveredSignal(
-            recurrenceKey,
-            new FeedbackAnchor.DiffAnchor("src/App.java", 10, null),
-            Disposition.POSTED,
-            externalRef,
-            "discussion-1"
-        );
+                recurrenceKey,
+                new FeedbackAnchor.DiffAnchor("src/App.java", 10, null),
+                Disposition.POSTED,
+                externalRef,
+                "discussion-1");
     }
 }

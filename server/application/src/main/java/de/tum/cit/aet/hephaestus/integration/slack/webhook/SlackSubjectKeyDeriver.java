@@ -60,26 +60,24 @@ public class SlackSubjectKeyDeriver implements SubjectKeyDeriver {
         }
         String team = teamId(root);
         JsonNode event = root == null ? null : root.path("event");
-        String composite =
-            team +
-            "|" +
-            eventType(event) +
-            "|" +
-            textAt(event, "event_ts") +
-            "|" +
-            textAt(event, "ts") +
-            "|" +
-            textAt(event, "deleted_ts") +
-            "|" +
-            textAt(event, "channel") +
-            "|" +
-            textAt(event, "user") +
-            "|" +
-            textAt(event, "subtype") +
-            "|" +
-            textAt(event == null ? null : event.path("previous_message"), "ts") +
-            "|" +
-            textAt(event == null ? null : event.path("message"), "ts");
+        String composite = team + "|"
+                + eventType(event)
+                + "|"
+                + textAt(event, "event_ts")
+                + "|"
+                + textAt(event, "ts")
+                + "|"
+                + textAt(event, "deleted_ts")
+                + "|"
+                + textAt(event, "channel")
+                + "|"
+                + textAt(event, "user")
+                + "|"
+                + textAt(event, "subtype")
+                + "|"
+                + textAt(event == null ? null : event.path("previous_message"), "ts")
+                + "|"
+                + textAt(event == null ? null : event.path("message"), "ts");
         return "slack-" + sha256TruncatedHex(composite.getBytes(StandardCharsets.UTF_8));
     }
 
@@ -126,17 +124,22 @@ public class SlackSubjectKeyDeriver implements SubjectKeyDeriver {
         }
         return switch (eventType) {
             case "message" -> event.path("channel").asString("");
-            case "message_im", "app_home_opened" -> firstNonBlank(
-                event.path("user").asString(""),
-                event.path("channel").asString("")
-            );
-            case "app_context_changed" -> firstNonBlank(
-                event.path("context").path("entities").path(0).path("value").asString(""),
-                event.path("user").asString("")
-            );
+            case "message_im", "app_home_opened" ->
+                firstNonBlank(
+                        event.path("user").asString(""), event.path("channel").asString(""));
+            case "app_context_changed" ->
+                firstNonBlank(
+                        event.path("context")
+                                .path("entities")
+                                .path(0)
+                                .path("value")
+                                .asString(""),
+                        event.path("user").asString(""));
             case "member_joined_channel" -> event.path("channel").asString("");
             case "app_uninstalled", "tokens_revoked" -> "workspace";
-            default -> firstNonBlank(event.path("channel").asString(""), event.path("user").asString(""), "workspace");
+            default ->
+                firstNonBlank(
+                        event.path("channel").asString(""), event.path("user").asString(""), "workspace");
         };
     }
 

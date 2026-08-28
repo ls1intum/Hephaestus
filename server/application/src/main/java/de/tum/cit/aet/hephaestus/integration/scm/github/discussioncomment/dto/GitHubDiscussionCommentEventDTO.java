@@ -15,12 +15,12 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.user.dto.GitHubUserDTO;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubDiscussionCommentEventDTO(
-    @JsonProperty("action") String action,
-    @JsonProperty("comment") GitHubDiscussionCommentDTO comment,
-    @JsonProperty("discussion") GitHubDiscussionDTO discussion,
-    @JsonProperty("repository") GitHubRepositoryRefDTO repository,
-    @JsonProperty("sender") GitHubUserDTO sender
-) implements GitHubWebhookEvent {
+        @JsonProperty("action") String action,
+        @JsonProperty("comment") GitHubDiscussionCommentDTO comment,
+        @JsonProperty("discussion") GitHubDiscussionDTO discussion,
+        @JsonProperty("repository") GitHubRepositoryRefDTO repository,
+        @JsonProperty("sender") GitHubUserDTO sender)
+        implements GitHubWebhookEvent {
     @Override
     public GitHubEventAction.DiscussionComment actionType() {
         return GitHubEventAction.DiscussionComment.fromString(action);

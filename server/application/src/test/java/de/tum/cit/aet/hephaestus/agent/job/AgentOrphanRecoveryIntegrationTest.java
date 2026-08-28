@@ -88,21 +88,19 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         AgentProperties properties = mock(AgentProperties.class);
         when(properties.maxRetries()).thenReturn(5);
         sweeper = new AgentJobZombieSweeper(
-            jobRepository,
-            workerRegistryRepository,
-            properties,
-            objectMapper,
-            transactionTemplate,
-            lifecycleService,
-            usageRecorder,
-            meterRegistry
-        );
+                jobRepository,
+                workerRegistryRepository,
+                properties,
+                objectMapper,
+                transactionTemplate,
+                lifecycleService,
+                usageRecorder,
+                meterRegistry);
         workspace = workspaceRepository.save(TestEntities.activeWorkspace("orphan-recovery-ws"));
 
         LlmConnection connection = connectionRepository.save(LlmCatalogTestFixtures.connection("orphan-recovery"));
-        instanceModel = modelRepository.save(
-            LlmCatalogTestFixtures.model(connection, "orphan-recovery-model", "test-model")
-        );
+        instanceModel =
+                modelRepository.save(LlmCatalogTestFixtures.model(connection, "orphan-recovery-model", "test-model"));
 
         LlmModelPrice price = new LlmModelPrice();
         price.setModel(instanceModel);
@@ -154,12 +152,14 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         // The old token is dead: this mirrors JobTokenAuthenticationFilter#resolveJobRouting's lookup
         // (hash + status=RUNNING) — the requeue moved status to QUEUED too, so BOTH conditions now fail
         // for the old token even before considering the hash change.
-        assertThat(jobRepository.findByJobTokenHashAndStatus(oldTokenHash, AgentJobStatus.RUNNING)).isEmpty();
+        assertThat(jobRepository.findByJobTokenHashAndStatus(oldTokenHash, AgentJobStatus.RUNNING))
+                .isEmpty();
 
         fastForwardAvailableAt(jobId);
 
         assertThat(eligibleForClaim(jobId)).isTrue();
-        assertThat(jobRepository.findByJobTokenHashAndStatus(oldTokenHash, AgentJobStatus.RUNNING)).isEmpty();
+        assertThat(jobRepository.findByJobTokenHashAndStatus(oldTokenHash, AgentJobStatus.RUNNING))
+                .isEmpty();
     }
 
     @Test
@@ -173,8 +173,8 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         AgentJob requeued = jobRepository.findById(jobId).orElseThrow();
         assertThat(requeued.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
         assertThat(requeued.getAvailableAt())
-            .as("the backoff-computed available_at is still in the future")
-            .isAfter(Instant.now());
+                .as("the backoff-computed available_at is still in the future")
+                .isAfter(Instant.now());
 
         assertThat(eligibleForClaim(jobId)).isFalse();
         AgentJob stillQueued = jobRepository.findById(jobId).orElseThrow();
@@ -195,8 +195,8 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         assertThat(requeued.getAvailableAt()).isAfter(Instant.now());
 
         assertThat(jobRepository.findQueuedIdsOldestFirst(10))
-            .as("a not-yet-eligible QUEUED job must not be offered as a poll candidate")
-            .doesNotContain(jobId);
+                .as("a not-yet-eligible QUEUED job must not be offered as a poll candidate")
+                .doesNotContain(jobId);
     }
 
     @Test
@@ -215,28 +215,24 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @DisplayName(
-        "requeueOrphan is fenced on worker_id — a stale caller cannot steal a job a live sibling has re-claimed"
-    )
+            "requeueOrphan is fenced on worker_id — a stale caller cannot steal a job a live sibling has re-claimed")
     void requeueOrphanDoesNotStealAJobReclaimedBySomeoneElse() {
         UUID jobId = runningJobOwnedBy("live-sibling", Instant.now(), 0);
 
         // @Modifying queries need an active transaction (the sweeper normally provides one via
         // TransactionTemplate); wrap here too.
         String candidateNewToken = AgentJob.generateJobToken();
-        int updated = transactionTemplate.execute(s ->
-            jobRepository.requeueOrphan(
+        int updated = transactionTemplate.execute(s -> jobRepository.requeueOrphan(
                 jobId,
                 "dead-replica",
                 5,
                 Instant.now(),
                 candidateNewToken,
-                AgentJob.computeTokenHash(candidateNewToken)
-            )
-        );
+                AgentJob.computeTokenHash(candidateNewToken)));
 
         assertThat(updated)
-            .as("the CAS must not match — the row's worker_id does not match the stale caller's")
-            .isZero();
+                .as("the CAS must not match — the row's worker_id does not match the stale caller's")
+                .isZero();
         AgentJob untouched = jobRepository.findById(jobId).orElseThrow();
         assertThat(untouched.getStatus()).isEqualTo(AgentJobStatus.RUNNING);
         assertThat(untouched.getWorkerId()).isEqualTo("live-sibling");
@@ -249,16 +245,13 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         UUID jobId = runningJobOwnedBy("dead-replica-3", Instant.now(), 5);
 
         String candidateNewToken = AgentJob.generateJobToken();
-        int updated = transactionTemplate.execute(s ->
-            jobRepository.requeueOrphan(
+        int updated = transactionTemplate.execute(s -> jobRepository.requeueOrphan(
                 jobId,
                 "dead-replica-3",
                 5,
                 Instant.now(),
                 candidateNewToken,
-                AgentJob.computeTokenHash(candidateNewToken)
-            )
-        );
+                AgentJob.computeTokenHash(candidateNewToken)));
 
         assertThat(updated).isZero();
         AgentJob unchanged = jobRepository.findById(jobId).orElseThrow();
@@ -272,38 +265,25 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         job.setStatus(AgentJobStatus.RUNNING);
-        job.setConfigSnapshot(
-            new ConfigSnapshot(
-                ConfigSnapshot.SCHEMA_VERSION,
-                "openai-completions",
-                "https://api.openai.com/v1",
-                "test-model",
-                null,
-                null,
-                null,
-                false,
-                FundingSource.INSTANCE,
-                instanceModel.getConnection().getId(),
-                instanceModel.getId(),
-                workspace.getId(),
-                600,
-                false,
-                null
-            )
-                .withPriceSnapshot(
-                    new LlmPriceSnapshot(
+        job.setConfigSnapshot(new ConfigSnapshot(
+                        ConfigSnapshot.SCHEMA_VERSION,
+                        "openai-completions",
+                        "https://api.openai.com/v1",
+                        "test-model",
+                        null,
+                        null,
+                        null,
+                        false,
                         FundingSource.INSTANCE,
-                        PricingState.NO_CHARGE,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        null
-                    )
-                )
-                .toJson(objectMapper)
-        );
+                        instanceModel.getConnection().getId(),
+                        instanceModel.getId(),
+                        workspace.getId(),
+                        600,
+                        false,
+                        null)
+                .withPriceSnapshot(new LlmPriceSnapshot(
+                        FundingSource.INSTANCE, PricingState.NO_CHARGE, null, null, null, null, null, null))
+                .toJson(objectMapper));
         job.setWorkerId(workerId);
         job.setStartedAt(startedAt);
         job.setRetryCount(retryCount);
@@ -319,9 +299,9 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     }
 
     private boolean eligibleForClaim(UUID jobId) {
-        return transactionTemplate.execute(status ->
-            jobRepository.findByIdQueuedForUpdateSkipLocked(jobId, Instant.now()).isPresent()
-        );
+        return transactionTemplate.execute(status -> jobRepository
+                .findByIdQueuedForUpdateSkipLocked(jobId, Instant.now())
+                .isPresent());
     }
 
     private void fastForwardAvailableAt(UUID jobId) {

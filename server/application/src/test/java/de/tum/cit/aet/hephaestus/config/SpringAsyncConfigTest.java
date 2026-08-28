@@ -22,13 +22,14 @@ class SpringAsyncConfigTest {
     void asyncMethodsRunOnTheBoundedApplicationPool() {
         // setActiveProfiles("default") clears surefire's "test" profile so @Profile("!test") applies.
         new ApplicationContextRunner()
-            .withInitializer(ctx -> ctx.getEnvironment().setActiveProfiles("default"))
-            .withUserConfiguration(SpringAsyncConfig.class, AsyncProbe.class)
-            .run(ctx -> {
-                String thread = ctx.getBean(AsyncProbe.class).currentThread().get(5, TimeUnit.SECONDS);
-                // async-* = the bounded pool, not the SimpleAsyncTaskExecutor fallback.
-                assertThat(thread).startsWith("async-");
-            });
+                .withInitializer(ctx -> ctx.getEnvironment().setActiveProfiles("default"))
+                .withUserConfiguration(SpringAsyncConfig.class, AsyncProbe.class)
+                .run(ctx -> {
+                    String thread =
+                            ctx.getBean(AsyncProbe.class).currentThread().get(5, TimeUnit.SECONDS);
+                    // async-* = the bounded pool, not the SimpleAsyncTaskExecutor fallback.
+                    assertThat(thread).startsWith("async-");
+                });
     }
 
     @Test
@@ -36,8 +37,10 @@ class SpringAsyncConfigTest {
         // The advice chain tie is nondeterministic, so this can't be asserted behaviorally. Assert the
         // invariant against the orders production actually declares — reading the aspect's @Order rather
         // than restating it, so moving either end fails this test.
-        int asyncOrder = SpringAsyncConfig.class.getAnnotation(EnableAsync.class).order();
-        int tenancyAspectOrder = WorkspaceAgnosticAspect.class.getAnnotation(Order.class).value();
+        int asyncOrder =
+                SpringAsyncConfig.class.getAnnotation(EnableAsync.class).order();
+        int tenancyAspectOrder =
+                WorkspaceAgnosticAspect.class.getAnnotation(Order.class).value();
         // Spring Boot's TransactionAutoConfiguration enables tx management at the default advisor order.
         int transactionAdvisorOrder = Ordered.LOWEST_PRECEDENCE;
 

@@ -28,10 +28,8 @@ public class ObservationVisibilityPolicy {
     public Set<UUID> permitsAll(long workspaceId, Collection<Observation> observations, SourceUsePurpose purpose) {
         List<Observation> current = new ArrayList<>(observations.size());
         for (Observation observation : observations) {
-            if (
-                ReviewClaimCurrentness.of(observation.getPracticeRevision(), observation.getPractice()) ==
-                ReviewClaimCurrentness.CURRENT
-            ) {
+            if (ReviewClaimCurrentness.of(observation.getPracticeRevision(), observation.getPractice())
+                    == ReviewClaimCurrentness.CURRENT) {
                 current.add(observation);
             }
         }

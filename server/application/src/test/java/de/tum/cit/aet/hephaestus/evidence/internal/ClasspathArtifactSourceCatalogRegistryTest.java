@@ -30,7 +30,7 @@ import tools.jackson.databind.json.JsonMapper;
 class ClasspathArtifactSourceCatalogRegistryTest {
 
     private static final String VERSION_1_CATALOG_SHA256 =
-        "978097f57047bb716457e8b3c44115ef0bb55602dbce4f1a15900a40d70a39b8";
+            "978097f57047bb716457e8b3c44115ef0bb55602dbce4f1a15900a40d70a39b8";
 
     private final JsonMapper objectMapper = JsonMapper.builder().build();
 
@@ -41,14 +41,10 @@ class ClasspathArtifactSourceCatalogRegistryTest {
         assertThat(registry.current().version()).isEqualTo(new SourceContractVersion("1.0.0"));
         assertThat(registry.catalogDigest()).isEqualTo(VERSION_1_CATALOG_SHA256);
         assertThat(registry.current().sources()).hasSize(15);
-        assertThat(registry.requireSourcesFor(new SourceContractVersion("1.0.0"), "scm.pull_request")).contains(
-            new SourceKind("scm.repository.tree"),
-            new SourceKind("scm.pull-request.diff")
-        );
-        var repositoryTree = registry.requireSource(
-            new SourceContractVersion("1.0.0"),
-            new SourceKind("scm.repository.tree")
-        );
+        assertThat(registry.requireSourcesFor(new SourceContractVersion("1.0.0"), "scm.pull_request"))
+                .contains(new SourceKind("scm.repository.tree"), new SourceKind("scm.pull-request.diff"));
+        var repositoryTree =
+                registry.requireSource(new SourceContractVersion("1.0.0"), new SourceKind("scm.repository.tree"));
         assertThat(repositoryTree.displayName()).isEqualTo("Repository files");
         assertThat(repositoryTree.completenessPolicy().supportsPartial()).isTrue();
         assertThat(repositoryTree.completenessPolicy().supportsEmpty()).isTrue();
@@ -58,35 +54,33 @@ class ClasspathArtifactSourceCatalogRegistryTest {
     void shouldRejectUnknownVersionKindAndArtifactKind() {
         var registry = new ClasspathArtifactSourceCatalogRegistry(objectMapper, java.time.Clock.systemUTC());
 
-        assertThatIllegalArgumentException().isThrownBy(() ->
-            registry.requireSource(new SourceContractVersion("2.0.0"), new SourceKind("scm.repository.tree"))
-        );
-        assertThatIllegalArgumentException().isThrownBy(() ->
-            registry.requireSource(new SourceContractVersion("1.0.0"), new SourceKind("scm.unknown"))
-        );
-        assertThatIllegalArgumentException().isThrownBy(() ->
-            registry.requireSourcesFor(new SourceContractVersion("1.0.0"), "scm.deployment")
-        );
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> registry.requireSource(
+                        new SourceContractVersion("2.0.0"), new SourceKind("scm.repository.tree")));
+        assertThatIllegalArgumentException()
+                .isThrownBy(() ->
+                        registry.requireSource(new SourceContractVersion("1.0.0"), new SourceKind("scm.unknown")));
+        assertThatIllegalArgumentException()
+                .isThrownBy(() -> registry.requireSourcesFor(new SourceContractVersion("1.0.0"), "scm.deployment"));
     }
 
     @Test
     void shouldRejectUnknownCatalogFields() throws IOException {
-        JsonNode catalog = read(ClasspathArtifactSourceCatalogRegistry.CATALOG_RESOURCE).deepCopy();
+        JsonNode catalog =
+                read(ClasspathArtifactSourceCatalogRegistry.CATALOG_RESOURCE).deepCopy();
         ((tools.jackson.databind.node.ObjectNode) catalog).put("futureMeaning", true);
 
         assertThatIllegalStateException()
-            .isThrownBy(() -> ClasspathArtifactSourceCatalogRegistry.parse(catalog))
-            .withMessageContaining("Unknown field");
+                .isThrownBy(() -> ClasspathArtifactSourceCatalogRegistry.parse(catalog))
+                .withMessageContaining("Unknown field");
     }
 
     @Test
     void shouldRequireTraceableCurrentEngineeringApproval() throws IOException {
         var catalog = ClasspathArtifactSourceCatalogRegistry.parse(
-            read(ClasspathArtifactSourceCatalogRegistry.CATALOG_RESOURCE)
-        );
+                read(ClasspathArtifactSourceCatalogRegistry.CATALOG_RESOURCE));
         var decisions = ClasspathArtifactSourceCatalogRegistry.parseUseDecisions(
-            read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE)
-        );
+                read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE));
         ClasspathArtifactSourceCatalogRegistry.validateUseDecisions(catalog, decisions);
         assertThat(decisions.values()).allSatisfy(decision -> {
             assertThat(decision.reviewer()).isNotBlank();
@@ -96,18 +90,20 @@ class ClasspathArtifactSourceCatalogRegistryTest {
             // Probed relative to the decision's own date rather than a fixed instant: a wall-clock
             // constant here silently becomes an assertion that no decision was ever taken after it,
             // and a source added later then fails this test for having a truthful date.
-            assertThat(decision.permitsAt(decision.decidedAt().plusSeconds(1), purpose)).isTrue();
+            assertThat(decision.permitsAt(decision.decidedAt().plusSeconds(1), purpose))
+                    .isTrue();
         });
     }
 
     @Test
     void shouldRejectEngineeringBaselineWithoutApprovalMetadata() throws IOException {
-        JsonNode root = read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE).deepCopy();
+        JsonNode root = read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE)
+                .deepCopy();
         ((tools.jackson.databind.node.ObjectNode) root.path("decisions").get(0)).remove("reviewer");
 
         assertThatIllegalArgumentException()
-            .isThrownBy(() -> ClasspathArtifactSourceCatalogRegistry.parseUseDecisions(root))
-            .withMessageContaining("requires review metadata");
+                .isThrownBy(() -> ClasspathArtifactSourceCatalogRegistry.parseUseDecisions(root))
+                .withMessageContaining("requires review metadata");
     }
 
     @Test
@@ -117,13 +113,11 @@ class ClasspathArtifactSourceCatalogRegistryTest {
         var registry = new ClasspathArtifactSourceCatalogRegistry(objectMapper, clock);
         when(clock.instant()).thenReturn(Instant.parse("2027-08-03T00:00:00Z"));
 
-        assertThat(
-            registry.isSourceUsePermitted(
-                new SourceContractVersion("1.0.0"),
-                new SourceKind("scm.pull-request.diff"),
-                SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW
-            )
-        ).isFalse();
+        assertThat(registry.isSourceUsePermitted(
+                        new SourceContractVersion("1.0.0"),
+                        new SourceKind("scm.pull-request.diff"),
+                        SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
+                .isFalse();
     }
 
     @Test
@@ -131,85 +125,76 @@ class ClasspathArtifactSourceCatalogRegistryTest {
         var registry = new ClasspathArtifactSourceCatalogRegistry(objectMapper, Clock.systemUTC());
         var version = new SourceContractVersion("1.0.0");
 
-        assertThat(
-            registry.isSourceUsePermitted(
-                version,
-                new SourceKind("scm.pull-request.diff"),
-                SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW
-            )
-        ).isTrue();
-        assertThat(
-            registry.isSourceUsePermitted(
-                version,
-                new SourceKind("scm.issue.core"),
-                SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW
-            )
-        ).isTrue();
+        assertThat(registry.isSourceUsePermitted(
+                        version, new SourceKind("scm.pull-request.diff"), SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
+                .isTrue();
+        assertThat(registry.isSourceUsePermitted(
+                        version, new SourceKind("scm.issue.core"), SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
+                .isTrue();
     }
 
     @Test
     void shouldEnforceEachApprovedPurpose() throws IOException {
-        JsonNode root = read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE).deepCopy();
+        JsonNode root = read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE)
+                .deepCopy();
         var decisions = ClasspathArtifactSourceCatalogRegistry.parseUseDecisions(root);
         var assessment = decisions.get("use-scm-pull-request-core-automated-review");
         var feedback = decisions.get("use-scm-pull-request-core-feedback-delivery");
         org.junit.jupiter.api.Assertions.assertNotNull(assessment);
         org.junit.jupiter.api.Assertions.assertNotNull(feedback);
 
-        assertThat(
-            assessment.permitsAt(Instant.parse("2026-08-03T12:00:00Z"), SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)
-        ).isTrue();
-        assertThat(
-            assessment.permitsAt(Instant.parse("2026-08-03T12:00:00Z"), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)
-        ).isFalse();
-        assertThat(
-            feedback.permitsAt(Instant.parse("2026-08-03T12:00:00Z"), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)
-        ).isTrue();
+        assertThat(assessment.permitsAt(
+                        Instant.parse("2026-08-03T12:00:00Z"), SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
+                .isTrue();
+        assertThat(assessment.permitsAt(
+                        Instant.parse("2026-08-03T12:00:00Z"), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+                .isFalse();
+        assertThat(feedback.permitsAt(
+                        Instant.parse("2026-08-03T12:00:00Z"), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+                .isTrue();
     }
 
     /** A decision stops permitting at its expiry, not after it. */
     @Test
     void shouldStopPermittingAtTheInstantOfExpiry() throws IOException {
         var decisions = ClasspathArtifactSourceCatalogRegistry.parseUseDecisions(
-            read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE)
-        );
+                read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE));
         var decision = decisions.get("use-docs-document-core-automated-review");
         org.junit.jupiter.api.Assertions.assertNotNull(decision);
         Instant expiry = Instant.parse("2027-08-07T00:00:00Z");
 
-        assertThat(decision.permitsAt(expiry.minusMillis(1), SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)).isTrue();
-        assertThat(decision.permitsAt(expiry, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)).isFalse();
+        assertThat(decision.permitsAt(expiry.minusMillis(1), SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
+                .isTrue();
+        assertThat(decision.permitsAt(expiry, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
+                .isFalse();
     }
 
     /** Symmetrically, a decision permits from the instant it was taken and not before it. */
     @Test
     void shouldStartPermittingAtTheInstantItWasDecided() throws IOException {
         var decisions = ClasspathArtifactSourceCatalogRegistry.parseUseDecisions(
-            read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE)
-        );
+                read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE));
         var decision = decisions.get("use-docs-document-core-automated-review");
         org.junit.jupiter.api.Assertions.assertNotNull(decision);
         Instant decided = Instant.parse("2026-08-07T00:00:00Z");
 
-        assertThat(decision.permitsAt(decided, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)).isTrue();
-        assertThat(decision.permitsAt(decided.minusMillis(1), SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)).isFalse();
+        assertThat(decision.permitsAt(decided, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
+                .isTrue();
+        assertThat(decision.permitsAt(decided.minusMillis(1), SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
+                .isFalse();
     }
 
     @Test
     void shouldRejectMissingUseDecision() throws IOException {
         var catalog = ClasspathArtifactSourceCatalogRegistry.parse(
-            read(ClasspathArtifactSourceCatalogRegistry.CATALOG_RESOURCE)
-        );
-        var decisions = new HashMap<>(
-            ClasspathArtifactSourceCatalogRegistry.parseUseDecisions(
-                read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE)
-            )
-        );
+                read(ClasspathArtifactSourceCatalogRegistry.CATALOG_RESOURCE));
+        var decisions = new HashMap<>(ClasspathArtifactSourceCatalogRegistry.parseUseDecisions(
+                read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE)));
         decisions.remove("use-scm-repository-tree-automated-review");
 
         assertThatIllegalStateException()
-            .isThrownBy(() -> ClasspathArtifactSourceCatalogRegistry.validateUseDecisions(catalog, decisions))
-            .withMessageContaining("must match the catalog exactly");
+                .isThrownBy(() -> ClasspathArtifactSourceCatalogRegistry.validateUseDecisions(catalog, decisions))
+                .withMessageContaining("must match the catalog exactly");
     }
 
     /**
@@ -219,41 +204,33 @@ class ClasspathArtifactSourceCatalogRegistryTest {
      */
     @Test
     void shouldRejectASourceThatLacksADecisionForOnePurpose() throws IOException {
-        JsonNode catalogNode = read(ClasspathArtifactSourceCatalogRegistry.CATALOG_RESOURCE).deepCopy();
-        var useDecisionIds = (tools.jackson.databind.node.ArrayNode) catalogNode
-            .path("sources")
-            .get(0)
-            .path("useDecisionIds");
+        JsonNode catalogNode =
+                read(ClasspathArtifactSourceCatalogRegistry.CATALOG_RESOURCE).deepCopy();
+        var useDecisionIds = (tools.jackson.databind.node.ArrayNode)
+                catalogNode.path("sources").get(0).path("useDecisionIds");
         String dropped = useDecisionIds.get(useDecisionIds.size() - 1).asString();
         useDecisionIds.remove(useDecisionIds.size() - 1);
         var catalog = ClasspathArtifactSourceCatalogRegistry.parse(catalogNode);
-        var decisions = new HashMap<>(
-            ClasspathArtifactSourceCatalogRegistry.parseUseDecisions(
-                read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE)
-            )
-        );
+        var decisions = new HashMap<>(ClasspathArtifactSourceCatalogRegistry.parseUseDecisions(
+                read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE)));
         decisions.remove(dropped);
 
         assertThatIllegalStateException()
-            .isThrownBy(() -> ClasspathArtifactSourceCatalogRegistry.validateUseDecisions(catalog, decisions))
-            .withMessageContaining("do not cover every product purpose");
+                .isThrownBy(() -> ClasspathArtifactSourceCatalogRegistry.validateUseDecisions(catalog, decisions))
+                .withMessageContaining("do not cover every product purpose");
     }
 
     @Test
     void shouldRejectOrphanUseDecision() throws IOException {
         var catalog = ClasspathArtifactSourceCatalogRegistry.parse(
-            read(ClasspathArtifactSourceCatalogRegistry.CATALOG_RESOURCE)
-        );
-        var decisions = new HashMap<>(
-            ClasspathArtifactSourceCatalogRegistry.parseUseDecisions(
-                read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE)
-            )
-        );
+                read(ClasspathArtifactSourceCatalogRegistry.CATALOG_RESOURCE));
+        var decisions = new HashMap<>(ClasspathArtifactSourceCatalogRegistry.parseUseDecisions(
+                read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE)));
         decisions.put("orphan", decisions.values().iterator().next());
 
         assertThatIllegalStateException()
-            .isThrownBy(() -> ClasspathArtifactSourceCatalogRegistry.validateUseDecisions(catalog, decisions))
-            .withMessageContaining("must match the catalog exactly");
+                .isThrownBy(() -> ClasspathArtifactSourceCatalogRegistry.validateUseDecisions(catalog, decisions))
+                .withMessageContaining("must match the catalog exactly");
     }
 
     @Test
@@ -277,17 +254,24 @@ class ClasspathArtifactSourceCatalogRegistryTest {
         // The schema restates this "closed vocabulary" by hand; nothing validates a manifest against the
         // schema in production, so the restatement is held to the enum here instead.
         JsonNode schema = read("contracts/artifact-source/1.0.0/artifact-source-manifest.schema.json");
-        List<String> expected = Stream.of(SourceAbsenceReason.values()).map(Enum::name).toList();
+        List<String> expected =
+                Stream.of(SourceAbsenceReason.values()).map(Enum::name).toList();
 
         List<JsonNode> vocabularies = schema.findValues("reasonCode");
         vocabularies.addAll(schema.findValues("errorCode"));
-        assertThat(vocabularies).as("both the absence and the collection-error vocabularies").hasSize(2);
+        assertThat(vocabularies)
+                .as("both the absence and the collection-error vocabularies")
+                .hasSize(2);
 
         for (JsonNode vocabulary : vocabularies) {
-            List<String> declared = vocabulary.path("enum").valueStream().map(JsonNode::asString).toList();
+            List<String> declared = vocabulary
+                    .path("enum")
+                    .valueStream()
+                    .map(JsonNode::asString)
+                    .toList();
             assertThat(declared)
-                .as("schema vocabulary vs SourceAbsenceReason.values()")
-                .containsExactlyInAnyOrderElementsOf(expected);
+                    .as("schema vocabulary vs SourceAbsenceReason.values()")
+                    .containsExactlyInAnyOrderElementsOf(expected);
         }
     }
 
@@ -297,22 +281,25 @@ class ClasspathArtifactSourceCatalogRegistryTest {
         JsonNode catalogSchema = read("contracts/artifact-source/1.0.0/artifact-source-catalog.schema.json");
         JsonNode decisionsSchema = read("contracts/artifact-source/1.0.0/source-use-decisions.schema.json");
         JsonNode source = catalogSchema.path("$defs").path("source").path("properties");
-        JsonNode decision = decisionsSchema.path("properties").path("decisions").path("items").path("properties");
+        JsonNode decision = decisionsSchema
+                .path("properties")
+                .path("decisions")
+                .path("items")
+                .path("properties");
 
-        assertThat(vocabularyOf(source.path("privacyClass"))).containsExactlyInAnyOrderElementsOf(
-            names(PrivacyClass.values())
-        );
-        assertThat(vocabularyOf(decision.path("basis"))).containsExactlyInAnyOrderElementsOf(
-            names(SourceUseBasis.values())
-        );
-        assertThat(vocabularyOf(decision.path("outcome"))).containsExactlyInAnyOrderElementsOf(
-            names(SourceUseOutcome.values())
-        );
+        assertThat(vocabularyOf(source.path("privacyClass")))
+                .containsExactlyInAnyOrderElementsOf(names(PrivacyClass.values()));
+        assertThat(vocabularyOf(decision.path("basis")))
+                .containsExactlyInAnyOrderElementsOf(names(SourceUseBasis.values()));
+        assertThat(vocabularyOf(decision.path("outcome")))
+                .containsExactlyInAnyOrderElementsOf(names(SourceUseOutcome.values()));
     }
 
     /** A one-value vocabulary is written as {@code const}, a wider one as {@code enum}. */
     private static List<String> vocabularyOf(JsonNode property) {
-        assertThat(property.isObject()).as("schema property to read a vocabulary from").isTrue();
+        assertThat(property.isObject())
+                .as("schema property to read a vocabulary from")
+                .isTrue();
         if (property.has("const")) {
             return List.of(property.path("const").asString());
         }
@@ -326,15 +313,12 @@ class ClasspathArtifactSourceCatalogRegistryTest {
     @Test
     void shouldAllowCaptureFactsWithoutAWatermarkOrImmutableIdentity() throws IOException {
         JsonNode factsSchema = read("contracts/artifact-source/1.0.0/artifact-source-manifest.schema.json")
-            .path("$defs")
-            .path("facts");
+                .path("$defs")
+                .path("facts");
 
         assertThat(factsSchema.has("anyOf")).isFalse();
-        assertThat(factsSchema.path("required").toString()).doesNotContain(
-            "sourceEffectiveAt",
-            "observedAt",
-            "immutableIdentity"
-        );
+        assertThat(factsSchema.path("required").toString())
+                .doesNotContain("sourceEffectiveAt", "observedAt", "immutableIdentity");
     }
 
     private JsonNode read(String resource) throws IOException {

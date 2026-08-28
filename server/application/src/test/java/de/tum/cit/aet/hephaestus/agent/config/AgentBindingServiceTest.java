@@ -12,7 +12,6 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditAction;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
@@ -66,9 +65,8 @@ class AgentBindingServiceTest extends BaseUnitTest {
     void upsertBindsAnAvailableInstanceModel() {
         Workspace w = workspace();
         when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(w));
-        when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
-            Optional.empty()
-        );
+        when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_REVIEW))
+                .thenReturn(Optional.empty());
         LlmModel model = new LlmModel();
         model.setId(99L);
         when(llmModelRepository.findById(99L)).thenReturn(Optional.of(model));
@@ -100,27 +98,25 @@ class AgentBindingServiceTest extends BaseUnitTest {
         assertThat(entry.getValue().action()).isEqualTo(ConfigAuditAction.UPDATED);
         assertThat(entry.getValue().before()).hasFieldOrPropertyWithValue("instanceModelId", null);
         assertThat(entry.getValue().after())
-            .hasFieldOrPropertyWithValue("instanceModelId", 99L)
-            .hasFieldOrPropertyWithValue("workspaceModelId", null)
-            .hasFieldOrPropertyWithValue("enabled", true);
+                .hasFieldOrPropertyWithValue("instanceModelId", 99L)
+                .hasFieldOrPropertyWithValue("workspaceModelId", null)
+                .hasFieldOrPropertyWithValue("enabled", true);
     }
 
     @Test
     void upsertRejectsAModelThatIsNotAvailableToTheWorkspace() {
         Workspace w = workspace();
         when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(w));
-        when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
-            Optional.empty()
-        );
+        when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_REVIEW))
+                .thenReturn(Optional.empty());
         LlmModel model = new LlmModel();
         model.setId(99L);
         when(llmModelRepository.findById(99L)).thenReturn(Optional.of(model));
         when(llmModelResolver.isAvailable(any(WorkspaceAgentBinding.class))).thenReturn(false);
 
         var request = new AgentBindingRequestDTO(99L, null, null, null, null, true);
-        assertThatThrownBy(() -> service.upsertBinding(context(), AgentPurpose.PRACTICE_REVIEW, request)).isInstanceOf(
-            IllegalArgumentException.class
-        );
+        assertThatThrownBy(() -> service.upsertBinding(context(), AgentPurpose.PRACTICE_REVIEW, request))
+                .isInstanceOf(IllegalArgumentException.class);
         verify(bindingRepository, never()).save(any());
     }
 
@@ -128,12 +124,12 @@ class AgentBindingServiceTest extends BaseUnitTest {
     void upsertRejectsWhenNotExactlyOneModelIsProvided() {
         Workspace w = workspace();
         when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(w));
-        when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.MENTOR)).thenReturn(Optional.empty());
+        when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.MENTOR))
+                .thenReturn(Optional.empty());
 
         var bothNull = new AgentBindingRequestDTO(null, null, null, null, null, true);
-        assertThatThrownBy(() -> service.upsertBinding(context(), AgentPurpose.MENTOR, bothNull)).isInstanceOf(
-            IllegalArgumentException.class
-        );
+        assertThatThrownBy(() -> service.upsertBinding(context(), AgentPurpose.MENTOR, bothNull))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -145,7 +141,8 @@ class AgentBindingServiceTest extends BaseUnitTest {
         bound.setId(42L);
         existing.setInstanceModel(bound);
         existing.setEnabled(true);
-        when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.MENTOR)).thenReturn(Optional.of(existing));
+        when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.MENTOR))
+                .thenReturn(Optional.of(existing));
 
         service.deleteBinding(context(), AgentPurpose.MENTOR);
 
@@ -157,14 +154,14 @@ class AgentBindingServiceTest extends BaseUnitTest {
         assertThat(entry.getValue().entityId()).isEqualTo(AgentPurpose.MENTOR.name());
         assertThat(entry.getValue().workspaceId()).isEqualTo(1L);
         assertThat(entry.getValue().action())
-            .as("removing a binding is a deletion, not an update to an all-null snapshot")
-            .isEqualTo(ConfigAuditAction.DELETED);
+                .as("removing a binding is a deletion, not an update to an all-null snapshot")
+                .isEqualTo(ConfigAuditAction.DELETED);
         assertThat(entry.getValue().after()).isNull();
         assertThat(entry.getValue().before())
-            .as("the pre-delete state must name the model the workspace lost")
-            .hasFieldOrPropertyWithValue("instanceModelId", 42L)
-            .hasFieldOrPropertyWithValue("workspaceModelId", null)
-            .hasFieldOrPropertyWithValue("enabled", true);
+                .as("the pre-delete state must name the model the workspace lost")
+                .hasFieldOrPropertyWithValue("instanceModelId", 42L)
+                .hasFieldOrPropertyWithValue("workspaceModelId", null)
+                .hasFieldOrPropertyWithValue("enabled", true);
     }
 
     /**

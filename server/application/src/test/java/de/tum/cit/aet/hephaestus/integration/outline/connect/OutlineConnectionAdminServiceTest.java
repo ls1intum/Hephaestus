@@ -41,16 +41,17 @@ class OutlineConnectionAdminServiceTest extends BaseUnitTest {
     private OutlineConnectionAdminService service() {
         lenient().when(connection.getId()).thenReturn(CONNECTION_ID);
         lenient()
-            .when(connection.getConfig())
-            .thenReturn(new ConnectionConfig.OutlineConfig(SERVER_URL, null, null, Set.of()));
-        lenient().when(connectionService.findActive(WS, IntegrationKind.OUTLINE)).thenReturn(Optional.of(connection));
+                .when(connection.getConfig())
+                .thenReturn(new ConnectionConfig.OutlineConfig(SERVER_URL, null, null, Set.of()));
+        lenient()
+                .when(connectionService.findActive(WS, IntegrationKind.OUTLINE))
+                .thenReturn(Optional.of(connection));
         return new OutlineConnectionAdminService(connectionService, apiClient);
     }
 
     private void storedToken(String token) {
-        when(connectionService.findActiveBearerToken(WS, IntegrationKind.OUTLINE)).thenReturn(
-            Optional.of(new BearerToken(token, null))
-        );
+        when(connectionService.findActiveBearerToken(WS, IntegrationKind.OUTLINE))
+                .thenReturn(Optional.of(new BearerToken(token, null)));
     }
 
     @Test
@@ -58,8 +59,8 @@ class OutlineConnectionAdminServiceTest extends BaseUnitTest {
         OutlineConnectionAdminService service = service();
         storedToken("ol_dead_key");
         org.mockito.Mockito.doThrow(new OutlineApiException("Outline /api/auth.info failed (HTTP 401)"))
-            .when(apiClient)
-            .validateToken(SERVER_URL, "ol_dead_key");
+                .when(apiClient)
+                .validateToken(SERVER_URL, "ol_dead_key");
 
         OutlineTokenStatusDTO status = service.tokenStatus(WS);
 
@@ -75,9 +76,8 @@ class OutlineConnectionAdminServiceTest extends BaseUnitTest {
         storedToken("ol_live_key");
         Instant expiresAt = Instant.parse("2026-12-01T10:00:00Z");
         Instant lastActiveAt = Instant.parse("2026-07-13T08:30:00Z");
-        when(apiClient.describeToken(SERVER_URL, "ol_live_key")).thenReturn(
-            Optional.of(new OutlineTokenDescription("Hephaestus", "ab12", expiresAt, lastActiveAt))
-        );
+        when(apiClient.describeToken(SERVER_URL, "ol_live_key"))
+                .thenReturn(Optional.of(new OutlineTokenDescription("Hephaestus", "ab12", expiresAt, lastActiveAt)));
 
         OutlineTokenStatusDTO status = service.tokenStatus(WS);
 
@@ -107,9 +107,8 @@ class OutlineConnectionAdminServiceTest extends BaseUnitTest {
     void tokenStatus_acceptedButMetadataProbeFails_isAcceptedWithoutMetadata_notAnError() {
         OutlineConnectionAdminService service = service();
         storedToken("ol_live_key");
-        when(apiClient.describeToken(SERVER_URL, "ol_live_key")).thenThrow(
-            new OutlineApiException("Outline /api/apiKeys.list failed (HTTP 500)")
-        );
+        when(apiClient.describeToken(SERVER_URL, "ol_live_key"))
+                .thenThrow(new OutlineApiException("Outline /api/apiKeys.list failed (HTTP 500)"));
 
         OutlineTokenStatusDTO status = service.tokenStatus(WS);
 
@@ -123,7 +122,8 @@ class OutlineConnectionAdminServiceTest extends BaseUnitTest {
     @Test
     void tokenStatus_withoutAStoredToken_isNotAccepted() {
         OutlineConnectionAdminService service = service();
-        when(connectionService.findActiveBearerToken(WS, IntegrationKind.OUTLINE)).thenReturn(Optional.empty());
+        when(connectionService.findActiveBearerToken(WS, IntegrationKind.OUTLINE))
+                .thenReturn(Optional.empty());
 
         assertThat(service.tokenStatus(WS).accepted()).isFalse();
         org.mockito.Mockito.verify(apiClient, never()).validateToken(any(), any());

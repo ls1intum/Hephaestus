@@ -12,7 +12,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy.Connect
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy.InitiateRequest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
-import de.tum.cit.aet.hephaestus.integration.outline.OutlineProperties;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient;
 import de.tum.cit.aet.hephaestus.integration.outline.client.OutlineApiClient.OutlineIdentity;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
@@ -20,7 +19,6 @@ import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentEvent
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.lifecycle.OutlineWebhookRegistrar;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import java.time.Duration;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -45,13 +43,12 @@ class OutlineConnectionStrategyTest extends BaseUnitTest {
 
     private OutlineConnectionStrategy strategy() {
         return new OutlineConnectionStrategy(
-            outlineApiClient,
-            webhookRegistrar,
-            outlineDocumentRepository,
-            outlineCollectionRepository,
-            outlineDocumentEventRepository,
-            new OutlineOriginPolicy(Set.of("https://app.getoutline.com"))
-        );
+                outlineApiClient,
+                webhookRegistrar,
+                outlineDocumentRepository,
+                outlineCollectionRepository,
+                outlineDocumentEventRepository,
+                new OutlineOriginPolicy(Set.of("https://app.getoutline.com")));
     }
 
     private InitiateRequest request(Map<String, String> userInput) {
@@ -60,14 +57,12 @@ class OutlineConnectionStrategyTest extends BaseUnitTest {
 
     @Test
     void initiate_validatesTokenAndAcceptsInlineWithTheTeamAsInstanceKey() {
-        when(outlineApiClient.validateToken("https://app.getoutline.com", "tok-123")).thenReturn(
-            new OutlineIdentity("team-9", "Acme", "user-1")
-        );
+        when(outlineApiClient.validateToken("https://app.getoutline.com", "tok-123"))
+                .thenReturn(new OutlineIdentity("team-9", "Acme", "user-1"));
         OutlineConnectionStrategy strategy = strategy();
 
-        ConnectInitiation result = strategy.initiate(
-            request(Map.of("server_url", "https://app.getoutline.com", "token", "tok-123"))
-        );
+        ConnectInitiation result =
+                strategy.initiate(request(Map.of("server_url", "https://app.getoutline.com", "token", "tok-123")));
 
         assertThat(result).isInstanceOf(ConnectInitiation.AcceptInline.class);
         ConnectInitiation.AcceptInline inline = (ConnectInitiation.AcceptInline) result;
@@ -79,17 +74,16 @@ class OutlineConnectionStrategyTest extends BaseUnitTest {
     @Test
     void initiate_rejectsMissingToken() {
         assertThatThrownBy(() -> strategy().initiate(request(Map.of("server_url", "https://app.getoutline.com"))))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("token");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("token");
     }
 
     @Test
     void initiate_rejectsAnOriginOutsideTheOperatorAllowlist() {
-        assertThatThrownBy(() ->
-            strategy().initiate(request(Map.of("server_url", "https://outline.example.com", "token", "tok-123")))
-        )
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("not approved");
+        assertThatThrownBy(() -> strategy()
+                        .initiate(request(Map.of("server_url", "https://outline.example.com", "token", "tok-123"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not approved");
 
         verifyNoInteractions(outlineApiClient);
     }

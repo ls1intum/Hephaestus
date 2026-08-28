@@ -86,29 +86,23 @@ class GitHubDeletionSweepServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         GitHubSyncProperties syncProperties = new GitHubSyncProperties(
-            Duration.ofSeconds(30),
-            Duration.ofSeconds(60),
-            Duration.ofSeconds(120),
-            Duration.ZERO,
-            true,
-            Duration.ofMinutes(5),
-            10
-        );
+                Duration.ofSeconds(30),
+                Duration.ofSeconds(60),
+                Duration.ofSeconds(120),
+                Duration.ZERO,
+                true,
+                Duration.ofMinutes(5),
+                10);
 
         service = new GitHubDeletionSweepService(
-            issueRepository,
-            repositoryRepository,
-            graphQlClientProvider,
-            graphQlSyncHelper,
-            syncProperties
-        );
+                issueRepository, repositoryRepository, graphQlClientProvider, graphQlSyncHelper, syncProperties);
 
         lenient().when(graphQlClientProvider.forScope(SCOPE_ID)).thenReturn(client);
         lenient().when(client.documentName(anyString())).thenReturn(requestSpec);
         lenient().when(requestSpec.variable(anyString(), any())).thenReturn(requestSpec);
         lenient()
-            .when(requestSpec.execute())
-            .thenAnswer(invocation -> scriptedResponses.isEmpty() ? Mono.empty() : scriptedResponses.poll());
+                .when(requestSpec.execute())
+                .thenAnswer(invocation -> scriptedResponses.isEmpty() ? Mono.empty() : scriptedResponses.poll());
     }
 
     private static Repository repository() {
@@ -126,16 +120,13 @@ class GitHubDeletionSweepServiceTest extends BaseUnitTest {
     /** A valid issues response with an explicitly-built {@code pageInfo}, for malformed-paging cases. */
     private static ClientGraphQlResponse issuePage(List<Integer> numbers, GHPageInfo pageInfo, int totalCount) {
         GHIssueConnection connection = new GHIssueConnection();
-        connection.setNodes(
-            numbers
-                .stream()
+        connection.setNodes(numbers.stream()
                 .map(number -> {
                     GHIssue issue = new GHIssue();
                     issue.setNumber(number);
                     return issue;
                 })
-                .toList()
-        );
+                .toList());
         connection.setPageInfo(pageInfo);
         connection.setTotalCount(totalCount);
         return validResponse("repository.issues", connection);
@@ -143,16 +134,13 @@ class GitHubDeletionSweepServiceTest extends BaseUnitTest {
 
     private static ClientGraphQlResponse pullRequestPage(List<Integer> numbers, boolean hasNextPage, int totalCount) {
         GHPullRequestConnection connection = new GHPullRequestConnection();
-        connection.setNodes(
-            numbers
-                .stream()
+        connection.setNodes(numbers.stream()
                 .map(number -> {
                     GHPullRequest pullRequest = new GHPullRequest();
                     pullRequest.setNumber(number);
                     return pullRequest;
                 })
-                .toList()
-        );
+                .toList());
         connection.setPageInfo(pageInfo(hasNextPage));
         connection.setTotalCount(totalCount);
         return validResponse("repository.pullRequests", connection);
@@ -182,11 +170,7 @@ class GitHubDeletionSweepServiceTest extends BaseUnitTest {
     }
 
     private static ClientGraphQlResponse issuePage(
-        List<Integer> numbers,
-        boolean hasNextPage,
-        int totalCount,
-        Boolean hasIssuesEnabled
-    ) {
+            List<Integer> numbers, boolean hasNextPage, int totalCount, Boolean hasIssuesEnabled) {
         return withFlag(issuePage(numbers, hasNextPage, totalCount), "repository.hasIssuesEnabled", hasIssuesEnabled);
     }
 
@@ -197,8 +181,12 @@ class GitHubDeletionSweepServiceTest extends BaseUnitTest {
     }
 
     private void stubLocalNumbers(List<Integer> issues, List<Integer> pullRequests) {
-        lenient().when(issueRepository.findLiveIssueNumbersByRepositoryId(REPO_ID)).thenReturn(issues);
-        lenient().when(issueRepository.findLivePullRequestNumbersByRepositoryId(REPO_ID)).thenReturn(pullRequests);
+        lenient()
+                .when(issueRepository.findLiveIssueNumbersByRepositoryId(REPO_ID))
+                .thenReturn(issues);
+        lenient()
+                .when(issueRepository.findLivePullRequestNumbersByRepositoryId(REPO_ID))
+                .thenReturn(pullRequests);
     }
 
     /**
@@ -208,11 +196,8 @@ class GitHubDeletionSweepServiceTest extends BaseUnitTest {
      */
     private void verifyNothingTombstoned() {
         verify(issueRepository, never()).tombstoneIssuesByRepositoryIdAndNumbers(anyLong(), anyCollection(), any());
-        verify(issueRepository, never()).tombstonePullRequestsByRepositoryIdAndNumbers(
-            anyLong(),
-            anyCollection(),
-            any()
-        );
+        verify(issueRepository, never())
+                .tombstonePullRequestsByRepositoryIdAndNumbers(anyLong(), anyCollection(), any());
     }
 
     @Nested
@@ -225,18 +210,15 @@ class GitHubDeletionSweepServiceTest extends BaseUnitTest {
             scriptedResponses.add(Mono.just(issuePage(List.of(1, 3), false, 2)));
             scriptedResponses.add(Mono.just(pullRequestPage(List.of(), false, 0)));
             stubLocalNumbers(List.of(1, 2, 3), List.of());
-            when(issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(anyLong(), anyCollection(), any())).thenReturn(
-                1
-            );
+            when(issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(anyLong(), anyCollection(), any()))
+                    .thenReturn(1);
 
             var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
 
             ArgumentCaptor<java.util.Collection<Integer>> captor = ArgumentCaptor.captor();
-            verify(issueRepository).tombstoneIssuesByRepositoryIdAndNumbers(
-                org.mockito.ArgumentMatchers.eq(REPO_ID),
-                captor.capture(),
-                any(Instant.class)
-            );
+            verify(issueRepository)
+                    .tombstoneIssuesByRepositoryIdAndNumbers(
+                            org.mockito.ArgumentMatchers.eq(REPO_ID), captor.capture(), any(Instant.class));
             assertThat(captor.getValue()).containsExactly(2);
             assertThat(outcome.issuesTombstoned()).isEqualTo(1);
             assertThat(outcome.skipped()).isFalse();
@@ -249,18 +231,15 @@ class GitHubDeletionSweepServiceTest extends BaseUnitTest {
             scriptedResponses.add(Mono.just(issuePage(List.of(), false, 0)));
             scriptedResponses.add(Mono.just(pullRequestPage(List.of(10), false, 1)));
             stubLocalNumbers(List.of(), List.of(10, 11));
-            when(
-                issueRepository.tombstonePullRequestsByRepositoryIdAndNumbers(anyLong(), anyCollection(), any())
-            ).thenReturn(1);
+            when(issueRepository.tombstonePullRequestsByRepositoryIdAndNumbers(anyLong(), anyCollection(), any()))
+                    .thenReturn(1);
 
             var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
 
             ArgumentCaptor<java.util.Collection<Integer>> captor = ArgumentCaptor.captor();
-            verify(issueRepository).tombstonePullRequestsByRepositoryIdAndNumbers(
-                org.mockito.ArgumentMatchers.eq(REPO_ID),
-                captor.capture(),
-                any(Instant.class)
-            );
+            verify(issueRepository)
+                    .tombstonePullRequestsByRepositoryIdAndNumbers(
+                            org.mockito.ArgumentMatchers.eq(REPO_ID), captor.capture(), any(Instant.class));
             assertThat(captor.getValue()).containsExactly(11);
             assertThat(outcome.pullRequestsTombstoned()).isEqualTo(1);
         }
@@ -309,15 +288,15 @@ class GitHubDeletionSweepServiceTest extends BaseUnitTest {
             // resurrected it.
             List<Integer> mirror = new ArrayList<>(List.of(1, 3));
             lenient()
-                .when(issueRepository.findLiveIssueNumbersByRepositoryId(REPO_ID))
-                .thenAnswer(invocation -> List.copyOf(mirror));
-            lenient().when(issueRepository.findLivePullRequestNumbersByRepositoryId(REPO_ID)).thenReturn(List.of());
-            scriptedResponses.add(
-                Mono.fromSupplier(() -> {
-                    mirror.add(4); // the webhook insert, landing mid-listing
-                    return issuePage(List.of(1, 3), false, 2);
-                })
-            );
+                    .when(issueRepository.findLiveIssueNumbersByRepositoryId(REPO_ID))
+                    .thenAnswer(invocation -> List.copyOf(mirror));
+            lenient()
+                    .when(issueRepository.findLivePullRequestNumbersByRepositoryId(REPO_ID))
+                    .thenReturn(List.of());
+            scriptedResponses.add(Mono.fromSupplier(() -> {
+                mirror.add(4); // the webhook insert, landing mid-listing
+                return issuePage(List.of(1, 3), false, 2);
+            }));
             scriptedResponses.add(Mono.just(pullRequestPage(List.of(), false, 0)));
 
             var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
@@ -333,28 +312,25 @@ class GitHubDeletionSweepServiceTest extends BaseUnitTest {
             // listing started and upstream does not have it, so it is a genuine deletion.
             List<Integer> mirror = new ArrayList<>(List.of(1, 2, 3));
             lenient()
-                .when(issueRepository.findLiveIssueNumbersByRepositoryId(REPO_ID))
-                .thenAnswer(invocation -> List.copyOf(mirror));
-            lenient().when(issueRepository.findLivePullRequestNumbersByRepositoryId(REPO_ID)).thenReturn(List.of());
-            scriptedResponses.add(
-                Mono.fromSupplier(() -> {
-                    mirror.add(4);
-                    return issuePage(List.of(1, 3), false, 2);
-                })
-            );
+                    .when(issueRepository.findLiveIssueNumbersByRepositoryId(REPO_ID))
+                    .thenAnswer(invocation -> List.copyOf(mirror));
+            lenient()
+                    .when(issueRepository.findLivePullRequestNumbersByRepositoryId(REPO_ID))
+                    .thenReturn(List.of());
+            scriptedResponses.add(Mono.fromSupplier(() -> {
+                mirror.add(4);
+                return issuePage(List.of(1, 3), false, 2);
+            }));
             scriptedResponses.add(Mono.just(pullRequestPage(List.of(), false, 0)));
-            when(issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(anyLong(), anyCollection(), any())).thenReturn(
-                1
-            );
+            when(issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(anyLong(), anyCollection(), any()))
+                    .thenReturn(1);
 
             var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
 
             ArgumentCaptor<java.util.Collection<Integer>> captor = ArgumentCaptor.captor();
-            verify(issueRepository).tombstoneIssuesByRepositoryIdAndNumbers(
-                ArgumentMatchers.eq(REPO_ID),
-                captor.capture(),
-                any(Instant.class)
-            );
+            verify(issueRepository)
+                    .tombstoneIssuesByRepositoryIdAndNumbers(
+                            ArgumentMatchers.eq(REPO_ID), captor.capture(), any(Instant.class));
             // #2 only — never the concurrently-created #4.
             assertThat(captor.getValue()).containsExactly(2);
             assertThat(outcome.issuesTombstoned()).isEqualTo(1);
@@ -422,12 +398,9 @@ class GitHubDeletionSweepServiceTest extends BaseUnitTest {
             scriptedResponses.add(Mono.just(invalid));
             scriptedResponses.add(Mono.just(pullRequestPage(List.of(), false, 0)));
             stubLocalNumbers(List.of(1, 2, 3), List.of());
-            when(graphQlSyncHelper.classifyGraphQlErrors(any())).thenReturn(
-                de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier.ClassificationResult.rateLimited(
-                    Duration.ofMinutes(30),
-                    "rate limited"
-                )
-            );
+            when(graphQlSyncHelper.classifyGraphQlErrors(any()))
+                    .thenReturn(de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier
+                            .ClassificationResult.rateLimited(Duration.ofMinutes(30), "rate limited"));
             when(graphQlSyncHelper.handleGraphQlClassification(any())).thenReturn(false);
 
             var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
@@ -457,9 +430,8 @@ class GitHubDeletionSweepServiceTest extends BaseUnitTest {
             scriptedResponses.add(Mono.just(issuePage(List.of(1), false, 900)));
             scriptedResponses.add(Mono.just(pullRequestPage(List.of(10), false, 1)));
             stubLocalNumbers(List.of(1, 2), List.of(10, 11));
-            when(
-                issueRepository.tombstonePullRequestsByRepositoryIdAndNumbers(anyLong(), anyCollection(), any())
-            ).thenReturn(1);
+            when(issueRepository.tombstonePullRequestsByRepositoryIdAndNumbers(anyLong(), anyCollection(), any()))
+                    .thenReturn(1);
 
             var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
 
@@ -467,11 +439,8 @@ class GitHubDeletionSweepServiceTest extends BaseUnitTest {
             assertThat(outcome.pullRequestsTombstoned()).isEqualTo(1);
             assertThat(outcome.skipped()).isTrue();
             verify(issueRepository, never()).tombstoneIssuesByRepositoryIdAndNumbers(anyLong(), anyCollection(), any());
-            verify(issueRepository, times(1)).tombstonePullRequestsByRepositoryIdAndNumbers(
-                anyLong(),
-                anyCollection(),
-                any()
-            );
+            verify(issueRepository, times(1))
+                    .tombstonePullRequestsByRepositoryIdAndNumbers(anyLong(), anyCollection(), any());
         }
 
         @Test
@@ -579,18 +548,15 @@ class GitHubDeletionSweepServiceTest extends BaseUnitTest {
             scriptedResponses.add(Mono.just(issuePage(List.of(1, 3), false, 2, true)));
             scriptedResponses.add(Mono.just(pullRequestPage(List.of(), false, 0)));
             stubLocalNumbers(List.of(1, 2, 3), List.of());
-            when(issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(anyLong(), anyCollection(), any())).thenReturn(
-                1
-            );
+            when(issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(anyLong(), anyCollection(), any()))
+                    .thenReturn(1);
 
             var outcome = service.sweepRepository(SCOPE_ID, repository(), handle);
 
             ArgumentCaptor<java.util.Collection<Integer>> captor = ArgumentCaptor.captor();
-            verify(issueRepository).tombstoneIssuesByRepositoryIdAndNumbers(
-                ArgumentMatchers.eq(REPO_ID),
-                captor.capture(),
-                any(Instant.class)
-            );
+            verify(issueRepository)
+                    .tombstoneIssuesByRepositoryIdAndNumbers(
+                            ArgumentMatchers.eq(REPO_ID), captor.capture(), any(Instant.class));
             assertThat(captor.getValue()).containsExactly(2);
             assertThat(outcome.issuesTombstoned()).isEqualTo(1);
             assertThat(outcome.skipped()).isFalse();
@@ -659,13 +625,12 @@ class GitHubDeletionSweepServiceTest extends BaseUnitTest {
 
             service.sweepScope(SCOPE_ID, handle);
 
-            verify(handle, org.mockito.Mockito.atLeastOnce()).progress(
-                any(),
-                any(),
-                ArgumentMatchers.argThat(
-                    progress -> progress.phase() == de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase.SWEEP
-                )
-            );
+            verify(handle, org.mockito.Mockito.atLeastOnce())
+                    .progress(
+                            any(),
+                            any(),
+                            ArgumentMatchers.argThat(progress -> progress.phase()
+                                    == de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase.SWEEP));
         }
 
         @Test

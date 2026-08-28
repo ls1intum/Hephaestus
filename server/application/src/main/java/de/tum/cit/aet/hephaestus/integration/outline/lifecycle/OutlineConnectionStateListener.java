@@ -42,10 +42,9 @@ public class OutlineConnectionStateListener {
     private final SyncJobService syncJobService;
 
     public OutlineConnectionStateListener(
-        OutlineWebhookRegistrar webhookRegistrar,
-        OutlineDocumentSyncScheduler syncScheduler,
-        SyncJobService syncJobService
-    ) {
+            OutlineWebhookRegistrar webhookRegistrar,
+            OutlineDocumentSyncScheduler syncScheduler,
+            SyncJobService syncJobService) {
         this.webhookRegistrar = webhookRegistrar;
         this.syncScheduler = syncScheduler;
         this.syncJobService = syncJobService;
@@ -64,41 +63,37 @@ public class OutlineConnectionStateListener {
         } catch (RuntimeException e) {
             // Async listener: rethrowing reaches nobody. The periodic reconcile is the safety net.
             log.warn(
-                "outline.lifecycle: connect-time setup failed for workspaceId={}: {}",
-                event.workspaceId(),
-                e.toString()
-            );
+                    "outline.lifecycle: connect-time setup failed for workspaceId={}: {}",
+                    event.workspaceId(),
+                    e.toString());
         }
     }
 
     private void runInitialSyncJob(ConnectionLifecycleEvent.Activated event) {
         try {
             syncJobService.run(
-                new SyncJobRequest(
-                    event.workspaceId(),
-                    event.connectionId(),
-                    IntegrationKind.OUTLINE,
-                    SyncJobType.INITIAL,
-                    SyncJobTrigger.LIFECYCLE,
-                    null
-                ),
-                handle -> {
-                    // INITIAL, threaded through: a mirror being populated for the first time must not infer
-                    // upstream deletions from its own half-filled state (parity with the SCM initial syncs).
-                    syncScheduler.syncWorkspaceNow(event.workspaceId(), handle, SyncJobType.INITIAL);
-                    // Cancelling the initial connect-time sync must record CANCELLED, not SUCCEEDED — mirror the
-                    // reportCancelled tail every other Outline entry point (catchUp/syncAllNow/runner) already has.
-                    if (handle.isCancellationRequested()) {
-                        handle.reportCancelled();
-                    }
-                }
-            );
+                    new SyncJobRequest(
+                            event.workspaceId(),
+                            event.connectionId(),
+                            IntegrationKind.OUTLINE,
+                            SyncJobType.INITIAL,
+                            SyncJobTrigger.LIFECYCLE,
+                            null),
+                    handle -> {
+                        // INITIAL, threaded through: a mirror being populated for the first time must not infer
+                        // upstream deletions from its own half-filled state (parity with the SCM initial syncs).
+                        syncScheduler.syncWorkspaceNow(event.workspaceId(), handle, SyncJobType.INITIAL);
+                        // Cancelling the initial connect-time sync must record CANCELLED, not SUCCEEDED — mirror the
+                        // reportCancelled tail every other Outline entry point (catchUp/syncAllNow/runner) already has.
+                        if (handle.isCancellationRequested()) {
+                            handle.reportCancelled();
+                        }
+                    });
         } catch (SyncJobConflictException e) {
             log.debug(
-                "outline.lifecycle: initial sync skipped for workspaceId={} — job {} already active",
-                event.workspaceId(),
-                e.activeJob().getId()
-            );
+                    "outline.lifecycle: initial sync skipped for workspaceId={} — job {} already active",
+                    event.workspaceId(),
+                    e.activeJob().getId());
         }
     }
 
@@ -113,10 +108,9 @@ public class OutlineConnectionStateListener {
             webhookRegistrar.deregister(event.workspaceId(), event.connectionId());
         } catch (RuntimeException e) {
             log.warn(
-                "outline.lifecycle: deactivation teardown failed for connectionId={}: {}",
-                event.connectionId(),
-                e.toString()
-            );
+                    "outline.lifecycle: deactivation teardown failed for connectionId={}: {}",
+                    event.connectionId(),
+                    e.toString());
         }
     }
 }

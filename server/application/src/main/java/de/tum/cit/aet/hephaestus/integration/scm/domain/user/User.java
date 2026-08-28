@@ -50,11 +50,12 @@ import org.jspecify.annotations.Nullable;
 @Entity
 // Unique constraint on LOWER(login) is managed by Liquibase (functional index — not expressible in JPA).
 @Table(
-    name = "\"user\"",
-    uniqueConstraints = {
-        @UniqueConstraint(name = "uq_user_provider_native_id", columnNames = { "provider_id", "native_id" }),
-    }
-)
+        name = "\"user\"",
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "uq_user_provider_native_id",
+                    columnNames = {"provider_id", "native_id"}),
+        })
 @Getter
 @Setter
 @NoArgsConstructor

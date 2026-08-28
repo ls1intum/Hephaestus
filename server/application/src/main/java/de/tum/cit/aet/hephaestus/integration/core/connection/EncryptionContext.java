@@ -31,11 +31,7 @@ import org.jspecify.annotations.Nullable;
  * @param columnFqn   stable column FQN — future-proof against a second encrypted column
  */
 public record EncryptionContext(
-    long workspaceId,
-    IntegrationKind kind,
-    @Nullable String instanceKey,
-    String columnFqn
-) {
+        long workspaceId, IntegrationKind kind, @Nullable String instanceKey, String columnFqn) {
     /** AAD schema version. Only V2 is supported; decrypt rejects any other version byte. */
     public static final byte SCHEMA_VERSION_V2 = 0x02;
 
@@ -55,10 +51,7 @@ public record EncryptionContext(
      * outside this package is the JPA entity {@link Connection}; arch-test pins this.
      */
     static EncryptionContext forConnectionCredentials(
-        long workspaceId,
-        IntegrationKind kind,
-        @Nullable String instanceKey
-    ) {
+            long workspaceId, IntegrationKind kind, @Nullable String instanceKey) {
         return new EncryptionContext(workspaceId, kind, instanceKey, "connection.credentials_encrypted");
     }
 
@@ -69,17 +62,17 @@ public record EncryptionContext(
         byte[] instanceBytes = (instanceKey == null ? "" : instanceKey).getBytes(StandardCharsets.UTF_8);
         byte[] columnBytes = columnFqn.getBytes(StandardCharsets.UTF_8);
 
-        int len =
-            DOMAIN_SEPARATOR.length +
-            1 + // schema version
-            2 +
-            workspaceBytes.length +
-            2 +
-            kindBytes.length +
-            2 +
-            instanceBytes.length +
-            2 +
-            columnBytes.length;
+        int len = DOMAIN_SEPARATOR.length
+                + 1
+                + // schema version
+                2
+                + workspaceBytes.length
+                + 2
+                + kindBytes.length
+                + 2
+                + instanceBytes.length
+                + 2
+                + columnBytes.length;
 
         ByteBuffer buf = ByteBuffer.allocate(len);
         buf.put(DOMAIN_SEPARATOR);

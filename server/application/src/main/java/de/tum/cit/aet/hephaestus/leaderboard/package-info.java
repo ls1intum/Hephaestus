@@ -11,24 +11,23 @@
  * no longer imports any vendor adapter packages.
  */
 @org.springframework.modulith.ApplicationModule(
-    displayName = "Leaderboard",
-    allowedDependencies = {
-        "activity",
-        "activity::scoring",
-        "config",
-        "core",
-        "core::exception",
-        "core::runtime",
-        "integration.core",
-        "integration.core::spi",
-        "integration.scm",
-        "profile",
-        "workspace",
-        "workspace::context",
-        // LeaderboardTaskScheduler reschedules on WorkspaceCreatedEvent / WorkspaceScheduleChangedEvent.
-        "workspace::events",
-        "workspace::settings",
-    }
-)
+        displayName = "Leaderboard",
+        allowedDependencies = {
+            "activity",
+            "activity::scoring",
+            "config",
+            "core",
+            "core::exception",
+            "core::runtime",
+            "integration.core",
+            "integration.core::spi",
+            "integration.scm",
+            "profile",
+            "workspace",
+            "workspace::context",
+            // LeaderboardTaskScheduler reschedules on WorkspaceCreatedEvent / WorkspaceScheduleChangedEvent.
+            "workspace::events",
+            "workspace::settings",
+        })
 @org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.leaderboard;

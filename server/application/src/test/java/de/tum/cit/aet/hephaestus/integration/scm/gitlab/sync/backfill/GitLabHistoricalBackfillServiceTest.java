@@ -26,7 +26,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncServiceHolder;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issue.GitLabIssueSyncService;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest.GitLabMergeRequestSyncService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.List;
@@ -77,21 +76,19 @@ class GitLabHistoricalBackfillServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         service = new GitLabHistoricalBackfillService(
-            syncTargetProvider,
-            repositoryRepository,
-            organizationRepository,
-            syncServiceHolderProvider,
-            new SyncSchedulerProperties(
-                true,
-                7,
-                "0 0 3 * * *",
-                15,
-                new BackfillProperties(true, 50, 100, 60),
-                new FilterProperties(Set.of(), Set.of(), Set.of()),
-                null,
-                null
-            )
-        );
+                syncTargetProvider,
+                repositoryRepository,
+                organizationRepository,
+                syncServiceHolderProvider,
+                new SyncSchedulerProperties(
+                        true,
+                        7,
+                        "0 0 3 * * *",
+                        15,
+                        new BackfillProperties(true, 50, 100, 60),
+                        new FilterProperties(Set.of(), Set.of(), Set.of()),
+                        null,
+                        null));
 
         lenient().when(syncServiceHolderProvider.getIfAvailable()).thenReturn(syncServiceHolder);
         lenient().when(syncServiceHolder.getIssueSyncService()).thenReturn(issueSyncService);
@@ -102,19 +99,21 @@ class GitLabHistoricalBackfillServiceTest extends BaseUnitTest {
         repository.setNameWithOwner(REPO);
         // No GitLab organization row → no provider id → the service falls back to the unscoped lookup.
         lenient()
-            .when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(any(), eq(IdentityProviderType.GITLAB)))
-            .thenReturn(Optional.empty());
+                .when(organizationRepository.findByLoginIgnoreCaseAndProvider_Type(
+                        any(), eq(IdentityProviderType.GITLAB)))
+                .thenReturn(Optional.empty());
         lenient().when(repositoryRepository.findByNameWithOwner(REPO)).thenReturn(Optional.of(repository));
 
-        lenient().when(syncTargetProvider.getSyncSessions(IntegrationKind.GITLAB)).thenReturn(List.of(session()));
+        lenient()
+                .when(syncTargetProvider.getSyncSessions(IntegrationKind.GITLAB))
+                .thenReturn(List.of(session()));
     }
 
     @Test
     void scheduledPassAfterAProductiveOneIsGatedByTheSuccessCooldown() {
         // One page of issues with more to come: the repository is nowhere near backfilled.
-        when(issueSyncService.backfillIssues(eq(SCOPE_ID), any(), any(), anyInt())).thenReturn(
-            new BackfillBatchResult(25, 100, 124, "cursor-2", false, false)
-        );
+        when(issueSyncService.backfillIssues(eq(SCOPE_ID), any(), any(), anyInt()))
+                .thenReturn(new BackfillBatchResult(25, 100, 124, "cursor-2", false, false));
 
         // No handle: this is the 60s scheduler tick, which the success cooldown exists to space out.
         int firstPass = service.runBackfillPass(SCOPE_ID, null);
@@ -128,9 +127,8 @@ class GitLabHistoricalBackfillServiceTest extends BaseUnitTest {
     @Test
     void jobDrivenPassIgnoresTheSuccessCooldownSoAManualBackfillDrains() {
         // Same repository, same "more history remains" answer — but an administrator is driving.
-        when(issueSyncService.backfillIssues(eq(SCOPE_ID), any(), any(), anyInt())).thenReturn(
-            new BackfillBatchResult(25, 100, 124, "cursor-2", false, false)
-        );
+        when(issueSyncService.backfillIssues(eq(SCOPE_ID), any(), any(), anyInt()))
+                .thenReturn(new BackfillBatchResult(25, 100, 124, "cursor-2", false, false));
 
         int firstPass = service.runBackfillPass(SCOPE_ID, handle);
         int secondPass = service.runBackfillPass(SCOPE_ID, handle);
@@ -145,9 +143,8 @@ class GitLabHistoricalBackfillServiceTest extends BaseUnitTest {
     @Test
     void errorBackoffGatesTheJobDrivenPassToo() {
         // A vendor that just failed is backed off for everybody — an admin click cannot hammer it.
-        when(issueSyncService.backfillIssues(eq(SCOPE_ID), any(), any(), anyInt())).thenReturn(
-            new BackfillBatchResult(0, 0, 0, null, false, true)
-        );
+        when(issueSyncService.backfillIssues(eq(SCOPE_ID), any(), any(), anyInt()))
+                .thenReturn(new BackfillBatchResult(0, 0, 0, null, false, true));
 
         assertThat(service.runBackfillPass(SCOPE_ID, handle)).isZero();
         assertThat(service.runBackfillPass(SCOPE_ID, handle)).isZero();
@@ -158,9 +155,8 @@ class GitLabHistoricalBackfillServiceTest extends BaseUnitTest {
     @Test
     void passThatDidNoWorkLeavesTheRepositoryEligibleForTheNextPass() {
         // No issues at all: didWork stays false, so no COOLDOWN_NORMAL is parked on the target.
-        when(issueSyncService.backfillIssues(eq(SCOPE_ID), any(), any(), anyInt())).thenReturn(
-            BackfillBatchResult.empty()
-        );
+        when(issueSyncService.backfillIssues(eq(SCOPE_ID), any(), any(), anyInt()))
+                .thenReturn(BackfillBatchResult.empty());
 
         assertThat(service.runBackfillPass(SCOPE_ID, handle)).isZero();
         assertThat(service.runBackfillPass(SCOPE_ID, handle)).isZero();
@@ -180,29 +176,28 @@ class GitLabHistoricalBackfillServiceTest extends BaseUnitTest {
 
     private static SyncSession session() {
         return new SyncSession(
-            SCOPE_ID,
-            "acme",
-            "Acme",
-            "acme",
-            null,
-            null,
-            List.of(target()),
-            new SyncContext(SCOPE_ID, "acme", "Acme", null)
-        );
+                SCOPE_ID,
+                "acme",
+                "Acme",
+                "acme",
+                null,
+                null,
+                List.of(target()),
+                new SyncContext(SCOPE_ID, "acme", "Acme", null));
     }
 
     /** A target past initial sync with issue backfill still pending — the only shape that backfills. */
     private static SyncTarget target() {
         return SyncTargetTestBuilder.syncTarget()
-            .id(SYNC_TARGET_ID)
-            .scopeId(SCOPE_ID)
-            .personalAccessToken("glpat-token")
-            .authMode(AuthMode.PERSONAL_ACCESS_TOKEN)
-            .repositoryNameWithOwner(REPO)
-            .lastIssuesSyncedAt(Instant.now()) // initial sync done, so backfill is allowed
-            .issueBackfillHighWaterMark(500) // initialized
-            .issueBackfillCheckpoint(125) // still counting down, so not complete
-            .issueSyncCursor("cursor-1")
-            .build();
+                .id(SYNC_TARGET_ID)
+                .scopeId(SCOPE_ID)
+                .personalAccessToken("glpat-token")
+                .authMode(AuthMode.PERSONAL_ACCESS_TOKEN)
+                .repositoryNameWithOwner(REPO)
+                .lastIssuesSyncedAt(Instant.now()) // initial sync done, so backfill is allowed
+                .issueBackfillHighWaterMark(500) // initialized
+                .issueBackfillCheckpoint(125) // still counting down, so not complete
+                .issueSyncCursor("cursor-1")
+                .build();
     }
 }

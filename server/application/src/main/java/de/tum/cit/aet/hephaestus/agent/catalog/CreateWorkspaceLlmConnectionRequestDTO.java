@@ -9,21 +9,30 @@ import org.jspecify.annotations.Nullable;
 
 @Schema(description = "Connect your own AI provider")
 public record CreateWorkspaceLlmConnectionRequestDTO(
-    @Nullable
-    @Size(max = 63)
-    @Schema(description = "Optional internal slug; generated from displayName when omitted")
-    String slug,
-    @NonNull @NotBlank @Size(max = 128) @Schema(description = "Human-readable name") String displayName,
-    @NonNull @NotBlank @Size(max = 2048) @Schema(description = "Provider base URL") String baseUrl,
-    @NonNull
-    @NotBlank
-    @Pattern(
-        regexp = "openai-completions|openai-responses",
-        message = "apiProtocol must be one of openai-completions, openai-responses"
-    )
-    @Schema(description = "Wire protocol", example = "openai-completions")
-    String apiProtocol,
-    @Nullable @Schema(description = "Credential shape (default BEARER)") LlmAuthMode authMode,
-    @Nullable @Schema(description = "API key (write-only; never returned)") String apiKey,
-    @Nullable @Schema(description = "Whether the connection is active (default false)") Boolean enabled
-) {}
+        @Nullable
+        @Size(max = 63)
+        @Schema(description = "Optional internal slug; generated from displayName when omitted")
+        String slug,
+
+        @NonNull @NotBlank @Size(max = 128) @Schema(description = "Human-readable name")
+        String displayName,
+
+        @NonNull @NotBlank @Size(max = 2048) @Schema(description = "Provider base URL")
+        String baseUrl,
+
+        @NonNull
+        @NotBlank
+        @Pattern(
+                regexp = "openai-completions|openai-responses",
+                message = "apiProtocol must be one of openai-completions, openai-responses")
+        @Schema(description = "Wire protocol", example = "openai-completions")
+        String apiProtocol,
+
+        @Nullable @Schema(description = "Credential shape (default BEARER)")
+        LlmAuthMode authMode,
+
+        @Nullable @Schema(description = "API key (write-only; never returned)")
+        String apiKey,
+
+        @Nullable @Schema(description = "Whether the connection is active (default false)")
+        Boolean enabled) {}

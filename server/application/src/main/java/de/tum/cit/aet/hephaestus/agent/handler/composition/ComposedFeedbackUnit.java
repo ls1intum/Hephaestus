@@ -16,18 +16,17 @@ import org.jspecify.annotations.Nullable;
  * @param placement where an in-context note goes: on a verified diff citation or in the artifact summary
  */
 public record ComposedFeedbackUnit(
-    FeedbackChannel channel,
-    String practiceSlug,
-    List<String> basedOn,
-    Action action,
-    @Nullable String supersedesThreadKey,
-    @Nullable WithholdReason withholdReason,
-    @Nullable String title,
-    @Nullable String body,
-    @Nullable String nextStep,
-    @Nullable ConversationBrief notes,
-    @Nullable InContextPlacement placement
-) {
+        FeedbackChannel channel,
+        String practiceSlug,
+        List<String> basedOn,
+        Action action,
+        @Nullable String supersedesThreadKey,
+        @Nullable WithholdReason withholdReason,
+        @Nullable String title,
+        @Nullable String body,
+        @Nullable String nextStep,
+        @Nullable ConversationBrief notes,
+        @Nullable InContextPlacement placement) {
     public static final int MAX_TITLE_LENGTH = 255;
 
     public static final int MAX_BODY_LENGTH = 8_000;
@@ -84,12 +83,11 @@ public record ComposedFeedbackUnit(
      * @param inConversationSignal an observable sign the conversation helped, not an instruction to relay
      */
     public record ConversationBrief(
-        String situation,
-        String capability,
-        String evidenceSummary,
-        String inConversationSignal,
-        @Nullable String alreadySaid
-    ) {
+            String situation,
+            String capability,
+            String evidenceSummary,
+            String inConversationSignal,
+            @Nullable String alreadySaid) {
         public ConversationBrief {
             requirePresent(situation, "situation");
             requirePresent(capability, "capability");
@@ -107,20 +105,20 @@ public record ComposedFeedbackUnit(
 
     /** In-context placement resolved from an observation citation, never from model-supplied coordinates. */
     public record ResolvedAnchor(
-        String observationId,
-        int citationIndex,
-        String path,
-        @Nullable String side,
-        int startLine,
-        @Nullable Integer endLine
-    ) {
+            String observationId,
+            int citationIndex,
+            String path,
+            @Nullable String side,
+            int startLine,
+            @Nullable Integer endLine) {
         public ResolvedAnchor {
             Objects.requireNonNull(observationId, "observationId");
             Objects.requireNonNull(path, "path");
         }
     }
 
-    public record InContextPlacement(PlacementKind kind, @Nullable ResolvedAnchor diffAnchor) {
+    public record InContextPlacement(
+            PlacementKind kind, @Nullable ResolvedAnchor diffAnchor) {
         public InContextPlacement {
             Objects.requireNonNull(kind, "kind");
             if ((kind == PlacementKind.DIFF) != (diffAnchor != null)) {
@@ -145,7 +143,7 @@ public record ComposedFeedbackUnit(
         if (channel == FeedbackChannel.IN_CHAT) return notes != null;
         if (nextStep == null || nextStep.isBlank()) return false;
         return channel == FeedbackChannel.IN_CONTEXT
-            ? body == null && placement != null
-            : body != null && !body.isBlank();
+                ? body == null && placement != null
+                : body != null && !body.isBlank();
     }
 }

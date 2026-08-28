@@ -34,10 +34,9 @@ public final class WorkspaceContextHolder {
         WorkspaceContext existing = contextHolder.get();
         if (existing != null && !existing.equals(context)) {
             log.warn(
-                "Detected context overwrite: existingSlug={}, newSlug={}",
-                existing.slug(),
-                context != null ? context.slug() : "null"
-            );
+                    "Detected context overwrite: existingSlug={}, newSlug={}",
+                    existing.slug(),
+                    context != null ? context.slug() : "null");
         }
 
         contextHolder.set(context);

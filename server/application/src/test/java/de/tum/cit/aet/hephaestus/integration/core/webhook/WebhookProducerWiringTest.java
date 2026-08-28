@@ -42,18 +42,14 @@ class WebhookProducerWiringTest extends BaseUnitTest {
     };
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
-        .withBean("natsConnection", Connection.class, WebhookProducerWiringTest::natsConnection)
-        .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
-        .withBean(WebhookProperties.class, WebhookPropertiesFixture::properties)
-        .withBean(NatsConnectionProperties.class, () ->
-            new NatsConnectionProperties(
-                false,
-                null,
-                "hephaestus",
-                new NatsConnectionProperties.Consumer(Duration.ofSeconds(60))
-            )
-        )
-        .withUserConfiguration(WebhookConfiguration.class);
+            .withBean("natsConnection", Connection.class, WebhookProducerWiringTest::natsConnection)
+            .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
+            .withBean(WebhookProperties.class, WebhookPropertiesFixture::properties)
+            .withBean(
+                    NatsConnectionProperties.class,
+                    () -> new NatsConnectionProperties(
+                            false, null, "hephaestus", new NatsConnectionProperties.Consumer(Duration.ofSeconds(60))))
+            .withUserConfiguration(WebhookConfiguration.class);
 
     @Test
     void contributesEveryBeanTheWebhookRoleIsResponsibleFor() {
@@ -69,14 +65,12 @@ class WebhookProducerWiringTest extends BaseUnitTest {
     void contributesNoneOfThemWhereTheRoleIsOff() {
         // The control: application-server runs with this false, so a bound delivered there configures
         // nothing. scripts/check-env-roles.mjs is the other half of that check.
-        runner
-            .withPropertyValues(RuntimeRole.WEBHOOK_PROPERTY + "=false")
-            .run(context -> {
-                assertThat(context).hasNotFailed();
-                for (String bean : WEBHOOK_ROLE_BEANS) {
-                    assertThat(context).doesNotHaveBean(bean);
-                }
-            });
+        runner.withPropertyValues(RuntimeRole.WEBHOOK_PROPERTY + "=false").run(context -> {
+            assertThat(context).hasNotFailed();
+            for (String bean : WEBHOOK_ROLE_BEANS) {
+                assertThat(context).doesNotHaveBean(bean);
+            }
+        });
     }
 
     /** A connection whose JetStream handles answer "no such stream", so bootstrap creates rather than reads. */
@@ -90,7 +84,9 @@ class WebhookProducerWiringTest extends BaseUnitTest {
             // Lenient throughout: the role-off case builds the same connection and touches none of it.
             lenient().when(connection.jetStreamManagement()).thenReturn(jsm);
             // The bootstrap takes its own handle with a longer request timeout than the probes want.
-            lenient().when(connection.jetStreamManagement(any(JetStreamOptions.class))).thenReturn(jsm);
+            lenient()
+                    .when(connection.jetStreamManagement(any(JetStreamOptions.class)))
+                    .thenReturn(jsm);
             lenient().when(connection.jetStream()).thenReturn(mock(JetStream.class));
             lenient().when(connection.getMaxPayload()).thenReturn(26_214_400L);
             return connection;

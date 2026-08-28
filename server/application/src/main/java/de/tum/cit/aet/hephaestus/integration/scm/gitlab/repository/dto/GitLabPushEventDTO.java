@@ -17,31 +17,29 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitLabPushEventDTO(
-    @JsonProperty("object_kind") @Nullable String objectKind,
-    @JsonProperty("ref") @Nullable String ref,
-    @JsonProperty("before") @Nullable String before,
-    @JsonProperty("after") @Nullable String after,
-    @JsonProperty("checkout_sha") @Nullable String checkoutSha,
-    @JsonProperty("project_id") @Nullable Long projectId,
-    @JsonProperty("project") @Nullable ProjectInfo project,
-    @JsonProperty("total_commits_count") int totalCommitsCount,
-    @JsonProperty("commits") @Nullable List<CommitInfo> commits
-) {
+        @JsonProperty("object_kind") @Nullable String objectKind,
+        @JsonProperty("ref") @Nullable String ref,
+        @JsonProperty("before") @Nullable String before,
+        @JsonProperty("after") @Nullable String after,
+        @JsonProperty("checkout_sha") @Nullable String checkoutSha,
+        @JsonProperty("project_id") @Nullable Long projectId,
+        @JsonProperty("project") @Nullable ProjectInfo project,
+        @JsonProperty("total_commits_count") int totalCommitsCount,
+        @JsonProperty("commits") @Nullable List<CommitInfo> commits) {
     /**
      * Commit data embedded in the push event payload.
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record CommitInfo(
-        @JsonProperty("id") String id,
-        @JsonProperty("message") @Nullable String message,
-        @JsonProperty("title") @Nullable String title,
-        @JsonProperty("timestamp") @Nullable String timestamp,
-        @JsonProperty("url") @Nullable String url,
-        @JsonProperty("author") @Nullable AuthorInfo author,
-        @JsonProperty("added") @Nullable List<String> added,
-        @JsonProperty("modified") @Nullable List<String> modified,
-        @JsonProperty("removed") @Nullable List<String> removed
-    ) {
+            @JsonProperty("id") String id,
+            @JsonProperty("message") @Nullable String message,
+            @JsonProperty("title") @Nullable String title,
+            @JsonProperty("timestamp") @Nullable String timestamp,
+            @JsonProperty("url") @Nullable String url,
+            @JsonProperty("author") @Nullable AuthorInfo author,
+            @JsonProperty("added") @Nullable List<String> added,
+            @JsonProperty("modified") @Nullable List<String> modified,
+            @JsonProperty("removed") @Nullable List<String> removed) {
         /**
          * Returns the total number of changed files.
          */
@@ -59,9 +57,8 @@ public record GitLabPushEventDTO(
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record AuthorInfo(
-        @JsonProperty("name") @Nullable String name,
-        @JsonProperty("email") @Nullable String email
-    ) {}
+            @JsonProperty("name") @Nullable String name,
+            @JsonProperty("email") @Nullable String email) {}
 
     /**
      * Embedded project metadata from the push event payload.
@@ -71,15 +68,14 @@ public record GitLabPushEventDTO(
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record ProjectInfo(
-        @JsonProperty("id") @Nullable Long id,
-        @JsonProperty("name") @Nullable String name,
-        @JsonProperty("description") @Nullable String description,
-        @JsonProperty("web_url") @Nullable String webUrl,
-        @JsonProperty("namespace") @Nullable String namespace,
-        @JsonProperty("path_with_namespace") @Nullable String pathWithNamespace,
-        @JsonProperty("default_branch") @Nullable String defaultBranch,
-        @JsonProperty("visibility_level") int visibilityLevel
-    ) {
+            @JsonProperty("id") @Nullable Long id,
+            @JsonProperty("name") @Nullable String name,
+            @JsonProperty("description") @Nullable String description,
+            @JsonProperty("web_url") @Nullable String webUrl,
+            @JsonProperty("namespace") @Nullable String namespace,
+            @JsonProperty("path_with_namespace") @Nullable String pathWithNamespace,
+            @JsonProperty("default_branch") @Nullable String defaultBranch,
+            @JsonProperty("visibility_level") int visibilityLevel) {
         /** Visibility level 0 = private. */
         public static final int VISIBILITY_PRIVATE = 0;
 

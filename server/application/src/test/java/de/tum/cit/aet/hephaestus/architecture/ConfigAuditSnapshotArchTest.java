@@ -33,29 +33,26 @@ class ConfigAuditSnapshotArchTest extends HephaestusArchitectureTest {
      * a presence flag or a non-sensitive enum, never the material itself.
      */
     private static final Set<String> ALLOWED = Set.of(
-        // boolean: whether a key exists, never the key
-        "llmApiKeySet",
-        // enum: PROXY | API_KEY — how credentials are supplied, not what they are
-        "credentialMode",
-        // boolean: whether a workspace SCM token is present, never the token itself
-        "tokenSet",
-        // Integer: the model's max *output tokens* capability (an LLM sizing parameter), not a
-        // credential — "token" here means the language-model unit, unrelated to auth tokens
-        "maxOutputTokens"
-    );
+            // boolean: whether a key exists, never the key
+            "llmApiKeySet",
+            // enum: PROXY | API_KEY — how credentials are supplied, not what they are
+            "credentialMode",
+            // boolean: whether a workspace SCM token is present, never the token itself
+            "tokenSet",
+            // Integer: the model's max *output tokens* capability (an LLM sizing parameter), not a
+            // credential — "token" here means the language-model unit, unrelated to auth tokens
+            "maxOutputTokens");
 
     @Test
     void snapshotsAreRecords() {
         classes()
-            .that()
-            .implement(ConfigAuditSnapshot.class)
-            .should()
-            .beRecords()
-            .because(
-                "Jackson serializes record components in declaration order; a Map's iteration order is " +
-                    "not contractual, and the change diff and no-op suppression both depend on determinism"
-            )
-            .check(classes);
+                .that()
+                .implement(ConfigAuditSnapshot.class)
+                .should()
+                .beRecords()
+                .because("Jackson serializes record components in declaration order; a Map's iteration order is "
+                        + "not contractual, and the change diff and no-op suppression both depend on determinism")
+                .check(classes);
     }
 
     @Test
@@ -66,13 +63,11 @@ class ConfigAuditSnapshotArchTest extends HephaestusArchitectureTest {
     /** Exposed so {@code ConfigAuditSnapshotSecretDetectionTest} can run it against fixtures. */
     static com.tngtech.archunit.lang.ArchRule secretLikeComponentRule() {
         return classes()
-            .that()
-            .implement(ConfigAuditSnapshot.class)
-            .should(haveNoSecretLikeField())
-            .because(
-                "config_audit_event is append-only: a leaked credential or address cannot be edited out. " +
-                    "Snapshot a presence flag (e.g. llmApiKeySet) instead, or add a justified exemption"
-            );
+                .that()
+                .implement(ConfigAuditSnapshot.class)
+                .should(haveNoSecretLikeField())
+                .because("config_audit_event is append-only: a leaked credential or address cannot be edited out. "
+                        + "Snapshot a presence flag (e.g. llmApiKeySet) instead, or add a justified exemption");
     }
 
     private static ArchCondition<JavaClass> haveNoSecretLikeField() {
@@ -90,12 +85,7 @@ class ConfigAuditSnapshotArchTest extends HephaestusArchitectureTest {
      * record would pass it. Cycles are possible in principle, hence the visited set.
      */
     private static void checkRecursively(
-        JavaClass root,
-        JavaClass clazz,
-        String path,
-        Set<String> visited,
-        ConditionEvents events
-    ) {
+            JavaClass root, JavaClass clazz, String path, Set<String> visited, ConditionEvents events) {
         if (!visited.add(clazz.getName())) {
             return;
         }
@@ -105,12 +95,8 @@ class ConfigAuditSnapshotArchTest extends HephaestusArchitectureTest {
             }
             String fieldPath = path + "." + field.getName();
             if (SECRET_LIKE.matcher(field.getName().toLowerCase(Locale.ROOT)).find()) {
-                events.add(
-                    SimpleConditionEvent.violated(
-                        root,
-                        root.getName() + fieldPath + " looks like secret or contact material"
-                    )
-                );
+                events.add(SimpleConditionEvent.violated(
+                        root, root.getName() + fieldPath + " looks like secret or contact material"));
             }
             JavaClass type = field.getRawType();
             if (type.isRecord()) {

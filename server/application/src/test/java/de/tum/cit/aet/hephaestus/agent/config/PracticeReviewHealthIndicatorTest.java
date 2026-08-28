@@ -29,61 +29,47 @@ class PracticeReviewHealthIndicatorTest extends BaseUnitTest {
 
     @Test
     void shouldStayHealthyWhenReviewsAreDisabled() {
-        assertThat(indicator(false, false, Optional.empty()).health().getStatus()).isEqualTo(Status.UP);
+        assertThat(indicator(false, false, Optional.empty()).health().getStatus())
+                .isEqualTo(Status.UP);
     }
 
     @Test
     void shouldStayHealthyOnANonWorkerRole() {
-        assertThat(indicator(true, false, Optional.empty(), false).health().getStatus()).isEqualTo(Status.UP);
+        assertThat(indicator(true, false, Optional.empty(), false).health().getStatus())
+                .isEqualTo(Status.UP);
     }
 
     @Test
     void shouldRefuseReadinessWhenSourceAuthorizationExpired() {
-        var health = indicator(true, true, Optional.of(Instant.parse("2025-01-01T00:00:00Z"))).health();
+        var health = indicator(true, true, Optional.of(Instant.parse("2025-01-01T00:00:00Z")))
+                .health();
 
         assertThat(health.getStatus()).isEqualTo(Status.OUT_OF_SERVICE);
         assertThat(health.getDetails()).containsEntry("reason", "SOURCE_AUTHORIZATION_EXPIRED");
     }
 
     private static PracticeReviewHealthIndicator indicator(
-        boolean agentEnabled,
-        boolean gitEnabled,
-        Optional<Instant> expiry
-    ) {
+            boolean agentEnabled, boolean gitEnabled, Optional<Instant> expiry) {
         return indicator(agentEnabled, gitEnabled, expiry, true);
     }
 
     private static PracticeReviewHealthIndicator indicator(
-        boolean agentEnabled,
-        boolean gitEnabled,
-        Optional<Instant> expiry,
-        boolean workerRole
-    ) {
+            boolean agentEnabled, boolean gitEnabled, Optional<Instant> expiry, boolean workerRole) {
         ArtifactSourceCatalogRegistry sourceCatalog = mock(ArtifactSourceCatalogRegistry.class);
-        expiry.ifPresent(value ->
-            when(sourceCatalog.earliestUseDecisionExpiry(SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)).thenReturn(
-                Optional.of(value)
-            )
-        );
+        expiry.ifPresent(
+                value -> when(sourceCatalog.earliestUseDecisionExpiry(SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
+                        .thenReturn(Optional.of(value)));
         return new PracticeReviewHealthIndicator(
-            agent(agentEnabled),
-            git(gitEnabled),
-            sourceCatalog,
-            java.time.Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC),
-            workerRole
-        );
+                agent(agentEnabled),
+                git(gitEnabled),
+                sourceCatalog,
+                java.time.Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC),
+                workerRole);
     }
 
     private static AgentProperties agent(boolean enabled) {
         return new AgentProperties(
-            enabled,
-            Duration.ofSeconds(1),
-            5,
-            5,
-            Duration.ofSeconds(25),
-            Duration.ofDays(14),
-            Duration.ofDays(90)
-        );
+                enabled, Duration.ofSeconds(1), 5, 5, Duration.ofSeconds(25), Duration.ofDays(14), Duration.ofDays(90));
     }
 
     private static GitRepositoryProperties git(boolean enabled) {

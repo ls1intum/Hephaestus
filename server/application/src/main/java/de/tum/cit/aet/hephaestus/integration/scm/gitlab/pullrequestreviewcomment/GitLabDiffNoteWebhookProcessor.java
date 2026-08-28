@@ -62,28 +62,26 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
     private final GitLabReviewReconciler reviewReconciler;
 
     public GitLabDiffNoteWebhookProcessor(
-        GitLabUserService gitLabUserService,
-        UserRepository userRepository,
-        LabelRepository labelRepository,
-        RepositoryRepository repositoryRepository,
-        ScopeIdResolver scopeIdResolver,
-        RepositoryScopeFilter repositoryScopeFilter,
-        GitLabProperties gitLabProperties,
-        PullRequestRepository pullRequestRepository,
-        GitLabPullRequestReviewThreadProcessor threadProcessor,
-        GitLabPullRequestReviewCommentProcessor reviewCommentProcessor,
-        PullRequestReviewCommentRepository reviewCommentRepository,
-        GitLabReviewReconciler reviewReconciler
-    ) {
+            GitLabUserService gitLabUserService,
+            UserRepository userRepository,
+            LabelRepository labelRepository,
+            RepositoryRepository repositoryRepository,
+            ScopeIdResolver scopeIdResolver,
+            RepositoryScopeFilter repositoryScopeFilter,
+            GitLabProperties gitLabProperties,
+            PullRequestRepository pullRequestRepository,
+            GitLabPullRequestReviewThreadProcessor threadProcessor,
+            GitLabPullRequestReviewCommentProcessor reviewCommentProcessor,
+            PullRequestReviewCommentRepository reviewCommentRepository,
+            GitLabReviewReconciler reviewReconciler) {
         super(
-            gitLabUserService,
-            userRepository,
-            labelRepository,
-            repositoryRepository,
-            scopeIdResolver,
-            repositoryScopeFilter,
-            gitLabProperties
-        );
+                gitLabUserService,
+                userRepository,
+                labelRepository,
+                repositoryRepository,
+                scopeIdResolver,
+                repositoryScopeFilter,
+                gitLabProperties);
         this.pullRequestRepository = pullRequestRepository;
         this.threadProcessor = threadProcessor;
         this.reviewCommentProcessor = reviewCommentProcessor;
@@ -108,17 +106,17 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
         // Find parent MR, creating a minimal stub if it doesn't exist yet
         // (diff note webhooks can arrive before the MR webhook)
         PullRequest pr = pullRequestRepository
-            .findByRepositoryIdAndNumber(Objects.requireNonNull(context.repository()).getId(), embeddedMr.iid())
-            .orElse(null);
+                .findByRepositoryIdAndNumber(
+                        Objects.requireNonNull(context.repository()).getId(), embeddedMr.iid())
+                .orElse(null);
 
         if (pr == null) {
             pr = createMinimalPullRequestWithRetry(embeddedMr, context);
             if (pr == null) {
                 log.warn(
-                    "Skipped diff note: reason=failedToCreateParent, mrIid={}, noteId={}",
-                    embeddedMr.iid(),
-                    attrs.id()
-                );
+                        "Skipped diff note: reason=failedToCreateParent, mrIid={}, noteId={}",
+                        embeddedMr.iid(),
+                        attrs.id());
                 return null;
             }
         }
@@ -170,12 +168,7 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
             threadNativeId = attrs.id();
         }
         var webhookThreadData = new GitLabPullRequestReviewThreadProcessor.WebhookThreadData(
-            threadNativeId,
-            threadPath,
-            threadLine,
-            createdAt,
-            updatedAt
-        );
+                threadNativeId, threadPath, threadLine, createdAt, updatedAt);
         PullRequestReviewThread thread = threadProcessor.findOrCreateWebhookThread(webhookThreadData, pr, provider);
 
         // Resolve author
@@ -185,27 +178,27 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
         String noteGlobalId = "gid://gitlab/DiffNote/" + attrs.id();
 
         var noteData = new GitLabPullRequestReviewCommentProcessor.DiffNoteData(
-            noteGlobalId,
-            attrs.note(),
-            attrs.url(),
-            filePath,
-            newLine,
-            oldLine,
-            newPath,
-            oldPath,
-            headSha,
-            baseSha,
-            startSha,
-            createdAt,
-            updatedAt
-        );
+                noteGlobalId,
+                attrs.note(),
+                attrs.url(),
+                filePath,
+                newLine,
+                oldLine,
+                newPath,
+                oldPath,
+                headSha,
+                baseSha,
+                startSha,
+                createdAt,
+                updatedAt);
 
         // Resolve parent: if the thread already has a starter comment, this note is a reply.
         // This mirrors GitLab's semantics where all notes in a discussion share the same
         // discussion_id; the earliest note is the thread starter and subsequent notes reply to it.
-        PullRequestReviewComment inReplyTo =
-            thread.getId() != null
-                ? reviewCommentRepository.findFirstByThreadIdOrderByCreatedAtAsc(thread.getId()).orElse(null)
+        PullRequestReviewComment inReplyTo = thread.getId() != null
+                ? reviewCommentRepository
+                        .findFirstByThreadIdOrderByCreatedAtAsc(thread.getId())
+                        .orElse(null)
                 : null;
 
         // Reconcile a synthetic COMMENTED review per (author, discussion) so the note links
@@ -214,24 +207,11 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
         if (author != null && attrs.discussionId() != null) {
             String discussionGid = "gid://gitlab/Discussion/" + attrs.discussionId();
             review = reviewReconciler.findOrCreateCommentedReview(
-                pr,
-                author,
-                discussionGid,
-                createdAt,
-                provider,
-                context
-            );
+                    pr, author, discussionGid, createdAt, provider, context);
         }
 
         var commentContext = new GitLabPullRequestReviewCommentProcessor.CommentContext(
-            thread,
-            pr,
-            author,
-            provider,
-            inReplyTo,
-            review,
-            Objects.requireNonNull(context.scopeId())
-        );
+                thread, pr, author, provider, inReplyTo, review, Objects.requireNonNull(context.scopeId()));
         PullRequestReviewComment comment = reviewCommentProcessor.findOrCreateComment(noteData, commentContext);
 
         if (comment != null) {
@@ -254,24 +234,21 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
      */
     @Nullable
     private PullRequest createMinimalPullRequestWithRetry(
-        GitLabNoteEventDTO.EmbeddedMergeRequest dto,
-        ProcessingContext context
-    ) {
+            GitLabNoteEventDTO.EmbeddedMergeRequest dto, ProcessingContext context) {
         try {
             return createMinimalPullRequest(dto, context);
         } catch (DataIntegrityViolationException e) {
             log.debug("Concurrent MR creation, looking up: iid={}", dto.iid());
             return pullRequestRepository
-                .findByRepositoryIdAndNumber(Objects.requireNonNull(context.repository()).getId(), dto.iid())
-                .orElse(null);
+                    .findByRepositoryIdAndNumber(
+                            Objects.requireNonNull(context.repository()).getId(), dto.iid())
+                    .orElse(null);
         }
     }
 
     @Nullable
     private PullRequest createMinimalPullRequest(
-        GitLabNoteEventDTO.EmbeddedMergeRequest dto,
-        ProcessingContext context
-    ) {
+            GitLabNoteEventDTO.EmbeddedMergeRequest dto, ProcessingContext context) {
         Repository repository = Objects.requireNonNull(context.repository());
         if (repository == null || dto.id() == null) return null;
 
@@ -300,11 +277,10 @@ public class GitLabDiffNoteWebhookProcessor extends BaseGitLabProcessor {
 
         PullRequest saved = pullRequestRepository.save(pr);
         log.info(
-            "Created stub PullRequest from diff note webhook: prId={}, iid={}, repo={}",
-            saved.getId(),
-            saved.getNumber(),
-            repository.getNameWithOwner()
-        );
+                "Created stub PullRequest from diff note webhook: prId={}, iid={}, repo={}",
+                saved.getId(),
+                saved.getNumber(),
+                repository.getNameWithOwner());
         return saved;
     }
 

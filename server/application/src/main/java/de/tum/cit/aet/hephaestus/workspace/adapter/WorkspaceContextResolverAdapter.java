@@ -33,9 +33,9 @@ public class WorkspaceContextResolverAdapter implements ScopeIdResolver {
     public Optional<Long> findScopeIdByOrgLogin(String organizationLogin) {
         // First try to find by linked organization login
         return workspaceRepository
-            .findByOrganization_Login(organizationLogin)
-            .or(() -> workspaceRepository.findByAccountLoginIgnoreCase(organizationLogin))
-            .map(Workspace::getId);
+                .findByOrganization_Login(organizationLogin)
+                .or(() -> workspaceRepository.findByAccountLoginIgnoreCase(organizationLogin))
+                .map(Workspace::getId);
     }
 
     @Override
@@ -43,7 +43,7 @@ public class WorkspaceContextResolverAdapter implements ScopeIdResolver {
         // Find workspace by monitored repository nameWithOwner
         // This supports personal repos and serves as fallback for org repos
         return workspaceRepository
-            .findByRepositoriesToMonitor_NameWithOwner(repositoryNameWithOwner)
-            .map(Workspace::getId);
+                .findByRepositoriesToMonitor_NameWithOwner(repositoryNameWithOwner)
+                .map(Workspace::getId);
     }
 }

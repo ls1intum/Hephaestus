@@ -42,13 +42,12 @@ public class ConnectionService {
     private final TransactionTemplate revokeTransactionTemplate;
 
     public ConnectionService(
-        ConnectionRepository connectionRepository,
-        ConnectionAuditRepository auditRepository,
-        CredentialBundleConverter credentialConverter,
-        ApplicationEventPublisher eventPublisher,
-        SyncJobService syncJobService,
-        PlatformTransactionManager transactionManager
-    ) {
+            ConnectionRepository connectionRepository,
+            ConnectionAuditRepository auditRepository,
+            CredentialBundleConverter credentialConverter,
+            ApplicationEventPublisher eventPublisher,
+            SyncJobService syncJobService,
+            PlatformTransactionManager transactionManager) {
         this.connectionRepository = connectionRepository;
         this.auditRepository = auditRepository;
         this.credentialConverter = credentialConverter;
@@ -78,15 +77,16 @@ public class ConnectionService {
      */
     @Transactional(readOnly = true)
     public Optional<IntegrationKind> findActiveProviderKind(long workspaceId) {
-        boolean github = connectionRepository.findActive(workspaceId, IntegrationKind.GITHUB).isPresent();
-        boolean gitlab = connectionRepository.findActive(workspaceId, IntegrationKind.GITLAB).isPresent();
+        boolean github = connectionRepository
+                .findActive(workspaceId, IntegrationKind.GITHUB)
+                .isPresent();
+        boolean gitlab = connectionRepository
+                .findActive(workspaceId, IntegrationKind.GITLAB)
+                .isPresent();
         if (github && gitlab) {
-            throw new IllegalStateException(
-                "Workspace " +
-                    workspaceId +
-                    " has ACTIVE Connections for both GITHUB and GITLAB; " +
-                    "out-of-band fix required"
-            );
+            throw new IllegalStateException("Workspace " + workspaceId
+                    + " has ACTIVE Connections for both GITHUB and GITLAB; "
+                    + "out-of-band fix required");
         }
         if (github) return Optional.of(IntegrationKind.GITHUB);
         if (gitlab) return Optional.of(IntegrationKind.GITLAB);
@@ -96,46 +96,46 @@ public class ConnectionService {
     @Transactional(readOnly = true)
     public Optional<ConnectionConfig.GitHubAppConfig> findActiveGitHubAppConfig(long workspaceId) {
         return connectionRepository
-            .findActive(workspaceId, IntegrationKind.GITHUB)
-            .map(Connection::getConfig)
-            .filter(c -> c instanceof ConnectionConfig.GitHubAppConfig)
-            .map(c -> (ConnectionConfig.GitHubAppConfig) c);
+                .findActive(workspaceId, IntegrationKind.GITHUB)
+                .map(Connection::getConfig)
+                .filter(c -> c instanceof ConnectionConfig.GitHubAppConfig)
+                .map(c -> (ConnectionConfig.GitHubAppConfig) c);
     }
 
     @Transactional(readOnly = true)
     public Optional<ConnectionConfig.GitHubPatConfig> findActiveGitHubPatConfig(long workspaceId) {
         return connectionRepository
-            .findActive(workspaceId, IntegrationKind.GITHUB)
-            .map(Connection::getConfig)
-            .filter(c -> c instanceof ConnectionConfig.GitHubPatConfig)
-            .map(c -> (ConnectionConfig.GitHubPatConfig) c);
+                .findActive(workspaceId, IntegrationKind.GITHUB)
+                .map(Connection::getConfig)
+                .filter(c -> c instanceof ConnectionConfig.GitHubPatConfig)
+                .map(c -> (ConnectionConfig.GitHubPatConfig) c);
     }
 
     @Transactional(readOnly = true)
     public Optional<ConnectionConfig.GitLabConfig> findActiveGitLabConfig(long workspaceId) {
         return connectionRepository
-            .findActive(workspaceId, IntegrationKind.GITLAB)
-            .map(Connection::getConfig)
-            .filter(c -> c instanceof ConnectionConfig.GitLabConfig)
-            .map(c -> (ConnectionConfig.GitLabConfig) c);
+                .findActive(workspaceId, IntegrationKind.GITLAB)
+                .map(Connection::getConfig)
+                .filter(c -> c instanceof ConnectionConfig.GitLabConfig)
+                .map(c -> (ConnectionConfig.GitLabConfig) c);
     }
 
     @Transactional(readOnly = true)
     public Optional<ConnectionConfig.SlackConfig> findSlackNotificationConfig(long workspaceId) {
         return connectionRepository
-            .findActive(workspaceId, IntegrationKind.SLACK)
-            .map(Connection::getConfig)
-            .filter(c -> c instanceof ConnectionConfig.SlackConfig)
-            .map(c -> (ConnectionConfig.SlackConfig) c);
+                .findActive(workspaceId, IntegrationKind.SLACK)
+                .map(Connection::getConfig)
+                .filter(c -> c instanceof ConnectionConfig.SlackConfig)
+                .map(c -> (ConnectionConfig.SlackConfig) c);
     }
 
     @Transactional(readOnly = true)
     public Optional<ConnectionConfig.OutlineConfig> findActiveOutlineConfig(long workspaceId) {
         return connectionRepository
-            .findActive(workspaceId, IntegrationKind.OUTLINE)
-            .map(Connection::getConfig)
-            .filter(c -> c instanceof ConnectionConfig.OutlineConfig)
-            .map(c -> (ConnectionConfig.OutlineConfig) c);
+                .findActive(workspaceId, IntegrationKind.OUTLINE)
+                .map(Connection::getConfig)
+                .filter(c -> c instanceof ConnectionConfig.OutlineConfig)
+                .map(c -> (ConnectionConfig.OutlineConfig) c);
     }
 
     /**
@@ -160,28 +160,25 @@ public class ConnectionService {
             return Optional.empty();
         }
         List<ConnectionRepository.OutlineSubscriptionProjection> matches =
-            connectionRepository.findOutlineSubscriptionsBySubscriptionId(subscriptionId);
+                connectionRepository.findOutlineSubscriptionsBySubscriptionId(subscriptionId);
         if (matches.isEmpty()) {
             return Optional.empty();
         }
         if (matches.size() > 1) {
             // Never log the (attacker-supplied) subscription id itself.
             log.error(
-                "Outline webhook subscription id matches {} ACTIVE connections — rejecting delivery; out-of-band fix required",
-                matches.size()
-            );
+                    "Outline webhook subscription id matches {} ACTIVE connections — rejecting delivery; out-of-band fix required",
+                    matches.size());
             return Optional.empty();
         }
         ConnectionRepository.OutlineSubscriptionProjection match = matches.getFirst();
         String secret = match.getSigningSecret();
         String serverUrl = match.getServerUrl();
-        if (
-            secret == null ||
-            secret.isBlank() ||
-            serverUrl == null ||
-            serverUrl.isBlank() ||
-            match.getWorkspaceId() == null
-        ) {
+        if (secret == null
+                || secret.isBlank()
+                || serverUrl == null
+                || serverUrl.isBlank()
+                || match.getWorkspaceId() == null) {
             return Optional.empty();
         }
         return Optional.of(new OutlineSubscription(match.getWorkspaceId(), serverUrl, secret));
@@ -196,9 +193,9 @@ public class ConnectionService {
     @Transactional(readOnly = true)
     public Optional<BearerToken> findActiveBearerToken(long workspaceId, IntegrationKind kind) {
         return connectionRepository
-            .findActive(workspaceId, kind)
-            .flatMap(c -> c.credentials(credentialConverter))
-            .flatMap(b -> b instanceof BearerToken bt ? Optional.of(bt) : Optional.empty());
+                .findActive(workspaceId, kind)
+                .flatMap(c -> c.credentials(credentialConverter))
+                .flatMap(b -> b instanceof BearerToken bt ? Optional.of(bt) : Optional.empty());
     }
 
     /**
@@ -216,15 +213,12 @@ public class ConnectionService {
     public Optional<Connection> findReferenced(IntegrationRef ref) {
         if (ref.connectionId() != null) {
             return connectionRepository
-                .findByIdAndWorkspaceId(ref.connectionId(), ref.workspaceId())
-                .filter(c -> c.getKind() == ref.kind());
+                    .findByIdAndWorkspaceId(ref.connectionId(), ref.workspaceId())
+                    .filter(c -> c.getKind() == ref.kind());
         }
         if (ref.instanceKey() != null) {
             return connectionRepository.findByWorkspaceIdAndKindAndInstanceKey(
-                ref.workspaceId(),
-                ref.kind(),
-                ref.instanceKey()
-            );
+                    ref.workspaceId(), ref.kind(), ref.instanceKey());
         }
         return connectionRepository.findActive(ref.workspaceId(), ref.kind());
     }
@@ -235,11 +229,7 @@ public class ConnectionService {
             return false;
         }
         return connectionRepository.existsByKindAndInstanceKeyAndStateNotAndIdNot(
-            ref.kind(),
-            ref.instanceKey(),
-            IntegrationState.UNINSTALLED,
-            ref.connectionId()
-        );
+                ref.kind(), ref.instanceKey(), IntegrationState.UNINSTALLED, ref.connectionId());
     }
 
     /**
@@ -249,9 +239,9 @@ public class ConnectionService {
     @Transactional(readOnly = true)
     public Optional<BearerToken> findBearerToken(long workspaceId, long connectionId) {
         return connectionRepository
-            .findByIdAndWorkspaceId(connectionId, workspaceId)
-            .flatMap(c -> c.credentials(credentialConverter))
-            .flatMap(b -> b instanceof BearerToken bt ? Optional.of(bt) : Optional.empty());
+                .findByIdAndWorkspaceId(connectionId, workspaceId)
+                .flatMap(c -> c.credentials(credentialConverter))
+                .flatMap(b -> b instanceof BearerToken bt ? Optional.of(bt) : Optional.empty());
     }
 
     /**
@@ -261,32 +251,23 @@ public class ConnectionService {
      */
     @Transactional
     public Optional<Connection> updateConfig(
-        long workspaceId,
-        IntegrationKind kind,
-        UnaryOperator<ConnectionConfig> mutator
-    ) {
-        return connectionRepository
-            .findActive(workspaceId, kind)
-            .map(c -> {
-                ConnectionConfig next = mutator.apply(c.getConfig());
-                if (next == null) {
-                    throw new IllegalArgumentException(
-                        "Mutator returned null for connection " + c.getId() + " — config must be non-null"
-                    );
-                }
-                if (!next.getClass().equals(c.getConfig().getClass())) {
-                    throw new IllegalArgumentException(
-                        "Mutator changed config variant on connection " +
-                            c.getId() +
-                            ": " +
-                            c.getConfig().getClass().getSimpleName() +
-                            " → " +
-                            next.getClass().getSimpleName()
-                    );
-                }
-                c.setConfig(next);
-                return connectionRepository.save(c);
-            });
+            long workspaceId, IntegrationKind kind, UnaryOperator<ConnectionConfig> mutator) {
+        return connectionRepository.findActive(workspaceId, kind).map(c -> {
+            ConnectionConfig next = mutator.apply(c.getConfig());
+            if (next == null) {
+                throw new IllegalArgumentException(
+                        "Mutator returned null for connection " + c.getId() + " — config must be non-null");
+            }
+            if (!next.getClass().equals(c.getConfig().getClass())) {
+                throw new IllegalArgumentException("Mutator changed config variant on connection " + c.getId()
+                        + ": "
+                        + c.getConfig().getClass().getSimpleName()
+                        + " → "
+                        + next.getClass().getSimpleName());
+            }
+            c.setConfig(next);
+            return connectionRepository.save(c);
+        });
     }
 
     /**
@@ -295,12 +276,10 @@ public class ConnectionService {
      */
     @Transactional
     public Optional<Connection> rotateBearerToken(long workspaceId, IntegrationKind kind, BearerToken bundle) {
-        return connectionRepository
-            .findActive(workspaceId, kind)
-            .map(c -> {
-                c.setCredentials(bundle, credentialConverter);
-                return connectionRepository.save(c);
-            });
+        return connectionRepository.findActive(workspaceId, kind).map(c -> {
+            c.setCredentials(bundle, credentialConverter);
+            return connectionRepository.save(c);
+        });
     }
 
     /**
@@ -312,18 +291,12 @@ public class ConnectionService {
      */
     @Transactional
     public Connection upsertGitHubAppConnection(
-        Workspace workspace,
-        long installationId,
-        @Nullable String accountLogin,
-        String correlationId
-    ) {
+            Workspace workspace, long installationId, @Nullable String accountLogin, String correlationId) {
         String instanceKey = Long.toString(installationId);
 
         // Invariant: one ACTIVE GitHub Connection per workspace.
-        for (Connection existing : connectionRepository.findByWorkspaceIdAndState(
-            workspace.getId(),
-            IntegrationState.ACTIVE
-        )) {
+        for (Connection existing :
+                connectionRepository.findByWorkspaceIdAndState(workspace.getId(), IntegrationState.ACTIVE)) {
             if (existing.getKind() != IntegrationKind.GITHUB) {
                 continue;
             }
@@ -331,65 +304,49 @@ public class ConnectionService {
                 continue;
             }
             applyTransition(
-                existing,
-                new TransitionRequest(
-                    IntegrationState.UNINSTALLED,
-                    "REPLACED_BY_INSTALL",
-                    "SYSTEM",
-                    "github-install-" + installationId,
-                    correlationId + "-retire-" + existing.getId(),
-                    "Replaced by GitHub App installation " + installationId
-                ),
-                null
-            );
+                    existing,
+                    new TransitionRequest(
+                            IntegrationState.UNINSTALLED,
+                            "REPLACED_BY_INSTALL",
+                            "SYSTEM",
+                            "github-install-" + installationId,
+                            correlationId + "-retire-" + existing.getId(),
+                            "Replaced by GitHub App installation " + installationId),
+                    null);
         }
 
         Connection connection = connectionRepository
-            .findByWorkspaceIdAndKindAndInstanceKey(workspace.getId(), IntegrationKind.GITHUB, instanceKey)
-            .orElseGet(() -> {
-                ConnectionConfig.GitHubAppConfig config = new ConnectionConfig.GitHubAppConfig(
-                    installationId,
-                    accountLogin,
-                    /* serverUrl */ null,
-                    Set.of()
-                );
-                Connection fresh = new Connection(workspace, IntegrationKind.GITHUB, instanceKey, config);
-                fresh.setDisplayName(accountLogin);
-                return connectionRepository.save(fresh);
-            });
+                .findByWorkspaceIdAndKindAndInstanceKey(workspace.getId(), IntegrationKind.GITHUB, instanceKey)
+                .orElseGet(() -> {
+                    ConnectionConfig.GitHubAppConfig config = new ConnectionConfig.GitHubAppConfig(
+                            installationId, accountLogin, /* serverUrl */ null, Set.of());
+                    Connection fresh = new Connection(workspace, IntegrationKind.GITHUB, instanceKey, config);
+                    fresh.setDisplayName(accountLogin);
+                    return connectionRepository.save(fresh);
+                });
 
         // Refresh accountLogin/orgLogin if renamed since first bind.
-        if (
-            accountLogin != null &&
-            !accountLogin.isBlank() &&
-            connection.getConfig() instanceof ConnectionConfig.GitHubAppConfig current &&
-            !accountLogin.equals(current.orgLogin())
-        ) {
-            connection.setConfig(
-                new ConnectionConfig.GitHubAppConfig(
-                    installationId,
-                    accountLogin,
-                    current.serverUrl(),
-                    current.enabledStreams()
-                )
-            );
+        if (accountLogin != null
+                && !accountLogin.isBlank()
+                && connection.getConfig() instanceof ConnectionConfig.GitHubAppConfig current
+                && !accountLogin.equals(current.orgLogin())) {
+            connection.setConfig(new ConnectionConfig.GitHubAppConfig(
+                    installationId, accountLogin, current.serverUrl(), current.enabledStreams()));
             connection.setDisplayName(accountLogin);
             connection = connectionRepository.save(connection);
         }
 
         if (connection.getState() != IntegrationState.ACTIVE) {
             connection = applyTransition(
-                connection,
-                new TransitionRequest(
-                    IntegrationState.ACTIVE,
-                    "INSTALL_BIND",
-                    "GITHUB_WEBHOOK",
-                    "github-install-" + installationId,
-                    correlationId,
-                    "Linked workspace to GitHub App installation " + installationId
-                ),
-                null
-            );
+                    connection,
+                    new TransitionRequest(
+                            IntegrationState.ACTIVE,
+                            "INSTALL_BIND",
+                            "GITHUB_WEBHOOK",
+                            "github-install-" + installationId,
+                            correlationId,
+                            "Linked workspace to GitHub App installation " + installationId),
+                    null);
         }
 
         return connection;
@@ -401,34 +358,31 @@ public class ConnectionService {
      */
     @Transactional
     public void provisionPatConnection(
-        Workspace workspace,
-        IntegrationKind kind,
-        @Nullable String instanceKey,
-        ConnectionConfig config,
-        String token,
-        String correlationId
-    ) {
+            Workspace workspace,
+            IntegrationKind kind,
+            @Nullable String instanceKey,
+            ConnectionConfig config,
+            String token,
+            String correlationId) {
         Connection connection = connectionRepository
-            .findByWorkspaceIdAndKindAndInstanceKey(workspace.getId(), kind, instanceKey)
-            .orElseGet(() -> {
-                Connection fresh = new Connection(workspace, kind, instanceKey, config);
-                fresh.setDisplayName(workspace.getAccountLogin());
-                return connectionRepository.save(fresh);
-            });
+                .findByWorkspaceIdAndKindAndInstanceKey(workspace.getId(), kind, instanceKey)
+                .orElseGet(() -> {
+                    Connection fresh = new Connection(workspace, kind, instanceKey, config);
+                    fresh.setDisplayName(workspace.getAccountLogin());
+                    return connectionRepository.save(fresh);
+                });
 
         if (connection.getState() != IntegrationState.ACTIVE) {
             connection = applyTransition(
-                connection,
-                new TransitionRequest(
-                    IntegrationState.ACTIVE,
-                    "PAT_PROVISIONED",
-                    "SYSTEM",
-                    "scm-connection-provisioner",
-                    correlationId,
-                    "Provisioned PAT connection on workspace creation"
-                ),
-                null
-            );
+                    connection,
+                    new TransitionRequest(
+                            IntegrationState.ACTIVE,
+                            "PAT_PROVISIONED",
+                            "SYSTEM",
+                            "scm-connection-provisioner",
+                            correlationId,
+                            "Provisioned PAT connection on workspace creation"),
+                    null);
         }
 
         if (token != null && !token.isBlank()) {
@@ -491,12 +445,7 @@ public class ConnectionService {
             throw new IllegalArgumentException("Disconnect must transition to UNINSTALLED");
         }
         return applyTransition(
-            connection,
-            req,
-            revoke,
-            /* fenceOnActiveSyncJob */ true,
-            /* propagateRevokeFailure */ false
-        );
+                connection, req, revoke, /* fenceOnActiveSyncJob */ true, /* propagateRevokeFailure */ false);
     }
 
     /** Disconnects for mandatory erasure without allowing a sync job to delay credential removal. */
@@ -506,35 +455,25 @@ public class ConnectionService {
             throw new IllegalArgumentException("Disconnect must transition to UNINSTALLED");
         }
         return applyTransition(
-            connection,
-            req,
-            revoke,
-            /* fenceOnActiveSyncJob */ false,
-            /* propagateRevokeFailure */ true
-        );
+                connection, req, revoke, /* fenceOnActiveSyncJob */ false, /* propagateRevokeFailure */ true);
     }
 
     private Connection applyTransition(
-        Connection connection,
-        TransitionRequest req,
-        @Nullable Runnable beforeLocalTransition
-    ) {
+            Connection connection, TransitionRequest req, @Nullable Runnable beforeLocalTransition) {
         return applyTransition(
-            connection,
-            req,
-            beforeLocalTransition,
-            /* fenceOnActiveSyncJob */ false,
-            /* propagateRevokeFailure */ false
-        );
+                connection,
+                req,
+                beforeLocalTransition,
+                /* fenceOnActiveSyncJob */ false,
+                /* propagateRevokeFailure */ false);
     }
 
     private Connection applyTransition(
-        Connection requested,
-        TransitionRequest req,
-        @Nullable Runnable beforeLocalTransition,
-        boolean fenceOnActiveSyncJob,
-        boolean propagateRevokeFailure
-    ) {
+            Connection requested,
+            TransitionRequest req,
+            @Nullable Runnable beforeLocalTransition,
+            boolean fenceOnActiveSyncJob,
+            boolean propagateRevokeFailure) {
         // For a persisted argument the row transitioned below is the one re-read under the lifecycle
         // lock, never the caller's possibly-stale instance.
         Connection connection = requested;
@@ -543,15 +482,13 @@ public class ConnectionService {
             long workspaceId = requested.getWorkspace().getId();
             connectionRepository.acquireLifecycleLock(connectionId, workspaceId);
             connection = connectionRepository
-                .findByIdAndWorkspaceId(connectionId, workspaceId)
-                .orElseThrow(() -> new EntityNotFoundException("Connection", connectionId));
+                    .findByIdAndWorkspaceId(connectionId, workspaceId)
+                    .orElseThrow(() -> new EntityNotFoundException("Connection", connectionId));
             if (fenceOnActiveSyncJob) {
                 // Inside the lock, so no job can slip in between this check and the state write.
-                syncJobService
-                    .requestCancelForTeardown(connectionId)
-                    .ifPresent(activeJobId -> {
-                        throw new ConnectionBusyException(connectionId, activeJobId);
-                    });
+                syncJobService.requestCancelForTeardown(connectionId).ifPresent(activeJobId -> {
+                    throw new ConnectionBusyException(connectionId, activeJobId);
+                });
             }
         }
         IntegrationState current = connection.getState();
@@ -561,8 +498,7 @@ public class ConnectionService {
         }
         if (!current.canTransitionTo(req.next()) && !isGuardedReconnect(connection, current, req)) {
             throw new IllegalStateException(
-                "Illegal transition for connection " + connection.getId() + ": " + current + " → " + req.next()
-            );
+                    "Illegal transition for connection " + connection.getId() + ": " + current + " → " + req.next());
         }
         if (beforeLocalTransition != null) {
             if (propagateRevokeFailure) {
@@ -572,24 +508,22 @@ public class ConnectionService {
             }
         }
         ConnectionAudit audit = new ConnectionAudit(
-            connection,
-            req.eventType(),
-            current,
-            req.next(),
-            req.actorKind(),
-            req.actorRef(),
-            req.correlationId(),
-            req.detail()
-        );
+                connection,
+                req.eventType(),
+                current,
+                req.next(),
+                req.actorKind(),
+                req.actorRef(),
+                req.correlationId(),
+                req.detail());
         try {
             auditRepository.save(audit);
         } catch (DataIntegrityViolationException e) {
             log.info(
-                "Idempotent {} for connection={} corr={} (already recorded)",
-                req.eventType(),
-                connection.getId(),
-                req.correlationId()
-            );
+                    "Idempotent {} for connection={} corr={} (already recorded)",
+                    req.eventType(),
+                    connection.getId(),
+                    req.correlationId());
             return connection;
         }
         connection.setState(req.next());
@@ -620,11 +554,10 @@ public class ConnectionService {
             revokeTransactionTemplate.executeWithoutResult(status -> revoke.run());
         } catch (RuntimeException e) {
             log.warn(
-                "Vendor revoke/erase failed for connection={} kind={}: {} — proceeding with the local transition",
-                connection.getId(),
-                connection.getKind(),
-                e.toString()
-            );
+                    "Vendor revoke/erase failed for connection={} kind={}: {} — proceeding with the local transition",
+                    connection.getId(),
+                    connection.getKind(),
+                    e.toString());
         }
     }
 
@@ -637,12 +570,10 @@ public class ConnectionService {
         long workspaceId = connection.getWorkspace().getId();
         if (next == IntegrationState.ACTIVE) {
             eventPublisher.publishEvent(
-                new ConnectionLifecycleEvent.Activated(connection.getId(), workspaceId, connection.getKind())
-            );
+                    new ConnectionLifecycleEvent.Activated(connection.getId(), workspaceId, connection.getKind()));
         } else if (previous == IntegrationState.ACTIVE) {
             eventPublisher.publishEvent(
-                new ConnectionLifecycleEvent.Deactivated(connection.getId(), workspaceId, connection.getKind())
-            );
+                    new ConnectionLifecycleEvent.Deactivated(connection.getId(), workspaceId, connection.getKind()));
         }
     }
 
@@ -654,10 +585,7 @@ public class ConnectionService {
      * {@code (workspace, kind, instance_key)} instead of colliding with the unique constraint.
      */
     private static boolean isGuardedReconnect(
-        Connection connection,
-        IntegrationState current,
-        TransitionRequest request
-    ) {
+            Connection connection, IntegrationState current, TransitionRequest request) {
         if (current != IntegrationState.UNINSTALLED || request.next() != IntegrationState.ACTIVE) {
             return false;
         }
@@ -669,11 +597,10 @@ public class ConnectionService {
 
     /** Parameter object for {@link #transition}. */
     public record TransitionRequest(
-        IntegrationState next,
-        String eventType,
-        String actorKind,
-        @Nullable String actorRef,
-        @Nullable String correlationId,
-        @Nullable String detail
-    ) {}
+            IntegrationState next,
+            String eventType,
+            String actorKind,
+            @Nullable String actorRef,
+            @Nullable String correlationId,
+            @Nullable String detail) {}
 }

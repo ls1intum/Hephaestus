@@ -26,15 +26,13 @@ class MentorChannelBoundaryTest extends HephaestusArchitectureTest {
     @DisplayName("SseEmitter is confined to the web mentor adapter package")
     void sseEmitterConfinedToWebAdapter() {
         ArchRule rule = noClasses()
-            .that()
-            .resideOutsideOfPackages(WEB_ADAPTER, SYNC_PUSH_WEB_ADAPTER)
-            .should()
-            .dependOnClassesThat()
-            .haveFullyQualifiedName(SSE_EMITTER)
-            .because(
-                "the mentor orchestrator drives turns through MentorChannel; SSE transport details " +
-                    "must not leak past the web adapter (a Slack adapter would implement the same port)"
-            );
+                .that()
+                .resideOutsideOfPackages(WEB_ADAPTER, SYNC_PUSH_WEB_ADAPTER)
+                .should()
+                .dependOnClassesThat()
+                .haveFullyQualifiedName(SSE_EMITTER)
+                .because("the mentor orchestrator drives turns through MentorChannel; SSE transport details "
+                        + "must not leak past the web adapter (a Slack adapter would implement the same port)");
         rule.check(classes);
     }
 }

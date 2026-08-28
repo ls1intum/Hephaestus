@@ -14,12 +14,12 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubInstallationRepositoriesEventDTO(
-    @JsonProperty("action") String action,
-    @JsonProperty("installation") GitHubInstallationEventDTO.@Nullable GitHubInstallationDTO installation,
-    @JsonProperty("repositories_added") @Nullable List<GitHubRepositoryRefDTO> repositoriesAdded,
-    @JsonProperty("repositories_removed") @Nullable List<GitHubRepositoryRefDTO> repositoriesRemoved,
-    @JsonProperty("sender") @Nullable GitHubUserDTO sender
-) implements GitHubWebhookEvent {
+        @JsonProperty("action") String action,
+        @JsonProperty("installation") GitHubInstallationEventDTO.@Nullable GitHubInstallationDTO installation,
+        @JsonProperty("repositories_added") @Nullable List<GitHubRepositoryRefDTO> repositoriesAdded,
+        @JsonProperty("repositories_removed") @Nullable List<GitHubRepositoryRefDTO> repositoriesRemoved,
+        @JsonProperty("sender") @Nullable GitHubUserDTO sender)
+        implements GitHubWebhookEvent {
     @Override
     public GitHubEventAction.InstallationRepositories actionType() {
         return GitHubEventAction.InstallationRepositories.fromString(action);

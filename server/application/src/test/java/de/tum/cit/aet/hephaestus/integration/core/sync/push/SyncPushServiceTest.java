@@ -45,11 +45,7 @@ class SyncPushServiceTest extends BaseUnitTest {
 
     private SyncStateChangedEvent someEvent() {
         return new SyncStateChangedEvent(
-            WORKSPACE_ID,
-            CONNECTION_ID,
-            IntegrationKind.GITHUB,
-            SyncStateChangedEvent.Scope.JOB
-        );
+                WORKSPACE_ID, CONNECTION_ID, IntegrationKind.GITHUB, SyncStateChangedEvent.Scope.JOB);
     }
 
     @Test
@@ -72,8 +68,7 @@ class SyncPushServiceTest extends BaseUnitTest {
         SyncPushService service = new SyncPushService(hub, MAPPER, objectProviderReturning(null), meters);
 
         service.onConnectionActivated(
-            new ConnectionLifecycleEvent.Activated(CONNECTION_ID, WORKSPACE_ID, IntegrationKind.GITHUB)
-        );
+                new ConnectionLifecycleEvent.Activated(CONNECTION_ID, WORKSPACE_ID, IntegrationKind.GITHUB));
 
         verify(hub).publish(WORKSPACE_ID, new SyncEventHint("connection", CONNECTION_ID));
     }
@@ -110,8 +105,8 @@ class SyncPushServiceTest extends BaseUnitTest {
     void withNats_publishFailure_deliversLocallyAndRecordsBothOutcomes() {
         when(connection.createDispatcher(any(MessageHandler.class))).thenReturn(dispatcher);
         org.mockito.Mockito.doThrow(new IllegalStateException("broker unavailable"))
-            .when(connection)
-            .publish(anyString(), any(byte[].class));
+                .when(connection)
+                .publish(anyString(), any(byte[].class));
         SyncPushService service = new SyncPushService(hub, MAPPER, objectProviderReturning(connection), meters);
 
         service.onSyncStateChanged(someEvent());
@@ -161,11 +156,10 @@ class SyncPushServiceTest extends BaseUnitTest {
     }
 
     private double pushCounter(String transport, String outcome) {
-        return meters
-            .get("integration.sync.push.messages")
-            .tag("transport", transport)
-            .tag("outcome", outcome)
-            .counter()
-            .count();
+        return meters.get("integration.sync.push.messages")
+                .tag("transport", transport)
+                .tag("outcome", outcome)
+                .counter()
+                .count();
     }
 }

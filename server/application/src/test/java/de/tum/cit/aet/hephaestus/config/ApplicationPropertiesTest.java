@@ -14,32 +14,33 @@ class ApplicationPropertiesTest {
     @EnableConfigurationProperties(ApplicationProperties.class)
     static class TestConfiguration {}
 
-    private final ApplicationContextRunner contextRunner = new ApplicationContextRunner().withUserConfiguration(
-        TestConfiguration.class,
-        ValidationAutoConfiguration.class
-    );
+    private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+            .withUserConfiguration(TestConfiguration.class, ValidationAutoConfiguration.class);
 
     @Test
     void bindsValidWebappUrl() {
         contextRunner
-            .withPropertyValues("hephaestus.webapp.url=https://hephaestus.example/app")
-            .run(context -> {
-                assertThat(context).hasNotFailed();
-                assertThat(context.getBean(ApplicationProperties.class).webapp().url()).isEqualTo(
-                    "https://hephaestus.example/app"
-                );
-            });
+                .withPropertyValues("hephaestus.webapp.url=https://hephaestus.example/app")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context.getBean(ApplicationProperties.class)
+                                    .webapp()
+                                    .url())
+                            .isEqualTo("https://hephaestus.example/app");
+                });
     }
 
     @Test
     void rejectsBlankWebappUrl() {
-        contextRunner.withPropertyValues("hephaestus.webapp.url=").run(context -> assertThat(context).hasFailed());
+        contextRunner
+                .withPropertyValues("hephaestus.webapp.url=")
+                .run(context -> assertThat(context).hasFailed());
     }
 
     @Test
     void rejectsNonHttpWebappUrl() {
         contextRunner
-            .withPropertyValues("hephaestus.webapp.url=ftp://hephaestus.example")
-            .run(context -> assertThat(context).hasFailed());
+                .withPropertyValues("hephaestus.webapp.url=ftp://hephaestus.example")
+                .run(context -> assertThat(context).hasFailed());
     }
 }

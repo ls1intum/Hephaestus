@@ -18,14 +18,17 @@ import org.springframework.web.server.ResponseStatusException;
  * checklists in the UI are multi-select.
  */
 public record ConfigAuditFilterParams(
-    @RequestParam(required = false) @Nullable List<ConfigAuditEntityType> entityType,
-    @RequestParam(required = false) @Nullable String entityId,
-    @RequestParam(required = false) @Nullable String changedKey,
-    @RequestParam(required = false) @Nullable List<ConfigAuditAction> action,
-    @RequestParam(required = false) @Nullable Long actorId,
-    @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) @Nullable Instant from,
-    @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) @Nullable Instant to
-) {
+        @RequestParam(required = false) @Nullable List<ConfigAuditEntityType> entityType,
+        @RequestParam(required = false) @Nullable String entityId,
+        @RequestParam(required = false) @Nullable String changedKey,
+        @RequestParam(required = false) @Nullable List<ConfigAuditAction> action,
+        @RequestParam(required = false) @Nullable Long actorId,
+
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) @Nullable
+        Instant from,
+
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) @Nullable
+        Instant to) {
     /** Hard cap so a typo'd or malicious {@code size} can't pull the whole trail in one request. */
     public static final int MAX_PAGE_SIZE = 200;
 

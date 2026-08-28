@@ -54,6 +54,7 @@ public final class ScopeConsumer {
 
     /** Null for the installation-wide consumer; never null for scope consumers. */
     private final @Nullable Long scopeId;
+
     private final String consumerName;
     private final String streamName;
     private final ConsumerContext context;
@@ -72,14 +73,13 @@ public final class ScopeConsumer {
     private final BlockingQueue<Message> messageQueue = new LinkedBlockingQueue<>();
 
     public ScopeConsumer(
-        @Nullable Long scopeId,
-        String consumerName,
-        @Nullable String streamName,
-        ConsumerContext context,
-        StreamContext streamContext,
-        String[] subjects,
-        @Nullable Consumer<Message> messageHandler
-    ) {
+            @Nullable Long scopeId,
+            String consumerName,
+            @Nullable String streamName,
+            ConsumerContext context,
+            StreamContext streamContext,
+            String[] subjects,
+            @Nullable Consumer<Message> messageHandler) {
         if (consumerName == null || consumerName.isBlank()) {
             throw new IllegalArgumentException("consumerName must not be blank");
         }
@@ -135,11 +135,10 @@ public final class ScopeConsumer {
         processorThread = Thread.ofVirtual().name(threadName).start(this::processMessagesSequentially);
         subscription = context.consume(this::enqueueMessage);
         log.debug(
-            "Started ScopeConsumer: consumerName={}, scopeId={}, subjectCount={}",
-            consumerName,
-            scopeId,
-            currentSubjects.length
-        );
+                "Started ScopeConsumer: consumerName={}, scopeId={}, subjectCount={}",
+                consumerName,
+                scopeId,
+                currentSubjects.length);
     }
 
     /** Stops the subscription and waits until its dispatch thread can no longer write. */
@@ -176,7 +175,7 @@ public final class ScopeConsumer {
      * configuration is updated first; once that succeeds, the local subscription is
      * recycled. Idempotent: identical subject sets are a no-op.
      */
-    public synchronized void updateSubjects(String@Nullable [] newSubjects) throws IOException, JetStreamApiException {
+    public synchronized void updateSubjects(String @Nullable [] newSubjects) throws IOException, JetStreamApiException {
         if (newSubjects == null) {
             throw new IllegalArgumentException("newSubjects must not be null");
         }
@@ -184,18 +183,17 @@ public final class ScopeConsumer {
             return;
         }
         ConsumerConfiguration existing = context.getConsumerInfo().getConsumerConfiguration();
-        streamContext.createOrUpdateConsumer(
-            ConsumerConfiguration.builder(existing).filterSubjects(newSubjects).build()
-        );
+        streamContext.createOrUpdateConsumer(ConsumerConfiguration.builder(existing)
+                .filterSubjects(newSubjects)
+                .build());
         currentSubjects = newSubjects.clone();
         closeSubscriptionQuietly();
         subscription = context.consume(this::enqueueMessage);
         log.debug(
-            "Updated ScopeConsumer subjects: consumerName={}, scopeId={}, subjectCount={}",
-            consumerName,
-            scopeId,
-            newSubjects.length
-        );
+                "Updated ScopeConsumer subjects: consumerName={}, scopeId={}, subjectCount={}",
+                consumerName,
+                scopeId,
+                newSubjects.length);
     }
 
     /**

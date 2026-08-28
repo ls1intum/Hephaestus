@@ -45,18 +45,16 @@ import org.jspecify.annotations.Nullable;
  */
 @Entity
 @Table(
-    name = "review_sweep_schedule",
-    uniqueConstraints = {
-        // Two schedules for one kind would each see the other's ledger rows as already covered, and only
-        // one could hold the workspace's single active campaign slot; the loser would look enabled
-        // forever while sweeping nothing.
-        @UniqueConstraint(
-            name = "uq_review_sweep_schedule_workspace_kind",
-            columnNames = { "workspace_id", "artifact_kind" }
-        ),
-    },
-    indexes = { @Index(name = "idx_review_sweep_schedule_due", columnList = "enabled, next_run_at") }
-)
+        name = "review_sweep_schedule",
+        uniqueConstraints = {
+            // Two schedules for one kind would each see the other's ledger rows as already covered, and only
+            // one could hold the workspace's single active campaign slot; the loser would look enabled
+            // forever while sweeping nothing.
+            @UniqueConstraint(
+                    name = "uq_review_sweep_schedule_workspace_kind",
+                    columnNames = {"workspace_id", "artifact_kind"}),
+        },
+        indexes = {@Index(name = "idx_review_sweep_schedule_due", columnList = "enabled, next_run_at")})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -77,11 +75,10 @@ public class ReviewSweepSchedule {
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
-        name = "workspace_id",
-        nullable = false,
-        updatable = false,
-        foreignKey = @ForeignKey(name = "fk_review_sweep_schedule_workspace")
-    )
+            name = "workspace_id",
+            nullable = false,
+            updatable = false,
+            foreignKey = @ForeignKey(name = "fk_review_sweep_schedule_workspace"))
     @ToString.Exclude
     private Workspace workspace;
 

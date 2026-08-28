@@ -66,14 +66,13 @@ public class SlackChannelHistorySyncService {
     private final Clock clock;
 
     public SlackChannelHistorySyncService(
-        SlackMonitoredChannelRepository monitoredChannelRepository,
-        SlackThreadRepository threadRepository,
-        SlackMessageService slackMessageService,
-        SlackIngestService ingestService,
-        ConnectionService connectionService,
-        SlackSyncProperties properties,
-        Clock clock
-    ) {
+            SlackMonitoredChannelRepository monitoredChannelRepository,
+            SlackThreadRepository threadRepository,
+            SlackMessageService slackMessageService,
+            SlackIngestService ingestService,
+            ConnectionService connectionService,
+            SlackSyncProperties properties,
+            Clock clock) {
         this.monitoredChannelRepository = monitoredChannelRepository;
         this.threadRepository = threadRepository;
         this.slackMessageService = slackMessageService;
@@ -109,25 +108,17 @@ public class SlackChannelHistorySyncService {
     }
 
     private WorkspaceSyncSummary sync(
-        long workspaceId,
-        BooleanSupplier cancelled,
-        @Nullable String onlySlackChannelId
-    ) {
-        SlackSyncBudget historyBudget = new SlackSyncBudget(
-            properties.historyRequestBudget(),
-            properties.historyRequestInterval()
-        );
-        SlackSyncBudget repliesBudget = new SlackSyncBudget(
-            properties.repliesRequestBudget(),
-            properties.historyRequestInterval()
-        );
+            long workspaceId, BooleanSupplier cancelled, @Nullable String onlySlackChannelId) {
+        SlackSyncBudget historyBudget =
+                new SlackSyncBudget(properties.historyRequestBudget(), properties.historyRequestInterval());
+        SlackSyncBudget repliesBudget =
+                new SlackSyncBudget(properties.repliesRequestBudget(), properties.historyRequestInterval());
         Instant now = clock.instant();
         String retentionFloor = SlackTs.ofInstant(now.minus(Duration.ofDays(retentionWindowDays(workspaceId))));
-        List<SlackMonitoredChannel> channels = monitoredChannelRepository
-            .findForHistorySync(workspaceId, ConsentState.ACTIVE)
-            .stream()
-            .filter(c -> onlySlackChannelId == null || onlySlackChannelId.equals(c.getSlackChannelId()))
-            .toList();
+        List<SlackMonitoredChannel> channels =
+                monitoredChannelRepository.findForHistorySync(workspaceId, ConsentState.ACTIVE).stream()
+                        .filter(c -> onlySlackChannelId == null || onlySlackChannelId.equals(c.getSlackChannelId()))
+                        .toList();
 
         int synced = 0;
         int skipped = 0;
@@ -141,15 +132,14 @@ public class SlackChannelHistorySyncService {
             }
             try {
                 Long count = syncChannel(
-                    workspaceId,
-                    channel,
-                    retentionFloor,
-                    historyBudget,
-                    repliesBudget,
-                    repliesBudgetExhausted,
-                    now,
-                    cancelled
-                );
+                        workspaceId,
+                        channel,
+                        retentionFloor,
+                        historyBudget,
+                        repliesBudget,
+                        repliesBudgetExhausted,
+                        now,
+                        cancelled);
                 if (count == null) {
                     skipped++;
                 } else {
@@ -162,22 +152,20 @@ public class SlackChannelHistorySyncService {
                 skipped++;
                 failed++;
                 log.warn(
-                    "slack.sync: history sync failed for workspaceId={} channelId={} (watermark not advanced): {}",
-                    workspaceId,
-                    channel.getSlackChannelId(),
-                    e.toString()
-                );
+                        "slack.sync: history sync failed for workspaceId={} channelId={} (watermark not advanced): {}",
+                        workspaceId,
+                        channel.getSlackChannelId(),
+                        e.toString());
             }
         }
         return new WorkspaceSyncSummary(
-            channels.size(),
-            synced,
-            skipped,
-            ingested,
-            historyBudget.used() + repliesBudget.used(),
-            !historyBudget.available() || repliesBudgetExhausted.get(),
-            failed
-        );
+                channels.size(),
+                synced,
+                skipped,
+                ingested,
+                historyBudget.used() + repliesBudget.used(),
+                !historyBudget.available() || repliesBudgetExhausted.get(),
+                failed);
     }
 
     /**
@@ -185,15 +173,14 @@ public class SlackChannelHistorySyncService {
      * {@code null} when the channel was skipped (no announcement stamp, consent flipped mid-sync, budget out).
      */
     private @Nullable Long syncChannel(
-        long workspaceId,
-        SlackMonitoredChannel channel,
-        String retentionFloor,
-        SlackSyncBudget historyBudget,
-        SlackSyncBudget repliesBudget,
-        AtomicBoolean repliesBudgetExhausted,
-        Instant windowEnd,
-        BooleanSupplier cancelled
-    ) {
+            long workspaceId,
+            SlackMonitoredChannel channel,
+            String retentionFloor,
+            SlackSyncBudget historyBudget,
+            SlackSyncBudget repliesBudget,
+            AtomicBoolean repliesBudgetExhausted,
+            Instant windowEnd,
+            BooleanSupplier cancelled) {
         String channelId = channel.getSlackChannelId();
         Instant announcedAt = channel.getConsentAnnouncedAt();
         if (announcedAt == null) {
@@ -201,9 +188,7 @@ public class SlackChannelHistorySyncService {
             return null;
         }
         String floor = SlackTs.max(
-            SlackTs.max(SlackTs.ofInstant(announcedAt), retentionFloor),
-            channel.getLastHistorySyncedTs()
-        );
+                SlackTs.max(SlackTs.ofInstant(announcedAt), retentionFloor), channel.getLastHistorySyncedTs());
         String latest = SlackTs.ofInstant(windowEnd);
         if (floor == null || SlackTs.compare(floor, latest) >= 0) {
             return null;
@@ -214,7 +199,9 @@ public class SlackChannelHistorySyncService {
         do {
             // Re-check consent before every request: a channel revoked mid-sync must stop consuming budget, and its
             // just-erased history must not be re-fetched.
-            ConsentState state = monitoredChannelRepository.findConsentState(workspaceId, channelId).orElse(null);
+            ConsentState state = monitoredChannelRepository
+                    .findConsentState(workspaceId, channelId)
+                    .orElse(null);
             if (state != ConsentState.ACTIVE) {
                 return null;
             }
@@ -222,25 +209,12 @@ public class SlackChannelHistorySyncService {
                 return null; // budget exhausted mid-window: no watermark advance, re-fetched next night
             }
             HistoryPage page = slackMessageService.fetchHistoryPage(
-                workspaceId,
-                channelId,
-                floor,
-                latest,
-                cursor,
-                properties.historyPageLimit()
-            );
+                    workspaceId, channelId, floor, latest, cursor, properties.historyPageLimit());
             for (Message message : page.messages()) {
                 ingested += routeThroughIngest(workspaceId, channel, message) ? 1 : 0;
                 if (properties.repliesEnabled() && hasReplyGap(workspaceId, channelId, message)) {
                     ReplySync replySync = syncReplies(
-                        workspaceId,
-                        channel,
-                        message,
-                        floor,
-                        repliesBudget,
-                        repliesBudgetExhausted,
-                        cancelled
-                    );
+                            workspaceId, channel, message, floor, repliesBudget, repliesBudgetExhausted, cancelled);
                     ingested += replySync.ingested();
                     if (!replySync.complete()) {
                         return null;
@@ -275,22 +249,10 @@ public class SlackChannelHistorySyncService {
         String channelId = channel.getSlackChannelId();
         if (message.getEdited() != null) {
             ingestService.editMessage(
-                teamId,
-                channelId,
-                message.getTs(),
-                message.getThreadTs(),
-                message.getUser(),
-                text
-            );
+                    teamId, channelId, message.getTs(), message.getThreadTs(), message.getUser(), text);
         } else {
             ingestService.ingestChannelMessage(
-                teamId,
-                channelId,
-                message.getTs(),
-                message.getThreadTs(),
-                message.getUser(),
-                text
-            );
+                    teamId, channelId, message.getTs(), message.getThreadTs(), message.getUser(), text);
         }
         return true;
     }
@@ -303,8 +265,8 @@ public class SlackChannelHistorySyncService {
             return false;
         }
         SlackThread thread = threadRepository
-            .findByWorkspaceIdAndSlackChannelIdAndSlackThreadTs(workspaceId, channelId, parent.getTs())
-            .orElse(null);
+                .findByWorkspaceIdAndSlackChannelIdAndSlackThreadTs(workspaceId, channelId, parent.getTs())
+                .orElse(null);
         if (thread == null) {
             return true; // parent has replies we have never aggregated
         }
@@ -316,35 +278,32 @@ public class SlackChannelHistorySyncService {
 
     /** Fetch a gapped thread's replies (bounded by the replies budget) through the same ingest stack. */
     private ReplySync syncReplies(
-        long workspaceId,
-        SlackMonitoredChannel channel,
-        Message parent,
-        String floor,
-        SlackSyncBudget repliesBudget,
-        AtomicBoolean repliesBudgetExhausted,
-        BooleanSupplier cancelled
-    ) {
+            long workspaceId,
+            SlackMonitoredChannel channel,
+            Message parent,
+            String floor,
+            SlackSyncBudget repliesBudget,
+            AtomicBoolean repliesBudgetExhausted,
+            BooleanSupplier cancelled) {
         long ingested = 0;
         String cursor = null;
         do {
             if (!repliesBudget.acquire(cancelled)) {
                 repliesBudgetExhausted.set(true);
                 log.debug(
-                    "slack.sync: replies budget exhausted for workspaceId={} channelId={} thread={}",
-                    workspaceId,
-                    channel.getSlackChannelId(),
-                    parent.getTs()
-                );
+                        "slack.sync: replies budget exhausted for workspaceId={} channelId={} thread={}",
+                        workspaceId,
+                        channel.getSlackChannelId(),
+                        parent.getTs());
                 return new ReplySync(ingested, false);
             }
             HistoryPage page = slackMessageService.fetchRepliesPage(
-                workspaceId,
-                channel.getSlackChannelId(),
-                parent.getTs(),
-                floor,
-                cursor,
-                properties.historyPageLimit()
-            );
+                    workspaceId,
+                    channel.getSlackChannelId(),
+                    parent.getTs(),
+                    floor,
+                    cursor,
+                    properties.historyPageLimit());
             for (Message reply : page.messages()) {
                 if (parent.getTs().equals(reply.getTs())) {
                     continue; // Slack includes the parent in conversations.replies
@@ -360,9 +319,9 @@ public class SlackChannelHistorySyncService {
 
     private int retentionWindowDays(long workspaceId) {
         int configured = connectionService
-            .findSlackNotificationConfig(workspaceId)
-            .map(ConnectionConfig.SlackConfig::retentionDaysOrDefault)
-            .orElse(ConnectionConfig.SlackConfig.DEFAULT_RETENTION_DAYS);
+                .findSlackNotificationConfig(workspaceId)
+                .map(ConnectionConfig.SlackConfig::retentionDaysOrDefault)
+                .orElse(ConnectionConfig.SlackConfig.DEFAULT_RETENTION_DAYS);
         return Math.min(configured, SlackRetentionSweeper.MAX_RETENTION_DAYS);
     }
 
@@ -372,14 +331,13 @@ public class SlackChannelHistorySyncService {
      * signal {@code SlackIntegrationSyncRunner} maps to {@code SUCCEEDED_WITH_WARNINGS}.
      */
     public record WorkspaceSyncSummary(
-        int channels,
-        int synced,
-        int skipped,
-        long ingested,
-        int requestsUsed,
-        boolean budgetExhausted,
-        int failed
-    ) {
+            int channels,
+            int synced,
+            int skipped,
+            long ingested,
+            int requestsUsed,
+            boolean budgetExhausted,
+            int failed) {
         /** The workspace has no ACTIVE Slack connection, so nothing was attempted and no budget was spent. */
         public static WorkspaceSyncSummary notConnected() {
             return new WorkspaceSyncSummary(0, 0, 0, 0L, 0, false, 0);

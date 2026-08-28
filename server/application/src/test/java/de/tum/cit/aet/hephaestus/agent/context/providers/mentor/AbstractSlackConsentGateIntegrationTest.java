@@ -64,10 +64,9 @@ abstract class AbstractSlackConsentGateIntegrationTest extends BaseIntegrationTe
         activeWorkspace.getFeatures().setPracticesEnabled(true);
         workspace = workspaceRepository.save(activeWorkspace);
         IdentityProvider provider = identityProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                identityProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> identityProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
         recipient = userRepository.save(TestUserFactory.createUser(100L, "recipient", provider));
         WorkspaceMembership membership = new WorkspaceMembership();
         membership.setWorkspace(workspace);

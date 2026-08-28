@@ -9,10 +9,15 @@ import org.jspecify.annotations.Nullable;
 
 public interface OutlineContentClient {
     List<OutlineCollectionModel> listCollections(String serverUrl, String token);
+
     List<OutlineCollectionModel> listCollections(String serverUrl, String token, int maxPages);
+
     List<OutlineNavigationNode> listCollectionDocuments(String serverUrl, String token, String collectionId);
+
     List<OutlineDocumentModel> listDocuments(String serverUrl, String token, String collectionId);
+
     Optional<OutlineDocumentModel> getDocumentInfo(String serverUrl, String token, String documentId);
+
     List<OutlineDocumentModel> listArchivedDocuments(String serverUrl, String token, String collectionId);
 
     @Nullable

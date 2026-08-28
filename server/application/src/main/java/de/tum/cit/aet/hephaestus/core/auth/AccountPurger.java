@@ -71,11 +71,10 @@ public class AccountPurger {
      */
     private void anonymizeAuditRows(Long accountId) {
         int redacted = jdbcTemplate.update(
-            "UPDATE auth_event SET ip_inet = NULL, user_agent = NULL, details = NULL " +
-                "WHERE account_id = ? OR acting_account_id = ?",
-            accountId,
-            accountId
-        );
+                "UPDATE auth_event SET ip_inet = NULL, user_agent = NULL, details = NULL "
+                        + "WHERE account_id = ? OR acting_account_id = ?",
+                accountId,
+                accountId);
         if (redacted > 0) {
             log.info("auth.account: anonymized {} auth_event row(s) for erased accountId={}", redacted, accountId);
         }
@@ -84,17 +83,13 @@ public class AccountPurger {
         // need clearing. The append-only trigger permits exactly this per-column nulling; the change
         // itself stays, which is what the Art. 17(3)(b) basis retains.
         int unlinked = jdbcTemplate.update(
-            "UPDATE config_audit_event SET actor_account_id = NULL, acting_account_id = NULL " +
-                "WHERE actor_account_id = ? OR acting_account_id = ?",
-            accountId,
-            accountId
-        );
+                "UPDATE config_audit_event SET actor_account_id = NULL, acting_account_id = NULL "
+                        + "WHERE actor_account_id = ? OR acting_account_id = ?",
+                accountId,
+                accountId);
         if (unlinked > 0) {
             log.info(
-                "auth.account: unlinked {} config_audit_event row(s) for erased accountId={}",
-                unlinked,
-                accountId
-            );
+                    "auth.account: unlinked {} config_audit_event row(s) for erased accountId={}", unlinked, accountId);
         }
     }
 }

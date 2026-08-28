@@ -37,16 +37,17 @@ public interface ConnectionStrategy {
     }
 
     record InitiateRequest(
-        long workspaceId,
-        IntegrationKind kind,
-        Map<String, String> userInput, // pasted PAT, configured server URL, etc.
-        @Nullable String actorRef // initiating admin, woven into the OAuth state so the audit row attributes it
-    ) {}
+            long workspaceId,
+            IntegrationKind kind,
+            Map<String, String> userInput, // pasted PAT, configured server URL, etc.
+            @Nullable String actorRef // initiating admin, woven into the OAuth state so the audit row attributes it
+            ) {}
 
     sealed interface ConnectInitiation permits ConnectInitiation.RedirectToVendor, ConnectInitiation.AcceptInline {
         record RedirectToVendor(URI vendorUrl, String oauthState) implements ConnectInitiation {}
 
-        record AcceptInline(CredentialBundle credentials, @Nullable String instanceKey) implements ConnectInitiation {}
+        record AcceptInline(
+                CredentialBundle credentials, @Nullable String instanceKey) implements ConnectInitiation {}
     }
 
     sealed interface ConnectFinalization permits ConnectFinalization.Completed, ConnectFinalization.Failed {
@@ -56,11 +57,11 @@ public interface ConnectionStrategy {
          * {@code findOrCreatePendingConnection}.
          */
         record Completed(
-            String instanceKey,
-            @Nullable CredentialBundle credentials,
-            @Nullable String displayName,
-            @Nullable ConnectionConfig config
-        ) implements ConnectFinalization {
+                String instanceKey,
+                @Nullable CredentialBundle credentials,
+                @Nullable String displayName,
+                @Nullable ConnectionConfig config)
+                implements ConnectFinalization {
             /** 3-arg overload for strategies that don't need to upgrade the config blob. */
             public Completed(String instanceKey, @Nullable CredentialBundle credentials, @Nullable String displayName) {
                 this(instanceKey, credentials, displayName, null);

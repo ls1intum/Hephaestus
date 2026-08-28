@@ -27,9 +27,8 @@ public class SlackWorkspaceResolver {
     /** The workspace id of the ACTIVE Slack connection for {@code teamId}, if any. */
     public Optional<Long> resolveWorkspaceId(String teamId) {
         return jdbc.query(
-            "SELECT workspace_id FROM connection WHERE kind = 'SLACK' AND instance_key = ? AND state = 'ACTIVE' LIMIT 1",
-            rs -> rs.next() ? Optional.of(rs.getLong(1)) : Optional.<Long>empty(),
-            teamId
-        );
+                "SELECT workspace_id FROM connection WHERE kind = 'SLACK' AND instance_key = ? AND state = 'ACTIVE' LIMIT 1",
+                rs -> rs.next() ? Optional.of(rs.getLong(1)) : Optional.<Long>empty(),
+                teamId);
     }
 }

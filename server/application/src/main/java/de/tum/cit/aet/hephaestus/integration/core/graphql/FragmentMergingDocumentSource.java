@@ -63,10 +63,7 @@ public class FragmentMergingDocumentSource extends ResourceDocumentSource {
      * @throws IllegalStateException if any fragment resource cannot be read
      */
     public FragmentMergingDocumentSource(
-        List<Resource> locations,
-        List<String> extensions,
-        List<Resource> fragmentResources
-    ) {
+            List<Resource> locations, List<String> extensions, List<Resource> fragmentResources) {
         super(locations, extensions);
         this.fragmentsByName = parseFragmentsPerResource(fragmentResources);
     }
@@ -160,7 +157,8 @@ public class FragmentMergingDocumentSource extends ResourceDocumentSource {
 
         while (m.find()) {
             if (prevName != null) {
-                fragments.put(prevName, rawContent.substring(prevStart, m.start()).trim());
+                fragments.put(
+                        prevName, rawContent.substring(prevStart, m.start()).trim());
             }
             prevStart = m.start();
             prevName = m.group(1);
@@ -193,9 +191,7 @@ public class FragmentMergingDocumentSource extends ResourceDocumentSource {
             return new String(is.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new IllegalStateException(
-                "Failed to load GraphQL fragment resource: " + resource.getDescription(),
-                e
-            );
+                    "Failed to load GraphQL fragment resource: " + resource.getDescription(), e);
         }
     }
 }

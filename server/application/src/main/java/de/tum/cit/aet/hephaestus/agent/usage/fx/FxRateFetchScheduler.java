@@ -35,11 +35,7 @@ public class FxRateFetchScheduler {
     private final Clock clock;
 
     public FxRateFetchScheduler(
-        EcbFxRateClient client,
-        FxRateRepository fxRateRepository,
-        FxRateLookup fxRateLookup,
-        Clock clock
-    ) {
+            EcbFxRateClient client, FxRateRepository fxRateRepository, FxRateLookup fxRateLookup, Clock clock) {
         this.client = client;
         this.fxRateRepository = fxRateRepository;
         this.fxRateLookup = fxRateLookup;
@@ -92,7 +88,8 @@ public class FxRateFetchScheduler {
         }
         Optional<FxRate> existing = fxRateRepository.findByRateDate(rate.date());
         FxRate row = existing.orElseGet(FxRate::new);
-        boolean unchanged = existing.isPresent() && existing.get().getUsdPerEur().compareTo(rate.usdPerEur()) == 0;
+        boolean unchanged =
+                existing.isPresent() && existing.get().getUsdPerEur().compareTo(rate.usdPerEur()) == 0;
         row.setRateDate(rate.date());
         row.setUsdPerEur(rate.usdPerEur());
         row.setFetchedAt(Instant.now(clock));

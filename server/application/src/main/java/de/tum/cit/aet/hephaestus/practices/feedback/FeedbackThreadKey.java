@@ -61,17 +61,12 @@ public final class FeedbackThreadKey {
      * @return the lowercase SHA-256 hex digest (exactly 64 characters)
      */
     public static String compute(
-        String artifactKind,
-        @Nullable Long artifactId,
-        long recipientUserId,
-        FeedbackChannel surface
-    ) {
+            String artifactKind, @Nullable Long artifactId, long recipientUserId, FeedbackChannel surface) {
         return canonical(
-            artifactKind == null ? "" : artifactKind,
-            artifactId == null ? "" : String.valueOf(artifactId),
-            recipientUserId,
-            surface
-        );
+                artifactKind == null ? "" : artifactKind,
+                artifactId == null ? "" : String.valueOf(artifactId),
+                recipientUserId,
+                surface);
     }
 
     /**
@@ -100,14 +95,14 @@ public final class FeedbackThreadKey {
     private static String canonical(String kind, String locus, long recipientUserId, FeedbackChannel surface) {
         Objects.requireNonNull(surface, "surface");
         String canonical = new StringBuilder()
-            .append(kind)
-            .append(SEP)
-            .append(locus)
-            .append(SEP)
-            .append(recipientUserId)
-            .append(SEP)
-            .append(surface.name())
-            .toString();
+                .append(kind)
+                .append(SEP)
+                .append(locus)
+                .append(SEP)
+                .append(recipientUserId)
+                .append(SEP)
+                .append(surface.name())
+                .toString();
         return sha256Hex(canonical);
     }
 

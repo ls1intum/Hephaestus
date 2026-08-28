@@ -92,59 +92,45 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
         PracticeDefinition shipped = shipped();
         String v1Fingerprint = "v1:" + "a".repeat(64);
         seedLegacyWorkspace(
-            matching,
-            shipped.criteria(),
-            false,
-            evidenceDefaults.policyFor(shipped.artifactKind()),
-            v1Fingerprint
-        );
+                matching, shipped.criteria(), false, evidenceDefaults.policyFor(shipped.artifactKind()), v1Fingerprint);
 
         backfill.run();
 
-        assertThat(
-            jdbcTemplate.queryForObject(
-                "SELECT automated_review_policy = ?::jsonb FROM practice WHERE workspace_id = ?",
-                Boolean.class,
-                evidenceJson(shipped),
-                matching.getId()
-            )
-        ).isTrue();
-        assertThat(
-            jdbcTemplate.queryForObject(
-                "SELECT source_curated_fingerprint FROM practice WHERE workspace_id = ?",
-                String.class,
-                matching.getId()
-            )
-        ).isEqualTo(shipped.provenanceFingerprint(SHIPPED_SLUG));
-        assertThat(
-            count(
-                "SELECT count(*) FROM practice_revision r JOIN practice p ON p.id = r.practice_id WHERE p.workspace_id = ?",
-                matching.getId()
-            )
-        ).isEqualTo(3);
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT automated_review_policy = ?::jsonb FROM practice WHERE workspace_id = ?",
+                        Boolean.class,
+                        evidenceJson(shipped),
+                        matching.getId()))
+                .isTrue();
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT source_curated_fingerprint FROM practice WHERE workspace_id = ?",
+                        String.class,
+                        matching.getId()))
+                .isEqualTo(shipped.provenanceFingerprint(SHIPPED_SLUG));
+        assertThat(count(
+                        "SELECT count(*) FROM practice_revision r JOIN practice p ON p.id = r.practice_id WHERE p.workspace_id = ?",
+                        matching.getId()))
+                .isEqualTo(3);
     }
 
     @Test
     void shouldContinueAligningWhenAPracticeIsMalformed() {
         String v1Fingerprint = "v1:" + "a".repeat(64);
         seedLegacyWorkspace(
-            matching,
-            shipped().criteria(),
-            false,
-            evidenceDefaults.policyFor(shipped().artifactKind()),
-            v1Fingerprint
-        );
+                matching,
+                shipped().criteria(),
+                false,
+                evidenceDefaults.policyFor(shipped().artifactKind()),
+                v1Fingerprint);
         seedLegacyWorkspace(
-            edited,
-            shipped().criteria(),
-            false,
-            evidenceDefaults.policyFor(shipped().artifactKind()),
-            v1Fingerprint
-        );
+                edited,
+                shipped().criteria(),
+                false,
+                evidenceDefaults.policyFor(shipped().artifactKind()),
+                v1Fingerprint);
         jdbcTemplate.update(
-            "UPDATE practice SET automated_review_policy = '{\"subject\":\"INVALID\"}'::jsonb WHERE workspace_id = ?",
-            matching.getId()
-        );
+                "UPDATE practice SET automated_review_policy = '{\"subject\":\"INVALID\"}'::jsonb WHERE workspace_id = ?",
+                matching.getId());
 
         backfill.run();
 
@@ -156,23 +142,18 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
     void shouldKeepCustomizedV1DefinitionWhenItDiffersFromTheCatalog() {
         String v1Fingerprint = "v1:" + "a".repeat(64);
         seedLegacyWorkspace(
-            matching,
-            "The workspace intentionally changed these criteria",
-            false,
-            evidenceDefaults.policyFor(shipped().artifactKind()),
-            v1Fingerprint
-        );
+                matching,
+                "The workspace intentionally changed these criteria",
+                false,
+                evidenceDefaults.policyFor(shipped().artifactKind()),
+                v1Fingerprint);
 
         backfill.run();
 
         assertThat(sourceFingerprint(matching)).isEqualTo(v1Fingerprint);
-        assertThat(
-            jdbcTemplate.queryForObject(
-                "SELECT criteria FROM practice WHERE workspace_id = ?",
-                String.class,
-                matching.getId()
-            )
-        ).isEqualTo("The workspace intentionally changed these criteria");
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT criteria FROM practice WHERE workspace_id = ?", String.class, matching.getId()))
+                .isEqualTo("The workspace intentionally changed these criteria");
     }
 
     private PracticeDefinition shipped() {
@@ -185,9 +166,8 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
         // automated_review_policy the migration left null. Those rows must not enter the fingerprint pass:
         // digesting a null policy aborts the whole workspace, leaving every review claim UNVERIFIABLE.
         seedLegacyWorkspace(matching, shipped().criteria(), true);
-        transactionOperations.executeWithoutResult(ignored ->
-            jdbcTemplate.update(
-                """
+        transactionOperations.executeWithoutResult(
+                ignored -> jdbcTemplate.update("""
                 INSERT INTO practice_revision (
                     practice_id, revision_number, slug, name, applies_to, bindings, criteria,
                     automated_review_policy, why_it_matters, group_slug, review_rule_fingerprint, created_at
@@ -195,23 +175,15 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                 SELECT id, 0, slug, name, applies_to, bindings, criteria,
                        NULL, 'Reviewers need context', ?, NULL, now()
                 FROM practice WHERE workspace_id = ?
-                """,
-                shipped().groupSlug(),
-                matching.getId()
-            )
-        );
+                """, shipped().groupSlug(), matching.getId()));
 
         backfill.run();
 
-        Integer stillMissing = jdbcTemplate.queryForObject(
-            """
+        Integer stillMissing = jdbcTemplate.queryForObject("""
             SELECT count(*) FROM practice_revision r JOIN practice p ON p.id = r.practice_id
             WHERE p.workspace_id = ? AND r.automated_review_policy IS NOT NULL
               AND r.review_rule_fingerprint IS NULL
-            """,
-            Integer.class,
-            matching.getId()
-        );
+            """, Integer.class, matching.getId());
         assertThat(stillMissing).isZero();
     }
 
@@ -221,28 +193,22 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
     }
 
     private void seedLegacyWorkspace(
-        Workspace workspace,
-        String criteria,
-        boolean provenancePending,
-        @Nullable PracticeAutomatedReviewPolicy evidence,
-        @Nullable String fingerprint
-    ) {
+            Workspace workspace,
+            String criteria,
+            boolean provenancePending,
+            @Nullable PracticeAutomatedReviewPolicy evidence,
+            @Nullable String fingerprint) {
         PracticeDefinition shipped = shipped();
         transactionOperations.executeWithoutResult(ignored -> {
-            Long groupId = jdbcTemplate.queryForObject(
-                """
+            Long groupId = jdbcTemplate.queryForObject("""
                 INSERT INTO practice_group (
                     workspace_id, slug, name, visible_in_practice_dashboards, display_order, created_at
                 )
                 VALUES (?, ?, 'Group', true, 0, now())
                 RETURNING id
-                """,
-                Long.class,
-                workspace.getId(),
-                shipped.groupSlug()
-            );
+                """, Long.class, workspace.getId(), shipped.groupSlug());
             Long practiceId = jdbcTemplate.queryForObject(
-                """
+                    """
                 INSERT INTO practice (
                     workspace_id, practice_group_id, slug, name, applies_to, display_order, bindings,
                     criteria, automated_review_policy, why_it_matters, source_curated_slug,
@@ -250,46 +216,25 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                 ) VALUES (?, ?, ?, ?, ?, 0, ?::jsonb, ?, ?::jsonb, 'Reviewers need context', ?, ?, 'AUTOMATIC', now())
                 RETURNING id
                 """,
-                Long.class,
-                workspace.getId(),
-                groupId,
-                SHIPPED_SLUG,
-                shipped.name(),
-                shipped.artifactKind().value(),
-                bindingsJson(shipped),
-                criteria,
-                evidenceJson(evidence),
-                fingerprint == null ? null : SHIPPED_SLUG,
-                fingerprint
-            );
+                    Long.class,
+                    workspace.getId(),
+                    groupId,
+                    SHIPPED_SLUG,
+                    shipped.name(),
+                    shipped.artifactKind().value(),
+                    bindingsJson(shipped),
+                    criteria,
+                    evidenceJson(evidence),
+                    fingerprint == null ? null : SHIPPED_SLUG,
+                    fingerprint);
             Long revisionId = jdbcTemplate.queryForObject(
-                """
+                    """
                 INSERT INTO practice_revision (
                     practice_id, revision_number, slug, name, applies_to, bindings, criteria,
                     automated_review_policy, why_it_matters, group_slug, review_rule_fingerprint, created_at
                 ) VALUES (?, 1, ?, ?, ?, ?::jsonb, ?, ?::jsonb, 'Reviewers need context', ?, ?, now())
                 RETURNING id
                 """,
-                Long.class,
-                practiceId,
-                SHIPPED_SLUG,
-                shipped.name(),
-                shipped.artifactKind().value(),
-                bindingsJson(shipped),
-                criteria,
-                evidenceJson(evidence),
-                shipped.groupSlug(),
-                fingerprint
-            );
-            if (fingerprint != null) {
-                revisionId = jdbcTemplate.queryForObject(
-                    """
-                    INSERT INTO practice_revision (
-                        practice_id, revision_number, slug, name, applies_to, bindings, criteria,
-                        automated_review_policy, why_it_matters, group_slug, review_rule_fingerprint, created_at
-                    ) VALUES (?, 2, ?, ?, ?, ?::jsonb, ?, ?::jsonb, 'Reviewers need context', ?, NULL, now())
-                    RETURNING id
-                    """,
                     Long.class,
                     practiceId,
                     SHIPPED_SLUG,
@@ -298,18 +243,32 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                     bindingsJson(shipped),
                     criteria,
                     evidenceJson(evidence),
-                    shipped.groupSlug()
-                );
+                    shipped.groupSlug(),
+                    fingerprint);
+            if (fingerprint != null) {
+                revisionId = jdbcTemplate.queryForObject(
+                        """
+                    INSERT INTO practice_revision (
+                        practice_id, revision_number, slug, name, applies_to, bindings, criteria,
+                        automated_review_policy, why_it_matters, group_slug, review_rule_fingerprint, created_at
+                    ) VALUES (?, 2, ?, ?, ?, ?::jsonb, ?, ?::jsonb, 'Reviewers need context', ?, NULL, now())
+                    RETURNING id
+                    """,
+                        Long.class,
+                        practiceId,
+                        SHIPPED_SLUG,
+                        shipped.name(),
+                        shipped.artifactKind().value(),
+                        bindingsJson(shipped),
+                        criteria,
+                        evidenceJson(evidence),
+                        shipped.groupSlug());
             }
             jdbcTemplate.update("UPDATE practice SET current_revision_id = ? WHERE id = ?", revisionId, practiceId);
-            jdbcTemplate.update(
-                """
+            jdbcTemplate.update("""
                 INSERT INTO practice_catalog_installation (workspace_id, installed_at, provenance_linked_at)
                 VALUES (?, now(), CASE WHEN ? THEN NULL ELSE now() END)
-                """,
-                workspace.getId(),
-                provenancePending
-            );
+                """, workspace.getId(), provenancePending);
         });
     }
 
@@ -328,25 +287,22 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
 
     private long stampedPractices(Workspace workspace) {
         return count(
-            "SELECT count(*) FROM practice WHERE workspace_id = ? AND source_curated_slug IS NOT NULL",
-            workspace.getId()
-        );
+                "SELECT count(*) FROM practice WHERE workspace_id = ? AND source_curated_slug IS NOT NULL",
+                workspace.getId());
     }
 
     private String sourceFingerprint(Workspace workspace) {
         String fingerprint = jdbcTemplate.queryForObject(
-            "SELECT source_curated_fingerprint FROM practice WHERE workspace_id = ?",
-            String.class,
-            workspace.getId()
-        );
+                "SELECT source_curated_fingerprint FROM practice WHERE workspace_id = ?",
+                String.class,
+                workspace.getId());
         assertNotNull(fingerprint);
         return fingerprint;
     }
 
     private long unfingerprintedRevisions() {
         return count(
-            "SELECT count(*) FROM practice_revision WHERE slug IS NOT NULL AND review_rule_fingerprint IS NULL"
-        );
+                "SELECT count(*) FROM practice_revision WHERE slug IS NOT NULL AND review_rule_fingerprint IS NULL");
     }
 
     private long workspacesAwaiting() {

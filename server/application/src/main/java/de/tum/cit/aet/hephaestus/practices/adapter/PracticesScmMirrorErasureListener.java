@@ -41,11 +41,10 @@ public class PracticesScmMirrorErasureListener {
     private final ObservationRepository observationRepository;
 
     public PracticesScmMirrorErasureListener(
-        DeliveryPolicyEvaluationRepository evaluationRepository,
-        FeedbackDispatchRepository dispatchRepository,
-        FeedbackRepository feedbackRepository,
-        ObservationRepository observationRepository
-    ) {
+            DeliveryPolicyEvaluationRepository evaluationRepository,
+            FeedbackDispatchRepository dispatchRepository,
+            FeedbackRepository feedbackRepository,
+            ObservationRepository observationRepository) {
         this.evaluationRepository = evaluationRepository;
         this.dispatchRepository = dispatchRepository;
         this.feedbackRepository = feedbackRepository;
@@ -63,13 +62,12 @@ public class PracticesScmMirrorErasureListener {
         int observationsDeleted = observationRepository.deleteAllScmArtifactObservations(workspaceId);
         if (evaluationsDeleted > 0 || dispatchesDeleted > 0 || feedbackDeleted > 0 || observationsDeleted > 0) {
             log.info(
-                "Erased SCM-derived practice rows: workspaceId={}, evaluations={}, dispatches={}, feedback={}, observations={}",
-                workspaceId,
-                evaluationsDeleted,
-                dispatchesDeleted,
-                feedbackDeleted,
-                observationsDeleted
-            );
+                    "Erased SCM-derived practice rows: workspaceId={}, evaluations={}, dispatches={}, feedback={}, observations={}",
+                    workspaceId,
+                    evaluationsDeleted,
+                    dispatchesDeleted,
+                    feedbackDeleted,
+                    observationsDeleted);
         }
     }
 }

@@ -11,7 +11,7 @@ public final class GitHubGraphQlFragments {
     public static final String PROJECT_FRAGMENTS_RESOURCE = "graphql/github/fragments/ProjectFragments.graphql";
 
     public static final String COMMIT_ENRICHMENT_FIELDS_RESOURCE =
-        "graphql/github/fragments/CommitEnrichmentFields.graphql";
+            "graphql/github/fragments/CommitEnrichmentFields.graphql";
 
     public static final String COMMIT_ENRICHMENT_FIELDS_NAME = "CommitEnrichmentFields";
 

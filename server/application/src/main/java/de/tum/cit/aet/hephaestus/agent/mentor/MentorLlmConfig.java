@@ -13,37 +13,35 @@ import org.jspecify.annotations.Nullable;
  * same resolved, non-secret shape the practice-review path freezes into {@code ConfigSnapshot}.
  */
 public record MentorLlmConfig(
-    String apiProtocol,
-    String baseUrl,
-    String upstreamModelId,
-    @Nullable Integer contextWindow,
-    @Nullable Integer maxOutputTokens,
-    boolean supportsReasoning,
-    @Nullable FundingSource connectionScope,
-    @Nullable Long connectionId,
-    @Nullable Long modelId,
-    @Nullable Long workspaceId,
-    @Nullable LlmPriceSnapshot priceSnapshot,
-    boolean allowInternet,
-    int timeoutSeconds
-) {
+        String apiProtocol,
+        String baseUrl,
+        String upstreamModelId,
+        @Nullable Integer contextWindow,
+        @Nullable Integer maxOutputTokens,
+        boolean supportsReasoning,
+        @Nullable FundingSource connectionScope,
+        @Nullable Long connectionId,
+        @Nullable Long modelId,
+        @Nullable Long workspaceId,
+        @Nullable LlmPriceSnapshot priceSnapshot,
+        boolean allowInternet,
+        int timeoutSeconds) {
     public static MentorLlmConfig fromAdmission(ModelBindingSource config, AdmittedLlmModel admitted) {
         ResolvedLlmModel resolved = admitted.resolved();
         LlmModelResolver.ConnectionRef ref = admitted.connection();
         return new MentorLlmConfig(
-            resolved.apiProtocol(),
-            resolved.baseUrl(),
-            resolved.upstreamModelId(),
-            resolved.contextWindow(),
-            resolved.maxOutputTokens(),
-            resolved.supportsReasoning(),
-            ref.scope(),
-            ref.connectionId(),
-            ref.modelId(),
-            ref.workspaceId(),
-            admitted.price(),
-            config.isAllowInternet(),
-            config.getTimeoutSeconds()
-        );
+                resolved.apiProtocol(),
+                resolved.baseUrl(),
+                resolved.upstreamModelId(),
+                resolved.contextWindow(),
+                resolved.maxOutputTokens(),
+                resolved.supportsReasoning(),
+                ref.scope(),
+                ref.connectionId(),
+                ref.modelId(),
+                ref.workspaceId(),
+                admitted.price(),
+                config.isAllowInternet(),
+                config.getTimeoutSeconds());
     }
 }

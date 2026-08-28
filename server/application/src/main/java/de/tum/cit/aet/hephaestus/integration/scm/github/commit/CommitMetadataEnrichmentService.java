@@ -114,7 +114,7 @@ public class CommitMetadataEnrichmentService {
 
     /** Type reference for deserializing GraphQL fields as {@code Map<String, Object>} without unchecked casts. */
     private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE_REF =
-        new ParameterizedTypeReference<>() {};
+            new ParameterizedTypeReference<>() {};
 
     private final CommitRepository commitRepository;
     private final CommitContributorRepository contributorRepository;
@@ -141,10 +141,7 @@ public class CommitMetadataEnrichmentService {
      * and any overflow records that need follow-up pagination.
      */
     private record BatchProcessingResult(
-        int processedCount,
-        List<CommitWithAuthorCursor> authorOverflows,
-        List<CommitWithPrCursor> prOverflows
-    ) {}
+            int processedCount, List<CommitWithAuthorCursor> authorOverflows, List<CommitWithPrCursor> prOverflows) {}
 
     /**
      * Enriches commits with contributor data and PR links for a repository.
@@ -174,21 +171,19 @@ public class CommitMetadataEnrichmentService {
         }
 
         // Validate SHAs
-        List<String> validShas = unenrichedShas
-            .stream()
-            .filter(sha -> SHA_PATTERN.matcher(sha).matches())
-            .toList();
+        List<String> validShas = unenrichedShas.stream()
+                .filter(sha -> SHA_PATTERN.matcher(sha).matches())
+                .toList();
 
         if (validShas.isEmpty()) {
             return 0;
         }
 
         log.debug(
-            "Enriching {} commits with metadata: repoId={}, repo={}",
-            validShas.size(),
-            repositoryId,
-            nameWithOwner
-        );
+                "Enriching {} commits with metadata: repoId={}, repo={}",
+                validShas.size(),
+                repositoryId,
+                nameWithOwner);
 
         String[] parts = nameWithOwner.split("/", 2);
         if (parts.length != 2) {
@@ -209,33 +204,19 @@ public class CommitMetadataEnrichmentService {
 
             // Check rate limit before each batch
             if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                if (
-                    !graphQlSyncCoordinator.waitForRateLimitIfNeeded(
-                        scopeId,
-                        "commit metadata enrichment",
-                        "repo",
-                        nameWithOwner,
-                        log
-                    )
-                ) {
+                if (!graphQlSyncCoordinator.waitForRateLimitIfNeeded(
+                        scopeId, "commit metadata enrichment", "repo", nameWithOwner, log)) {
                     log.warn(
-                        "Aborting commit metadata enrichment due to rate limit: repo={}, processed={}/{}",
-                        nameWithOwner,
-                        batchStart,
-                        validShas.size()
-                    );
+                            "Aborting commit metadata enrichment due to rate limit: repo={}, processed={}/{}",
+                            nameWithOwner,
+                            batchStart,
+                            validShas.size());
                     break;
                 }
             }
 
-            BatchProcessingResult result = fetchAndProcessBatch(
-                owner,
-                repoName,
-                scopeId,
-                batch,
-                repositoryId,
-                nameWithOwner
-            );
+            BatchProcessingResult result =
+                    fetchAndProcessBatch(owner, repoName, scopeId, batch, repositoryId, nameWithOwner);
             enriched += result.processedCount();
             allAuthorOverflows.addAll(result.authorOverflows());
             allPrOverflows.addAll(result.prOverflows());
@@ -244,10 +225,9 @@ public class CommitMetadataEnrichmentService {
         // Phase 2: Follow-up pagination for overflowed author connections
         if (!allAuthorOverflows.isEmpty()) {
             log.debug(
-                "Starting follow-up author pagination: repo={}, commitCount={}",
-                nameWithOwner,
-                allAuthorOverflows.size()
-            );
+                    "Starting follow-up author pagination: repo={}, commitCount={}",
+                    nameWithOwner,
+                    allAuthorOverflows.size());
             for (CommitWithAuthorCursor overflow : allAuthorOverflows) {
                 fetchRemainingAuthors(owner, repoName, scopeId, overflow, nameWithOwner);
             }
@@ -256,23 +236,21 @@ public class CommitMetadataEnrichmentService {
         // Phase 3: Follow-up pagination for overflowed associatedPullRequests connections
         if (!allPrOverflows.isEmpty()) {
             log.debug(
-                "Starting follow-up associatedPullRequests pagination: repo={}, commitCount={}",
-                nameWithOwner,
-                allPrOverflows.size()
-            );
+                    "Starting follow-up associatedPullRequests pagination: repo={}, commitCount={}",
+                    nameWithOwner,
+                    allPrOverflows.size());
             for (CommitWithPrCursor overflow : allPrOverflows) {
                 fetchRemainingPullRequests(owner, repoName, scopeId, overflow, nameWithOwner);
             }
         }
 
         log.info(
-            "Completed commit metadata enrichment: repoId={}, enriched={}/{}, authorOverflows={}, prOverflows={}",
-            repositoryId,
-            enriched,
-            validShas.size(),
-            allAuthorOverflows.size(),
-            allPrOverflows.size()
-        );
+                "Completed commit metadata enrichment: repoId={}, enriched={}/{}, authorOverflows={}, prOverflows={}",
+                repositoryId,
+                enriched,
+                validShas.size(),
+                allAuthorOverflows.size(),
+                allPrOverflows.size());
         return enriched;
     }
 
@@ -282,13 +260,7 @@ public class CommitMetadataEnrichmentService {
      * @return a {@link BatchProcessingResult} with the count and any overflow records
      */
     private BatchProcessingResult fetchAndProcessBatch(
-        String owner,
-        String repoName,
-        Long scopeId,
-        List<String> batch,
-        Long repositoryId,
-        String nameWithOwner
-    ) {
+            String owner, String repoName, Long scopeId, List<String> batch, Long repositoryId, String nameWithOwner) {
         String queryString = buildBatchQuery(owner, repoName, batch);
         BatchProcessingResult emptyResult = new BatchProcessingResult(0, List.of(), List.of());
 
@@ -298,49 +270,39 @@ public class CommitMetadataEnrichmentService {
                 graphQlClientProvider.acquirePermission();
 
                 var client = graphQlClientProvider.forScope(scopeId);
-                ClientGraphQlResponse response = Mono.defer(() -> client.document(queryString).execute())
-                    .retryWhen(
-                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                            .jitter(JITTER_FACTOR)
-                            .filter(ScmTransportErrors::isTransportError)
-                            .doBeforeRetry(signal ->
-                                log.warn(
-                                    "Retrying commit metadata enrichment after transport error: repo={}, attempt={}, error={}",
-                                    nameWithOwner,
-                                    signal.totalRetries() + 1,
-                                    signal.failure().getMessage()
-                                )
-                            )
-                    )
-                    .block(GRAPHQL_BATCH_TIMEOUT);
+                ClientGraphQlResponse response = Mono.defer(
+                                () -> client.document(queryString).execute())
+                        .retryWhen(Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                                .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                                .jitter(JITTER_FACTOR)
+                                .filter(ScmTransportErrors::isTransportError)
+                                .doBeforeRetry(signal -> log.warn(
+                                        "Retrying commit metadata enrichment after transport error: repo={}, attempt={}, error={}",
+                                        nameWithOwner,
+                                        signal.totalRetries() + 1,
+                                        signal.failure().getMessage())))
+                        .block(GRAPHQL_BATCH_TIMEOUT);
 
                 if (response == null || !response.isValid()) {
                     ClassificationResult classification = graphQlSyncCoordinator.classifyGraphQlErrors(response);
                     if (classification != null) {
-                        if (
-                            graphQlSyncCoordinator.handleGraphQlClassification(
-                                new GraphQlClassificationContext(
-                                    classification,
-                                    retryAttempt,
-                                    MAX_RETRY_ATTEMPTS,
-                                    "commit metadata enrichment",
-                                    "repo",
-                                    nameWithOwner,
-                                    log
-                                )
-                            )
-                        ) {
+                        if (graphQlSyncCoordinator.handleGraphQlClassification(new GraphQlClassificationContext(
+                                classification,
+                                retryAttempt,
+                                MAX_RETRY_ATTEMPTS,
+                                "commit metadata enrichment",
+                                "repo",
+                                nameWithOwner,
+                                log))) {
                             retryAttempt++;
                             continue;
                         }
                         break;
                     }
                     log.warn(
-                        "Invalid GraphQL response for commit metadata enrichment: repo={}, errors={}",
-                        nameWithOwner,
-                        response != null ? response.getErrors() : "null"
-                    );
+                            "Invalid GraphQL response for commit metadata enrichment: repo={}, errors={}",
+                            nameWithOwner,
+                            response != null ? response.getErrors() : "null");
                     break;
                 }
 
@@ -352,19 +314,14 @@ public class CommitMetadataEnrichmentService {
                 graphQlClientProvider.recordFailure(e);
 
                 ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
-                if (
-                    graphQlSyncCoordinator.handleGraphQlClassification(
-                        new GraphQlClassificationContext(
-                            classification,
-                            retryAttempt,
-                            MAX_RETRY_ATTEMPTS,
-                            "commit metadata enrichment",
-                            "repo",
-                            nameWithOwner,
-                            log
-                        )
-                    )
-                ) {
+                if (graphQlSyncCoordinator.handleGraphQlClassification(new GraphQlClassificationContext(
+                        classification,
+                        retryAttempt,
+                        MAX_RETRY_ATTEMPTS,
+                        "commit metadata enrichment",
+                        "repo",
+                        nameWithOwner,
+                        log))) {
                     retryAttempt++;
                     continue;
                 }
@@ -387,17 +344,20 @@ public class CommitMetadataEnrichmentService {
         StringBuilder sb = new StringBuilder();
         sb.append("query {\n");
         sb.append("  rateLimit { cost limit remaining resetAt }\n");
-        sb.append("  repository(owner: \"").append(owner).append("\", name: \"").append(repoName).append("\") {\n");
+        sb.append("  repository(owner: \"")
+                .append(owner)
+                .append("\", name: \"")
+                .append(repoName)
+                .append("\") {\n");
 
         for (int i = 0; i < shas.size(); i++) {
-            sb
-                .append("    commit")
-                .append(i)
-                .append(": object(oid: \"")
-                .append(shas.get(i))
-                .append("\") { ...")
-                .append(GitHubGraphQlFragments.COMMIT_ENRICHMENT_FIELDS_NAME)
-                .append(" }\n");
+            sb.append("    commit")
+                    .append(i)
+                    .append(": object(oid: \"")
+                    .append(shas.get(i))
+                    .append("\") { ...")
+                    .append(GitHubGraphQlFragments.COMMIT_ENRICHMENT_FIELDS_NAME)
+                    .append(" }\n");
         }
 
         sb.append("  }\n");
@@ -416,9 +376,7 @@ public class CommitMetadataEnrichmentService {
             return new String(in.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new IllegalStateException(
-                "Missing GraphQL fragment " + GitHubGraphQlFragments.COMMIT_ENRICHMENT_FIELDS_RESOURCE,
-                e
-            );
+                    "Missing GraphQL fragment " + GitHubGraphQlFragments.COMMIT_ENRICHMENT_FIELDS_RESOURCE, e);
         }
     }
 
@@ -433,11 +391,7 @@ public class CommitMetadataEnrichmentService {
      * @return a {@link BatchProcessingResult} with the count and overflow records
      */
     private BatchProcessingResult processResponse(
-        ClientGraphQlResponse response,
-        List<String> batch,
-        Long repositoryId,
-        String nameWithOwner
-    ) {
+            ClientGraphQlResponse response, List<String> batch, Long repositoryId, String nameWithOwner) {
         int processed = 0;
         List<CommitWithAuthorCursor> authorOverflows = new ArrayList<>();
         List<CommitWithPrCursor> prOverflows = new ArrayList<>();
@@ -478,13 +432,8 @@ public class CommitMetadataEnrichmentService {
                 processCommitter(commitData, commitId);
 
                 // Process associated PRs and detect overflow
-                CommitWithPrCursor prOverflow = processAssociatedPullRequests(
-                    commitData,
-                    commitId,
-                    sha,
-                    repositoryId,
-                    context
-                );
+                CommitWithPrCursor prOverflow =
+                        processAssociatedPullRequests(commitData, commitId, sha, repositoryId, context);
                 if (prOverflow != null) {
                     prOverflows.add(prOverflow);
                 }
@@ -508,11 +457,7 @@ public class CommitMetadataEnrichmentService {
      */
     @Nullable
     private CommitWithAuthorCursor processAuthors(
-        Map<String, Object> commitData,
-        Long commitId,
-        String sha,
-        String context
-    ) {
+            Map<String, Object> commitData, Long commitId, String sha, String context) {
         Object authorsObj = commitData.get("authors");
         if (!(authorsObj instanceof Map<?, ?> authorsMap)) {
             return null;
@@ -580,13 +525,7 @@ public class CommitMetadataEnrichmentService {
         Long userId = extractUserId(committerMap);
 
         contributorRepository.upsertContributor(
-            commitId,
-            userId,
-            CommitContributor.Role.COMMITTER.name(),
-            name,
-            email,
-            0
-        );
+                commitId, userId, CommitContributor.Role.COMMITTER.name(), name, email, 0);
     }
 
     /**
@@ -596,12 +535,7 @@ public class CommitMetadataEnrichmentService {
      */
     @Nullable
     private CommitWithPrCursor processAssociatedPullRequests(
-        Map<String, Object> commitData,
-        Long commitId,
-        String sha,
-        Long repositoryId,
-        String context
-    ) {
+            Map<String, Object> commitData, Long commitId, String sha, Long repositoryId, String context) {
         Object prObj = commitData.get("associatedPullRequests");
         if (!(prObj instanceof Map<?, ?> prMap)) {
             return null;
@@ -617,11 +551,7 @@ public class CommitMetadataEnrichmentService {
         boolean overflowed = false;
         if (totalCount != null) {
             overflowed = GraphQlConnectionOverflowDetector.check(
-                "associatedPullRequests",
-                nodes.size(),
-                totalCount,
-                context
-            );
+                    "associatedPullRequests", nodes.size(), totalCount, context);
         }
 
         // Link all PRs from this page
@@ -658,12 +588,7 @@ public class CommitMetadataEnrichmentService {
      * Issues cursor-based paginated queries until all authors are fetched.
      */
     private void fetchRemainingAuthors(
-        String owner,
-        String repoName,
-        Long scopeId,
-        CommitWithAuthorCursor overflow,
-        String nameWithOwner
-    ) {
+            String owner, String repoName, Long scopeId, CommitWithAuthorCursor overflow, String nameWithOwner) {
         String cursor = overflow.endCursor();
         int totalFetched = AUTHORS_PAGE_SIZE; // Already fetched this many in the batch query
         int page = 0;
@@ -672,32 +597,23 @@ public class CommitMetadataEnrichmentService {
             page++;
 
             if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                if (
-                    !graphQlSyncCoordinator.waitForRateLimitIfNeeded(
-                        scopeId,
-                        "commit author follow-up",
-                        "commit",
-                        overflow.sha(),
-                        log
-                    )
-                ) {
+                if (!graphQlSyncCoordinator.waitForRateLimitIfNeeded(
+                        scopeId, "commit author follow-up", "commit", overflow.sha(), log)) {
                     log.warn(
-                        "Aborting author follow-up pagination due to rate limit: sha={}, fetched={}",
-                        overflow.sha(),
-                        totalFetched
-                    );
+                            "Aborting author follow-up pagination due to rate limit: sha={}, fetched={}",
+                            overflow.sha(),
+                            totalFetched);
                     return;
                 }
             }
 
             String query = buildSingleCommitAuthorsQuery(owner, repoName, overflow.sha(), cursor);
             Map<String, Object> authorsConnection = executeSingleCommitFollowUp(
-                query,
-                "object.authors",
-                scopeId,
-                nameWithOwner,
-                "author follow-up for " + overflow.sha().substring(0, 7)
-            );
+                    query,
+                    "object.authors",
+                    scopeId,
+                    nameWithOwner,
+                    "author follow-up for " + overflow.sha().substring(0, 7));
 
             if (authorsConnection == null) {
                 break;
@@ -740,11 +656,10 @@ public class CommitMetadataEnrichmentService {
 
         if (page >= MAX_FOLLOW_UP_PAGES && cursor != null) {
             log.warn(
-                "Hit max follow-up pages for commit authors: sha={}, pages={}, totalFetched={}",
-                overflow.sha(),
-                page,
-                totalFetched
-            );
+                    "Hit max follow-up pages for commit authors: sha={}, pages={}, totalFetched={}",
+                    overflow.sha(),
+                    page,
+                    totalFetched);
         }
     }
 
@@ -753,12 +668,7 @@ public class CommitMetadataEnrichmentService {
      * Issues cursor-based paginated queries until all PRs are fetched.
      */
     private void fetchRemainingPullRequests(
-        String owner,
-        String repoName,
-        Long scopeId,
-        CommitWithPrCursor overflow,
-        String nameWithOwner
-    ) {
+            String owner, String repoName, Long scopeId, CommitWithPrCursor overflow, String nameWithOwner) {
         String cursor = overflow.endCursor();
         int totalFetched = ASSOCIATED_PRS_PAGE_SIZE; // Already fetched this many in the batch query
         int page = 0;
@@ -767,32 +677,23 @@ public class CommitMetadataEnrichmentService {
             page++;
 
             if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                if (
-                    !graphQlSyncCoordinator.waitForRateLimitIfNeeded(
-                        scopeId,
-                        "commit PR follow-up",
-                        "commit",
-                        overflow.sha(),
-                        log
-                    )
-                ) {
+                if (!graphQlSyncCoordinator.waitForRateLimitIfNeeded(
+                        scopeId, "commit PR follow-up", "commit", overflow.sha(), log)) {
                     log.warn(
-                        "Aborting PR follow-up pagination due to rate limit: sha={}, fetched={}",
-                        overflow.sha(),
-                        totalFetched
-                    );
+                            "Aborting PR follow-up pagination due to rate limit: sha={}, fetched={}",
+                            overflow.sha(),
+                            totalFetched);
                     return;
                 }
             }
 
             String query = buildSingleCommitPrsQuery(owner, repoName, overflow.sha(), cursor);
             Map<String, Object> prsConnection = executeSingleCommitFollowUp(
-                query,
-                "object.associatedPullRequests",
-                scopeId,
-                nameWithOwner,
-                "PR follow-up for " + overflow.sha().substring(0, 7)
-            );
+                    query,
+                    "object.associatedPullRequests",
+                    scopeId,
+                    nameWithOwner,
+                    "PR follow-up for " + overflow.sha().substring(0, 7));
 
             if (prsConnection == null) {
                 break;
@@ -831,11 +732,10 @@ public class CommitMetadataEnrichmentService {
 
         if (page >= MAX_FOLLOW_UP_PAGES && cursor != null) {
             log.warn(
-                "Hit max follow-up pages for commit PRs: sha={}, pages={}, totalFetched={}",
-                overflow.sha(),
-                page,
-                totalFetched
-            );
+                    "Hit max follow-up pages for commit PRs: sha={}, pages={}, totalFetched={}",
+                    overflow.sha(),
+                    page,
+                    totalFetched);
         }
     }
 
@@ -843,70 +743,64 @@ public class CommitMetadataEnrichmentService {
      * Builds a GraphQL query to fetch a single commit's remaining authors after a cursor.
      */
     private static String buildSingleCommitAuthorsQuery(String owner, String repoName, String sha, String cursor) {
-        return (
-            "query {\n" +
-            "  rateLimit { cost limit remaining resetAt }\n" +
-            "  repository(owner: \"" +
-            owner +
-            "\", name: \"" +
-            repoName +
-            "\") {\n" +
-            "    object(oid: \"" +
-            sha +
-            "\") {\n" +
-            "      ... on Commit {\n" +
-            "        authors(first: " +
-            AUTHORS_PAGE_SIZE +
-            ", after: \"" +
-            cursor +
-            "\") {\n" +
-            "          totalCount\n" +
-            "          pageInfo { hasNextPage endCursor }\n" +
-            "          nodes {\n" +
-            "            name\n" +
-            "            email\n" +
-            "            user { login databaseId }\n" +
-            "          }\n" +
-            "        }\n" +
-            "      }\n" +
-            "    }\n" +
-            "  }\n" +
-            "}\n"
-        );
+        return ("query {\n" + "  rateLimit { cost limit remaining resetAt }\n"
+                + "  repository(owner: \""
+                + owner
+                + "\", name: \""
+                + repoName
+                + "\") {\n"
+                + "    object(oid: \""
+                + sha
+                + "\") {\n"
+                + "      ... on Commit {\n"
+                + "        authors(first: "
+                + AUTHORS_PAGE_SIZE
+                + ", after: \""
+                + cursor
+                + "\") {\n"
+                + "          totalCount\n"
+                + "          pageInfo { hasNextPage endCursor }\n"
+                + "          nodes {\n"
+                + "            name\n"
+                + "            email\n"
+                + "            user { login databaseId }\n"
+                + "          }\n"
+                + "        }\n"
+                + "      }\n"
+                + "    }\n"
+                + "  }\n"
+                + "}\n");
     }
 
     /**
      * Builds a GraphQL query to fetch a single commit's remaining associated pull requests after a cursor.
      */
     private static String buildSingleCommitPrsQuery(String owner, String repoName, String sha, String cursor) {
-        return (
-            "query {\n" +
-            "  rateLimit { cost limit remaining resetAt }\n" +
-            "  repository(owner: \"" +
-            owner +
-            "\", name: \"" +
-            repoName +
-            "\") {\n" +
-            "    object(oid: \"" +
-            sha +
-            "\") {\n" +
-            "      ... on Commit {\n" +
-            "        associatedPullRequests(first: " +
-            ASSOCIATED_PRS_PAGE_SIZE +
-            ", after: \"" +
-            cursor +
-            "\") {\n" +
-            "          totalCount\n" +
-            "          pageInfo { hasNextPage endCursor }\n" +
-            "          nodes {\n" +
-            "            number\n" +
-            "          }\n" +
-            "        }\n" +
-            "      }\n" +
-            "    }\n" +
-            "  }\n" +
-            "}\n"
-        );
+        return ("query {\n" + "  rateLimit { cost limit remaining resetAt }\n"
+                + "  repository(owner: \""
+                + owner
+                + "\", name: \""
+                + repoName
+                + "\") {\n"
+                + "    object(oid: \""
+                + sha
+                + "\") {\n"
+                + "      ... on Commit {\n"
+                + "        associatedPullRequests(first: "
+                + ASSOCIATED_PRS_PAGE_SIZE
+                + ", after: \""
+                + cursor
+                + "\") {\n"
+                + "          totalCount\n"
+                + "          pageInfo { hasNextPage endCursor }\n"
+                + "          nodes {\n"
+                + "            number\n"
+                + "          }\n"
+                + "        }\n"
+                + "      }\n"
+                + "    }\n"
+                + "  }\n"
+                + "}\n");
     }
 
     /**
@@ -921,63 +815,48 @@ public class CommitMetadataEnrichmentService {
      */
     @Nullable
     private Map<String, Object> executeSingleCommitFollowUp(
-        String queryString,
-        String connectionPath,
-        Long scopeId,
-        String nameWithOwner,
-        String description
-    ) {
+            String queryString, String connectionPath, Long scopeId, String nameWithOwner, String description) {
         int retryAttempt = 0;
         while (retryAttempt <= MAX_RETRY_ATTEMPTS) {
             try {
                 graphQlClientProvider.acquirePermission();
 
                 var client = graphQlClientProvider.forScope(scopeId);
-                ClientGraphQlResponse response = Mono.defer(() -> client.document(queryString).execute())
-                    .retryWhen(
-                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                            .jitter(JITTER_FACTOR)
-                            .filter(ScmTransportErrors::isTransportError)
-                            .doBeforeRetry(signal ->
-                                log.warn(
-                                    "Retrying {}: repo={}, attempt={}, error={}",
-                                    description,
-                                    nameWithOwner,
-                                    signal.totalRetries() + 1,
-                                    signal.failure().getMessage()
-                                )
-                            )
-                    )
-                    .block(GRAPHQL_TIMEOUT);
+                ClientGraphQlResponse response = Mono.defer(
+                                () -> client.document(queryString).execute())
+                        .retryWhen(Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                                .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                                .jitter(JITTER_FACTOR)
+                                .filter(ScmTransportErrors::isTransportError)
+                                .doBeforeRetry(signal -> log.warn(
+                                        "Retrying {}: repo={}, attempt={}, error={}",
+                                        description,
+                                        nameWithOwner,
+                                        signal.totalRetries() + 1,
+                                        signal.failure().getMessage())))
+                        .block(GRAPHQL_TIMEOUT);
 
                 if (response == null || !response.isValid()) {
                     ClassificationResult classification = graphQlSyncCoordinator.classifyGraphQlErrors(response);
                     if (classification != null) {
-                        if (
-                            graphQlSyncCoordinator.handleGraphQlClassification(
-                                new GraphQlClassificationContext(
-                                    classification,
-                                    retryAttempt,
-                                    MAX_RETRY_ATTEMPTS,
-                                    description,
-                                    "repo",
-                                    nameWithOwner,
-                                    log
-                                )
-                            )
-                        ) {
+                        if (graphQlSyncCoordinator.handleGraphQlClassification(new GraphQlClassificationContext(
+                                classification,
+                                retryAttempt,
+                                MAX_RETRY_ATTEMPTS,
+                                description,
+                                "repo",
+                                nameWithOwner,
+                                log))) {
                             retryAttempt++;
                             continue;
                         }
                         break;
                     }
                     log.warn(
-                        "Invalid GraphQL response for {}: repo={}, errors={}",
-                        description,
-                        nameWithOwner,
-                        response != null ? response.getErrors() : "null"
-                    );
+                            "Invalid GraphQL response for {}: repo={}, errors={}",
+                            description,
+                            nameWithOwner,
+                            response != null ? response.getErrors() : "null");
                     break;
                 }
 
@@ -995,19 +874,8 @@ public class CommitMetadataEnrichmentService {
                 graphQlClientProvider.recordFailure(e);
 
                 ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
-                if (
-                    graphQlSyncCoordinator.handleGraphQlClassification(
-                        new GraphQlClassificationContext(
-                            classification,
-                            retryAttempt,
-                            MAX_RETRY_ATTEMPTS,
-                            description,
-                            "repo",
-                            nameWithOwner,
-                            log
-                        )
-                    )
-                ) {
+                if (graphQlSyncCoordinator.handleGraphQlClassification(new GraphQlClassificationContext(
+                        classification, retryAttempt, MAX_RETRY_ATTEMPTS, description, "repo", nameWithOwner, log))) {
                     retryAttempt++;
                     continue;
                 }
@@ -1107,26 +975,25 @@ public class CommitMetadataEnrichmentService {
         }
 
         commitRepository.updateEnrichmentMetadata(
-            commitId,
-            additions,
-            deletions,
-            changedFiles,
-            authoredAt,
-            committedAt,
-            messageHeadline,
-            messageBody,
-            url,
-            signatureValid,
-            authoredByCommitter,
-            committedViaWeb,
-            parentCount,
-            signatureState,
-            signatureWasSignedByGitHub,
-            signatureSignerLogin,
-            parentShas,
-            statusCheckRollupState,
-            onBehalfOfLogin
-        );
+                commitId,
+                additions,
+                deletions,
+                changedFiles,
+                authoredAt,
+                committedAt,
+                messageHeadline,
+                messageBody,
+                url,
+                signatureValid,
+                authoredByCommitter,
+                committedViaWeb,
+                parentCount,
+                signatureState,
+                signatureWasSignedByGitHub,
+                signatureSignerLogin,
+                parentShas,
+                statusCheckRollupState,
+                onBehalfOfLogin);
     }
 
     // Utility methods

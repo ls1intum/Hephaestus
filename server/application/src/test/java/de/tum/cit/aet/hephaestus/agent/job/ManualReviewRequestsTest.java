@@ -83,30 +83,23 @@ class ManualReviewRequestsTest extends BaseUnitTest {
     @SuppressWarnings("unchecked")
     void setUp() {
         requests = new ManualReviewRequests(
-            authority,
-            rateLimits,
-            gate,
-            signalOptions,
-            signalRecorder,
-            agentJobService,
-            transactionTemplate
-        );
+                authority, rateLimits, gate, signalOptions, signalRecorder, agentJobService, transactionTemplate);
         workspace = new Workspace();
         workspace.setId(WORKSPACE_ID);
         lenient()
-            .doAnswer(invocation -> {
-                ((Consumer<TransactionStatus>) invocation.getArgument(0)).accept(mock(TransactionStatus.class));
-                return null;
-            })
-            .when(transactionTemplate)
-            .executeWithoutResult(any());
+                .doAnswer(invocation -> {
+                    ((Consumer<TransactionStatus>) invocation.getArgument(0)).accept(mock(TransactionStatus.class));
+                    return null;
+                })
+                .when(transactionTemplate)
+                .executeWithoutResult(any());
         lenient()
-            .when(authority.standingOf(anyLong(), any(), any()))
-            .thenAnswer(inv -> requesters().stream().findFirst());
+                .when(authority.standingOf(anyLong(), any(), any()))
+                .thenAnswer(inv -> requesters().stream().findFirst());
         lenient().when(rateLimits.refusalFor(any(), any(), anyLong(), any())).thenReturn(Optional.empty());
         lenient()
-            .when(signalOptions.manualRequestSignalFor(ScmSignals.PULL_REQUEST))
-            .thenReturn(Optional.of(ScmSignals.PULL_REQUEST_MANUAL_REVIEW));
+                .when(signalOptions.manualRequestSignalFor(ScmSignals.PULL_REQUEST))
+                .thenReturn(Optional.of(ScmSignals.PULL_REQUEST_MANUAL_REVIEW));
     }
 
     @Test
@@ -147,13 +140,13 @@ class ManualReviewRequestsTest extends BaseUnitTest {
         requests.requestPullRequestReview(workspace, pullRequest(), requesters());
 
         var captor = ArgumentCaptor.forClass(PullRequestReviewSubmissionRequest.class);
-        verify(agentJobService).submitWithOutcome(
-            eq(WORKSPACE_ID),
-            eq(AgentJobType.PULL_REQUEST_REVIEW),
-            captor.capture(),
-            any(),
-            any(GateDecision.Detect.class)
-        );
+        verify(agentJobService)
+                .submitWithOutcome(
+                        eq(WORKSPACE_ID),
+                        eq(AgentJobType.PULL_REQUEST_REVIEW),
+                        captor.capture(),
+                        any(),
+                        any(GateDecision.Detect.class));
         assertThat(captor.getValue().triggerSignal()).isNull();
         assertThat(captor.getValue().observationOrigin()).isEqualTo(ObservationOrigin.MANUAL);
     }
@@ -187,21 +180,18 @@ class ManualReviewRequestsTest extends BaseUnitTest {
         requests.requestPullRequestReview(workspace, pullRequest(), requesters());
 
         var captor = ArgumentCaptor.forClass(SignalKey.class);
-        verify(signalRecorder, org.mockito.Mockito.times(2)).record(
-            captor.capture(),
-            any(),
-            eq(DiscoveredVia.MANUAL),
-            eq(REQUESTER_ID)
-        );
-        assertThat(captor.getAllValues().get(0)).isNotEqualTo(captor.getAllValues().get(1));
+        verify(signalRecorder, org.mockito.Mockito.times(2))
+                .record(captor.capture(), any(), eq(DiscoveredVia.MANUAL), eq(REQUESTER_ID));
+        assertThat(captor.getAllValues().get(0))
+                .isNotEqualTo(captor.getAllValues().get(1));
     }
 
     /** A refusal is settled against the ledger row and handed back as a sentence, not as a failure. */
     @Test
     void aGateRefusalIsRecordedAndExplained() {
-        when(gate.evaluate(any(), any(), any())).thenReturn(
-            new GateDecision.Skip("every practice bound to this signal is off", SignalStateReason.PRACTICE_AUTONOMY_OFF)
-        );
+        when(gate.evaluate(any(), any(), any()))
+                .thenReturn(new GateDecision.Skip(
+                        "every practice bound to this signal is off", SignalStateReason.PRACTICE_AUTONOMY_OFF));
 
         ManualReviewOutcome outcome = requests.requestPullRequestReview(workspace, pullRequest(), requesters());
 
@@ -215,16 +205,15 @@ class ManualReviewRequestsTest extends BaseUnitTest {
     @Test
     void anAdministratorCanRequestAnInternalReviewOutsideCoverage() {
         GateDecision.Detect detection = new GateDecision.Detect(
-            workspace,
-            List.of(new Practice()),
-            workspace.getReviewSettings().getRolloutRevision(),
-            TriggerMode.MANUAL
-        );
-        when(gate.evaluate(any(), any(), any())).thenReturn(
-            new GateDecision.Skip("outside coverage", SignalStateReason.OUT_OF_REVIEW_SCOPE)
-        );
+                workspace,
+                List.of(new Practice()),
+                workspace.getReviewSettings().getRolloutRevision(),
+                TriggerMode.MANUAL);
+        when(gate.evaluate(any(), any(), any()))
+                .thenReturn(new GateDecision.Skip("outside coverage", SignalStateReason.OUT_OF_REVIEW_SCOPE));
         when(authority.isWorkspaceAdmin(WORKSPACE_ID, REQUESTER_ID)).thenReturn(true);
-        when(gate.evaluateAdministrative(any(), eq(ScmSignals.PULL_REQUEST_MANUAL_REVIEW))).thenReturn(detection);
+        when(gate.evaluateAdministrative(any(), eq(ScmSignals.PULL_REQUEST_MANUAL_REVIEW)))
+                .thenReturn(detection);
         givenSubmissionSucceeds();
 
         ManualReviewOutcome outcome = requests.requestPullRequestReview(workspace, pullRequest(), requesters());
@@ -235,9 +224,8 @@ class ManualReviewRequestsTest extends BaseUnitTest {
 
     @Test
     void anArtifactParticipantCannotBypassCoverage() {
-        when(gate.evaluate(any(), any(), any())).thenReturn(
-            new GateDecision.Skip("outside coverage", SignalStateReason.OUT_OF_REVIEW_SCOPE)
-        );
+        when(gate.evaluate(any(), any(), any()))
+                .thenReturn(new GateDecision.Skip("outside coverage", SignalStateReason.OUT_OF_REVIEW_SCOPE));
 
         ManualReviewOutcome outcome = requests.requestPullRequestReview(workspace, pullRequest(), requesters());
 
@@ -249,9 +237,8 @@ class ManualReviewRequestsTest extends BaseUnitTest {
     @Test
     void aSubmissionRefusalKeepsTheReasonTheSubmissionStoppedOn() {
         givenGateDetects();
-        when(
-            agentJobService.submitWithOutcome(anyLong(), any(), any(), any(), any(GateDecision.Detect.class))
-        ).thenReturn(SubmissionOutcome.refused(SignalStateReason.BUDGET_EXHAUSTED));
+        when(agentJobService.submitWithOutcome(anyLong(), any(), any(), any(), any(GateDecision.Detect.class)))
+                .thenReturn(SubmissionOutcome.refused(SignalStateReason.BUDGET_EXHAUSTED));
 
         ManualReviewOutcome outcome = requests.requestPullRequestReview(workspace, pullRequest(), requesters());
 
@@ -278,9 +265,8 @@ class ManualReviewRequestsTest extends BaseUnitTest {
      */
     @Test
     void aRateLimitedAskSpendsNothingAndRecordsNothing() {
-        when(rateLimits.refusalFor(any(), any(), anyLong(), any())).thenReturn(
-            Optional.of(SignalStateReason.REQUESTER_QUOTA_EXHAUSTED)
-        );
+        when(rateLimits.refusalFor(any(), any(), anyLong(), any()))
+                .thenReturn(Optional.of(SignalStateReason.REQUESTER_QUOTA_EXHAUSTED));
 
         ManualReviewOutcome outcome = requests.requestPullRequestReview(workspace, pullRequest(), requesters());
 
@@ -311,7 +297,8 @@ class ManualReviewRequestsTest extends BaseUnitTest {
         User second = new User();
         second.setId(7777L);
 
-        requests.requestPullRequestReview(workspace, pullRequest(), List.of(requesters().get(0), second));
+        requests.requestPullRequestReview(
+                workspace, pullRequest(), List.of(requesters().get(0), second));
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<java.util.Collection<Long>> ids = ArgumentCaptor.forClass(java.util.Collection.class);
@@ -335,22 +322,19 @@ class ManualReviewRequestsTest extends BaseUnitTest {
     // Fixtures
 
     private void givenGateDetects() {
-        when(gate.evaluate(any(), any(), any())).thenReturn(
-            new GateDecision.Detect(
-                workspace,
-                List.of(new Practice()),
-                workspace.getReviewSettings().getRolloutRevision(),
-                TriggerMode.MANUAL
-            )
-        );
+        when(gate.evaluate(any(), any(), any()))
+                .thenReturn(new GateDecision.Detect(
+                        workspace,
+                        List.of(new Practice()),
+                        workspace.getReviewSettings().getRolloutRevision(),
+                        TriggerMode.MANUAL));
     }
 
     private void givenSubmissionSucceeds() {
         AgentJob job = new AgentJob();
         job.setId(UUID.randomUUID());
-        when(
-            agentJobService.submitWithOutcome(anyLong(), any(), any(), any(), any(GateDecision.Detect.class))
-        ).thenReturn(SubmissionOutcome.of(job));
+        when(agentJobService.submitWithOutcome(anyLong(), any(), any(), any(), any(GateDecision.Detect.class)))
+                .thenReturn(SubmissionOutcome.of(job));
     }
 
     private PullRequest pullRequest() {

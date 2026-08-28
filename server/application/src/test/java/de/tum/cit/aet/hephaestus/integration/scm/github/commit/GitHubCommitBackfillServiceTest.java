@@ -67,28 +67,27 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
     void setUp() {
         // Execute TransactionTemplate callbacks directly, with no real transaction.
         lenient()
-            .when(transactionTemplate.execute(any(TransactionCallback.class)))
-            .thenAnswer(invocation -> {
-                TransactionCallback<Object> callback = invocation.getArgument(0);
-                return callback.doInTransaction(mock(TransactionStatus.class));
-            });
+                .when(transactionTemplate.execute(any(TransactionCallback.class)))
+                .thenAnswer(invocation -> {
+                    TransactionCallback<Object> callback = invocation.getArgument(0);
+                    return callback.doInTransaction(mock(TransactionStatus.class));
+                });
 
         service = new GitHubCommitBackfillService(
-            gitRepositoryManager,
-            tokenService,
-            commitRepository,
-            authorResolver,
-            eventPublisher,
-            transactionTemplate
-        );
+                gitRepositoryManager,
+                tokenService,
+                commitRepository,
+                authorResolver,
+                eventPublisher,
+                transactionTemplate);
     }
 
     private static SyncTarget createSyncTarget(AuthMode authMode) {
         var builder = SyncTargetTestBuilder.syncTarget()
-            .id(1L)
-            .scopeId(100L)
-            .authMode(authMode)
-            .repositoryNameWithOwner("owner/repo");
+                .id(1L)
+                .scopeId(100L)
+                .authMode(authMode)
+                .repositoryNameWithOwner("owner/repo");
         if (authMode == AuthMode.INSTALLATION_APP) builder.installationId(42L);
         if (authMode == AuthMode.PERSONAL_ACCESS_TOKEN) builder.personalAccessToken("ghp_test_token");
         return builder.build();
@@ -103,30 +102,21 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
 
     private static GitRepositoryManager.CommitInfo createCommitInfo(String sha, String message) {
         return new GitRepositoryManager.CommitInfo(
-            sha,
-            message,
-            null,
-            "Author",
-            "author@test.com",
-            Instant.parse("2024-01-15T10:00:00Z"),
-            "Committer",
-            "committer@test.com",
-            Instant.parse("2024-01-15T10:00:00Z"),
-            10,
-            5,
-            1,
-            List.of(
-                new GitRepositoryManager.FileChange(
-                    "src/Main.java",
-                    GitRepositoryManager.ChangeType.MODIFIED,
-                    10,
-                    5,
-                    15,
-                    null
-                )
-            ),
-            List.of()
-        );
+                sha,
+                message,
+                null,
+                "Author",
+                "author@test.com",
+                Instant.parse("2024-01-15T10:00:00Z"),
+                "Committer",
+                "committer@test.com",
+                Instant.parse("2024-01-15T10:00:00Z"),
+                10,
+                5,
+                1,
+                List.of(new GitRepositoryManager.FileChange(
+                        "src/Main.java", GitRepositoryManager.ChangeType.MODIFIED, 10, 5, 15, null)),
+                List.of());
     }
 
     private static Commit createMockCommit(String sha, Long repoId) {
@@ -236,23 +226,23 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
 
             assertThat(result).isEqualTo(1);
             verify(gitRepositoryManager).walkCommits(1L, null, "head123");
-            verify(commitRepository).upsertCommit(
-                eq("commit1"),
-                eq("First commit"),
-                any(),
-                eq("https://github.com/owner/repo/commit/commit1"),
-                any(),
-                any(),
-                eq(10),
-                eq(5),
-                eq(1),
-                any(),
-                eq(1L),
-                any(),
-                any(),
-                any(),
-                any()
-            );
+            verify(commitRepository)
+                    .upsertCommit(
+                            eq("commit1"),
+                            eq("First commit"),
+                            any(),
+                            eq("https://github.com/owner/repo/commit/commit1"),
+                            any(),
+                            any(),
+                            eq(10),
+                            eq(5),
+                            eq(1),
+                            any(),
+                            eq(1L),
+                            any(),
+                            any(),
+                            any(),
+                            any());
         }
 
         @Test
@@ -273,9 +263,8 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
 
             service.backfillCommits(target, repo, 100L);
 
-            ArgumentCaptor<ScmDomainEvent.CommitCreated> eventCaptor = ArgumentCaptor.forClass(
-                ScmDomainEvent.CommitCreated.class
-            );
+            ArgumentCaptor<ScmDomainEvent.CommitCreated> eventCaptor =
+                    ArgumentCaptor.forClass(ScmDomainEvent.CommitCreated.class);
             verify(eventPublisher).publishEvent(eventCaptor.capture());
 
             ScmDomainEvent.CommitCreated event = eventCaptor.getValue();
@@ -336,23 +325,23 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             int result = service.backfillCommits(target, repo, 100L);
 
             assertThat(result).isEqualTo(1);
-            verify(commitRepository, times(1)).upsertCommit(
-                eq("newone"),
-                anyString(),
-                any(),
-                anyString(),
-                any(),
-                any(),
-                any(Integer.class),
-                any(Integer.class),
-                any(Integer.class),
-                any(),
-                anyLong(),
-                any(),
-                any(),
-                any(),
-                any()
-            );
+            verify(commitRepository, times(1))
+                    .upsertCommit(
+                            eq("newone"),
+                            anyString(),
+                            any(),
+                            anyString(),
+                            any(),
+                            any(),
+                            any(Integer.class),
+                            any(Integer.class),
+                            any(Integer.class),
+                            any(),
+                            anyLong(),
+                            any(),
+                            any(),
+                            any(),
+                            any());
         }
 
         @Test
@@ -368,23 +357,23 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
             int result = service.backfillCommits(target, repo, 100L);
 
             assertThat(result).isEqualTo(0);
-            verify(commitRepository, never()).upsertCommit(
-                anyString(),
-                anyString(),
-                any(),
-                anyString(),
-                any(),
-                any(),
-                any(Integer.class),
-                any(Integer.class),
-                any(Integer.class),
-                any(),
-                anyLong(),
-                any(),
-                any(),
-                any(),
-                any()
-            );
+            verify(commitRepository, never())
+                    .upsertCommit(
+                            anyString(),
+                            anyString(),
+                            any(),
+                            anyString(),
+                            any(),
+                            any(),
+                            any(Integer.class),
+                            any(Integer.class),
+                            any(Integer.class),
+                            any(),
+                            anyLong(),
+                            any(),
+                            any(),
+                            any(),
+                            any());
         }
     }
 
@@ -430,9 +419,8 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
         @Test
         void shouldReturnNegativeOneOnGitOperationException() {
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
-            when(gitRepositoryManager.ensureRepository(anyLong(), anyString(), any())).thenThrow(
-                new GitRepositoryManager.GitOperationException("Clone failed", new RuntimeException())
-            );
+            when(gitRepositoryManager.ensureRepository(anyLong(), anyString(), any()))
+                    .thenThrow(new GitRepositoryManager.GitOperationException("Clone failed", new RuntimeException()));
 
             Repository repo = createMockRepository(1L, "owner/repo", "main");
             SyncTarget target = createSyncTarget(AuthMode.INSTALLATION_APP);
@@ -445,9 +433,8 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
         @Test
         void shouldReturnNegativeOneOnUnexpectedException() {
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
-            when(gitRepositoryManager.ensureRepository(anyLong(), anyString(), any())).thenThrow(
-                new RuntimeException("Unexpected error")
-            );
+            when(gitRepositoryManager.ensureRepository(anyLong(), anyString(), any()))
+                    .thenThrow(new RuntimeException("Unexpected error"));
 
             Repository repo = createMockRepository(1L, "owner/repo", "main");
             SyncTarget target = createSyncTarget(AuthMode.INSTALLATION_APP);
@@ -501,23 +488,23 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
 
             service.backfillCommits(target, repo, 100L);
 
-            verify(commitRepository).upsertCommit(
-                eq("commit1"),
-                anyString(),
-                any(),
-                anyString(),
-                any(),
-                any(),
-                any(Integer.class),
-                any(Integer.class),
-                any(Integer.class),
-                any(),
-                eq(1L),
-                eq(10L),
-                eq(20L),
-                any(),
-                any()
-            );
+            verify(commitRepository)
+                    .upsertCommit(
+                            eq("commit1"),
+                            anyString(),
+                            any(),
+                            anyString(),
+                            any(),
+                            any(),
+                            any(Integer.class),
+                            any(Integer.class),
+                            any(Integer.class),
+                            any(),
+                            eq(1L),
+                            eq(10L),
+                            eq(20L),
+                            any(),
+                            any());
         }
 
         @Test
@@ -541,23 +528,23 @@ class GitHubCommitBackfillServiceTest extends BaseUnitTest {
 
             service.backfillCommits(target, repo, 100L);
 
-            verify(commitRepository).upsertCommit(
-                eq("commit1"),
-                anyString(),
-                any(),
-                anyString(),
-                any(),
-                any(),
-                any(Integer.class),
-                any(Integer.class),
-                any(Integer.class),
-                any(),
-                eq(1L),
-                eq(null),
-                eq(null),
-                any(),
-                any()
-            );
+            verify(commitRepository)
+                    .upsertCommit(
+                            eq("commit1"),
+                            anyString(),
+                            any(),
+                            anyString(),
+                            any(),
+                            any(),
+                            any(Integer.class),
+                            any(Integer.class),
+                            any(Integer.class),
+                            any(),
+                            eq(1L),
+                            eq(null),
+                            eq(null),
+                            any(),
+                            any());
         }
     }
 

@@ -71,7 +71,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
     private static final int MR3_IID = 3;
     private static final String MR3_TITLE = "Test MR for close/reopen";
     private static final String MR3_HTML_URL =
-        "https://gitlab.lrz.de/hephaestustest/demo-repository/-/merge_requests/3";
+            "https://gitlab.lrz.de/hephaestustest/demo-repository/-/merge_requests/3";
     private static final String MR3_SOURCE_BRANCH = "feature/test-close-reopen";
     private static final String MR3_TARGET_BRANCH = "main";
 
@@ -157,8 +157,8 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
 
             transactionTemplate.executeWithoutResult(status -> {
                 PullRequest pr = pullRequestRepository
-                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR3_IID)
-                    .orElseThrow();
+                        .findByRepositoryIdAndNumber(savedRepo.getId(), MR3_IID)
+                        .orElseThrow();
 
                 // Core fields
                 assertThat(pr.getNativeId()).isEqualTo(NATIVE_MR3_ID);
@@ -193,7 +193,8 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
             });
 
             // Domain event
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestCreated.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestCreated.class))
+                    .hasSize(1);
         }
 
         @Test
@@ -207,15 +208,20 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
 
             transactionTemplate.executeWithoutResult(status -> {
                 PullRequest pr = pullRequestRepository
-                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR3_IID)
-                    .orElseThrow();
+                        .findByRepositoryIdAndNumber(savedRepo.getId(), MR3_IID)
+                        .orElseThrow();
                 assertThat(pr.getState()).isEqualTo(Issue.State.CLOSED);
                 // Real GitLab webhook payloads for 'close' action don't include closed_at
                 assertThat(pr.getClosedAt()).isNull();
             });
 
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class)).hasSize(1);
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class).get(0).wasMerged()).isFalse();
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class))
+                    .hasSize(1);
+            assertThat(eventListener
+                            .ofType(ScmDomainEvent.PullRequestClosed.class)
+                            .get(0)
+                            .wasMerged())
+                    .isFalse();
         }
 
         @Test
@@ -229,17 +235,23 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
 
             transactionTemplate.executeWithoutResult(status -> {
                 PullRequest pr = pullRequestRepository
-                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR2_IID)
-                    .orElseThrow();
+                        .findByRepositoryIdAndNumber(savedRepo.getId(), MR2_IID)
+                        .orElseThrow();
                 assertThat(pr.getState()).isEqualTo(Issue.State.MERGED);
                 assertThat(pr.isMerged()).isTrue();
                 // Real GitLab webhook payloads for 'merge' action don't include merged_at
                 assertThat(pr.getMergedAt()).isNull();
             });
 
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class)).hasSize(1);
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class).get(0).wasMerged()).isTrue();
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestMerged.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class))
+                    .hasSize(1);
+            assertThat(eventListener
+                            .ofType(ScmDomainEvent.PullRequestClosed.class)
+                            .get(0)
+                            .wasMerged())
+                    .isTrue();
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestMerged.class))
+                    .hasSize(1);
         }
 
         @Test
@@ -254,12 +266,13 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
 
             transactionTemplate.executeWithoutResult(status -> {
                 PullRequest pr = pullRequestRepository
-                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR3_IID)
-                    .orElseThrow();
+                        .findByRepositoryIdAndNumber(savedRepo.getId(), MR3_IID)
+                        .orElseThrow();
                 assertThat(pr.getState()).isEqualTo(Issue.State.OPEN);
             });
 
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestReopened.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestReopened.class))
+                    .hasSize(1);
         }
     }
 
@@ -275,28 +288,26 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
 
             transactionTemplate.executeWithoutResult(status -> {
                 PullRequest pr = pullRequestRepository
-                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR4_IID)
-                    .orElseThrow();
+                        .findByRepositoryIdAndNumber(savedRepo.getId(), MR4_IID)
+                        .orElseThrow();
 
-                List<PullRequestReview> reviews = reviewRepository
-                    .findAll()
-                    .stream()
-                    .filter(r -> r.getPullRequest() != null && r.getPullRequest().getId().equals(pr.getId()))
-                    .toList();
+                List<PullRequestReview> reviews = reviewRepository.findAll().stream()
+                        .filter(r -> r.getPullRequest() != null
+                                && r.getPullRequest().getId().equals(pr.getId()))
+                        .toList();
 
                 assertThat(reviews).hasSize(1);
                 PullRequestReview review = reviews.get(0);
                 assertThat(review.getState()).isEqualTo(PullRequestReview.State.APPROVED);
                 assertThat(review.getId()).isPositive(); // auto-generated PK
 
-                long expectedNativeId = GitLabMergeRequestProcessor.generateApprovalNativeId(
-                    NATIVE_MR4_ID,
-                    NATIVE_APPROVER_ID
-                );
+                long expectedNativeId =
+                        GitLabMergeRequestProcessor.generateApprovalNativeId(NATIVE_MR4_ID, NATIVE_APPROVER_ID);
                 assertThat(review.getNativeId()).isEqualTo(expectedNativeId);
             });
 
-            assertThat(eventListener.ofType(ScmDomainEvent.ReviewSubmitted.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.ReviewSubmitted.class))
+                    .hasSize(1);
         }
 
         @Test
@@ -316,7 +327,8 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                 assertThat(review.get().getState()).isEqualTo(PullRequestReview.State.DISMISSED);
             });
 
-            assertThat(eventListener.ofType(ScmDomainEvent.ReviewDismissed.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.ReviewDismissed.class))
+                    .hasSize(1);
         }
     }
 
@@ -351,35 +363,42 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         void fullLifecycle_openCloseReopen() throws Exception {
             // Open MR !3
             handler.handleEvent(loadPayload("merge_request.open"));
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestCreated.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestCreated.class))
+                    .hasSize(1);
 
             transactionTemplate.executeWithoutResult(status -> {
                 PullRequest pr = pullRequestRepository
-                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR3_IID)
-                    .orElseThrow();
+                        .findByRepositoryIdAndNumber(savedRepo.getId(), MR3_IID)
+                        .orElseThrow();
                 assertThat(pr.getState()).isEqualTo(Issue.State.OPEN);
             });
 
             // Close MR !3
             handler.handleEvent(loadPayload("merge_request.close"));
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class)).hasSize(1);
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class).get(0).wasMerged()).isFalse();
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class))
+                    .hasSize(1);
+            assertThat(eventListener
+                            .ofType(ScmDomainEvent.PullRequestClosed.class)
+                            .get(0)
+                            .wasMerged())
+                    .isFalse();
 
             transactionTemplate.executeWithoutResult(status -> {
                 PullRequest pr = pullRequestRepository
-                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR3_IID)
-                    .orElseThrow();
+                        .findByRepositoryIdAndNumber(savedRepo.getId(), MR3_IID)
+                        .orElseThrow();
                 assertThat(pr.getState()).isEqualTo(Issue.State.CLOSED);
             });
 
             // Reopen MR !3
             handler.handleEvent(loadPayload("merge_request.reopen"));
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestReopened.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestReopened.class))
+                    .hasSize(1);
 
             transactionTemplate.executeWithoutResult(status -> {
                 PullRequest pr = pullRequestRepository
-                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR3_IID)
-                    .orElseThrow();
+                        .findByRepositoryIdAndNumber(savedRepo.getId(), MR3_IID)
+                        .orElseThrow();
                 assertThat(pr.getState()).isEqualTo(Issue.State.OPEN);
             });
         }
@@ -388,18 +407,19 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         void fullLifecycle_approveUnapprove() throws Exception {
             // Approve MR !4 (also creates it)
             handler.handleEvent(loadPayload("merge_request.approved"));
-            assertThat(eventListener.ofType(ScmDomainEvent.ReviewSubmitted.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.ReviewSubmitted.class))
+                    .hasSize(1);
 
             transactionTemplate.executeWithoutResult(status -> {
                 long nativeId = GitLabMergeRequestProcessor.generateApprovalNativeId(NATIVE_MR4_ID, NATIVE_APPROVER_ID);
-                assertThat(
-                    reviewRepository.findByNativeIdAndProviderId(nativeId, persistedId(savedProvider))
-                ).isPresent();
+                assertThat(reviewRepository.findByNativeIdAndProviderId(nativeId, persistedId(savedProvider)))
+                        .isPresent();
             });
 
             // Unapprove MR !4 — should dismiss the review (not delete, not CHANGES_REQUESTED)
             handler.handleEvent(loadPayload("merge_request.unapproved"));
-            assertThat(eventListener.ofType(ScmDomainEvent.ReviewDismissed.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.ReviewDismissed.class))
+                    .hasSize(1);
 
             transactionTemplate.executeWithoutResult(status -> {
                 long nativeId = GitLabMergeRequestProcessor.generateApprovalNativeId(NATIVE_MR4_ID, NATIVE_APPROVER_ID);
@@ -413,16 +433,18 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         void fullLifecycle_updateMerge() throws Exception {
             // Create MR !2 via update
             handler.handleEvent(loadPayload("merge_request.update"));
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestCreated.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestCreated.class))
+                    .hasSize(1);
 
             // Merge MR !2
             handler.handleEvent(loadPayload("merge_request.merge"));
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestMerged.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestMerged.class))
+                    .hasSize(1);
 
             transactionTemplate.executeWithoutResult(status -> {
                 PullRequest pr = pullRequestRepository
-                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR2_IID)
-                    .orElseThrow();
+                        .findByRepositoryIdAndNumber(savedRepo.getId(), MR2_IID)
+                        .orElseThrow();
                 assertThat(pr.getState()).isEqualTo(Issue.State.MERGED);
                 assertThat(pr.isMerged()).isTrue();
                 assertThat(pr.getTitle()).isEqualTo(MR2_TITLE);
@@ -434,29 +456,28 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
             // Create an Issue with number=3 in the same repository
             transactionTemplate.executeWithoutResult(status -> {
                 issueRepository.upsertCore(
-                    /* nativeId */ 888888L,
-                    /* providerId */ persistedId(savedProvider),
-                    /* number */ MR3_IID, // Same number as MR !3
-                    /* title */ "Issue with same IID",
-                    /* body */ "This is an issue with the same IID as the MR",
-                    /* state */ "OPEN",
-                    /* stateReason */ null,
-                    /* htmlUrl */ "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/3",
-                    /* isLocked */ false,
-                    /* closedAt */ null,
-                    /* commentsCount */ 0,
-                    /* lastSyncAt */ Instant.now(),
-                    /* createdAt */ Instant.now(),
-                    /* updatedAt */ Instant.now(),
-                    /* authorId */ null,
-                    /* repositoryId */ savedRepo.getId(),
-                    /* milestoneId */ null,
-                    /* issueTypeId */ null,
-                    /* parentIssueId */ null,
-                    /* subIssuesTotal */ null,
-                    /* subIssuesCompleted */ null,
-                    /* subIssuesPercentCompleted */ null
-                );
+                        /* nativeId */ 888888L,
+                        /* providerId */ persistedId(savedProvider),
+                        /* number */ MR3_IID, // Same number as MR !3
+                        /* title */ "Issue with same IID",
+                        /* body */ "This is an issue with the same IID as the MR",
+                        /* state */ "OPEN",
+                        /* stateReason */ null,
+                        /* htmlUrl */ "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/3",
+                        /* isLocked */ false,
+                        /* closedAt */ null,
+                        /* commentsCount */ 0,
+                        /* lastSyncAt */ Instant.now(),
+                        /* createdAt */ Instant.now(),
+                        /* updatedAt */ Instant.now(),
+                        /* authorId */ null,
+                        /* repositoryId */ savedRepo.getId(),
+                        /* milestoneId */ null,
+                        /* issueTypeId */ null,
+                        /* parentIssueId */ null,
+                        /* subIssuesTotal */ null,
+                        /* subIssuesCompleted */ null,
+                        /* subIssuesPercentCompleted */ null);
             });
 
             // Now create MR !3
@@ -465,15 +486,17 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
             // Both should exist independently
             transactionTemplate.executeWithoutResult(status -> {
                 // Issue #3 exists as Issue type
-                Issue issue = issueRepository.findByRepositoryIdAndNumber(savedRepo.getId(), MR3_IID).orElse(null);
+                Issue issue = issueRepository
+                        .findByRepositoryIdAndNumber(savedRepo.getId(), MR3_IID)
+                        .orElse(null);
                 assertThat(issue).isNotNull();
                 assertThat(issue.getTitle()).isEqualTo("Issue with same IID");
                 assertThat(issue.isPullRequest()).isFalse();
 
                 // MR !3 exists as PullRequest type
                 PullRequest pr = pullRequestRepository
-                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR3_IID)
-                    .orElse(null);
+                        .findByRepositoryIdAndNumber(savedRepo.getId(), MR3_IID)
+                        .orElse(null);
                 assertThat(pr).isNotNull();
                 assertThat(pr.getTitle()).isEqualTo(MR3_TITLE);
                 assertThat(pr.isPullRequest()).isTrue();
@@ -490,18 +513,25 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         void domainEvents_mr3Lifecycle() throws Exception {
             // Open -> PullRequestCreated
             handler.handleEvent(loadPayload("merge_request.open"));
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestCreated.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestCreated.class))
+                    .hasSize(1);
 
             // Close -> PullRequestClosed(wasMerged=false)
             handler.handleEvent(loadPayload("merge_request.close"));
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class)).hasSize(1);
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class).get(0).wasMerged()).isFalse();
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class))
+                    .hasSize(1);
+            assertThat(eventListener
+                            .ofType(ScmDomainEvent.PullRequestClosed.class)
+                            .get(0)
+                            .wasMerged())
+                    .isFalse();
 
             eventListener.clear();
 
             // Reopen -> PullRequestReopened
             handler.handleEvent(loadPayload("merge_request.reopen"));
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestReopened.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestReopened.class))
+                    .hasSize(1);
         }
 
         @Test
@@ -512,22 +542,30 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
 
             // Merge -> PullRequestClosed(wasMerged=true) + PullRequestMerged
             handler.handleEvent(loadPayload("merge_request.merge"));
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class)).hasSize(1);
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class).get(0).wasMerged()).isTrue();
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestMerged.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class))
+                    .hasSize(1);
+            assertThat(eventListener
+                            .ofType(ScmDomainEvent.PullRequestClosed.class)
+                            .get(0)
+                            .wasMerged())
+                    .isTrue();
+            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestMerged.class))
+                    .hasSize(1);
         }
 
         @Test
         void domainEvents_mr4Approval() throws Exception {
             // Approve -> ReviewSubmitted
             handler.handleEvent(loadPayload("merge_request.approved"));
-            assertThat(eventListener.ofType(ScmDomainEvent.ReviewSubmitted.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.ReviewSubmitted.class))
+                    .hasSize(1);
 
             eventListener.clear();
 
             // Unapprove -> ReviewDismissed (not CHANGES_REQUESTED — unapproval is a distinct action)
             handler.handleEvent(loadPayload("merge_request.unapproved"));
-            assertThat(eventListener.ofType(ScmDomainEvent.ReviewDismissed.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.ReviewDismissed.class))
+                    .hasSize(1);
         }
     }
 
@@ -545,8 +583,8 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
 
             transactionTemplate.executeWithoutResult(status -> {
                 var author = userRepository
-                    .findByNativeIdAndProviderId(NATIVE_AUTHOR_ID, persistedId(savedProvider))
-                    .orElseThrow();
+                        .findByNativeIdAndProviderId(NATIVE_AUTHOR_ID, persistedId(savedProvider))
+                        .orElseThrow();
                 assertThat(author.getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
                 assertThat(author.getProvider().getType()).isEqualTo(IdentityProviderType.GITLAB);
             });
@@ -563,10 +601,9 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
 
     private void setupTestData() {
         savedProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.lrz.de")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.lrz.de"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.lrz.de")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.lrz.de")));
 
         Organization org = new Organization();
         org.setNativeId(1L);

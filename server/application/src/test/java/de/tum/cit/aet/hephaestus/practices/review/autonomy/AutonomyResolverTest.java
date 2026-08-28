@@ -23,21 +23,15 @@ class AutonomyResolverTest extends BaseUnitTest {
         @Test
         void aPracticeThatDecidedForItselfWins() {
             EffectiveAutonomy resolved = AutonomyResolver.resolvePractice(
-                PracticeAutonomy.OFF,
-                PracticeAutonomy.AUTOMATIC,
-                PracticeAutonomy.AUTOMATIC
-            );
+                    PracticeAutonomy.OFF, PracticeAutonomy.AUTOMATIC, PracticeAutonomy.AUTOMATIC);
             assertThat(resolved.autonomy()).isEqualTo(PracticeAutonomy.OFF);
             assertThat(resolved.source()).isEqualTo(AutonomySource.PRACTICE);
         }
 
         @Test
         void aPracticeThatDecidedNothingTakesItsGroupsAnswer() {
-            EffectiveAutonomy resolved = AutonomyResolver.resolvePractice(
-                null,
-                PracticeAutonomy.HUMAN_APPROVAL,
-                PracticeAutonomy.AUTOMATIC
-            );
+            EffectiveAutonomy resolved =
+                    AutonomyResolver.resolvePractice(null, PracticeAutonomy.HUMAN_APPROVAL, PracticeAutonomy.AUTOMATIC);
             assertThat(resolved.autonomy()).isEqualTo(PracticeAutonomy.HUMAN_APPROVAL);
             assertThat(resolved.source()).isEqualTo(AutonomySource.GROUP);
         }
@@ -63,13 +57,14 @@ class AutonomyResolverTest extends BaseUnitTest {
         @ParameterizedTest
         @EnumSource(PracticeAutonomy.class)
         void theNearestDecisionWinsForEveryAutonomy(PracticeAutonomy autonomy) {
-            assertThat(
-                AutonomyResolver.resolvePractice(autonomy, null, PracticeAutonomy.AUTOMATIC).autonomy()
-            ).isEqualTo(autonomy);
-            assertThat(
-                AutonomyResolver.resolvePractice(null, autonomy, PracticeAutonomy.AUTOMATIC).autonomy()
-            ).isEqualTo(autonomy);
-            assertThat(AutonomyResolver.resolvePractice(null, null, autonomy).autonomy()).isEqualTo(autonomy);
+            assertThat(AutonomyResolver.resolvePractice(autonomy, null, PracticeAutonomy.AUTOMATIC)
+                            .autonomy())
+                    .isEqualTo(autonomy);
+            assertThat(AutonomyResolver.resolvePractice(null, autonomy, PracticeAutonomy.AUTOMATIC)
+                            .autonomy())
+                    .isEqualTo(autonomy);
+            assertThat(AutonomyResolver.resolvePractice(null, null, autonomy).autonomy())
+                    .isEqualTo(autonomy);
         }
     }
 
@@ -85,9 +80,8 @@ class AutonomyResolverTest extends BaseUnitTest {
 
         @Test
         void aWorkspaceThatChoseGetsWhatItChose() {
-            assertThat(AutonomyResolver.workspaceDefault(PracticeAutonomy.HUMAN_APPROVAL)).isEqualTo(
-                PracticeAutonomy.HUMAN_APPROVAL
-            );
+            assertThat(AutonomyResolver.workspaceDefault(PracticeAutonomy.HUMAN_APPROVAL))
+                    .isEqualTo(PracticeAutonomy.HUMAN_APPROVAL);
         }
     }
 
@@ -123,12 +117,11 @@ class AutonomyResolverTest extends BaseUnitTest {
             practice.setAutonomy(null);
             practice.setGroup(group);
 
-            assertThat(AutonomyResolver.resolvePractice(practice, PracticeAutonomy.AUTOMATIC)).isEqualTo(
-                AutonomyResolver.resolvePractice(null, PracticeAutonomy.HUMAN_APPROVAL, PracticeAutonomy.AUTOMATIC)
-            );
-            assertThat(AutonomyResolver.effectiveAutonomyOf(practice, PracticeAutonomy.AUTOMATIC)).isEqualTo(
-                PracticeAutonomy.HUMAN_APPROVAL
-            );
+            assertThat(AutonomyResolver.resolvePractice(practice, PracticeAutonomy.AUTOMATIC))
+                    .isEqualTo(AutonomyResolver.resolvePractice(
+                            null, PracticeAutonomy.HUMAN_APPROVAL, PracticeAutonomy.AUTOMATIC));
+            assertThat(AutonomyResolver.effectiveAutonomyOf(practice, PracticeAutonomy.AUTOMATIC))
+                    .isEqualTo(PracticeAutonomy.HUMAN_APPROVAL);
         }
     }
 

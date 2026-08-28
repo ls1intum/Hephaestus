@@ -36,13 +36,12 @@ public class LlmUsageService {
     private final FxRateLookup fxRateLookup;
 
     public LlmUsageService(
-        LlmUsageEventRepository usageRepository,
-        WorkspaceRepository workspaceRepository,
-        LlmBudgetService llmBudgetService,
-        ConfigAuditPort configAudit,
-        AgentJobRepository jobRepository,
-        FxRateLookup fxRateLookup
-    ) {
+            LlmUsageEventRepository usageRepository,
+            WorkspaceRepository workspaceRepository,
+            LlmBudgetService llmBudgetService,
+            ConfigAuditPort configAudit,
+            AgentJobRepository jobRepository,
+            FxRateLookup fxRateLookup) {
         this.usageRepository = usageRepository;
         this.workspaceRepository = workspaceRepository;
         this.llmBudgetService = llmBudgetService;
@@ -54,42 +53,33 @@ public class LlmUsageService {
     @Transactional(readOnly = true)
     public WorkspaceLlmUsageReportDTO getWorkspaceReport(Long workspaceId, YearMonth month) {
         Workspace workspace = workspaceRepository
-            .findById(workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
+                .findById(workspaceId)
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
         LlmBudgetService.MonthWindow window = LlmBudgetService.MonthWindow.of(month);
 
-        List<LlmUsageByJobTypeDTO> byJobType = usageRepository
-            .aggregateByJobType(workspaceId, window.from(), window.to())
-            .stream()
-            .map(row ->
-                new LlmUsageByJobTypeDTO(
-                    LlmUsageJobType.valueOf(row.getJobType()),
-                    row.getPricedTotalCostUsd(),
-                    row.getByoTotalCostUsd(),
-                    row.getUnpricedEventCount(),
-                    row.getInputTokens(),
-                    row.getOutputTokens(),
-                    row.getCacheReadTokens(),
-                    row.getCacheWriteTokens(),
-                    row.getTotalCalls(),
-                    row.getEvents()
-                )
-            )
-            .toList();
+        List<LlmUsageByJobTypeDTO> byJobType =
+                usageRepository.aggregateByJobType(workspaceId, window.from(), window.to()).stream()
+                        .map(row -> new LlmUsageByJobTypeDTO(
+                                LlmUsageJobType.valueOf(row.getJobType()),
+                                row.getPricedTotalCostUsd(),
+                                row.getByoTotalCostUsd(),
+                                row.getUnpricedEventCount(),
+                                row.getInputTokens(),
+                                row.getOutputTokens(),
+                                row.getCacheReadTokens(),
+                                row.getCacheWriteTokens(),
+                                row.getTotalCalls(),
+                                row.getEvents()))
+                        .toList();
 
-        List<LlmUsageByDayDTO> byDay = usageRepository
-            .aggregateByDay(workspaceId, window.from(), window.to())
-            .stream()
-            .map(row ->
-                new LlmUsageByDayDTO(
-                    row.getDay(),
-                    row.getPricedTotalCostUsd(),
-                    row.getByoTotalCostUsd(),
-                    row.getUnpricedEventCount(),
-                    row.getEvents()
-                )
-            )
-            .toList();
+        List<LlmUsageByDayDTO> byDay = usageRepository.aggregateByDay(workspaceId, window.from(), window.to()).stream()
+                .map(row -> new LlmUsageByDayDTO(
+                        row.getDay(),
+                        row.getPricedTotalCostUsd(),
+                        row.getByoTotalCostUsd(),
+                        row.getUnpricedEventCount(),
+                        row.getEvents()))
+                .toList();
 
         BigDecimal pricedTotal = usageRepository.sumCost(workspaceId, window.from(), window.to());
         BigDecimal ownProviderTotal = usageRepository.sumByoCost(workspaceId, window.from(), window.to());
@@ -97,31 +87,28 @@ public class LlmUsageService {
         BigDecimal ownProviderBudget = workspace.getMonthlyByoLlmBudgetUsd();
         long uncosted = usageRepository.countUncosted(workspaceId, window.from(), window.to());
         LlmBudgetVerdict instanceVerdict = LlmBudgetService.verdictFor(
-            pricedTotal,
-            usageRepository.existsUnpricedInstanceFunded(workspaceId, window.from(), window.to()),
-            instanceBudget
-        );
+                pricedTotal,
+                usageRepository.existsUnpricedInstanceFunded(workspaceId, window.from(), window.to()),
+                instanceBudget);
         LlmBudgetVerdict ownProviderVerdict = LlmBudgetService.verdictFor(
-            ownProviderTotal,
-            usageRepository.existsUnpricedWorkspaceFunded(workspaceId, window.from(), window.to()),
-            ownProviderBudget
-        );
+                ownProviderTotal,
+                usageRepository.existsUnpricedWorkspaceFunded(workspaceId, window.from(), window.to()),
+                ownProviderBudget);
         LlmBudgetDecision decision = livePauseDecision(workspaceId, month);
         return new WorkspaceLlmUsageReportDTO(
-            month.toString(),
-            instanceBudget,
-            ownProviderBudget,
-            pricedTotal,
-            ownProviderTotal,
-            uncosted,
-            instanceVerdict,
-            ownProviderVerdict,
-            decision.blocks(FundingSource.INSTANCE),
-            decision.blocks(FundingSource.WORKSPACE),
-            byJobType,
-            byDay,
-            fxRateLookup.forMonth(month).orElse(null)
-        );
+                month.toString(),
+                instanceBudget,
+                ownProviderBudget,
+                pricedTotal,
+                ownProviderTotal,
+                uncosted,
+                instanceVerdict,
+                ownProviderVerdict,
+                decision.blocks(FundingSource.INSTANCE),
+                decision.blocks(FundingSource.WORKSPACE),
+                byJobType,
+                byDay,
+                fxRateLookup.forMonth(month).orElse(null));
     }
 
     /**
@@ -134,28 +121,25 @@ public class LlmUsageService {
         // and Hibernate's all-columns UPDATE would otherwise let this write revert the instance
         // admin's cap (or be reverted by it).
         Workspace workspace = workspaceRepository
-            .findByIdForUpdate(workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
+                .findByIdForUpdate(workspaceId)
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
         BigDecimal before = workspace.getMonthlyByoLlmBudgetUsd();
         workspace.setMonthlyByoLlmBudgetUsd(monthlyBudgetUsd);
         workspaceRepository.save(workspace);
-        configAudit.record(
-            ConfigAuditEntry.updated(
+        configAudit.record(ConfigAuditEntry.updated(
                 ConfigAuditEntityType.WORKSPACE_OWN_PROVIDER_LLM_BUDGET,
                 workspaceId,
                 workspaceId,
                 new OwnProviderLlmBudgetSnapshot(before),
-                new OwnProviderLlmBudgetSnapshot(monthlyBudgetUsd)
-            )
-        );
+                new OwnProviderLlmBudgetSnapshot(monthlyBudgetUsd)));
         jobRepository.releaseBudgetHolds(workspaceId, Instant.now());
     }
 
     /** The live gate's verdict, which always evaluates against now — so a closed month pauses nothing. */
     private LlmBudgetDecision livePauseDecision(Long workspaceId, YearMonth month) {
         return month.equals(YearMonth.now(ZoneOffset.UTC))
-            ? llmBudgetService.decide(workspaceId)
-            : LlmBudgetDecision.ALLOWED;
+                ? llmBudgetService.decide(workspaceId)
+                : LlmBudgetDecision.ALLOWED;
     }
 
     /** {@code null} = uncapped. */

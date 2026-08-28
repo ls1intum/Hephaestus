@@ -45,6 +45,8 @@ class OpenApiSlackOperationIdLintTest extends BaseUnitTest {
                 offenders.add(currentPath + " → " + m.group(1));
             }
         }
-        assertThat(offenders).as("operations on /slack paths without 'Slack' in their operationId").isEmpty();
+        assertThat(offenders)
+                .as("operations on /slack paths without 'Slack' in their operationId")
+                .isEmpty();
     }
 }

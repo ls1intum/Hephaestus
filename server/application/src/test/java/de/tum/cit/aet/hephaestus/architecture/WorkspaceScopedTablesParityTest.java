@@ -35,23 +35,21 @@ class WorkspaceScopedTablesParityTest {
     @Test
     @DisplayName("GLOBAL_TABLES (prod) and GLOBAL_ENTITIES (arch) describe the same set")
     void productionAndArchAllowlistsMatch() {
-        Set<String> archEntitiesSnakeCase = readPrivateSet(DataIsolationArchitectureTest.class, "GLOBAL_ENTITIES")
-            .stream()
-            .map(WorkspaceScopedTablesParityTest::toSnakeCase)
-            .collect(Collectors.toUnmodifiableSet());
+        Set<String> archEntitiesSnakeCase =
+                readPrivateSet(DataIsolationArchitectureTest.class, "GLOBAL_ENTITIES").stream()
+                        .map(WorkspaceScopedTablesParityTest::toSnakeCase)
+                        .collect(Collectors.toUnmodifiableSet());
 
         Set<String> productionTablesExcludingLiquibase = WorkspaceScopedTables.GLOBAL_TABLES.stream()
-            .filter(t -> !t.equals("databasechangelog"))
-            .filter(t -> !t.equals("databasechangeloglock"))
-            .collect(Collectors.toUnmodifiableSet());
+                .filter(t -> !t.equals("databasechangelog"))
+                .filter(t -> !t.equals("databasechangeloglock"))
+                .collect(Collectors.toUnmodifiableSet());
 
         assertThat(productionTablesExcludingLiquibase)
-            .as(
-                "Production allowlist must match arch-test allowlist (Liquibase tables " +
-                    "excluded — those are not @Entity classes). When this fails, update " +
-                    "BOTH lists with the same entity in the same commit."
-            )
-            .containsExactlyInAnyOrderElementsOf(archEntitiesSnakeCase);
+                .as("Production allowlist must match arch-test allowlist (Liquibase tables "
+                        + "excluded — those are not @Entity classes). When this fails, update "
+                        + "BOTH lists with the same entity in the same commit.")
+                .containsExactlyInAnyOrderElementsOf(archEntitiesSnakeCase);
     }
 
     @SuppressWarnings("unchecked")

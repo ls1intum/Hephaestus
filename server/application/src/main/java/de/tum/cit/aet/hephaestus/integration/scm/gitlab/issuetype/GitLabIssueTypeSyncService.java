@@ -47,12 +47,11 @@ public class GitLabIssueTypeSyncService {
     private final GitLabProperties gitLabProperties;
 
     public GitLabIssueTypeSyncService(
-        IssueTypeRepository issueTypeRepository,
-        OrganizationRepository organizationRepository,
-        GitLabGraphQlClientProvider graphQlClientProvider,
-        GitLabGraphQlResponseHandler responseHandler,
-        GitLabProperties gitLabProperties
-    ) {
+            IssueTypeRepository issueTypeRepository,
+            OrganizationRepository organizationRepository,
+            GitLabGraphQlClientProvider graphQlClientProvider,
+            GitLabGraphQlResponseHandler responseHandler,
+            GitLabProperties gitLabProperties) {
         this.issueTypeRepository = issueTypeRepository;
         this.organizationRepository = organizationRepository;
         this.graphQlClientProvider = graphQlClientProvider;
@@ -72,8 +71,8 @@ public class GitLabIssueTypeSyncService {
         String safeGroupPath = sanitizeForLog(groupPath);
 
         Organization org = organizationRepository
-            .findByLoginIgnoreCaseAndProvider_Type(groupPath, IdentityProviderType.GITLAB)
-            .orElse(null);
+                .findByLoginIgnoreCaseAndProvider_Type(groupPath, IdentityProviderType.GITLAB)
+                .orElse(null);
         if (org == null) {
             log.debug("Organization not found, skipping issue type sync: groupPath={}", safeGroupPath);
             return 0;
@@ -84,11 +83,10 @@ public class GitLabIssueTypeSyncService {
             graphQlClientProvider.waitIfRateLimitLow(scopeId);
 
             HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
-            ClientGraphQlResponse response = client
-                .documentName(GET_WORK_ITEM_TYPES_DOCUMENT)
-                .variable("fullPath", groupPath)
-                .execute()
-                .block(gitLabProperties.graphqlTimeout());
+            ClientGraphQlResponse response = client.documentName(GET_WORK_ITEM_TYPES_DOCUMENT)
+                    .variable("fullPath", groupPath)
+                    .execute()
+                    .block(gitLabProperties.graphqlTimeout());
 
             var handleResult = responseHandler.handle(response, "issue types for " + safeGroupPath, log);
             if (handleResult.action() != GitLabGraphQlResponseHandler.HandleResult.Action.CONTINUE) {
@@ -99,8 +97,8 @@ public class GitLabIssueTypeSyncService {
 
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> nodes = (List<Map<String, Object>>) (List<?>) Objects.requireNonNull(response)
-                .field("group.workItemTypes.nodes")
-                .toEntityList(Map.class);
+                    .field("group.workItemTypes.nodes")
+                    .toEntityList(Map.class);
 
             if (nodes == null || nodes.isEmpty()) {
                 log.debug("No work item types found: groupPath={}", safeGroupPath);

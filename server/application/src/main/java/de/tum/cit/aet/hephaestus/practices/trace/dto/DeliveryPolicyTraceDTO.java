@@ -15,38 +15,34 @@ import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.ObjectMapper;
 
 public record DeliveryPolicyTraceDTO(
-    @NonNull UUID reviewId,
-    @NonNull Long admittedRevision,
-    @Nullable Long evaluatedRevision,
-    @NonNull String resolverVersion,
-    @NonNull DeliveryPolicySurface surface,
-    @NonNull DeliveryPolicyStage stage,
-    @NonNull Boolean allowed,
-    @Nullable FeedbackSuppressionReason decisiveReason,
-    @NonNull List<DeliveryPolicyTraceCheckDTO> checks,
-    @NonNull DeliveryPolicyFactsSnapshot facts,
-    @NonNull Instant evaluatedAt
-) {
+        @NonNull UUID reviewId,
+        @NonNull Long admittedRevision,
+        @Nullable Long evaluatedRevision,
+        @NonNull String resolverVersion,
+        @NonNull DeliveryPolicySurface surface,
+        @NonNull DeliveryPolicyStage stage,
+        @NonNull Boolean allowed,
+        @Nullable FeedbackSuppressionReason decisiveReason,
+        @NonNull List<DeliveryPolicyTraceCheckDTO> checks,
+        @NonNull DeliveryPolicyFactsSnapshot facts,
+        @NonNull Instant evaluatedAt) {
     public static DeliveryPolicyTraceDTO from(DeliveryPolicyEvaluation evaluation, ObjectMapper objectMapper) {
         return new DeliveryPolicyTraceDTO(
-            evaluation.getAgentJobId(),
-            evaluation.getAdmittedRevision(),
-            evaluation.getEvaluatedRevision(),
-            evaluation.getResolverVersion(),
-            evaluation.getSurface(),
-            evaluation.getStage(),
-            evaluation.getAllowed(),
-            evaluation.getDecisiveReason(),
-            java.util.stream.StreamSupport.stream(evaluation.getChecks().spliterator(), false)
-                .map(check ->
-                    new DeliveryPolicyTraceCheckDTO(
-                        DeliveryPolicyCheck.valueOf(check.path("check").asString()),
-                        DeliveryPolicyCheckStatus.valueOf(check.path("status").asString())
-                    )
-                )
-                .toList(),
-            objectMapper.treeToValue(evaluation.getFacts(), DeliveryPolicyFactsSnapshot.class),
-            evaluation.getEvaluatedAt()
-        );
+                evaluation.getAgentJobId(),
+                evaluation.getAdmittedRevision(),
+                evaluation.getEvaluatedRevision(),
+                evaluation.getResolverVersion(),
+                evaluation.getSurface(),
+                evaluation.getStage(),
+                evaluation.getAllowed(),
+                evaluation.getDecisiveReason(),
+                java.util.stream.StreamSupport.stream(evaluation.getChecks().spliterator(), false)
+                        .map(check -> new DeliveryPolicyTraceCheckDTO(
+                                DeliveryPolicyCheck.valueOf(check.path("check").asString()),
+                                DeliveryPolicyCheckStatus.valueOf(
+                                        check.path("status").asString())))
+                        .toList(),
+                objectMapper.treeToValue(evaluation.getFacts(), DeliveryPolicyFactsSnapshot.class),
+                evaluation.getEvaluatedAt());
     }
 }

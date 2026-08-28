@@ -59,26 +59,12 @@ class LlmUsageFxDisplayIntegrationTest extends AbstractWorkspaceIntegrationTest 
     @BeforeEach
     void setUpServices() {
         LlmProperties properties = new LlmProperties(
-            "EUR",
-            new LlmProperties.Egress(false),
-            new LlmProperties.Fx(LlmProperties.ECB_DAILY_URL)
-        );
+                "EUR", new LlmProperties.Egress(false), new LlmProperties.Fx(LlmProperties.ECB_DAILY_URL));
         FxRateLookup rates = new FxRateLookup(fxRateRepository, clock, properties);
         usageService = new LlmUsageService(
-            usageRepository,
-            workspaceRepository,
-            budgetService,
-            configAudit,
-            jobRepository,
-            rates
-        );
-        adminService = new LlmUsageAdminService(
-            usageRepository,
-            workspaceRepository,
-            configAudit,
-            jobRepository,
-            rates
-        );
+                usageRepository, workspaceRepository, budgetService, configAudit, jobRepository, rates);
+        adminService =
+                new LlmUsageAdminService(usageRepository, workspaceRepository, configAudit, jobRepository, rates);
     }
 
     @Test
@@ -139,7 +125,8 @@ class LlmUsageFxDisplayIntegrationTest extends AbstractWorkspaceIntegrationTest 
         stale.setFetchedAt(Instant.now());
         fxRateRepository.save(stale);
 
-        assertThat(usageService.getWorkspaceReport(workspace.getId(), CURRENT).fx()).isNull();
+        assertThat(usageService.getWorkspaceReport(workspace.getId(), CURRENT).fx())
+                .isNull();
     }
 
     private Workspace workspace(String slug) {
@@ -160,7 +147,8 @@ class LlmUsageFxDisplayIntegrationTest extends AbstractWorkspaceIntegrationTest 
         event.setCostUsd(new BigDecimal(cost));
         event.setPricingState(PricingState.PRICED);
         event.setFundingSource(FundingSource.INSTANCE);
-        event.setOccurredAt(CURRENT.atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant().plusSeconds(3600));
+        event.setOccurredAt(
+                CURRENT.atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant().plusSeconds(3600));
         usageRepository.save(event);
     }
 

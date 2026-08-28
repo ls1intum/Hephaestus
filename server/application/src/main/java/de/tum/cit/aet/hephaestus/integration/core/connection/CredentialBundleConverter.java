@@ -74,9 +74,7 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
      */
     @Autowired
     public CredentialBundleConverter(
-        SecurityProperties securityProperties,
-        @Value("${spring.profiles.active:}") String activeProfiles
-    ) {
+            SecurityProperties securityProperties, @Value("${spring.profiles.active:}") String activeProfiles) {
         this(securityProperties.encryptionKey(), activeProfiles);
     }
 
@@ -89,19 +87,15 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
         if (encryptionKey == null || encryptionKey.isBlank()) {
             if (activeProfiles != null && activeProfiles.contains("prod")) {
                 throw new IllegalStateException(
-                    "Encryption key is required in production! Set hephaestus.security.encryption-key"
-                );
+                        "Encryption key is required in production! Set hephaestus.security.encryption-key");
             }
-            log.warn(
-                "Skipped credential encryption configuration: reason=missing_key, " +
-                    "action=set_hephaestus_security_encryption_key_in_production"
-            );
+            log.warn("Skipped credential encryption configuration: reason=missing_key, "
+                    + "action=set_hephaestus_security_encryption_key_in_production");
             this.secretKey = null;
             this.enabled = false;
         } else if (encryptionKey.length() != 32) {
             throw new IllegalArgumentException(
-                "Encryption key must be exactly 32 characters (256 bits). Got: " + encryptionKey.length()
-            );
+                    "Encryption key must be exactly 32 characters (256 bits). Got: " + encryptionKey.length());
         } else {
             this.secretKey = new SecretKeySpec(encryptionKey.getBytes(StandardCharsets.UTF_8), "AES");
             this.enabled = true;
@@ -134,12 +128,11 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
      * silent fall-back to context-less encryption is caught at unit-test time.
      */
     @Override
-    public byte@Nullable [] convertToDatabaseColumn(@Nullable CredentialBundle attribute) {
+    public byte @Nullable [] convertToDatabaseColumn(@Nullable CredentialBundle attribute) {
         if (attribute == null) return null;
         throw new EncryptionException(
-            "CredentialBundleConverter.convertToDatabaseColumn requires per-row EncryptionContext — " +
-                "use encrypt(bundle, ctx)"
-        );
+                "CredentialBundleConverter.convertToDatabaseColumn requires per-row EncryptionContext — "
+                        + "use encrypt(bundle, ctx)");
     }
 
     /**
@@ -150,14 +143,13 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
      */
     @Override
     @Nullable
-    public CredentialBundle convertToEntityAttribute(byte@Nullable [] dbData) {
+    public CredentialBundle convertToEntityAttribute(byte @Nullable [] dbData) {
         if (dbData == null) return null;
         requireEnabled("decrypt");
         byte version = versionByte(dbData);
         if (version == FORMAT_VERSION_V2) {
             throw new EncryptionException(
-                "v2 blob requires per-row EncryptionContext — use decrypt(byte[], EncryptionContext)"
-            );
+                    "v2 blob requires per-row EncryptionContext — use decrypt(byte[], EncryptionContext)");
         }
         throw unsupportedVersion(version);
     }
@@ -191,10 +183,7 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
             byte[] iv = new byte[GCM_IV_LENGTH];
             IV_GENERATOR.nextBytes(iv);
             cipher.init(
-                Cipher.ENCRYPT_MODE,
-                Objects.requireNonNull(secretKey),
-                new GCMParameterSpec(GCM_TAG_LENGTH, iv)
-            );
+                    Cipher.ENCRYPT_MODE, Objects.requireNonNull(secretKey), new GCMParameterSpec(GCM_TAG_LENGTH, iv));
             cipher.updateAAD(aad);
             byte[] cipherText = cipher.doFinal(plaintext);
 
@@ -210,13 +199,10 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
 
     private byte[] decryptInternal(byte[] dbData, int headerLen, byte[] aad) {
         if (dbData.length < headerLen + GCM_IV_LENGTH + 1) {
-            throw new EncryptionException(
-                "Credential ciphertext too short: " +
-                    dbData.length +
-                    " bytes (need > " +
-                    (headerLen + GCM_IV_LENGTH) +
-                    ")"
-            );
+            throw new EncryptionException("Credential ciphertext too short: " + dbData.length
+                    + " bytes (need > "
+                    + (headerLen + GCM_IV_LENGTH)
+                    + ")");
         }
         try {
             byte[] iv = new byte[GCM_IV_LENGTH];
@@ -226,10 +212,7 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
 
             Cipher cipher = Cipher.getInstance(ALGORITHM);
             cipher.init(
-                Cipher.DECRYPT_MODE,
-                Objects.requireNonNull(secretKey),
-                new GCMParameterSpec(GCM_TAG_LENGTH, iv)
-            );
+                    Cipher.DECRYPT_MODE, Objects.requireNonNull(secretKey), new GCMParameterSpec(GCM_TAG_LENGTH, iv));
             cipher.updateAAD(aad);
             return cipher.doFinal(cipherText);
         } catch (Exception e) {
@@ -251,8 +234,7 @@ public class CredentialBundleConverter implements AttributeConverter<CredentialB
     private void requireEnabled(String op) {
         if (!enabled) {
             throw new EncryptionException(
-                "CredentialBundleConverter is not enabled; cannot " + op + " credentials without a configured key"
-            );
+                    "CredentialBundleConverter is not enabled; cannot " + op + " credentials without a configured key");
         }
     }
 

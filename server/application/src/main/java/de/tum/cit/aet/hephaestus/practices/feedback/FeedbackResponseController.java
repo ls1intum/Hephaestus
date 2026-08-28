@@ -34,26 +34,22 @@ public class FeedbackResponseController {
 
     @PutMapping("/{feedbackId}/response")
     @Operation(
-        operationId = "replaceFeedbackResponse",
-        summary = "Replace the response to delivered feedback",
-        description = "Sets the complete current response. Repeating the same request has no effect."
-    )
+            operationId = "replaceFeedbackResponse",
+            summary = "Replace the response to delivered feedback",
+            description = "Sets the complete current response. Repeating the same request has no effect.")
     @ApiResponse(responseCode = "200", description = "Response replaced")
     @ApiResponse(
-        responseCode = "400",
-        description = "Invalid response",
-        content = @Content(schema = @Schema(hidden = true))
-    )
+            responseCode = "400",
+            description = "Invalid response",
+            content = @Content(schema = @Schema(hidden = true)))
     @ApiResponse(
-        responseCode = "404",
-        description = "Delivered feedback not found for the current recipient",
-        content = @Content(schema = @Schema(hidden = true))
-    )
+            responseCode = "404",
+            description = "Delivered feedback not found for the current recipient",
+            content = @Content(schema = @Schema(hidden = true)))
     public ResponseEntity<FeedbackResponseDTO> replace(
-        WorkspaceContext workspaceContext,
-        @PathVariable UUID feedbackId,
-        @Valid @RequestBody FeedbackResponseRequestDTO request
-    ) {
+            WorkspaceContext workspaceContext,
+            @PathVariable UUID feedbackId,
+            @Valid @RequestBody FeedbackResponseRequestDTO request) {
         return ResponseEntity.ok(responseService.replaceResponse(workspaceContext, feedbackId, request));
     }
 
@@ -61,37 +57,31 @@ public class FeedbackResponseController {
     @Operation(operationId = "getFeedbackResponse", summary = "Get the current feedback response")
     @ApiResponse(responseCode = "200", description = "Current response returned")
     @ApiResponse(
-        responseCode = "204",
-        description = "No response is currently recorded",
-        content = @Content(schema = @Schema(hidden = true))
-    )
+            responseCode = "204",
+            description = "No response is currently recorded",
+            content = @Content(schema = @Schema(hidden = true)))
     @ApiResponse(
-        responseCode = "404",
-        description = "Delivered feedback not found for the current recipient",
-        content = @Content(schema = @Schema(hidden = true))
-    )
+            responseCode = "404",
+            description = "Delivered feedback not found for the current recipient",
+            content = @Content(schema = @Schema(hidden = true)))
     public ResponseEntity<FeedbackResponseDTO> current(
-        WorkspaceContext workspaceContext,
-        @PathVariable UUID feedbackId
-    ) {
+            WorkspaceContext workspaceContext, @PathVariable UUID feedbackId) {
         return responseService
-            .getResponse(workspaceContext, feedbackId)
-            .map(ResponseEntity::ok)
-            .orElseGet(() -> ResponseEntity.noContent().build());
+                .getResponse(workspaceContext, feedbackId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
     @DeleteMapping("/{feedbackId}/response")
     @Operation(operationId = "deleteFeedbackResponse", summary = "Delete the response to delivered feedback")
     @ApiResponse(
-        responseCode = "204",
-        description = "Response deleted or no response was recorded",
-        content = @Content(schema = @Schema(hidden = true))
-    )
+            responseCode = "204",
+            description = "Response deleted or no response was recorded",
+            content = @Content(schema = @Schema(hidden = true)))
     @ApiResponse(
-        responseCode = "404",
-        description = "Delivered feedback not found for the current recipient",
-        content = @Content(schema = @Schema(hidden = true))
-    )
+            responseCode = "404",
+            description = "Delivered feedback not found for the current recipient",
+            content = @Content(schema = @Schema(hidden = true)))
     public ResponseEntity<Void> delete(WorkspaceContext workspaceContext, @PathVariable UUID feedbackId) {
         responseService.deleteResponse(workspaceContext, feedbackId);
         return ResponseEntity.noContent().build();

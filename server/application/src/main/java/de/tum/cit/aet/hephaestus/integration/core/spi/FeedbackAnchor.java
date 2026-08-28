@@ -9,11 +9,7 @@ import org.jspecify.annotations.Nullable;
 public sealed interface FeedbackAnchor permits FeedbackAnchor.DiffAnchor {
     /** SCM diff coordinates. {@code side} disambiguates multi-line inline shapes (Bitbucket). */
     record DiffAnchor(
-        String filePath,
-        int newLineNumber,
-        @Nullable Integer startLine,
-        DiffSide side
-    ) implements FeedbackAnchor {
+            String filePath, int newLineNumber, @Nullable Integer startLine, DiffSide side) implements FeedbackAnchor {
         public DiffAnchor(String filePath, int newLineNumber, @Nullable Integer startLine) {
             this(filePath, newLineNumber, startLine, DiffSide.RIGHT);
         }

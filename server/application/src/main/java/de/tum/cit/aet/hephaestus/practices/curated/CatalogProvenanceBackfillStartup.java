@@ -33,7 +33,9 @@ class CatalogProvenanceBackfillStartup implements ApplicationRunner, HealthIndic
     @Override
     public Health health() {
         return failed
-            ? Health.outOfService().withDetail("reason", "CATALOG_PROVENANCE_REPAIR_FAILED").build()
-            : Health.up().build();
+                ? Health.outOfService()
+                        .withDetail("reason", "CATALOG_PROVENANCE_REPAIR_FAILED")
+                        .build()
+                : Health.up().build();
     }
 }

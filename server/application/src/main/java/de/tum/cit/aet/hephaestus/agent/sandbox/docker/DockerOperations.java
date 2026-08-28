@@ -17,34 +17,32 @@ public final class DockerOperations {
 
     /** Specification for creating a container. */
     public record ContainerSpec(
-        String image,
-        List<String> command,
-        Map<String, String> environment,
-        @Nullable String networkId,
-        @Nullable String hostname,
-        @Nullable String user,
-        Map<String, String> labels,
-        HostConfigSpec hostConfig,
-        List<String> extraHosts
-    ) {}
+            String image,
+            List<String> command,
+            Map<String, String> environment,
+            @Nullable String networkId,
+            @Nullable String hostname,
+            @Nullable String user,
+            Map<String, String> labels,
+            HostConfigSpec hostConfig,
+            List<String> extraHosts) {}
 
     /** Host configuration for container resource limits and security. */
     public record HostConfigSpec(
-        long memoryBytes,
-        long memorySwapBytes,
-        long nanoCpus,
-        int pidsLimit,
-        boolean readonlyRootfs,
-        boolean privileged,
-        List<String> capDrop,
-        List<String> securityOpts,
-        Map<String, String> tmpfsMounts,
-        List<String> dns,
-        @Nullable String cgroupnsMode,
-        @Nullable String ipcMode,
-        @Nullable String runtime,
-        Map<String, UlimitSpec> ulimits
-    ) {}
+            long memoryBytes,
+            long memorySwapBytes,
+            long nanoCpus,
+            int pidsLimit,
+            boolean readonlyRootfs,
+            boolean privileged,
+            List<String> capDrop,
+            List<String> securityOpts,
+            Map<String, String> tmpfsMounts,
+            List<String> dns,
+            @Nullable String cgroupnsMode,
+            @Nullable String ipcMode,
+            @Nullable String runtime,
+            Map<String, UlimitSpec> ulimits) {}
 
     public record UlimitSpec(long soft, long hard) {}
 
@@ -52,12 +50,11 @@ public final class DockerOperations {
 
     /** {@code createdAt} is null when the daemon reported none — an unknown age counts as young. */
     public record ContainerInfo(
-        String id,
-        String name,
-        Map<String, String> labels,
-        String state,
-        @Nullable Instant createdAt
-    ) {}
+            String id,
+            String name,
+            Map<String, String> labels,
+            String state,
+            @Nullable Instant createdAt) {}
 
     public record NetworkInfo(String id, String name) {}
 }

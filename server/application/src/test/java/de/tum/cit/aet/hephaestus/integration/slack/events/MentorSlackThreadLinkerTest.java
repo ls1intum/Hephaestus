@@ -47,9 +47,8 @@ class MentorSlackThreadLinkerTest extends BaseUnitTest {
         UUID existing = UUID.randomUUID();
         MentorSlackThread mapping = new MentorSlackThread();
         mapping.setChatThreadId(existing);
-        when(
-            mentorSlackThreadRepository.findByWorkspaceIdAndSlackChannelIdAndSlackThreadTs(WORKSPACE, CHANNEL, THREAD)
-        ).thenReturn(Optional.of(mapping));
+        when(mentorSlackThreadRepository.findByWorkspaceIdAndSlackChannelIdAndSlackThreadTs(WORKSPACE, CHANNEL, THREAD))
+                .thenReturn(Optional.of(mapping));
 
         UUID result = linker.findOrCreateThread(WORKSPACE, TEAM, CHANNEL, THREAD, USER, "alice");
 
@@ -61,10 +60,10 @@ class MentorSlackThreadLinkerTest extends BaseUnitTest {
     @Test
     void missingMapping_provisionsThreadAndPersistsMapping() {
         UUID created = UUID.randomUUID();
-        when(
-            mentorSlackThreadRepository.findByWorkspaceIdAndSlackChannelIdAndSlackThreadTs(WORKSPACE, CHANNEL, THREAD)
-        ).thenReturn(Optional.empty());
-        when(mentorSlackThreadService.ensureSlackThread(eq(WORKSPACE), isNull(), eq("alice"))).thenReturn(created);
+        when(mentorSlackThreadRepository.findByWorkspaceIdAndSlackChannelIdAndSlackThreadTs(WORKSPACE, CHANNEL, THREAD))
+                .thenReturn(Optional.empty());
+        when(mentorSlackThreadService.ensureSlackThread(eq(WORKSPACE), isNull(), eq("alice")))
+                .thenReturn(created);
 
         UUID result = linker.findOrCreateThread(WORKSPACE, TEAM, CHANNEL, THREAD, USER, "alice");
 

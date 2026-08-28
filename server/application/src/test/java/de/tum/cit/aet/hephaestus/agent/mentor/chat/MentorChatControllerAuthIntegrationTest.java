@@ -51,11 +51,16 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
     /** Minimal valid mentor turn request body. */
     private static Map<String, Object> validBody() {
         return Map.of(
-            "id",
-            UUID.randomUUID(),
-            "message",
-            Map.of("id", UUID.randomUUID(), "role", "user", "parts", List.of(Map.of("type", "text", "text", "hi")))
-        );
+                "id",
+                UUID.randomUUID(),
+                "message",
+                Map.of(
+                        "id",
+                        UUID.randomUUID(),
+                        "role",
+                        "user",
+                        "parts",
+                        List.of(Map.of("type", "text", "text", "hi"))));
     }
 
     @Test
@@ -66,13 +71,13 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
         // before it reaches the controller (the request is unauthenticated at that point, so the
         // AccessDenied resolves to 403). Detailed 403-vs-401 semantics live in CsrfProtectionIntegrationTest.
         webTestClient
-            .post()
-            .uri("/workspaces/{workspaceSlug}/mentor/chat", "any-slug")
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(validBody())
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .post()
+                .uri("/workspaces/{workspaceSlug}/mentor/chat", "any-slug")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(validBody())
+                .exchange()
+                .expectStatus()
+                .isForbidden();
     }
 
     @Test
@@ -84,14 +89,14 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
         enableMentor(workspace);
 
         webTestClient
-            .post()
-            .uri("/workspaces/{workspaceSlug}/mentor/chat", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(validBody())
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .post()
+                .uri("/workspaces/{workspaceSlug}/mentor/chat", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(validBody())
+                .exchange()
+                .expectStatus()
+                .isForbidden();
     }
 
     @Test
@@ -104,21 +109,21 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
         ensureWorkspaceMembership(workspace, mentor, WorkspaceMembership.WorkspaceRole.MEMBER);
 
         webTestClient
-            .post()
-            .uri("/workspaces/{workspaceSlug}/mentor/chat", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .accept(MediaType.TEXT_EVENT_STREAM)
-            .bodyValue(validBody())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectHeader()
-            .contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM)
-            .expectHeader()
-            .valueEquals("x-vercel-ai-ui-message-stream", "v1")
-            .expectHeader()
-            .valueEquals("Cache-Control", "no-cache");
+                .post()
+                .uri("/workspaces/{workspaceSlug}/mentor/chat", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.TEXT_EVENT_STREAM)
+                .bodyValue(validBody())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectHeader()
+                .contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM)
+                .expectHeader()
+                .valueEquals("x-vercel-ai-ui-message-stream", "v1")
+                .expectHeader()
+                .valueEquals("Cache-Control", "no-cache");
 
         assertThat(mentorChatStarter.awaitInvocation()).isTrue();
     }
@@ -128,25 +133,20 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
     void authenticatedMember_mentorDisabled_returnsNotFound() {
         User mentor = persistUser("mentor");
         User owner = persistUser("workspace-owner-for-mentor-disabled");
-        Workspace workspace = createWorkspace(
-            "mentor-disabled-space",
-            "Disabled",
-            "mentor-disabled",
-            AccountType.ORG,
-            owner
-        );
+        Workspace workspace =
+                createWorkspace("mentor-disabled-space", "Disabled", "mentor-disabled", AccountType.ORG, owner);
         // Deliberately NOT enabling mentor — the gate is what we're asserting.
         ensureWorkspaceMembership(workspace, mentor, WorkspaceMembership.WorkspaceRole.MEMBER);
 
         webTestClient
-            .post()
-            .uri("/workspaces/{workspaceSlug}/mentor/chat", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .accept(MediaType.TEXT_EVENT_STREAM)
-            .bodyValue(validBody())
-            .exchange()
-            .expectStatus()
-            .isNotFound();
+                .post()
+                .uri("/workspaces/{workspaceSlug}/mentor/chat", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.TEXT_EVENT_STREAM)
+                .bodyValue(validBody())
+                .exchange()
+                .expectStatus()
+                .isNotFound();
     }
 }

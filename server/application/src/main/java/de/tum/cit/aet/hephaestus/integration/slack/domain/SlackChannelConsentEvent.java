@@ -72,13 +72,12 @@ public class SlackChannelConsentEvent {
     private @Nullable Instant createdAt;
 
     public SlackChannelConsentEvent(
-        Long workspaceId,
-        String slackChannelId,
-        @Nullable ConsentState fromState,
-        ConsentState toState,
-        @Nullable Long actorUserId,
-        @Nullable String reason
-    ) {
+            Long workspaceId,
+            String slackChannelId,
+            @Nullable ConsentState fromState,
+            ConsentState toState,
+            @Nullable Long actorUserId,
+            @Nullable String reason) {
         this.workspaceId = workspaceId;
         this.slackChannelId = slackChannelId;
         this.fromState = fromState;

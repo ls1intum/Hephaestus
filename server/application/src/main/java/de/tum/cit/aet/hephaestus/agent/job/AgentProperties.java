@@ -27,14 +27,19 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.agent")
 public record AgentProperties(
-    @DefaultValue("false") boolean enabled,
-    @DurationUnit(ChronoUnit.SECONDS) @DefaultValue("1s") @NotNull Duration pollInterval,
-    @DefaultValue("5") @Min(1) int claimBatchSize,
-    @DefaultValue("5") @PositiveOrZero int maxRetries,
-    @DurationUnit(ChronoUnit.SECONDS) @DefaultValue("25s") @NotNull Duration heartbeatInterval,
-    @DefaultValue("P14D") @NotNull Duration payloadRetention,
-    @DefaultValue("P90D") @NotNull Duration rowRetention
-) {
+        @DefaultValue("false") boolean enabled,
+
+        @DurationUnit(ChronoUnit.SECONDS) @DefaultValue("1s") @NotNull
+        Duration pollInterval,
+
+        @DefaultValue("5") @Min(1) int claimBatchSize,
+        @DefaultValue("5") @PositiveOrZero int maxRetries,
+
+        @DurationUnit(ChronoUnit.SECONDS) @DefaultValue("25s") @NotNull
+        Duration heartbeatInterval,
+
+        @DefaultValue("P14D") @NotNull Duration payloadRetention,
+        @DefaultValue("P90D") @NotNull Duration rowRetention) {
     /** Floor for {@link #pollInterval}: below this the poll loop busy-spins against the DB. */
     public static final Duration MIN_POLL_INTERVAL = Duration.ofMillis(100);
 
@@ -51,43 +56,33 @@ public record AgentProperties(
     public AgentProperties {
         if (pollInterval == null || pollInterval.compareTo(MIN_POLL_INTERVAL) < 0) {
             throw new IllegalArgumentException(
-                "hephaestus.agent.poll-interval (AGENT_POLL_INTERVAL) must be >= " +
-                    MIN_POLL_INTERVAL +
-                    ", got: " +
-                    pollInterval
-            );
+                    "hephaestus.agent.poll-interval (AGENT_POLL_INTERVAL) must be >= " + MIN_POLL_INTERVAL
+                            + ", got: "
+                            + pollInterval);
         }
         if (heartbeatInterval == null || heartbeatInterval.compareTo(MIN_HEARTBEAT_INTERVAL) < 0) {
             throw new IllegalArgumentException(
-                "hephaestus.agent.heartbeat-interval must be >= " +
-                    MIN_HEARTBEAT_INTERVAL +
-                    ", got: " +
-                    heartbeatInterval
-            );
+                    "hephaestus.agent.heartbeat-interval must be >= " + MIN_HEARTBEAT_INTERVAL
+                            + ", got: "
+                            + heartbeatInterval);
         }
         if (heartbeatInterval.compareTo(MAX_HEARTBEAT_INTERVAL) > 0) {
             throw new IllegalArgumentException(
-                "hephaestus.agent.heartbeat-interval must be <= " +
-                    MAX_HEARTBEAT_INTERVAL +
-                    " (half the " +
-                    WORKER_LEASE_TTL +
-                    " worker lease), or every worker is orphaned while its jobs are still running; got: " +
-                    heartbeatInterval
-            );
+                    "hephaestus.agent.heartbeat-interval must be <= " + MAX_HEARTBEAT_INTERVAL
+                            + " (half the "
+                            + WORKER_LEASE_TTL
+                            + " worker lease), or every worker is orphaned while its jobs are still running; got: "
+                            + heartbeatInterval);
         }
         if (payloadRetention == null || payloadRetention.isNegative() || payloadRetention.isZero()) {
             throw new IllegalArgumentException(
-                "hephaestus.agent.payload-retention must be positive, got: " + payloadRetention
-            );
+                    "hephaestus.agent.payload-retention must be positive, got: " + payloadRetention);
         }
         if (rowRetention == null || rowRetention.compareTo(payloadRetention) < 0) {
-            throw new IllegalArgumentException(
-                "hephaestus.agent.row-retention (" +
-                    rowRetention +
-                    ") must be >= payload-retention (" +
-                    payloadRetention +
-                    ") — a row cannot be deleted before its payload would already have been stripped"
-            );
+            throw new IllegalArgumentException("hephaestus.agent.row-retention (" + rowRetention
+                    + ") must be >= payload-retention ("
+                    + payloadRetention
+                    + ") — a row cannot be deleted before its payload would already have been stripped");
         }
     }
 }

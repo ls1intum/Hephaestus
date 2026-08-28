@@ -57,12 +57,11 @@ public class AgentJobEventListener {
     private final SignalRecorder signalRecorder;
 
     public AgentJobEventListener(
-        AgentJobService agentJobService,
-        PullRequestRepository pullRequestRepository,
-        PracticeReviewDetectionGate practiceReviewDetectionGate,
-        WorkspaceResolver workspaceResolver,
-        SignalRecorder signalRecorder
-    ) {
+            AgentJobService agentJobService,
+            PullRequestRepository pullRequestRepository,
+            PracticeReviewDetectionGate practiceReviewDetectionGate,
+            WorkspaceResolver workspaceResolver,
+            SignalRecorder signalRecorder) {
         this.agentJobService = agentJobService;
         this.pullRequestRepository = pullRequestRepository;
         this.practiceReviewDetectionGate = practiceReviewDetectionGate;
@@ -125,10 +124,7 @@ public class AgentJobEventListener {
     // PR event handling
 
     private void handlePullRequestEvent(
-        ScmEventPayload.PullRequestData prData,
-        EventContext context,
-        String triggerEventName
-    ) {
+            ScmEventPayload.PullRequestData prData, EventContext context, String triggerEventName) {
         if (isClosedOrMerged(prData.state(), prData.isMerged())) {
             return;
         }
@@ -143,11 +139,10 @@ public class AgentJobEventListener {
      * job, so a webhook redelivered after the review completed no longer re-runs it.
      */
     private void dispatch(
-        ScmEventPayload.PullRequestData prData,
-        EventContext context,
-        String triggerEventName,
-        ScmEventPayload.@Nullable ReviewData reviewData
-    ) {
+            ScmEventPayload.PullRequestData prData,
+            EventContext context,
+            String triggerEventName,
+            ScmEventPayload.@Nullable ReviewData reviewData) {
         try {
             SignalKey key = signalKeyFor(prData, triggerEventName, reviewData);
             if (key == null) {
@@ -157,11 +152,10 @@ public class AgentJobEventListener {
             DiscoveredVia discoveredVia = context.isSync() ? DiscoveredVia.SYNC : DiscoveredVia.EVENT;
             if (!signalRecorder.record(key, context.occurredAt(), discoveredVia)) {
                 log.debug(
-                    "Signal already settled, not reviewing again: prNumber={}, repoName={}, signal={}",
-                    prData.number(),
-                    repositoryNameOf(prData),
-                    key.signalName()
-                );
+                        "Signal already settled, not reviewing again: prNumber={}, repoName={}, signal={}",
+                        prData.number(),
+                        repositoryNameOf(prData),
+                        key.signalName());
                 return;
             }
 
@@ -171,7 +165,8 @@ public class AgentJobEventListener {
                 return;
             }
 
-            PullRequest pr = pullRequestRepository.findByIdWithAllForGate(prData.id()).orElse(null);
+            PullRequest pr =
+                    pullRequestRepository.findByIdWithAllForGate(prData.id()).orElse(null);
             if (pr == null) {
                 log.warn("Cannot submit agent job: PR not found, prId={}", prData.id());
                 signalRecorder.markRefused(key, SignalStateReason.ARTIFACT_GONE);
@@ -186,36 +181,29 @@ public class AgentJobEventListener {
                 return;
             }
 
-            GateDecision decision =
-                reviewData == null
+            GateDecision decision = reviewData == null
                     ? practiceReviewDetectionGate.evaluate(pr, key.signalName(), TriggerMode.AUTO)
                     : practiceReviewDetectionGate.evaluate(
-                          pr,
-                          key.signalName(),
-                          TriggerMode.AUTO,
-                          new ReviewSubject(reviewData.authorId(), true)
-                      );
+                            pr, key.signalName(), TriggerMode.AUTO, new ReviewSubject(reviewData.authorId(), true));
             switch (decision) {
                 case GateDecision.Skip skip -> {
                     log.debug(
-                        "Agent job skipped by practice gate: prNumber={}, repoName={}, event={}, reason={}",
-                        prData.number(),
-                        repositoryNameOf(prData),
-                        triggerEventName,
-                        skip.reason()
-                    );
+                            "Agent job skipped by practice gate: prNumber={}, repoName={}, event={}, reason={}",
+                            prData.number(),
+                            repositoryNameOf(prData),
+                            triggerEventName,
+                            skip.reason());
                     signalRecorder.markRefused(key, skip.resolvedSignalReason());
                 }
                 case GateDecision.Detect detect -> submitJob(prData, pr, detect, key, reviewData);
             }
         } catch (Exception e) {
             log.error(
-                "Failed to process PR event: prNumber={}, repoName={}, event={}",
-                prData.number(),
-                repositoryNameOf(prData),
-                triggerEventName,
-                e
-            );
+                    "Failed to process PR event: prNumber={}, repoName={}, event={}",
+                    prData.number(),
+                    repositoryNameOf(prData),
+                    triggerEventName,
+                    e);
         }
     }
 
@@ -224,13 +212,14 @@ public class AgentJobEventListener {
     private void handleReviewEvent(ScmEventPayload.ReviewData reviewData, EventContext context) {
         try {
             // ReviewSubmitted carries ReviewData, not PullRequestData, so the PR is loaded here.
-            PullRequest pr = pullRequestRepository.findByIdWithAllForGate(reviewData.pullRequestId()).orElse(null);
+            PullRequest pr = pullRequestRepository
+                    .findByIdWithAllForGate(reviewData.pullRequestId())
+                    .orElse(null);
             if (pr == null) {
                 log.warn(
-                    "Cannot submit agent job for review: PR not found, reviewId={}, pullRequestId={}",
-                    reviewData.id(),
-                    reviewData.pullRequestId()
-                );
+                        "Cannot submit agent job for review: PR not found, reviewId={}, pullRequestId={}",
+                        reviewData.id(),
+                        reviewData.pullRequestId());
                 return;
             }
 
@@ -246,11 +235,10 @@ public class AgentJobEventListener {
             dispatch(ScmEventPayload.PullRequestData.from(pr), context, TriggerEventNames.REVIEW_SUBMITTED, reviewData);
         } catch (Exception e) {
             log.error(
-                "Failed to process review event: reviewId={}, pullRequestId={}",
-                reviewData.id(),
-                reviewData.pullRequestId(),
-                e
-            );
+                    "Failed to process review event: reviewId={}, pullRequestId={}",
+                    reviewData.id(),
+                    reviewData.pullRequestId(),
+                    e);
         }
     }
 
@@ -263,14 +251,14 @@ public class AgentJobEventListener {
      * a reconciliation pass records without ever needing the rest of it.
      */
     private @Nullable SignalKey signalKeyFor(
-        ScmEventPayload.PullRequestData prData,
-        String triggerEventName,
-        ScmEventPayload.@Nullable ReviewData reviewData
-    ) {
+            ScmEventPayload.PullRequestData prData,
+            String triggerEventName,
+            ScmEventPayload.@Nullable ReviewData reviewData) {
         // The mirror can hold a pull request whose repository row is gone; that reads as "not ours"
         // rather than as an error, matching the gate.
         String repositoryName = repositoryNameOf(prData);
-        Workspace workspace = workspaceResolver.resolveForRepository(repositoryName).orElse(null);
+        Workspace workspace =
+                workspaceResolver.resolveForRepository(repositoryName).orElse(null);
         if (workspace == null) {
             log.debug("No workspace owns this repository, nothing to record: repoName={}", repositoryName);
             return null;
@@ -282,17 +270,17 @@ public class AgentJobEventListener {
         }
         if (signal.equals(ScmSignals.PULL_REQUEST_REVIEWED)) {
             return reviewData == null
-                ? null
-                : ScmSignals.pullRequestReviewKey(workspace.getId(), prData.id(), reviewData.id());
+                    ? null
+                    : ScmSignals.pullRequestReviewKey(workspace.getId(), prData.id(), reviewData.id());
         }
         return ScmSignals.pullRequestKey(
-            workspace.getId(),
-            prData.id(),
-            signal,
-            pullRequestRepository.findHeadRefOidById(prData.id()).orElse(null),
-            prData.title(),
-            prData.body()
-        ).orElse(null);
+                        workspace.getId(),
+                        prData.id(),
+                        signal,
+                        pullRequestRepository.findHeadRefOidById(prData.id()).orElse(null),
+                        prData.title(),
+                        prData.body())
+                .orElse(null);
     }
 
     private static @Nullable String repositoryNameOf(ScmEventPayload.PullRequestData prData) {
@@ -306,68 +294,55 @@ public class AgentJobEventListener {
     private boolean hasBranchInfo(PullRequest pr, Long prId) {
         if (pr.getHeadRefOid() == null || pr.getHeadRefName() == null || pr.getBaseRefName() == null) {
             log.warn(
-                "Cannot submit agent job: missing branch info, prId={}, headRefOid={}, headRefName={}, baseRefName={}",
-                prId,
-                pr.getHeadRefOid(),
-                pr.getHeadRefName(),
-                pr.getBaseRefName()
-            );
+                    "Cannot submit agent job: missing branch info, prId={}, headRefOid={}, headRefName={}, baseRefName={}",
+                    prId,
+                    pr.getHeadRefOid(),
+                    pr.getHeadRefName(),
+                    pr.getBaseRefName());
             return false;
         }
         return true;
     }
 
     private void submitJob(
-        ScmEventPayload.PullRequestData prData,
-        PullRequest pr,
-        GateDecision.Detect detect,
-        SignalKey signalKey,
-        ScmEventPayload.@Nullable ReviewData reviewData
-    ) {
+            ScmEventPayload.PullRequestData prData,
+            PullRequest pr,
+            GateDecision.Detect detect,
+            SignalKey signalKey,
+            ScmEventPayload.@Nullable ReviewData reviewData) {
         String headRefOid = pr.getHeadRefOid();
         if (headRefOid == null) {
             log.warn("Cannot submit agent job: missing head commit, prId={}", pr.getId());
             return;
         }
-        PullRequestReviewSubmissionRequest request =
-            reviewData == null
+        PullRequestReviewSubmissionRequest request = reviewData == null
                 ? new PullRequestReviewSubmissionRequest(
-                      prData,
-                      pr.getHeadRefName(),
-                      headRefOid,
-                      pr.getBaseRefName(),
-                      signalKey.signalName()
-                  )
+                        prData, pr.getHeadRefName(), headRefOid, pr.getBaseRefName(), signalKey.signalName())
                 : PullRequestReviewSubmissionRequest.forSubmittedReview(
-                      prData,
-                      pr.getHeadRefName(),
-                      headRefOid,
-                      pr.getBaseRefName(),
-                      signalKey.signalName(),
-                      reviewData
-                  );
+                        prData,
+                        pr.getHeadRefName(),
+                        headRefOid,
+                        pr.getBaseRefName(),
+                        signalKey.signalName(),
+                        reviewData);
 
         try {
             agentJobService
-                .submit(detect.workspace().getId(), AgentJobType.PULL_REQUEST_REVIEW, request, signalKey, detect)
-                .ifPresent(job ->
-                    log.info(
-                        "Agent job submitted: jobId={}, prNumber={}, repoName={}, signal={}, matchedPractices={}",
-                        job.getId(),
-                        prData.number(),
-                        repositoryNameOf(prData),
-                        signalKey.signalName(),
-                        detect.matchedPractices().size()
-                    )
-                );
+                    .submit(detect.workspace().getId(), AgentJobType.PULL_REQUEST_REVIEW, request, signalKey, detect)
+                    .ifPresent(job -> log.info(
+                            "Agent job submitted: jobId={}, prNumber={}, repoName={}, signal={}, matchedPractices={}",
+                            job.getId(),
+                            prData.number(),
+                            repositoryNameOf(prData),
+                            signalKey.signalName(),
+                            detect.matchedPractices().size()));
         } catch (Exception e) {
             log.error(
-                "Failed to submit agent job: prNumber={}, repoName={}, signal={}",
-                prData.number(),
-                repositoryNameOf(prData),
-                signalKey.signalName(),
-                e
-            );
+                    "Failed to submit agent job: prNumber={}, repoName={}, signal={}",
+                    prData.number(),
+                    repositoryNameOf(prData),
+                    signalKey.signalName(),
+                    e);
         }
     }
 }

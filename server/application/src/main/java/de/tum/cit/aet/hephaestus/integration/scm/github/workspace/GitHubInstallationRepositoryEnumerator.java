@@ -29,10 +29,8 @@ public class GitHubInstallationRepositoryEnumerator implements InstallationRepos
 
     @Override
     public List<InstallationRepository> enumerate(long installationId) {
-        return delegate
-            .enumerate(installationId)
-            .stream()
-            .map(s -> new InstallationRepository(s.id(), s.nameWithOwner(), s.name(), s.isPrivate()))
-            .toList();
+        return delegate.enumerate(installationId).stream()
+                .map(s -> new InstallationRepository(s.id(), s.nameWithOwner(), s.name(), s.isPrivate()))
+                .toList();
     }
 }

@@ -20,12 +20,11 @@ import org.hibernate.annotations.CreationTimestamp;
  */
 @Entity
 @Table(
-    name = "mentor_slack_thread",
-    uniqueConstraints = @UniqueConstraint(
-        name = "uk_mentor_slack_thread",
-        columnNames = { "workspace_id", "slack_channel_id", "slack_thread_ts" }
-    )
-)
+        name = "mentor_slack_thread",
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uk_mentor_slack_thread",
+                        columnNames = {"workspace_id", "slack_channel_id", "slack_thread_ts"}))
 @Getter
 @Setter
 @NoArgsConstructor

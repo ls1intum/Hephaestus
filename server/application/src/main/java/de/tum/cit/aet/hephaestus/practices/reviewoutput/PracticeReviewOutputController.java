@@ -50,111 +50,91 @@ public class PracticeReviewOutputController {
 
     @GetMapping("/observations")
     @Operation(
-        summary = "List practice review observations across the workspace",
-        description = "Results include linked feedback outcomes and are ordered newest first by default.",
-        operationId = "listPracticeReviewObservations"
-    )
+            summary = "List practice review observations across the workspace",
+            description = "Results include linked feedback outcomes and are ordered newest first by default.",
+            operationId = "listPracticeReviewObservations")
     @ApiResponse(responseCode = "200", description = "Paginated observations returned")
     @ApiResponse(
-        responseCode = "400",
-        description = "Invalid filter or pagination",
-        content = @Content(
-            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-            schema = @Schema(implementation = ProblemDetail.class)
-        )
-    )
+            responseCode = "400",
+            description = "Invalid filter or pagination",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     public ResponseEntity<PagedModel<ReviewObservationDTO>> listObservations(
-        WorkspaceContext workspaceContext,
-        @RequestParam(defaultValue = "0") @Min(0) int page,
-        @RequestParam(defaultValue = "50") @Min(1) @Max(100) int size,
-        @Parameter(
-            description = "Sorting strategy. ACTIONABILITY orders problems from CRITICAL to INFO, then strengths, " +
-                "then not-applicable observations; ties are newest first."
-        ) @RequestParam(defaultValue = "NEWEST") ReviewObservationSort sort,
-        @Valid @ParameterObject ReviewObservationFilterParams filter
-    ) {
-        return ResponseEntity.ok(
-            new PagedModel<>(
-                observationQueryService.list(workspaceContext.id(), filter.toFilter(), sort, PageRequest.of(page, size))
-            )
-        );
+            WorkspaceContext workspaceContext,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "50") @Min(1) @Max(100) int size,
+            @Parameter(
+                            description =
+                                    "Sorting strategy. ACTIONABILITY orders problems from CRITICAL to INFO, then strengths, "
+                                            + "then not-applicable observations; ties are newest first.")
+                    @RequestParam(defaultValue = "NEWEST")
+                    ReviewObservationSort sort,
+            @Valid @ParameterObject ReviewObservationFilterParams filter) {
+        return ResponseEntity.ok(new PagedModel<>(observationQueryService.list(
+                workspaceContext.id(), filter.toFilter(), sort, PageRequest.of(page, size))));
     }
 
     @GetMapping("/observations/{observationId}")
     @Operation(
-        summary = "Get an observation with its evidence and linked feedback",
-        operationId = "getPracticeReviewObservation"
-    )
+            summary = "Get an observation with its evidence and linked feedback",
+            operationId = "getPracticeReviewObservation")
     @ApiResponse(
-        responseCode = "200",
-        description = "Observation detail returned",
-        content = @Content(schema = @Schema(implementation = ReviewObservationDetailDTO.class))
-    )
+            responseCode = "200",
+            description = "Observation detail returned",
+            content = @Content(schema = @Schema(implementation = ReviewObservationDetailDTO.class)))
     @ApiResponse(
-        responseCode = "404",
-        description = "Observation not found in this workspace",
-        content = @Content(
-            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-            schema = @Schema(implementation = ProblemDetail.class)
-        )
-    )
+            responseCode = "404",
+            description = "Observation not found in this workspace",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     public ResponseEntity<ReviewObservationDetailDTO> getObservation(
-        WorkspaceContext workspaceContext,
-        @PathVariable UUID observationId
-    ) {
+            WorkspaceContext workspaceContext, @PathVariable UUID observationId) {
         return ResponseEntity.ok(observationQueryService.get(workspaceContext.id(), observationId));
     }
 
     @GetMapping("/feedback")
     @Operation(
-        summary = "List practice review feedback across the workspace",
-        description = "Results are ordered newest first and include every delivery state.",
-        operationId = "listPracticeReviewFeedback"
-    )
+            summary = "List practice review feedback across the workspace",
+            description = "Results are ordered newest first and include every delivery state.",
+            operationId = "listPracticeReviewFeedback")
     @ApiResponse(responseCode = "200", description = "Paginated feedback returned")
     @ApiResponse(
-        responseCode = "400",
-        description = "Invalid filter or pagination",
-        content = @Content(
-            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-            schema = @Schema(implementation = ProblemDetail.class)
-        )
-    )
+            responseCode = "400",
+            description = "Invalid filter or pagination",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     public ResponseEntity<PagedModel<ReviewFeedbackDTO>> listFeedback(
-        WorkspaceContext workspaceContext,
-        @RequestParam(defaultValue = "0") @Min(0) int page,
-        @RequestParam(defaultValue = "50") @Min(1) @Max(100) int size,
-        @Valid @ParameterObject ReviewFeedbackFilterParams filter
-    ) {
-        return ResponseEntity.ok(
-            new PagedModel<>(
-                feedbackQueryService.list(workspaceContext.id(), filter.toFilter(), PageRequest.of(page, size))
-            )
-        );
+            WorkspaceContext workspaceContext,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "50") @Min(1) @Max(100) int size,
+            @Valid @ParameterObject ReviewFeedbackFilterParams filter) {
+        return ResponseEntity.ok(new PagedModel<>(
+                feedbackQueryService.list(workspaceContext.id(), filter.toFilter(), PageRequest.of(page, size))));
     }
 
     @GetMapping("/feedback/{feedbackId}")
     @Operation(
-        summary = "Get feedback with its stored body, observations and placements",
-        operationId = "getPracticeReviewFeedback"
-    )
+            summary = "Get feedback with its stored body, observations and placements",
+            operationId = "getPracticeReviewFeedback")
     @ApiResponse(
-        responseCode = "200",
-        description = "Feedback detail returned",
-        content = @Content(schema = @Schema(implementation = ReviewFeedbackDetailDTO.class))
-    )
+            responseCode = "200",
+            description = "Feedback detail returned",
+            content = @Content(schema = @Schema(implementation = ReviewFeedbackDetailDTO.class)))
     @ApiResponse(
-        responseCode = "404",
-        description = "Feedback not found in this workspace",
-        content = @Content(
-            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-            schema = @Schema(implementation = ProblemDetail.class)
-        )
-    )
+            responseCode = "404",
+            description = "Feedback not found in this workspace",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     public ResponseEntity<ReviewFeedbackDetailDTO> getFeedback(
-        WorkspaceContext workspaceContext,
-        @PathVariable UUID feedbackId
-    ) {
+            WorkspaceContext workspaceContext, @PathVariable UUID feedbackId) {
         return ResponseEntity.ok(feedbackQueryService.get(workspaceContext.id(), feedbackId));
     }
 
@@ -162,26 +142,19 @@ public class PracticeReviewOutputController {
     @AuditExempt(reason = "The immutable feedback_approval row is the domain audit trail")
     @Operation(summary = "Approve or reject an immutable feedback proposal", operationId = "decideFeedbackProposal")
     public ResponseEntity<FeedbackApprovalDTO> decideFeedbackProposal(
-        WorkspaceContext workspaceContext,
-        @PathVariable UUID feedbackId,
-        @Valid @org.springframework.web.bind.annotation.RequestBody DecideFeedbackProposalRequestDTO request
-    ) {
+            WorkspaceContext workspaceContext,
+            @PathVariable UUID feedbackId,
+            @Valid @org.springframework.web.bind.annotation.RequestBody DecideFeedbackProposalRequestDTO request) {
         long actorAccountId = SecurityUtils.getCurrentAccountId().orElseThrow();
-        return ResponseEntity.ok(
-            FeedbackApprovalDTO.from(
-                feedbackApprovalService.decide(workspaceContext.id(), feedbackId, actorAccountId, request)
-            )
-        );
+        return ResponseEntity.ok(FeedbackApprovalDTO.from(
+                feedbackApprovalService.decide(workspaceContext.id(), feedbackId, actorAccountId, request)));
     }
 
     @GetMapping("/feedback/{feedbackId}/approval")
     @Operation(summary = "Get the decision for a feedback proposal", operationId = "getFeedbackProposalDecision")
     public ResponseEntity<FeedbackApprovalDTO> getFeedbackProposalDecision(
-        WorkspaceContext workspaceContext,
-        @PathVariable UUID feedbackId
-    ) {
+            WorkspaceContext workspaceContext, @PathVariable UUID feedbackId) {
         return ResponseEntity.ok(
-            FeedbackApprovalDTO.from(feedbackApprovalService.get(workspaceContext.id(), feedbackId))
-        );
+                FeedbackApprovalDTO.from(feedbackApprovalService.get(workspaceContext.id(), feedbackId)));
     }
 }

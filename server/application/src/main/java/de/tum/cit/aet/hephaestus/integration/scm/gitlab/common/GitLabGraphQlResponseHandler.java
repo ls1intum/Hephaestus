@@ -64,11 +64,10 @@ public class GitLabGraphQlResponseHandler {
                 var classification = exceptionClassifier.classifyGraphQlResponse(response);
                 if (classification != null) {
                     log.warn(
-                        "Partial GraphQL errors (data still valid): context={}, category={}, message={}",
-                        context,
-                        classification.category(),
-                        classification.message()
-                    );
+                            "Partial GraphQL errors (data still valid): context={}, category={}, message={}",
+                            context,
+                            classification.category(),
+                            classification.message());
                 }
             }
             return new HandleResult(HandleResult.Action.CONTINUE, null);
@@ -79,11 +78,10 @@ public class GitLabGraphQlResponseHandler {
 
         if (classification != null) {
             log.warn(
-                "GraphQL error classified: context={}, category={}, message={}",
-                context,
-                classification.category(),
-                classification.message()
-            );
+                    "GraphQL error classified: context={}, category={}, message={}",
+                    context,
+                    classification.category(),
+                    classification.message());
 
             if (classification.category() == Category.RATE_LIMITED && classification.suggestedWait() != null) {
                 long waitMs = Math.min(classification.suggestedWait().toMillis(), MAX_RATE_LIMIT_WAIT_MS);
@@ -102,7 +100,9 @@ public class GitLabGraphQlResponseHandler {
         }
 
         // No classification possible — generic failure
-        var errors = response == null ? "null response" : Objects.requireNonNull(response).getErrors();
+        var errors = response == null
+                ? "null response"
+                : Objects.requireNonNull(response).getErrors();
         log.warn("GraphQL request failed (unclassified): context={}, errors={}", context, errors);
         return new HandleResult(HandleResult.Action.ABORT, null);
     }
@@ -117,17 +117,12 @@ public class GitLabGraphQlResponseHandler {
      * @return true if a loop is detected (caller should break)
      */
     public boolean isPaginationLoop(
-        @Nullable String currentCursor,
-        @Nullable String previousCursor,
-        String context,
-        Logger log
-    ) {
+            @Nullable String currentCursor, @Nullable String previousCursor, String context, Logger log) {
         if (currentCursor != null && currentCursor.equals(previousCursor)) {
             log.error(
-                "Pagination loop detected (same cursor returned twice): context={}, cursor={}",
-                context,
-                currentCursor
-            );
+                    "Pagination loop detected (same cursor returned twice): context={}, cursor={}",
+                    context,
+                    currentCursor);
             return true;
         }
         return false;

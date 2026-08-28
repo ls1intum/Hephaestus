@@ -14,13 +14,10 @@ import org.jspecify.annotations.Nullable;
  */
 @Schema(description = "Transition a Slack channel to a target consent state")
 public record UpdateSlackChannelConsentRequestDTO(
-    @NonNull
-    @NotNull
-    @Schema(description = "Target consent state", requiredMode = Schema.RequiredMode.REQUIRED)
-    ConsentState consentState,
+        @NonNull @NotNull @Schema(description = "Target consent state", requiredMode = Schema.RequiredMode.REQUIRED)
+        ConsentState consentState,
 
-    @Size(max = 2000)
-    @Schema(description = "Optional free-text reason recorded in the immutable audit trail")
-    @Nullable
-    String reason
-) {}
+        @Size(max = 2000)
+        @Schema(description = "Optional free-text reason recorded in the immutable audit trail")
+        @Nullable
+        String reason) {}

@@ -48,41 +48,35 @@ public class ReviewBackfillController {
 
     @PostMapping
     @Operation(
-        summary = "Enumerate and price a backfill campaign",
-        description = "Creates a run awaiting confirmation. Submits nothing and spends nothing."
-    )
+            summary = "Enumerate and price a backfill campaign",
+            description = "Creates a run awaiting confirmation. Submits nothing and spends nothing.")
     @ApiResponse(
-        responseCode = "201",
-        description = "Scope enumerated and priced",
-        content = @Content(schema = @Schema(implementation = ReviewBackfillRunDTO.class))
-    )
+            responseCode = "201",
+            description = "Scope enumerated and priced",
+            content = @Content(schema = @Schema(implementation = ReviewBackfillRunDTO.class)))
     @ApiResponse(
-        responseCode = "400",
-        description = "The window is inverted, too long, or covers too many artifacts",
-        content = @Content(
-            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-            schema = @Schema(implementation = ProblemDetail.class)
-        )
-    )
+            responseCode = "400",
+            description = "The window is inverted, too long, or covers too many artifacts",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(
-        responseCode = "409",
-        description = "A campaign is already under way for this workspace",
-        content = @Content(
-            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-            schema = @Schema(implementation = ProblemDetail.class)
-        )
-    )
+            responseCode = "409",
+            description = "A campaign is already under way for this workspace",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "REVIEW_BACKFILL_RUN")
     public ResponseEntity<ReviewBackfillRunDTO> preflightBackfillRun(
-        WorkspaceContext workspaceContext,
-        @Valid @RequestBody CreateReviewBackfillRunRequestDTO request
-    ) {
+            WorkspaceContext workspaceContext, @Valid @RequestBody CreateReviewBackfillRunRequestDTO request) {
         ReviewBackfillRunDTO run = reviewBackfillService.preflight(workspaceContext, request);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
-            .path("/{runId}")
-            .buildAndExpand(run.id())
-            .toUri();
+                .path("/{runId}")
+                .buildAndExpand(run.id())
+                .toUri();
         return ResponseEntity.created(location).body(run);
     }
 
@@ -97,51 +91,44 @@ public class ReviewBackfillController {
     @GetMapping("/{runId}")
     @Operation(summary = "Get one backfill campaign, including its live progress")
     @ApiResponse(
-        responseCode = "200",
-        description = "Campaign returned",
-        content = @Content(schema = @Schema(implementation = ReviewBackfillRunDTO.class))
-    )
+            responseCode = "200",
+            description = "Campaign returned",
+            content = @Content(schema = @Schema(implementation = ReviewBackfillRunDTO.class)))
     @ApiResponse(
-        responseCode = "404",
-        description = "No such campaign in this workspace",
-        content = @Content(
-            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-            schema = @Schema(implementation = ProblemDetail.class)
-        )
-    )
+            responseCode = "404",
+            description = "No such campaign in this workspace",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<ReviewBackfillRunDTO> getBackfillRun(
-        WorkspaceContext workspaceContext,
-        @PathVariable UUID runId
-    ) {
+            WorkspaceContext workspaceContext, @PathVariable UUID runId) {
         return ResponseEntity.ok(reviewBackfillService.get(workspaceContext, runId));
     }
 
     @PatchMapping("/{runId}/status")
     @Operation(
-        summary = "Confirm or cancel a backfill campaign",
-        description = "RUNNING authorises the estimated spend and starts the campaign; CANCELLED stops it for good."
-    )
+            summary = "Confirm or cancel a backfill campaign",
+            description =
+                    "RUNNING authorises the estimated spend and starts the campaign; CANCELLED stops it for good.")
     @ApiResponse(
-        responseCode = "200",
-        description = "Campaign updated",
-        content = @Content(schema = @Schema(implementation = ReviewBackfillRunDTO.class))
-    )
+            responseCode = "200",
+            description = "Campaign updated",
+            content = @Content(schema = @Schema(implementation = ReviewBackfillRunDTO.class)))
     @ApiResponse(
-        responseCode = "409",
-        description = "The campaign cannot make that transition from its current state",
-        content = @Content(
-            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-            schema = @Schema(implementation = ProblemDetail.class)
-        )
-    )
+            responseCode = "409",
+            description = "The campaign cannot make that transition from its current state",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "REVIEW_BACKFILL_RUN")
     public ResponseEntity<ReviewBackfillRunDTO> updateBackfillRunStatus(
-        WorkspaceContext workspaceContext,
-        @PathVariable UUID runId,
-        @Valid @RequestBody UpdateReviewBackfillRunStatusRequestDTO request
-    ) {
+            WorkspaceContext workspaceContext,
+            @PathVariable UUID runId,
+            @Valid @RequestBody UpdateReviewBackfillRunStatusRequestDTO request) {
         return ResponseEntity.ok(reviewBackfillService.updateStatus(workspaceContext, runId, request.status()));
     }
 }

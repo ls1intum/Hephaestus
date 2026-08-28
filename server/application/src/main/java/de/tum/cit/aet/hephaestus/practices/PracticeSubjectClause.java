@@ -27,16 +27,14 @@ import org.jspecify.annotations.Nullable;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @Schema(description = "One shape the subject a practice judges can take in a piece of work")
 public record PracticeSubjectClause(
-    @Schema(description = "Globs; holds when the change touches a matching path")
-    @Nullable
-    List<String> changedPathMatches,
-    @Schema(description = "Literal strings; holds when the diff contains one of them")
-    @Nullable
-    List<String> diffContains,
-    @Schema(description = "Named evidence collection; holds when it has at least one entry")
-    @Nullable
-    SubjectEvidenceCollection evidenceHasItems
-) {
+        @Schema(description = "Globs; holds when the change touches a matching path") @Nullable
+        List<String> changedPathMatches,
+
+        @Schema(description = "Literal strings; holds when the diff contains one of them") @Nullable
+        List<String> diffContains,
+
+        @Schema(description = "Named evidence collection; holds when it has at least one entry") @Nullable
+        SubjectEvidenceCollection evidenceHasItems) {
     public static final SourceKind DIFF_SOURCE = new SourceKind("scm.pull-request.diff");
 
     static final int MAX_TERM_LENGTH = 200;
@@ -45,20 +43,18 @@ public record PracticeSubjectClause(
 
     @JsonCreator
     public PracticeSubjectClause(
-        @JsonProperty("changedPathMatches") @Nullable List<String> changedPathMatches,
-        @JsonProperty("diffContains") @Nullable List<String> diffContains,
-        @JsonProperty("evidenceHasItems") @Nullable SubjectEvidenceCollection evidenceHasItems
-    ) {
+            @JsonProperty("changedPathMatches") @Nullable List<String> changedPathMatches,
+            @JsonProperty("diffContains") @Nullable List<String> diffContains,
+            @JsonProperty("evidenceHasItems") @Nullable SubjectEvidenceCollection evidenceHasItems) {
         this.changedPathMatches = copyTerms(changedPathMatches, "changedPathMatches");
         this.diffContains = copyTerms(diffContains, "diffContains");
         this.evidenceHasItems = evidenceHasItems;
         long declared = java.util.stream.Stream.of(this.changedPathMatches, this.diffContains, this.evidenceHasItems)
-            .filter(Objects::nonNull)
-            .count();
+                .filter(Objects::nonNull)
+                .count();
         if (declared != 1) {
             throw new IllegalArgumentException(
-                "A subject clause states exactly one of changedPathMatches, diffContains or evidenceHasItems"
-            );
+                    "A subject clause states exactly one of changedPathMatches, diffContains or evidenceHasItems");
         }
     }
 
@@ -107,8 +103,7 @@ public record PracticeSubjectClause(
             }
             if (term.length() > MAX_TERM_LENGTH) {
                 throw new IllegalArgumentException(
-                    field + " entries may not exceed " + MAX_TERM_LENGTH + " characters"
-                );
+                        field + " entries may not exceed " + MAX_TERM_LENGTH + " characters");
             }
         }
         return List.copyOf(terms);

@@ -72,25 +72,24 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
     private final Executor closeExecutor;
 
     DockerAttachedSandboxAdapter(
-        UUID sessionId,
-        String userId,
-        String workspaceId,
-        String containerId,
-        String networkId,
-        InteractiveSandboxRuntimeKey runtimeKey,
-        PiProcessHandle process,
-        ObjectMapper mapper,
-        FrameRingBuffer ring,
-        int subscriberQueueCapacity,
-        int stdinWriteTimeoutMs,
-        int sendQueueCapacity,
-        int maxLineChars,
-        Duration defaultGrace,
-        InteractiveSandboxMetrics metrics,
-        LifecycleOps lifecycle,
-        Executor closeExecutor,
-        Consumer<DockerAttachedSandboxAdapter> onClosed
-    ) {
+            UUID sessionId,
+            String userId,
+            String workspaceId,
+            String containerId,
+            String networkId,
+            InteractiveSandboxRuntimeKey runtimeKey,
+            PiProcessHandle process,
+            ObjectMapper mapper,
+            FrameRingBuffer ring,
+            int subscriberQueueCapacity,
+            int stdinWriteTimeoutMs,
+            int sendQueueCapacity,
+            int maxLineChars,
+            Duration defaultGrace,
+            InteractiveSandboxMetrics metrics,
+            LifecycleOps lifecycle,
+            Executor closeExecutor,
+            Consumer<DockerAttachedSandboxAdapter> onClosed) {
         this.sessionId = sessionId;
         this.identity = new SandboxIdentity(sessionId, userId, workspaceId);
         this.containerId = containerId;
@@ -109,30 +108,28 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
 
         Map<String, String> mdcSnapshot = mdcContext();
         this.writer = new JsonlStdinWriter(
-            sessionId,
-            process.stdin(),
-            mapper,
-            sendQueueCapacity,
-            stdinWriteTimeoutMs,
-            metrics.sendRejectedQueueFull,
-            metrics.sendRejectedWriteTimeout,
-            metrics.sendRejectedBrokenPipe,
-            metrics.sendRejectedClosed,
-            metrics.sendBytes,
-            () -> terminate(EvictionReason.ERROR),
-            mdcSnapshot
-        );
+                sessionId,
+                process.stdin(),
+                mapper,
+                sendQueueCapacity,
+                stdinWriteTimeoutMs,
+                metrics.sendRejectedQueueFull,
+                metrics.sendRejectedWriteTimeout,
+                metrics.sendRejectedBrokenPipe,
+                metrics.sendRejectedClosed,
+                metrics.sendBytes,
+                () -> terminate(EvictionReason.ERROR),
+                mdcSnapshot);
         this.pump = new JsonlStdoutPump(
-            sessionId,
-            process.stdout(),
-            mapper,
-            this::onFrame,
-            this::onEof,
-            process::exitValueOrAlive,
-            metrics.frameParseError,
-            maxLineChars,
-            mdcSnapshot
-        );
+                sessionId,
+                process.stdout(),
+                mapper,
+                this::onFrame,
+                this::onEof,
+                process::exitValueOrAlive,
+                metrics.frameParseError,
+                maxLineChars,
+                mdcSnapshot);
     }
 
     void start() {
@@ -183,24 +180,18 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
         // CLOSING: late add would leak its dispatcher — runClose has already drained subscriptions.
         AttachedSandboxState s = state.get();
         if (s != AttachedSandboxState.ATTACHED) {
-            FrameSubscription disposed = new FrameSubscription(
-                listener,
-                1,
-                metrics.subscriberDropped,
-                metrics.subscriberError,
-                () -> {}
-            );
+            FrameSubscription disposed =
+                    new FrameSubscription(listener, 1, metrics.subscriberDropped, metrics.subscriberError, () -> {});
             disposed.dispose();
             return disposed;
         }
         FrameSubscription[] holder = new FrameSubscription[1];
         FrameSubscription sub = new FrameSubscription(
-            listener,
-            subscriberQueueCapacity,
-            metrics.subscriberDropped,
-            metrics.subscriberError,
-            () -> subscriptions.remove(holder[0])
-        );
+                listener,
+                subscriberQueueCapacity,
+                metrics.subscriberDropped,
+                metrics.subscriberError,
+                () -> subscriptions.remove(holder[0]));
         holder[0] = sub;
 
         // Snapshot+add atomic against pump fan-out → snapshot replay strictly precedes live frames.
@@ -367,7 +358,8 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
             for (FrameSubscription sub : subscriptions) {
                 try {
                     sub.dispose();
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
             }
             subscriptions.clear();
 
@@ -386,7 +378,8 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
 
             try {
                 process.awaitExitAndClose(Duration.ofSeconds(2));
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
 
             metrics.lifetime.record(Duration.between(attachedAt, Instant.now()));
             metrics.subscribersAtClose.record(subscriberCount);
@@ -402,10 +395,9 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
             }
             closed.complete(null);
             log.info(
-                "Sandbox closed: reason={}, lifetimeMs={}",
-                reason,
-                Duration.between(attachedAt, Instant.now()).toMillis()
-            );
+                    "Sandbox closed: reason={}, lifetimeMs={}",
+                    reason,
+                    Duration.between(attachedAt, Instant.now()).toMillis());
         } catch (Throwable t) {
             log.error("Unexpected error during sandbox close", t);
             state.set(AttachedSandboxState.CLOSED);
@@ -446,7 +438,9 @@ public final class DockerAttachedSandboxAdapter implements AttachedSandbox, Stdi
     /** Adapter-provided container / network teardown. */
     interface LifecycleOps {
         void stopContainer(String containerId, int graceSeconds);
+
         void removeContainer(String containerId);
+
         void disconnectAndRemoveNetwork(String networkId);
     }
 }

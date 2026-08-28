@@ -20,8 +20,7 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
     /** Retention sweep: delete messages only for thread aggregates selected as aged. */
     @Modifying
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         DELETE FROM slack_message m
          USING slack_thread t
          WHERE m.workspace_id = :workspaceId
@@ -29,13 +28,9 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
            AND t.id IN (:threadIds)
            AND m.slack_channel_id = t.slack_channel_id
            AND COALESCE(m.slack_thread_ts, m.slack_ts) = t.slack_thread_ts
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int deleteByWorkspaceIdAndThreadIds(
-        @Param("workspaceId") long workspaceId,
-        @Param("threadIds") java.util.Collection<Long> threadIds
-    );
+            @Param("workspaceId") long workspaceId, @Param("threadIds") java.util.Collection<Long> threadIds);
 
     long deleteByWorkspaceId(Long workspaceId);
 
@@ -53,21 +48,18 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
     @Modifying
     @Transactional
     @Query(
-        value = "DELETE FROM slack_message WHERE workspace_id = :workspaceId AND author_member_id = :memberId",
-        nativeQuery = true
-    )
+            value = "DELETE FROM slack_message WHERE workspace_id = :workspaceId AND author_member_id = :memberId",
+            nativeQuery = true)
     int deleteByWorkspaceIdAndAuthorMemberId(@Param("workspaceId") long workspaceId, @Param("memberId") long memberId);
 
     @Modifying
     @Transactional
     @Query(
-        value = "DELETE FROM slack_message WHERE workspace_id = :workspaceId AND author_slack_user_id = :slackUserId",
-        nativeQuery = true
-    )
+            value =
+                    "DELETE FROM slack_message WHERE workspace_id = :workspaceId AND author_slack_user_id = :slackUserId",
+            nativeQuery = true)
     int deleteByWorkspaceIdAndAuthorSlackUserId(
-        @Param("workspaceId") long workspaceId,
-        @Param("slackUserId") String slackUserId
-    );
+            @Param("workspaceId") long workspaceId, @Param("slackUserId") String slackUserId);
 
     long countByWorkspaceId(Long workspaceId);
 
@@ -87,15 +79,14 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
      *
      * @return one projection row per channel that has at least one stored message
      */
-    @Query(
-        "SELECT m.slackChannelId AS slackChannelId, COUNT(m) AS itemCount FROM SlackMessage m " +
-            "WHERE m.workspaceId = :workspaceId GROUP BY m.slackChannelId"
-    )
+    @Query("SELECT m.slackChannelId AS slackChannelId, COUNT(m) AS itemCount FROM SlackMessage m "
+            + "WHERE m.workspaceId = :workspaceId GROUP BY m.slackChannelId")
     List<ChannelItemCount> countGroupedByChannelId(@Param("workspaceId") long workspaceId);
 
     /** Projection for {@link #countGroupedByChannelId}. */
     interface ChannelItemCount {
         String getSlackChannelId();
+
         Long getItemCount();
     }
 
@@ -115,24 +106,20 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
      */
     @Modifying
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id, slack_ts, slack_thread_ts, author_slack_user_id, author_member_id, text, ingested_at)
         VALUES (:workspaceId, :slackTeamId, :slackChannelId, :slackTs, :slackThreadTs, :authorSlackUserId, :authorMemberId, :text, now())
         ON CONFLICT (workspace_id, slack_channel_id, slack_ts) DO NOTHING
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int insertIfAbsent(
-        @Param("workspaceId") long workspaceId,
-        @Param("slackTeamId") String slackTeamId,
-        @Param("slackChannelId") String slackChannelId,
-        @Param("slackTs") String slackTs,
-        @Param("slackThreadTs") @Nullable String slackThreadTs,
-        @Param("authorSlackUserId") @Nullable String authorSlackUserId,
-        @Param("authorMemberId") @Nullable Long authorMemberId,
-        @Param("text") @Nullable String text
-    );
+            @Param("workspaceId") long workspaceId,
+            @Param("slackTeamId") String slackTeamId,
+            @Param("slackChannelId") String slackChannelId,
+            @Param("slackTs") String slackTs,
+            @Param("slackThreadTs") @Nullable String slackThreadTs,
+            @Param("authorSlackUserId") @Nullable String authorSlackUserId,
+            @Param("authorMemberId") @Nullable Long authorMemberId,
+            @Param("text") @Nullable String text);
 
     /**
      * Slack {@code message_deleted} tombstone (GDPR Art. 17), durable against out-of-order delivery: UPSERT a
@@ -144,21 +131,17 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
      */
     @Modifying
     @Transactional
-    @Query(
-        value = """
+    @Query(value = """
         INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id, slack_ts, text, deleted_at, ingested_at)
         VALUES (:workspaceId, :slackTeamId, :slackChannelId, :slackTs, NULL, :now, now())
         ON CONFLICT (workspace_id, slack_channel_id, slack_ts) DO UPDATE SET deleted_at = :now, text = NULL
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int tombstone(
-        @Param("workspaceId") long workspaceId,
-        @Param("slackTeamId") String slackTeamId,
-        @Param("slackChannelId") String slackChannelId,
-        @Param("slackTs") String slackTs,
-        @Param("now") Instant now
-    );
+            @Param("workspaceId") long workspaceId,
+            @Param("slackTeamId") String slackTeamId,
+            @Param("slackChannelId") String slackChannelId,
+            @Param("slackTs") String slackTs,
+            @Param("now") Instant now);
 
     /**
      * Slack {@code message_changed}: replace the rendered {@code text} with the edited body and stamp
@@ -170,18 +153,15 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
      */
     @Modifying
     @Transactional
-    @Query(
-        "UPDATE SlackMessage m SET m.text = :text, m.editedAt = :now " +
-            "WHERE m.workspaceId = :workspaceId AND m.slackChannelId = :slackChannelId AND m.slackTs = :slackTs " +
-            "AND m.deletedAt IS NULL"
-    )
+    @Query("UPDATE SlackMessage m SET m.text = :text, m.editedAt = :now "
+            + "WHERE m.workspaceId = :workspaceId AND m.slackChannelId = :slackChannelId AND m.slackTs = :slackTs "
+            + "AND m.deletedAt IS NULL")
     int applyEdit(
-        @Param("workspaceId") Long workspaceId,
-        @Param("slackChannelId") String slackChannelId,
-        @Param("slackTs") String slackTs,
-        @Param("text") @Nullable String text,
-        @Param("now") Instant now
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("slackChannelId") String slackChannelId,
+            @Param("slackTs") String slackTs,
+            @Param("text") @Nullable String text,
+            @Param("now") Instant now);
 
     /**
      * Agent-owned {@code ConversationThreadProjection} SPI: the non-tombstoned turns of one thread (root
@@ -194,8 +174,7 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
      *
      * @param pageable caller passes {@code PageRequest.of(0, limit)} for the per-thread message cap
      */
-    @Query(
-        """
+    @Query("""
         SELECT new de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadMessageRow(
             m.slackTs, m.authorSlackUserId, m.authorMemberId, u.login, u.name, m.text, m.editedAt
         )
@@ -208,40 +187,32 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
           AND m.deletedAt IS NULL
           AND c.consentState = de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState.ACTIVE
         ORDER BY m.slackTs ASC
-        """
-    )
+        """)
     List<SlackThreadMessageRow> findThreadMessages(
-        @Param("workspaceId") long workspaceId,
-        @Param("channelId") String channelId,
-        @Param("threadTs") String threadTs,
-        Pageable pageable
-    );
+            @Param("workspaceId") long workspaceId,
+            @Param("channelId") String channelId,
+            @Param("threadTs") String threadTs,
+            Pageable pageable);
 
     /** Agent-owned {@code ConversationCandidateSource} SPI: count of non-tombstoned turns in one thread, workspace-pinned. */
-    @Query(
-        "SELECT COUNT(m) FROM SlackMessage m WHERE m.workspaceId = :workspaceId AND m.slackChannelId = :channelId " +
-            "AND (m.slackThreadTs = :threadTs OR m.slackTs = :threadTs) AND m.deletedAt IS NULL"
-    )
+    @Query("SELECT COUNT(m) FROM SlackMessage m WHERE m.workspaceId = :workspaceId AND m.slackChannelId = :channelId "
+            + "AND (m.slackThreadTs = :threadTs OR m.slackTs = :threadTs) AND m.deletedAt IS NULL")
     long countLiveTurns(
-        @Param("workspaceId") long workspaceId,
-        @Param("channelId") String channelId,
-        @Param("threadTs") String threadTs
-    );
+            @Param("workspaceId") long workspaceId,
+            @Param("channelId") String channelId,
+            @Param("threadTs") String threadTs);
 
     /**
      * Agent-owned {@code ConversationCandidateSource} SPI: count of non-tombstoned turns in one thread whose
      * {@code slack_ts} is strictly greater than {@code watermark} (lexicographic — the same Slack-{@code ts}
      * ordering invariant {@link SlackThreadRepository#upsertOnMessage} relies on), workspace-pinned.
      */
-    @Query(
-        "SELECT COUNT(m) FROM SlackMessage m WHERE m.workspaceId = :workspaceId AND m.slackChannelId = :channelId " +
-            "AND (m.slackThreadTs = :threadTs OR m.slackTs = :threadTs) AND m.deletedAt IS NULL " +
-            "AND m.slackTs > :watermark"
-    )
+    @Query("SELECT COUNT(m) FROM SlackMessage m WHERE m.workspaceId = :workspaceId AND m.slackChannelId = :channelId "
+            + "AND (m.slackThreadTs = :threadTs OR m.slackTs = :threadTs) AND m.deletedAt IS NULL "
+            + "AND m.slackTs > :watermark")
     long countLiveTurnsSince(
-        @Param("workspaceId") long workspaceId,
-        @Param("channelId") String channelId,
-        @Param("threadTs") String threadTs,
-        @Param("watermark") String watermark
-    );
+            @Param("workspaceId") long workspaceId,
+            @Param("channelId") String channelId,
+            @Param("threadTs") String threadTs,
+            @Param("watermark") String watermark);
 }

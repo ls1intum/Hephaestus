@@ -28,15 +28,12 @@ public class ResearchConsentAuditAdapter implements ResearchConsentAudit {
     @Override
     public void recordOptOut(String login, ConsentSource source) {
         authEventLogger
-            .event(AuthEvent.EventType.RESEARCH_CONSENT_REVOKED, AuthEvent.Result.SUCCESS)
-            .details(
-                "{\"source\":\"" +
-                    jsonEscape(source == null ? null : source.name()) +
-                    "\",\"login\":\"" +
-                    jsonEscape(login) +
-                    "\"}"
-            )
-            .record();
+                .event(AuthEvent.EventType.RESEARCH_CONSENT_REVOKED, AuthEvent.Result.SUCCESS)
+                .details("{\"source\":\"" + jsonEscape(source == null ? null : source.name())
+                        + "\",\"login\":\""
+                        + jsonEscape(login)
+                        + "\"}")
+                .record();
     }
 
     /** Minimal JSON string escaping for the free-text values embedded in the audit {@code details} object. */

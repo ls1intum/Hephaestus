@@ -42,7 +42,7 @@ final class BetaPosterior {
         double currentMean = gridMean(currentMass, gridSize);
         double previousMean = gridMean(previousMass, gridSize);
         double variance =
-            gridVariance(currentMass, currentMean, gridSize) + gridVariance(previousMass, previousMean, gridSize);
+                gridVariance(currentMass, currentMean, gridSize) + gridVariance(previousMass, previousMean, gridSize);
         return new Difference(currentMean - previousMean, variance, currentMass, previousMass, gridSize);
     }
 

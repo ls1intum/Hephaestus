@@ -36,25 +36,15 @@ class AgentWorkspacePurgeAdapterTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         adapter = new AgentWorkspacePurgeAdapter(
-            jobRepository,
-            bindingRepository,
-            modelRepository,
-            connectionRepository,
-            grantRepository
-        );
+                jobRepository, bindingRepository, modelRepository, connectionRepository, grantRepository);
     }
 
     @Test
     void shouldDeleteWorkspaceOwnedAgentDataInDependencyOrder() {
         adapter.deleteWorkspaceData(42L);
 
-        InOrder order = inOrder(
-            jobRepository,
-            bindingRepository,
-            modelRepository,
-            connectionRepository,
-            grantRepository
-        );
+        InOrder order =
+                inOrder(jobRepository, bindingRepository, modelRepository, connectionRepository, grantRepository);
         order.verify(jobRepository).deleteAllByWorkspaceId(42L);
         order.verify(bindingRepository).deleteAllByWorkspaceId(42L);
         order.verify(modelRepository).deleteAllByWorkspaceId(42L);

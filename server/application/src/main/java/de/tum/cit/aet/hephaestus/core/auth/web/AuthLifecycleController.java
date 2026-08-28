@@ -40,7 +40,8 @@ public class AuthLifecycleController {
         this.impersonationService = impersonationService;
     }
 
-    public record ImpersonateRequestDTO(@NotNull Long targetAccountId, @NotBlank String reason) {}
+    public record ImpersonateRequestDTO(
+            @NotNull Long targetAccountId, @NotBlank String reason) {}
 
     @PostMapping("/logout")
     @PreAuthorize("isAuthenticated()")
@@ -55,16 +56,14 @@ public class AuthLifecycleController {
     @Operation(summary = "Rotate the access token (new jti, old revoked)", operationId = "refresh")
     public ResponseEntity<Void> refresh(HttpServletRequest request, HttpServletResponse response) {
         sessionService.refresh(
-            CurrentAccount.requireId(),
-            CurrentAccount.requireJti(),
-            new AuthSessionService.RefreshContext(
-                CurrentAccount.impersonatorId(),
-                CurrentAccount.impersonationExpiresAt(),
-                CurrentAccount.sessionExpiresAt()
-            ),
-            request,
-            response
-        );
+                CurrentAccount.requireId(),
+                CurrentAccount.requireJti(),
+                new AuthSessionService.RefreshContext(
+                        CurrentAccount.impersonatorId(),
+                        CurrentAccount.impersonationExpiresAt(),
+                        CurrentAccount.sessionExpiresAt()),
+                request,
+                response);
         return ResponseEntity.noContent().build();
     }
 
@@ -73,16 +72,9 @@ public class AuthLifecycleController {
     @Operation(summary = "Begin impersonating another account", operationId = "impersonate")
     @Audited(ledger = AuditLedger.AUTH_EVENT, type = "IMPERSONATION_BEGIN")
     public ResponseEntity<Void> impersonate(
-        @Valid @RequestBody ImpersonateRequestDTO body,
-        HttpServletRequest request,
-        HttpServletResponse response
-    ) {
-        ImpersonationService.Result result = impersonationService.begin(
-            CurrentAccount.requireId(),
-            body.targetAccountId(),
-            body.reason(),
-            request
-        );
+            @Valid @RequestBody ImpersonateRequestDTO body, HttpServletRequest request, HttpServletResponse response) {
+        ImpersonationService.Result result =
+                impersonationService.begin(CurrentAccount.requireId(), body.targetAccountId(), body.reason(), request);
         sessionService.setCookie(response, result.token());
         return ResponseEntity.noContent().build();
     }
@@ -96,11 +88,7 @@ public class AuthLifecycleController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "not currently impersonating");
         }
         ImpersonationService.Result result = impersonationService.exit(
-            impersonatorId,
-            CurrentAccount.requireId(),
-            CurrentAccount.requireJti(),
-            request
-        );
+                impersonatorId, CurrentAccount.requireId(), CurrentAccount.requireJti(), request);
         sessionService.setCookie(response, result.token());
         return ResponseEntity.noContent().build();
     }

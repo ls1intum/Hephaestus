@@ -41,10 +41,9 @@ class SlackMessageServiceTest extends BaseUnitTest {
     void setUp() {
         silentModeEngaged = false;
         service = new SlackMessageService(
-            credentialProvider,
-            new SlackRateLimitTracker(new SimpleMeterRegistry()),
-            new OutboundEgressGuard(() -> silentModeEngaged)
-        );
+                credentialProvider,
+                new SlackRateLimitTracker(new SimpleMeterRegistry()),
+                new OutboundEgressGuard(() -> silentModeEngaged));
     }
 
     /** One guard fronts every content send; parameterizing pins each entry point without triplicating. */
@@ -54,8 +53,9 @@ class SlackMessageServiceTest extends BaseUnitTest {
         silentModeEngaged = true;
 
         assertThatThrownBy(() -> send.run(service))
-            .isInstanceOf(SlackSendException.class)
-            .satisfies(ex -> assertThat(((SlackSendException) ex).slackError()).isEqualTo("silent_mode_engaged"));
+                .isInstanceOf(SlackSendException.class)
+                .satisfies(
+                        ex -> assertThat(((SlackSendException) ex).slackError()).isEqualTo("silent_mode_engaged"));
         verifyNoInteractions(credentialProvider);
     }
 
@@ -66,15 +66,14 @@ class SlackMessageServiceTest extends BaseUnitTest {
 
     private static Stream<Arguments> outboundSends() {
         return Stream.of(
-            Arguments.of("sendForWorkspace", (ThrowingSend) s -> s.sendForWorkspace(7L, "C1ABCDEFGH", List.of(), "f")),
-            Arguments.of(
-                "sendEphemeralForWorkspace",
-                (ThrowingSend) s -> s.sendEphemeralForWorkspace(7L, "C1ABCDEFGH", "U123", List.of(), "f")
-            ),
-            Arguments.of("startStream", (ThrowingSend) s -> s.startStream(7L, "C1ABCDEFGH", "171234.5678", "hi")),
-            Arguments.of("appendStream", (ThrowingSend) s -> s.appendStream(7L, "C1ABCDEFGH", "171234.5678", "hi")),
-            Arguments.of("stopStream", (ThrowingSend) s -> s.stopStream(7L, "C1ABCDEFGH", "171234.5678", List.of()))
-        );
+                Arguments.of(
+                        "sendForWorkspace", (ThrowingSend) s -> s.sendForWorkspace(7L, "C1ABCDEFGH", List.of(), "f")),
+                Arguments.of("sendEphemeralForWorkspace", (ThrowingSend)
+                        s -> s.sendEphemeralForWorkspace(7L, "C1ABCDEFGH", "U123", List.of(), "f")),
+                Arguments.of("startStream", (ThrowingSend) s -> s.startStream(7L, "C1ABCDEFGH", "171234.5678", "hi")),
+                Arguments.of("appendStream", (ThrowingSend) s -> s.appendStream(7L, "C1ABCDEFGH", "171234.5678", "hi")),
+                Arguments.of(
+                        "stopStream", (ThrowingSend) s -> s.stopStream(7L, "C1ABCDEFGH", "171234.5678", List.of())));
     }
 
     /** These ride inbound events whose handlers do not catch, so a throw would NAK into the poison alarm. */
@@ -89,14 +88,13 @@ class SlackMessageServiceTest extends BaseUnitTest {
 
     private static Stream<Arguments> decorationCalls() {
         return Stream.of(
-            Arguments.of("setStatus", (ThrowingSend) s -> s.setStatus(7L, "C1ABCDEFGH", "171234.5678", "Thinking…")),
-            Arguments.of(
-                "setSuggestedPrompts",
-                (ThrowingSend) s -> s.setSuggestedPrompts(7L, "C1ABCDEFGH", "Try", List.of())
-            ),
-            Arguments.of("publishHomeView", (ThrowingSend) s -> s.publishHomeView(7L, "U123", View.builder().build())),
-            Arguments.of("joinPublicChannel", (ThrowingSend) s -> s.joinPublicChannel(7L, "C1ABCDEFGH"))
-        );
+                Arguments.of(
+                        "setStatus", (ThrowingSend) s -> s.setStatus(7L, "C1ABCDEFGH", "171234.5678", "Thinking…")),
+                Arguments.of("setSuggestedPrompts", (ThrowingSend)
+                        s -> s.setSuggestedPrompts(7L, "C1ABCDEFGH", "Try", List.of())),
+                Arguments.of("publishHomeView", (ThrowingSend)
+                        s -> s.publishHomeView(7L, "U123", View.builder().build())),
+                Arguments.of("joinPublicChannel", (ThrowingSend) s -> s.joinPublicChannel(7L, "C1ABCDEFGH")));
     }
 
     @Test
@@ -104,13 +102,13 @@ class SlackMessageServiceTest extends BaseUnitTest {
         when(credentialProvider.resolve(any(IntegrationRef.class))).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.sendForWorkspace(7L, "C1ABCDEFGH", List.of(), "fallback"))
-            .isInstanceOf(SlackSendException.class)
-            .satisfies(ex -> {
-                SlackSendException sse = (SlackSendException) ex;
-                assertThat(sse.workspaceId()).isEqualTo(7L);
-                assertThat(sse.channelId()).isEqualTo("C1ABCDEFGH");
-                assertThat(sse.slackError()).isEqualTo("no_active_slack_connection");
-            });
+                .isInstanceOf(SlackSendException.class)
+                .satisfies(ex -> {
+                    SlackSendException sse = (SlackSendException) ex;
+                    assertThat(sse.workspaceId()).isEqualTo(7L);
+                    assertThat(sse.channelId()).isEqualTo("C1ABCDEFGH");
+                    assertThat(sse.slackError()).isEqualTo("no_active_slack_connection");
+                });
     }
 
     @Test
@@ -121,17 +119,20 @@ class SlackMessageServiceTest extends BaseUnitTest {
         });
 
         assertThatThrownBy(() -> service.appendStream(7L, "C1ABCDEFGH", "171234.5678", "delta"))
-            .isInstanceOf(SlackSendException.class)
-            .satisfies(ex -> assertThat(((SlackSendException) ex).slackError()).isEqualTo("silent_mode_engaged"));
+                .isInstanceOf(SlackSendException.class)
+                .satisfies(
+                        ex -> assertThat(((SlackSendException) ex).slackError()).isEqualTo("silent_mode_engaged"));
     }
 
     private static SlackApiException apiException(int code, String retryAfterHeader) {
-        Request request = new Request.Builder().url("https://slack.com/api/chat.postMessage").build();
+        Request request = new Request.Builder()
+                .url("https://slack.com/api/chat.postMessage")
+                .build();
         Response.Builder builder = new Response.Builder()
-            .request(request)
-            .protocol(Protocol.HTTP_1_1)
-            .code(code)
-            .message("test");
+                .request(request)
+                .protocol(Protocol.HTTP_1_1)
+                .code(code)
+                .message("test");
         if (retryAfterHeader != null) {
             builder.header("Retry-After", retryAfterHeader);
         }
@@ -140,18 +141,16 @@ class SlackMessageServiceTest extends BaseUnitTest {
 
     private static Stream<Arguments> rateLimitCases() {
         return Stream.of(
-            // A 429 with Retry-After: 3 → the caller must back off 3000 ms (honoring Slack, not a fixed tick).
-            Arguments.of(429, "3", 3000L),
-            Arguments.of(429, null, 1000L),
-            Arguments.of(500, "7", SlackSendException.NOT_RATE_LIMITED)
-        );
+                // A 429 with Retry-After: 3 → the caller must back off 3000 ms (honoring Slack, not a fixed tick).
+                Arguments.of(429, "3", 3000L),
+                Arguments.of(429, null, 1000L),
+                Arguments.of(500, "7", SlackSendException.NOT_RATE_LIMITED));
     }
 
     @ParameterizedTest(name = "code={0} retryAfterHeader={1} -> {2}ms")
     @MethodSource("rateLimitCases")
     void rateLimitRetryAfterMillis(int code, String retryAfterHeader, long expected) {
-        assertThat(SlackMessageService.rateLimitRetryAfterMillis(apiException(code, retryAfterHeader))).isEqualTo(
-            expected
-        );
+        assertThat(SlackMessageService.rateLimitRetryAfterMillis(apiException(code, retryAfterHeader)))
+                .isEqualTo(expected);
     }
 }

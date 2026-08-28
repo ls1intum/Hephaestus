@@ -24,17 +24,14 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHPullRequ
  * @see <a href="https://docs.github.com/en/graphql/reference/unions#projectv2itemcontent">GitHub GraphQL API - ProjectV2ItemContent</a>
  */
 @JsonTypeInfo(
-    use = JsonTypeInfo.Id.NAME,
-    include = JsonTypeInfo.As.PROPERTY,
-    property = "__typename",
-    visible = true,
-    defaultImpl = GHIssue.class
-)
-@JsonSubTypes(
-    {
-        @JsonSubTypes.Type(value = GHIssue.class, name = "Issue"),
-        @JsonSubTypes.Type(value = GHPullRequest.class, name = "PullRequest"),
-        @JsonSubTypes.Type(value = GHDraftIssue.class, name = "DraftIssue"),
-    }
-)
+        use = JsonTypeInfo.Id.NAME,
+        include = JsonTypeInfo.As.PROPERTY,
+        property = "__typename",
+        visible = true,
+        defaultImpl = GHIssue.class)
+@JsonSubTypes({
+    @JsonSubTypes.Type(value = GHIssue.class, name = "Issue"),
+    @JsonSubTypes.Type(value = GHPullRequest.class, name = "PullRequest"),
+    @JsonSubTypes.Type(value = GHDraftIssue.class, name = "DraftIssue"),
+})
 public abstract class GitHubProjectV2ItemContentMixin {}

@@ -64,21 +64,18 @@ class LeaderboardTaskSchedulerTest extends BaseUnitTest {
     /** Build the scheduler, register one workspace, and return the Runnable handed to the scheduler. */
     private Runnable registerAndCaptureTick(boolean notificationsEnabled, List<LeaderboardNotificationTask> tasks) {
         properties = new LeaderboardProperties(
-            new LeaderboardProperties.Schedule(1, "09:00"),
-            new LeaderboardProperties.Notification(notificationsEnabled)
-        );
+                new LeaderboardProperties.Schedule(1, "09:00"),
+                new LeaderboardProperties.Notification(notificationsEnabled));
         LeaderboardTaskScheduler scheduler = new LeaderboardTaskScheduler(
-            properties,
-            scheduleResolver,
-            taskScheduler,
-            tasks,
-            leaguePointsUpdateTask,
-            workspaceRepository,
-            lockProvider
-        );
-        when(taskScheduler.schedule(any(Runnable.class), any(Trigger.class))).thenReturn(
-            Mockito.mock(ScheduledFuture.class)
-        );
+                properties,
+                scheduleResolver,
+                taskScheduler,
+                tasks,
+                leaguePointsUpdateTask,
+                workspaceRepository,
+                lockProvider);
+        when(taskScheduler.schedule(any(Runnable.class), any(Trigger.class)))
+                .thenReturn(Mockito.mock(ScheduledFuture.class));
         when(workspaceRepository.findById(7L)).thenReturn(Optional.of(workspace(7L)));
 
         scheduler.onWorkspaceCreated(new WorkspaceCreatedEvent(7L, IntegrationKind.GITHUB));
@@ -127,8 +124,8 @@ class LeaderboardTaskSchedulerTest extends BaseUnitTest {
         Runnable tick = registerAndCaptureTick(true, List.of(notificationTask));
         when(lockProvider.lock(any())).thenReturn(Optional.of(lock));
         Mockito.doThrow(new IllegalStateException("slack down"))
-            .when(notificationTask)
-            .runForWorkspace(any(Workspace.class));
+                .when(notificationTask)
+                .runForWorkspace(any(Workspace.class));
 
         tick.run();
 

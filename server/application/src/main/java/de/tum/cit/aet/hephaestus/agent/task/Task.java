@@ -10,7 +10,7 @@ import java.util.Objects;
  * is interactive (stdin JSON-RPC) and lives outside this hierarchy.
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "kind")
-@JsonSubTypes({ @JsonSubTypes.Type(value = Task.PracticeReview.class, name = Task.PracticeReview.KIND) })
+@JsonSubTypes({@JsonSubTypes.Type(value = Task.PracticeReview.class, name = Task.PracticeReview.KIND)})
 public sealed interface Task {
     /**
      * Practice-review task: the Pi agent reads workspace context (PR diff, metadata, practice

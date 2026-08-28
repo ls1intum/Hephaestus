@@ -19,12 +19,11 @@ import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(
-    name = "repository_to_monitor",
-    uniqueConstraints = @UniqueConstraint(
-        name = "uk_repository_to_monitor_workspace_id",
-        columnNames = { "workspace_id", "id" }
-    )
-)
+        name = "repository_to_monitor",
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uk_repository_to_monitor_workspace_id",
+                        columnNames = {"workspace_id", "id"}))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -172,10 +171,8 @@ public class RepositoryToMonitor {
         if (!isPullRequestBackfillInitialized()) {
             return false;
         }
-        return (
-            pullRequestBackfillHighWaterMark == 0 ||
-            (pullRequestBackfillCheckpoint != null && pullRequestBackfillCheckpoint <= 0)
-        );
+        return (pullRequestBackfillHighWaterMark == 0
+                || (pullRequestBackfillCheckpoint != null && pullRequestBackfillCheckpoint <= 0));
     }
 
     /**

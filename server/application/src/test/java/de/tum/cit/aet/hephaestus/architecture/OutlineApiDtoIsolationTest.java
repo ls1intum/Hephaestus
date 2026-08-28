@@ -23,28 +23,24 @@ class OutlineApiDtoIsolationTest extends HephaestusArchitectureTest {
     @Test
     void outlineWireModelsStayOnTheExtractSeam() {
         ArchRule rule = classes()
-            .that()
-            .resideInAPackage("..integration.outline.client.model..")
-            .should()
-            .onlyBeAccessed()
-            .byClassesThat()
-            .resideInAnyPackage(
-                "..integration.outline.client..",
-                "..integration.outline.sync..",
-                "..integration.outline.collection..",
-                "..integration.outline.lifecycle..",
-                "..integration.outline.webhook.."
-            )
-            .because(
-                "Outline wire models are an implementation detail of the client and its sync, collection-admin, " +
-                    "lifecycle-registrar, and webhook consumers on the extract seam; they must not leak into the " +
-                    "agent read path or any other module"
-            )
-            .allowEmptyShould(false);
-        rule.check(
-            new ClassFileImporter()
+                .that()
+                .resideInAPackage("..integration.outline.client.model..")
+                .should()
+                .onlyBeAccessed()
+                .byClassesThat()
+                .resideInAnyPackage(
+                        "..integration.outline.client..",
+                        "..integration.outline.sync..",
+                        "..integration.outline.collection..",
+                        "..integration.outline.lifecycle..",
+                        "..integration.outline.webhook..")
+                .because(
+                        "Outline wire models are an implementation detail of the client and its sync, collection-admin, "
+                                + "lifecycle-registrar, and webhook consumers on the extract seam; they must not leak into the "
+                                + "agent read path or any other module")
+                .allowEmptyShould(false);
+        rule.check(new ClassFileImporter()
                 .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
-                .importPackages(BASE_PACKAGE)
-        );
+                .importPackages(BASE_PACKAGE));
     }
 }

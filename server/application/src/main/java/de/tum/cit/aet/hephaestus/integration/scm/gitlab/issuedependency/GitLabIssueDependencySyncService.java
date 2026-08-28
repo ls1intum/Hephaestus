@@ -62,12 +62,11 @@ public class GitLabIssueDependencySyncService {
     private final WebClient webClient;
 
     public GitLabIssueDependencySyncService(
-        IssueRepository issueRepository,
-        RepositoryRepository repositoryRepository,
-        GitLabTokenService tokenService,
-        GitLabRateLimitTracker rateLimitTracker,
-        WebClient.Builder webClientBuilder
-    ) {
+            IssueRepository issueRepository,
+            RepositoryRepository repositoryRepository,
+            GitLabTokenService tokenService,
+            GitLabRateLimitTracker rateLimitTracker,
+            WebClient.Builder webClientBuilder) {
         this.issueRepository = issueRepository;
         this.repositoryRepository = repositoryRepository;
         this.tokenService = tokenService;
@@ -88,18 +87,12 @@ public class GitLabIssueDependencySyncService {
      */
     @Transactional
     public SyncResult syncDependenciesForRepository(
-        Long scopeId,
-        Repository repository,
-        @Nullable OffsetDateTime updatedAfter
-    ) {
+            Long scopeId, Repository repository, @Nullable OffsetDateTime updatedAfter) {
         return syncDependenciesInternal(scopeId, repository, updatedAfter);
     }
 
     private SyncResult syncDependenciesInternal(
-        Long scopeId,
-        Repository repository,
-        @Nullable OffsetDateTime updatedAfter
-    ) {
+            Long scopeId, Repository repository, @Nullable OffsetDateTime updatedAfter) {
         String safeProjectPath = Objects.requireNonNullElse(sanitizeForLog(repository.getNameWithOwner()), "<unknown>");
 
         // Issues only: GitLab keeps issue IIDs and merge-request IIDs in separate per-project namespaces
@@ -115,16 +108,12 @@ public class GitLabIssueDependencySyncService {
         List<Issue> issuesToProcess;
         if (updatedAfter != null) {
             java.time.Instant cutoff = updatedAfter.toInstant();
-            issuesToProcess = allIssues
-                .stream()
-                .filter(i -> i.getNumber() > 0)
-                .filter(i -> i.getUpdatedAt() != null && i.getUpdatedAt().isAfter(cutoff))
-                .toList();
+            issuesToProcess = allIssues.stream()
+                    .filter(i -> i.getNumber() > 0)
+                    .filter(i -> i.getUpdatedAt() != null && i.getUpdatedAt().isAfter(cutoff))
+                    .toList();
         } else {
-            issuesToProcess = allIssues
-                .stream()
-                .filter(i -> i.getNumber() > 0)
-                .toList();
+            issuesToProcess = allIssues.stream().filter(i -> i.getNumber() > 0).toList();
         }
 
         if (issuesToProcess.isEmpty()) return SyncResult.completed(0);
@@ -132,11 +121,10 @@ public class GitLabIssueDependencySyncService {
         // Cap to avoid rate limit exhaustion
         if (issuesToProcess.size() > MAX_ISSUES_PER_CYCLE) {
             log.info(
-                "Capping dependency sync: project={}, total={}, cap={}",
-                safeProjectPath,
-                issuesToProcess.size(),
-                MAX_ISSUES_PER_CYCLE
-            );
+                    "Capping dependency sync: project={}, total={}, cap={}",
+                    safeProjectPath,
+                    issuesToProcess.size(),
+                    MAX_ISSUES_PER_CYCLE);
             issuesToProcess = issuesToProcess.subList(0, MAX_ISSUES_PER_CYCLE);
         }
 
@@ -150,10 +138,9 @@ public class GitLabIssueDependencySyncService {
             // Check rate limit before each API call
             if (rateLimitTracker.isCritical(scopeId)) {
                 log.info(
-                    "Rate limit critical, stopping dependency sync: project={}, remaining={}",
-                    safeProjectPath,
-                    rateLimitTracker.getRemaining(scopeId)
-                );
+                        "Rate limit critical, stopping dependency sync: project={}, remaining={}",
+                        safeProjectPath,
+                        rateLimitTracker.getRemaining(scopeId));
                 return SyncResult.abortedRateLimit(totalDeps);
             }
 
@@ -162,21 +149,19 @@ public class GitLabIssueDependencySyncService {
                 totalDeps += deps;
             } catch (Exception e) {
                 log.debug(
-                    "Failed to fetch issue links for dependencies: project={}, issue=#{}",
-                    safeProjectPath,
-                    issue.getNumber(),
-                    e
-                );
+                        "Failed to fetch issue links for dependencies: project={}, issue=#{}",
+                        safeProjectPath,
+                        issue.getNumber(),
+                        e);
             }
         }
 
         if (totalDeps > 0) {
             log.info(
-                "GitLab dependency sync: project={}, issuesProcessed={}, dependenciesProcessed={}",
-                safeProjectPath,
-                issuesToProcess.size(),
-                totalDeps
-            );
+                    "GitLab dependency sync: project={}, issuesProcessed={}, dependenciesProcessed={}",
+                    safeProjectPath,
+                    issuesToProcess.size(),
+                    totalDeps);
         }
 
         return SyncResult.completed(totalDeps);
@@ -192,19 +177,14 @@ public class GitLabIssueDependencySyncService {
 
     @SuppressWarnings("unchecked")
     private int processIssueDependencies(
-        String serverUrl,
-        String token,
-        long projectId,
-        Issue issue,
-        Repository repository
-    ) {
+            String serverUrl, String token, long projectId, Issue issue, Repository repository) {
         List<Map<String, Object>> links = webClient
-            .get()
-            .uri(serverUrl + "/api/v4/projects/{projectId}/issues/{iid}/links", projectId, issue.getNumber())
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-            .retrieve()
-            .bodyToMono(new ParameterizedTypeReference<List<Map<String, Object>>>() {})
-            .block(REQUEST_TIMEOUT);
+                .get()
+                .uri(serverUrl + "/api/v4/projects/{projectId}/issues/{iid}/links", projectId, issue.getNumber())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .retrieve()
+                .bodyToMono(new ParameterizedTypeReference<List<Map<String, Object>>>() {})
+                .block(REQUEST_TIMEOUT);
 
         if (links == null || links.isEmpty()) {
             // No links — clear any stale blockedBy entries for this issue
@@ -213,7 +193,8 @@ public class GitLabIssueDependencySyncService {
         }
 
         // Fetch issue with blockedBy eagerly loaded to avoid lazy loading issues
-        Issue issueWithDeps = issueRepository.findByIdWithBlockedBy(issue.getId()).orElse(issue);
+        Issue issueWithDeps =
+                issueRepository.findByIdWithBlockedBy(issue.getId()).orElse(issue);
         Set<Long> currentBlockerIds = new HashSet<>();
         // Track which issues this issue blocks (for bidirectional cleanup)
         Set<Long> currentBlockingIds = new HashSet<>();
@@ -242,7 +223,9 @@ public class GitLabIssueDependencySyncService {
                 Issue blocked = findIssueByLink(link, linkedIid, repository);
                 if (blocked != null) {
                     currentBlockingIds.add(blocked.getId());
-                    Issue blockedWithDeps = issueRepository.findByIdWithBlockedBy(blocked.getId()).orElse(blocked);
+                    Issue blockedWithDeps = issueRepository
+                            .findByIdWithBlockedBy(blocked.getId())
+                            .orElse(blocked);
                     if (!blockedWithDeps.getBlockedBy().contains(issueWithDeps)) {
                         blockedWithDeps.getBlockedBy().add(issueWithDeps);
                         issueRepository.save(blockedWithDeps);
@@ -267,7 +250,8 @@ public class GitLabIssueDependencySyncService {
      * Clears all blockers for an issue that has no links in GitLab.
      */
     private void clearAllBlockers(Issue issue) {
-        Issue issueWithDeps = issueRepository.findByIdWithBlockedBy(issue.getId()).orElse(null);
+        Issue issueWithDeps =
+                issueRepository.findByIdWithBlockedBy(issue.getId()).orElse(null);
         if (issueWithDeps != null && !issueWithDeps.getBlockedBy().isEmpty()) {
             issueWithDeps.getBlockedBy().clear();
             issueRepository.save(issueWithDeps);
@@ -290,7 +274,8 @@ public class GitLabIssueDependencySyncService {
         for (Issue candidate : allRepoIssues) {
             if (currentBlockingIds.contains(candidate.getId())) continue;
             // Check if this candidate currently has blocker in its blockedBy
-            Issue candidateWithDeps = issueRepository.findByIdWithBlockedBy(candidate.getId()).orElse(null);
+            Issue candidateWithDeps =
+                    issueRepository.findByIdWithBlockedBy(candidate.getId()).orElse(null);
             if (candidateWithDeps != null && candidateWithDeps.getBlockedBy().contains(blocker)) {
                 candidateWithDeps.getBlockedBy().remove(blocker);
                 issueRepository.save(candidateWithDeps);
@@ -305,7 +290,9 @@ public class GitLabIssueDependencySyncService {
     @Nullable
     private Issue findIssueByLink(Map<String, Object> link, int linkedIid, Repository repository) {
         // Same-repo lookup first (fast path)
-        Issue issue = issueRepository.findByRepositoryIdAndNumber(repository.getId(), linkedIid).orElse(null);
+        Issue issue = issueRepository
+                .findByRepositoryIdAndNumber(repository.getId(), linkedIid)
+                .orElse(null);
         if (issue != null) return issue;
 
         // Cross-repo: extract project_id from the link response
@@ -314,13 +301,14 @@ public class GitLabIssueDependencySyncService {
             long linkedProjectId = projectIdNum.longValue();
             if (linkedProjectId != repository.getNativeId()) {
                 Repository crossRepo = repositoryRepository
-                    .findByNativeIdAndProviderId(
-                        linkedProjectId,
-                        Objects.requireNonNull(repository.getProvider().getId())
-                    )
-                    .orElse(null);
+                        .findByNativeIdAndProviderId(
+                                linkedProjectId,
+                                Objects.requireNonNull(repository.getProvider().getId()))
+                        .orElse(null);
                 if (crossRepo != null) {
-                    return issueRepository.findByRepositoryIdAndNumber(crossRepo.getId(), linkedIid).orElse(null);
+                    return issueRepository
+                            .findByRepositoryIdAndNumber(crossRepo.getId(), linkedIid)
+                            .orElse(null);
                 }
             }
         }

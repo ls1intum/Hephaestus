@@ -62,15 +62,14 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
     private final ApplicationEventPublisher eventPublisher;
 
     public GitHubIssueCommentProcessor(
-        IssueCommentRepository commentRepository,
-        IssueRepository issueRepository,
-        PullRequestRepository pullRequestRepository,
-        UserRepository userRepository,
-        LabelRepository labelRepository,
-        MilestoneRepository milestoneRepository,
-        GitHubUserProcessor gitHubUserProcessor,
-        ApplicationEventPublisher eventPublisher
-    ) {
+            IssueCommentRepository commentRepository,
+            IssueRepository issueRepository,
+            PullRequestRepository pullRequestRepository,
+            UserRepository userRepository,
+            LabelRepository labelRepository,
+            MilestoneRepository milestoneRepository,
+            GitHubUserProcessor gitHubUserProcessor,
+            ApplicationEventPublisher eventPublisher) {
         super(userRepository, labelRepository, milestoneRepository, gitHubUserProcessor);
         this.commentRepository = commentRepository;
         this.issueRepository = issueRepository;
@@ -105,20 +104,19 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
         // Look up parent: try Issue first, then PullRequest (needed because
         // IssueRepository filters by TYPE = Issue, excluding PullRequest rows)
         Issue issue = issueRepository
-            .findByRepositoryIdAndNumber(context.repository().getId(), issueNumber)
-            .orElse(null);
-        if (issue == null) {
-            issue = pullRequestRepository
                 .findByRepositoryIdAndNumber(context.repository().getId(), issueNumber)
                 .orElse(null);
+        if (issue == null) {
+            issue = pullRequestRepository
+                    .findByRepositoryIdAndNumber(context.repository().getId(), issueNumber)
+                    .orElse(null);
         }
         if (issue == null) {
             log.warn(
-                "Skipped comment processing: reason=parentNotFound, repoId={}, issueNumber={}, commentId={}",
-                context.repository().getId(),
-                issueNumber,
-                dto.id()
-            );
+                    "Skipped comment processing: reason=parentNotFound, repoId={}, issueNumber={}, commentId={}",
+                    context.repository().getId(),
+                    issueNumber,
+                    dto.id());
             return null;
         }
 
@@ -149,10 +147,7 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
      */
     @Transactional
     public @Nullable IssueComment processWithParentCreation(
-        GitHubCommentDTO dto,
-        GitHubIssueDTO issueDto,
-        ProcessingContext context
-    ) {
+            GitHubCommentDTO dto, GitHubIssueDTO issueDto, ProcessingContext context) {
         if (dto == null || dto.id() == null) {
             log.warn("Skipped comment processing: reason=nullOrMissingId");
             return null;
@@ -165,21 +160,20 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
 
         if (issueDto.number() <= 0) {
             log.warn(
-                "Skipped comment processing: reason=invalidIssueNumber, issueNumber={}, commentId={}",
-                issueDto.number(),
-                dto.id()
-            );
+                    "Skipped comment processing: reason=invalidIssueNumber, issueNumber={}, commentId={}",
+                    issueDto.number(),
+                    dto.id());
             return null;
         }
 
         // Try to find existing parent entity: Issue first, then PullRequest
         Issue issue = issueRepository
-            .findByRepositoryIdAndNumber(context.repository().getId(), issueDto.number())
-            .orElse(null);
-        if (issue == null) {
-            issue = pullRequestRepository
                 .findByRepositoryIdAndNumber(context.repository().getId(), issueDto.number())
                 .orElse(null);
+        if (issue == null) {
+            issue = pullRequestRepository
+                    .findByRepositoryIdAndNumber(context.repository().getId(), issueDto.number())
+                    .orElse(null);
         }
 
         // If parent doesn't exist, create a minimal entity from webhook data
@@ -187,11 +181,10 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
             issue = createMinimalParentEntityWithRetry(issueDto, context);
             if (issue == null) {
                 log.warn(
-                    "Skipped comment processing: reason=failedToCreateParent, repoId={}, issueNumber={}, commentId={}",
-                    context.repository().getId(),
-                    issueDto.number(),
-                    dto.id()
-                );
+                        "Skipped comment processing: reason=failedToCreateParent, repoId={}, issueNumber={}, commentId={}",
+                        context.repository().getId(),
+                        issueDto.number(),
+                        dto.id());
                 return null;
             }
         }
@@ -261,23 +254,12 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
 
         // Publish domain events with DTOs (safe for async handlers)
         if (isNew) {
-            eventPublisher.publishEvent(
-                new ScmDomainEvent.CommentCreated(
-                    ScmEventPayload.CommentData.from(saved),
-                    issueId,
-                    EventContext.from(context)
-                )
-            );
+            eventPublisher.publishEvent(new ScmDomainEvent.CommentCreated(
+                    ScmEventPayload.CommentData.from(saved), issueId, EventContext.from(context)));
             log.debug("Created comment: commentId={}, issueId={}", saved.getId(), issueId);
         } else if (!changedFields.isEmpty()) {
-            eventPublisher.publishEvent(
-                new ScmDomainEvent.CommentUpdated(
-                    ScmEventPayload.CommentData.from(saved),
-                    issueId,
-                    changedFields,
-                    EventContext.from(context)
-                )
-            );
+            eventPublisher.publishEvent(new ScmDomainEvent.CommentUpdated(
+                    ScmEventPayload.CommentData.from(saved), issueId, changedFields, EventContext.from(context)));
             log.debug("Updated comment: commentId={}, changedFields={}", saved.getId(), changedFields);
         }
 
@@ -302,23 +284,23 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
         }
 
         commentRepository
-            .findByNativeIdAndProviderId(commentId, Objects.requireNonNull(context.providerId()))
-            .ifPresent(comment -> {
-                Long issueId = comment.getIssue() != null ? comment.getIssue().getId() : null;
+                .findByNativeIdAndProviderId(commentId, Objects.requireNonNull(context.providerId()))
+                .ifPresent(comment -> {
+                    Long issueId =
+                            comment.getIssue() != null ? comment.getIssue().getId() : null;
 
-                // CRITICAL: Remove from parent Issue's collection BEFORE deleting
-                // to prevent TransientObjectException with orphanRemoval=true
-                Issue parentIssue = comment.getIssue();
-                if (parentIssue != null) {
-                    parentIssue.getComments().remove(comment);
-                }
+                    // CRITICAL: Remove from parent Issue's collection BEFORE deleting
+                    // to prevent TransientObjectException with orphanRemoval=true
+                    Issue parentIssue = comment.getIssue();
+                    if (parentIssue != null) {
+                        parentIssue.getComments().remove(comment);
+                    }
 
-                commentRepository.delete(comment);
-                eventPublisher.publishEvent(
-                    new ScmDomainEvent.CommentDeleted(commentId, issueId, EventContext.from(context))
-                );
-                log.info("Deleted comment: commentId={}", commentId);
-            });
+                    commentRepository.delete(comment);
+                    eventPublisher.publishEvent(
+                            new ScmDomainEvent.CommentDeleted(commentId, issueId, EventContext.from(context)));
+                    log.info("Deleted comment: commentId={}", commentId);
+                });
     }
 
     // Private Helper Methods
@@ -345,18 +327,17 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
             // Another thread created the entity first (unique constraint violation)
             // This is expected behavior in concurrent webhook processing
             log.debug(
-                "Concurrent parent creation detected, looking up existing entity: repoId={}, issueNumber={}",
-                repository.getId(),
-                issueDto.number()
-            );
+                    "Concurrent parent creation detected, looking up existing entity: repoId={}, issueNumber={}",
+                    repository.getId(),
+                    issueDto.number());
             // Try Issue first, then PullRequest (IssueRepository filters by TYPE = Issue)
             Issue found = issueRepository
-                .findByRepositoryIdAndNumber(repository.getId(), issueDto.number())
-                .orElse(null);
+                    .findByRepositoryIdAndNumber(repository.getId(), issueDto.number())
+                    .orElse(null);
             if (found != null) return found;
             return pullRequestRepository
-                .findByRepositoryIdAndNumber(repository.getId(), issueDto.number())
-                .orElse(null);
+                    .findByRepositoryIdAndNumber(repository.getId(), issueDto.number())
+                    .orElse(null);
         }
     }
 
@@ -416,12 +397,11 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
         populateBaseIssueFields(issue, dto, repository, context);
         Issue saved = issueRepository.save(issue);
         log.info(
-            "Created stub Issue from comment webhook (will be hydrated by issue webhook or sync): " +
-                "issueId={}, issueNumber={}, repoName={}",
-            saved.getId(),
-            saved.getNumber(),
-            repository.getNameWithOwner()
-        );
+                "Created stub Issue from comment webhook (will be hydrated by issue webhook or sync): "
+                        + "issueId={}, issueNumber={}, repoName={}",
+                saved.getId(),
+                saved.getNumber(),
+                repository.getNameWithOwner());
         return saved;
     }
 
@@ -457,12 +437,11 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
 
         PullRequest saved = pullRequestRepository.save(pr);
         log.info(
-            "Created stub PullRequest from comment webhook (will be hydrated by PR webhook or sync): " +
-                "prId={}, prNumber={}, repoName={}",
-            saved.getId(),
-            saved.getNumber(),
-            repository.getNameWithOwner()
-        );
+                "Created stub PullRequest from comment webhook (will be hydrated by PR webhook or sync): "
+                        + "prId={}, prNumber={}, repoName={}",
+                saved.getId(),
+                saved.getNumber(),
+                repository.getNameWithOwner());
         return saved;
     }
 
@@ -470,11 +449,7 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
      * Populates base Issue fields common to both Issue and PullRequest entities.
      */
     private void populateBaseIssueFields(
-        Issue issue,
-        GitHubIssueDTO dto,
-        Repository repository,
-        ProcessingContext context
-    ) {
+            Issue issue, GitHubIssueDTO dto, Repository repository, ProcessingContext context) {
         issue.setNativeId(Objects.requireNonNull(dto.getDatabaseId()));
         issue.setProvider(Objects.requireNonNull(context.provider()));
         issue.setNumber(dto.number());
@@ -528,10 +503,8 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
      */
     private Issue.@Nullable State convertState(@Nullable String state) {
         if (state == null) {
-            log.warn(
-                "Issue state is null when creating stub from comment webhook, defaulting to OPEN. " +
-                    "This may indicate missing data in webhook payload."
-            );
+            log.warn("Issue state is null when creating stub from comment webhook, defaulting to OPEN. "
+                    + "This may indicate missing data in webhook payload.");
             return Issue.State.OPEN;
         }
         return switch (state.toUpperCase()) {

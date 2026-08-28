@@ -16,12 +16,11 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  */
 @ConfigurationProperties(prefix = "hephaestus.worker")
 public record WorkerProperties(
-    @Nullable String workerId,
-    @DefaultValue Capacity capacity,
-    @DefaultValue Drain drain,
-    @DefaultValue Heartbeat heartbeat,
-    @DefaultValue Control control
-) {
+        @Nullable String workerId,
+        @DefaultValue Capacity capacity,
+        @DefaultValue Drain drain,
+        @DefaultValue Heartbeat heartbeat,
+        @DefaultValue Control control) {
     public static final String AUTO = "auto";
 
     /**
@@ -56,22 +55,21 @@ public record WorkerProperties(
 
     @Override
     public String toString() {
-        return (
-            "WorkerProperties[workerId=" +
-            workerId +
-            ", capacity=" +
-            capacity +
-            ", drain=" +
-            drain +
-            ", heartbeat=" +
-            heartbeat +
-            ", control=" +
-            control +
-            "]"
-        );
+        return ("WorkerProperties[workerId=" + workerId
+                + ", capacity="
+                + capacity
+                + ", drain="
+                + drain
+                + ", heartbeat="
+                + heartbeat
+                + ", control="
+                + control
+                + "]");
     }
 
-    public record Capacity(@DefaultValue("auto") String reviewMax, @DefaultValue("auto") String mentorMax) {
+    public record Capacity(
+            @DefaultValue("auto") String reviewMax,
+            @DefaultValue("auto") String mentorMax) {
         public int resolveReviewMax() {
             return resolve(reviewMax, Math.max(1, Runtime.getRuntime().availableProcessors() - 1));
         }
@@ -113,29 +111,24 @@ public record WorkerProperties(
     }
 
     public record Control(
-        @Nullable URI endpoint,
-        @Nullable String registrationToken,
-        @DefaultValue("10s") Duration handshakeTimeout
-    ) {
+            @Nullable URI endpoint,
+            @Nullable String registrationToken,
+            @DefaultValue("10s") Duration handshakeTimeout) {
         public Control {
             if (handshakeTimeout == null || handshakeTimeout.isZero() || handshakeTimeout.isNegative()) {
                 throw new IllegalArgumentException(
-                    "control.handshakeTimeout must be positive, got: " + handshakeTimeout
-                );
+                        "control.handshakeTimeout must be positive, got: " + handshakeTimeout);
             }
         }
 
         @Override
         public String toString() {
-            return (
-                "Control[endpoint=" +
-                endpoint +
-                ", registrationToken=" +
-                (registrationToken == null || registrationToken.isBlank() ? "<unset>" : "<redacted>") +
-                ", handshakeTimeout=" +
-                handshakeTimeout +
-                "]"
-            );
+            return ("Control[endpoint=" + endpoint
+                    + ", registrationToken="
+                    + (registrationToken == null || registrationToken.isBlank() ? "<unset>" : "<redacted>")
+                    + ", handshakeTimeout="
+                    + handshakeTimeout
+                    + "]");
         }
 
         /** @return {@code true} iff the worker has enough config to attempt a WSS dial. */

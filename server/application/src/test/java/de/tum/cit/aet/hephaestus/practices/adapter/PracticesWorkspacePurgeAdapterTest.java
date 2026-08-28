@@ -41,13 +41,12 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         adapter = new PracticesWorkspacePurgeAdapter(
-            evaluationRepository,
-            dispatchRepository,
-            feedbackRepository,
-            observationRepository,
-            practiceRepository,
-            practiceGroupRepository
-        );
+                evaluationRepository,
+                dispatchRepository,
+                feedbackRepository,
+                observationRepository,
+                practiceRepository,
+                practiceGroupRepository);
     }
 
     @Test
@@ -60,13 +59,12 @@ class PracticesWorkspacePurgeAdapterTest extends BaseUnitTest {
         // practice -> practice_group references before groups are removed). Assert the ORDER, not just the
         // calls, so a reordering refactor fails the unit test instead of only failing on a real DB.
         InOrder inOrder = inOrder(
-            evaluationRepository,
-            dispatchRepository,
-            feedbackRepository,
-            observationRepository,
-            practiceRepository,
-            practiceGroupRepository
-        );
+                evaluationRepository,
+                dispatchRepository,
+                feedbackRepository,
+                observationRepository,
+                practiceRepository,
+                practiceGroupRepository);
         inOrder.verify(evaluationRepository).deleteAllByWorkspaceId(workspaceId);
         inOrder.verify(dispatchRepository).deleteAllByWorkspaceId(workspaceId);
         inOrder.verify(feedbackRepository).deleteAllByWorkspaceId(workspaceId);

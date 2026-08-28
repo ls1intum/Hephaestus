@@ -33,13 +33,11 @@ public interface ApiCredentialProvider {
      * time, not at compile time, so keep them in sync.
      */
     @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = "type")
-    @JsonSubTypes(
-        {
-            @JsonSubTypes.Type(value = BearerToken.class, name = "BEARER"),
-            @JsonSubTypes.Type(value = InstallationCredential.class, name = "INSTALLATION_APP"),
-            @JsonSubTypes.Type(value = OAuthSession.class, name = "OAUTH_SESSION"),
-        }
-    )
+    @JsonSubTypes({
+        @JsonSubTypes.Type(value = BearerToken.class, name = "BEARER"),
+        @JsonSubTypes.Type(value = InstallationCredential.class, name = "INSTALLATION_APP"),
+        @JsonSubTypes.Type(value = OAuthSession.class, name = "OAUTH_SESSION"),
+    })
     sealed interface CredentialBundle permits BearerToken, InstallationCredential, OAuthSession {}
 
     /**
@@ -65,19 +63,15 @@ public interface ApiCredentialProvider {
 
     /** OAuth session with refresh capability. {@code accessToken} + {@code refreshToken} redacted. */
     record OAuthSession(
-        String accessToken,
-        @Nullable String refreshToken,
-        @Nullable Instant expiresAt
-    ) implements CredentialBundle {
+            String accessToken,
+            @Nullable String refreshToken,
+            @Nullable Instant expiresAt) implements CredentialBundle {
         @Override
         public String toString() {
-            return (
-                "OAuthSession[accessToken=***, refreshToken=" +
-                (refreshToken == null ? "null" : "***") +
-                ", expiresAt=" +
-                expiresAt +
-                "]"
-            );
+            return ("OAuthSession[accessToken=***, refreshToken=" + (refreshToken == null ? "null" : "***")
+                    + ", expiresAt="
+                    + expiresAt
+                    + "]");
         }
     }
 }

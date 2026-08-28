@@ -56,25 +56,26 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
 
     private SlackMessageService slackThatStreamsOk() {
         SlackMessageService slack = mock(SlackMessageService.class);
-        when(slack.startStream(anyLong(), anyString(), anyString(), anyString())).thenAnswer(inv -> {
-            delivered.add(inv.getArgument(3));
-            starts.incrementAndGet();
-            return "1700000000.999999";
-        });
+        when(slack.startStream(anyLong(), anyString(), anyString(), anyString()))
+                .thenAnswer(inv -> {
+                    delivered.add(inv.getArgument(3));
+                    starts.incrementAndGet();
+                    return "1700000000.999999";
+                });
         lenient()
-            .doAnswer(inv -> {
-                delivered.add(inv.getArgument(3));
-                appends.incrementAndGet();
-                return null;
-            })
-            .when(slack)
-            .appendStream(anyLong(), anyString(), anyString(), anyString());
+                .doAnswer(inv -> {
+                    delivered.add(inv.getArgument(3));
+                    appends.incrementAndGet();
+                    return null;
+                })
+                .when(slack)
+                .appendStream(anyLong(), anyString(), anyString(), anyString());
         doAnswer(inv -> {
-            stops.incrementAndGet();
-            return null;
-        })
-            .when(slack)
-            .stopStream(anyLong(), anyString(), anyString(), any());
+                    stops.incrementAndGet();
+                    return null;
+                })
+                .when(slack)
+                .stopStream(anyLong(), anyString(), anyString(), any());
         return slack;
     }
 
@@ -99,17 +100,9 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
     void streamsIncrementallyAndPreservesContent() throws InterruptedException {
         SlackMessageService slack = slackThatStreamsOk();
         var channel = new SlackStreamingMentorChannel(
-            slack,
-            WS,
-            CH,
-            THREAD,
-            Duration.ofSeconds(2),
-            Duration.ofSeconds(10),
-            5,
-            10
-        );
+                slack, WS, CH, THREAD, Duration.ofSeconds(2), Duration.ofSeconds(10), 5, 10);
 
-        String[] words = { "The ", "token ", "validator ", "ships ", "without ", "any ", "unit ", "tests. " };
+        String[] words = {"The ", "token ", "validator ", "ships ", "without ", "any ", "unit ", "tests. "};
         for (int i = 0; i < 4; i++) {
             channel.send(delta(words[i]));
         }
@@ -122,7 +115,9 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
         waitUntil(() -> stops.get() >= 1, 4000);
 
         assertThat(starts.get()).isEqualTo(1);
-        assertThat(appends.get()).as("reply must stream in more than the initial open").isGreaterThanOrEqualTo(1);
+        assertThat(appends.get())
+                .as("reply must stream in more than the initial open")
+                .isGreaterThanOrEqualTo(1);
         assertThat(stops.get()).isEqualTo(1);
         assertThat(String.join("", delivered)).isEqualTo(String.join("", words));
         verify(slack).startStream(eq(WS), eq(CH), eq(THREAD), anyString());
@@ -140,7 +135,9 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
 
         ArgumentCaptor<List<LayoutBlock>> blocks = ArgumentCaptor.captor();
         verify(slack).stopStream(eq(WS), eq(CH), anyString(), blocks.capture());
-        assertThat(blocks.getValue()).as("mentor answers should not add a bulky feedback row").isEmpty();
+        assertThat(blocks.getValue())
+                .as("mentor answers should not add a bulky feedback row")
+                .isEmpty();
     }
 
     @Test
@@ -150,8 +147,7 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
         var channel = new SlackStreamingMentorChannel(slack, WS, CH, THREAD);
 
         channel.send(
-            delta("Hey! Which of the recent items - PR #12, PR #9, or issue #15 - do you want to look at next?")
-        );
+                delta("Hey! Which of the recent items - PR #12, PR #9, or issue #15 - do you want to look at next?"));
         channel.send(delta("Hey there! Which of the recent items - PR #12, PR #9, or issue #15 - should we focus on?"));
 
         channel.completeWithDone();
@@ -159,17 +155,16 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
 
         assertThat(starts.get()).isEqualTo(1);
         assertThat(stops.get()).isEqualTo(1);
-        assertThat(String.join("", delivered)).isEqualTo(
-            "Hey! Which of the recent items - PR #12, PR #9, or issue #15 - do you want to look at next?"
-        );
+        assertThat(String.join("", delivered))
+                .isEqualTo(
+                        "Hey! Which of the recent items - PR #12, PR #9, or issue #15 - do you want to look at next?");
     }
 
     @Test
     @DisplayName("normalizes non-ASCII punctuation before text reaches Slack")
     void normalizesNonAsciiPunctuation() {
-        assertThat(SlackMentorTextFilter.normalize("Slack\u2011mentor — “review”…")).isEqualTo(
-            "Slack-mentor - \"review\"..."
-        );
+        assertThat(SlackMentorTextFilter.normalize("Slack\u2011mentor — “review”…"))
+                .isEqualTo("Slack-mentor - \"review\"...");
     }
 
     @Test
@@ -178,19 +173,14 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
         SlackMessageService slack = slackThatStreamsOk();
         var channel = new SlackStreamingMentorChannel(slack, WS, CH, THREAD);
 
-        channel.send(
-            delta(
-                "User wants to see Slack messages in context. " +
-                    "We need to fetch inputs/context/slack_conversations.json. " +
-                    "I can use your recent Slack threads as context. Which thread should we look at?"
-            )
-        );
+        channel.send(delta("User wants to see Slack messages in context. "
+                + "We need to fetch inputs/context/slack_conversations.json. "
+                + "I can use your recent Slack threads as context. Which thread should we look at?"));
         channel.completeWithDone();
         waitUntil(() -> stops.get() >= 1, 4000);
 
-        assertThat(String.join("", delivered)).isEqualTo(
-            "I can use your recent Slack threads as context. Which thread should we look at?"
-        );
+        assertThat(String.join("", delivered))
+                .isEqualTo("I can use your recent Slack threads as context. Which thread should we look at?");
     }
 
     @Test
@@ -204,9 +194,8 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
         channel.completeWithDone();
         waitUntil(() -> stops.get() >= 1, 4000);
 
-        assertThat(String.join("", delivered)).isEqualTo(
-            "Your PR validation is stronger. Your issue triage still needs tests."
-        );
+        assertThat(String.join("", delivered))
+                .isEqualTo("Your PR validation is stronger. Your issue triage still needs tests.");
     }
 
     @Test
@@ -220,7 +209,9 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
 
         ArgumentCaptor<List<LayoutBlock>> blocks = ArgumentCaptor.captor();
         verify(slack).stopStream(eq(WS), eq(CH), anyString(), blocks.capture());
-        assertThat(blocks.getValue()).as("failed mentor turns should not ask for quality feedback").isEmpty();
+        assertThat(blocks.getValue())
+                .as("failed mentor turns should not ask for quality feedback")
+                .isEmpty();
     }
 
     @Test
@@ -238,9 +229,8 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
 
     private static Stream<Arguments> transientStartStreamFailures() {
         return Stream.of(
-            Arguments.of("bare rate-limit error", new SlackSendException(WS, CH, "ratelimited")),
-            Arguments.of("429 with Retry-After", new SlackSendException(WS, CH, "ratelimited", 20L))
-        );
+                Arguments.of("bare rate-limit error", new SlackSendException(WS, CH, "ratelimited")),
+                Arguments.of("429 with Retry-After", new SlackSendException(WS, CH, "ratelimited", 20L)));
     }
 
     @ParameterizedTest(name = "{0} is retried and the turn is NOT aborted")
@@ -250,28 +240,29 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
         List<String> got = Collections.synchronizedList(new ArrayList<>());
         AtomicInteger startCalls = new AtomicInteger();
         AtomicBoolean stopped = new AtomicBoolean();
-        when(slack.startStream(anyLong(), anyString(), anyString(), anyString())).thenAnswer(inv -> {
-            // First open fails transiently; the loop must re-buffer and retry, not give up.
-            if (startCalls.incrementAndGet() == 1) {
-                throw failure;
-            }
-            got.add(inv.getArgument(3));
-            return "ts";
-        });
+        when(slack.startStream(anyLong(), anyString(), anyString(), anyString()))
+                .thenAnswer(inv -> {
+                    // First open fails transiently; the loop must re-buffer and retry, not give up.
+                    if (startCalls.incrementAndGet() == 1) {
+                        throw failure;
+                    }
+                    got.add(inv.getArgument(3));
+                    return "ts";
+                });
         // The fast path finalizes via startStream; appendStream may or may not be hit depending on timing.
         lenient()
-            .doAnswer(inv -> {
-                got.add(inv.getArgument(3));
-                return null;
-            })
-            .when(slack)
-            .appendStream(anyLong(), anyString(), anyString(), anyString());
+                .doAnswer(inv -> {
+                    got.add(inv.getArgument(3));
+                    return null;
+                })
+                .when(slack)
+                .appendStream(anyLong(), anyString(), anyString(), anyString());
         doAnswer(inv -> {
-            stopped.set(true);
-            return null;
-        })
-            .when(slack)
-            .stopStream(anyLong(), anyString(), anyString(), any());
+                    stopped.set(true);
+                    return null;
+                })
+                .when(slack)
+                .stopStream(anyLong(), anyString(), anyString(), any());
 
         var channel = new SlackStreamingMentorChannel(slack, WS, CH, THREAD);
         AtomicBoolean disconnected = new AtomicBoolean();
@@ -281,8 +272,12 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
         channel.completeWithDone();
         waitUntil(stopped::get, 5000);
 
-        assertThat(disconnected.get()).as("a transient failure must not be treated as a disconnect").isFalse();
-        assertThat(startCalls.get()).as("startStream retried after the transient failure").isGreaterThanOrEqualTo(2);
+        assertThat(disconnected.get())
+                .as("a transient failure must not be treated as a disconnect")
+                .isFalse();
+        assertThat(startCalls.get())
+                .as("startStream retried after the transient failure")
+                .isGreaterThanOrEqualTo(2);
         assertThat(String.join("", got)).contains("hello world");
     }
 
@@ -295,39 +290,28 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
         AtomicBoolean released = new AtomicBoolean(false);
         // The first startStream blocks until released, IGNORING interrupts — modelling an OkHttp call that does not
         // respond to shutdownNow()'s interrupt. This keeps a flush tick "in-flight" while finish() runs.
-        when(slack.startStream(anyLong(), anyString(), anyString(), anyString())).thenAnswer(inv -> {
-            startCalls.incrementAndGet();
-            startEntered.countDown();
-            while (!released.get()) {
-                try {
-                    Thread.sleep(50);
-                } catch (InterruptedException ignored) {
-                    // swallow: OkHttp does not abort on interrupt
-                }
-            }
-            return "ts-" + startCalls.get();
-        });
-        lenient()
-            .doAnswer(inv -> null)
-            .when(slack)
-            .appendStream(anyLong(), anyString(), anyString(), anyString());
-        lenient()
-            .doAnswer(inv -> null)
-            .when(slack)
-            .stopStream(anyLong(), anyString(), anyString(), any());
+        when(slack.startStream(anyLong(), anyString(), anyString(), anyString()))
+                .thenAnswer(inv -> {
+                    startCalls.incrementAndGet();
+                    startEntered.countDown();
+                    while (!released.get()) {
+                        try {
+                            Thread.sleep(50);
+                        } catch (InterruptedException ignored) {
+                            // swallow: OkHttp does not abort on interrupt
+                        }
+                    }
+                    return "ts-" + startCalls.get();
+                });
+        lenient().doAnswer(inv -> null).when(slack).appendStream(anyLong(), anyString(), anyString(), anyString());
+        lenient().doAnswer(inv -> null).when(slack).stopStream(anyLong(), anyString(), anyString(), any());
 
         var channel = new SlackStreamingMentorChannel(
-            slack,
-            WS,
-            CH,
-            THREAD,
-            Duration.ofMillis(20),
-            Duration.ofSeconds(2),
-            350,
-            1000
-        );
+                slack, WS, CH, THREAD, Duration.ofMillis(20), Duration.ofSeconds(2), 350, 1000);
         channel.send(delta("first words here "));
-        assertThat(startEntered.await(3, TimeUnit.SECONDS)).as("flush tick should open the stream").isTrue();
+        assertThat(startEntered.await(3, TimeUnit.SECONDS))
+                .as("flush tick should open the stream")
+                .isTrue();
 
         Thread finisher = new Thread(channel::completeWithDone, "finisher");
         finisher.start();
@@ -335,16 +319,17 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
         released.set(true);
         finisher.join(8000);
 
-        assertThat(startCalls.get()).as("the stream must be opened exactly once, never twice").isEqualTo(1);
+        assertThat(startCalls.get())
+                .as("the stream must be opened exactly once, never twice")
+                .isEqualTo(1);
     }
 
     @Test
     @DisplayName("a genuine 'gone' error fires the disconnect hook once")
     void goneErrorDisconnects() {
         SlackMessageService slack = mock(SlackMessageService.class);
-        when(slack.startStream(anyLong(), eq(CH), anyString(), anyString())).thenThrow(
-            new SlackSendException(WS, CH, "channel_not_found")
-        );
+        when(slack.startStream(anyLong(), eq(CH), anyString(), anyString()))
+                .thenThrow(new SlackSendException(WS, CH, "channel_not_found"));
 
         var channel = new SlackStreamingMentorChannel(slack, WS, CH, THREAD);
         AtomicInteger disconnects = new AtomicInteger();
@@ -361,9 +346,8 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
     @Test
     void noWriteBlockedBySilentModeIsSuppressed() {
         SlackMessageService slack = mock(SlackMessageService.class);
-        when(slack.startStream(anyLong(), anyString(), anyString(), anyString())).thenThrow(
-            new SlackSendException(WS, CH, "silent_mode_engaged")
-        );
+        when(slack.startStream(anyLong(), anyString(), anyString(), anyString()))
+                .thenThrow(new SlackSendException(WS, CH, "silent_mode_engaged"));
         var channel = new SlackStreamingMentorChannel(slack, WS, CH, THREAD);
 
         channel.send(delta("suppressed response"));
@@ -373,10 +357,11 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
     @Test
     void successfulContentWinsWhenSilentModeEngagesMidStream() {
         SlackMessageService slack = mock(SlackMessageService.class);
-        when(slack.startStream(anyLong(), anyString(), anyString(), anyString())).thenReturn("ts");
+        when(slack.startStream(anyLong(), anyString(), anyString(), anyString()))
+                .thenReturn("ts");
         doThrow(new SlackSendException(WS, CH, "silent_mode_engaged"))
-            .when(slack)
-            .appendStream(anyLong(), anyString(), anyString(), anyString());
+                .when(slack)
+                .appendStream(anyLong(), anyString(), anyString(), anyString());
         var channel = new SlackStreamingMentorChannel(slack, WS, CH, THREAD);
 
         channel.send(delta("first "));

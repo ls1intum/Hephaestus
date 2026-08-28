@@ -12,11 +12,10 @@ import org.jspecify.annotations.Nullable;
  * it could not, rather than omitting the fact.
  */
 public record SourceCaptureFacts(
-    Instant capturedAt,
-    @Nullable Instant sourceEffectiveAt,
-    @Nullable Instant observedAt,
-    @Nullable String immutableIdentity
-) {
+        Instant capturedAt,
+        @Nullable Instant sourceEffectiveAt,
+        @Nullable Instant observedAt,
+        @Nullable String immutableIdentity) {
     public SourceCaptureFacts {
         Objects.requireNonNull(capturedAt, "capturedAt");
         if (immutableIdentity != null && immutableIdentity.isBlank()) {

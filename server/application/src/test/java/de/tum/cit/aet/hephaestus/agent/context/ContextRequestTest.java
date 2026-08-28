@@ -23,10 +23,10 @@ class ContextRequestTest extends BaseUnitTest {
         assertThat(req.threadId()).isEqualTo(threadId);
 
         assertThatThrownBy(() -> new MentorChatRequest(0L, 2L, threadId))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("workspaceId");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("workspaceId");
         assertThatThrownBy(() -> new MentorChatRequest(1L, 0L, threadId))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("developerId");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("developerId");
     }
 }

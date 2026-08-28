@@ -21,16 +21,15 @@ class SlackConsentBlocksTest extends BaseUnitTest {
         List<LayoutBlock> blocks = SlackConsentBlocks.consentNotice();
 
         assertThat(blocks).isNotEmpty();
-        ButtonElement optOut = blocks
-            .stream()
-            .filter(ActionsBlock.class::isInstance)
-            .map(ActionsBlock.class::cast)
-            .flatMap(a -> a.getElements().stream())
-            .filter(ButtonElement.class::isInstance)
-            .map(ButtonElement.class::cast)
-            .filter(b -> SlackConsentBlocks.ACTION_PARTICIPANT_OPT_OUT.equals(b.getActionId()))
-            .findFirst()
-            .orElseThrow(() -> new AssertionError("consent notice is missing the participant_opt_out button"));
+        ButtonElement optOut = blocks.stream()
+                .filter(ActionsBlock.class::isInstance)
+                .map(ActionsBlock.class::cast)
+                .flatMap(a -> a.getElements().stream())
+                .filter(ButtonElement.class::isInstance)
+                .map(ButtonElement.class::cast)
+                .filter(b -> SlackConsentBlocks.ACTION_PARTICIPANT_OPT_OUT.equals(b.getActionId()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("consent notice is missing the participant_opt_out button"));
 
         // Destructive action → danger style + a confirm dialog before the irreversible erase.
         assertThat(optOut.getText().getText()).isEqualTo("Do not use my channel messages");
@@ -42,34 +41,31 @@ class SlackConsentBlocksTest extends BaseUnitTest {
     void fallbackText_isPlainLanguage_noAiBuzzwords() {
         // Plain-language transparency: say what is read in concrete terms, not "AI-powered" marketing copy.
         assertThat(SlackConsentBlocks.fallbackText())
-            .isNotBlank()
-            .contains(
-                "Starting now",
-                "new messages and thread replies",
-                "context for private mentoring about software practices",
-                "It does not read earlier history and will not reply in this channel",
-                "deletes your already collected channel-message data",
-                "Do not use my channel messages"
-            )
-            .doesNotContain("AI-powered", "Opt me out", "Exclude my channel messages", "—", ";");
+                .isNotBlank()
+                .contains(
+                        "Starting now",
+                        "new messages and thread replies",
+                        "context for private mentoring about software practices",
+                        "It does not read earlier history and will not reply in this channel",
+                        "deletes your already collected channel-message data",
+                        "Do not use my channel messages")
+                .doesNotContain("AI-powered", "Opt me out", "Exclude my channel messages", "—", ";");
     }
 
     @Test
     void activationNotice_doesNotLinkToWorkspaceDashboard() {
         String url = "https://heph.example/w/team";
 
-        assertThat(SlackConsentBlocks.activationNotice(url).toString()).doesNotContain(
-            "Open Hephaestus",
-            "workspace dashboard",
-            url
-        );
+        assertThat(SlackConsentBlocks.activationNotice(url).toString())
+                .doesNotContain("Open Hephaestus", "workspace dashboard", url);
         assertThat(SlackConsentBlocks.activationFallbackText(url)).doesNotContain("Open Hephaestus", url);
     }
 
     @Test
     void lateJoinText_isSpecificToLateJoiner() {
         assertThat(SlackConsentBlocks.lateJoinFallbackText())
-            .contains("You joined a Hephaestus-monitored channel", "From now on", "Manage this anytime from App Home")
-            .doesNotContain("Starting now");
+                .contains(
+                        "You joined a Hephaestus-monitored channel", "From now on", "Manage this anytime from App Home")
+                .doesNotContain("Starting now");
     }
 }

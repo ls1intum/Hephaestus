@@ -8,7 +8,6 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookPropertiesFixture;
@@ -92,7 +91,9 @@ class WebhookStreamMonitorTest extends BaseUnitTest {
 
         monitor.poll();
 
-        assertThat(counter()).as("re-charging historic loss on every restart would make it meaningless").isZero();
+        assertThat(counter())
+                .as("re-charging historic loss on every restart would make it meaningless")
+                .isZero();
         assertThat(gauge()).isEqualTo(499d);
         assertThat(output.getAll()).contains("499 webhook(s) were deleted before it read them");
     }
@@ -115,12 +116,16 @@ class WebhookStreamMonitorTest extends BaseUnitTest {
 
         monitor.poll();
 
-        assertThat(registry.get("webhook.stream.bytes").tag("stream", STREAM).gauge().value()).isEqualTo(
-            (double) GIBIBYTE / 2
-        );
-        assertThat(registry.get("webhook.stream.bytes.utilization").tag("stream", STREAM).gauge().value()).isEqualTo(
-            0.5
-        );
+        assertThat(registry.get("webhook.stream.bytes")
+                        .tag("stream", STREAM)
+                        .gauge()
+                        .value())
+                .isEqualTo((double) GIBIBYTE / 2);
+        assertThat(registry.get("webhook.stream.bytes.utilization")
+                        .tag("stream", STREAM)
+                        .gauge()
+                        .value())
+                .isEqualTo(0.5);
     }
 
     @Test
@@ -146,7 +151,9 @@ class WebhookStreamMonitorTest extends BaseUnitTest {
 
         monitor.poll();
 
-        assertThat(gauge()).as("the worst of the durables present, not one series each").isEqualTo(199d);
+        assertThat(gauge())
+                .as("the worst of the durables present, not one series each")
+                .isEqualTo(199d);
 
         // Scope 2 is gone and scope 3 is new. A tag per consumer would leave scope 2's 199 standing
         // on a series of its own forever; one series per stream has to follow the set that exists now.
@@ -155,12 +162,12 @@ class WebhookStreamMonitorTest extends BaseUnitTest {
         monitor.poll();
 
         assertThat(gauge()).isEqualTo(49d);
-        assertThat(registry.find("webhook.stream.unacknowledged.gap").gauges()).hasSize(
-            WebhookJetStreamBootstrap.STREAMS.length
-        );
+        assertThat(registry.find("webhook.stream.unacknowledged.gap").gauges())
+                .hasSize(WebhookJetStreamBootstrap.STREAMS.length);
         assertThat(registry.find("webhook.stream.unacknowledged.deletions").counters())
-            .hasSize(WebhookJetStreamBootstrap.STREAMS.length)
-            .allSatisfy(counter -> assertThat(counter.getId().getTag("consumer")).isNull());
+                .hasSize(WebhookJetStreamBootstrap.STREAMS.length)
+                .allSatisfy(counter ->
+                        assertThat(counter.getId().getTag("consumer")).isNull());
     }
 
     @Test
@@ -170,9 +177,12 @@ class WebhookStreamMonitorTest extends BaseUnitTest {
 
         monitor.poll();
 
-        assertThat(registry.get("webhook.stream.oldest.message.age").tag("stream", STREAM).gauge().value())
-            .as("max-age is a ceiling and max-bytes a floor; this is the retention the deployment gets")
-            .isCloseTo(Duration.ofDays(9).toSeconds(), within(60d));
+        assertThat(registry.get("webhook.stream.oldest.message.age")
+                        .tag("stream", STREAM)
+                        .gauge()
+                        .value())
+                .as("max-age is a ceiling and max-bytes a floor; this is the retention the deployment gets")
+                .isCloseTo(Duration.ofDays(9).toSeconds(), within(60d));
     }
 
     @Test
@@ -183,10 +193,12 @@ class WebhookStreamMonitorTest extends BaseUnitTest {
 
         monitor.poll();
 
-        assertThat(counter()).as("a broker blip must not kill the scheduled task").isZero();
+        assertThat(counter())
+                .as("a broker blip must not kill the scheduled task")
+                .isZero();
         assertThat(output.getAll())
-            .as("a frozen counter reads exactly like no loss, so the failure has to say so itself")
-            .contains("the dropped-webhook counter is frozen, not zero");
+                .as("a frozen counter reads exactly like no loss, so the failure has to say so itself")
+                .contains("the dropped-webhook counter is frozen, not zero");
     }
 
     @Test
@@ -201,20 +213,24 @@ class WebhookStreamMonitorTest extends BaseUnitTest {
         monitor.poll();
 
         assertThat(output.getAll().split("counter is frozen", -1))
-            .as("one line per outage, not one per poll")
-            .hasSize(2);
+                .as("one line per outage, not one per poll")
+                .hasSize(2);
         assertThat(output.getAll()).contains("Webhook loss accounting resumed for stream github");
     }
 
     @Test
     void reportsHowStaleTheLossCounterIs() throws Exception {
         WebhookStreamMonitor monitor = monitor();
-        assertThat(pollAge()).as("never polled is not the same as polled and found nothing").isNaN();
+        assertThat(pollAge())
+                .as("never polled is not the same as polled and found nothing")
+                .isNaN();
 
         give(1_000, 999);
         doThrow(new java.io.IOException("broker unreachable")).when(jsm).getStreamInfo(STREAM);
         monitor.poll();
-        assertThat(pollAge()).as("a poll that failed did not maintain the counter, so it must not say it did").isNaN();
+        assertThat(pollAge())
+                .as("a poll that failed did not maintain the counter, so it must not say it did")
+                .isNaN();
 
         give(1_000, 999);
         monitor.poll();
@@ -243,10 +259,10 @@ class WebhookStreamMonitorTest extends BaseUnitTest {
 
     private void give(long firstSequence, ZonedDateTime firstTime, ConsumerInfo... consumers) throws Exception {
         StreamConfiguration config = StreamConfiguration.builder()
-            .name(STREAM)
-            .subjects(STREAM + ".>")
-            .maxBytes(GIBIBYTE)
-            .build();
+                .name(STREAM)
+                .subjects(STREAM + ".>")
+                .maxBytes(GIBIBYTE)
+                .build();
         StreamState state = mock(StreamState.class);
         lenient().when(state.getByteCount()).thenReturn(GIBIBYTE / 2);
         lenient().when(state.getMsgCount()).thenReturn(1_000L);
@@ -268,7 +284,9 @@ class WebhookStreamMonitorTest extends BaseUnitTest {
         StreamState state = mock(StreamState.class);
         lenient().when(state.getFirstSequence()).thenReturn(1L);
         StreamInfo info = mock(StreamInfo.class);
-        lenient().when(info.getConfiguration()).thenReturn(StreamConfiguration.builder().name("quiet").build());
+        lenient()
+                .when(info.getConfiguration())
+                .thenReturn(StreamConfiguration.builder().name("quiet").build());
         lenient().when(info.getStreamState()).thenReturn(state);
         return info;
     }
@@ -283,14 +301,23 @@ class WebhookStreamMonitorTest extends BaseUnitTest {
     }
 
     private double counter() {
-        return registry.get("webhook.stream.unacknowledged.deletions").tag("stream", STREAM).counter().count();
+        return registry.get("webhook.stream.unacknowledged.deletions")
+                .tag("stream", STREAM)
+                .counter()
+                .count();
     }
 
     private double pollAge() {
-        return registry.get("webhook.stream.poll.age").tag("stream", STREAM).gauge().value();
+        return registry.get("webhook.stream.poll.age")
+                .tag("stream", STREAM)
+                .gauge()
+                .value();
     }
 
     private double gauge() {
-        return registry.get("webhook.stream.unacknowledged.gap").tag("stream", STREAM).gauge().value();
+        return registry.get("webhook.stream.unacknowledged.gap")
+                .tag("stream", STREAM)
+                .gauge()
+                .value();
     }
 }

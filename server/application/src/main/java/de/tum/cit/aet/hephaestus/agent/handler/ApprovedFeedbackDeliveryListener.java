@@ -36,16 +36,14 @@ class ApprovedFeedbackDeliveryListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void deliver(ApprovedFeedbackReadyEvent event) {
         Feedback feedback = feedbackRepository
-            .findByIdAndWorkspaceId(event.feedbackId(), event.workspaceId())
-            .orElse(null);
-        if (
-            feedback == null ||
-            (feedback.getDeliveryState() != FeedbackDeliveryState.PREPARED &&
-                feedback.getDeliveryState() != FeedbackDeliveryState.PARTIALLY_DELIVERED)
-        ) return;
+                .findByIdAndWorkspaceId(event.feedbackId(), event.workspaceId())
+                .orElse(null);
+        if (feedback == null
+                || (feedback.getDeliveryState() != FeedbackDeliveryState.PREPARED
+                        && feedback.getDeliveryState() != FeedbackDeliveryState.PARTIALLY_DELIVERED)) return;
         var approval = approvalRepository
-            .findByFeedbackIdAndWorkspaceId(feedback.getId(), event.workspaceId())
-            .orElse(null);
+                .findByFeedbackIdAndWorkspaceId(feedback.getId(), event.workspaceId())
+                .orElse(null);
         if (approval == null || !approval.getContentDigest().equals(FeedbackApprovalDigest.of(feedback))) {
             log.error("Approved proposal content no longer matches its approval: feedbackId={}", feedback.getId());
             stop(feedback, event.workspaceId(), FeedbackSuppressionReason.APPROVAL_STALE);
@@ -56,31 +54,22 @@ class ApprovedFeedbackDeliveryListener {
             return;
         }
         AgentJob job = agentJobRepository
-            .findByIdAndWorkspaceId(feedback.getAgentJobId(), event.workspaceId())
-            .orElse(null);
+                .findByIdAndWorkspaceId(feedback.getAgentJobId(), event.workspaceId())
+                .orElse(null);
         if (job == null || feedback.getBody() == null || feedback.getBody().isBlank()) return;
 
         PracticeFeedbackDeliveryPolicy.Decision<?> policy;
         if (ArtifactKinds.ISSUE.equals(feedback.getArtifactKind())) {
             policy = deliveryPolicy.evaluateIssue(
-                job,
-                DeliveryPolicyStage.APPROVED,
-                feedback.getId(),
-                feedback.getProposedPracticeSlugs()
-            );
+                    job, DeliveryPolicyStage.APPROVED, feedback.getId(), feedback.getProposedPracticeSlugs());
         } else if (ArtifactKinds.PULL_REQUEST.equals(feedback.getArtifactKind())) {
             policy = deliveryPolicy.evaluatePullRequest(
-                job,
-                DeliveryPolicyStage.APPROVED,
-                feedback.getId(),
-                feedback.getProposedPracticeSlugs()
-            );
+                    job, DeliveryPolicyStage.APPROVED, feedback.getId(), feedback.getProposedPracticeSlugs());
         } else {
             log.error(
-                "Approved proposal has no supported artifact kind: feedbackId={}, artifactKind={}",
-                feedback.getId(),
-                feedback.getArtifactKind()
-            );
+                    "Approved proposal has no supported artifact kind: feedbackId={}, artifactKind={}",
+                    feedback.getId(),
+                    feedback.getArtifactKind());
             return;
         }
         if (!policy.allowed()) {
@@ -89,11 +78,9 @@ class ApprovedFeedbackDeliveryListener {
             }
             return;
         }
-        if (
-            policy.target() instanceof PullRequest pullRequest &&
-            feedback.getReviewedRevision() != null &&
-            !feedback.getReviewedRevision().equals(pullRequest.getHeadRefOid())
-        ) {
+        if (policy.target() instanceof PullRequest pullRequest
+                && feedback.getReviewedRevision() != null
+                && !feedback.getReviewedRevision().equals(pullRequest.getHeadRefOid())) {
             stop(feedback, event.workspaceId(), FeedbackSuppressionReason.APPROVAL_STALE);
             return;
         }
@@ -113,18 +100,12 @@ class ApprovedFeedbackDeliveryListener {
             FeedbackSuppressionReason reason = result.refusal();
             dispatchService.projectApproved(feedback, () -> {
                 feedbackLedgerRecorder.recordApprovedPlacements(
-                    feedback,
-                    result.externalRef(),
-                    result.deliveredSignals()
-                );
+                        feedback, result.externalRef(), result.deliveredSignals());
                 if (result.externalRef() == null) {
                     stop(feedback, event.workspaceId(), reason);
                 } else {
                     feedbackRepository.markApprovedPartiallyDelivered(
-                        event.workspaceId(),
-                        feedback.getId(),
-                        reason.name()
-                    );
+                            event.workspaceId(), feedback.getId(), reason.name());
                 }
             });
             return;
@@ -132,10 +113,7 @@ class ApprovedFeedbackDeliveryListener {
         if (result.status() == PracticeFeedbackDispatchService.Result.Status.SENT) {
             dispatchService.projectApproved(feedback, () -> {
                 feedbackLedgerRecorder.recordApprovedPlacements(
-                    feedback,
-                    result.externalRef(),
-                    result.deliveredSignals()
-                );
+                        feedback, result.externalRef(), result.deliveredSignals());
                 feedbackRepository.markApprovedDelivered(event.workspaceId(), feedback.getId());
             });
             return;
@@ -143,10 +121,7 @@ class ApprovedFeedbackDeliveryListener {
         if (result.status() == PracticeFeedbackDispatchService.Result.Status.FAILED) {
             dispatchService.projectApproved(feedback, () -> {
                 feedbackLedgerRecorder.recordApprovedPlacements(
-                    feedback,
-                    result.externalRef(),
-                    result.deliveredSignals()
-                );
+                        feedback, result.externalRef(), result.deliveredSignals());
                 if (result.externalRef() == null) {
                     feedbackRepository.markApprovedFailed(event.workspaceId(), feedback.getId());
                 } else {

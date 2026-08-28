@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.feedback;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -52,11 +51,8 @@ class GithubApprovalChannelTest extends BaseUnitTest {
 
     @Test
     void approveInvokesMutation() {
-        FeedbackTarget target = new FeedbackTarget(
-            new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
-            "owner/repo#42",
-            null
-        );
+        FeedbackTarget target =
+                new FeedbackTarget(new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/repo#42", null);
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
         when(prNodeIdResolver.resolve(1L, "owner", "repo", 42)).thenReturn("PR_node123");
 
@@ -83,40 +79,32 @@ class GithubApprovalChannelTest extends BaseUnitTest {
     @Test
     void shouldBlockApprovalMutationWhenSilentModeIsEngaged() {
         doThrow(new OutboundEgressSuppressedException("test"))
-            .when(egressGuard)
-            .requireDeliveryAllowed("github.approve");
+                .when(egressGuard)
+                .requireDeliveryAllowed("github.approve");
 
-        assertThatThrownBy(() ->
-            channel.approve(
-                new FeedbackTarget(new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/repo#42", null),
-                "looks good"
-            )
-        ).isInstanceOf(OutboundEgressSuppressedException.class);
+        assertThatThrownBy(() -> channel.approve(
+                        new FeedbackTarget(new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/repo#42", null),
+                        "looks good"))
+                .isInstanceOf(OutboundEgressSuppressedException.class);
         verifyNoInteractions(prNodeIdResolver);
         verify(gitHubProvider, never()).forScope(anyLong());
     }
 
     @Test
     void approveThrowsOnRateLimit() {
-        FeedbackTarget target = new FeedbackTarget(
-            new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
-            "owner/repo#42",
-            null
-        );
+        FeedbackTarget target =
+                new FeedbackTarget(new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/repo#42", null);
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(true);
 
         assertThatThrownBy(() -> channel.approve(target, "ok"))
-            .isInstanceOf(FeedbackDeliveryException.class)
-            .hasMessageContaining("rate limit critical");
+                .isInstanceOf(FeedbackDeliveryException.class)
+                .hasMessageContaining("rate limit critical");
     }
 
     @Test
     void approveThrowsOnMutationErrors() {
-        FeedbackTarget target = new FeedbackTarget(
-            new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
-            "owner/repo#42",
-            null
-        );
+        FeedbackTarget target =
+                new FeedbackTarget(new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/repo#42", null);
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
         when(prNodeIdResolver.resolve(1L, "owner", "repo", 42)).thenReturn("PR_node123");
 
@@ -131,7 +119,7 @@ class GithubApprovalChannelTest extends BaseUnitTest {
         when(spec.execute()).thenReturn(Mono.just(response));
 
         assertThatThrownBy(() -> channel.approve(target, "ok"))
-            .isInstanceOf(FeedbackDeliveryException.class)
-            .hasMessageContaining("ApprovePullRequest failed");
+                .isInstanceOf(FeedbackDeliveryException.class)
+                .hasMessageContaining("ApprovePullRequest failed");
     }
 }

@@ -96,10 +96,9 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
     private void setupTestData() {
         // Create GitHub provider
         githubProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
 
         // Create organization
         Organization org = new Organization();
@@ -159,28 +158,26 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
 
     private GitHubDiscussionCommentDTO createCommentDTO(Long id, String body) {
         return new GitHubDiscussionCommentDTO(
-            id,
-            id,
-            "node_id_" + id,
-            body,
-            "https://github.com/" + TEST_REPO_FULL_NAME + "/discussions/27#discussioncomment-" + id,
-            false,
-            false,
-            null,
-            "OWNER",
-            Instant.now(),
-            Instant.now(),
-            new GitHubUserDTO(
-                100L,
-                100L,
-                "test-user",
-                "https://avatars.githubusercontent.com/u/100",
-                "https://github.com/test-user",
-                "Test User",
-                null
-            ),
-            null
-        );
+                id,
+                id,
+                "node_id_" + id,
+                body,
+                "https://github.com/" + TEST_REPO_FULL_NAME + "/discussions/27#discussioncomment-" + id,
+                false,
+                false,
+                null,
+                "OWNER",
+                Instant.now(),
+                Instant.now(),
+                new GitHubUserDTO(
+                        100L,
+                        100L,
+                        "test-user",
+                        "https://avatars.githubusercontent.com/u/100",
+                        "https://github.com/test-user",
+                        "Test User",
+                        null),
+                null);
     }
 
     @Nested
@@ -200,56 +197,56 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
 
             // Verify DiscussionCommentCreated event was published
             assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentCreated.class))
-                .hasSize(1)
-                .first()
-                .satisfies(event -> {
-                    assertThat(event.comment().id()).isEqualTo(result.getId());
-                    assertThat(event.discussionId()).isEqualTo(testDiscussion.getId());
-                    assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
-                });
+                    .hasSize(1)
+                    .first()
+                    .satisfies(event -> {
+                        assertThat(event.comment().id()).isEqualTo(result.getId());
+                        assertThat(event.discussionId()).isEqualTo(testDiscussion.getId());
+                        assertThat(event.context().scopeId()).isEqualTo(testWorkspace.getId());
+                    });
         }
 
         @Test
         void shouldHandleNullDtoGracefully() {
             GitHubDiscussionCommentDTO dto = new GitHubDiscussionCommentDTO(
-                null,
-                null,
-                "node_id",
-                "body",
-                "https://github.com/test",
-                false,
-                false,
-                null,
-                "NONE",
-                Instant.now(),
-                Instant.now(),
-                null,
-                null
-            );
+                    null,
+                    null,
+                    "node_id",
+                    "body",
+                    "https://github.com/test",
+                    false,
+                    false,
+                    null,
+                    "NONE",
+                    Instant.now(),
+                    Instant.now(),
+                    null,
+                    null);
 
             DiscussionComment result = processor.process(dto, testDiscussion, createContext());
 
             assertThat(result).isNull();
-            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentCreated.class)).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentCreated.class))
+                    .isEmpty();
         }
 
         @Test
         void shouldHandleNullAuthor() {
             GitHubDiscussionCommentDTO dto = new GitHubDiscussionCommentDTO(
-                TEST_COMMENT_ID,
-                TEST_COMMENT_ID,
-                "node_id_" + TEST_COMMENT_ID,
-                "Comment without author",
-                "https://github.com/" + TEST_REPO_FULL_NAME + "/discussions/27#discussioncomment-" + TEST_COMMENT_ID,
-                false,
-                false,
-                null,
-                "NONE",
-                Instant.now(),
-                Instant.now(),
-                null,
-                null
-            );
+                    TEST_COMMENT_ID,
+                    TEST_COMMENT_ID,
+                    "node_id_" + TEST_COMMENT_ID,
+                    "Comment without author",
+                    "https://github.com/" + TEST_REPO_FULL_NAME + "/discussions/27#discussioncomment-"
+                            + TEST_COMMENT_ID,
+                    false,
+                    false,
+                    null,
+                    "NONE",
+                    Instant.now(),
+                    Instant.now(),
+                    null,
+                    null);
             ProcessingContext context = createContext();
 
             DiscussionComment result = processor.process(dto, testDiscussion, context);
@@ -257,7 +254,8 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             assertNotNull(result);
             assertThat(result.getNativeId()).isEqualTo(TEST_COMMENT_ID);
             assertThat(result.getAuthor()).isNull();
-            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentCreated.class)).hasSize(1);
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentCreated.class))
+                    .hasSize(1);
         }
 
         @Test
@@ -295,9 +293,8 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             existing.setNativeId(TEST_COMMENT_ID);
             existing.setProvider(githubProvider);
             existing.setBody("Original body");
-            existing.setHtmlUrl(
-                "https://github.com/" + TEST_REPO_FULL_NAME + "/discussions/27#discussioncomment-" + TEST_COMMENT_ID
-            );
+            existing.setHtmlUrl("https://github.com/" + TEST_REPO_FULL_NAME + "/discussions/27#discussioncomment-"
+                    + TEST_COMMENT_ID);
             existing.setCreatedAt(Instant.now());
             existing.setDiscussion(testDiscussion);
             commentRepository.save(existing);
@@ -313,13 +310,13 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
 
             // Verify DiscussionCommentEdited event was published
             assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentEdited.class))
-                .hasSize(1)
-                .first()
-                .satisfies(event -> {
-                    assertThat(event.comment().id()).isEqualTo(result.getId());
-                    assertThat(event.changedFields()).contains("body");
-                    assertThat(event.discussionId()).isEqualTo(testDiscussion.getId());
-                });
+                    .hasSize(1)
+                    .first()
+                    .satisfies(event -> {
+                        assertThat(event.comment().id()).isEqualTo(result.getId());
+                        assertThat(event.changedFields()).contains("body");
+                        assertThat(event.discussionId()).isEqualTo(testDiscussion.getId());
+                    });
         }
 
         @Test
@@ -329,9 +326,8 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             existing.setNativeId(TEST_COMMENT_ID);
             existing.setProvider(githubProvider);
             existing.setBody("Answer body");
-            existing.setHtmlUrl(
-                "https://github.com/" + TEST_REPO_FULL_NAME + "/discussions/27#discussioncomment-" + TEST_COMMENT_ID
-            );
+            existing.setHtmlUrl("https://github.com/" + TEST_REPO_FULL_NAME + "/discussions/27#discussioncomment-"
+                    + TEST_COMMENT_ID);
             existing.setAnswer(false);
             existing.setCreatedAt(Instant.now());
             existing.setDiscussion(testDiscussion);
@@ -339,28 +335,27 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
 
             // Update with isAnswer=true
             GitHubDiscussionCommentDTO dto = new GitHubDiscussionCommentDTO(
-                TEST_COMMENT_ID,
-                TEST_COMMENT_ID,
-                "node_id_" + TEST_COMMENT_ID,
-                "Answer body",
-                "https://github.com/" + TEST_REPO_FULL_NAME + "/discussions/27#discussioncomment-" + TEST_COMMENT_ID,
-                true,
-                false,
-                null,
-                "OWNER",
-                Instant.now(),
-                Instant.now(),
-                new GitHubUserDTO(
-                    100L,
-                    100L,
-                    "test-user",
-                    "https://avatars.githubusercontent.com/u/100",
-                    "https://github.com/test-user",
-                    "Test User",
-                    null
-                ),
-                null
-            );
+                    TEST_COMMENT_ID,
+                    TEST_COMMENT_ID,
+                    "node_id_" + TEST_COMMENT_ID,
+                    "Answer body",
+                    "https://github.com/" + TEST_REPO_FULL_NAME + "/discussions/27#discussioncomment-"
+                            + TEST_COMMENT_ID,
+                    true,
+                    false,
+                    null,
+                    "OWNER",
+                    Instant.now(),
+                    Instant.now(),
+                    new GitHubUserDTO(
+                            100L,
+                            100L,
+                            "test-user",
+                            "https://avatars.githubusercontent.com/u/100",
+                            "https://github.com/test-user",
+                            "Test User",
+                            null),
+                    null);
             ProcessingContext context = createContext();
 
             DiscussionComment result = processor.process(dto, testDiscussion, context);
@@ -370,12 +365,12 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
 
             // Verify DiscussionCommentEdited event was published with isAnswer change
             assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentEdited.class))
-                .hasSize(1)
-                .first()
-                .satisfies(event -> {
-                    assertThat(event.changedFields()).contains("isAnswer");
-                    assertThat(event.discussionId()).isEqualTo(testDiscussion.getId());
-                });
+                    .hasSize(1)
+                    .first()
+                    .satisfies(event -> {
+                        assertThat(event.changedFields()).contains("isAnswer");
+                        assertThat(event.discussionId()).isEqualTo(testDiscussion.getId());
+                    });
         }
 
         @Test
@@ -392,8 +387,10 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             processor.process(dto, testDiscussion, context);
 
             // No edited events should be published for unchanged data
-            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentCreated.class)).isEmpty();
-            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentEdited.class)).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentCreated.class))
+                    .isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentEdited.class))
+                    .isEmpty();
         }
 
         @Test
@@ -436,16 +433,17 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             processor.processDeleted(dto, createContext());
 
             // Verify comment is deleted
-            assertThat(commentRepository.findByNativeIdAndProviderId(TEST_COMMENT_ID, githubProviderId())).isEmpty();
+            assertThat(commentRepository.findByNativeIdAndProviderId(TEST_COMMENT_ID, githubProviderId()))
+                    .isEmpty();
 
             // Verify DiscussionCommentDeleted event was published
             assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentDeleted.class))
-                .hasSize(1)
-                .first()
-                .satisfies(event -> {
-                    assertThat(event.commentId()).isEqualTo(TEST_COMMENT_ID);
-                    assertThat(event.discussionId()).isEqualTo(testDiscussion.getId());
-                });
+                    .hasSize(1)
+                    .first()
+                    .satisfies(event -> {
+                        assertThat(event.commentId()).isEqualTo(TEST_COMMENT_ID);
+                        assertThat(event.discussionId()).isEqualTo(testDiscussion.getId());
+                    });
         }
 
         @Test
@@ -456,16 +454,16 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             existing.setNativeId(TEST_COMMENT_ID);
             existing.setProvider(githubProvider);
             existing.setBody("Comment to test bidirectional sync");
-            existing.setHtmlUrl(
-                "https://github.com/" + TEST_REPO_FULL_NAME + "/discussions/27#discussioncomment-" + TEST_COMMENT_ID
-            );
+            existing.setHtmlUrl("https://github.com/" + TEST_REPO_FULL_NAME + "/discussions/27#discussioncomment-"
+                    + TEST_COMMENT_ID);
             existing.setCreatedAt(Instant.now());
             existing.setDiscussion(testDiscussion);
             commentRepository.save(existing);
 
             // Load the discussion and initialize its comments collection (simulates
             // real-world scenario where parent is in persistence context)
-            Discussion loadedDiscussion = discussionRepository.findById(testDiscussion.getId()).orElseThrow();
+            Discussion loadedDiscussion =
+                    discussionRepository.findById(testDiscussion.getId()).orElseThrow();
             loadedDiscussion.getComments().size(); // Force lazy initialization
 
             // Delete should work without TransientObjectException
@@ -474,30 +472,19 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             assertThatCode(() -> processor.processDeleted(dto, createContext())).doesNotThrowAnyException();
 
             // Verify comment is deleted
-            assertThat(commentRepository.findByNativeIdAndProviderId(TEST_COMMENT_ID, githubProviderId())).isEmpty();
+            assertThat(commentRepository.findByNativeIdAndProviderId(TEST_COMMENT_ID, githubProviderId()))
+                    .isEmpty();
         }
 
         @Test
         void shouldHandleNullCommentIdGracefully() {
             GitHubDiscussionCommentDTO dto = new GitHubDiscussionCommentDTO(
-                null,
-                null,
-                null,
-                null,
-                null,
-                false,
-                false,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
-            );
+                    null, null, null, null, null, false, false, null, null, null, null, null, null);
 
             processor.processDeleted(dto, createContext());
 
-            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentDeleted.class)).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentDeleted.class))
+                    .isEmpty();
         }
 
         @Test
@@ -507,7 +494,8 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             processor.processDeleted(dto, createContext());
 
             // No event should be published for non-existent comment
-            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentDeleted.class)).isEmpty();
+            assertThat(eventListener.ofType(ScmDomainEvent.DiscussionCommentDeleted.class))
+                    .isEmpty();
         }
     }
 
@@ -524,28 +512,26 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             // Create reply comment
             Long replyId = TEST_COMMENT_ID + 1;
             GitHubDiscussionCommentDTO replyDto = new GitHubDiscussionCommentDTO(
-                replyId,
-                replyId,
-                "node_id_" + replyId,
-                "Reply comment",
-                "https://github.com/" + TEST_REPO_FULL_NAME + "/discussions/27#discussioncomment-" + replyId,
-                false,
-                false,
-                null,
-                "NONE",
-                Instant.now(),
-                Instant.now(),
-                new GitHubUserDTO(
-                    101L,
-                    101L,
-                    "reply-user",
-                    "https://avatars.githubusercontent.com/u/101",
-                    "https://github.com/reply-user",
-                    "Reply User",
-                    null
-                ),
-                "node_id_" + parentId
-            );
+                    replyId,
+                    replyId,
+                    "node_id_" + replyId,
+                    "Reply comment",
+                    "https://github.com/" + TEST_REPO_FULL_NAME + "/discussions/27#discussioncomment-" + replyId,
+                    false,
+                    false,
+                    null,
+                    "NONE",
+                    Instant.now(),
+                    Instant.now(),
+                    new GitHubUserDTO(
+                            101L,
+                            101L,
+                            "reply-user",
+                            "https://avatars.githubusercontent.com/u/101",
+                            "https://github.com/reply-user",
+                            "Reply User",
+                            null),
+                    "node_id_" + parentId);
             DiscussionComment reply = processor.process(replyDto, testDiscussion, createContext());
             assertNotNull(reply);
 
@@ -555,8 +541,8 @@ class GitHubDiscussionCommentProcessorIntegrationTest extends BaseIntegrationTes
             // Verify parent was set (wrap in transaction to avoid LazyInitializationException)
             transactionTemplate.executeWithoutResult(status -> {
                 DiscussionComment savedReply = commentRepository
-                    .findByNativeIdAndProviderId(replyId, githubProviderId())
-                    .orElseThrow();
+                        .findByNativeIdAndProviderId(replyId, githubProviderId())
+                        .orElseThrow();
                 assertThat(savedReply.getParentComment()).isNotNull();
                 assertThat(savedReply.getParentComment().getNativeId()).isEqualTo(parentId);
             });

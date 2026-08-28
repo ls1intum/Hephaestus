@@ -30,23 +30,19 @@ public class HephaestusAuthFailureHandler implements AuthenticationFailureHandle
     private final String appBaseUrl;
 
     public HephaestusAuthFailureHandler(
-        AuthEventLogger authEventLogger,
-        @Value("${hephaestus.webapp.url:}") String webappBaseUrl
-    ) {
+            AuthEventLogger authEventLogger, @Value("${hephaestus.webapp.url:}") String webappBaseUrl) {
         this.authEventLogger = authEventLogger;
         this.appBaseUrl = stripTrailingSlash(webappBaseUrl);
     }
 
     @Override
     public void onAuthenticationFailure(
-        HttpServletRequest request,
-        HttpServletResponse response,
-        AuthenticationException exception
-    ) throws IOException {
+            HttpServletRequest request, HttpServletResponse response, AuthenticationException exception)
+            throws IOException {
         authEventLogger
-            .event(AuthEvent.EventType.LOGIN_FAILED, AuthEvent.Result.FAILURE)
-            .failureReason(exception.getClass().getSimpleName())
-            .record();
+                .event(AuthEvent.EventType.LOGIN_FAILED, AuthEvent.Result.FAILURE)
+                .failureReason(exception.getClass().getSimpleName())
+                .record();
         response.sendRedirect(appBaseUrl + "/auth/error?code=oauth_failure");
     }
 

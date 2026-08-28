@@ -18,9 +18,9 @@ class AccountPreferencesQueryTest extends BaseUnitTest {
         boolean defaultWithoutRow = preferences(null).practiceFeedbackDeliveryEnabled(USER_ID);
 
         assertThat(defaultWithoutRow)
-            .isTrue()
-            .isEqualTo(new UserPreferences().isPracticeFeedbackDeliveryEnabled())
-            .isEqualTo(PreferencesView.PRACTICE_FEEDBACK_DELIVERY_ENABLED_BY_DEFAULT);
+                .isTrue()
+                .isEqualTo(new UserPreferences().isPracticeFeedbackDeliveryEnabled())
+                .isEqualTo(PreferencesView.PRACTICE_FEEDBACK_DELIVERY_ENABLED_BY_DEFAULT);
     }
 
     @Test

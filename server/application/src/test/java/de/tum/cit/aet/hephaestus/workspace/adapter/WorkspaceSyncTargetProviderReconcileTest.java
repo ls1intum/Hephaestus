@@ -66,13 +66,12 @@ class WorkspaceSyncTargetProviderReconcileTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         provider = new WorkspaceSyncTargetProvider(
-            workspaceRepository,
-            repositoryToMonitorRepository,
-            workspaceScopeFilter,
-            connectionService,
-            new NatsConnectionProperties(true, "nats://localhost:4222", null, null),
-            natsConsumerService
-        );
+                workspaceRepository,
+                repositoryToMonitorRepository,
+                workspaceScopeFilter,
+                connectionService,
+                new NatsConnectionProperties(true, "nats://localhost:4222", null, null),
+                natsConsumerService);
     }
 
     private RepositoryToMonitor monitor(@Nullable Long nativeId, String nameWithOwner) {
@@ -89,12 +88,12 @@ class WorkspaceSyncTargetProviderReconcileTest extends BaseUnitTest {
         when(repositoryToMonitorRepository.findById(SYNC_TARGET_ID)).thenReturn(Optional.of(rtm));
         when(workspace.getId()).thenReturn(WORKSPACE_ID);
         doAnswer(inv -> {
-            Consumer<IntegrationNatsConsumer> c = inv.getArgument(0);
-            c.accept(natsConsumer);
-            return null;
-        })
-            .when(natsConsumerService)
-            .ifAvailable(any());
+                    Consumer<IntegrationNatsConsumer> c = inv.getArgument(0);
+                    c.accept(natsConsumer);
+                    return null;
+                })
+                .when(natsConsumerService)
+                .ifAvailable(any());
 
         provider.reconcileSyncTargetIdentity(SYNC_TARGET_ID, NATIVE_ID, NEW_NAME);
 
@@ -143,12 +142,12 @@ class WorkspaceSyncTargetProviderReconcileTest extends BaseUnitTest {
         when(repositoryToMonitorRepository.findById(SYNC_TARGET_ID + 1)).thenReturn(Optional.of(second));
         when(workspace.getId()).thenReturn(WORKSPACE_ID);
         doAnswer(inv -> {
-            Consumer<IntegrationNatsConsumer> c = inv.getArgument(0);
-            c.accept(natsConsumer);
-            return null;
-        })
-            .when(natsConsumerService)
-            .ifAvailable(any());
+                    Consumer<IntegrationNatsConsumer> c = inv.getArgument(0);
+                    c.accept(natsConsumer);
+                    return null;
+                })
+                .when(natsConsumerService)
+                .ifAvailable(any());
 
         provider.reconcileSyncTargetsForRepository(NATIVE_ID, NEW_NAME);
 

@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.common;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -12,7 +11,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationTokenProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
 import java.util.Optional;
-import java.util.function.Function;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -45,12 +43,11 @@ class GitLabTokenServiceTest extends BaseUnitTest {
         when(builder.build()).thenReturn(mockWebClient);
 
         GitLabProperties properties = new GitLabProperties(
-            "https://gitlab.com",
-            Duration.ofSeconds(30),
-            Duration.ofSeconds(60),
-            Duration.ofMillis(200),
-            Duration.ofMinutes(5)
-        );
+                "https://gitlab.com",
+                Duration.ofSeconds(30),
+                Duration.ofSeconds(60),
+                Duration.ofMillis(200),
+                Duration.ofMinutes(5));
 
         tokenService = new GitLabTokenService(tokenProvider, builder, properties);
     }
@@ -73,8 +70,8 @@ class GitLabTokenServiceTest extends BaseUnitTest {
             when(tokenProvider.isScopeActive(1L)).thenReturn(false);
 
             assertThatThrownBy(() -> tokenService.getAccessToken(1L))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("not active");
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("not active");
         }
 
         @Test
@@ -83,8 +80,8 @@ class GitLabTokenServiceTest extends BaseUnitTest {
             when(tokenProvider.getPersonalAccessToken(1L)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> tokenService.getAccessToken(1L))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("no token is stored");
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("no token is stored");
         }
 
         @Test
@@ -93,8 +90,8 @@ class GitLabTokenServiceTest extends BaseUnitTest {
             when(tokenProvider.getPersonalAccessToken(1L)).thenReturn(Optional.of("  "));
 
             assertThatThrownBy(() -> tokenService.getAccessToken(1L))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("no token is stored");
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("no token is stored");
         }
     }
 
@@ -156,9 +153,8 @@ class GitLabTokenServiceTest extends BaseUnitTest {
             when(uriSpec.uri(anyString())).thenReturn((RequestHeadersSpec) headersSpec);
             when(headersSpec.header(anyString(), anyString())).thenReturn((RequestHeadersSpec) headersSpec);
             when(headersSpec.retrieve()).thenReturn(responseSpec);
-            when(responseSpec.bodyToMono(eq(GitLabTokenService.GitLabUserResponse.class))).thenReturn(
-                Mono.just(new GitLabTokenService.GitLabUserResponse(42L, "testuser"))
-            );
+            when(responseSpec.bodyToMono(eq(GitLabTokenService.GitLabUserResponse.class)))
+                    .thenReturn(Mono.just(new GitLabTokenService.GitLabUserResponse(42L, "testuser")));
 
             // First call → makes HTTP request
             GitLabTokenService.ValidatedToken result1 = tokenService.validateToken(1L);

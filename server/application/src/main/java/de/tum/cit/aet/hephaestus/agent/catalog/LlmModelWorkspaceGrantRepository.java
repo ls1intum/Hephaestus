@@ -15,8 +15,7 @@ import org.springframework.data.repository.query.Param;
  * have excused the bind-time check, the one read here that must stay pinned to a single workspace.
  */
 public interface LlmModelWorkspaceGrantRepository
-    extends JpaRepository<LlmModelWorkspaceGrant, LlmModelWorkspaceGrant.Id>
-{
+        extends JpaRepository<LlmModelWorkspaceGrant, LlmModelWorkspaceGrant.Id> {
     @Modifying(flushAutomatically = true)
     @Query("DELETE FROM LlmModelWorkspaceGrant g WHERE g.id.workspaceId = :workspaceId")
     int deleteAllByWorkspaceId(@Param("workspaceId") Long workspaceId);

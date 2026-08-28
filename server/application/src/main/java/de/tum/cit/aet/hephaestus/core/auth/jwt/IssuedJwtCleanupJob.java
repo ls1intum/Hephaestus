@@ -37,8 +37,8 @@ public class IssuedJwtCleanupJob {
         this.repository = repository;
         this.clock = clock;
         this.prunedCounter = Counter.builder("auth.issued_jwt.pruned")
-            .description("Expired issued_jwt revocation rows physically removed by the daily sweep")
-            .register(meterRegistry);
+                .description("Expired issued_jwt revocation rows physically removed by the daily sweep")
+                .register(meterRegistry);
     }
 
     /** Runs daily at 03:30 server time. */

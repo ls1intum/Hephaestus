@@ -40,9 +40,9 @@ class PracticeGroupReviewRunIntegrationTest extends AbstractWorkspaceIntegration
 
     /** Delivery authorization reads the run's evidence contract, so every fixture observation cites a source. */
     private static final String DIFF_EVIDENCE_JSON =
-        "{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\",\"artifactPath\":\"inputs/context/diff.patch\"," +
-        "\"path\":\"src/Main.java\",\"side\":\"NEW\",\"startLine\":42,\"endLine\":42,\"quote\":\"example\"," +
-        "\"quoteRedacted\":false}]}";
+            "{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\",\"artifactPath\":\"inputs/context/diff.patch\","
+                    + "\"path\":\"src/Main.java\",\"side\":\"NEW\",\"startLine\":42,\"endLine\":42,\"quote\":\"example\","
+                    + "\"quoteRedacted\":false}]}";
 
     @Autowired
     private WebTestClient webTestClient;
@@ -112,68 +112,56 @@ class PracticeGroupReviewRunIntegrationTest extends AbstractWorkspaceIntegration
     }
 
     private void insertObservation(
-        String title,
-        String presence,
-        @org.jspecify.annotations.Nullable String assessment,
-        @org.jspecify.annotations.Nullable String severity,
-        String artifactKind,
-        Long artifactId
-    ) {
+            String title,
+            String presence,
+            @org.jspecify.annotations.Nullable String assessment,
+            @org.jspecify.annotations.Nullable String severity,
+            String artifactKind,
+            Long artifactId) {
         insertObservation(
-            practice,
-            agentJob,
-            title,
-            presence,
-            assessment,
-            severity,
-            artifactKind,
-            artifactId,
-            Instant.now()
-        );
+                practice, agentJob, title, presence, assessment, severity, artifactKind, artifactId, Instant.now());
     }
 
     private void insertObservation(
-        Practice observedPractice,
-        AgentJob reviewJob,
-        String title,
-        String presence,
-        @org.jspecify.annotations.Nullable String assessment,
-        @org.jspecify.annotations.Nullable String severity,
-        String artifactKind,
-        Long artifactId,
-        Instant observedAt
-    ) {
+            Practice observedPractice,
+            AgentJob reviewJob,
+            String title,
+            String presence,
+            @org.jspecify.annotations.Nullable String assessment,
+            @org.jspecify.annotations.Nullable String severity,
+            String artifactKind,
+            Long artifactId,
+            Instant observedAt) {
         UUID id = UUID.randomUUID();
         observationRepository.insertIfAbsent(
-            id,
-            "key-" + id,
-            reviewJob.getId(),
-            observedPractice.getId(),
-            observedPractice.getCurrentRevision().getId(),
-            artifactKind,
-            artifactId,
-            developer.getId(),
-            title,
-            presence,
-            assessment,
-            severity,
-            DIFF_EVIDENCE_JSON,
-            "Test reasoning for " + title,
-            null,
-            observedAt,
-            "LIVE"
-        );
+                id,
+                "key-" + id,
+                reviewJob.getId(),
+                observedPractice.getId(),
+                observedPractice.getCurrentRevision().getId(),
+                artifactKind,
+                artifactId,
+                developer.getId(),
+                title,
+                presence,
+                assessment,
+                severity,
+                DIFF_EVIDENCE_JSON,
+                "Test reasoning for " + title,
+                null,
+                observedAt,
+                "LIVE");
     }
 
     private WebTestClient.BodyContentSpec getHistory() {
         return webTestClient
-            .get()
-            .uri(REVIEW_RUNS_URI, workspace.getWorkspaceSlug(), group.getSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody();
+                .get()
+                .uri(REVIEW_RUNS_URI, workspace.getWorkspaceSlug(), group.getSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody();
     }
 
     @Test
@@ -184,12 +172,12 @@ class PracticeGroupReviewRunIntegrationTest extends AbstractWorkspaceIntegration
         insertObservation("No testing notes", "ABSENT", "BAD", "MAJOR", ArtifactKinds.PULL_REQUEST.value(), 1L);
 
         getHistory()
-            .jsonPath("$.content.length()")
-            .isEqualTo(1)
-            .jsonPath("$.content[0].reviewId")
-            .isEqualTo(agentJob.getId().toString())
-            .jsonPath("$.content[0].observations.length()")
-            .isEqualTo(2);
+                .jsonPath("$.content.length()")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].reviewId")
+                .isEqualTo(agentJob.getId().toString())
+                .jsonPath("$.content[0].observations.length()")
+                .isEqualTo(2);
     }
 
     @Test
@@ -199,14 +187,14 @@ class PracticeGroupReviewRunIntegrationTest extends AbstractWorkspaceIntegration
         insertObservation("Could not tell from the diff", "INCONCLUSIVE", null, null, "scm.pull_request", 1L);
 
         getHistory()
-            .jsonPath("$.content.length()")
-            .isEqualTo(1)
-            .jsonPath("$.content[0].observations.length()")
-            .isEqualTo(1)
-            .jsonPath("$.content[0].observations[0].presence")
-            .isEqualTo("INCONCLUSIVE")
-            .jsonPath("$.content[0].observations[0].assessment")
-            .doesNotExist();
+                .jsonPath("$.content.length()")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].observations.length()")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].observations[0].presence")
+                .isEqualTo("INCONCLUSIVE")
+                .jsonPath("$.content[0].observations[0].assessment")
+                .doesNotExist();
     }
 
     @Test
@@ -216,12 +204,12 @@ class PracticeGroupReviewRunIntegrationTest extends AbstractWorkspaceIntegration
         insertObservation("Issue lacks acceptance criteria", "ABSENT", "BAD", "MINOR", ArtifactKinds.ISSUE.value(), 7L);
 
         getHistory()
-            .jsonPath("$.content.length()")
-            .isEqualTo(1)
-            .jsonPath("$.content[0].observations.length()")
-            .isEqualTo(1)
-            .jsonPath("$.content[0].observations[0].title")
-            .isEqualTo("Issue lacks acceptance criteria");
+                .jsonPath("$.content.length()")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].observations.length()")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].observations[0].title")
+                .isEqualTo("Issue lacks acceptance criteria");
     }
 
     @Test
@@ -229,13 +217,7 @@ class PracticeGroupReviewRunIntegrationTest extends AbstractWorkspaceIntegration
     @DisplayName("a run that produced nothing to judge is absent from the history")
     void shouldOmitRunsWithoutAnythingToJudge() {
         insertObservation(
-            "Nothing to judge here",
-            "NOT_APPLICABLE",
-            null,
-            null,
-            ArtifactKinds.PULL_REQUEST.value(),
-            1L
-        );
+                "Nothing to judge here", "NOT_APPLICABLE", null, null, ArtifactKinds.PULL_REQUEST.value(), 1L);
 
         getHistory().jsonPath("$.content.length()").isEqualTo(0);
     }
@@ -246,20 +228,18 @@ class PracticeGroupReviewRunIntegrationTest extends AbstractWorkspaceIntegration
         insertObservation("Motivation is clear", "PRESENT", "GOOD", null, ArtifactKinds.PULL_REQUEST.value(), 1L);
 
         webTestClient
-            .get()
-            .uri(uriBuilder ->
-                uriBuilder
-                    .path(REVIEW_RUNS_URI)
-                    .queryParam("severities", "MAJOR")
-                    .build(workspace.getWorkspaceSlug(), group.getSlug())
-            )
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.content.length()")
-            .isEqualTo(0);
+                .get()
+                .uri(uriBuilder -> uriBuilder
+                        .path(REVIEW_RUNS_URI)
+                        .queryParam("severities", "MAJOR")
+                        .build(workspace.getWorkspaceSlug(), group.getSlug()))
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.content.length()")
+                .isEqualTo(0);
     }
 
     @Test
@@ -267,52 +247,48 @@ class PracticeGroupReviewRunIntegrationTest extends AbstractWorkspaceIntegration
     void shouldFillAPageAfterWithholdingANewerRun() {
         AgentJob olderJob = persistAgentJob(workspace);
         insertObservation(
-            practice,
-            olderJob,
-            "Visible observation",
-            "PRESENT",
-            "GOOD",
-            null,
-            ArtifactKinds.PULL_REQUEST.value(),
-            1L,
-            Instant.parse("2025-01-01T00:00:00Z")
-        );
+                practice,
+                olderJob,
+                "Visible observation",
+                "PRESENT",
+                "GOOD",
+                null,
+                ArtifactKinds.PULL_REQUEST.value(),
+                1L,
+                Instant.parse("2025-01-01T00:00:00Z"));
 
         Practice superseded = persistPractice(workspace, group, "superseded", "Superseded");
         AgentJob newerJob = persistAgentJob(workspace);
         insertObservation(
-            superseded,
-            newerJob,
-            "Withheld observation",
-            "PRESENT",
-            "GOOD",
-            null,
-            ArtifactKinds.PULL_REQUEST.value(),
-            2L,
-            Instant.parse("2025-01-02T00:00:00Z")
-        );
+                superseded,
+                newerJob,
+                "Withheld observation",
+                "PRESENT",
+                "GOOD",
+                null,
+                ArtifactKinds.PULL_REQUEST.value(),
+                2L,
+                Instant.parse("2025-01-02T00:00:00Z"));
         superseded.setCriteria("New criteria");
         superseded.setGroup(group);
         superseded.setCurrentRevision(practiceRevisionRepository.save(new PracticeRevision(superseded, 2)));
         practiceRepository.saveAndFlush(superseded);
 
         webTestClient
-            .get()
-            .uri(uriBuilder ->
-                uriBuilder
-                    .path(REVIEW_RUNS_URI)
-                    .queryParam("size", 1)
-                    .build(workspace.getWorkspaceSlug(), group.getSlug())
-            )
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.content[0].observations[0].title")
-            .isEqualTo("Visible observation")
-            .jsonPath("$.hasNext")
-            .isEqualTo(false);
+                .get()
+                .uri(uriBuilder -> uriBuilder
+                        .path(REVIEW_RUNS_URI)
+                        .queryParam("size", 1)
+                        .build(workspace.getWorkspaceSlug(), group.getSlug()))
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.content[0].observations[0].title")
+                .isEqualTo("Visible observation")
+                .jsonPath("$.hasNext")
+                .isEqualTo(false);
     }
 
     @Test

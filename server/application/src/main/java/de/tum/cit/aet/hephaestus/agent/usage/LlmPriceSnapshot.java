@@ -7,15 +7,14 @@ import org.jspecify.annotations.Nullable;
 
 /** Immutable pricing provenance captured when an LLM turn is admitted. */
 public record LlmPriceSnapshot(
-    FundingSource fundingSource,
-    PricingState pricingState,
-    @Nullable Long appliedPriceId,
-    @Nullable Long appliedWorkspaceModelId,
-    @Nullable BigDecimal per1mInputUsd,
-    @Nullable BigDecimal per1mOutputUsd,
-    @Nullable BigDecimal per1mCacheReadUsd,
-    @Nullable BigDecimal per1mCacheWriteUsd
-) {
+        FundingSource fundingSource,
+        PricingState pricingState,
+        @Nullable Long appliedPriceId,
+        @Nullable Long appliedWorkspaceModelId,
+        @Nullable BigDecimal per1mInputUsd,
+        @Nullable BigDecimal per1mOutputUsd,
+        @Nullable BigDecimal per1mCacheReadUsd,
+        @Nullable BigDecimal per1mCacheWriteUsd) {
     private static final BigDecimal PER_1M = BigDecimal.valueOf(1_000_000L);
 
     /** Decimal places the ledger keeps: {@code llm_usage_event.cost_usd} is {@code NUMERIC(18,6)}. */
@@ -74,9 +73,9 @@ public record LlmPriceSnapshot(
         if (pricingState == PricingState.UNPRICED) return Cost.exact(null);
         if (pricingState == PricingState.NO_CHARGE) return Cost.exact(BigDecimal.ZERO.setScale(LEDGER_SCALE));
         BigDecimal raw = bucket(inputTokens, per1mInputUsd, CALC)
-            .add(bucket(outputTokens, per1mOutputUsd, CALC), CALC)
-            .add(bucket(cacheReadTokens, per1mCacheReadUsd, CALC), CALC)
-            .add(bucket(cacheWriteTokens, per1mCacheWriteUsd, CALC), CALC);
+                .add(bucket(outputTokens, per1mOutputUsd, CALC), CALC)
+                .add(bucket(cacheReadTokens, per1mCacheReadUsd, CALC), CALC)
+                .add(bucket(cacheWriteTokens, per1mCacheWriteUsd, CALC), CALC);
         if (raw.signum() < 0) throw new IllegalStateException("Frozen LLM price produced a negative cost");
         BigDecimal rounded = raw.setScale(LEDGER_SCALE, LEDGER_ROUNDING);
         if (raw.signum() > 0 && rounded.signum() == 0) {

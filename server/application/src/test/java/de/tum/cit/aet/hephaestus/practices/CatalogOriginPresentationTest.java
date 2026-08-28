@@ -13,7 +13,6 @@ import de.tum.cit.aet.hephaestus.practices.curated.EffectiveCatalog;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
-import de.tum.cit.aet.hephaestus.practices.observation.PracticeGroupStandingService;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyRollupService;
@@ -28,16 +27,8 @@ class CatalogOriginPresentationTest extends BaseUnitTest {
 
     private static final long WORKSPACE_ID = 1L;
 
-    private static final WorkspaceContext CTX = new WorkspaceContext(
-        WORKSPACE_ID,
-        "acme",
-        "Acme",
-        AccountType.ORG,
-        null,
-        false,
-        false,
-        Set.of()
-    );
+    private static final WorkspaceContext CTX =
+            new WorkspaceContext(WORKSPACE_ID, "acme", "Acme", AccountType.ORG, null, false, false, Set.of());
 
     @Test
     void practiceBatchReadsTheCatalogOnce() {
@@ -107,12 +98,11 @@ class CatalogOriginPresentationTest extends BaseUnitTest {
         List<Practice> practices = List.of(mock(Practice.class), mock(Practice.class));
         when(service.listPractices(CTX, null)).thenReturn(practices);
         PracticeCatalogController controller = new PracticeCatalogController(
-            service,
-            presenter,
-            mock(AutonomyRollupService.class),
-            mock(PracticeGroupService.class),
-            mock(PracticeDefinitionOptionsService.class)
-        );
+                service,
+                presenter,
+                mock(AutonomyRollupService.class),
+                mock(PracticeGroupService.class),
+                mock(PracticeDefinitionOptionsService.class));
 
         controller.listPractices(CTX, null);
 

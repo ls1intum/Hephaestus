@@ -26,9 +26,9 @@ class VerifiedEmailResolverTest extends BaseUnitTest {
 
     private static OAuth2User oidcUser(Map<String, Object> claims) {
         OidcIdToken idToken = OidcIdToken.withTokenValue("tok")
-            .subject("sub-1")
-            .claims(c -> c.putAll(claims))
-            .build();
+                .subject("sub-1")
+                .claims(c -> c.putAll(claims))
+                .build();
         return new DefaultOidcUser(List.of(new SimpleGrantedAuthority("ROLE_USER")), idToken);
     }
 

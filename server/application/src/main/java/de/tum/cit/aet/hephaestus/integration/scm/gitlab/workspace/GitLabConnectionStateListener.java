@@ -46,10 +46,9 @@ public class GitLabConnectionStateListener {
     private final AsyncTaskExecutor monitoringExecutor;
 
     public GitLabConnectionStateListener(
-        GitLabWorkspaceInitializationService initService,
-        GitLabWebhookService webhookService,
-        @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
-    ) {
+            GitLabWorkspaceInitializationService initService,
+            GitLabWebhookService webhookService,
+            @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor) {
         this.initService = initService;
         this.webhookService = webhookService;
         this.monitoringExecutor = monitoringExecutor;
@@ -67,10 +66,9 @@ public class GitLabConnectionStateListener {
             initService.initializeAsync(event.workspaceId());
         } catch (RuntimeException e) {
             log.warn(
-                "gitlab.lifecycle: connect-time initialization dispatch failed for workspaceId={}: {}",
-                event.workspaceId(),
-                e.toString()
-            );
+                    "gitlab.lifecycle: connect-time initialization dispatch failed for workspaceId={}: {}",
+                    event.workspaceId(),
+                    e.toString());
         }
     }
 
@@ -87,10 +85,9 @@ public class GitLabConnectionStateListener {
                 webhookService.deregisterWebhookForConnection(workspaceId, connectionId);
             } catch (RuntimeException e) {
                 log.warn(
-                    "gitlab.lifecycle: deactivation webhook teardown failed for connectionId={}: {}",
-                    connectionId,
-                    e.toString()
-                );
+                        "gitlab.lifecycle: deactivation webhook teardown failed for connectionId={}: {}",
+                        connectionId,
+                        e.toString());
             }
         });
     }

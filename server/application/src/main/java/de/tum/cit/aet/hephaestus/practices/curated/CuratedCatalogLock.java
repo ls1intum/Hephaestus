@@ -14,9 +14,8 @@ public class CuratedCatalogLock {
 
     public void acquire() {
         entityManager
-            .createNativeQuery(
-                "SELECT pg_advisory_xact_lock(hashtext('hephaestus'), hashtext('curated-practice-catalog'))"
-            )
-            .getSingleResult();
+                .createNativeQuery(
+                        "SELECT pg_advisory_xact_lock(hashtext('hephaestus'), hashtext('curated-practice-catalog'))")
+                .getSingleResult();
     }
 }

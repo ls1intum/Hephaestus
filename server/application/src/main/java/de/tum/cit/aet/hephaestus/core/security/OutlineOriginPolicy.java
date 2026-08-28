@@ -13,12 +13,10 @@ public class OutlineOriginPolicy {
     private final Set<String> allowedOrigins;
 
     public OutlineOriginPolicy(
-        @Value("${hephaestus.integration.outline.allowed-origins:}") Set<String> allowedOrigins
-    ) {
-        this.allowedOrigins = allowedOrigins
-            .stream()
-            .map(OutlineOriginPolicy::canonicalOrigin)
-            .collect(Collectors.toUnmodifiableSet());
+            @Value("${hephaestus.integration.outline.allowed-origins:}") Set<String> allowedOrigins) {
+        this.allowedOrigins = allowedOrigins.stream()
+                .map(OutlineOriginPolicy::canonicalOrigin)
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     public boolean allows(String serverUrl) {

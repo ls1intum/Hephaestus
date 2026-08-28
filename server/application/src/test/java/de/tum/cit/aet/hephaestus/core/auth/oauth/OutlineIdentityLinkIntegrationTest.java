@@ -38,6 +38,7 @@ class OutlineIdentityLinkIntegrationTest extends RealAuthIntegrationTest {
 
     /** Outline's subject is the immutable user UUID; the tenant key is the team UUID. */
     private static final String OUTLINE_USER = "0aa1bb2c-user";
+
     private static final String OUTLINE_TEAM = "9ff8ee7d-team";
 
     @Autowired
@@ -57,23 +58,20 @@ class OutlineIdentityLinkIntegrationTest extends RealAuthIntegrationTest {
         seedProvider("github-outlinelink", LoginProvider.ProviderType.GITHUB);
         seedProvider("outline-link", LoginProvider.ProviderType.OUTLINE);
 
-        Account github = service
-            .resolveOrProvision(
-                "github-outlinelink",
-                "gh-2",
-                githubPrincipal("gh-2", "dev@example.com", "octocat"),
-                AuthIntentCookie.Intent.login(null, null)
-            )
-            .account();
+        Account github = service.resolveOrProvision(
+                        "github-outlinelink",
+                        "gh-2",
+                        githubPrincipal("gh-2", "dev@example.com", "octocat"),
+                        AuthIntentCookie.Intent.login(null, null))
+                .account();
         long accountsAfterLogin = accountRepository.count();
 
         // While authenticated, they link their wiki identity (simulated auth.info principal).
         AccountProvisioningService.ProvisionResult linked = service.resolveOrProvision(
-            "outline-link",
-            OUTLINE_USER,
-            outlinePrincipal(OUTLINE_USER, OUTLINE_TEAM, "dev@example.com"),
-            AuthIntentCookie.Intent.link(persistedId(github.getId()), "/settings")
-        );
+                "outline-link",
+                OUTLINE_USER,
+                outlinePrincipal(OUTLINE_USER, OUTLINE_TEAM, "dev@example.com"),
+                AuthIntentCookie.Intent.link(persistedId(github.getId()), "/settings"));
 
         assertThat(linked.identityLinked()).isTrue();
         assertThat(linked.account().getId()).isEqualTo(persistedId(github.getId()));
@@ -82,11 +80,10 @@ class OutlineIdentityLinkIntegrationTest extends RealAuthIntegrationTest {
 
         List<IdentityLink> links = identityLinkRepository.findActiveByAccountId(persistedId(github.getId()));
         assertThat(links).extracting(IdentityLink::getSubject).containsExactlyInAnyOrder("gh-2", OUTLINE_USER);
-        IdentityLink outline = links
-            .stream()
-            .filter(l -> l.getSubject().equals(OUTLINE_USER))
-            .findFirst()
-            .orElseThrow();
+        IdentityLink outline = links.stream()
+                .filter(l -> l.getSubject().equals(OUTLINE_USER))
+                .findFirst()
+                .orElseThrow();
         // The tenant key is mandatory: an Outline user UUID is only unique within its team.
         assertThat(outline.getTeamId()).isEqualTo(OUTLINE_TEAM);
         assertThat(outline.getLinkedVia()).isEqualTo(IdentityLink.LinkedVia.MANUAL_LINK);
@@ -98,14 +95,12 @@ class OutlineIdentityLinkIntegrationTest extends RealAuthIntegrationTest {
         long before = accountRepository.count();
 
         // LOGIN mode on a link-only provider — the success handler maps this to /auth/error?code=link_requires_auth.
-        assertThatThrownBy(() ->
-            service.resolveOrProvision(
-                "outline-loginmode",
-                OUTLINE_USER,
-                outlinePrincipal(OUTLINE_USER, OUTLINE_TEAM, "dev@example.com"),
-                AuthIntentCookie.Intent.login(null, null)
-            )
-        ).isInstanceOf(LinkOnlyProviderLoginException.class);
+        assertThatThrownBy(() -> service.resolveOrProvision(
+                        "outline-loginmode",
+                        OUTLINE_USER,
+                        outlinePrincipal(OUTLINE_USER, OUTLINE_TEAM, "dev@example.com"),
+                        AuthIntentCookie.Intent.login(null, null)))
+                .isInstanceOf(LinkOnlyProviderLoginException.class);
 
         assertThat(accountRepository.count()).isEqualTo(before);
     }
@@ -116,14 +111,12 @@ class OutlineIdentityLinkIntegrationTest extends RealAuthIntegrationTest {
         long before = accountRepository.count();
 
         // A LINK-mode callback with no authenticated account binding must fail closed — never an orphan.
-        assertThatThrownBy(() ->
-            service.resolveOrProvision(
-                "outline-noauth",
-                OUTLINE_USER,
-                outlinePrincipal(OUTLINE_USER, OUTLINE_TEAM, "dev@example.com"),
-                AuthIntentCookie.Intent.link(null, "/settings")
-            )
-        ).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> service.resolveOrProvision(
+                        "outline-noauth",
+                        OUTLINE_USER,
+                        outlinePrincipal(OUTLINE_USER, OUTLINE_TEAM, "dev@example.com"),
+                        AuthIntentCookie.Intent.link(null, "/settings")))
+                .isInstanceOf(IllegalStateException.class);
 
         assertThat(accountRepository.count()).isEqualTo(before);
     }
@@ -134,48 +127,41 @@ class OutlineIdentityLinkIntegrationTest extends RealAuthIntegrationTest {
         seedProvider("github-outlineconflict-b", LoginProvider.ProviderType.GITHUB);
         seedProvider("outline-conflict", LoginProvider.ProviderType.OUTLINE);
 
-        Account owner = service
-            .resolveOrProvision(
-                "github-outlineconflict-a",
-                "gh-owner",
-                githubPrincipal("gh-owner", "owner@example.com", "owner"),
-                AuthIntentCookie.Intent.login(null, null)
-            )
-            .account();
+        Account owner = service.resolveOrProvision(
+                        "github-outlineconflict-a",
+                        "gh-owner",
+                        githubPrincipal("gh-owner", "owner@example.com", "owner"),
+                        AuthIntentCookie.Intent.login(null, null))
+                .account();
         service.resolveOrProvision(
-            "outline-conflict",
-            OUTLINE_USER,
-            outlinePrincipal(OUTLINE_USER, OUTLINE_TEAM, "owner@example.com"),
-            AuthIntentCookie.Intent.link(persistedId(owner.getId()), "/settings")
-        );
+                "outline-conflict",
+                OUTLINE_USER,
+                outlinePrincipal(OUTLINE_USER, OUTLINE_TEAM, "owner@example.com"),
+                AuthIntentCookie.Intent.link(persistedId(owner.getId()), "/settings"));
 
-        Account attacker = service
-            .resolveOrProvision(
-                "github-outlineconflict-b",
-                "gh-attacker",
-                githubPrincipal("gh-attacker", "attacker@example.com", "attacker"),
-                AuthIntentCookie.Intent.login(null, null)
-            )
-            .account();
+        Account attacker = service.resolveOrProvision(
+                        "github-outlineconflict-b",
+                        "gh-attacker",
+                        githubPrincipal("gh-attacker", "attacker@example.com", "attacker"),
+                        AuthIntentCookie.Intent.login(null, null))
+                .account();
 
         // The SAME (OUTLINE, user, team) identity, linked from a different session: rebinding it would
         // hand the attacker the owner's wiki identity. Mapped to /auth/error?code=identity_already_linked.
-        assertThatThrownBy(() ->
-            service.resolveOrProvision(
-                "outline-conflict",
-                OUTLINE_USER,
-                outlinePrincipal(OUTLINE_USER, OUTLINE_TEAM, "attacker@example.com"),
-                AuthIntentCookie.Intent.link(persistedId(attacker.getId()), "/settings")
-            )
-        ).isInstanceOf(AccountLinkConflictException.class);
+        assertThatThrownBy(() -> service.resolveOrProvision(
+                        "outline-conflict",
+                        OUTLINE_USER,
+                        outlinePrincipal(OUTLINE_USER, OUTLINE_TEAM, "attacker@example.com"),
+                        AuthIntentCookie.Intent.link(persistedId(attacker.getId()), "/settings")))
+                .isInstanceOf(AccountLinkConflictException.class);
 
         // The link still hangs off the original owner, and the attacker gained nothing.
         assertThat(identityLinkRepository.findActiveByAccountId(persistedId(attacker.getId())))
-            .extracting(IdentityLink::getSubject)
-            .containsExactly("gh-attacker");
+                .extracting(IdentityLink::getSubject)
+                .containsExactly("gh-attacker");
         assertThat(identityLinkRepository.findActiveByAccountId(persistedId(owner.getId())))
-            .extracting(IdentityLink::getSubject)
-            .contains(OUTLINE_USER);
+                .extracting(IdentityLink::getSubject)
+                .contains(OUTLINE_USER);
     }
 
     private void seedProvider(String registrationId, LoginProvider.ProviderType type) {
@@ -194,19 +180,17 @@ class OutlineIdentityLinkIntegrationTest extends RealAuthIntegrationTest {
 
     private static OAuth2User githubPrincipal(String subject, String email, String login) {
         return new DefaultOAuth2User(
-            List.of(new SimpleGrantedAuthority("ROLE_USER")),
-            Map.of("id", subject, "login", login, "email", email, "email_verified", true),
-            "id"
-        );
+                List.of(new SimpleGrantedAuthority("ROLE_USER")),
+                Map.of("id", subject, "login", login, "email", email, "email_verified", true),
+                "id");
     }
 
     /** The principal {@code OutlineAuthInfoUserService} flattens out of {@code auth.info}. */
     private static OAuth2User outlinePrincipal(String subject, String teamId, String email) {
         return new DefaultOAuth2User(
-            List.of(new SimpleGrantedAuthority("ROLE_USER")),
-            Map.of("id", subject, "team_id", teamId, "team_name", "Acme", "name", "Ada Lovelace", "email", email),
-            "id"
-        );
+                List.of(new SimpleGrantedAuthority("ROLE_USER")),
+                Map.of("id", subject, "team_id", teamId, "team_name", "Acme", "name", "Ada Lovelace", "email", email),
+                "id");
     }
 
     private static long persistedId(@Nullable Long id) {

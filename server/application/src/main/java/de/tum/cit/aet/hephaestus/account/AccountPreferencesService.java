@@ -36,11 +36,10 @@ public class AccountPreferencesService {
     private final ObjectProvider<ResearchConsentAudit> researchConsentAuditProvider;
 
     public AccountPreferencesService(
-        UserPreferencesRepository userPreferencesRepository,
-        UserRepository userRepository,
-        ObjectProvider<PosthogClient> posthogClientProvider,
-        ObjectProvider<ResearchConsentAudit> researchConsentAuditProvider
-    ) {
+            UserPreferencesRepository userPreferencesRepository,
+            UserRepository userRepository,
+            ObjectProvider<PosthogClient> posthogClientProvider,
+            ObjectProvider<ResearchConsentAudit> researchConsentAuditProvider) {
         this.userPreferencesRepository = userPreferencesRepository;
         this.userRepository = userRepository;
         this.posthogClientProvider = posthogClientProvider;
@@ -53,12 +52,10 @@ public class AccountPreferencesService {
     }
 
     private UserPreferences loadOrCreatePreferences(User user) {
-        return userPreferencesRepository
-            .findByUserId(user.getId())
-            .orElseGet(() -> {
-                log.debug("Created default preferences: userLogin={}", user.getLogin());
-                return userPreferencesRepository.save(new UserPreferences(user));
-            });
+        return userPreferencesRepository.findByUserId(user.getId()).orElseGet(() -> {
+            log.debug("Created default preferences: userLogin={}", user.getLogin());
+            return userPreferencesRepository.save(new UserPreferences(user));
+        });
     }
 
     @Transactional
@@ -77,18 +74,12 @@ public class AccountPreferencesService {
         log.info("Updating user settings: userLogin={}", user.getLogin());
         UserPreferences preferences = loadOrCreatePreferences(user);
 
-        preferences.setPracticeFeedbackDeliveryEnabled(
-            Objects.requireNonNull(
-                userSettings.practiceFeedbackDeliveryEnabled(),
-                "practiceFeedbackDeliveryEnabled must not be null"
-            )
-        );
+        preferences.setPracticeFeedbackDeliveryEnabled(Objects.requireNonNull(
+                userSettings.practiceFeedbackDeliveryEnabled(), "practiceFeedbackDeliveryEnabled must not be null"));
 
         boolean previousParticipation = preferences.isParticipateInResearch();
-        boolean participatesInResearch = Objects.requireNonNull(
-            userSettings.participateInResearch(),
-            "participateInResearch must not be null"
-        );
+        boolean participatesInResearch =
+                Objects.requireNonNull(userSettings.participateInResearch(), "participateInResearch must not be null");
         preferences.setParticipateInResearch(participatesInResearch);
         userPreferencesRepository.save(preferences);
 
@@ -102,10 +93,7 @@ public class AccountPreferencesService {
                 }
             } catch (PosthogClientException exception) {
                 throw new ResponseStatusException(
-                    HttpStatus.BAD_GATEWAY,
-                    "Failed to revoke analytics consent",
-                    exception
-                );
+                        HttpStatus.BAD_GATEWAY, "Failed to revoke analytics consent", exception);
             }
         }
         return toDTO(preferences);
@@ -162,10 +150,9 @@ public class AccountPreferencesService {
         } catch (PosthogClientException exception) {
             // Lenient — the opt-out row is already committed; analytics reachability must not gate a user right.
             log.warn(
-                "research-consent: PostHog revocation failed on opt-out (opt-out still applied): userLogin={}",
-                user.getLogin(),
-                exception
-            );
+                    "research-consent: PostHog revocation failed on opt-out (opt-out still applied): userLogin={}",
+                    user.getLogin(),
+                    exception);
         }
     }
 
@@ -187,9 +174,7 @@ public class AccountPreferencesService {
 
     private static UserSettingsDTO toDTO(UserPreferences preferences) {
         return new UserSettingsDTO(
-            preferences.isParticipateInResearch(),
-            preferences.isPracticeFeedbackDeliveryEnabled()
-        );
+                preferences.isParticipateInResearch(), preferences.isPracticeFeedbackDeliveryEnabled());
     }
 
     private boolean deletePosthogIdentities(User user, @Nullable String primaryDistinctId) {

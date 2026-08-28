@@ -61,12 +61,11 @@ class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
 
     private OutlineWebhookMessageHandler handler() {
         return new OutlineWebhookMessageHandler(
-            connectionService,
-            syncScheduler,
-            documentEventRepository,
-            JsonMapper.builder().build(),
-            new OutlineOriginPolicy(Set.of("https://wiki.example.com"))
-        );
+                connectionService,
+                syncScheduler,
+                documentEventRepository,
+                JsonMapper.builder().build(),
+                new OutlineOriginPolicy(Set.of("https://wiki.example.com")));
     }
 
     private static Message message(String subscriptionId, String event, @Nullable String payloadId) {
@@ -74,19 +73,18 @@ class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
     }
 
     private static Message message(
-        String subscriptionId,
-        String event,
-        @Nullable String payloadId,
-        @Nullable String actorId,
-        @Nullable String createdAt
-    ) {
+            String subscriptionId,
+            String event,
+            @Nullable String payloadId,
+            @Nullable String actorId,
+            @Nullable String createdAt) {
         Message msg = Mockito.mock(Message.class);
         String payload = payloadId == null ? "{}" : "{\"id\":\"" + payloadId + "\"}";
         StringBuilder body = new StringBuilder("{\"webhookSubscriptionId\":\"")
-            .append(subscriptionId)
-            .append("\",\"event\":\"")
-            .append(event)
-            .append("\"");
+                .append(subscriptionId)
+                .append("\",\"event\":\"")
+                .append(event)
+                .append("\"");
         if (actorId != null) {
             body.append(",\"actorId\":\"").append(actorId).append("\"");
         }
@@ -99,20 +97,18 @@ class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
     }
 
     private void resolves(String subscriptionId, long workspaceId) {
-        when(connectionService.findOutlineSubscription(subscriptionId)).thenReturn(
-            Optional.of(new OutlineSubscription(workspaceId, "https://wiki.example.com", "secret"))
-        );
+        when(connectionService.findOutlineSubscription(subscriptionId))
+                .thenReturn(Optional.of(new OutlineSubscription(workspaceId, "https://wiki.example.com", "secret")));
         lenient().when(connection.getId()).thenReturn(CONNECTION_ID);
         lenient()
-            .when(connectionService.findActive(workspaceId, IntegrationKind.OUTLINE))
-            .thenReturn(Optional.of(connection));
+                .when(connectionService.findActive(workspaceId, IntegrationKind.OUTLINE))
+                .thenReturn(Optional.of(connection));
     }
 
     @Test
     void removedOriginIsNotPersistedOrRefreshed() {
-        when(connectionService.findOutlineSubscription("sub-1")).thenReturn(
-            Optional.of(new OutlineSubscription(42L, "https://removed.example.com", "secret"))
-        );
+        when(connectionService.findOutlineSubscription("sub-1"))
+                .thenReturn(Optional.of(new OutlineSubscription(42L, "https://removed.example.com", "secret")));
 
         handler().onMessage(message("sub-1", "documents.update", "doc-9"));
 
@@ -148,12 +144,12 @@ class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
         handler().onMessage(message("sub-1", "documents.update", null));
 
         verify(syncScheduler).syncWorkspaceNow(42L);
-        verify(syncScheduler, never()).refreshDocumentNow(
-            Mockito.anyLong(),
-            Mockito.anyString(),
-            Mockito.anyString(),
-            org.mockito.ArgumentMatchers.any()
-        );
+        verify(syncScheduler, never())
+                .refreshDocumentNow(
+                        Mockito.anyLong(),
+                        Mockito.anyString(),
+                        Mockito.anyString(),
+                        org.mockito.ArgumentMatchers.any());
         // No document id → nothing to attribute an event row to.
         verifyNoInteractions(documentEventRepository);
     }
@@ -243,7 +239,9 @@ class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
     @Test
     void eventLogFailure_neverBlocksTheRefresh() {
         resolves("sub-1", 42L);
-        doThrow(new RuntimeException("insert failed")).when(documentEventRepository).save(any());
+        doThrow(new RuntimeException("insert failed"))
+                .when(documentEventRepository)
+                .save(any());
 
         handler().onMessage(message("sub-1", "documents.update", "doc-9"));
 
@@ -252,9 +250,8 @@ class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
 
     @Test
     void missingActiveConnection_skipsTheEventRowButStillRoutes() {
-        when(connectionService.findOutlineSubscription("sub-1")).thenReturn(
-            Optional.of(new OutlineSubscription(42L, "https://wiki.example.com", "secret"))
-        );
+        when(connectionService.findOutlineSubscription("sub-1"))
+                .thenReturn(Optional.of(new OutlineSubscription(42L, "https://wiki.example.com", "secret")));
         when(connectionService.findActive(42L, IntegrationKind.OUTLINE)).thenReturn(Optional.empty());
 
         handler().onMessage(message("sub-1", "documents.update", "doc-9"));
@@ -287,9 +284,8 @@ class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
         // scalar node must degrade to "no usable model", not throw.
         resolves("sub-1", 42L);
         Message msg = Mockito.mock(Message.class);
-        String body =
-            "{\"webhookSubscriptionId\":\"sub-1\",\"event\":\"documents.update\"," +
-            "\"payload\":{\"id\":\"doc-9\",\"model\":\"not-an-object\"}}";
+        String body = "{\"webhookSubscriptionId\":\"sub-1\",\"event\":\"documents.update\","
+                + "\"payload\":{\"id\":\"doc-9\",\"model\":\"not-an-object\"}}";
         when(msg.getData()).thenReturn(body.getBytes(StandardCharsets.UTF_8));
 
         handler().onMessage(msg);
@@ -303,10 +299,9 @@ class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
     void documentEventWithUsableModel_passesItThrough() {
         resolves("sub-1", 42L);
         Message msg = Mockito.mock(Message.class);
-        String body =
-            "{\"webhookSubscriptionId\":\"sub-1\",\"event\":\"documents.update\"," +
-            "\"payload\":{\"id\":\"doc-9\",\"model\":{\"id\":\"doc-9\",\"collectionId\":\"col-1\"," +
-            "\"title\":\"Doc\",\"url\":\"/doc/doc-9\"}}}";
+        String body = "{\"webhookSubscriptionId\":\"sub-1\",\"event\":\"documents.update\","
+                + "\"payload\":{\"id\":\"doc-9\",\"model\":{\"id\":\"doc-9\",\"collectionId\":\"col-1\","
+                + "\"title\":\"Doc\",\"url\":\"/doc/doc-9\"}}}";
         when(msg.getData()).thenReturn(body.getBytes(StandardCharsets.UTF_8));
 
         handler().onMessage(msg);
@@ -323,9 +318,8 @@ class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
     void documentEventWithModelMissingCollectionId_fallsBackToNull() {
         resolves("sub-1", 42L);
         Message msg = Mockito.mock(Message.class);
-        String body =
-            "{\"webhookSubscriptionId\":\"sub-1\",\"event\":\"documents.update\"," +
-            "\"payload\":{\"id\":\"doc-9\",\"model\":{\"id\":\"doc-9\",\"title\":\"Doc\"}}}";
+        String body = "{\"webhookSubscriptionId\":\"sub-1\",\"event\":\"documents.update\","
+                + "\"payload\":{\"id\":\"doc-9\",\"model\":{\"id\":\"doc-9\",\"title\":\"Doc\"}}}";
         when(msg.getData()).thenReturn(body.getBytes(StandardCharsets.UTF_8));
 
         handler().onMessage(msg);

@@ -163,45 +163,44 @@ class GithubDataSyncServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         SyncSchedulerProperties properties = new SyncSchedulerProperties(
-            true,
-            7,
-            "0 0 3 * * *",
-            15, // cooldownMinutes
-            new BackfillProperties(false, 50, 100, 60),
-            new FilterProperties(Set.of(), Set.of(), Set.of()),
-            new DiscussionsProperties(false), // discussions off — keeps the test on the issue/PR path
-            new ProjectsProperties(false)
-        );
+                true,
+                7,
+                "0 0 3 * * *",
+                15, // cooldownMinutes
+                new BackfillProperties(false, 50, 100, 60),
+                new FilterProperties(Set.of(), Set.of(), Set.of()),
+                new DiscussionsProperties(false), // discussions off — keeps the test on the issue/PR path
+                new ProjectsProperties(false));
 
         service = new GithubDataSyncService(
-            properties,
-            gitProviderRepository,
-            syncTargetProvider,
-            organizationMembershipListener,
-            repositoryRepository,
-            organizationRepository,
-            labelSyncService,
-            milestoneSyncService,
-            issueSyncService,
-            issueDependencySyncService,
-            issueTypeSyncService,
-            subIssueSyncService,
-            pullRequestSyncService,
-            discussionSyncService,
-            teamSyncService,
-            projectSyncService,
-            organizationSyncService,
-            repositorySyncService,
-            collaboratorSyncService,
-            commitBackfillService,
-            commitAuthorEnrichmentService,
-            commitMetadataEnrichmentService,
-            exceptionClassifier,
-            tokenProvider,
-            gitHubAppTokenService,
-            rateLimitTracker,
-            Runnable::run // synchronous executor — deterministic assertions
-        );
+                properties,
+                gitProviderRepository,
+                syncTargetProvider,
+                organizationMembershipListener,
+                repositoryRepository,
+                organizationRepository,
+                labelSyncService,
+                milestoneSyncService,
+                issueSyncService,
+                issueDependencySyncService,
+                issueTypeSyncService,
+                subIssueSyncService,
+                pullRequestSyncService,
+                discussionSyncService,
+                teamSyncService,
+                projectSyncService,
+                organizationSyncService,
+                repositorySyncService,
+                collaboratorSyncService,
+                commitBackfillService,
+                commitAuthorEnrichmentService,
+                commitMetadataEnrichmentService,
+                exceptionClassifier,
+                tokenProvider,
+                gitHubAppTokenService,
+                rateLimitTracker,
+                Runnable::run // synchronous executor — deterministic assertions
+                );
 
         IdentityProvider provider = new IdentityProvider();
         ReflectionTestUtils.setField(provider, "id", PROVIDER_ID);
@@ -215,25 +214,25 @@ class GithubDataSyncServiceTest extends BaseUnitTest {
         repository.setUpdatedAt(REPO_UPDATED_AT);
 
         when(syncTargetProvider.isScopeActiveForSync(SCOPE_ID)).thenReturn(true);
-        when(
-            gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-        ).thenReturn(Optional.of(provider));
-        when(repositoryRepository.findByNameWithOwnerAndProviderId(REPO_NAME, PROVIDER_ID)).thenReturn(
-            Optional.of(repository)
-        );
+        when(gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com"))
+                .thenReturn(Optional.of(provider));
+        when(repositoryRepository.findByNameWithOwnerAndProviderId(REPO_NAME, PROVIDER_ID))
+                .thenReturn(Optional.of(repository));
         // Re-sync returns the same entity with an unchanged updatedAt. Lenient: the NOT_FOUND
         // rename/delete tests re-stub this to throw, which would otherwise flag this as unused.
         lenient()
-            .when(repositorySyncService.syncRepository(SCOPE_ID, REPO_NAME, provider))
-            .thenReturn(Optional.of(repository));
+                .when(repositorySyncService.syncRepository(SCOPE_ID, REPO_NAME, provider))
+                .thenReturn(Optional.of(repository));
 
-        lenient().when(commitBackfillService.backfillCommits(any(), any(), any())).thenReturn(0);
         lenient()
-            .when(issueSyncService.syncForRepository(any(), any(), any(), any(), any()))
-            .thenReturn(SyncResult.completed(3));
+                .when(commitBackfillService.backfillCommits(any(), any(), any()))
+                .thenReturn(0);
         lenient()
-            .when(pullRequestSyncService.syncForRepository(any(), any(), any(), any(), any()))
-            .thenReturn(SyncResult.completed(2));
+                .when(issueSyncService.syncForRepository(any(), any(), any(), any(), any()))
+                .thenReturn(SyncResult.completed(3));
+        lenient()
+                .when(pullRequestSyncService.syncForRepository(any(), any(), any(), any(), any()))
+                .thenReturn(SyncResult.completed(2));
     }
 
     /**
@@ -248,18 +247,18 @@ class GithubDataSyncServiceTest extends BaseUnitTest {
         // All timestamps recent => within cooldown and initial sync "completed".
         Instant recent = Instant.now();
         var builder = SyncTargetTestBuilder.syncTarget()
-            .id(SYNC_TARGET_ID)
-            .scopeId(SCOPE_ID)
-            .installationId(100L)
-            .authMode(AuthMode.INSTALLATION_APP)
-            .repositoryNameWithOwner(REPO_NAME)
-            .lastLabelsSyncedAt(recent)
-            .lastMilestonesSyncedAt(recent)
-            .lastIssuesSyncedAt(recent)
-            .lastPullRequestsSyncedAt(recent)
-            .lastDiscussionsSyncedAt(recent)
-            .lastCollaboratorsSyncedAt(recent)
-            .lastFullSyncAt(recent);
+                .id(SYNC_TARGET_ID)
+                .scopeId(SCOPE_ID)
+                .installationId(100L)
+                .authMode(AuthMode.INSTALLATION_APP)
+                .repositoryNameWithOwner(REPO_NAME)
+                .lastLabelsSyncedAt(recent)
+                .lastMilestonesSyncedAt(recent)
+                .lastIssuesSyncedAt(recent)
+                .lastPullRequestsSyncedAt(recent)
+                .lastDiscussionsSyncedAt(recent)
+                .lastCollaboratorsSyncedAt(recent)
+                .lastFullSyncAt(recent);
         if (issueCursor != null) builder.issueSyncCursor(issueCursor);
         if (pullRequestCursor != null) builder.pullRequestSyncCursor(pullRequestCursor);
         return builder.build();
@@ -271,18 +270,18 @@ class GithubDataSyncServiceTest extends BaseUnitTest {
     private static SyncTarget syncTargetWithNativeId(@Nullable Long nativeId) {
         Instant recent = Instant.now();
         var builder = SyncTargetTestBuilder.syncTarget()
-            .id(SYNC_TARGET_ID)
-            .scopeId(SCOPE_ID)
-            .installationId(100L)
-            .authMode(AuthMode.INSTALLATION_APP)
-            .repositoryNameWithOwner(REPO_NAME)
-            .lastLabelsSyncedAt(recent)
-            .lastMilestonesSyncedAt(recent)
-            .lastIssuesSyncedAt(recent)
-            .lastPullRequestsSyncedAt(recent)
-            .lastDiscussionsSyncedAt(recent)
-            .lastCollaboratorsSyncedAt(recent)
-            .lastFullSyncAt(recent);
+                .id(SYNC_TARGET_ID)
+                .scopeId(SCOPE_ID)
+                .installationId(100L)
+                .authMode(AuthMode.INSTALLATION_APP)
+                .repositoryNameWithOwner(REPO_NAME)
+                .lastLabelsSyncedAt(recent)
+                .lastMilestonesSyncedAt(recent)
+                .lastIssuesSyncedAt(recent)
+                .lastPullRequestsSyncedAt(recent)
+                .lastDiscussionsSyncedAt(recent)
+                .lastCollaboratorsSyncedAt(recent)
+                .lastFullSyncAt(recent);
         if (nativeId != null) builder.nativeId(nativeId);
         return builder.build();
     }
@@ -293,12 +292,10 @@ class GithubDataSyncServiceTest extends BaseUnitTest {
         // re-sync is attempted and GitHub answers a definitive 404 for the old name. Because the monitor
         // carries a stable native id, this is a rename — NOT a deletion.
         SyncTarget target = syncTargetWithNativeId(NATIVE_ID);
-        when(repositorySyncService.syncRepository(eq(SCOPE_ID), eq(REPO_NAME), any())).thenThrow(
-            new RepositoryNotFoundOnGitProviderException(REPO_NAME)
-        );
-        when(exceptionClassifier.classifyWithDetails(any())).thenReturn(
-            ClassificationResult.of(Category.NOT_FOUND, "not found")
-        );
+        when(repositorySyncService.syncRepository(eq(SCOPE_ID), eq(REPO_NAME), any()))
+                .thenThrow(new RepositoryNotFoundOnGitProviderException(REPO_NAME));
+        when(exceptionClassifier.classifyWithDetails(any()))
+                .thenReturn(ClassificationResult.of(Category.NOT_FOUND, "not found"));
         lenient().when(repositoryRepository.findById(REPOSITORY_ID)).thenReturn(Optional.empty());
 
         boolean result = service.syncSyncTarget(target);
@@ -315,12 +312,10 @@ class GithubDataSyncServiceTest extends BaseUnitTest {
         // A legacy monitor with no captured native id: a definitive 404 is treated as a real deletion, so
         // the orphan is cleaned up.
         SyncTarget target = syncTargetWithNativeId(null);
-        when(repositorySyncService.syncRepository(eq(SCOPE_ID), eq(REPO_NAME), any())).thenThrow(
-            new RepositoryNotFoundOnGitProviderException(REPO_NAME)
-        );
-        when(exceptionClassifier.classifyWithDetails(any())).thenReturn(
-            ClassificationResult.of(Category.NOT_FOUND, "not found")
-        );
+        when(repositorySyncService.syncRepository(eq(SCOPE_ID), eq(REPO_NAME), any()))
+                .thenThrow(new RepositoryNotFoundOnGitProviderException(REPO_NAME));
+        when(exceptionClassifier.classifyWithDetails(any()))
+                .thenReturn(ClassificationResult.of(Category.NOT_FOUND, "not found"));
         lenient().when(repositoryRepository.findById(REPOSITORY_ID)).thenReturn(Optional.empty());
 
         boolean result = service.syncSyncTarget(target);
@@ -338,9 +333,8 @@ class GithubDataSyncServiceTest extends BaseUnitTest {
         resolved.setId(REPOSITORY_ID);
         resolved.setNativeId(NATIVE_ID);
         resolved.setNameWithOwner(REPO_NAME);
-        when(repositoryRepository.findByNameWithOwnerAndProviderId(REPO_NAME, PROVIDER_ID)).thenReturn(
-            Optional.of(resolved)
-        );
+        when(repositoryRepository.findByNameWithOwnerAndProviderId(REPO_NAME, PROVIDER_ID))
+                .thenReturn(Optional.of(resolved));
 
         service.syncSyncTarget(syncTarget(null, null));
 

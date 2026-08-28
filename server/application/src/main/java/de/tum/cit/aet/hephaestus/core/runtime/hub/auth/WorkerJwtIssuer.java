@@ -25,15 +25,15 @@ public class WorkerJwtIssuer {
         Instant expires = now.plus(properties.ttl());
         String jti = UUID.randomUUID().toString();
         String token = JWT.create()
-            .withKeyId(active.kid())
-            .withIssuer(properties.issuer())
-            .withAudience(properties.audience())
-            .withSubject(workerId)
-            .withJWTId(jti)
-            .withIssuedAt(now)
-            .withNotBefore(now)
-            .withExpiresAt(expires)
-            .sign(algorithm);
+                .withKeyId(active.kid())
+                .withIssuer(properties.issuer())
+                .withAudience(properties.audience())
+                .withSubject(workerId)
+                .withJWTId(jti)
+                .withIssuedAt(now)
+                .withNotBefore(now)
+                .withExpiresAt(expires)
+                .sign(algorithm);
         return new IssuedWorkerJwt(token, jti, expires);
     }
 

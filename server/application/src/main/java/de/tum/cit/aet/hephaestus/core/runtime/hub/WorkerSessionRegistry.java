@@ -33,8 +33,8 @@ public class WorkerSessionRegistry implements SmartLifecycle {
     public WorkerSessionRegistry(ApplicationEventPublisher events, MeterRegistry meterRegistry) {
         this.events = events;
         Gauge.builder("worker.hub.sessions.active", byWorkerId, ConcurrentHashMap::size)
-            .description("Active worker WSS connections registered on this app-pod")
-            .register(meterRegistry);
+                .description("Active worker WSS connections registered on this app-pod")
+                .register(meterRegistry);
     }
 
     /**
@@ -55,16 +55,14 @@ public class WorkerSessionRegistry implements SmartLifecycle {
         WorkerSession loser = evicted.get();
         if (loser != null) {
             log.info(
-                "Evicting duplicate worker session: workerId={}, oldSession={}, newSession={}",
-                incoming.workerId(),
-                loser.sessionId(),
-                incoming.sessionId()
-            );
+                    "Evicting duplicate worker session: workerId={}, oldSession={}, newSession={}",
+                    incoming.workerId(),
+                    loser.sessionId(),
+                    incoming.sessionId());
             // Close after swap so any in-flight forwarder reading byWorkerId can't pick the loser.
             loser.close(CloseStatus.NORMAL);
-            events.publishEvent(
-                new WorkerDisconnectedEvent(incoming.workerId(), loser.sessionId(), "duplicate-evicted", Instant.now())
-            );
+            events.publishEvent(new WorkerDisconnectedEvent(
+                    incoming.workerId(), loser.sessionId(), "duplicate-evicted", Instant.now()));
         }
         return result;
     }
@@ -77,8 +75,7 @@ public class WorkerSessionRegistry implements SmartLifecycle {
         boolean removed = byWorkerId.remove(session.workerId(), session);
         if (removed) {
             events.publishEvent(
-                new WorkerDisconnectedEvent(session.workerId(), session.sessionId(), reason, Instant.now())
-            );
+                    new WorkerDisconnectedEvent(session.workerId(), session.sessionId(), reason, Instant.now()));
         }
     }
 
@@ -111,9 +108,8 @@ public class WorkerSessionRegistry implements SmartLifecycle {
         for (WorkerSession session : byWorkerId.values()) {
             session.send(new ForceReconnect("hub draining"));
             session.close(CloseStatus.GOING_AWAY);
-            events.publishEvent(
-                new WorkerDisconnectedEvent(session.workerId(), session.sessionId(), "hub-draining", Instant.now())
-            );
+            events.publishEvent(new WorkerDisconnectedEvent(
+                    session.workerId(), session.sessionId(), "hub-draining", Instant.now()));
         }
         byWorkerId.clear();
         log.info("WorkerSessionRegistry drained on shutdown");

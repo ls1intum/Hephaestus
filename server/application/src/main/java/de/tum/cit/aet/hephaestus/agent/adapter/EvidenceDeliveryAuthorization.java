@@ -26,9 +26,7 @@ public class EvidenceDeliveryAuthorization implements EvidenceAuthorization {
     private final ArtifactSourceCatalogRegistry sourceCatalogs;
 
     public EvidenceDeliveryAuthorization(
-        AgentJobRepository jobRepository,
-        ArtifactSourceCatalogRegistry sourceCatalogs
-    ) {
+            AgentJobRepository jobRepository, ArtifactSourceCatalogRegistry sourceCatalogs) {
         this.jobRepository = jobRepository;
         this.sourceCatalogs = sourceCatalogs;
     }
@@ -39,27 +37,20 @@ public class EvidenceDeliveryAuthorization implements EvidenceAuthorization {
     }
 
     public boolean permits(
-        long workspaceId,
-        @Nullable UUID jobId,
-        @Nullable JsonNode evidence,
-        SourceUsePurpose requestedPurpose
-    ) {
+            long workspaceId, @Nullable UUID jobId, @Nullable JsonNode evidence, SourceUsePurpose requestedPurpose) {
         JsonNode citations = citationsOrNull(jobId, evidence);
         if (jobId == null || citations == null) {
             return false;
         }
         return jobRepository
-            .findEvidenceContractVersion(jobId, workspaceId)
-            .map(contractVersion -> permits(contractVersion, citations, requestedPurpose))
-            .orElse(false);
+                .findEvidenceContractVersion(jobId, workspaceId)
+                .map(contractVersion -> permits(contractVersion, citations, requestedPurpose))
+                .orElse(false);
     }
 
     @Override
     public Set<UUID> permitsAll(
-        long workspaceId,
-        Collection<Observation> observations,
-        SourceUsePurpose requestedPurpose
-    ) {
+            long workspaceId, Collection<Observation> observations, SourceUsePurpose requestedPurpose) {
         List<Citable> citable = new ArrayList<>();
         Set<UUID> jobIds = new HashSet<>();
         for (Observation observation : observations) {
@@ -110,14 +101,9 @@ public class EvidenceDeliveryAuthorization implements EvidenceAuthorization {
             SourceContractVersion version = new SourceContractVersion(contractVersion);
             for (JsonNode citation : citations) {
                 JsonNode sourceKind = citation.path("sourceKind");
-                if (
-                    !sourceKind.isString() ||
-                    !sourceCatalogs.isSourceUsePermitted(
-                        version,
-                        new SourceKind(sourceKind.asString()),
-                        requestedPurpose
-                    )
-                ) {
+                if (!sourceKind.isString()
+                        || !sourceCatalogs.isSourceUsePermitted(
+                                version, new SourceKind(sourceKind.asString()), requestedPurpose)) {
                     return false;
                 }
             }

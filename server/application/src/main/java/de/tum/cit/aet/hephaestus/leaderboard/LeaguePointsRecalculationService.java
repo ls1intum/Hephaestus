@@ -42,13 +42,12 @@ public class LeaguePointsRecalculationService implements LeaguePointsRecalculato
     private final UserRepository userRepository;
 
     public LeaguePointsRecalculationService(
-        WorkspaceMembershipRepository workspaceMembershipRepository,
-        WorkspaceMembershipService workspaceMembershipService,
-        WorkspaceContributionActivityService workspaceContributionActivityService,
-        LeaderboardService leaderboardService,
-        LeaguePointsService leaguePointsService,
-        UserRepository userRepository
-    ) {
+            WorkspaceMembershipRepository workspaceMembershipRepository,
+            WorkspaceMembershipService workspaceMembershipService,
+            WorkspaceContributionActivityService workspaceContributionActivityService,
+            LeaderboardService leaderboardService,
+            LeaguePointsService leaguePointsService,
+            UserRepository userRepository) {
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.workspaceMembershipService = workspaceMembershipService;
         this.workspaceContributionActivityService = workspaceContributionActivityService;
@@ -88,13 +87,13 @@ public class LeaguePointsRecalculationService implements LeaguePointsRecalculato
 
             Long userId = memberUser.getId();
             User hydratedUser = userRepository
-                .findByLoginWithEagerMergedPullRequests(memberUser.getLogin())
-                .orElse(memberUser);
+                    .findByLoginWithEagerMergedPullRequests(memberUser.getLogin())
+                    .orElse(memberUser);
             memberUsersById.put(userId, hydratedUser);
             currentPointsByUserId.put(userId, POINTS_DEFAULT);
             Instant firstContribution = workspaceContributionActivityService
-                .findFirstContributionInstant(workspaceId, userId)
-                .orElse(null);
+                    .findFirstContributionInstant(workspaceId, userId)
+                    .orElse(null);
             firstContributionByUserId.put(userId, firstContribution);
         });
 
@@ -103,12 +102,10 @@ public class LeaguePointsRecalculationService implements LeaguePointsRecalculato
             return;
         }
 
-        Instant earliestContribution = firstContributionByUserId
-            .values()
-            .stream()
-            .filter(Objects::nonNull)
-            .min(Instant::compareTo)
-            .orElse(null);
+        Instant earliestContribution = firstContributionByUserId.values().stream()
+                .filter(Objects::nonNull)
+                .min(Instant::compareTo)
+                .orElse(null);
 
         if (earliestContribution == null) {
             log.info("Skipped league points recalculation: reason=noContributions, workspaceId={}", workspaceId);
@@ -125,25 +122,16 @@ public class LeaguePointsRecalculationService implements LeaguePointsRecalculato
             }
 
             List<LeaderboardEntryDTO> leaderboardEntries = leaderboardService.createLeaderboard(
-                workspace,
-                windowStart,
-                windowEnd,
-                "all",
-                LeaderboardSortType.SCORE,
-                LeaderboardMode.INDIVIDUAL
-            );
+                    workspace, windowStart, windowEnd, "all", LeaderboardSortType.SCORE, LeaderboardMode.INDIVIDUAL);
 
             Instant windowEndSnapshot = windowEnd;
-            leaderboardEntries.forEach(entry ->
-                updateMemberPointsForEntry(
+            leaderboardEntries.forEach(entry -> updateMemberPointsForEntry(
                     workspaceId,
                     entry,
                     memberUsersById,
                     firstContributionByUserId,
                     currentPointsByUserId,
-                    windowEndSnapshot
-                )
-            );
+                    windowEndSnapshot));
 
             if (!windowEnd.isAfter(windowStart)) {
                 break;
@@ -156,13 +144,12 @@ public class LeaguePointsRecalculationService implements LeaguePointsRecalculato
     }
 
     private void updateMemberPointsForEntry(
-        Long workspaceId,
-        LeaderboardEntryDTO entry,
-        Map<Long, User> memberUsersById,
-        Map<Long, Instant> firstContributionByUserId,
-        Map<Long, Integer> currentPointsByUserId,
-        Instant windowEnd
-    ) {
+            Long workspaceId,
+            LeaderboardEntryDTO entry,
+            Map<Long, User> memberUsersById,
+            Map<Long, Instant> firstContributionByUserId,
+            Map<Long, Integer> currentPointsByUserId,
+            Instant windowEnd) {
         if (entry == null || entry.user() == null || entry.user().id() == null) {
             return;
         }

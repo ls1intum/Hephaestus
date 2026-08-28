@@ -68,18 +68,15 @@ class OutlineIntegrationSyncRunnerTest extends BaseUnitTest {
     @Test
     void reconcile_propagatesPartialFailuresAsWarnings() {
         doAnswer(invocation -> {
-            SyncExecutionHandle threaded = invocation.getArgument(1);
-            threaded.reportWarnings();
-            return null;
-        })
-            .when(syncScheduler)
-            .syncWorkspaceNow(eq(WORKSPACE), any(SyncExecutionHandle.class), eq(SyncJobType.RECONCILIATION));
+                    SyncExecutionHandle threaded = invocation.getArgument(1);
+                    threaded.reportWarnings();
+                    return null;
+                })
+                .when(syncScheduler)
+                .syncWorkspaceNow(eq(WORKSPACE), any(SyncExecutionHandle.class), eq(SyncJobType.RECONCILIATION));
 
         runner.reconcile(
-            new IntegrationRef(IntegrationKind.OUTLINE, WORKSPACE, "team-1"),
-            handle,
-            SyncJobType.RECONCILIATION
-        );
+                new IntegrationRef(IntegrationKind.OUTLINE, WORKSPACE, "team-1"), handle, SyncJobType.RECONCILIATION);
 
         verify(handle).reportWarnings();
     }

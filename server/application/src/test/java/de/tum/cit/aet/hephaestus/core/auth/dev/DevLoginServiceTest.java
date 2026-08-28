@@ -45,10 +45,7 @@ class DevLoginServiceTest extends BaseUnitTest {
     private static final Duration SESSION_MAX = Duration.ofHours(8);
 
     private final HephaestusJwtIssuer.Token token = new HephaestusJwtIssuer.Token(
-        "jwt-value",
-        UUID.randomUUID(),
-        Instant.now().plusSeconds(900)
-    );
+            "jwt-value", UUID.randomUUID(), Instant.now().plusSeconds(900));
 
     private DevLoginService service(boolean enabled, String... activeProfiles) {
         AuthProperties props = mock(AuthProperties.class);
@@ -57,13 +54,12 @@ class DevLoginServiceTest extends BaseUnitTest {
         MockEnvironment environment = new MockEnvironment();
         environment.setActiveProfiles(activeProfiles);
         return new DevLoginService(
-            props,
-            accountRepository,
-            principalFactory,
-            jwtIssuer,
-            Clock.fixed(FIXED_NOW, ZoneOffset.UTC),
-            environment
-        );
+                props,
+                accountRepository,
+                principalFactory,
+                jwtIssuer,
+                Clock.fixed(FIXED_NOW, ZoneOffset.UTC),
+                environment);
     }
 
     private void stubIssuer() {
@@ -74,10 +70,10 @@ class DevLoginServiceTest extends BaseUnitTest {
     @Test
     void disabled_returns404() {
         DevLoginService service = service(false, "dev");
-        assertThatThrownBy(() -> service.devLogin("alice", null, false, null)).isInstanceOfSatisfying(
-            ResponseStatusException.class,
-            e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND)
-        );
+        assertThatThrownBy(() -> service.devLogin("alice", null, false, null))
+                .isInstanceOfSatisfying(
+                        ResponseStatusException.class,
+                        e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
         verify(jwtIssuer, never()).issue(any(), any(), any(), any(), any());
     }
 
@@ -86,8 +82,8 @@ class DevLoginServiceTest extends BaseUnitTest {
         // Boot expands the webhook-server/worker-node group aliases to include `prod`; assert the guard
         // fires on that expanded active-profile set (acceptsProfiles catches it; a string-split wouldn't).
         assertThatThrownBy(() -> service(true, "prod", "webhook"))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("prod");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("prod");
         assertThatThrownBy(() -> service(true, "prod")).isInstanceOf(IllegalStateException.class);
     }
 

@@ -19,14 +19,13 @@ import org.jspecify.annotations.Nullable;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record GitHubLabelDTO(
-    @JsonProperty("id") @Nullable Long id,
-    @JsonProperty("node_id") String nodeId,
-    @JsonProperty("name") String name,
-    @JsonProperty("description") @Nullable String description,
-    @JsonProperty("color") String color,
-    @Nullable Instant createdAt,
-    @Nullable Instant updatedAt
-) {
+        @JsonProperty("id") @Nullable Long id,
+        @JsonProperty("node_id") String nodeId,
+        @JsonProperty("name") String name,
+        @JsonProperty("description") @Nullable String description,
+        @JsonProperty("color") String color,
+        @Nullable Instant createdAt,
+        @Nullable Instant updatedAt) {
     // STATIC FACTORY METHODS FOR GRAPHQL RESPONSES
 
     /**
@@ -38,14 +37,13 @@ public record GitHubLabelDTO(
             return null;
         }
         return new GitHubLabelDTO(
-            null,
-            label.getId(),
-            label.getName(),
-            label.getDescription(),
-            label.getColor(),
-            toInstant(label.getCreatedAt()),
-            toInstant(label.getUpdatedAt())
-        );
+                null,
+                label.getId(),
+                label.getName(),
+                label.getDescription(),
+                label.getColor(),
+                toInstant(label.getCreatedAt()),
+                toInstant(label.getUpdatedAt()));
     }
 
     /**
@@ -59,12 +57,10 @@ public record GitHubLabelDTO(
         if (connection == null || connection.getNodes() == null) {
             return Collections.emptyList();
         }
-        List<GitHubLabelDTO> result = connection
-            .getNodes()
-            .stream()
-            .map(GitHubLabelDTO::fromLabel)
-            .filter(dto -> dto != null)
-            .toList();
+        List<GitHubLabelDTO> result = connection.getNodes().stream()
+                .map(GitHubLabelDTO::fromLabel)
+                .filter(dto -> dto != null)
+                .toList();
         GraphQlConnectionOverflowDetector.check("labels", result.size(), connection.getTotalCount(), context);
         return result;
     }

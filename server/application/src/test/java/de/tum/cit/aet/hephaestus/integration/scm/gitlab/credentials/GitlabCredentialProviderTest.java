@@ -64,7 +64,8 @@ class GitlabCredentialProviderTest extends BaseUnitTest {
 
     @Test
     void wrongKindRef_returnsEmpty() {
-        assertThat(provider.resolve(new IntegrationRef(IntegrationKind.GITHUB, 17L, "100"))).isEmpty();
+        assertThat(provider.resolve(new IntegrationRef(IntegrationKind.GITHUB, 17L, "100")))
+                .isEmpty();
         Mockito.verifyNoInteractions(connectionService);
     }
 
@@ -72,16 +73,14 @@ class GitlabCredentialProviderTest extends BaseUnitTest {
         Workspace ws = new Workspace();
         ws.setId(workspaceId);
         return new Connection(
-            ws,
-            IntegrationKind.GITLAB,
-            "200",
-            new ConnectionConfig.GitLabConfig(
-                "https://gitlab.example.com",
-                200L,
-                null,
-                ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
-                Set.of()
-            )
-        );
+                ws,
+                IntegrationKind.GITLAB,
+                "200",
+                new ConnectionConfig.GitLabConfig(
+                        "https://gitlab.example.com",
+                        200L,
+                        null,
+                        ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
+                        Set.of()));
     }
 }

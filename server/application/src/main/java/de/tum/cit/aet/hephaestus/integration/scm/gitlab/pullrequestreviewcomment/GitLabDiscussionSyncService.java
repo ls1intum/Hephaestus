@@ -71,14 +71,13 @@ public class GitLabDiscussionSyncService {
     private final GitLabProperties gitLabProperties;
 
     public GitLabDiscussionSyncService(
-        GitLabGraphQlClientProvider graphQlClientProvider,
-        GitLabGraphQlResponseHandler responseHandler,
-        GitLabPullRequestReviewThreadProcessor threadProcessor,
-        GitLabPullRequestReviewCommentProcessor reviewCommentProcessor,
-        GitLabIssueCommentProcessor issueCommentProcessor,
-        GitLabReviewReconciler reviewReconciler,
-        GitLabProperties gitLabProperties
-    ) {
+            GitLabGraphQlClientProvider graphQlClientProvider,
+            GitLabGraphQlResponseHandler responseHandler,
+            GitLabPullRequestReviewThreadProcessor threadProcessor,
+            GitLabPullRequestReviewCommentProcessor reviewCommentProcessor,
+            GitLabIssueCommentProcessor issueCommentProcessor,
+            GitLabReviewReconciler reviewReconciler,
+            GitLabProperties gitLabProperties) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.responseHandler = responseHandler;
         this.threadProcessor = threadProcessor;
@@ -138,14 +137,13 @@ public class GitLabDiscussionSyncService {
 
                 HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
-                ClientGraphQlResponse response = client
-                    .documentName(GET_MR_DISCUSSIONS_DOCUMENT)
-                    .variable("fullPath", projectPath)
-                    .variable("iid", String.valueOf(mrIid))
-                    .variable("first", pageSize)
-                    .variable("after", cursor)
-                    .execute()
-                    .block(gitLabProperties.graphqlTimeout());
+                ClientGraphQlResponse response = client.documentName(GET_MR_DISCUSSIONS_DOCUMENT)
+                        .variable("fullPath", projectPath)
+                        .variable("iid", String.valueOf(mrIid))
+                        .variable("first", pageSize)
+                        .variable("after", cursor)
+                        .execute()
+                        .block(gitLabProperties.graphqlTimeout());
 
                 var handleResult = responseHandler.handle(response, "discussions for " + safeContext, log);
                 if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
@@ -153,8 +151,7 @@ public class GitLabDiscussionSyncService {
                 }
                 if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
                     graphQlClientProvider.recordFailure(
-                        new GitLabSyncException("Invalid GraphQL response: context=" + safeContext)
-                    );
+                            new GitLabSyncException("Invalid GraphQL response: context=" + safeContext));
                     break;
                 }
 
@@ -164,8 +161,8 @@ public class GitLabDiscussionSyncService {
 
                 @SuppressWarnings("rawtypes")
                 List nodesRaw = Objects.requireNonNull(response)
-                    .field(discussionsPath + ".nodes")
-                    .toEntityList(Map.class);
+                        .field(discussionsPath + ".nodes")
+                        .toEntityList(Map.class);
                 @SuppressWarnings("unchecked")
                 List<Map<String, Object>> nodes = (List<Map<String, Object>>) nodesRaw;
 
@@ -181,19 +178,18 @@ public class GitLabDiscussionSyncService {
                         totalSkipped += result[2];
                     } catch (Exception e) {
                         log.warn(
-                            "Error processing discussion: context={}, id={}",
-                            safeContext,
-                            discussionNode.get("id"),
-                            e
-                        );
+                                "Error processing discussion: context={}, id={}",
+                                safeContext,
+                                discussionNode.get("id"),
+                                e);
                         totalSkipped++;
                     }
                 }
 
                 // Pagination
                 GitLabPageInfo pageInfo = Objects.requireNonNull(response)
-                    .field(discussionsPath + ".pageInfo")
-                    .toEntity(GitLabPageInfo.class);
+                        .field(discussionsPath + ".pageInfo")
+                        .toEntity(GitLabPageInfo.class);
                 if (pageInfo == null || !pageInfo.hasNextPage()) {
                     break;
                 }
@@ -223,12 +219,11 @@ public class GitLabDiscussionSyncService {
         int totalSynced = totalDiffNotes + totalGeneralNotes;
         if (totalSynced > 0 || totalSkipped > 0) {
             log.info(
-                "Synced discussions: context={}, diffNotes={}, generalNotes={}, skipped={}",
-                safeContext,
-                totalDiffNotes,
-                totalGeneralNotes,
-                totalSkipped
-            );
+                    "Synced discussions: context={}, diffNotes={}, generalNotes={}, skipped={}",
+                    safeContext,
+                    totalDiffNotes,
+                    totalGeneralNotes,
+                    totalSkipped);
         }
 
         return totalSynced;
@@ -241,16 +236,15 @@ public class GitLabDiscussionSyncService {
      */
     @SuppressWarnings("unchecked")
     private int[] processDiscussion(
-        Map<String, Object> discussionNode,
-        PullRequest pr,
-        Repository repository,
-        IdentityProvider provider,
-        Long providerId,
-        Long scopeId
-    ) {
+            Map<String, Object> discussionNode,
+            PullRequest pr,
+            Repository repository,
+            IdentityProvider provider,
+            Long providerId,
+            Long scopeId) {
         String discussionGlobalId = (String) discussionNode.get("id");
         if (discussionGlobalId == null) {
-            return new int[] { 0, 0, 1 };
+            return new int[] {0, 0, 1};
         }
 
         Boolean resolved = (Boolean) discussionNode.get("resolved");
@@ -258,22 +252,21 @@ public class GitLabDiscussionSyncService {
         // Extract notes
         Map<String, Object> notesMap = (Map<String, Object>) discussionNode.get("notes");
         if (notesMap == null) {
-            return new int[] { 0, 0, 1 };
+            return new int[] {0, 0, 1};
         }
 
         List<Map<String, Object>> noteNodes = (List<Map<String, Object>>) notesMap.get("nodes");
         if (noteNodes == null || noteNodes.isEmpty()) {
-            return new int[] { 0, 0, 1 };
+            return new int[] {0, 0, 1};
         }
 
         // Detect notes truncation (100-note limit per discussion)
         Map<String, Object> notesPageInfo = (Map<String, Object>) notesMap.get("pageInfo");
         if (notesPageInfo != null && Boolean.TRUE.equals(notesPageInfo.get("hasNextPage"))) {
             log.warn(
-                "Discussion has more than 100 notes (truncated): discussionId={}, fetchedNotes={}",
-                discussionGlobalId,
-                noteNodes.size()
-            );
+                    "Discussion has more than 100 notes (truncated): discussionId={}, fetchedNotes={}",
+                    discussionGlobalId,
+                    noteNodes.size());
         }
 
         // Check if this is a diff discussion (any note has position)
@@ -281,16 +274,15 @@ public class GitLabDiscussionSyncService {
 
         if (isDiffDiscussion) {
             return processDiffDiscussion(
-                discussionNode,
-                discussionGlobalId,
-                resolved != null && resolved,
-                noteNodes,
-                pr,
-                repository,
-                provider,
-                providerId,
-                scopeId
-            );
+                    discussionNode,
+                    discussionGlobalId,
+                    resolved != null && resolved,
+                    noteNodes,
+                    pr,
+                    repository,
+                    provider,
+                    providerId,
+                    scopeId);
         } else {
             return processGeneralDiscussion(noteNodes, pr, providerId, scopeId);
         }
@@ -301,16 +293,15 @@ public class GitLabDiscussionSyncService {
      */
     @SuppressWarnings("unchecked")
     private int[] processDiffDiscussion(
-        Map<String, Object> discussionNode,
-        String discussionGlobalId,
-        boolean resolved,
-        List<Map<String, Object>> noteNodes,
-        PullRequest pr,
-        Repository repository,
-        IdentityProvider provider,
-        Long providerId,
-        Long scopeId
-    ) {
+            Map<String, Object> discussionNode,
+            String discussionGlobalId,
+            boolean resolved,
+            List<Map<String, Object>> noteNodes,
+            PullRequest pr,
+            Repository repository,
+            IdentityProvider provider,
+            Long providerId,
+            Long scopeId) {
         int diffNotes = 0;
 
         // Resolve the user who resolved the thread
@@ -319,15 +310,13 @@ public class GitLabDiscussionSyncService {
             Map<String, Object> resolvedByMap = (Map<String, Object>) discussionNode.get("resolvedBy");
             if (resolvedByMap != null) {
                 resolvedBy = issueCommentProcessor.findOrCreateUser(
-                    GitLabUserLookup.of(
-                        (String) resolvedByMap.get("id"),
-                        (String) resolvedByMap.get("username"),
-                        (String) resolvedByMap.get("name"),
-                        (String) resolvedByMap.get("avatarUrl"),
-                        (String) resolvedByMap.get("webUrl")
-                    ),
-                    providerId
-                );
+                        GitLabUserLookup.of(
+                                (String) resolvedByMap.get("id"),
+                                (String) resolvedByMap.get("username"),
+                                (String) resolvedByMap.get("name"),
+                                (String) resolvedByMap.get("avatarUrl"),
+                                (String) resolvedByMap.get("webUrl")),
+                        providerId);
             }
         }
 
@@ -377,31 +366,23 @@ public class GitLabDiscussionSyncService {
 
         // Create/update the thread
         var threadData = new GitLabPullRequestReviewThreadProcessor.ThreadData(
-            discussionGlobalId,
-            resolved,
-            resolvedBy,
-            filePath,
-            newLine,
-            oldLine,
-            threadSide,
-            headSha,
-            baseSha,
-            outdated,
-            firstCreatedAt
-        );
+                discussionGlobalId,
+                resolved,
+                resolvedBy,
+                filePath,
+                newLine,
+                oldLine,
+                threadSide,
+                headSha,
+                baseSha,
+                outdated,
+                firstCreatedAt);
         PullRequestReviewThread thread = threadProcessor.findOrCreateThread(threadData, pr, provider, scopeId);
 
         // Pre-compute one synthetic COMMENTED review per (author, discussion) so each note
         // below can attach to the matching review without redundant DB lookups.
         Map<Long, PullRequestReview> reviewsByAuthor = reconcileDiscussionReviews(
-            noteNodes,
-            discussionGlobalId,
-            pr,
-            repository,
-            provider,
-            providerId,
-            scopeId
-        );
+                noteNodes, discussionGlobalId, pr, repository, provider, providerId, scopeId);
 
         // Process each note in the discussion as a review comment
         PullRequestReviewComment previousComment = null;
@@ -450,33 +431,31 @@ public class GitLabDiscussionSyncService {
             User author = resolveAuthor(noteNode, providerId);
 
             var noteData = new GitLabPullRequestReviewCommentProcessor.DiffNoteData(
-                noteGlobalId,
-                (String) noteNode.get("body"),
-                (String) noteNode.get("url"),
-                noteFilePath,
-                noteNewLine,
-                noteOldLine,
-                newPath,
-                oldPath,
-                noteHeadSha,
-                noteBaseSha,
-                noteStartSha,
-                parseTimestamp((String) noteNode.get("createdAt")),
-                parseTimestamp((String) noteNode.get("updatedAt"))
-            );
+                    noteGlobalId,
+                    (String) noteNode.get("body"),
+                    (String) noteNode.get("url"),
+                    noteFilePath,
+                    noteNewLine,
+                    noteOldLine,
+                    newPath,
+                    oldPath,
+                    noteHeadSha,
+                    noteBaseSha,
+                    noteStartSha,
+                    parseTimestamp((String) noteNode.get("createdAt")),
+                    parseTimestamp((String) noteNode.get("updatedAt")));
 
             PullRequestReview review =
-                author != null && author.getNativeId() != null ? reviewsByAuthor.get(author.getNativeId()) : null;
+                    author != null && author.getNativeId() != null ? reviewsByAuthor.get(author.getNativeId()) : null;
 
             var commentContext = new GitLabPullRequestReviewCommentProcessor.CommentContext(
-                thread,
-                pr,
-                author,
-                provider,
-                previousComment, // first note has no parent, subsequent notes are replies
-                review,
-                scopeId
-            );
+                    thread,
+                    pr,
+                    author,
+                    provider,
+                    previousComment, // first note has no parent, subsequent notes are replies
+                    review,
+                    scopeId);
             PullRequestReviewComment comment = reviewCommentProcessor.findOrCreateComment(noteData, commentContext);
 
             if (comment != null) {
@@ -485,7 +464,7 @@ public class GitLabDiscussionSyncService {
             }
         }
 
-        return new int[] { diffNotes, 0, 0 };
+        return new int[] {diffNotes, 0, 0};
     }
 
     /**
@@ -499,14 +478,13 @@ public class GitLabDiscussionSyncService {
      */
     @SuppressWarnings("unchecked")
     private Map<Long, PullRequestReview> reconcileDiscussionReviews(
-        List<Map<String, Object>> noteNodes,
-        String discussionGlobalId,
-        PullRequest pr,
-        Repository repository,
-        IdentityProvider provider,
-        Long providerId,
-        Long scopeId
-    ) {
+            List<Map<String, Object>> noteNodes,
+            String discussionGlobalId,
+            PullRequest pr,
+            Repository repository,
+            IdentityProvider provider,
+            Long providerId,
+            Long scopeId) {
         record AuthorEarliest(User author, @Nullable Instant earliest) {}
 
         Map<Long, AuthorEarliest> byAuthor = new HashMap<>();
@@ -535,13 +513,7 @@ public class GitLabDiscussionSyncService {
         for (Map.Entry<Long, AuthorEarliest> entry : byAuthor.entrySet()) {
             AuthorEarliest info = entry.getValue();
             PullRequestReview review = reviewReconciler.findOrCreateCommentedReview(
-                pr,
-                info.author(),
-                discussionGlobalId,
-                info.earliest(),
-                provider,
-                ctx
-            );
+                    pr, info.author(), discussionGlobalId, info.earliest(), provider, ctx);
             if (review != null) {
                 result.put(entry.getKey(), review);
             }
@@ -553,11 +525,7 @@ public class GitLabDiscussionSyncService {
      * Processes a general discussion into IssueComment(s) via the existing processor.
      */
     private int[] processGeneralDiscussion(
-        List<Map<String, Object>> noteNodes,
-        PullRequest pr,
-        Long providerId,
-        Long scopeId
-    ) {
+            List<Map<String, Object>> noteNodes, PullRequest pr, Long providerId, Long scopeId) {
         int generalNotes = 0;
 
         for (Map<String, Object> noteNode : noteNodes) {
@@ -577,17 +545,20 @@ public class GitLabDiscussionSyncService {
                 Map<String, Object> authorMap = (Map<String, Object>) noteNode.get("author");
 
                 var syncData = new GitLabIssueCommentProcessor.SyncNoteData(
-                    noteId,
-                    (String) noteNode.get("body"),
-                    (String) noteNode.get("url"),
-                    authorMap != null ? (String) authorMap.get("id") : null,
-                    authorMap != null ? (String) authorMap.get("username") : null,
-                    authorMap != null ? (String) authorMap.get("name") : null,
-                    authorMap != null ? (String) authorMap.get("avatarUrl") : null,
-                    authorMap != null ? (String) authorMap.get("webUrl") : null,
-                    noteNode.get("createdAt") != null ? noteNode.get("createdAt").toString() : null,
-                    noteNode.get("updatedAt") != null ? noteNode.get("updatedAt").toString() : null
-                );
+                        noteId,
+                        (String) noteNode.get("body"),
+                        (String) noteNode.get("url"),
+                        authorMap != null ? (String) authorMap.get("id") : null,
+                        authorMap != null ? (String) authorMap.get("username") : null,
+                        authorMap != null ? (String) authorMap.get("name") : null,
+                        authorMap != null ? (String) authorMap.get("avatarUrl") : null,
+                        authorMap != null ? (String) authorMap.get("webUrl") : null,
+                        noteNode.get("createdAt") != null
+                                ? noteNode.get("createdAt").toString()
+                                : null,
+                        noteNode.get("updatedAt") != null
+                                ? noteNode.get("updatedAt").toString()
+                                : null);
 
                 if (issueCommentProcessor.processFromSync(syncData, pr, providerId, scopeId) != null) {
                     generalNotes++;
@@ -597,7 +568,7 @@ public class GitLabDiscussionSyncService {
             }
         }
 
-        return new int[] { 0, generalNotes, 0 };
+        return new int[] {0, generalNotes, 0};
     }
 
     /**
@@ -623,15 +594,13 @@ public class GitLabDiscussionSyncService {
             return null;
         }
         return issueCommentProcessor.findOrCreateUser(
-            GitLabUserLookup.of(
-                (String) authorMap.get("id"),
-                (String) authorMap.get("username"),
-                (String) authorMap.get("name"),
-                (String) authorMap.get("avatarUrl"),
-                (String) authorMap.get("webUrl")
-            ),
-            providerId
-        );
+                GitLabUserLookup.of(
+                        (String) authorMap.get("id"),
+                        (String) authorMap.get("username"),
+                        (String) authorMap.get("name"),
+                        (String) authorMap.get("avatarUrl"),
+                        (String) authorMap.get("webUrl")),
+                providerId);
     }
 
     @Nullable

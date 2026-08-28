@@ -57,33 +57,33 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
         LlmModel model = seedInstanceModel("binding-list");
 
         webTestClient
-            .put()
-            .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), "PRACTICE_REVIEW")
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("instanceModelId", model.getId(), "enabled", true))
-            .exchange()
-            .expectStatus()
-            .isOk();
+                .put()
+                .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), "PRACTICE_REVIEW")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("instanceModelId", model.getId(), "enabled", true))
+                .exchange()
+                .expectStatus()
+                .isOk();
 
         // A separate request, so the listing loads the binding fresh: the write above cannot have left
         // it hydrated in a session.
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/agents", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.length()")
-            .isEqualTo(1)
-            .jsonPath("$[0].purpose")
-            .isEqualTo("PRACTICE_REVIEW")
-            .jsonPath("$[0].instanceModelId")
-            .isEqualTo(model.getId())
-            .jsonPath("$[0].ready")
-            .isEqualTo(true);
+                .get()
+                .uri("/workspaces/{slug}/agents", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.length()")
+                .isEqualTo(1)
+                .jsonPath("$[0].purpose")
+                .isEqualTo("PRACTICE_REVIEW")
+                .jsonPath("$[0].instanceModelId")
+                .isEqualTo(model.getId())
+                .jsonPath("$[0].ready")
+                .isEqualTo(true);
     }
 
     @Test
@@ -94,46 +94,46 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
         LlmModel model = seedInstanceModel("binding-off");
 
         webTestClient
-            .put()
-            .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), "MENTOR")
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("instanceModelId", model.getId(), "enabled", false))
-            .exchange()
-            .expectStatus()
-            .isOk();
+                .put()
+                .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), "MENTOR")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("instanceModelId", model.getId(), "enabled", false))
+                .exchange()
+                .expectStatus()
+                .isOk();
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/agents", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$[0].enabled")
-            .isEqualTo(false)
-            .jsonPath("$[0].ready")
-            .isEqualTo(false);
+                .get()
+                .uri("/workspaces/{slug}/agents", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$[0].enabled")
+                .isEqualTo(false)
+                .jsonPath("$[0].ready")
+                .isEqualTo(false);
 
         webTestClient
-            .delete()
-            .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), "MENTOR")
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isNoContent();
+                .delete()
+                .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), "MENTOR")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNoContent();
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/agents", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody()
-            .jsonPath("$.length()")
-            .isEqualTo(0);
+                .get()
+                .uri("/workspaces/{slug}/agents", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.length()")
+                .isEqualTo(0);
     }
 
     @Test
@@ -146,14 +146,14 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
         llmModelRepository.save(model);
 
         webTestClient
-            .put()
-            .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), "PRACTICE_REVIEW")
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("instanceModelId", model.getId(), "enabled", true))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+                .put()
+                .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), "PRACTICE_REVIEW")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("instanceModelId", model.getId(), "enabled", true))
+                .exchange()
+                .expectStatus()
+                .isBadRequest();
     }
 
     @Test
@@ -163,20 +163,15 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
         // on listAgents is pinned here and nowhere else. Against a REAL workspace: an unknown slug 404s
         // during resolution, which would pass this assertion without reaching the authentication check.
         User owner = persistUser("binding-anon-owner");
-        Workspace workspace = createWorkspace(
-            "binding-anon",
-            "Binding Workspace",
-            "binding-anon-org",
-            AccountType.ORG,
-            owner
-        );
+        Workspace workspace =
+                createWorkspace("binding-anon", "Binding Workspace", "binding-anon-org", AccountType.ORG, owner);
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/agents", workspace.getWorkspaceSlug())
-            .exchange()
-            .expectStatus()
-            .isUnauthorized();
+                .get()
+                .uri("/workspaces/{slug}/agents", workspace.getWorkspaceSlug())
+                .exchange()
+                .expectStatus()
+                .isUnauthorized();
     }
 
     @Test
@@ -190,14 +185,18 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
         ensureWorkspaceMembership(workspace, member, WorkspaceRole.MEMBER);
 
         webTestClient
-            .put()
-            .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), AgentPurpose.PRACTICE_REVIEW)
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("instanceModelId", seedInstanceModel("binding-member-model").getId(), "enabled", true))
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .put()
+                .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), AgentPurpose.PRACTICE_REVIEW)
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of(
+                        "instanceModelId",
+                        seedInstanceModel("binding-member-model").getId(),
+                        "enabled",
+                        true))
+                .exchange()
+                .expectStatus()
+                .isForbidden();
     }
 
     @Test
@@ -209,12 +208,12 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
         ensureWorkspaceMembership(workspace, member, WorkspaceRole.MEMBER);
 
         webTestClient
-            .delete()
-            .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), AgentPurpose.PRACTICE_REVIEW)
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .delete()
+                .uri("/workspaces/{slug}/agents/{purpose}", workspace.getWorkspaceSlug(), AgentPurpose.PRACTICE_REVIEW)
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isForbidden();
     }
 
     @Test
@@ -228,27 +227,22 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
         ensureWorkspaceMembership(own, admin, WorkspaceRole.ADMIN);
 
         Workspace other = createWorkspace(
-            "binding-other-ws",
-            "Other",
-            "binding-other-org",
-            AccountType.ORG,
-            persistUser("binding-other-owner")
-        );
+                "binding-other-ws", "Other", "binding-other-org", AccountType.ORG, persistUser("binding-other-owner"));
 
         webTestClient
-            .delete()
-            .uri("/workspaces/{slug}/agents/{purpose}", other.getWorkspaceSlug(), AgentPurpose.PRACTICE_REVIEW)
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .delete()
+                .uri("/workspaces/{slug}/agents/{purpose}", other.getWorkspaceSlug(), AgentPurpose.PRACTICE_REVIEW)
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isForbidden();
 
         webTestClient
-            .get()
-            .uri("/workspaces/{slug}/agents", own.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk();
+                .get()
+                .uri("/workspaces/{slug}/agents", own.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk();
     }
 }

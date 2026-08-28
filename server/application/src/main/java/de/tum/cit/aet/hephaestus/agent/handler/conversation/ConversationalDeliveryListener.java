@@ -49,14 +49,13 @@ public class ConversationalDeliveryListener {
     private final PracticeFeedbackDeliveryPolicy deliveryPolicy;
 
     public ConversationalDeliveryListener(
-        ObservationRepository observationRepository,
-        FeedbackChannelRouter router,
-        ConversationalFeedbackPreparer preparer,
-        OutboundEgressGuard egressGuard,
-        AgentJobRepository agentJobRepository,
-        FeedbackCompositionResultParser resultParser,
-        PracticeFeedbackDeliveryPolicy deliveryPolicy
-    ) {
+            ObservationRepository observationRepository,
+            FeedbackChannelRouter router,
+            ConversationalFeedbackPreparer preparer,
+            OutboundEgressGuard egressGuard,
+            AgentJobRepository agentJobRepository,
+            FeedbackCompositionResultParser resultParser,
+            PracticeFeedbackDeliveryPolicy deliveryPolicy) {
         this.observationRepository = observationRepository;
         this.router = router;
         this.preparer = preparer;
@@ -74,10 +73,9 @@ public class ConversationalDeliveryListener {
             prepare(event.agentJobId(), event.agentJobId(), event.workspaceId());
         } catch (RuntimeException e) {
             log.warn(
-                "Conversational routing/prepare failed (delivery unaffected): jobId={}, error={}",
-                event.agentJobId(),
-                e.toString()
-            );
+                    "Conversational routing/prepare failed (delivery unaffected): jobId={}, error={}",
+                    event.agentJobId(),
+                    e.toString());
         }
     }
 

@@ -20,17 +20,14 @@ class SlackWebhookSignatureVerifierTest extends BaseUnitTest {
     private static final String SECRET = "test-signing-secret";
 
     private final SlackWebhookSignatureVerifier verifier = new SlackWebhookSignatureVerifier(
-        new SlackSignatureVerifier(SECRET),
-        JsonMapper.builder().build()
-    );
+            new SlackSignatureVerifier(SECRET), JsonMapper.builder().build());
 
     @Test
     void urlVerificationRespondsWithPlainChallenge() {
         byte[] body = "{\"type\":\"url_verification\",\"challenge\":\"abc123\"}".getBytes(StandardCharsets.UTF_8);
 
         VerificationResult result = verifier.verify(
-            new WebhookRequest(body, signedHeaders(body, Instant.now().getEpochSecond()))
-        );
+                new WebhookRequest(body, signedHeaders(body, Instant.now().getEpochSecond())));
 
         assertThat(result).isInstanceOf(VerificationResult.RespondImmediately.class);
         VerificationResult.RespondImmediately response = (VerificationResult.RespondImmediately) result;
@@ -41,28 +38,24 @@ class SlackWebhookSignatureVerifierTest extends BaseUnitTest {
 
     @Test
     void validEventCallbackIsVerified() {
-        byte[] body = "{\"type\":\"event_callback\",\"event_id\":\"Ev1\",\"event\":{\"type\":\"message\"}}".getBytes(
-            StandardCharsets.UTF_8
-        );
+        byte[] body = "{\"type\":\"event_callback\",\"event_id\":\"Ev1\",\"event\":{\"type\":\"message\"}}"
+                .getBytes(StandardCharsets.UTF_8);
 
         VerificationResult result = verifier.verify(
-            new WebhookRequest(body, signedHeaders(body, Instant.now().getEpochSecond()))
-        );
+                new WebhookRequest(body, signedHeaders(body, Instant.now().getEpochSecond())));
 
         assertThat(result).isInstanceOf(VerificationResult.Verified.class);
     }
 
     @Test
     void invalidSignatureIsRejected() {
-        byte[] body = "{\"type\":\"event_callback\",\"event_id\":\"Ev1\",\"event\":{\"type\":\"message\"}}".getBytes(
-            StandardCharsets.UTF_8
-        );
+        byte[] body = "{\"type\":\"event_callback\",\"event_id\":\"Ev1\",\"event\":{\"type\":\"message\"}}"
+                .getBytes(StandardCharsets.UTF_8);
         Map<String, String> headers = Map.of(
-            "X-Slack-Request-Timestamp",
-            String.valueOf(Instant.now().getEpochSecond()),
-            "X-Slack-Signature",
-            "v0=deadbeef"
-        );
+                "X-Slack-Request-Timestamp",
+                String.valueOf(Instant.now().getEpochSecond()),
+                "X-Slack-Signature",
+                "v0=deadbeef");
 
         VerificationResult result = verifier.verify(new WebhookRequest(body, headers));
 
@@ -71,9 +64,8 @@ class SlackWebhookSignatureVerifierTest extends BaseUnitTest {
 
     @Test
     void expiredTimestampIsRejected() {
-        byte[] body = "{\"type\":\"event_callback\",\"event_id\":\"Ev1\",\"event\":{\"type\":\"message\"}}".getBytes(
-            StandardCharsets.UTF_8
-        );
+        byte[] body = "{\"type\":\"event_callback\",\"event_id\":\"Ev1\",\"event\":{\"type\":\"message\"}}"
+                .getBytes(StandardCharsets.UTF_8);
         long expiredTimestamp = Instant.now().getEpochSecond() - 301;
 
         VerificationResult result = verifier.verify(new WebhookRequest(body, signedHeaders(body, expiredTimestamp)));
@@ -83,11 +75,10 @@ class SlackWebhookSignatureVerifierTest extends BaseUnitTest {
 
     private static Map<String, String> signedHeaders(byte[] body, long timestamp) {
         return Map.of(
-            "X-Slack-Request-Timestamp",
-            String.valueOf(timestamp),
-            "X-Slack-Signature",
-            signature(body, timestamp)
-        );
+                "X-Slack-Request-Timestamp",
+                String.valueOf(timestamp),
+                "X-Slack-Signature",
+                signature(body, timestamp));
     }
 
     private static String signature(byte[] body, long timestamp) {

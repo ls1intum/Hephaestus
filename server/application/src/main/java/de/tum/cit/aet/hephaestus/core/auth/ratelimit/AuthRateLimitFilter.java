@@ -53,11 +53,10 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     private final AuthMetrics metrics;
 
     public AuthRateLimitFilter(
-        AuthRateLimitProperties properties,
-        BucketResolver bucketResolver,
-        ObjectMapper objectMapper,
-        AuthMetrics metrics
-    ) {
+            AuthRateLimitProperties properties,
+            BucketResolver bucketResolver,
+            ObjectMapper objectMapper,
+            AuthMetrics metrics) {
         this.properties = properties;
         this.bucketResolver = bucketResolver;
         this.objectMapper = objectMapper;
@@ -86,7 +85,7 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
-        throws ServletException, IOException {
+            throws ServletException, IOException {
         if (!properties.enabled()) {
             chain.doFilter(request, response);
             return;
@@ -120,7 +119,8 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
             return;
         }
 
-        long retryAfterSeconds = Math.max(1, Duration.ofNanos(probe.getNanosToWaitForRefill()).toSeconds());
+        long retryAfterSeconds =
+                Math.max(1, Duration.ofNanos(probe.getNanosToWaitForRefill()).toSeconds());
         // key is namespaced (no raw account-id PII beyond what already exists in auth logs); safe at WARN.
         log.warn("Auth rate limit exceeded: endpoint={} key={} retryAfterSeconds={}", endpoint, key, retryAfterSeconds);
         // Tag by bucket namespace (oauth-authz/refresh/impersonate/delete-user) — bounded, no PII.
@@ -219,11 +219,9 @@ public class AuthRateLimitFilter extends OncePerRequestFilter {
     }
 
     private void writeTooManyRequests(HttpServletRequest request, HttpServletResponse response, long retryAfterSeconds)
-        throws IOException {
+            throws IOException {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-            HttpStatus.TOO_MANY_REQUESTS,
-            "Rate limit exceeded. Retry after " + retryAfterSeconds + " seconds."
-        );
+                HttpStatus.TOO_MANY_REQUESTS, "Rate limit exceeded. Retry after " + retryAfterSeconds + " seconds.");
         problem.setTitle("Too Many Requests");
         problem.setProperty("retryAfterSeconds", retryAfterSeconds);
         problem.setInstance(java.net.URI.create(request.getRequestURI()));

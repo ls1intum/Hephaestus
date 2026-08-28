@@ -8,28 +8,24 @@ import java.util.List;
 import org.jspecify.annotations.NonNull;
 
 public record ReviewRepositoryTarget(
-    @Schema(description = "Exact provider repository name, including its owner")
-    @NonNull
-    @NotBlank
-    @Size(max = 255)
-    String nameWithOwner,
-    @Schema(description = "Exact pull-request base branches to cover; empty covers every base branch")
-    @NonNull
-    @NotNull
-    List<String> baseBranches
-) {
+        @Schema(description = "Exact provider repository name, including its owner") @NonNull @NotBlank @Size(max = 255)
+        String nameWithOwner,
+
+        @Schema(description = "Exact pull-request base branches to cover; empty covers every base branch")
+        @NonNull
+        @NotNull
+        List<String> baseBranches) {
     public ReviewRepositoryTarget {
         nameWithOwner = validValue(nameWithOwner, "repository name");
         baseBranches = normalize(baseBranches);
     }
 
     private static List<String> normalize(List<String> values) {
-        return java.util.Objects.requireNonNull(values, "baseBranches")
-            .stream()
-            .map(value -> validValue(value, "base branch"))
-            .distinct()
-            .sorted()
-            .toList();
+        return java.util.Objects.requireNonNull(values, "baseBranches").stream()
+                .map(value -> validValue(value, "base branch"))
+                .distinct()
+                .sorted()
+                .toList();
     }
 
     private static String validValue(String value, String label) {

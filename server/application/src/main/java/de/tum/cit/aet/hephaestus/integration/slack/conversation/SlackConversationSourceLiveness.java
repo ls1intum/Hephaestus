@@ -26,18 +26,8 @@ public class SlackConversationSourceLiveness implements ConversationSourceLivene
 
     @Override
     public boolean isDeliverableThread(
-        long workspaceId,
-        long threadId,
-        String channelId,
-        String threadTimestamp,
-        long participantId
-    ) {
+            long workspaceId, long threadId, String channelId, String threadTimestamp, long participantId) {
         return threadRepository.existsDeliverableThread(
-            threadId,
-            workspaceId,
-            channelId,
-            threadTimestamp,
-            participantId
-        );
+                threadId, workspaceId, channelId, threadTimestamp, participantId);
     }
 }

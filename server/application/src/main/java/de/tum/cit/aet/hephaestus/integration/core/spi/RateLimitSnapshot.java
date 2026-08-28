@@ -30,12 +30,11 @@ import org.jspecify.annotations.Nullable;
  *                       never told us to back off
  */
 public record RateLimitSnapshot(
-    @Nullable Integer limit,
-    @Nullable Integer remaining,
-    @Nullable Instant resetAt,
-    @NonNull Instant observedAt,
-    @Nullable Instant throttledUntil
-) {
+        @Nullable Integer limit,
+        @Nullable Integer remaining,
+        @Nullable Instant resetAt,
+        @NonNull Instant observedAt,
+        @Nullable Instant throttledUntil) {
     /**
      * The sanctioned construction path for every tracker — applies the shared <b>window-expiry rule</b> so
      * no provider has to (and so none can do it differently).
@@ -49,19 +48,13 @@ public record RateLimitSnapshot(
      * while it is still in the future, which keeps the invariant here trivial.
      */
     public static RateLimitSnapshot observed(
-        @Nullable Integer limit,
-        @Nullable Integer remaining,
-        @Nullable Instant resetAt,
-        Instant observedAt,
-        @Nullable Instant throttledUntil
-    ) {
+            @Nullable Integer limit,
+            @Nullable Integer remaining,
+            @Nullable Instant resetAt,
+            Instant observedAt,
+            @Nullable Instant throttledUntil) {
         boolean windowClosed = resetAt != null && !Instant.now().isBefore(resetAt);
         return new RateLimitSnapshot(
-            limit,
-            windowClosed ? null : remaining,
-            windowClosed ? null : resetAt,
-            observedAt,
-            throttledUntil
-        );
+                limit, windowClosed ? null : remaining, windowClosed ? null : resetAt, observedAt, throttledUntil);
     }
 }

@@ -12,9 +12,7 @@ import tools.jackson.databind.JsonNode;
 public class SlackGroupLeftMessageHandler extends SlackChannelLifecycleMessageHandler {
 
     public SlackGroupLeftMessageHandler(
-        SlackChannelLifecycleService lifecycleService,
-        NatsMessageDeserializer deserializer
-    ) {
+            SlackChannelLifecycleService lifecycleService, NatsMessageDeserializer deserializer) {
         super("group_left", lifecycleService, deserializer);
     }
 

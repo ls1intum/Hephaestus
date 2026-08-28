@@ -48,12 +48,10 @@ class OAuthStateNonceStoreTest extends BaseUnitTest {
 
     @Test
     void issueRejectsBlank() {
-        assertThatThrownBy(() -> store.issue(null, 1L, IntegrationKind.GITHUB, Instant.now())).isInstanceOf(
-            IllegalArgumentException.class
-        );
-        assertThatThrownBy(() -> store.issue("", 1L, IntegrationKind.GITHUB, Instant.now())).isInstanceOf(
-            IllegalArgumentException.class
-        );
+        assertThatThrownBy(() -> store.issue(null, 1L, IntegrationKind.GITHUB, Instant.now()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> store.issue("", 1L, IntegrationKind.GITHUB, Instant.now()))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

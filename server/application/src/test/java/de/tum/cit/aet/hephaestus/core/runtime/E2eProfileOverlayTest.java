@@ -24,7 +24,8 @@ class E2eProfileOverlayTest extends BaseUnitTest {
         PropertySource<?> overlay = overlay();
 
         assertThat(overlay.getProperty("hephaestus.sync.nats.server")).isEqualTo("nats://localhost:4222");
-        assertThat(overlay.getProperty("hephaestus.sync.filters.allowed-organizations")).isEqualTo("");
+        assertThat(overlay.getProperty("hephaestus.sync.filters.allowed-organizations"))
+                .isEqualTo("");
     }
 
     private static PropertySource<?> overlay() throws IOException {

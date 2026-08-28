@@ -14,13 +14,7 @@ import org.jspecify.annotations.Nullable;
  * @param aborted     true if the batch was aborted due to an error
  */
 public record BackfillBatchResult(
-    int count,
-    int minIid,
-    int maxIid,
-    @Nullable String nextCursor,
-    boolean complete,
-    boolean aborted
-) {
+        int count, int minIid, int maxIid, @Nullable String nextCursor, boolean complete, boolean aborted) {
     public static BackfillBatchResult empty() {
         return new BackfillBatchResult(0, -1, -1, null, true, false);
     }

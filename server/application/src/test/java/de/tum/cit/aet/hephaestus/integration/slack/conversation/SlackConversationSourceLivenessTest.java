@@ -16,7 +16,8 @@ class SlackConversationSourceLivenessTest extends BaseUnitTest {
 
     @Test
     void delegatesExactThreadValidation() {
-        when(threadRepository.existsDeliverableThread(77L, 1L, "C123", "1700000000.100000", 789L)).thenReturn(true);
+        when(threadRepository.existsDeliverableThread(77L, 1L, "C123", "1700000000.100000", 789L))
+                .thenReturn(true);
         var liveness = new SlackConversationSourceLiveness(threadRepository);
 
         boolean result = liveness.isDeliverableThread(1L, 77L, "C123", "1700000000.100000", 789L);

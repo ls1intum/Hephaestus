@@ -22,47 +22,40 @@ public final class DeliveryPolicyResolver {
 
     public static Result resolve(Facts facts) {
         List<Candidate> candidates = List.of(
-            new Candidate(
-                DeliveryPolicyCheck.INSTANCE_SILENT_MODE,
-                facts.instanceMayDeliver(),
-                FeedbackSuppressionReason.INSTANCE_SILENCED
-            ),
-            new Candidate(
-                DeliveryPolicyCheck.WORKSPACE_ENABLED,
-                FactAnswer.of(facts.workspaceEnabled()),
-                FeedbackSuppressionReason.WORKSPACE_DISABLED
-            ),
-            new Candidate(
-                DeliveryPolicyCheck.ROLLOUT_REVISION,
-                facts.rolloutCurrent(),
-                FeedbackSuppressionReason.STALE_ROLLOUT_REVISION
-            ),
-            new Candidate(
-                DeliveryPolicyCheck.WORKSPACE_DELIVERY,
-                facts.deliveryActive(),
-                FeedbackSuppressionReason.WORKSPACE_DELIVERY_PAUSED
-            ),
-            new Candidate(
-                DeliveryPolicyCheck.CURRENT_COVERAGE,
-                facts.currentlyCovered(),
-                FeedbackSuppressionReason.OUTSIDE_CURRENT_COVERAGE
-            ),
-            new Candidate(
-                DeliveryPolicyCheck.PRACTICE_AUTHORITY,
-                facts.practiceAuthority(),
-                FeedbackSuppressionReason.PRACTICE_REQUIRES_APPROVAL
-            ),
-            new Candidate(
-                DeliveryPolicyCheck.RECIPIENT_CONSENT,
-                facts.recipientConsent(),
-                FeedbackSuppressionReason.RECIPIENT_OPTED_OUT
-            ),
-            new Candidate(
-                DeliveryPolicyCheck.ARTIFACT_ELIGIBILITY,
-                facts.artifactEligible(),
-                facts.artifactRefusal() == null ? FeedbackSuppressionReason.ARTIFACT_GONE : facts.artifactRefusal()
-            )
-        );
+                new Candidate(
+                        DeliveryPolicyCheck.INSTANCE_SILENT_MODE,
+                        facts.instanceMayDeliver(),
+                        FeedbackSuppressionReason.INSTANCE_SILENCED),
+                new Candidate(
+                        DeliveryPolicyCheck.WORKSPACE_ENABLED,
+                        FactAnswer.of(facts.workspaceEnabled()),
+                        FeedbackSuppressionReason.WORKSPACE_DISABLED),
+                new Candidate(
+                        DeliveryPolicyCheck.ROLLOUT_REVISION,
+                        facts.rolloutCurrent(),
+                        FeedbackSuppressionReason.STALE_ROLLOUT_REVISION),
+                new Candidate(
+                        DeliveryPolicyCheck.WORKSPACE_DELIVERY,
+                        facts.deliveryActive(),
+                        FeedbackSuppressionReason.WORKSPACE_DELIVERY_PAUSED),
+                new Candidate(
+                        DeliveryPolicyCheck.CURRENT_COVERAGE,
+                        facts.currentlyCovered(),
+                        FeedbackSuppressionReason.OUTSIDE_CURRENT_COVERAGE),
+                new Candidate(
+                        DeliveryPolicyCheck.PRACTICE_AUTHORITY,
+                        facts.practiceAuthority(),
+                        FeedbackSuppressionReason.PRACTICE_REQUIRES_APPROVAL),
+                new Candidate(
+                        DeliveryPolicyCheck.RECIPIENT_CONSENT,
+                        facts.recipientConsent(),
+                        FeedbackSuppressionReason.RECIPIENT_OPTED_OUT),
+                new Candidate(
+                        DeliveryPolicyCheck.ARTIFACT_ELIGIBILITY,
+                        facts.artifactEligible(),
+                        facts.artifactRefusal() == null
+                                ? FeedbackSuppressionReason.ARTIFACT_GONE
+                                : facts.artifactRefusal()));
 
         List<CheckResult> checks = new ArrayList<>(candidates.size());
         FeedbackSuppressionReason refusal = null;
@@ -88,24 +81,20 @@ public final class DeliveryPolicyResolver {
     }
 
     public record Facts(
-        FactAnswer instanceMayDeliver,
-        boolean workspaceEnabled,
-        FactAnswer rolloutCurrent,
-        FactAnswer deliveryActive,
-        FactAnswer currentlyCovered,
-        FactAnswer practiceAuthority,
-        FactAnswer recipientConsent,
-        FactAnswer artifactEligible,
-        @Nullable FeedbackSuppressionReason artifactRefusal
-    ) {}
+            FactAnswer instanceMayDeliver,
+            boolean workspaceEnabled,
+            FactAnswer rolloutCurrent,
+            FactAnswer deliveryActive,
+            FactAnswer currentlyCovered,
+            FactAnswer practiceAuthority,
+            FactAnswer recipientConsent,
+            FactAnswer artifactEligible,
+            @Nullable FeedbackSuppressionReason artifactRefusal) {}
 
     public record CheckResult(DeliveryPolicyCheck check, DeliveryPolicyCheckStatus status) {}
 
     public record Result(
-        boolean allowed,
-        @Nullable FeedbackSuppressionReason suppressionReason,
-        List<CheckResult> checks
-    ) {
+            boolean allowed, @Nullable FeedbackSuppressionReason suppressionReason, List<CheckResult> checks) {
         public FeedbackSuppressionReason refusal() {
             return java.util.Objects.requireNonNull(suppressionReason, "a denied result always names its reason");
         }

@@ -29,8 +29,8 @@ class JobSubmissionTest extends BaseUnitTest {
         void shouldRejectBlankIdempotencyKey() {
             ObjectNode metadata = objectMapper.createObjectNode();
             assertThatThrownBy(() -> new JobSubmission(metadata, "  "))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("blank");
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("blank");
         }
     }
 }

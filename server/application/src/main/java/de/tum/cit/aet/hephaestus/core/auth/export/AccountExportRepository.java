@@ -34,14 +34,12 @@ public interface AccountExportRepository extends JpaRepository<AccountExport, Lo
      * number of rows affected.
      */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(
-        """
+    @Query("""
         UPDATE AccountExport e
            SET e.status = de.tum.cit.aet.hephaestus.core.auth.export.AccountExport.Status.EXPIRED,
                e.payload = NULL
          WHERE e.status = de.tum.cit.aet.hephaestus.core.auth.export.AccountExport.Status.READY
            AND e.expiresAt < :now
-        """
-    )
+        """)
     int expireReadyBefore(@Param("now") Instant now);
 }

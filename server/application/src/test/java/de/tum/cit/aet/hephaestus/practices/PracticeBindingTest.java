@@ -26,11 +26,11 @@ class PracticeBindingTest extends BaseUnitTest {
     @Test
     void shouldRejectASourceNamedTwiceWhateverTheStance() {
         assertThatThrownBy(() -> binding(List.of(required(CORE), required(CORE))))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("duplicate source");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("duplicate source");
         assertThatThrownBy(() -> binding(List.of(required(CORE), contextual(CORE))))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("duplicate source");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("duplicate source");
     }
 
     @Test
@@ -38,46 +38,37 @@ class PracticeBindingTest extends BaseUnitTest {
         PracticeBinding binding = binding(List.of(required(DIFF), contextual(COMMENTS), required(CORE)));
 
         assertThat(binding.needs())
-            .extracting(need -> need.sourceKind().value())
-            .containsExactly("scm.pull-request.comments", "scm.pull-request.core", "scm.pull-request.diff");
+                .extracting(need -> need.sourceKind().value())
+                .containsExactly("scm.pull-request.comments", "scm.pull-request.core", "scm.pull-request.diff");
     }
 
     @Test
     void shouldSortAndDeduplicateSignals() {
         PracticeBinding binding = new PracticeBinding(
-            List.of(ScmSignals.PULL_REQUEST_MERGED, ScmSignals.PULL_REQUEST_OPENED, ScmSignals.PULL_REQUEST_MERGED),
-            List.of(required(CORE)),
-            false
-        );
+                List.of(ScmSignals.PULL_REQUEST_MERGED, ScmSignals.PULL_REQUEST_OPENED, ScmSignals.PULL_REQUEST_MERGED),
+                List.of(required(CORE)),
+                false);
 
         assertThat(binding.signals()).containsExactly(ScmSignals.PULL_REQUEST_MERGED, ScmSignals.PULL_REQUEST_OPENED);
     }
 
     @Test
     void shouldRefuseSignalsOfDifferentKindsInOneBinding() {
-        assertThatThrownBy(() ->
-            new PracticeBinding(
-                List.of(ScmSignals.PULL_REQUEST_OPENED, ScmSignals.ISSUE_OPENED),
-                List.of(required(CORE)),
-                false
-            )
-        )
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("cannot mix artifact kinds");
+        assertThatThrownBy(() -> new PracticeBinding(
+                        List.of(ScmSignals.PULL_REQUEST_OPENED, ScmSignals.ISSUE_OPENED),
+                        List.of(required(CORE)),
+                        false))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cannot mix artifact kinds");
     }
 
     @Test
     void shouldRefuseAPracticeWhoseBindingsDisagreeAboutWhatItReviews() {
-        assertThatThrownBy(() ->
-            PracticeBinding.artifactKindOf(
-                List.of(
-                    PracticeBinding.on(ScmSignals.PULL_REQUEST_OPENED, List.of(required(CORE))),
-                    PracticeBinding.on(ScmSignals.ISSUE_OPENED, List.of(required(CORE)))
-                )
-            )
-        )
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("reviews one kind of artifact");
+        assertThatThrownBy(() -> PracticeBinding.artifactKindOf(List.of(
+                        PracticeBinding.on(ScmSignals.PULL_REQUEST_OPENED, List.of(required(CORE))),
+                        PracticeBinding.on(ScmSignals.ISSUE_OPENED, List.of(required(CORE))))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("reviews one kind of artifact");
     }
 
     /**
@@ -88,14 +79,13 @@ class PracticeBindingTest extends BaseUnitTest {
     @Test
     void aDraftOccasionsOnlyTheBindingThatSaysSo() {
         PracticeBinding onFinished = PracticeBinding.on(ScmSignals.PULL_REQUEST_OPENED, List.of(required(CORE)));
-        PracticeBinding onDrafts = new PracticeBinding(
-            List.of(ScmSignals.PULL_REQUEST_OPENED),
-            List.of(required(CORE)),
-            true
-        );
+        PracticeBinding onDrafts =
+                new PracticeBinding(List.of(ScmSignals.PULL_REQUEST_OPENED), List.of(required(CORE)), true);
 
-        assertThat(onFinished.occasionedBy(ScmSignals.PULL_REQUEST_OPENED, false)).isTrue();
-        assertThat(onFinished.occasionedBy(ScmSignals.PULL_REQUEST_OPENED, true)).isFalse();
+        assertThat(onFinished.occasionedBy(ScmSignals.PULL_REQUEST_OPENED, false))
+                .isTrue();
+        assertThat(onFinished.occasionedBy(ScmSignals.PULL_REQUEST_OPENED, true))
+                .isFalse();
         assertThat(onDrafts.occasionedBy(ScmSignals.PULL_REQUEST_OPENED, true)).isTrue();
         assertThat(onDrafts.occasionedBy(ScmSignals.PULL_REQUEST_MERGED, false)).isFalse();
     }
@@ -107,16 +97,15 @@ class PracticeBindingTest extends BaseUnitTest {
     @Test
     void evidenceIsSelectedByTheOccasionAndUnionedWhenThereIsNone() {
         List<PracticeBinding> bindings = List.of(
-            PracticeBinding.on(ScmSignals.PULL_REQUEST_OPENED, List.of(required(CORE))),
-            PracticeBinding.on(ScmSignals.PULL_REQUEST_MERGED, List.of(required(DIFF)))
-        );
+                PracticeBinding.on(ScmSignals.PULL_REQUEST_OPENED, List.of(required(CORE))),
+                PracticeBinding.on(ScmSignals.PULL_REQUEST_MERGED, List.of(required(DIFF))));
 
         assertThat(PracticeBinding.needsFor(bindings, ScmSignals.PULL_REQUEST_OPENED))
-            .extracting(need -> need.sourceKind().value())
-            .containsExactly("scm.pull-request.core");
+                .extracting(need -> need.sourceKind().value())
+                .containsExactly("scm.pull-request.core");
         assertThat(PracticeBinding.needsFor(bindings, null))
-            .extracting(need -> need.sourceKind().value())
-            .containsExactly("scm.pull-request.core", "scm.pull-request.diff");
+                .extracting(need -> need.sourceKind().value())
+                .containsExactly("scm.pull-request.core", "scm.pull-request.diff");
     }
 
     /**
@@ -129,14 +118,14 @@ class PracticeBindingTest extends BaseUnitTest {
         JsonMapper mapper = JsonMapper.builder().build();
 
         PracticeBinding parsed = mapper.readValue(
-            "{\"signals\": [\"scm.pull_request.opened\"], " +
-                "\"needs\": [{\"sourceKind\": \"scm.pull-request.core\", \"stance\": \"REQUIRED\"}]}",
-            PracticeBinding.class
-        );
+                "{\"signals\": [\"scm.pull_request.opened\"], "
+                        + "\"needs\": [{\"sourceKind\": \"scm.pull-request.core\", \"stance\": \"REQUIRED\"}]}",
+                PracticeBinding.class);
 
         assertThat(parsed.onDrafts()).isFalse();
         assertThat(parsed.signals()).containsExactly(ScmSignals.PULL_REQUEST_OPENED);
-        assertThat(mapper.readValue(mapper.writeValueAsString(parsed), PracticeBinding.class)).isEqualTo(parsed);
+        assertThat(mapper.readValue(mapper.writeValueAsString(parsed), PracticeBinding.class))
+                .isEqualTo(parsed);
     }
 
     @Test
@@ -144,10 +133,9 @@ class PracticeBindingTest extends BaseUnitTest {
         JsonMapper mapper = JsonMapper.builder().build();
 
         PracticeBinding parsed = mapper.readValue(
-            "{\"signals\": [\"scm.pull_request.opened\"], " +
-                "\"needs\": [{\"sourceKind\": \"scm.pull-request.core\", \"stance\": \"REQUIRED\"}], \"onDrafts\": true}",
-            PracticeBinding.class
-        );
+                "{\"signals\": [\"scm.pull_request.opened\"], "
+                        + "\"needs\": [{\"sourceKind\": \"scm.pull-request.core\", \"stance\": \"REQUIRED\"}], \"onDrafts\": true}",
+                PracticeBinding.class);
 
         assertThat(parsed.onDrafts()).isTrue();
     }

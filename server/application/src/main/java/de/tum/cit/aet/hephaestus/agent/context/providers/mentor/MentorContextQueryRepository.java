@@ -29,8 +29,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
      * by PK); each bucket is a {@code COALESCE((SELECT …), 0L)} so the projected longs are
      * never null. The nine metric counts ride in one statement rather than one round trip each.
      */
-    @Query(
-        """
+    @Query("""
         SELECT new de.tum.cit.aet.hephaestus.agent.context.providers.mentor.MentorUserCounts(
             COALESCE((SELECT COUNT(p1)
                 FROM PullRequest p1
@@ -99,15 +98,13 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
         )
         FROM User u
         WHERE u.id = :userId
-        """
-    )
+        """)
     MentorUserCounts fetchUserCounts(
-        @Param("workspaceId") Long workspaceId,
-        @Param("userId") Long userId,
-        @Param("twoWeeksAgo") Instant twoWeeksAgo,
-        @Param("weekAgo") Instant weekAgo,
-        @Param("now") Instant now
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("userId") Long userId,
+            @Param("twoWeeksAgo") Instant twoWeeksAgo,
+            @Param("weekAgo") Instant weekAgo,
+            @Param("now") Instant now);
 
     /**
      * Open issues assigned to user, ordered most recent first, scoped to workspace.
@@ -117,8 +114,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
      * open issues", and this list disagrees with the typed open-issue count in
      * {@link #fetchUserCounts}, which already carries the discriminator.
      */
-    @Query(
-        """
+    @Query("""
         SELECT i
         FROM Issue i
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = i.repository.nameWithOwner
@@ -130,13 +126,11 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
           AND rtm.workspace.id = :workspaceId
           AND i.state = de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.OPEN
         ORDER BY i.createdAt DESC
-        """
-    )
+        """)
     List<Issue> findAssignedOpenIssues(@Param("workspaceId") Long workspaceId, @Param("userId") Long userId);
 
     /** Open PRs where user has been requested to review, with author + repo fetched. */
-    @Query(
-        """
+    @Query("""
         SELECT p
         FROM PullRequest p
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = p.repository.nameWithOwner
@@ -147,27 +141,21 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
           AND rtm.workspace.id = :workspaceId
           AND p.state = de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.OPEN
         ORDER BY p.createdAt DESC
-        """
-    )
+        """)
     List<PullRequest> findPendingReviewRequestPrs(@Param("workspaceId") Long workspaceId, @Param("userId") Long userId);
 
     /** Recent chat threads for the user within the workspace, newest first. Caller passes
      *  a {@link Pageable} ({@code PageRequest.of(0, limit)}) so the DB-side LIMIT keeps power
      *  users (hundreds of threads) from hydrating the full list just to {@code subList(0, 10)}. */
-    @Query(
-        """
+    @Query("""
         SELECT t
         FROM ChatThread t
         WHERE t.workspace.id = :workspaceId
           AND t.user.id = :userId
         ORDER BY t.createdAt DESC
-        """
-    )
+        """)
     List<ChatThread> findRecentChatThreads(
-        @Param("workspaceId") Long workspaceId,
-        @Param("userId") Long userId,
-        Pageable pageable
-    );
+            @Param("workspaceId") Long workspaceId, @Param("userId") Long userId, Pageable pageable);
 
     // Observations context — reviews received in window
 
@@ -187,8 +175,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
      * expands to invalid {@code IN ()} SQL (a Postgres syntax error) for an empty list, so callers must
      * short-circuit beforehand (as {@code WorkspaceContentSource.loadFirstUserMessages} does).
      */
-    @Query(
-        value = """
+    @Query(value = """
         SELECT DISTINCT ON (m.thread_id) m.thread_id, m.parts::text
           FROM chat_message m
           JOIN chat_thread t ON t.id = m.thread_id
@@ -196,21 +183,16 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
            AND t.workspace_id = :workspaceId
            AND m.role = 'USER'
          ORDER BY m.thread_id, m.created_at ASC
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     List<Object[]> findFirstUserMessagePartsByThreadIds(
-        @Param("workspaceId") Long workspaceId,
-        @Param("threadIds") List<UUID> threadIds
-    );
+            @Param("workspaceId") Long workspaceId, @Param("threadIds") List<UUID> threadIds);
 
     /**
      * Reviews received on user's authored PRs within {@code since}..now, scoped to workspace.
      * Page the cap into the DB query — a heavy reviewer's 90-day window can return hundreds of
      * rows; surfacing more than {@code MAX_RECENT_REVIEWS} is wasted work.
      */
-    @Query(
-        """
+    @Query("""
         SELECT prr
         FROM PullRequestReview prr
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = prr.pullRequest.repository.nameWithOwner
@@ -220,14 +202,12 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
           AND rtm.workspace.id = :workspaceId
           AND prr.submittedAt > :since
         ORDER BY prr.submittedAt DESC
-        """
-    )
+        """)
     List<PullRequestReview> findReviewsReceivedSince(
-        @Param("workspaceId") Long workspaceId,
-        @Param("userId") Long userId,
-        @Param("since") Instant since,
-        Pageable page
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("userId") Long userId,
+            @Param("since") Instant since,
+            Pageable page);
 
     /**
      * The developer's own authored PULL REQUESTS in the workspace, newest first — the work itself (not
@@ -235,28 +215,22 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
      * author + RepositoryToMonitor scoping as {@link #findReviewsReceivedSince}. {@code FROM PullRequest}
      * narrows to the PR discriminator (single-table inheritance), so issues never leak in.
      */
-    @Query(
-        """
+    @Query("""
         SELECT p
         FROM PullRequest p
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = p.repository.nameWithOwner
         WHERE p.author.id = :userId
           AND rtm.workspace.id = :workspaceId
         ORDER BY p.createdAt DESC
-        """
-    )
+        """)
     List<PullRequest> findRecentAuthoredPullRequests(
-        @Param("workspaceId") Long workspaceId,
-        @Param("userId") Long userId,
-        Pageable page
-    );
+            @Param("workspaceId") Long workspaceId, @Param("userId") Long userId, Pageable page);
 
     /**
      * The developer's own authored ISSUES (excluding PRs via {@code TYPE(i) = Issue}) in the workspace,
      * newest first. Companion to {@link #findRecentAuthoredPullRequests}.
      */
-    @Query(
-        """
+    @Query("""
         SELECT i
         FROM Issue i
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = i.repository.nameWithOwner
@@ -264,11 +238,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
           AND rtm.workspace.id = :workspaceId
           AND TYPE(i) = Issue
         ORDER BY i.createdAt DESC
-        """
-    )
+        """)
     List<Issue> findRecentAuthoredIssues(
-        @Param("workspaceId") Long workspaceId,
-        @Param("userId") Long userId,
-        Pageable page
-    );
+            @Param("workspaceId") Long workspaceId, @Param("userId") Long userId, Pageable page);
 }

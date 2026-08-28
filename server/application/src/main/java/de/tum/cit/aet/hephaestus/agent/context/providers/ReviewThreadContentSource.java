@@ -59,11 +59,10 @@ public class ReviewThreadContentSource implements EvidenceSource {
     private final PullRequestReviewRepository reviewRepository;
 
     public ReviewThreadContentSource(
-        ObjectMapper objectMapper,
-        PullRequestRepository pullRequestRepository,
-        PullRequestReviewThreadRepository threadRepository,
-        PullRequestReviewRepository reviewRepository
-    ) {
+            ObjectMapper objectMapper,
+            PullRequestRepository pullRequestRepository,
+            PullRequestReviewThreadRepository threadRepository,
+            PullRequestReviewRepository reviewRepository) {
         this.objectMapper = objectMapper;
         this.pullRequestRepository = pullRequestRepository;
         this.threadRepository = threadRepository;
@@ -100,27 +99,24 @@ public class ReviewThreadContentSource implements EvidenceSource {
             }
 
             List<Long> threadIds = new java.util.ArrayList<>(
-                threadRepository.findRecentIdsByPullRequestId(pullRequestId, PageRequest.of(0, MAX_THREADS + 1))
-            );
+                    threadRepository.findRecentIdsByPullRequestId(pullRequestId, PageRequest.of(0, MAX_THREADS + 1)));
             boolean threadsTruncated = threadIds.size() > MAX_THREADS;
             if (threadsTruncated) threadIds.remove(threadIds.size() - 1);
-            List<PullRequestReviewThread> threads = threadIds.isEmpty()
-                ? List.of()
-                : threadRepository.findAllByIdWithResolvedBy(threadIds);
-            List<PullRequestReview> reviews = new java.util.ArrayList<>(
-                reviewRepository.findRecentByPullRequestIdWithAuthor(
-                    pullRequestId,
-                    Set.of(PullRequestReview.State.PENDING, PullRequestReview.State.UNKNOWN),
-                    PageRequest.of(0, MAX_DECISIONS + 1)
-                )
-            );
+            List<PullRequestReviewThread> threads =
+                    threadIds.isEmpty() ? List.of() : threadRepository.findAllByIdWithResolvedBy(threadIds);
+            List<PullRequestReview> reviews =
+                    new java.util.ArrayList<>(reviewRepository.findRecentByPullRequestIdWithAuthor(
+                            pullRequestId,
+                            Set.of(PullRequestReview.State.PENDING, PullRequestReview.State.UNKNOWN),
+                            PageRequest.of(0, MAX_DECISIONS + 1)));
             if (reviews.size() > MAX_DECISIONS + 1) {
                 reviews = new java.util.ArrayList<>(reviews.subList(0, MAX_DECISIONS + 1));
             }
             boolean decisionsTruncated = reviews.size() > MAX_DECISIONS;
             if (decisionsTruncated) reviews.remove(reviews.size() - 1);
 
-            PullRequest pullRequest = pullRequestRepository.findByIdWithAllForGate(pullRequestId).orElse(null);
+            PullRequest pullRequest =
+                    pullRequestRepository.findByIdWithAllForGate(pullRequestId).orElse(null);
 
             ObjectNode root = objectMapper.createObjectNode();
 
@@ -149,10 +145,8 @@ public class ReviewThreadContentSource implements EvidenceSource {
                 if (review == null || review.getState() == null) {
                     continue;
                 }
-                if (
-                    review.getState() == PullRequestReview.State.PENDING ||
-                    review.getState() == PullRequestReview.State.UNKNOWN
-                ) {
+                if (review.getState() == PullRequestReview.State.PENDING
+                        || review.getState() == PullRequestReview.State.UNKNOWN) {
                     continue;
                 }
                 decisionArray.add(toDecision(review));
@@ -164,13 +158,12 @@ public class ReviewThreadContentSource implements EvidenceSource {
 
             files.put(OUTPUT_PREFIX + FILE_NAME, objectMapper.writeValueAsBytes(root));
             log.info(
-                "ReviewThreads: prId={} threads={} unresolved={} decisions={} mergeState={}",
-                pullRequestId,
-                emittedThreads,
-                unresolved,
-                decisionArray.size(),
-                root.get("mergeState").asString()
-            );
+                    "ReviewThreads: prId={} threads={} unresolved={} decisions={} mergeState={}",
+                    pullRequestId,
+                    emittedThreads,
+                    unresolved,
+                    decisionArray.size(),
+                    root.get("mergeState").asString());
         } catch (Exception e) {
             throw new EvidenceCollectionException("Review-thread collection failed", e);
         }
@@ -185,15 +178,15 @@ public class ReviewThreadContentSource implements EvidenceSource {
         }
         try {
             JsonNode root = objectMapper.readTree(reviewState);
-            boolean empty = root.path("threads").isEmpty() && root.path("reviewDecisions").isEmpty();
+            boolean empty = root.path("threads").isEmpty()
+                    && root.path("reviewDecisions").isEmpty();
             return new EvidenceContribution(
-                captured.files(),
-                captured.completeness(),
-                captured.immutableIdentities(),
-                captured.observedAt(),
-                captured.sourceEffectiveAt(),
-                Map.of(KIND, empty ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY)
-            );
+                    captured.files(),
+                    captured.completeness(),
+                    captured.immutableIdentities(),
+                    captured.observedAt(),
+                    captured.sourceEffectiveAt(),
+                    Map.of(KIND, empty ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY));
         } catch (Exception exception) {
             throw new IllegalStateException("Serialized review threads could not be read", exception);
         }

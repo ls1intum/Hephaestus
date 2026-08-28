@@ -16,7 +16,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organizatio
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issue.dto.GitLabIssueEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
@@ -70,7 +69,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private static final String FIXTURE_ISSUE_TITLE = "Feature: Add user authentication";
     private static final String FIXTURE_ISSUE_BODY = "Implement OAuth2 authentication flow";
     private static final String FIXTURE_ISSUE_HTML_URL =
-        "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/5";
+            "https://gitlab.lrz.de/hephaestustest/demo-repository/-/issues/5";
     private static final String FIXTURE_AUTHOR_LOGIN = "ga84xah";
     private static final String FIXTURE_LABEL_NAME = "enhancement";
     private static final String FIXTURE_LABEL_COLOR = "#a2eeef";
@@ -145,7 +144,9 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(event);
 
             transactionTemplate.executeWithoutResult(status -> {
-                Issue issue = issueRepository.findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID).orElseThrow();
+                Issue issue = issueRepository
+                        .findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID)
+                        .orElseThrow();
 
                 // Core fields
                 assertThat(issue.getNativeId()).isEqualTo(NATIVE_ISSUE_ID);
@@ -189,7 +190,9 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             // Close
             handler.handleEvent(loadPayload("issue.close"));
 
-            Issue issue = issueRepository.findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID).orElse(null);
+            Issue issue = issueRepository
+                    .findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID)
+                    .orElse(null);
             assertThat(issue).isNotNull();
             assertThat(issue.getState()).isEqualTo(Issue.State.CLOSED);
 
@@ -206,7 +209,9 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             // Reopen
             handler.handleEvent(loadPayload("issue.reopen"));
 
-            Issue issue = issueRepository.findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID).orElse(null);
+            Issue issue = issueRepository
+                    .findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID)
+                    .orElse(null);
             assertThat(issue).isNotNull();
             assertThat(issue.getState()).isEqualTo(Issue.State.OPEN);
 
@@ -224,7 +229,9 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
             // Should still be one issue
             assertThat(issueRepository.count()).isEqualTo(1);
-            Issue issue = issueRepository.findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID).orElse(null);
+            Issue issue = issueRepository
+                    .findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID)
+                    .orElse(null);
             assertThat(issue).isNotNull();
         }
     }
@@ -273,8 +280,8 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             // Wrap in transaction to avoid LazyInitializationException when accessing provider
             transactionTemplate.executeWithoutResult(status -> {
                 var author = userRepository
-                    .findByNativeIdAndProviderId(NATIVE_USER_ID, persistedId(savedProvider))
-                    .orElseThrow();
+                        .findByNativeIdAndProviderId(NATIVE_USER_ID, persistedId(savedProvider))
+                        .orElseThrow();
                 assertThat(author.getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
                 assertThat(author.getProvider().getType()).isEqualTo(IdentityProviderType.GITLAB);
                 assertThat(author.getHtmlUrl()).isEqualTo("https://gitlab.lrz.de/ga84xah");
@@ -287,8 +294,8 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
             transactionTemplate.executeWithoutResult(status -> {
                 var label = labelRepository
-                    .findByRepositoryIdAndName(savedRepo.getId(), FIXTURE_LABEL_NAME)
-                    .orElseThrow();
+                        .findByRepositoryIdAndName(savedRepo.getId(), FIXTURE_LABEL_NAME)
+                        .orElseThrow();
                 assertThat(label.getName()).isEqualTo(FIXTURE_LABEL_NAME);
                 assertThat(label.getColor()).isEqualTo(FIXTURE_LABEL_COLOR);
             });
@@ -326,22 +333,29 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         @Test
         void shouldHandleFullLifecycle() throws Exception {
             handler.handleEvent(loadPayload("issue.open"));
-            assertThat(
-                issueRepository.findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID).orElseThrow().getState()
-            ).isEqualTo(Issue.State.OPEN);
+            assertThat(issueRepository
+                            .findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID)
+                            .orElseThrow()
+                            .getState())
+                    .isEqualTo(Issue.State.OPEN);
 
             handler.handleEvent(loadPayload("issue.close"));
-            assertThat(
-                issueRepository.findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID).orElseThrow().getState()
-            ).isEqualTo(Issue.State.CLOSED);
+            assertThat(issueRepository
+                            .findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID)
+                            .orElseThrow()
+                            .getState())
+                    .isEqualTo(Issue.State.CLOSED);
 
             handler.handleEvent(loadPayload("issue.reopen"));
-            assertThat(
-                issueRepository.findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID).orElseThrow().getState()
-            ).isEqualTo(Issue.State.OPEN);
+            assertThat(issueRepository
+                            .findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID)
+                            .orElseThrow()
+                            .getState())
+                    .isEqualTo(Issue.State.OPEN);
 
             handler.handleEvent(loadPayload("issue.update"));
-            assertThat(issueRepository.findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID)).isPresent();
+            assertThat(issueRepository.findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID))
+                    .isPresent();
 
             assertThat(issueRepository.count()).isEqualTo(1);
         }
@@ -357,10 +371,9 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     private void setupTestData() {
         savedProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.lrz.de")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.lrz.de"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.lrz.de")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.lrz.de")));
 
         Organization org = new Organization();
         org.setNativeId(1L);
@@ -399,11 +412,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     private Set<String> labelNames(Issue issue) {
-        return issue
-            .getLabels()
-            .stream()
-            .map(l -> l.getName())
-            .collect(Collectors.toSet());
+        return issue.getLabels().stream().map(l -> l.getName()).collect(Collectors.toSet());
     }
 
     private static long persistedId(IdentityProvider provider) {

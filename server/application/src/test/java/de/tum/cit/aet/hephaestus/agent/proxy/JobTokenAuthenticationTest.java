@@ -8,15 +8,7 @@ import org.junit.jupiter.api.Test;
 class JobTokenAuthenticationTest extends BaseUnitTest {
 
     private static final ProxyRouting ROUTING = new ProxyRouting(
-        "job:test",
-        "anthropic-messages",
-        "https://api.anthropic.com",
-        null,
-        null,
-        null,
-        null,
-        null
-    );
+            "job:test", "anthropic-messages", "https://api.anthropic.com", null, null, null, null, null);
 
     @Test
     void shouldRedactCredentials() {

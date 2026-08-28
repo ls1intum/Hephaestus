@@ -52,12 +52,11 @@ public class SlackIntegrationSyncRunner implements IntegrationSyncRunner {
      */
     public static SyncProgress progressDetail(WorkspaceSyncSummary summary) {
         StringBuilder step = new StringBuilder();
-        step
-            .append("Synced ")
-            .append(summary.synced())
-            .append(" of ")
-            .append(summary.channels())
-            .append(summary.channels() == 1 ? " channel" : " channels");
+        step.append("Synced ")
+                .append(summary.synced())
+                .append(" of ")
+                .append(summary.channels())
+                .append(summary.channels() == 1 ? " channel" : " channels");
         if (summary.ingested() > 0) {
             step.append(" — ").append(summary.ingested()).append(" messages");
         }
@@ -71,11 +70,6 @@ public class SlackIntegrationSyncRunner implements IntegrationSyncRunner {
             step.append(" · request budget exhausted");
         }
         return SyncProgress.ofResource(
-            SyncPhase.CHANNELS,
-            step.toString(),
-            null,
-            summary.synced() + summary.skipped(),
-            summary.channels()
-        );
+                SyncPhase.CHANNELS, step.toString(), null, summary.synced() + summary.skipped(), summary.channels());
     }
 }

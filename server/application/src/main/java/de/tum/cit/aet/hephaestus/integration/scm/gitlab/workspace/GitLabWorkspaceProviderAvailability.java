@@ -22,9 +22,7 @@ public class GitLabWorkspaceProviderAvailability implements WorkspaceProviderAva
     private final FeatureFlagService featureFlagService;
 
     public GitLabWorkspaceProviderAvailability(
-        GitLabProperties gitLabProperties,
-        FeatureFlagService featureFlagService
-    ) {
+            GitLabProperties gitLabProperties, FeatureFlagService featureFlagService) {
         this.gitLabProperties = gitLabProperties;
         this.featureFlagService = featureFlagService;
     }

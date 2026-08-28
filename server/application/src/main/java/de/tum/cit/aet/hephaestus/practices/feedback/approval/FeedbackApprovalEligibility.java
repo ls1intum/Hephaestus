@@ -27,20 +27,20 @@ public class FeedbackApprovalEligibility {
 
     @Transactional(readOnly = true)
     public boolean isEligible(Long workspaceId, UUID feedbackId) {
-        var feedback = feedbackRepository.findByIdAndWorkspaceId(feedbackId, workspaceId).orElse(null);
+        var feedback = feedbackRepository
+                .findByIdAndWorkspaceId(feedbackId, workspaceId)
+                .orElse(null);
         if (feedback == null || feedback.getProposedPracticeSlugs().isEmpty()) return false;
         var slugs = java.util.Set.copyOf(feedback.getProposedPracticeSlugs());
         var practices = practiceRepository.findByWorkspaceIdAndSlugIn(workspaceId, slugs);
         if (practices.size() != slugs.size()) return false;
-        PracticeAutonomy workspaceDefault = defaultsProvider.forWorkspace(workspaceId).defaultAutonomy();
-        var authorities = practices
-            .stream()
-            .map(practice -> AutonomyResolver.effectiveAutonomyOf(practice, workspaceDefault))
-            .toList();
-        return (
-            authorities.stream().noneMatch(authority -> authority == PracticeAutonomy.OFF) &&
-            authorities.stream().anyMatch(authority -> authority == PracticeAutonomy.HUMAN_APPROVAL)
-        );
+        PracticeAutonomy workspaceDefault =
+                defaultsProvider.forWorkspace(workspaceId).defaultAutonomy();
+        var authorities = practices.stream()
+                .map(practice -> AutonomyResolver.effectiveAutonomyOf(practice, workspaceDefault))
+                .toList();
+        return (authorities.stream().noneMatch(authority -> authority == PracticeAutonomy.OFF)
+                && authorities.stream().anyMatch(authority -> authority == PracticeAutonomy.HUMAN_APPROVAL));
     }
 
     @Transactional(readOnly = true)
@@ -49,9 +49,9 @@ public class FeedbackApprovalEligibility {
             return FeedbackSuppressionReason.INSTANCE_SILENCED;
         }
         boolean paused = workspaceRepository
-            .findById(workspaceId)
-            .map(workspace -> workspace.getReviewSettings().getDeliveryStatus() == PracticeDeliveryStatus.PAUSED)
-            .orElse(false);
+                .findById(workspaceId)
+                .map(workspace -> workspace.getReviewSettings().getDeliveryStatus() == PracticeDeliveryStatus.PAUSED)
+                .orElse(false);
         return paused ? FeedbackSuppressionReason.WORKSPACE_DELIVERY_PAUSED : null;
     }
 }

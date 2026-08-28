@@ -69,10 +69,9 @@ class ActivityEventRepositoryIntegrationTest extends BaseIntegrationTest {
         workspace = workspaceRepository.save(workspace);
 
         gitProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.com")));
 
         author = new User();
         author.setNativeId(900L);
@@ -120,26 +119,23 @@ class ActivityEventRepositoryIntegrationTest extends BaseIntegrationTest {
     private ActivityEvent persistCommitCreatedEvent(Commit commit, @Nullable User actor, double xp) {
         Instant occurredAt = commit.getAuthoredAt();
         ActivityEvent event = ActivityEvent.builder()
-            .id(UUID.randomUUID())
-            .eventKey(
-                ActivityEventType.COMMIT_CREATED.getValue() +
-                    ":" +
-                    commit.getId() +
-                    ":" +
-                    occurredAt.toEpochMilli() +
-                    ":" +
-                    UUID.randomUUID()
-            )
-            .eventType(ActivityEventType.COMMIT_CREATED)
-            .occurredAt(occurredAt)
-            .actor(actor)
-            .workspace(workspace)
-            .repository(commit.getRepository())
-            .targetType(ActivityTargetType.COMMIT.getValue())
-            .targetId(commit.getId())
-            .xp(xp)
-            .ingestedAt(Instant.now())
-            .build();
+                .id(UUID.randomUUID())
+                .eventKey(ActivityEventType.COMMIT_CREATED.getValue() + ":"
+                        + commit.getId()
+                        + ":"
+                        + occurredAt.toEpochMilli()
+                        + ":"
+                        + UUID.randomUUID())
+                .eventType(ActivityEventType.COMMIT_CREATED)
+                .occurredAt(occurredAt)
+                .actor(actor)
+                .workspace(workspace)
+                .repository(commit.getRepository())
+                .targetType(ActivityTargetType.COMMIT.getValue())
+                .targetId(commit.getId())
+                .xp(xp)
+                .ingestedAt(Instant.now())
+                .build();
         return activityEventRepository.save(event);
     }
 
@@ -155,7 +151,8 @@ class ActivityEventRepositoryIntegrationTest extends BaseIntegrationTest {
         int updated = activityEventRepository.backfillCommitActors(targetRepository.getId(), 5.0);
 
         assertThat(updated).isEqualTo(1);
-        ActivityEvent refreshed = activityEventRepository.findById(persisted.getId()).orElseThrow();
+        ActivityEvent refreshed =
+                activityEventRepository.findById(persisted.getId()).orElseThrow();
         assertThat(refreshed.getActor()).isNotNull();
         assertThat(refreshed.getActor().getId()).isEqualTo(author.getId());
         assertThat(refreshed.getXp()).isEqualTo(5.0);
@@ -180,7 +177,8 @@ class ActivityEventRepositoryIntegrationTest extends BaseIntegrationTest {
         int updated = activityEventRepository.backfillCommitActors(targetRepository.getId(), 7.0);
 
         assertThat(updated).isZero();
-        ActivityEvent refreshed = activityEventRepository.findById(persisted.getId()).orElseThrow();
+        ActivityEvent refreshed =
+                activityEventRepository.findById(persisted.getId()).orElseThrow();
         assertThat(refreshed.getXp()).isEqualTo(5.0);
     }
 
@@ -199,8 +197,10 @@ class ActivityEventRepositoryIntegrationTest extends BaseIntegrationTest {
         int updated = activityEventRepository.backfillCommitActors(targetRepository.getId(), 5.0);
 
         assertThat(updated).isEqualTo(1);
-        ActivityEvent refreshedTarget = activityEventRepository.findById(targetEvent.getId()).orElseThrow();
-        ActivityEvent refreshedOther = activityEventRepository.findById(otherEvent.getId()).orElseThrow();
+        ActivityEvent refreshedTarget =
+                activityEventRepository.findById(targetEvent.getId()).orElseThrow();
+        ActivityEvent refreshedOther =
+                activityEventRepository.findById(otherEvent.getId()).orElseThrow();
         assertThat(refreshedTarget.getActor()).isNotNull();
         assertThat(refreshedTarget.getActor().getId()).isEqualTo(author.getId());
         assertThat(refreshedTarget.getXp()).isEqualTo(5.0);
@@ -212,24 +212,25 @@ class ActivityEventRepositoryIntegrationTest extends BaseIntegrationTest {
     void ignoresNonCommitEvents() {
         Instant occurredAt = Instant.parse("2024-06-01T10:00:00Z");
         ActivityEvent prEvent = ActivityEvent.builder()
-            .id(UUID.randomUUID())
-            .eventKey(ActivityEventType.PULL_REQUEST_OPENED.getValue() + ":42:" + occurredAt.toEpochMilli())
-            .eventType(ActivityEventType.PULL_REQUEST_OPENED)
-            .occurredAt(occurredAt)
-            .actor(null)
-            .workspace(workspace)
-            .repository(targetRepository)
-            .targetType(ActivityTargetType.PULL_REQUEST.getValue())
-            .targetId(42L)
-            .xp(0.0)
-            .ingestedAt(Instant.now())
-            .build();
+                .id(UUID.randomUUID())
+                .eventKey(ActivityEventType.PULL_REQUEST_OPENED.getValue() + ":42:" + occurredAt.toEpochMilli())
+                .eventType(ActivityEventType.PULL_REQUEST_OPENED)
+                .occurredAt(occurredAt)
+                .actor(null)
+                .workspace(workspace)
+                .repository(targetRepository)
+                .targetType(ActivityTargetType.PULL_REQUEST.getValue())
+                .targetId(42L)
+                .xp(0.0)
+                .ingestedAt(Instant.now())
+                .build();
         activityEventRepository.save(prEvent);
 
         int updated = activityEventRepository.backfillCommitActors(targetRepository.getId(), 5.0);
 
         assertThat(updated).isZero();
-        ActivityEvent refreshed = activityEventRepository.findById(prEvent.getId()).orElseThrow();
+        ActivityEvent refreshed =
+                activityEventRepository.findById(prEvent.getId()).orElseThrow();
         assertThat(refreshed.getActor()).isNull();
         assertThat(refreshed.getXp()).isZero();
     }

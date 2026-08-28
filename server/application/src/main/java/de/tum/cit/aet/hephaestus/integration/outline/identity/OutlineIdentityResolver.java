@@ -38,10 +38,9 @@ public class OutlineIdentityResolver {
     private final AccountWorkspaceMembershipQuery workspaceMembershipQuery;
 
     public OutlineIdentityResolver(
-        GitProviderRegistry gitProviderRegistry,
-        AccountIdentityQuery accountIdentityQuery,
-        AccountWorkspaceMembershipQuery workspaceMembershipQuery
-    ) {
+            GitProviderRegistry gitProviderRegistry,
+            AccountIdentityQuery accountIdentityQuery,
+            AccountWorkspaceMembershipQuery workspaceMembershipQuery) {
         this.gitProviderRegistry = gitProviderRegistry;
         this.accountIdentityQuery = accountIdentityQuery;
         this.workspaceMembershipQuery = workspaceMembershipQuery;
@@ -50,46 +49,36 @@ public class OutlineIdentityResolver {
     /** The workspace member id the author resolves to, or empty when it is not linked to a member of {@code workspaceId}. */
     @Transactional(readOnly = true)
     public Optional<Long> resolveMemberId(
-        long workspaceId,
-        String serverUrl,
-        @Nullable String teamId,
-        String outlineSubject
-    ) {
+            long workspaceId, String serverUrl, @Nullable String teamId, String outlineSubject) {
         return linkedLogins(workspaceId, serverUrl, teamId, outlineSubject)
-            .map(login -> membershipIn(login, workspaceId))
-            .flatMap(Optional::stream)
-            .map(WorkspaceMembershipView::memberId)
-            .filter(Objects::nonNull)
-            .findFirst();
+                .map(login -> membershipIn(login, workspaceId))
+                .flatMap(Optional::stream)
+                .map(WorkspaceMembershipView::memberId)
+                .filter(Objects::nonNull)
+                .findFirst();
     }
 
     /** The distinct non-blank logins of the account the {@code (provider, subject, team)} triple resolves to. */
     private Stream<String> linkedLogins(
-        long workspaceId,
-        String serverUrl,
-        @Nullable String teamId,
-        String outlineSubject
-    ) {
+            long workspaceId, String serverUrl, @Nullable String teamId, String outlineSubject) {
         if (outlineSubject == null || outlineSubject.isBlank() || serverUrl == null || serverUrl.isBlank()) {
             return Stream.empty();
         }
         long outlineProviderId = gitProviderRegistry.resolveProviderId("OUTLINE", serverUrl);
         return accountIdentityQuery
-            .resolveAccountId(outlineProviderId, outlineSubject, teamId)
-            .map(accountIdentityQuery::activeLinksForAccount)
-            .orElseGet(List::of)
-            .stream()
-            .map(AccountIdentityQuery.IdentityLinkView::usernameAtSignup)
-            .filter(login -> login != null && !login.isBlank())
-            .distinct();
+                .resolveAccountId(outlineProviderId, outlineSubject, teamId)
+                .map(accountIdentityQuery::activeLinksForAccount)
+                .orElseGet(List::of)
+                .stream()
+                .map(AccountIdentityQuery.IdentityLinkView::usernameAtSignup)
+                .filter(login -> login != null && !login.isBlank())
+                .distinct();
     }
 
     /** The login's membership row in {@code workspaceId}, if any — the cross-workspace firewall. */
     private Optional<WorkspaceMembershipView> membershipIn(String login, long workspaceId) {
-        return workspaceMembershipQuery
-            .membershipsForLogins(Set.of(login))
-            .stream()
-            .filter(view -> view.workspaceId() != null && view.workspaceId() == workspaceId)
-            .findFirst();
+        return workspaceMembershipQuery.membershipsForLogins(Set.of(login)).stream()
+                .filter(view -> view.workspaceId() != null && view.workspaceId() == workspaceId)
+                .findFirst();
     }
 }

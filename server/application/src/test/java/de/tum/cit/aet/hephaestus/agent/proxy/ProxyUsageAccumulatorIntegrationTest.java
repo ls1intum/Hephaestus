@@ -64,36 +64,28 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
 
     private void accumulate(@org.jspecify.annotations.Nullable UUID jobId, JsonNode body, boolean responsesProtocol) {
         accumulateAs(
-            jobId == null
-                ? null
-                : new ProxyRouting.BilledAttempt(LlmUsageSourceType.AGENT_JOB, jobId, 0, BigDecimal.ZERO),
-            body,
-            responsesProtocol
-        );
+                jobId == null
+                        ? null
+                        : new ProxyRouting.BilledAttempt(LlmUsageSourceType.AGENT_JOB, jobId, 0, BigDecimal.ZERO),
+                body,
+                responsesProtocol);
     }
 
     private void accumulateAs(
-        ProxyRouting.@org.jspecify.annotations.Nullable BilledAttempt attempt,
-        JsonNode body,
-        boolean responsesProtocol
-    ) {
+            ProxyRouting.@org.jspecify.annotations.Nullable BilledAttempt attempt,
+            JsonNode body,
+            boolean responsesProtocol) {
         accumulateAs(
-            new ProxyUsageAccumulator(jobRepository, new SimpleMeterRegistry()),
-            attempt,
-            body,
-            responsesProtocol
-        );
+                new ProxyUsageAccumulator(jobRepository, new SimpleMeterRegistry()), attempt, body, responsesProtocol);
     }
 
     private void accumulateAs(
-        ProxyUsageAccumulator accumulator,
-        ProxyRouting.@org.jspecify.annotations.Nullable BilledAttempt attempt,
-        JsonNode body,
-        boolean responsesProtocol
-    ) {
-        transactionTemplate.executeWithoutResult(tx ->
-            accumulator.accumulate(attempt, ProxyTokenUsage.from(body, responsesProtocol))
-        );
+            ProxyUsageAccumulator accumulator,
+            ProxyRouting.@org.jspecify.annotations.Nullable BilledAttempt attempt,
+            JsonNode body,
+            boolean responsesProtocol) {
+        transactionTemplate.executeWithoutResult(
+                tx -> accumulator.accumulate(attempt, ProxyTokenUsage.from(body, responsesProtocol)));
     }
 
     private AgentJobLlmUsage usageOf(AgentJob job) {
@@ -104,10 +96,9 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
     @DisplayName("successive calls add onto the row rather than replacing it")
     void repeatedCallsAccumulateOntoTheSameRow() {
         AgentJob job = persistedJob("proxy-usage-adds");
-        String body =
-            "{\"usage\":{\"prompt_tokens\":30,\"completion_tokens\":10," +
-            "\"prompt_tokens_details\":{\"cached_tokens\":5}," +
-            "\"completion_tokens_details\":{\"reasoning_tokens\":2}}}";
+        String body = "{\"usage\":{\"prompt_tokens\":30,\"completion_tokens\":10,"
+                + "\"prompt_tokens_details\":{\"cached_tokens\":5},"
+                + "\"completion_tokens_details\":{\"reasoning_tokens\":2}}}";
 
         accumulate(job.getId(), json(body), false);
         accumulate(job.getId(), json(body), false);
@@ -153,29 +144,22 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
     @DisplayName("a late call from a superseded attempt is dropped, not billed to the attempt that now owns the row")
     void lateWriteFromASupersededAttemptDoesNotLandOnTheNewAttempt() {
         AgentJob job = persistedJob("proxy-usage-superseded");
-        ProxyRouting.BilledAttempt attemptZero = new ProxyRouting.BilledAttempt(
-            LlmUsageSourceType.AGENT_JOB,
-            job.getId(),
-            0,
-            BigDecimal.ZERO
-        );
+        ProxyRouting.BilledAttempt attemptZero =
+                new ProxyRouting.BilledAttempt(LlmUsageSourceType.AGENT_JOB, job.getId(), 0, BigDecimal.ZERO);
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         ProxyUsageAccumulator accumulator = new ProxyUsageAccumulator(jobRepository, registry);
 
         requeueTo(job, 1);
 
         accumulateAs(
-            accumulator,
-            attemptZero,
-            json("{\"usage\":{\"prompt_tokens\":25,\"completion_tokens\":9}}"),
-            false
-        );
+                accumulator, attemptZero, json("{\"usage\":{\"prompt_tokens\":25,\"completion_tokens\":9}}"), false);
 
         AgentJobLlmUsage usage = usageOf(job);
         assertThat(usage.totalCalls()).isZero();
         assertThat(usage.inputTokens()).isZero();
         assertThat(usage.outputTokens()).isZero();
-        assertThat(registry.counter("llm.proxy.usage.accumulate.superseded").count()).isEqualTo(1.0);
+        assertThat(registry.counter("llm.proxy.usage.accumulate.superseded").count())
+                .isEqualTo(1.0);
     }
 
     @Test
@@ -185,10 +169,9 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
         requeueTo(job, 1);
 
         accumulateAs(
-            new ProxyRouting.BilledAttempt(LlmUsageSourceType.AGENT_JOB, job.getId(), 1, BigDecimal.ZERO),
-            json("{\"usage\":{\"prompt_tokens\":25,\"completion_tokens\":9}}"),
-            false
-        );
+                new ProxyRouting.BilledAttempt(LlmUsageSourceType.AGENT_JOB, job.getId(), 1, BigDecimal.ZERO),
+                json("{\"usage\":{\"prompt_tokens\":25,\"completion_tokens\":9}}"),
+                false);
 
         AgentJobLlmUsage usage = usageOf(job);
         assertThat(usage.totalCalls()).isEqualTo(1);
@@ -230,19 +213,18 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
     @DisplayName("a failed write is swallowed, but counted so the under-billing is visible")
     void failedAccumulationIsCountedNotSilent() {
         AgentJobRepository failing = mock(AgentJobRepository.class);
-        when(failing.accumulateLlmUsage(any(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt())).thenThrow(
-            new IllegalStateException("connection reset")
-        );
+        when(failing.accumulateLlmUsage(any(), anyInt(), anyInt(), anyInt(), anyInt(), anyInt()))
+                .thenThrow(new IllegalStateException("connection reset"));
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         ProxyUsageAccumulator accumulator = new ProxyUsageAccumulator(failing, registry);
 
-        assertThatCode(() ->
-            accumulator.accumulate(
-                new ProxyRouting.BilledAttempt(LlmUsageSourceType.AGENT_JOB, UUID.randomUUID(), 0, BigDecimal.ZERO),
-                ProxyTokenUsage.from(json("{\"usage\":{\"prompt_tokens\":10}}"), false)
-            )
-        ).doesNotThrowAnyException();
+        assertThatCode(() -> accumulator.accumulate(
+                        new ProxyRouting.BilledAttempt(
+                                LlmUsageSourceType.AGENT_JOB, UUID.randomUUID(), 0, BigDecimal.ZERO),
+                        ProxyTokenUsage.from(json("{\"usage\":{\"prompt_tokens\":10}}"), false)))
+                .doesNotThrowAnyException();
 
-        assertThat(registry.counter("llm.proxy.usage.accumulate.failure").count()).isEqualTo(1.0);
+        assertThat(registry.counter("llm.proxy.usage.accumulate.failure").count())
+                .isEqualTo(1.0);
     }
 }

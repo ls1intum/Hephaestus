@@ -116,32 +116,15 @@ class MentorChatControllerTest extends BaseUnitTest {
     @Test
     void workspaceWithMentorDisabled_returns404() {
         WorkspaceContext disabledCtx = new WorkspaceContext(
-            1L,
-            "test-ws",
-            "Test",
-            AccountType.ORG,
-            null,
-            false,
-            false,
-            Set.of(WorkspaceRole.MEMBER)
-        );
-        assertThatThrownBy(() ->
-            controller.chat(disabledCtx, validBody(UUID.randomUUID(), "hi"), response)
-        ).isInstanceOf(EntityNotFoundException.class);
+                1L, "test-ws", "Test", AccountType.ORG, null, false, false, Set.of(WorkspaceRole.MEMBER));
+        assertThatThrownBy(() -> controller.chat(disabledCtx, validBody(UUID.randomUUID(), "hi"), response))
+                .isInstanceOf(EntityNotFoundException.class);
         verify(mentorChatService, never()).start(any(), any());
     }
 
     private static WorkspaceContext stubContext() {
         return new WorkspaceContext(
-            1L,
-            "test-ws",
-            "Test",
-            AccountType.ORG,
-            null,
-            false,
-            true,
-            Set.of(WorkspaceRole.MEMBER)
-        );
+                1L, "test-ws", "Test", AccountType.ORG, null, false, true, Set.of(WorkspaceRole.MEMBER));
     }
 
     private static MentorChatRequestBody validBody(UUID threadId, String text) {

@@ -67,14 +67,13 @@ public class GitLabCommitSyncService {
     private final WebClient webClient;
 
     public GitLabCommitSyncService(
-        CommitRepository commitRepository,
-        CommitContributorRepository contributorRepository,
-        CommitAuthorResolver authorResolver,
-        GitLabTokenService tokenService,
-        GitLabProperties gitLabProperties,
-        ApplicationEventPublisher eventPublisher,
-        WebClient.Builder webClientBuilder
-    ) {
+            CommitRepository commitRepository,
+            CommitContributorRepository contributorRepository,
+            CommitAuthorResolver authorResolver,
+            GitLabTokenService tokenService,
+            GitLabProperties gitLabProperties,
+            ApplicationEventPublisher eventPublisher,
+            WebClient.Builder webClientBuilder) {
         this.commitRepository = commitRepository;
         this.contributorRepository = contributorRepository;
         this.authorResolver = authorResolver;
@@ -103,8 +102,9 @@ public class GitLabCommitSyncService {
         }
 
         Long providerId = Objects.requireNonNull(
-            repository.getProvider() != null ? Objects.requireNonNull(repository.getProvider().getId()) : null
-        );
+                repository.getProvider() != null
+                        ? Objects.requireNonNull(repository.getProvider().getId())
+                        : null);
         String serverUrl = tokenService.resolveServerUrl(scopeId);
         String token = tokenService.getAccessToken(scopeId);
         long nativeId = repository.getNativeId();
@@ -130,12 +130,11 @@ public class GitLabCommitSyncService {
             }
         } catch (WebClientResponseException e) {
             log.warn(
-                "Commit sync REST error: project={}, status={}, page={}",
-                safeProjectPath,
-                e.getStatusCode().value(),
-                page,
-                e
-            );
+                    "Commit sync REST error: project={}, status={}, page={}",
+                    safeProjectPath,
+                    e.getStatusCode().value(),
+                    page,
+                    e);
             errorAborted = true;
         } catch (Exception e) {
             log.warn("Commit sync failed: project={}, page={}", safeProjectPath, page, e);
@@ -152,41 +151,28 @@ public class GitLabCommitSyncService {
     @Nullable
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> fetchCommitPage(
-        String serverUrl,
-        String token,
-        long projectId,
-        String branch,
-        @Nullable OffsetDateTime since,
-        int page
-    ) {
+            String serverUrl, String token, long projectId, String branch, @Nullable OffsetDateTime since, int page) {
         String base = serverUrl.endsWith("/") ? serverUrl.substring(0, serverUrl.length() - 1) : serverUrl;
-        String commitUrl =
-            base +
-            "/api/v4/projects/" +
-            projectId +
-            "/repository/commits" +
-            "?ref_name=" +
-            URLEncoder.encode(branch, StandardCharsets.UTF_8) +
-            "&per_page=" +
-            PER_PAGE +
-            "&page=" +
-            page +
-            (since != null ? "&since=" + URLEncoder.encode(since.toString(), StandardCharsets.UTF_8) : "");
+        String commitUrl = base + "/api/v4/projects/"
+                + projectId
+                + "/repository/commits"
+                + "?ref_name="
+                + URLEncoder.encode(branch, StandardCharsets.UTF_8)
+                + "&per_page="
+                + PER_PAGE
+                + "&page="
+                + page
+                + (since != null ? "&since=" + URLEncoder.encode(since.toString(), StandardCharsets.UTF_8) : "");
 
         var request = webClient.get().uri(commitUrl).header(HttpHeaders.AUTHORIZATION, "Bearer " + token);
 
-        return (List<Map<String, Object>>) (List<?>) request
-            .retrieve()
-            .bodyToMono(new ParameterizedTypeReference<List<Map<String, Object>>>() {})
-            .block(REQUEST_TIMEOUT);
+        return (List<Map<String, Object>>) (List<?>) request.retrieve()
+                .bodyToMono(new ParameterizedTypeReference<List<Map<String, Object>>>() {})
+                .block(REQUEST_TIMEOUT);
     }
 
     private void processCommit(
-        Map<String, Object> commitData,
-        Repository repository,
-        @Nullable Long providerId,
-        Long scopeId
-    ) {
+            Map<String, Object> commitData, Repository repository, @Nullable Long providerId, Long scopeId) {
         String sha = (String) commitData.get("id");
         String message = (String) commitData.get("message");
         String webUrl = (String) commitData.get("web_url");
@@ -212,22 +198,21 @@ public class GitLabCommitSyncService {
 
         // Upsert commit (passes null for stats — REST list endpoint doesn't provide them)
         commitRepository.upsertCommit(
-            sha,
-            Objects.requireNonNullElse(headline, ""),
-            body,
-            webUrl,
-            authoredAt,
-            committedAt,
-            null,
-            null,
-            null, // additions, deletions, changedFiles — not in REST list response
-            Instant.now(),
-            repository.getId(),
-            authorId,
-            committerId,
-            authorEmail,
-            committerEmail
-        );
+                sha,
+                Objects.requireNonNullElse(headline, ""),
+                body,
+                webUrl,
+                authoredAt,
+                committedAt,
+                null,
+                null,
+                null, // additions, deletions, changedFiles — not in REST list response
+                Instant.now(),
+                repository.getId(),
+                authorId,
+                committerId,
+                authorEmail,
+                committerEmail);
 
         // Persist parent metadata when the REST payload includes parent_ids.
         // Matches GitHub's CommitMetadataEnrichmentService which backfills the
@@ -254,40 +239,36 @@ public class GitLabCommitSyncService {
         // Upsert primary author contributor
         if (authorEmail != null) {
             contributorRepository.upsertContributor(
-                commitRepository
-                    .findByShaAndRepositoryId(sha, repository.getId())
-                    .map(c -> c.getId())
-                    .orElseThrow(),
-                authorId,
-                CommitContributor.Role.AUTHOR.name(),
-                authorName,
-                authorEmail,
-                0
-            );
+                    commitRepository
+                            .findByShaAndRepositoryId(sha, repository.getId())
+                            .map(c -> c.getId())
+                            .orElseThrow(),
+                    authorId,
+                    CommitContributor.Role.AUTHOR.name(),
+                    authorName,
+                    authorEmail,
+                    0);
         }
 
         // Upsert committer contributor (if different from author)
         if (committerEmail != null && !committerEmail.equals(authorEmail)) {
             contributorRepository.upsertContributor(
-                commitRepository
-                    .findByShaAndRepositoryId(sha, repository.getId())
-                    .map(c -> c.getId())
-                    .orElseThrow(),
-                committerId,
-                CommitContributor.Role.COMMITTER.name(),
-                committerName,
-                committerEmail,
-                0
-            );
+                    commitRepository
+                            .findByShaAndRepositoryId(sha, repository.getId())
+                            .map(c -> c.getId())
+                            .orElseThrow(),
+                    committerId,
+                    CommitContributor.Role.COMMITTER.name(),
+                    committerName,
+                    committerEmail,
+                    0);
         }
 
         // Publish CommitCreated event for newly created commits
         if (isNew) {
-            commitRepository
-                .findByShaAndRepositoryId(sha, repository.getId())
-                .ifPresent(commit -> {
-                    ScmEventPayload.CommitData commitPayload = ScmEventPayload.CommitData.from(commit);
-                    EventContext context = new EventContext(
+            commitRepository.findByShaAndRepositoryId(sha, repository.getId()).ifPresent(commit -> {
+                ScmEventPayload.CommitData commitPayload = ScmEventPayload.CommitData.from(commit);
+                EventContext context = new EventContext(
                         UUID.randomUUID(),
                         Instant.now(),
                         scopeId,
@@ -295,10 +276,9 @@ public class GitLabCommitSyncService {
                         DataSource.REST_SYNC,
                         null,
                         UUID.randomUUID().toString(),
-                        IdentityProviderType.GITLAB
-                    );
-                    eventPublisher.publishEvent(new ScmDomainEvent.CommitCreated(commitPayload, context));
-                });
+                        IdentityProviderType.GITLAB);
+                eventPublisher.publishEvent(new ScmDomainEvent.CommitCreated(commitPayload, context));
+            });
         }
     }
 

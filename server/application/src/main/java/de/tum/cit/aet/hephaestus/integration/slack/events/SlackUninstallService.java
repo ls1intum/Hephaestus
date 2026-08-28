@@ -32,13 +32,12 @@ public class SlackUninstallService {
     private final SlackMessageService messageService;
 
     public SlackUninstallService(
-        SlackWorkspaceResolver workspaceResolver,
-        ConnectionService connectionService,
-        SlackWorkspacePurgeAdapter purgeAdapter,
-        MentorSlackThreadService mentorSlackThreadService,
-        ConversationFeedbackErasure conversationFeedbackErasure,
-        SlackMessageService messageService
-    ) {
+            SlackWorkspaceResolver workspaceResolver,
+            ConnectionService connectionService,
+            SlackWorkspacePurgeAdapter purgeAdapter,
+            MentorSlackThreadService mentorSlackThreadService,
+            ConversationFeedbackErasure conversationFeedbackErasure,
+            SlackMessageService messageService) {
         this.workspaceResolver = workspaceResolver;
         this.connectionService = connectionService;
         this.purgeAdapter = purgeAdapter;
@@ -56,35 +55,30 @@ public class SlackUninstallService {
         }
         long workspaceId = workspaceOpt.get();
         connectionService
-            .findActive(workspaceId, IntegrationKind.SLACK)
-            .ifPresent(connection ->
-                connectionService.transition(
-                    connection,
-                    new ConnectionService.TransitionRequest(
-                        IntegrationState.UNINSTALLED,
-                        "APP_UNINSTALLED".equals(eventType) || "app_uninstalled".equals(eventType)
-                            ? "APP_UNINSTALLED"
-                            : "TOKENS_REVOKED",
-                        "SLACK",
-                        teamId,
-                        uninstallCorrelationId(teamId, eventType, eventId),
-                        "Slack " + eventType + " received"
-                    )
-                )
-            );
+                .findActive(workspaceId, IntegrationKind.SLACK)
+                .ifPresent(connection -> connectionService.transition(
+                        connection,
+                        new ConnectionService.TransitionRequest(
+                                IntegrationState.UNINSTALLED,
+                                "APP_UNINSTALLED".equals(eventType) || "app_uninstalled".equals(eventType)
+                                        ? "APP_UNINSTALLED"
+                                        : "TOKENS_REVOKED",
+                                "SLACK",
+                                teamId,
+                                uninstallCorrelationId(teamId, eventType, eventId),
+                                "Slack " + eventType + " received")));
         int erasedConversationRows = conversationFeedbackErasure.eraseAllConversationForWorkspace(workspaceId);
         purgeAdapter.deleteWorkspaceData(workspaceId);
         int purgedThreads = mentorSlackThreadService.purgeSlackThreads(workspaceId);
         // A later reconnect may install a different Slack app; the cached bot user id must not survive teardown.
         messageService.evictBotUserId(workspaceId);
         log.info(
-            "Slack {} for team {} → workspace {} torn down (connection UNINSTALLED, content purged, {} conversation-derived practice rows erased, {} mentor DM threads erased)",
-            eventType,
-            teamId,
-            workspaceId,
-            erasedConversationRows,
-            purgedThreads
-        );
+                "Slack {} for team {} → workspace {} torn down (connection UNINSTALLED, content purged, {} conversation-derived practice rows erased, {} mentor DM threads erased)",
+                eventType,
+                teamId,
+                workspaceId,
+                erasedConversationRows,
+                purgedThreads);
     }
 
     private static String uninstallCorrelationId(String teamId, String eventType, String eventId) {

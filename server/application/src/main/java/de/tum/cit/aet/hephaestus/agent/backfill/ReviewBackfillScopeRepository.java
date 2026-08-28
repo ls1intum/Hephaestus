@@ -26,8 +26,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 @WorkspaceAgnostic("Scope enumeration takes the workspace id as a parameter")
 public interface ReviewBackfillScopeRepository extends JpaRepository<Issue, Long> {
-    @Query(
-        """
+    @Query("""
         SELECT COUNT(p) FROM PullRequest p
         JOIN p.repository r
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
@@ -36,16 +35,11 @@ public interface ReviewBackfillScopeRepository extends JpaRepository<Issue, Long
           AND p.deletedAt IS NULL
           AND p.createdAt >= :fromAt
           AND p.createdAt < :toAt
-        """
-    )
+        """)
     long countPullRequests(
-        @Param("workspaceId") Long workspaceId,
-        @Param("fromAt") Instant fromAt,
-        @Param("toAt") Instant toAt
-    );
+            @Param("workspaceId") Long workspaceId, @Param("fromAt") Instant fromAt, @Param("toAt") Instant toAt);
 
-    @Query(
-        """
+    @Query("""
         SELECT p.id FROM PullRequest p
         JOIN p.repository r
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
@@ -56,18 +50,15 @@ public interface ReviewBackfillScopeRepository extends JpaRepository<Issue, Long
           AND p.createdAt < :toAt
           AND p.id > :afterId
         ORDER BY p.id ASC
-        """
-    )
+        """)
     List<Long> findPullRequestIds(
-        @Param("workspaceId") Long workspaceId,
-        @Param("fromAt") Instant fromAt,
-        @Param("toAt") Instant toAt,
-        @Param("afterId") Long afterId,
-        Pageable pageable
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("fromAt") Instant fromAt,
+            @Param("toAt") Instant toAt,
+            @Param("afterId") Long afterId,
+            Pageable pageable);
 
-    @Query(
-        """
+    @Query("""
         SELECT COUNT(i) FROM Issue i
         JOIN i.repository r
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
@@ -76,16 +67,11 @@ public interface ReviewBackfillScopeRepository extends JpaRepository<Issue, Long
           AND i.deletedAt IS NULL
           AND i.createdAt >= :fromAt
           AND i.createdAt < :toAt
-        """
-    )
+        """)
     long countIssues(
-        @Param("workspaceId") Long workspaceId,
-        @Param("fromAt") Instant fromAt,
-        @Param("toAt") Instant toAt
-    );
+            @Param("workspaceId") Long workspaceId, @Param("fromAt") Instant fromAt, @Param("toAt") Instant toAt);
 
-    @Query(
-        """
+    @Query("""
         SELECT i.id FROM Issue i
         JOIN i.repository r
         JOIN RepositoryToMonitor rtm ON rtm.nameWithOwner = r.nameWithOwner
@@ -96,13 +82,11 @@ public interface ReviewBackfillScopeRepository extends JpaRepository<Issue, Long
           AND i.createdAt < :toAt
           AND i.id > :afterId
         ORDER BY i.id ASC
-        """
-    )
+        """)
     List<Long> findIssueIds(
-        @Param("workspaceId") Long workspaceId,
-        @Param("fromAt") Instant fromAt,
-        @Param("toAt") Instant toAt,
-        @Param("afterId") Long afterId,
-        Pageable pageable
-    );
+            @Param("workspaceId") Long workspaceId,
+            @Param("fromAt") Instant fromAt,
+            @Param("toAt") Instant toAt,
+            @Param("afterId") Long afterId,
+            Pageable pageable);
 }

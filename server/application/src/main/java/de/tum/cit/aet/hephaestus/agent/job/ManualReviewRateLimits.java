@@ -47,11 +47,7 @@ class ManualReviewRateLimits {
      *     it could not attribute to an identity.
      */
     Optional<SignalStateReason> refusalFor(
-        Workspace workspace,
-        ArtifactKind artifactKind,
-        long artifactId,
-        Collection<Long> requesterIds
-    ) {
+            Workspace workspace, ArtifactKind artifactKind, long artifactId, Collection<Long> requesterIds) {
         Instant now = Instant.now();
         if (requesterQuotaExhausted(workspace.getId(), requesterIds, now)) {
             return Optional.of(SignalStateReason.REQUESTER_QUOTA_EXHAUSTED);

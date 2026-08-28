@@ -23,20 +23,18 @@ class SyncControllerAdvice {
     ProblemDetail handleNotFound(NoSuchElementException exception) {
         log.info("Sync lookup failed: {}", exception.getMessage());
         return problem(
-            HttpStatus.NOT_FOUND,
-            "Resource not found",
-            Objects.requireNonNullElse(exception.getMessage(), "Resource not found")
-        );
+                HttpStatus.NOT_FOUND,
+                "Resource not found",
+                Objects.requireNonNullElse(exception.getMessage(), "Resource not found"));
     }
 
     @ExceptionHandler(SyncStateConflictException.class)
     ProblemDetail handleStateConflict(SyncStateConflictException exception) {
         log.info("Sync state conflict: {}", exception.getMessage());
         ProblemDetail problem = problem(
-            HttpStatus.CONFLICT,
-            "Invalid state",
-            Objects.requireNonNullElse(exception.getMessage(), "Invalid state")
-        );
+                HttpStatus.CONFLICT,
+                "Invalid state",
+                Objects.requireNonNullElse(exception.getMessage(), "Invalid state"));
         exception.properties().forEach(problem::setProperty);
         return problem;
     }
@@ -45,10 +43,9 @@ class SyncControllerAdvice {
     ProblemDetail handleNotSupported(SyncNotSupportedException exception) {
         log.info("Sync not supported: {}", exception.getMessage());
         ProblemDetail problem = problem(
-            HttpStatus.CONFLICT,
-            "Manual sync not supported",
-            Objects.requireNonNullElse(exception.getMessage(), "Manual sync not supported")
-        );
+                HttpStatus.CONFLICT,
+                "Manual sync not supported",
+                Objects.requireNonNullElse(exception.getMessage(), "Manual sync not supported"));
         problem.setProperty("kind", exception.kind());
         return problem;
     }
@@ -57,10 +54,9 @@ class SyncControllerAdvice {
     ProblemDetail handleDispatchRejected(TaskRejectedException exception) {
         log.warn("Sync dispatch rejected: {}", exception.getMessage());
         return problem(
-            HttpStatus.SERVICE_UNAVAILABLE,
-            "Sync dispatch rejected",
-            "The server is busy and could not start the sync. Please retry."
-        );
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "Sync dispatch rejected",
+                "The server is busy and could not start the sync. Please retry.");
     }
 
     private static ProblemDetail problem(HttpStatus status, String title, String detail) {

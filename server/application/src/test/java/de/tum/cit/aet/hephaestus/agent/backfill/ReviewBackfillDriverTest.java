@@ -49,31 +49,20 @@ class ReviewBackfillDriverTest extends BaseUnitTest {
     @Mock
     private LlmBudgetService llmBudgetService;
 
-    private final ReviewBackfillProperties properties = new ReviewBackfillProperties(
-        3,
-        Duration.ofDays(400),
-        5000,
-        Duration.ofDays(90)
-    );
+    private final ReviewBackfillProperties properties =
+            new ReviewBackfillProperties(3, Duration.ofDays(400), 5000, Duration.ofDays(90));
 
     private ReviewBackfillDriver driver() {
         return new ReviewBackfillDriver(
-            runRepository,
-            scopeRepository,
-            submitter,
-            bindingRepository,
-            llmBudgetService,
-            properties
-        );
+                runRepository, scopeRepository, submitter, bindingRepository, llmBudgetService, properties);
     }
 
     @Test
     void aBatchAdvancesTheCursorToTheLastArtifactItOffered() {
         ReviewBackfillRun run = running();
         fundedAndEnabled();
-        when(scopeRepository.findPullRequestIds(eq(WORKSPACE_ID), any(), any(), eq(0L), any())).thenReturn(
-            List.of(10L, 11L, 12L)
-        );
+        when(scopeRepository.findPullRequestIds(eq(WORKSPACE_ID), any(), any(), eq(0L), any()))
+                .thenReturn(List.of(10L, 11L, 12L));
         when(submitter.offer(eq(run), anyLong())).thenReturn(ReviewBackfillSubmitter.Outcome.SUBMITTED);
 
         driver().advance(run);
@@ -88,9 +77,8 @@ class ReviewBackfillDriverTest extends BaseUnitTest {
     void anArtifactWalkedPastIsCountedRatherThanForgotten() {
         ReviewBackfillRun run = running();
         fundedAndEnabled();
-        when(scopeRepository.findPullRequestIds(eq(WORKSPACE_ID), any(), any(), eq(0L), any())).thenReturn(
-            List.of(10L, 11L)
-        );
+        when(scopeRepository.findPullRequestIds(eq(WORKSPACE_ID), any(), any(), eq(0L), any()))
+                .thenReturn(List.of(10L, 11L));
         when(submitter.offer(run, 10L)).thenReturn(ReviewBackfillSubmitter.Outcome.SUBMITTED);
         when(submitter.offer(run, 11L)).thenReturn(ReviewBackfillSubmitter.Outcome.PASSED);
 
@@ -119,9 +107,8 @@ class ReviewBackfillDriverTest extends BaseUnitTest {
     @Test
     void aWorkspaceWithNoEnabledBindingPausesRatherThanFailing() {
         ReviewBackfillRun run = running();
-        when(
-            bindingRepository.findByWorkspaceIdAndPurposeWithModels(WORKSPACE_ID, AgentPurpose.PRACTICE_REVIEW)
-        ).thenReturn(Optional.empty());
+        when(bindingRepository.findByWorkspaceIdAndPurposeWithModels(WORKSPACE_ID, AgentPurpose.PRACTICE_REVIEW))
+                .thenReturn(Optional.empty());
 
         driver().advance(run);
 
@@ -134,7 +121,8 @@ class ReviewBackfillDriverTest extends BaseUnitTest {
         ReviewBackfillRun run = running();
         run.transitionTo(ReviewBackfillStatus.PAUSED, ReviewBackfillPauseReason.BUDGET_EXHAUSTED);
         fundedAndEnabled();
-        when(scopeRepository.findPullRequestIds(eq(WORKSPACE_ID), any(), any(), eq(0L), any())).thenReturn(List.of(5L));
+        when(scopeRepository.findPullRequestIds(eq(WORKSPACE_ID), any(), any(), eq(0L), any()))
+                .thenReturn(List.of(5L));
         when(submitter.offer(eq(run), anyLong())).thenReturn(ReviewBackfillSubmitter.Outcome.SUBMITTED);
 
         driver().advance(run);
@@ -149,7 +137,8 @@ class ReviewBackfillDriverTest extends BaseUnitTest {
         ReviewBackfillRun run = running();
         run.setCursorArtifactId(99L);
         fundedAndEnabled();
-        when(scopeRepository.findPullRequestIds(eq(WORKSPACE_ID), any(), any(), eq(99L), any())).thenReturn(List.of());
+        when(scopeRepository.findPullRequestIds(eq(WORKSPACE_ID), any(), any(), eq(99L), any()))
+                .thenReturn(List.of());
 
         driver().advance(run);
 
@@ -170,9 +159,8 @@ class ReviewBackfillDriverTest extends BaseUnitTest {
     private void enabledBinding() {
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
         binding.setEnabled(true);
-        when(
-            bindingRepository.findByWorkspaceIdAndPurposeWithModels(WORKSPACE_ID, AgentPurpose.PRACTICE_REVIEW)
-        ).thenReturn(Optional.of(binding));
+        when(bindingRepository.findByWorkspaceIdAndPurposeWithModels(WORKSPACE_ID, AgentPurpose.PRACTICE_REVIEW))
+                .thenReturn(Optional.of(binding));
     }
 
     private void fundedAndEnabled() {

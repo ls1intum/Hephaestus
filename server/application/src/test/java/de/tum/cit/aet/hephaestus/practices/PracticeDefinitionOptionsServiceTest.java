@@ -19,12 +19,12 @@ class PracticeDefinitionOptionsServiceTest {
 
     @Test
     void exposesTheCurrentBaselineAndOnlyProfileCompatibleSources() {
-        var catalogs = new ClasspathArtifactSourceCatalogRegistry(JsonMapper.builder().build(), Clock.systemUTC());
+        var catalogs =
+                new ClasspathArtifactSourceCatalogRegistry(JsonMapper.builder().build(), Clock.systemUTC());
         var service = new PracticeDefinitionOptionsService(
-            catalogs,
-            new PracticeEvidenceDefaults(catalogs, PracticeSignalOptionsFixture.catalog()),
-            PracticeSignalOptionsFixture.real()
-        );
+                catalogs,
+                new PracticeEvidenceDefaults(catalogs, PracticeSignalOptionsFixture.catalog()),
+                PracticeSignalOptionsFixture.real());
 
         PracticeDefinitionOptionsDTO result = service.options();
 
@@ -32,41 +32,39 @@ class PracticeDefinitionOptionsServiceTest {
         // order is not stable across builds, and an authoring picker that reshuffles between deploys is
         // worse than one that is merely alphabetical.
         assertThat(result.workTypes())
-            .extracting(PracticeWorkTypeDefinitionOptionsDTO::artifactKind)
-            .containsExactly(
-                ArtifactKinds.CONVERSATION_THREAD,
-                ArtifactKind.of("docs.document"),
-                ArtifactKinds.ISSUE,
-                ArtifactKinds.PULL_REQUEST
-            );
+                .extracting(PracticeWorkTypeDefinitionOptionsDTO::artifactKind)
+                .containsExactly(
+                        ArtifactKinds.CONVERSATION_THREAD,
+                        ArtifactKind.of("docs.document"),
+                        ArtifactKinds.ISSUE,
+                        ArtifactKinds.PULL_REQUEST);
         PracticeWorkTypeDefinitionOptionsDTO pullRequests = workType(result, ArtifactKinds.PULL_REQUEST);
         assertThat(pullRequests.signals())
-            .filteredOn(option -> option.recommended())
-            .extracting(option -> option.signal().value())
-            .containsExactly("scm.pull_request.opened", "scm.pull_request.ready", "scm.pull_request.synchronized");
+                .filteredOn(option -> option.recommended())
+                .extracting(option -> option.signal().value())
+                .containsExactly("scm.pull_request.opened", "scm.pull_request.ready", "scm.pull_request.synchronized");
         assertThat(pullRequests.signals())
-            .filteredOn(option -> option.signal().equals(ScmSignals.PULL_REQUEST_CLOSED))
-            .singleElement()
-            .satisfies(option -> {
-                // The label is the domain's own, shown under a "Run mentoring when" legend that already
-                // names the work type — so it says what happened, not what it happened to.
-                assertThat(option.displayName()).isEqualTo("Closed without merging");
-                assertThat(option.recommended()).isFalse();
-            });
-        assertThat(pullRequests.supportedAutomatedReviewModes()).containsExactly(
-            PracticeAutomatedReviewMode.LANGUAGE_MODEL
-        );
+                .filteredOn(option -> option.signal().equals(ScmSignals.PULL_REQUEST_CLOSED))
+                .singleElement()
+                .satisfies(option -> {
+                    // The label is the domain's own, shown under a "Run mentoring when" legend that already
+                    // names the work type — so it says what happened, not what it happened to.
+                    assertThat(option.displayName()).isEqualTo("Closed without merging");
+                    assertThat(option.recommended()).isFalse();
+                });
+        assertThat(pullRequests.supportedAutomatedReviewModes())
+                .containsExactly(PracticeAutomatedReviewMode.LANGUAGE_MODEL);
         assertThat(pullRequests.recommendedNeeds())
-            .extracting(need -> need.sourceKind().value())
-            .containsExactly("scm.pull-request.core", "scm.pull-request.diff", "scm.pull-request.comments");
+                .extracting(need -> need.sourceKind().value())
+                .containsExactly("scm.pull-request.core", "scm.pull-request.diff", "scm.pull-request.comments");
         assertThat(pullRequests.allowedSources())
-            .extracting(PracticeEvidenceSourceOptionDTO::sourceKind)
-            .contains("scm.pull-request.core", "scm.repository.tree")
-            .doesNotContain("scm.issue.core", "slack.conversation.thread");
+                .extracting(PracticeEvidenceSourceOptionDTO::sourceKind)
+                .contains("scm.pull-request.core", "scm.repository.tree")
+                .doesNotContain("scm.issue.core", "slack.conversation.thread");
         assertThat(pullRequests.allowedSources())
-            .filteredOn(option -> option.sourceKind().equals("scm.pull-request.core"))
-            .singleElement()
-            .satisfies(option -> assertThat(option.displayName()).isEqualTo("Pull request details"));
+                .filteredOn(option -> option.sourceKind().equals("scm.pull-request.core"))
+                .singleElement()
+                .satisfies(option -> assertThat(option.displayName()).isEqualTo("Pull request details"));
     }
 
     /**
@@ -75,28 +73,27 @@ class PracticeDefinitionOptionsServiceTest {
      */
     @Test
     void offersOnlyChoosableOccasionsAndNamesTheHandRequestSeparately() {
-        var catalogs = new ClasspathArtifactSourceCatalogRegistry(JsonMapper.builder().build(), Clock.systemUTC());
+        var catalogs =
+                new ClasspathArtifactSourceCatalogRegistry(JsonMapper.builder().build(), Clock.systemUTC());
         var service = new PracticeDefinitionOptionsService(
-            catalogs,
-            new PracticeEvidenceDefaults(catalogs, PracticeSignalOptionsFixture.catalog()),
-            PracticeSignalOptionsFixture.real()
-        );
+                catalogs,
+                new PracticeEvidenceDefaults(catalogs, PracticeSignalOptionsFixture.catalog()),
+                PracticeSignalOptionsFixture.real());
 
         PracticeDefinitionOptionsDTO result = service.options();
 
         assertThat(workType(result, ArtifactKinds.PULL_REQUEST)).satisfies(pullRequests -> {
             assertThat(pullRequests.signals())
-                .extracting(option -> option.signal().value())
-                .doesNotContain("scm.pull_request.manual_review");
-            assertThat(pullRequests.manualReviewSignal())
-                .isNotNull()
-                .satisfies(manual -> {
-                    assertThat(manual.signal()).isEqualTo(ScmSignals.PULL_REQUEST_MANUAL_REVIEW);
-                    assertThat(manual.displayName()).isNotBlank();
-                });
+                    .extracting(option -> option.signal().value())
+                    .doesNotContain("scm.pull_request.manual_review");
+            assertThat(pullRequests.manualReviewSignal()).isNotNull().satisfies(manual -> {
+                assertThat(manual.signal()).isEqualTo(ScmSignals.PULL_REQUEST_MANUAL_REVIEW);
+                assertThat(manual.displayName()).isNotBlank();
+            });
         });
         // Absent rather than invented: nothing lets a person ask for a review of a conversation thread.
-        assertThat(workType(result, ArtifactKinds.CONVERSATION_THREAD).manualReviewSignal()).isNull();
+        assertThat(workType(result, ArtifactKinds.CONVERSATION_THREAD).manualReviewSignal())
+                .isNull();
     }
 
     /**
@@ -106,24 +103,25 @@ class PracticeDefinitionOptionsServiceTest {
      */
     @Test
     void saysWhichSourceContractTheOptionsDescribe() {
-        var catalogs = new ClasspathArtifactSourceCatalogRegistry(JsonMapper.builder().build(), Clock.systemUTC());
+        var catalogs =
+                new ClasspathArtifactSourceCatalogRegistry(JsonMapper.builder().build(), Clock.systemUTC());
         var service = new PracticeDefinitionOptionsService(
-            catalogs,
-            new PracticeEvidenceDefaults(catalogs, PracticeSignalOptionsFixture.catalog()),
-            PracticeSignalOptionsFixture.real()
-        );
+                catalogs,
+                new PracticeEvidenceDefaults(catalogs, PracticeSignalOptionsFixture.catalog()),
+                PracticeSignalOptionsFixture.real());
 
-        assertThat(service.options().sourceContractVersion()).isEqualTo(catalogs.current().version());
+        assertThat(service.options().sourceContractVersion())
+                .isEqualTo(catalogs.current().version());
     }
 
     @Test
     void saysWhichSourcesCanCarryAClaimAboutWhatIsAbsent() {
-        var catalogs = new ClasspathArtifactSourceCatalogRegistry(JsonMapper.builder().build(), Clock.systemUTC());
+        var catalogs =
+                new ClasspathArtifactSourceCatalogRegistry(JsonMapper.builder().build(), Clock.systemUTC());
         var service = new PracticeDefinitionOptionsService(
-            catalogs,
-            new PracticeEvidenceDefaults(catalogs, PracticeSignalOptionsFixture.catalog()),
-            PracticeSignalOptionsFixture.real()
-        );
+                catalogs,
+                new PracticeEvidenceDefaults(catalogs, PracticeSignalOptionsFixture.catalog()),
+                PracticeSignalOptionsFixture.real());
 
         PracticeDefinitionOptionsDTO result = service.options();
 
@@ -132,29 +130,26 @@ class PracticeDefinitionOptionsServiceTest {
         // them — an author offered EXHAUSTIVE over linked work items would be sending a request
         // PracticeDefinitionValidator refuses.
         assertThat(pullRequests.allowedSources())
-            .filteredOn(option -> option.sourceKind().equals("scm.pull-request.comments"))
-            .singleElement()
-            .satisfies(option -> {
-                assertThat(option.supportsExhaustiveEvidence()).isTrue();
-                // The bound the claim is made against travels with the flag. Offering EXHAUSTIVE without
-                // saying where the capture stops asks an author to promise something they cannot check.
-                assertThat(option.selectionScope()).contains("500", "PARTIAL");
-            });
+                .filteredOn(option -> option.sourceKind().equals("scm.pull-request.comments"))
+                .singleElement()
+                .satisfies(option -> {
+                    assertThat(option.supportsExhaustiveEvidence()).isTrue();
+                    // The bound the claim is made against travels with the flag. Offering EXHAUSTIVE without
+                    // saying where the capture stops asks an author to promise something they cannot check.
+                    assertThat(option.selectionScope()).contains("500", "PARTIAL");
+                });
         assertThat(pullRequests.allowedSources())
-            .filteredOn(option -> option.sourceKind().equals("scm.linked-work-items"))
-            .singleElement()
-            .satisfies(option -> assertThat(option.supportsExhaustiveEvidence()).isFalse());
+                .filteredOn(option -> option.sourceKind().equals("scm.linked-work-items"))
+                .singleElement()
+                .satisfies(option ->
+                        assertThat(option.supportsExhaustiveEvidence()).isFalse());
     }
 
     private static PracticeWorkTypeDefinitionOptionsDTO workType(
-        PracticeDefinitionOptionsDTO options,
-        ArtifactKind kind
-    ) {
-        return options
-            .workTypes()
-            .stream()
-            .filter(candidate -> candidate.artifactKind().equals(kind))
-            .findFirst()
-            .orElseThrow();
+            PracticeDefinitionOptionsDTO options, ArtifactKind kind) {
+        return options.workTypes().stream()
+                .filter(candidate -> candidate.artifactKind().equals(kind))
+                .findFirst()
+                .orElseThrow();
     }
 }

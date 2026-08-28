@@ -16,12 +16,7 @@ class PracticeReviewVolumeQueryAdapter implements PracticeReviewVolumeQuery {
     @Override
     @Transactional(readOnly = true)
     public int countSince(long workspaceId, Instant since) {
-        return Math.toIntExact(
-            repository.countByWorkspaceIdAndPurposeAndCreatedAtGreaterThanEqual(
-                workspaceId,
-                AgentPurpose.PRACTICE_REVIEW,
-                since
-            )
-        );
+        return Math.toIntExact(repository.countByWorkspaceIdAndPurposeAndCreatedAtGreaterThanEqual(
+                workspaceId, AgentPurpose.PRACTICE_REVIEW, since));
     }
 }

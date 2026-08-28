@@ -14,13 +14,18 @@ import org.jspecify.annotations.NonNull;
  */
 @Schema(description = "Repository contribution visibility settings for a specific team within a workspace")
 public record WorkspaceTeamRepositorySettingsDTO(
-    @NonNull @Schema(description = "The workspace ID these settings belong to") Long workspaceId,
-    @NonNull @Schema(description = "The team ID these settings apply to") Long teamId,
-    @NonNull @Schema(description = "The repository ID these settings apply to") Long repositoryId,
-    @NonNull
-    @Schema(description = "Whether contributions from this repository are hidden from leaderboard calculations")
-    Boolean hiddenFromContributions
-) {
+        @NonNull @Schema(description = "The workspace ID these settings belong to")
+        Long workspaceId,
+
+        @NonNull @Schema(description = "The team ID these settings apply to")
+        Long teamId,
+
+        @NonNull @Schema(description = "The repository ID these settings apply to")
+        Long repositoryId,
+
+        @NonNull
+        @Schema(description = "Whether contributions from this repository are hidden from leaderboard calculations")
+        Boolean hiddenFromContributions) {
     /**
      * Creates a DTO from the entity.
      *
@@ -29,11 +34,10 @@ public record WorkspaceTeamRepositorySettingsDTO(
      */
     public static WorkspaceTeamRepositorySettingsDTO from(WorkspaceTeamRepositorySettings settings) {
         return new WorkspaceTeamRepositorySettingsDTO(
-            settings.getId().getWorkspaceId(),
-            settings.getId().getTeamId(),
-            settings.getId().getRepositoryId(),
-            settings.isHiddenFromContributions()
-        );
+                settings.getId().getWorkspaceId(),
+                settings.getId().getTeamId(),
+                settings.getId().getRepositoryId(),
+                settings.isHiddenFromContributions());
     }
 
     /**

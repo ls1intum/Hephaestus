@@ -73,50 +73,33 @@ public class ObservationHistoryContentSource implements ContentSource {
 
     public ObjectNode buildPayload(Long workspaceId, Long developerId) {
         User user = userRepository
-            .findById(developerId)
-            .orElseThrow(() -> new EntityNotFoundException("User", developerId.toString()));
+                .findById(developerId)
+                .orElseThrow(() -> new EntityNotFoundException("User", developerId.toString()));
         Instant since = Instant.now().minus(LOOKBACK_DAYS, ChronoUnit.DAYS);
 
         List<Observation> recent = observationRepository.findRecentByDeveloperAndWorkspace(
-            developerId,
-            workspaceId,
-            since,
-            // Verdicts only: coaching on a run that declined to take a direction would invite the mentor to
-            // invent one. The totals still reach it through the presence-count summary.
-            true,
-            PageRequest.of(0, MAX_RECENT_OBSERVATIONS)
-        );
+                developerId,
+                workspaceId,
+                since,
+                // Verdicts only: coaching on a run that declined to take a direction would invite the mentor to
+                // invent one. The totals still reach it through the presence-count summary.
+                true,
+                PageRequest.of(0, MAX_RECENT_OBSERVATIONS));
         List<PullRequestReview> reviews = queryRepository.findReviewsReceivedSince(
-            workspaceId,
-            developerId,
-            since,
-            PageRequest.of(0, MAX_RECENT_REVIEWS)
-        );
+                workspaceId, developerId, since, PageRequest.of(0, MAX_RECENT_REVIEWS));
 
-        Set<UUID> authorizedIds = visibilityPolicy.permitsAll(
-            workspaceId,
-            recent,
-            SourceUsePurpose.CONVERSATIONAL_MENTORING
-        );
-        List<Observation> authorized = recent
-            .stream()
-            .filter(o -> authorizedIds.contains(o.getId()))
-            .toList();
-        Set<Long> activeThreadIds = conversationConsentGate.activeThreadIds(
-            workspaceId,
-            conversationThreadIds(authorized)
-        );
-        List<Observation> visible = authorized
-            .stream()
-            .filter(
-                o ->
-                    !ArtifactKinds.CONVERSATION_THREAD.equals(o.getArtifactKind()) ||
-                    isSurvivingConversation(o, activeThreadIds)
-            )
-            .toList();
-        boolean anyConversationSurvivor = visible
-            .stream()
-            .anyMatch(o -> ArtifactKinds.CONVERSATION_THREAD.equals(o.getArtifactKind()));
+        Set<UUID> authorizedIds =
+                visibilityPolicy.permitsAll(workspaceId, recent, SourceUsePurpose.CONVERSATIONAL_MENTORING);
+        List<Observation> authorized =
+                recent.stream().filter(o -> authorizedIds.contains(o.getId())).toList();
+        Set<Long> activeThreadIds =
+                conversationConsentGate.activeThreadIds(workspaceId, conversationThreadIds(authorized));
+        List<Observation> visible = authorized.stream()
+                .filter(o -> !ArtifactKinds.CONVERSATION_THREAD.equals(o.getArtifactKind())
+                        || isSurvivingConversation(o, activeThreadIds))
+                .toList();
+        boolean anyConversationSurvivor =
+                visible.stream().anyMatch(o -> ArtifactKinds.CONVERSATION_THREAD.equals(o.getArtifactKind()));
 
         ObjectNode root = objectMapper.createObjectNode();
         // Untrusted-content quarantine: only when a Slack-derived (attacker-controllable) reasoning survives the gate
@@ -205,10 +188,8 @@ public class ObservationHistoryContentSource implements ContentSource {
     }
 
     private static boolean isSurvivingConversation(Observation o, Set<Long> activeThreadIds) {
-        return (
-            ArtifactKinds.CONVERSATION_THREAD.equals(o.getArtifactKind()) &&
-            o.getArtifactId() != null &&
-            activeThreadIds.contains(o.getArtifactId())
-        );
+        return (ArtifactKinds.CONVERSATION_THREAD.equals(o.getArtifactKind())
+                && o.getArtifactId() != null
+                && activeThreadIds.contains(o.getArtifactId()));
     }
 }

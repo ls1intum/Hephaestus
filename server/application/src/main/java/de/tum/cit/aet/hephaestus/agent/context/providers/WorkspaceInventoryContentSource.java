@@ -60,11 +60,10 @@ public class WorkspaceInventoryContentSource implements EvidenceSource {
     private final RepositoryRepository repositoryRepository;
 
     public WorkspaceInventoryContentSource(
-        ObjectMapper objectMapper,
-        IssueRepository issueRepository,
-        PullRequestRepository pullRequestRepository,
-        RepositoryRepository repositoryRepository
-    ) {
+            ObjectMapper objectMapper,
+            IssueRepository issueRepository,
+            PullRequestRepository pullRequestRepository,
+            RepositoryRepository repositoryRepository) {
         this.objectMapper = objectMapper;
         this.issueRepository = issueRepository;
         this.pullRequestRepository = pullRequestRepository;
@@ -73,11 +72,9 @@ public class WorkspaceInventoryContentSource implements EvidenceSource {
 
     @Override
     public boolean supports(ContextRequest request) {
-        return (
-            request instanceof ContextRequest.PracticeReviewRequest ||
-            request instanceof ContextRequest.IssueReviewRequest ||
-            request instanceof ContextRequest.ConversationReviewRequest
-        );
+        return (request instanceof ContextRequest.PracticeReviewRequest
+                || request instanceof ContextRequest.IssueReviewRequest
+                || request instanceof ContextRequest.ConversationReviewRequest);
     }
 
     @Override
@@ -108,15 +105,15 @@ public class WorkspaceInventoryContentSource implements EvidenceSource {
         }
         try {
             JsonNode counts = objectMapper.readTree(inventory).path("counts");
-            boolean empty = counts.path("issuesListed").asInt() == 0 && counts.path("pullRequestsListed").asInt() == 0;
+            boolean empty = counts.path("issuesListed").asInt() == 0
+                    && counts.path("pullRequestsListed").asInt() == 0;
             return new EvidenceContribution(
-                captured.files(),
-                captured.completeness(),
-                captured.immutableIdentities(),
-                captured.observedAt(),
-                captured.sourceEffectiveAt(),
-                Map.of(KIND, empty ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY)
-            );
+                    captured.files(),
+                    captured.completeness(),
+                    captured.immutableIdentities(),
+                    captured.observedAt(),
+                    captured.sourceEffectiveAt(),
+                    Map.of(KIND, empty ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY));
         } catch (Exception exception) {
             throw new IllegalStateException("Serialized workspace inventory could not be read", exception);
         }
@@ -137,20 +134,18 @@ public class WorkspaceInventoryContentSource implements EvidenceSource {
         }
 
         // Identify the focal artifact so the agent can tell "what else exists" from "the one under review".
-        String focalType = (
-            request instanceof ContextRequest.IssueReviewRequest ? ArtifactKinds.ISSUE : ArtifactKinds.PULL_REQUEST
-        ).value();
-        Integer focalNumber =
-            m == null
+        String focalType = (request instanceof ContextRequest.IssueReviewRequest
+                        ? ArtifactKinds.ISSUE
+                        : ArtifactKinds.PULL_REQUEST)
+                .value();
+        Integer focalNumber = m == null
                 ? null
                 : MetaJson.optInteger(m, focalType.equals(ArtifactKinds.ISSUE.value()) ? "issue_number" : "pr_number");
 
         PageRequest cap = PageRequest.of(0, MAX_PER_TYPE);
         List<Issue> issues = issueRepository.findIssueInventoryByRepositoryId(repositoryId, cap);
-        List<PullRequest> pullRequests = pullRequestRepository.findPullRequestInventoryByRepositoryId(
-            repositoryId,
-            cap
-        );
+        List<PullRequest> pullRequests =
+                pullRequestRepository.findPullRequestInventoryByRepositoryId(repositoryId, cap);
 
         ObjectNode root = objectMapper.createObjectNode();
         String repositoryName = m == null ? null : MetaJson.optString(m, "repository_full_name");
@@ -163,26 +158,17 @@ public class WorkspaceInventoryContentSource implements EvidenceSource {
             focal.put("number", focalNumber);
         }
         root.put(
-            "note",
-            "Whole-project index of issues and pull requests (titles + state, not full bodies). Use it for " +
-                "cross-artifact judgement: overlap/duplication, whether work is already tracked or in flight, " +
-                "and scope. Open the focal artifact and linked_work_items.json for depth."
-        );
+                "note",
+                "Whole-project index of issues and pull requests (titles + state, not full bodies). Use it for "
+                        + "cross-artifact judgement: overlap/duplication, whether work is already tracked or in flight, "
+                        + "and scope. Open the focal artifact and linked_work_items.json for depth.");
 
         ArrayNode issuesArr = root.putArray("issues");
-        int issuesEmitted = emit(
-            issuesArr,
-            issues,
-            focalType.equals(ArtifactKinds.ISSUE.value()) ? focalNumber : null,
-            false
-        );
+        int issuesEmitted =
+                emit(issuesArr, issues, focalType.equals(ArtifactKinds.ISSUE.value()) ? focalNumber : null, false);
         ArrayNode prsArr = root.putArray("pullRequests");
         int prsEmitted = emit(
-            prsArr,
-            pullRequests,
-            focalType.equals(ArtifactKinds.PULL_REQUEST.value()) ? focalNumber : null,
-            true
-        );
+                prsArr, pullRequests, focalType.equals(ArtifactKinds.PULL_REQUEST.value()) ? focalNumber : null, true);
 
         ObjectNode counts = root.putObject("counts");
         counts.put("issuesListed", issuesEmitted);
@@ -195,12 +181,11 @@ public class WorkspaceInventoryContentSource implements EvidenceSource {
 
         files.put(OUTPUT_FILE, objectMapper.writeValueAsBytes(root));
         log.info(
-            "Project inventory: {} issue(s) + {} PR(s), truncated={}, repoId={}",
-            issuesEmitted,
-            prsEmitted,
-            truncated,
-            repositoryId
-        );
+                "Project inventory: {} issue(s) + {} PR(s), truncated={}, repoId={}",
+                issuesEmitted,
+                prsEmitted,
+                truncated,
+                repositoryId);
     }
 
     /**
@@ -251,11 +236,10 @@ public class WorkspaceInventoryContentSource implements EvidenceSource {
         ObjectNode focal = root.putObject("focal");
         focal.put("type", ArtifactKinds.CONVERSATION_THREAD.value());
         root.put(
-            "note",
-            "Whole-workspace index of issues and pull requests across every monitored repository (titles + " +
-                "state, not full bodies) — a conversation thread is not anchored to one repository. Use it for " +
-                "cross-artifact judgement: what work is already tracked or in flight for the topic being discussed."
-        );
+                "note",
+                "Whole-workspace index of issues and pull requests across every monitored repository (titles + "
+                        + "state, not full bodies) — a conversation thread is not anchored to one repository. Use it for "
+                        + "cross-artifact judgement: what work is already tracked or in flight for the topic being discussed.");
 
         ArrayNode issuesArr = root.putArray("issues");
         int issuesEmitted = emit(issuesArr, issues, null, false);
@@ -270,13 +254,12 @@ public class WorkspaceInventoryContentSource implements EvidenceSource {
 
         files.put(OUTPUT_FILE, objectMapper.writeValueAsBytes(root));
         log.info(
-            "Workspace-wide project inventory: {} issue(s) + {} PR(s) across {} repo(s), truncated={}, workspaceId={}",
-            issuesEmitted,
-            prsEmitted,
-            repos.size(),
-            truncated,
-            workspaceId
-        );
+                "Workspace-wide project inventory: {} issue(s) + {} PR(s) across {} repo(s), truncated={}, workspaceId={}",
+                issuesEmitted,
+                prsEmitted,
+                repos.size(),
+                truncated,
+                workspaceId);
     }
 
     /** Append each artifact (focal one excluded) as a compact node; returns how many were emitted. */

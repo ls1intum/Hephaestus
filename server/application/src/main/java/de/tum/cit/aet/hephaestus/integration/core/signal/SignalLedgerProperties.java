@@ -22,7 +22,6 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.signal-ledger")
 public record SignalLedgerProperties(
-    @DefaultValue("PT1H") Duration pendingRetryAfter,
-    @DefaultValue("P7D") Duration pendingLapseAfter,
-    @Min(1) @DefaultValue("200") int sweepBatchSize
-) {}
+        @DefaultValue("PT1H") Duration pendingRetryAfter,
+        @DefaultValue("P7D") Duration pendingLapseAfter,
+        @Min(1) @DefaultValue("200") int sweepBatchSize) {}

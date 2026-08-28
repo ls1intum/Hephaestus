@@ -22,13 +22,12 @@ import tools.jackson.databind.JsonNode;
 
 @Entity
 @Table(
-    name = "feedback_dispatch",
-    uniqueConstraints = @UniqueConstraint(name = "uk_feedback_dispatch_key", columnNames = "destination_key"),
-    indexes = {
-        @Index(name = "idx_feedback_dispatch_recovery", columnList = "state, lease_expires_at, updated_at"),
-        @Index(name = "idx_feedback_dispatch_workspace", columnList = "workspace_id, created_at DESC"),
-    }
-)
+        name = "feedback_dispatch",
+        uniqueConstraints = @UniqueConstraint(name = "uk_feedback_dispatch_key", columnNames = "destination_key"),
+        indexes = {
+            @Index(name = "idx_feedback_dispatch_recovery", columnList = "state, lease_expires_at, updated_at"),
+            @Index(name = "idx_feedback_dispatch_workspace", columnList = "workspace_id, created_at DESC"),
+        })
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor

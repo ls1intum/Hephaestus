@@ -62,6 +62,7 @@ public class SyncJobService implements SmartLifecycle {
      * out from under the driver, which would destroy the runner's own terminal write.
      */
     private final Map<Long, SyncJobHandle> activeHandles = new ConcurrentHashMap<>();
+
     private final AtomicBoolean running = new AtomicBoolean(true);
 
     /**
@@ -76,30 +77,27 @@ public class SyncJobService implements SmartLifecycle {
     // test seam, so without this marker Spring sees two candidates and falls back to a no-arg it can't find.
     @Autowired
     public SyncJobService(
-        SyncJobRepository syncJobRepository,
-        ConnectionRepository connectionRepository,
-        WorkspaceRepository workspaceRepository,
-        ApplicationEventPublisher eventPublisher,
-        TransactionTemplate transactionTemplate
-    ) {
+            SyncJobRepository syncJobRepository,
+            ConnectionRepository connectionRepository,
+            WorkspaceRepository workspaceRepository,
+            ApplicationEventPublisher eventPublisher,
+            TransactionTemplate transactionTemplate) {
         this(
-            syncJobRepository,
-            connectionRepository,
-            workspaceRepository,
-            eventPublisher,
-            transactionTemplate,
-            Clock.systemUTC()
-        );
+                syncJobRepository,
+                connectionRepository,
+                workspaceRepository,
+                eventPublisher,
+                transactionTemplate,
+                Clock.systemUTC());
     }
 
     SyncJobService(
-        SyncJobRepository syncJobRepository,
-        ConnectionRepository connectionRepository,
-        WorkspaceRepository workspaceRepository,
-        ApplicationEventPublisher eventPublisher,
-        TransactionTemplate transactionTemplate,
-        Clock clock
-    ) {
+            SyncJobRepository syncJobRepository,
+            ConnectionRepository connectionRepository,
+            WorkspaceRepository workspaceRepository,
+            ApplicationEventPublisher eventPublisher,
+            TransactionTemplate transactionTemplate,
+            Clock clock) {
         this.syncJobRepository = syncJobRepository;
         this.connectionRepository = connectionRepository;
         this.workspaceRepository = workspaceRepository;
@@ -119,58 +117,47 @@ public class SyncJobService implements SmartLifecycle {
         try {
             job = transactionTemplate.execute(status -> {
                 Workspace workspace = workspaceRepository
-                    .findByIdForUpdate(request.workspaceId())
-                    .orElseThrow(() -> new EntityNotFoundException("Workspace", String.valueOf(request.workspaceId())));
+                        .findByIdForUpdate(request.workspaceId())
+                        .orElseThrow(
+                                () -> new EntityNotFoundException("Workspace", String.valueOf(request.workspaceId())));
                 if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE) {
                     throw new SyncStateConflictException(
-                        "Cannot start sync for workspace " +
-                            request.workspaceId() +
-                            " in status " +
-                            workspace.getStatus(),
-                        Map.of("workspaceId", request.workspaceId(), "workspaceStatus", workspace.getStatus())
-                    );
+                            "Cannot start sync for workspace " + request.workspaceId()
+                                    + " in status "
+                                    + workspace.getStatus(),
+                            Map.of("workspaceId", request.workspaceId(), "workspaceStatus", workspace.getStatus()));
                 }
                 connectionRepository.acquireLifecycleLock(connectionId, request.workspaceId());
                 var connection = connectionRepository
-                    .findByIdAndWorkspaceId(connectionId, request.workspaceId())
-                    .orElseThrow(() -> new EntityNotFoundException("Connection", connectionId));
+                        .findByIdAndWorkspaceId(connectionId, request.workspaceId())
+                        .orElseThrow(() -> new EntityNotFoundException("Connection", connectionId));
                 if (connection.getState() != IntegrationState.ACTIVE) {
                     throw new SyncStateConflictException(
-                        "Cannot start sync for connection " + connectionId + " in state " + connection.getState(),
-                        Map.of("connectionId", connectionId, "connectionState", connection.getState())
-                    );
+                            "Cannot start sync for connection " + connectionId + " in state " + connection.getState(),
+                            Map.of("connectionId", connectionId, "connectionState", connection.getState()));
                 }
                 Optional<SyncJob> active = syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
-                    connectionId,
-                    SyncJobStatus.ACTIVE
-                );
+                        connectionId, SyncJobStatus.ACTIVE);
                 if (active.isPresent()) {
                     throw new SyncJobConflictException(active.get());
                 }
-                SyncJob created = syncJobRepository.saveAndFlush(
-                    new SyncJob(
+                SyncJob created = syncJobRepository.saveAndFlush(new SyncJob(
                         connection.getWorkspace(),
                         connection,
                         connection.getKind(),
                         request.type(),
                         request.trigger(),
-                        request.triggeredByUserId()
-                    )
-                );
+                        request.triggeredByUserId()));
                 // Must be published in-transaction for the AFTER_COMMIT listener.
                 publish(request.workspaceId(), connectionId, created.getKind(), SyncStateChangedEvent.Scope.JOB);
                 return created;
             });
         } catch (DataIntegrityViolationException e) {
             // Re-read the partial-index race winner in a fresh transaction; the insert transaction aborted.
-            Optional<SyncJob> raced = Optional.ofNullable(
-                transactionTemplate.execute(status ->
-                    syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
-                        connectionId,
-                        SyncJobStatus.ACTIVE
-                    )
-                )
-            ).orElseGet(Optional::empty);
+            Optional<SyncJob> raced = Optional.ofNullable(transactionTemplate.execute(
+                            status -> syncJobRepository.findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(
+                                    connectionId, SyncJobStatus.ACTIVE)))
+                    .orElseGet(Optional::empty);
             if (raced.isPresent()) {
                 throw new SyncJobConflictException(raced.get(), e);
             }
@@ -222,10 +209,8 @@ public class SyncJobService implements SmartLifecycle {
             }
             body.accept(handle);
             SyncJobStatus finalStatus = handle.cancelledReported()
-                ? SyncJobStatus.CANCELLED
-                : handle.warningsReported()
-                    ? SyncJobStatus.SUCCEEDED_WITH_WARNINGS
-                    : SyncJobStatus.SUCCEEDED;
+                    ? SyncJobStatus.CANCELLED
+                    : handle.warningsReported() ? SyncJobStatus.SUCCEEDED_WITH_WARNINGS : SyncJobStatus.SUCCEEDED;
             completeJob(jobId, finalStatus, null, handle);
         } catch (Exception e) {
             if (handle.cancelledReported()) {
@@ -263,21 +248,19 @@ public class SyncJobService implements SmartLifecycle {
     public void requestCancel(long workspaceId, long jobId) {
         transactionTemplate.executeWithoutResult(status -> {
             SyncJob job = syncJobRepository
-                .findByIdAndWorkspace_Id(jobId, workspaceId)
-                .orElseThrow(() -> new EntityNotFoundException("SyncJob", jobId));
+                    .findByIdAndWorkspace_Id(jobId, workspaceId)
+                    .orElseThrow(() -> new EntityNotFoundException("SyncJob", jobId));
             if (!SyncJobStatus.ACTIVE.contains(job.getStatus())) {
                 throw new SyncStateConflictException(
-                    "Cannot cancel sync job " + jobId + " — already in terminal status " + job.getStatus(),
-                    Map.of("jobId", jobId, "jobStatus", job.getStatus())
-                );
+                        "Cannot cancel sync job " + jobId + " — already in terminal status " + job.getStatus(),
+                        Map.of("jobId", jobId, "jobStatus", job.getStatus()));
             }
             // Targeted flag-only UPDATE (not a full-row save): a full save would write back this stale
             // snapshot's status column and could resurrect a job that the executor just completed.
             if (syncJobRepository.markCancelRequested(jobId, SyncJobStatus.ACTIVE) == 0) {
                 throw new SyncStateConflictException(
-                    "Cannot cancel sync job " + jobId + " because it completed concurrently",
-                    Map.of("jobId", jobId)
-                );
+                        "Cannot cancel sync job " + jobId + " because it completed concurrently",
+                        Map.of("jobId", jobId));
             }
             publish(workspaceId, job.getConnection().getId(), job.getKind(), SyncStateChangedEvent.Scope.JOB);
         });
@@ -304,25 +287,21 @@ public class SyncJobService implements SmartLifecycle {
      */
     public Optional<Long> requestCancelForTeardown(long connectionId) {
         reapAbandonedForConnection(connectionId);
-        Optional<Long> blockingJobId = Optional.ofNullable(
-            transactionTemplate.execute(status ->
-                syncJobRepository
-                    .findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(connectionId, SyncJobStatus.ACTIVE)
-                    .flatMap(job -> {
-                        if (syncJobRepository.markCancelRequested(job.getId(), SyncJobStatus.ACTIVE) == 0) {
-                            // Completed between the read and the write — the connection is free after all.
-                            return Optional.empty();
-                        }
-                        publish(
-                            job.getWorkspace().getId(),
-                            connectionId,
-                            job.getKind(),
-                            SyncStateChangedEvent.Scope.JOB
-                        );
-                        return Optional.of(job.getId());
-                    })
-            )
-        ).orElseGet(Optional::empty);
+        Optional<Long> blockingJobId = Optional.ofNullable(transactionTemplate.execute(status -> syncJobRepository
+                        .findFirstByConnection_IdAndStatusInOrderByCreatedAtDesc(connectionId, SyncJobStatus.ACTIVE)
+                        .flatMap(job -> {
+                            if (syncJobRepository.markCancelRequested(job.getId(), SyncJobStatus.ACTIVE) == 0) {
+                                // Completed between the read and the write — the connection is free after all.
+                                return Optional.empty();
+                            }
+                            publish(
+                                    job.getWorkspace().getId(),
+                                    connectionId,
+                                    job.getKind(),
+                                    SyncStateChangedEvent.Scope.JOB);
+                            return Optional.of(job.getId());
+                        })))
+                .orElseGet(Optional::empty);
         return blockingJobId.map(jobId -> {
             notifyLocalRunner(jobId);
             return jobId;
@@ -374,16 +353,14 @@ public class SyncJobService implements SmartLifecycle {
      * @return number of jobs reaped
      */
     public int reapAbandonedJobs() {
-        Integer reaped = transactionTemplate.execute(status ->
-            reapAbandoned(syncJobRepository.findAbandoned(leaseTtlSeconds()))
-        );
+        Integer reaped = transactionTemplate.execute(
+                status -> reapAbandoned(syncJobRepository.findAbandoned(leaseTtlSeconds())));
         return reaped == null ? 0 : reaped;
     }
 
     private void reapAbandonedForConnection(long connectionId) {
-        transactionTemplate.executeWithoutResult(status ->
-            reapAbandoned(syncJobRepository.findAbandonedForConnection(connectionId, leaseTtlSeconds()))
-        );
+        transactionTemplate.executeWithoutResult(
+                status -> reapAbandoned(syncJobRepository.findAbandonedForConnection(connectionId, leaseTtlSeconds())));
     }
 
     private int reapAbandoned(List<SyncJob> stale) {
@@ -404,20 +381,16 @@ public class SyncJobService implements SmartLifecycle {
                 continue;
             }
             int updated = syncJobRepository.markAbandoned(
-                job.getId(),
-                "Abandoned: no heartbeat (likely pod restart)",
-                leaseTtlSeconds()
-            );
+                    job.getId(), "Abandoned: no heartbeat (likely pod restart)", leaseTtlSeconds());
             if (updated == 0) {
                 continue;
             }
             reaped++;
             publish(
-                job.getWorkspace().getId(),
-                job.getConnection().getId(),
-                job.getKind(),
-                SyncStateChangedEvent.Scope.JOB
-            );
+                    job.getWorkspace().getId(),
+                    job.getConnection().getId(),
+                    job.getKind(),
+                    SyncStateChangedEvent.Scope.JOB);
         }
         // Only page when work was actually reaped: every candidate can be locally-owned or
         // heartbeat-refreshed, leaving reaped==0, and a WARN there would be a false alert
@@ -506,12 +479,10 @@ public class SyncJobService implements SmartLifecycle {
             if (syncJobRepository.markRunning(jobId) == 0) {
                 return new MarkRunningResult(false, false);
             }
-            boolean cancelRequested = syncJobRepository
-                .findCancelFlags(List.of(jobId))
-                .stream()
-                .findFirst()
-                .map(SyncJobRepository.CancelFlagProjection::isCancelRequested)
-                .orElse(false);
+            boolean cancelRequested = syncJobRepository.findCancelFlags(List.of(jobId)).stream()
+                    .findFirst()
+                    .map(SyncJobRepository.CancelFlagProjection::isCancelRequested)
+                    .orElse(false);
             return new MarkRunningResult(true, cancelRequested);
         });
         return result == null ? new MarkRunningResult(false, false) : result;
@@ -529,14 +500,13 @@ public class SyncJobService implements SmartLifecycle {
     private void completeJob(long jobId, SyncJobStatus status, @Nullable String errorSummary, SyncJobHandle handle) {
         transactionTemplate.executeWithoutResult(txStatus -> {
             int updated = syncJobRepository.completeActiveJob(
-                jobId,
-                status,
-                errorSummary,
-                handle.currentItemsProcessed(),
-                handle.currentItemsTotal(),
-                handle.currentProgressDetail(),
-                SyncJobStatus.ACTIVE
-            );
+                    jobId,
+                    status,
+                    errorSummary,
+                    handle.currentItemsProcessed(),
+                    handle.currentItemsTotal(),
+                    handle.currentProgressDetail(),
+                    SyncJobStatus.ACTIVE);
             if (updated == 0) {
                 log.warn("Sync job {} was no longer active at completion (attempted {})", jobId, status);
                 return;
@@ -546,28 +516,24 @@ public class SyncJobService implements SmartLifecycle {
                 return;
             }
             publish(
-                job.getWorkspace().getId(),
-                job.getConnection().getId(),
-                job.getKind(),
-                SyncStateChangedEvent.Scope.JOB
-            );
+                    job.getWorkspace().getId(),
+                    job.getConnection().getId(),
+                    job.getKind(),
+                    SyncStateChangedEvent.Scope.JOB);
             publish(
-                job.getWorkspace().getId(),
-                job.getConnection().getId(),
-                job.getKind(),
-                SyncStateChangedEvent.Scope.RESOURCES
-            );
+                    job.getWorkspace().getId(),
+                    job.getConnection().getId(),
+                    job.getKind(),
+                    SyncStateChangedEvent.Scope.RESOURCES);
         });
     }
 
     private void persistProgress(
-        long jobId,
-        @Nullable Integer itemsProcessed,
-        @Nullable Integer itemsTotal,
-        Map<String, Object> progressDetail
-    ) {
-        transactionTemplate.executeWithoutResult(status ->
-            syncJobRepository
+            long jobId,
+            @Nullable Integer itemsProcessed,
+            @Nullable Integer itemsTotal,
+            Map<String, Object> progressDetail) {
+        transactionTemplate.executeWithoutResult(status -> syncJobRepository
                 .findById(jobId)
                 .ifPresent(job -> {
                     job.setItemsProcessed(itemsProcessed);
@@ -577,24 +543,21 @@ public class SyncJobService implements SmartLifecycle {
                     }
                     syncJobRepository.save(job);
                     publish(
-                        job.getWorkspace().getId(),
-                        job.getConnection().getId(),
-                        job.getKind(),
-                        SyncStateChangedEvent.Scope.JOB
-                    );
+                            job.getWorkspace().getId(),
+                            job.getConnection().getId(),
+                            job.getKind(),
+                            SyncStateChangedEvent.Scope.JOB);
                     // Publish RESOURCES on every progress tick, not just at terminal: a running sync writes
                     // rows the whole time it runs, so a counts pane fed only by completeJob would sit still
                     // and then jump to its final numbers. The hub coalesces per-scope at 1s and this write is
                     // already throttled, so the extra hint costs one refetch of a small DTO per tick per
                     // watching admin.
                     publish(
-                        job.getWorkspace().getId(),
-                        job.getConnection().getId(),
-                        job.getKind(),
-                        SyncStateChangedEvent.Scope.RESOURCES
-                    );
-                })
-        );
+                            job.getWorkspace().getId(),
+                            job.getConnection().getId(),
+                            job.getKind(),
+                            SyncStateChangedEvent.Scope.RESOURCES);
+                }));
     }
 
     /**
@@ -626,9 +589,8 @@ public class SyncJobService implements SmartLifecycle {
 
     private void pruneRetention(long connectionId) {
         try {
-            transactionTemplate.executeWithoutResult(status ->
-                syncJobRepository.pruneOldJobs(connectionId, RETENTION_LIMIT)
-            );
+            transactionTemplate.executeWithoutResult(
+                    status -> syncJobRepository.pruneOldJobs(connectionId, RETENTION_LIMIT));
         } catch (Exception e) {
             log.warn("Sync job retention prune failed for connection {}: {}", connectionId, e.toString());
         }
@@ -646,10 +608,8 @@ public class SyncJobService implements SmartLifecycle {
      */
     private static String summarize(Exception e) {
         String message = e.getMessage();
-        return (
-            e.getClass().getSimpleName() +
-            (message == null || message.isBlank() ? "" : ": " + LoggingUtils.sanitizeForLog(message))
-        );
+        return (e.getClass().getSimpleName()
+                + (message == null || message.isBlank() ? "" : ": " + LoggingUtils.sanitizeForLog(message)));
     }
 
     private static String truncate(String s) {

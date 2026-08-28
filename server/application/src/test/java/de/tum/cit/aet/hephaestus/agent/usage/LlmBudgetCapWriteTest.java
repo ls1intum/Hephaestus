@@ -59,20 +59,9 @@ class LlmBudgetCapWriteTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         adminService = new LlmUsageAdminService(
-            usageRepository,
-            workspaceRepository,
-            configAudit,
-            jobRepository,
-            fxRateLookup
-        );
+                usageRepository, workspaceRepository, configAudit, jobRepository, fxRateLookup);
         workspaceService = new LlmUsageService(
-            usageRepository,
-            workspaceRepository,
-            llmBudgetService,
-            configAudit,
-            jobRepository,
-            fxRateLookup
-        );
+                usageRepository, workspaceRepository, llmBudgetService, configAudit, jobRepository, fxRateLookup);
         workspace = new Workspace();
         workspace.setId(WORKSPACE_ID);
         workspace.setWorkspaceSlug(SLUG);
@@ -96,9 +85,8 @@ class LlmBudgetCapWriteTest extends BaseUnitTest {
         verify(configAudit).record(entry.capture());
         assertThat(entry.getValue().entityType()).isEqualTo(ConfigAuditEntityType.WORKSPACE_INSTANCE_LLM_BUDGET);
         assertThat(entry.getValue().workspaceId()).isEqualTo(WORKSPACE_ID);
-        assertThat(entry.getValue().after()).isEqualTo(
-            new LlmUsageAdminService.LlmBudgetSnapshot(new BigDecimal("250.00"))
-        );
+        assertThat(entry.getValue().after())
+                .isEqualTo(new LlmUsageAdminService.LlmBudgetSnapshot(new BigDecimal("250.00")));
 
         // Raising a cap must free the jobs held on it immediately, not up to an hour later — and only
         // for this workspace, or one admin's raise would un-hold every tenant's parked work.
@@ -119,9 +107,8 @@ class LlmBudgetCapWriteTest extends BaseUnitTest {
         verify(configAudit).record(entry.capture());
         assertThat(entry.getValue().entityType()).isEqualTo(ConfigAuditEntityType.WORKSPACE_OWN_PROVIDER_LLM_BUDGET);
         assertThat(entry.getValue().workspaceId()).isEqualTo(WORKSPACE_ID);
-        assertThat(entry.getValue().after()).isEqualTo(
-            new LlmUsageService.OwnProviderLlmBudgetSnapshot(new BigDecimal("40.00"))
-        );
+        assertThat(entry.getValue().after())
+                .isEqualTo(new LlmUsageService.OwnProviderLlmBudgetSnapshot(new BigDecimal("40.00")));
 
         verify(jobRepository).releaseBudgetHolds(eq(WORKSPACE_ID), any(Instant.class));
     }

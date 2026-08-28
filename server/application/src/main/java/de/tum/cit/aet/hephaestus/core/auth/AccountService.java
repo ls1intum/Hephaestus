@@ -36,12 +36,11 @@ public class AccountService {
     private final Clock clock;
 
     public AccountService(
-        AccountRepository accountRepository,
-        IdentityLinkRepository identityLinkRepository,
-        IssuedJwtRepository issuedJwtRepository,
-        AuthEventLogger authEventLogger,
-        Clock clock
-    ) {
+            AccountRepository accountRepository,
+            IdentityLinkRepository identityLinkRepository,
+            IssuedJwtRepository issuedJwtRepository,
+            AuthEventLogger authEventLogger,
+            Clock clock) {
         this.accountRepository = accountRepository;
         this.identityLinkRepository = identityLinkRepository;
         this.issuedJwtRepository = issuedJwtRepository;
@@ -51,8 +50,8 @@ public class AccountService {
 
     public Account requireById(Long id) {
         return accountRepository
-            .findById(id)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "account not found"));
+                .findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "account not found"));
     }
 
     public List<IdentityLink> activeIdentities(Long accountId) {
@@ -85,10 +84,10 @@ public class AccountService {
         accountRepository.save(account);
         issuedJwtRepository.revokeAllForAccount(accountId, clock.instant(), IssuedJwt.RevokedReason.ACCOUNT_DELETED);
         authEventLogger
-            .event(AuthEvent.EventType.ACCOUNT_DELETED, AuthEvent.Result.SUCCESS)
-            .account(accountId)
-            .actingAccount(actingAccountId)
-            .record();
+                .event(AuthEvent.EventType.ACCOUNT_DELETED, AuthEvent.Result.SUCCESS)
+                .account(accountId)
+                .actingAccount(actingAccountId)
+                .record();
     }
 
     /**
@@ -112,16 +111,14 @@ public class AccountService {
         // Write-lock the account's active links so two concurrent unlinks of different identities
         // serialize — otherwise both pass the last-identity guard below and drain the account to zero.
         List<IdentityLink> active = identityLinkRepository.findActiveByAccountIdForUpdate(accountId);
-        IdentityLink target = active
-            .stream()
-            .filter(il -> il.getId().equals(identityLinkId))
-            .findFirst()
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "identity link not found"));
+        IdentityLink target = active.stream()
+                .filter(il -> il.getId().equals(identityLinkId))
+                .findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "identity link not found"));
         if (active.size() <= 1) {
             throw new ResponseStatusException(
-                HttpStatus.CONFLICT,
-                "You can't unlink your only sign-in method. Link another provider first, or delete your account."
-            );
+                    HttpStatus.CONFLICT,
+                    "You can't unlink your only sign-in method. Link another provider first, or delete your account.");
         }
         Long gitProviderId = target.getProviderId();
         if (identityLinkRepository.deleteByIdAndAccountId(identityLinkId, accountId) == 0) {
@@ -131,16 +128,18 @@ public class AccountService {
         // The link row is now gone, so don't reference its id in the audit (its auth_event FK is
         // ON DELETE SET NULL anyway); account + provider record who unlinked which provider.
         authEventLogger
-            .event(AuthEvent.EventType.IDENTITY_UNLINKED, AuthEvent.Result.SUCCESS)
-            .account(accountId)
-            .actingAccount(actingAccountId)
-            .gitProvider(gitProviderId)
-            .record();
+                .event(AuthEvent.EventType.IDENTITY_UNLINKED, AuthEvent.Result.SUCCESS)
+                .account(accountId)
+                .actingAccount(actingAccountId)
+                .gitProvider(gitProviderId)
+                .record();
     }
 
     public List<Account> adminList(int page, int size) {
         int capped = Math.min(Math.max(size, 1), 200);
-        return accountRepository.findAll(PageRequest.of(Math.max(page, 0), capped)).getContent();
+        return accountRepository
+                .findAll(PageRequest.of(Math.max(page, 0), capped))
+                .getContent();
     }
 
     @Transactional
@@ -159,19 +158,16 @@ public class AccountService {
             if (isDemotion) {
                 if (accountId.equals(actingAccountId)) {
                     throw new ResponseStatusException(
-                        HttpStatus.CONFLICT,
-                        "You can't revoke your own admin access. Have another admin do it."
-                    );
+                            HttpStatus.CONFLICT, "You can't revoke your own admin access. Have another admin do it.");
                 }
                 // Locked (FOR UPDATE) count so concurrent demotions serialize instead of both passing.
                 long activeAdmins = accountRepository
-                    .findByAppRoleAndStatusForUpdate(Account.AppRole.APP_ADMIN, Account.Status.ACTIVE)
-                    .size();
+                        .findByAppRoleAndStatusForUpdate(Account.AppRole.APP_ADMIN, Account.Status.ACTIVE)
+                        .size();
                 if (activeAdmins <= 1) {
                     throw new ResponseStatusException(
-                        HttpStatus.CONFLICT,
-                        "You can't revoke the last admin. Grant admin to another account first."
-                    );
+                            HttpStatus.CONFLICT,
+                            "You can't revoke the last admin. Grant admin to another account first.");
                 }
             }
             Account.AppRole previousRole = account.getAppRole();
@@ -184,21 +180,18 @@ public class AccountService {
                 // deliberately NOT revoked — the new role is picked up on the next silent refresh with no
                 // forced re-login.
                 issuedJwtRepository.revokeAllForAccount(
-                    accountId,
-                    clock.instant(),
-                    IssuedJwt.RevokedReason.ADMIN_REVOKE
-                );
+                        accountId, clock.instant(), IssuedJwt.RevokedReason.ADMIN_REVOKE);
             }
             // Dedicated APP_ROLE_CHANGED type so the most security-sensitive mutation (granting/revoking
             // APP_ADMIN) is queryable and alertable on the indexed event_type column — the ADR's stated
             // mitigation for omitting step-up re-auth. Enum names are [A-Z_] only, so the inline JSON is
             // injection-safe. previousRole/role are both non-null (app_role is NOT NULL).
             authEventLogger
-                .event(AuthEvent.EventType.APP_ROLE_CHANGED, AuthEvent.Result.SUCCESS)
-                .account(accountId)
-                .actingAccount(actingAccountId)
-                .details("{\"from\":\"" + previousRole.name() + "\",\"to\":\"" + role.name() + "\"}")
-                .record();
+                    .event(AuthEvent.EventType.APP_ROLE_CHANGED, AuthEvent.Result.SUCCESS)
+                    .account(accountId)
+                    .actingAccount(actingAccountId)
+                    .details("{\"from\":\"" + previousRole.name() + "\",\"to\":\"" + role.name() + "\"}")
+                    .record();
         }
         return account;
     }
@@ -213,16 +206,13 @@ public class AccountService {
     public int adminRevokeAllSessions(Long accountId, Long actingAccountId) {
         requireById(accountId); // 404 if the account does not exist
         int revoked = issuedJwtRepository.revokeAllForAccount(
-            accountId,
-            clock.instant(),
-            IssuedJwt.RevokedReason.ADMIN_REVOKE
-        );
+                accountId, clock.instant(), IssuedJwt.RevokedReason.ADMIN_REVOKE);
         authEventLogger
-            .event(AuthEvent.EventType.JWT_REVOKED, AuthEvent.Result.SUCCESS)
-            .account(accountId)
-            .actingAccount(actingAccountId)
-            .details("{\"reason\":\"ADMIN_REVOKE\",\"count\":" + revoked + "}")
-            .record();
+                .event(AuthEvent.EventType.JWT_REVOKED, AuthEvent.Result.SUCCESS)
+                .account(accountId)
+                .actingAccount(actingAccountId)
+                .details("{\"reason\":\"ADMIN_REVOKE\",\"count\":" + revoked + "}")
+                .record();
         return revoked;
     }
 }

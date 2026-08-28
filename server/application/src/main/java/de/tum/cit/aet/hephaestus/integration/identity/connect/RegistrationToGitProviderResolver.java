@@ -47,12 +47,10 @@ public class RegistrationToGitProviderResolver implements GitProviderRegistry {
     public long resolveProviderId(String providerTypeName, String baseUrl) {
         IdentityProviderType type = IdentityProviderType.valueOf(providerTypeName);
         String origin = originOf(baseUrl);
-        return Objects.requireNonNull(
-            gitProviderRepository
+        return Objects.requireNonNull(gitProviderRepository
                 .findByTypeAndServerUrl(type, origin)
                 .orElseGet(() -> gitProviderRepository.save(new IdentityProvider(type, origin)))
-                .getId()
-        );
+                .getId());
     }
 
     @Override
@@ -62,9 +60,9 @@ public class RegistrationToGitProviderResolver implements GitProviderRegistry {
             return UNKNOWN;
         }
         return gitProviderRepository
-            .findById(gitProviderId)
-            .map(p -> p.getType().name())
-            .orElse(UNKNOWN);
+                .findById(gitProviderId)
+                .map(p -> p.getType().name())
+                .orElse(UNKNOWN);
     }
 
     @Override
@@ -73,7 +71,10 @@ public class RegistrationToGitProviderResolver implements GitProviderRegistry {
         if (gitProviderId == null) {
             return null;
         }
-        return gitProviderRepository.findById(gitProviderId).map(IdentityProvider::getServerUrl).orElse(null);
+        return gitProviderRepository
+                .findById(gitProviderId)
+                .map(IdentityProvider::getServerUrl)
+                .orElse(null);
     }
 
     /**

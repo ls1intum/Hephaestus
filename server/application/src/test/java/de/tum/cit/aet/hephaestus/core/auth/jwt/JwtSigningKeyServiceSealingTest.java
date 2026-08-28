@@ -109,12 +109,12 @@ class JwtSigningKeyServiceSealingTest extends BaseUnitTest {
 
         // Startup assertion (called from AuthJwtConfig OUTSIDE the swallow) aborts boot.
         Assertions.assertThatThrownBy(service::assertProdKeysSealed)
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("unsealed");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("unsealed");
         // Signing path also refuses to materialize the unsealed key.
         Assertions.assertThatThrownBy(service::currentSigningKey)
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("unsealed");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("unsealed");
     }
 
     @Test

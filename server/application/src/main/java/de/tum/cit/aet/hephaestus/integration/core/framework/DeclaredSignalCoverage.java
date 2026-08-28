@@ -50,17 +50,15 @@ public class DeclaredSignalCoverage implements SignalCoverage {
 
     @Override
     public Set<IntegrationKind> raisedBy(SignalName signal) {
-        return manifests
-            .registeredKinds()
-            .stream()
-            .filter(kind -> contributionOf(kind).allRaisedSignals().contains(signal))
-            .collect(Collectors.toUnmodifiableSet());
+        return manifests.registeredKinds().stream()
+                .filter(kind -> contributionOf(kind).allRaisedSignals().contains(signal))
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     private IntegrationManifest.ReviewContribution contributionOf(IntegrationKind kind) {
         return manifests
-            .manifestFor(kind)
-            .map(IntegrationManifest::reviewContribution)
-            .orElseGet(IntegrationManifest.ReviewContribution::none);
+                .manifestFor(kind)
+                .map(IntegrationManifest::reviewContribution)
+                .orElseGet(IntegrationManifest.ReviewContribution::none);
     }
 }

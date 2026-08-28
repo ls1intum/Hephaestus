@@ -66,12 +66,10 @@ class MirrorQueryPredicateGuardTest extends BaseUnitTest {
             }
 
             assertThat(offenders)
-                .as(
-                    "JPQL rooted at Issue without TYPE(<alias>) = Issue also returns PullRequest rows " +
-                        "(single-table inheritance) — a GitLab merge request would surface as an issue. " +
-                        "Offending method -> unguarded alias"
-                )
-                .isEmpty();
+                    .as("JPQL rooted at Issue without TYPE(<alias>) = Issue also returns PullRequest rows "
+                            + "(single-table inheritance) — a GitLab merge request would surface as an issue. "
+                            + "Offending method -> unguarded alias")
+                    .isEmpty();
         }
 
         /**
@@ -80,15 +78,14 @@ class MirrorQueryPredicateGuardTest extends BaseUnitTest {
          */
         @Test
         void assignedOpenIssuesExcludesMergeRequests() throws NoSuchMethodException {
-            String jpql = normalize(
-                MentorContextQueryRepository.class.getMethod("findAssignedOpenIssues", Long.class, Long.class)
+            String jpql = normalize(MentorContextQueryRepository.class
+                    .getMethod("findAssignedOpenIssues", Long.class, Long.class)
                     .getAnnotation(Query.class)
-                    .value()
-            );
+                    .value());
 
             assertThat(jpql.replace(" ", ""))
-                .as("findAssignedOpenIssues must exclude PullRequest rows, like its sibling count query")
-                .contains("TYPE(i)=Issue");
+                    .as("findAssignedOpenIssues must exclude PullRequest rows, like its sibling count query")
+                    .contains("TYPE(i)=Issue");
         }
     }
 
@@ -111,22 +108,19 @@ class MirrorQueryPredicateGuardTest extends BaseUnitTest {
             record Guarded(Class<?> repository, String parentPath) {}
 
             List<Guarded> guarded = List.of(
-                new Guarded(IssueCommentRepository.class, "c.issue"),
-                new Guarded(PullRequestReviewRepository.class, "r.pullRequest"),
-                new Guarded(PullRequestReviewCommentRepository.class, "c.pullRequest")
-            );
+                    new Guarded(IssueCommentRepository.class, "c.issue"),
+                    new Guarded(PullRequestReviewRepository.class, "r.pullRequest"),
+                    new Guarded(PullRequestReviewCommentRepository.class, "c.pullRequest"));
 
             for (Guarded entry : guarded) {
                 String jpql = normalize(countQueryOf(entry.repository()));
 
                 assertThat(jpql)
-                    .as(
-                        "%s.countGroupedByRepositoryIds must exclude rows whose parent is tombstoned " +
-                            "(%s.deletedAt IS NULL), consistent with the issue and pull-request counts",
-                        entry.repository().getSimpleName(),
-                        entry.parentPath()
-                    )
-                    .contains(entry.parentPath() + ".deletedAt IS NULL");
+                        .as(
+                                "%s.countGroupedByRepositoryIds must exclude rows whose parent is tombstoned "
+                                        + "(%s.deletedAt IS NULL), consistent with the issue and pull-request counts",
+                                entry.repository().getSimpleName(), entry.parentPath())
+                        .contains(entry.parentPath() + ".deletedAt IS NULL");
             }
         }
 
@@ -141,8 +135,9 @@ class MirrorQueryPredicateGuardTest extends BaseUnitTest {
 
             assertThat(jpql).contains("GROUP BY");
             assertThat(countOccurrences(jpql, "SELECT"))
-                .as("exactly one SELECT: the grouped count, with no correlated subquery added by the tombstone filter")
-                .isEqualTo(1);
+                    .as(
+                            "exactly one SELECT: the grouped count, with no correlated subquery added by the tombstone filter")
+                    .isEqualTo(1);
         }
     }
 
@@ -153,8 +148,8 @@ class MirrorQueryPredicateGuardTest extends BaseUnitTest {
             }
             Query query = method.getAnnotation(Query.class);
             assertThat(query)
-                .as("%s.countGroupedByRepositoryIds must carry an explicit @Query", repository.getSimpleName())
-                .isNotNull();
+                    .as("%s.countGroupedByRepositoryIds must carry an explicit @Query", repository.getSimpleName())
+                    .isNotNull();
             return query.value();
         }
         throw new AssertionError(repository.getSimpleName() + " declares no countGroupedByRepositoryIds");

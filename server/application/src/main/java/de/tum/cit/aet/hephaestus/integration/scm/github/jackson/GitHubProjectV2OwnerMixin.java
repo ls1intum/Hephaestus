@@ -12,16 +12,13 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHUser;
  * A ProjectV2Owner can be either an Organization or a User.
  */
 @JsonTypeInfo(
-    use = JsonTypeInfo.Id.NAME,
-    include = JsonTypeInfo.As.PROPERTY,
-    property = "__typename",
-    visible = true,
-    defaultImpl = GHOrganization.class
-)
-@JsonSubTypes(
-    {
-        @JsonSubTypes.Type(value = GHOrganization.class, name = "Organization"),
-        @JsonSubTypes.Type(value = GHUser.class, name = "User"),
-    }
-)
+        use = JsonTypeInfo.Id.NAME,
+        include = JsonTypeInfo.As.PROPERTY,
+        property = "__typename",
+        visible = true,
+        defaultImpl = GHOrganization.class)
+@JsonSubTypes({
+    @JsonSubTypes.Type(value = GHOrganization.class, name = "Organization"),
+    @JsonSubTypes.Type(value = GHUser.class, name = "User"),
+})
 public abstract class GitHubProjectV2OwnerMixin {}

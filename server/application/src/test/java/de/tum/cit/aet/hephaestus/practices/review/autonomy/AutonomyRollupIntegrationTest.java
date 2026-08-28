@@ -87,26 +87,24 @@ class AutonomyRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private AutonomyRollupDTO fetchRollup() {
         AutonomyRollupDTO rollup = webTestClient
-            .get()
-            .uri(URI, workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(AutonomyRollupDTO.class)
-            .returnResult()
-            .getResponseBody();
+                .get()
+                .uri(URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(AutonomyRollupDTO.class)
+                .returnResult()
+                .getResponseBody();
         assertThat(rollup).isNotNull();
         return rollup;
     }
 
     private static GroupAutonomyRollupDTO groupNamed(AutonomyRollupDTO rollup, @Nullable String slug) {
-        return rollup
-            .groups()
-            .stream()
-            .filter(group -> Objects.equals(group.groupSlug(), slug))
-            .findFirst()
-            .orElseThrow(() -> new AssertionError("no group group for slug " + slug + " in " + rollup.groups()));
+        return rollup.groups().stream()
+                .filter(group -> Objects.equals(group.groupSlug(), slug))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("no group group for slug " + slug + " in " + rollup.groups()));
     }
 
     @Nested
@@ -139,29 +137,30 @@ class AutonomyRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
             assertThat(rollup.counts()).containsOnlyKeys(PracticeAutonomy.values());
             assertThat(rollup.counts()).containsEntry(PracticeAutonomy.OFF, 1);
             assertThat(rollup.groups())
-                .isNotEmpty()
-                .allSatisfy(group -> assertThat(group.counts()).containsOnlyKeys(PracticeAutonomy.values()));
+                    .isNotEmpty()
+                    .allSatisfy(group -> assertThat(group.counts()).containsOnlyKeys(PracticeAutonomy.values()));
         }
 
         @Test
         @WithAdminUser
         @DisplayName("counts the effective autonomy after the chain, not the stored override")
         void countsTheEffectiveTierNotTheStoredOverride() {
-            long practicesHoldingATierOfTheirOwn = practiceRepository
-                .findAllForCatalog(workspace.getId())
-                .stream()
-                .filter(practice -> practice.getAutonomy() != null)
-                .count();
+            long practicesHoldingATierOfTheirOwn = practiceRepository.findAllForCatalog(workspace.getId()).stream()
+                    .filter(practice -> practice.getAutonomy() != null)
+                    .count();
             assertThat(practicesHoldingATierOfTheirOwn).isEqualTo(1);
 
             AutonomyRollupDTO rollup = fetchRollup();
 
-            assertThat(rollup.counts()).containsOnly(
-                entry(PracticeAutonomy.OFF, 1),
-                entry(PracticeAutonomy.HUMAN_APPROVAL, 2),
-                entry(PracticeAutonomy.AUTOMATIC, 1)
-            );
-            assertThat(rollup.counts().values().stream().mapToInt(Integer::intValue).sum()).isEqualTo(4);
+            assertThat(rollup.counts())
+                    .containsOnly(
+                            entry(PracticeAutonomy.OFF, 1),
+                            entry(PracticeAutonomy.HUMAN_APPROVAL, 2),
+                            entry(PracticeAutonomy.AUTOMATIC, 1));
+            assertThat(rollup.counts().values().stream()
+                            .mapToInt(Integer::intValue)
+                            .sum())
+                    .isEqualTo(4);
         }
 
         @Test
@@ -170,11 +169,11 @@ class AutonomyRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
         void groupCountsFollowTheSameChain() {
             AutonomyRollupDTO rollup = fetchRollup();
 
-            assertThat(groupNamed(rollup, "alpha").counts()).containsOnly(
-                entry(PracticeAutonomy.OFF, 1),
-                entry(PracticeAutonomy.HUMAN_APPROVAL, 0),
-                entry(PracticeAutonomy.AUTOMATIC, 1)
-            );
+            assertThat(groupNamed(rollup, "alpha").counts())
+                    .containsOnly(
+                            entry(PracticeAutonomy.OFF, 1),
+                            entry(PracticeAutonomy.HUMAN_APPROVAL, 0),
+                            entry(PracticeAutonomy.AUTOMATIC, 1));
             assertThat(groupNamed(rollup, "beta").counts()).containsEntry(PracticeAutonomy.HUMAN_APPROVAL, 1);
         }
 
@@ -211,12 +210,8 @@ class AutonomyRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
             GroupAutonomyRollupDTO ungrouped = rollup.groups().getLast();
             assertThat(ungrouped.groupSlug()).isNull();
             assertThat(ungrouped.groupName()).isNull();
-            assertThat(rollup.groups().stream().map(GroupAutonomyRollupDTO::groupSlug)).containsExactly(
-                "alpha",
-                "beta",
-                "gamma",
-                null
-            );
+            assertThat(rollup.groups().stream().map(GroupAutonomyRollupDTO::groupSlug))
+                    .containsExactly("alpha", "beta", "gamma", null);
 
             assertThat(ungrouped.autonomy().override()).isNull();
             assertThat(ungrouped.autonomy().inherited()).isTrue();
@@ -252,18 +247,23 @@ class AutonomyRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
             ensureWorkspaceMembership(workspace, member, WorkspaceMembership.WorkspaceRole.MEMBER);
 
             webTestClient
-                .get()
-                .uri(URI, workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isForbidden();
+                    .get()
+                    .uri(URI, workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isForbidden();
         }
 
         @Test
         @DisplayName("returns 401 when not logged in")
         void shouldReturnUnauthorized() {
-            webTestClient.get().uri(URI, workspace.getWorkspaceSlug()).exchange().expectStatus().isUnauthorized();
+            webTestClient
+                    .get()
+                    .uri(URI, workspace.getWorkspaceSlug())
+                    .exchange()
+                    .expectStatus()
+                    .isUnauthorized();
         }
     }
 
@@ -339,7 +339,8 @@ class AutonomyRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         AutonomyRollupDTO rollup = fetchRollup();
 
-        assertThat(rollup.counts().values().stream().mapToInt(Integer::intValue).sum()).isEqualTo(1);
+        assertThat(rollup.counts().values().stream().mapToInt(Integer::intValue).sum())
+                .isEqualTo(1);
         assertThat(rollup.counts()).containsEntry(PracticeAutonomy.HUMAN_APPROVAL, 1);
         assertThat(rollup.counts()).containsEntry(PracticeAutonomy.OFF, 0);
     }

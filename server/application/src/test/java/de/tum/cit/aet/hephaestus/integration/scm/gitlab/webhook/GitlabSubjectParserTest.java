@@ -35,15 +35,7 @@ class GitlabSubjectParserTest extends BaseUnitTest {
         // Smoke-test that the common GitLab object_kind values round-trip the parser
         // without surprise normalization.
         for (String event : new String[] {
-            "merge_request",
-            "push",
-            "issue",
-            "note",
-            "pipeline",
-            "build",
-            "wiki_page",
-            "tag_push",
-            "release",
+            "merge_request", "push", "issue", "note", "pipeline", "build", "wiki_page", "tag_push", "release",
         }) {
             EventTypeKey key = parser.parse("gitlab.acme.web." + event);
             assertThat(key.eventType()).isEqualTo(event);
@@ -53,8 +45,8 @@ class GitlabSubjectParserTest extends BaseUnitTest {
     @Test
     void tooFewComponentsThrows() {
         assertThatThrownBy(() -> parser.parse("gitlab.acme.web"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("at least 4 components");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("at least 4 components");
 
         assertThatThrownBy(() -> parser.parse("gitlab.acme")).isInstanceOf(IllegalArgumentException.class);
 
@@ -64,8 +56,8 @@ class GitlabSubjectParserTest extends BaseUnitTest {
     @Test
     void wrongPrefixThrows() {
         assertThatThrownBy(() -> parser.parse("github.acme.web.merge_request"))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("gitlab");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("gitlab");
     }
 
     @Test
@@ -78,8 +70,8 @@ class GitlabSubjectParserTest extends BaseUnitTest {
     @Test
     void emptyEventComponentThrows() {
         assertThatThrownBy(() -> parser.parse("gitlab.acme.web."))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("blank");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("blank");
     }
 
     @Test

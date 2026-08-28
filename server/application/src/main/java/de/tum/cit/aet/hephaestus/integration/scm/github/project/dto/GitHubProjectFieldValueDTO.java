@@ -55,14 +55,13 @@ import tools.jackson.databind.json.JsonMapper;
 @JsonIgnoreProperties(ignoreUnknown = true)
 @Slf4j
 public record GitHubProjectFieldValueDTO(
-    @JsonProperty("field_id") @Nullable String fieldId,
-    @JsonProperty("field_type") String fieldType,
-    @JsonProperty("text_value") @Nullable String textValue,
-    @JsonProperty("number_value") @Nullable Double numberValue,
-    @JsonProperty("date_value") @Nullable LocalDate dateValue,
-    @JsonProperty("single_select_option_id") @Nullable String singleSelectOptionId,
-    @JsonProperty("iteration_id") @Nullable String iterationId
-) {
+        @JsonProperty("field_id") @Nullable String fieldId,
+        @JsonProperty("field_type") String fieldType,
+        @JsonProperty("text_value") @Nullable String textValue,
+        @JsonProperty("number_value") @Nullable Double numberValue,
+        @JsonProperty("date_value") @Nullable LocalDate dateValue,
+        @JsonProperty("single_select_option_id") @Nullable String singleSelectOptionId,
+        @JsonProperty("iteration_id") @Nullable String iterationId) {
     // Trivial serialization (List<String> → JSON string column); no global mapper config needed.
     private static final ObjectMapper OBJECT_MAPPER = JsonMapper.builder().build();
 
@@ -143,8 +142,7 @@ public record GitHubProjectFieldValueDTO(
     }
 
     private static @Nullable GitHubProjectFieldValueDTO fromSingleSelectValue(
-        GHProjectV2ItemFieldSingleSelectValue value
-    ) {
+            GHProjectV2ItemFieldSingleSelectValue value) {
         String fieldId = extractFieldId(value.getField());
         if (fieldId == null) {
             return null;
@@ -167,20 +165,13 @@ public record GitHubProjectFieldValueDTO(
         }
         List<String> labelNames = Collections.emptyList();
         if (value.getLabels() != null && value.getLabels().getNodes() != null) {
-            labelNames = value
-                .getLabels()
-                .getNodes()
-                .stream()
-                .filter(Objects::nonNull)
-                .map(GHLabel::getName)
-                .filter(Objects::nonNull)
-                .toList();
+            labelNames = value.getLabels().getNodes().stream()
+                    .filter(Objects::nonNull)
+                    .map(GHLabel::getName)
+                    .filter(Objects::nonNull)
+                    .toList();
             GraphQlConnectionOverflowDetector.check(
-                "fieldValue.labels",
-                labelNames.size(),
-                value.getLabels().getTotalCount(),
-                "field " + fieldId
-            );
+                    "fieldValue.labels", labelNames.size(), value.getLabels().getTotalCount(), "field " + fieldId);
         }
         String jsonValue = serializeToJson(labelNames);
         return new GitHubProjectFieldValueDTO(fieldId, "LABELS", jsonValue, null, null, null, null);
@@ -193,20 +184,13 @@ public record GitHubProjectFieldValueDTO(
         }
         List<String> userLogins = Collections.emptyList();
         if (value.getUsers() != null && value.getUsers().getNodes() != null) {
-            userLogins = value
-                .getUsers()
-                .getNodes()
-                .stream()
-                .filter(Objects::nonNull)
-                .map(GHUser::getLogin)
-                .filter(Objects::nonNull)
-                .toList();
+            userLogins = value.getUsers().getNodes().stream()
+                    .filter(Objects::nonNull)
+                    .map(GHUser::getLogin)
+                    .filter(Objects::nonNull)
+                    .toList();
             GraphQlConnectionOverflowDetector.check(
-                "fieldValue.users",
-                userLogins.size(),
-                value.getUsers().getTotalCount(),
-                "field " + fieldId
-            );
+                    "fieldValue.users", userLogins.size(), value.getUsers().getTotalCount(), "field " + fieldId);
         }
         String jsonValue = serializeToJson(userLogins);
         return new GitHubProjectFieldValueDTO(fieldId, "ASSIGNEES", jsonValue, null, null, null, null);
@@ -219,20 +203,16 @@ public record GitHubProjectFieldValueDTO(
         }
         List<String> reviewerNames = Collections.emptyList();
         if (value.getReviewers() != null && value.getReviewers().getNodes() != null) {
-            reviewerNames = value
-                .getReviewers()
-                .getNodes()
-                .stream()
-                .filter(Objects::nonNull)
-                .map(GitHubProjectFieldValueDTO::extractReviewerName)
-                .filter(Objects::nonNull)
-                .toList();
+            reviewerNames = value.getReviewers().getNodes().stream()
+                    .filter(Objects::nonNull)
+                    .map(GitHubProjectFieldValueDTO::extractReviewerName)
+                    .filter(Objects::nonNull)
+                    .toList();
             GraphQlConnectionOverflowDetector.check(
-                "fieldValue.reviewers",
-                reviewerNames.size(),
-                value.getReviewers().getTotalCount(),
-                "field " + fieldId
-            );
+                    "fieldValue.reviewers",
+                    reviewerNames.size(),
+                    value.getReviewers().getTotalCount(),
+                    "field " + fieldId);
         }
         String jsonValue = serializeToJson(reviewerNames);
         return new GitHubProjectFieldValueDTO(fieldId, "REVIEWERS", jsonValue, null, null, null, null);
@@ -275,27 +255,22 @@ public record GitHubProjectFieldValueDTO(
     }
 
     private static @Nullable GitHubProjectFieldValueDTO fromPullRequestValue(
-        GHProjectV2ItemFieldPullRequestValue value
-    ) {
+            GHProjectV2ItemFieldPullRequestValue value) {
         String fieldId = extractFieldId(value.getField());
         if (fieldId == null) {
             return null;
         }
         List<Integer> prNumbers = Collections.emptyList();
         if (value.getPullRequests() != null && value.getPullRequests().getNodes() != null) {
-            prNumbers = value
-                .getPullRequests()
-                .getNodes()
-                .stream()
-                .filter(Objects::nonNull)
-                .map(GHPullRequest::getNumber)
-                .toList();
+            prNumbers = value.getPullRequests().getNodes().stream()
+                    .filter(Objects::nonNull)
+                    .map(GHPullRequest::getNumber)
+                    .toList();
             GraphQlConnectionOverflowDetector.check(
-                "fieldValue.pullRequests",
-                prNumbers.size(),
-                value.getPullRequests().getTotalCount(),
-                "field " + fieldId
-            );
+                    "fieldValue.pullRequests",
+                    prNumbers.size(),
+                    value.getPullRequests().getTotalCount(),
+                    "field " + fieldId);
         }
         String jsonValue = serializeToJson(prNumbers);
         return new GitHubProjectFieldValueDTO(fieldId, "PULL_REQUESTS", jsonValue, null, null, null, null);

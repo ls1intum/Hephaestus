@@ -14,15 +14,14 @@ public class SlackAppUninstalledMessageHandler extends AbstractSlackEnvelopeHand
     private final SlackUninstallService uninstallService;
 
     public SlackAppUninstalledMessageHandler(
-        SlackUninstallService uninstallService,
-        NatsMessageDeserializer deserializer
-    ) {
+            SlackUninstallService uninstallService, NatsMessageDeserializer deserializer) {
         super("app_uninstalled", deserializer);
         this.uninstallService = uninstallService;
     }
 
     @Override
     protected void handleEnvelope(JsonNode root) {
-        uninstallService.onUninstall(teamId(root), "app_uninstalled", root.path("event_id").asString(""));
+        uninstallService.onUninstall(
+                teamId(root), "app_uninstalled", root.path("event_id").asString(""));
     }
 }

@@ -53,18 +53,17 @@ import org.jspecify.annotations.Nullable;
 @DynamicUpdate
 @Entity
 @Table(
-    name = "practice",
-    uniqueConstraints = @UniqueConstraint(
-        name = "uk_practice_workspace_slug",
-        columnNames = { "workspace_id", "slug" }
-    ),
-    indexes = {
-        @Index(name = "idx_practice_workspace_autonomy", columnList = "workspace_id, autonomy"),
-        @Index(name = "idx_practice_practice_group", columnList = "practice_group_id"),
-        @Index(name = "idx_practice_group_order", columnList = "practice_group_id, display_order"),
-        @Index(name = "idx_practice_source_curated_slug", columnList = "source_curated_slug"),
-    }
-)
+        name = "practice",
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uk_practice_workspace_slug",
+                        columnNames = {"workspace_id", "slug"}),
+        indexes = {
+            @Index(name = "idx_practice_workspace_autonomy", columnList = "workspace_id, autonomy"),
+            @Index(name = "idx_practice_practice_group", columnList = "practice_group_id"),
+            @Index(name = "idx_practice_group_order", columnList = "practice_group_id, display_order"),
+            @Index(name = "idx_practice_source_curated_slug", columnList = "source_curated_slug"),
+        })
 @Getter
 @Setter
 @NoArgsConstructor

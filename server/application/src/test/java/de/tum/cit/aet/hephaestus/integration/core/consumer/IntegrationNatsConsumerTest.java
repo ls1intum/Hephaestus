@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -65,19 +64,17 @@ class IntegrationNatsConsumerTest {
     void purgeFenceRejectsQueuedConsumerRestart() {
         NatsSubscriptionProvider subscriptions = mock(NatsSubscriptionProvider.class);
         IntegrationNatsConsumer consumer = new IntegrationNatsConsumer(
-            new NatsConnectionProperties(
-                true,
-                "nats://localhost:4222",
-                "heph",
-                new NatsConnectionProperties.Consumer(Duration.ofSeconds(60))
-            ),
-            NatsConsumerPropertiesFixture.defaults(),
-            subscriptions,
-            mock(IntegrationMessageDispatcher.class),
-            mock(IntegrationPoisonHandler.class),
-            new IntegrationConsumerStats(),
-            mock(ConnectionActivityRecorder.class)
-        );
+                new NatsConnectionProperties(
+                        true,
+                        "nats://localhost:4222",
+                        "heph",
+                        new NatsConnectionProperties.Consumer(Duration.ofSeconds(60))),
+                NatsConsumerPropertiesFixture.defaults(),
+                subscriptions,
+                mock(IntegrationMessageDispatcher.class),
+                mock(IntegrationPoisonHandler.class),
+                new IntegrationConsumerStats(),
+                mock(ConnectionActivityRecorder.class));
         try {
             consumer.stopConsumingScopeForPurge(7L);
             consumer.startConsumingScope(7L);
@@ -91,28 +88,27 @@ class IntegrationNatsConsumerTest {
     @Test
     void rolledBackPurgeRestartsConsumption() throws Exception {
         CountDownLatch restarted = new CountDownLatch(1);
-        IntegrationNatsConsumer consumer = new IntegrationNatsConsumer(
-            new NatsConnectionProperties(
-                true,
-                "nats://localhost:4222",
-                "heph",
-                new NatsConnectionProperties.Consumer(Duration.ofSeconds(60))
-            ),
-            NatsConsumerPropertiesFixture.defaults(),
-            scopeId -> Optional.empty(),
-            mock(IntegrationMessageDispatcher.class),
-            mock(IntegrationPoisonHandler.class),
-            new IntegrationConsumerStats(),
-            mock(ConnectionActivityRecorder.class)
-        ) {
-            @Override
-            void ensureNatsConnectionEstablished() {}
+        IntegrationNatsConsumer consumer =
+                new IntegrationNatsConsumer(
+                        new NatsConnectionProperties(
+                                true,
+                                "nats://localhost:4222",
+                                "heph",
+                                new NatsConnectionProperties.Consumer(Duration.ofSeconds(60))),
+                        NatsConsumerPropertiesFixture.defaults(),
+                        scopeId -> Optional.empty(),
+                        mock(IntegrationMessageDispatcher.class),
+                        mock(IntegrationPoisonHandler.class),
+                        new IntegrationConsumerStats(),
+                        mock(ConnectionActivityRecorder.class)) {
+                    @Override
+                    void ensureNatsConnectionEstablished() {}
 
-            @Override
-            void reconcileScope(Long scopeId) {
-                restarted.countDown();
-            }
-        };
+                    @Override
+                    void reconcileScope(Long scopeId) {
+                        restarted.countDown();
+                    }
+                };
         TransactionSynchronizationManager.initSynchronization();
         try {
             consumer.stopConsumingScopeForPurge(7L);
@@ -133,11 +129,8 @@ class IntegrationNatsConsumerTest {
     void newConsumerStartsAtNewMessagesInsteadOfReplayingStreamHistory() {
         NatsConsumerProperties properties = NatsConsumerPropertiesFixture.defaults();
 
-        var config = IntegrationNatsConsumer.newConsumerConfiguration(
-            new String[] { "slack.>" },
-            properties,
-            "heph-slack"
-        );
+        var config =
+                IntegrationNatsConsumer.newConsumerConfiguration(new String[] {"slack.>"}, properties, "heph-slack");
 
         assertThat(config.getDeliverPolicy()).isEqualTo(DeliverPolicy.New);
         assertThat(config.getDurable()).isEqualTo("heph-slack");
@@ -148,10 +141,7 @@ class IntegrationNatsConsumerTest {
         // Every durable, not only the ones a deployment remembers to configure — see
         // NatsConsumerProperties for why an unreaped one is permanent.
         var config = IntegrationNatsConsumer.newConsumerConfiguration(
-            new String[] { "github.>" },
-            NatsConsumerPropertiesFixture.defaults(),
-            "heph-github"
-        );
+                new String[] {"github.>"}, NatsConsumerPropertiesFixture.defaults(), "heph-github");
 
         assertThat(config.getInactiveThreshold()).isNotNull().isPositive();
     }
@@ -159,10 +149,9 @@ class IntegrationNatsConsumerTest {
     @Test
     void shouldReapDurableWhenInactiveThresholdIsConfigured() {
         var config = IntegrationNatsConsumer.newConsumerConfiguration(
-            new String[] { "github.>" },
-            NatsConsumerPropertiesFixture.withInactiveThreshold(Duration.ofHours(72)),
-            "heph-github"
-        );
+                new String[] {"github.>"},
+                NatsConsumerPropertiesFixture.withInactiveThreshold(Duration.ofHours(72)),
+                "heph-github");
 
         assertThat(config.getInactiveThreshold()).isEqualTo(Duration.ofHours(72));
     }
@@ -170,10 +159,9 @@ class IntegrationNatsConsumerTest {
     @Test
     void shouldLeaveEphemeralLifetimeAloneWhenInactiveThresholdIsConfigured() {
         var config = IntegrationNatsConsumer.newConsumerConfiguration(
-            new String[] { "github.>" },
-            NatsConsumerPropertiesFixture.withInactiveThreshold(Duration.ofHours(72)),
-            null
-        );
+                new String[] {"github.>"},
+                NatsConsumerPropertiesFixture.withInactiveThreshold(Duration.ofHours(72)),
+                null);
 
         assertThat(config.getInactiveThreshold()).isNull();
     }
@@ -182,24 +170,23 @@ class IntegrationNatsConsumerTest {
     class ReconnectBackoffMs {
 
         @ParameterizedTest(name = "attempt={0} → delay in [{1}, {2}] ms")
-        @CsvSource(
-            {
-                // attempt, minMs (= base * 2^attempt, no jitter floor), maxMs (= base * 2^attempt + JITTER_MAX, capped at 30_000)
-                "0, 1000, 2000",
-                "1, 2000, 3000",
-                "2, 4000, 5000",
-                "3, 8000, 9000",
-                "4, 16000, 17000",
-                "5, 30000, 30000",
-                "6, 30000, 30000",
-            }
-        )
+        @CsvSource({
+            // attempt, minMs (= base * 2^attempt, no jitter floor), maxMs (= base * 2^attempt + JITTER_MAX, capped at
+            // 30_000)
+            "0, 1000, 2000",
+            "1, 2000, 3000",
+            "2, 4000, 5000",
+            "3, 8000, 9000",
+            "4, 16000, 17000",
+            "5, 30000, 30000",
+            "6, 30000, 30000",
+        })
         void clampedExponentialWithJitter(int attempt, long minExpected, long maxExpected) {
             long delay = IntegrationNatsConsumer.reconnectBackoffMs(attempt);
             assertThat(delay)
-                .as("attempt=%d expected to land in [%d, %d] ms (got %d)", attempt, minExpected, maxExpected, delay)
-                .isGreaterThanOrEqualTo(minExpected)
-                .isLessThanOrEqualTo(maxExpected);
+                    .as("attempt=%d expected to land in [%d, %d] ms (got %d)", attempt, minExpected, maxExpected, delay)
+                    .isGreaterThanOrEqualTo(minExpected)
+                    .isLessThanOrEqualTo(maxExpected);
         }
 
         @Test
@@ -232,19 +219,17 @@ class IntegrationNatsConsumerTest {
         private IntegrationNatsConsumer newConsumer() {
             when(message.getSubject()).thenReturn("github.acme.repo.issues");
             return new IntegrationNatsConsumer(
-                new NatsConnectionProperties(
-                    true,
-                    "nats://localhost:4222",
-                    "heph",
-                    new NatsConnectionProperties.Consumer(Duration.ofSeconds(60))
-                ),
-                NatsConsumerPropertiesFixture.withFastPoisonBackoff(),
-                scopeId -> Optional.empty(),
-                dispatcher,
-                mock(IntegrationPoisonHandler.class),
-                new IntegrationConsumerStats(),
-                activityRecorder
-            );
+                    new NatsConnectionProperties(
+                            true,
+                            "nats://localhost:4222",
+                            "heph",
+                            new NatsConnectionProperties.Consumer(Duration.ofSeconds(60))),
+                    NatsConsumerPropertiesFixture.withFastPoisonBackoff(),
+                    scopeId -> Optional.empty(),
+                    dispatcher,
+                    mock(IntegrationPoisonHandler.class),
+                    new IntegrationConsumerStats(),
+                    activityRecorder);
         }
 
         @Test
@@ -323,8 +308,7 @@ class IntegrationNatsConsumerTest {
 
         @Test
         @DisplayName(
-            "a consumer started before the failing stream stays tracked (never a running-but-orphaned consumer)"
-        )
+                "a consumer started before the failing stream stays tracked (never a running-but-orphaned consumer)")
         void partialFailureCommitsWhatItStarted() {
             FakeFleet consumer = fleetFailingOn(OUTLINE_STREAM);
 
@@ -332,8 +316,8 @@ class IntegrationNatsConsumerTest {
 
             assertThat(consumer.started).hasSize(1);
             assertThat(consumer.trackedConsumers(SCOPE_ID))
-                .as("the started consumer must remain reachable for stop/update")
-                .containsExactlyElementsOf(consumer.started);
+                    .as("the started consumer must remain reachable for stop/update")
+                    .containsExactlyElementsOf(consumer.started);
             assertThat(consumer.trackedConsumers(SCOPE_ID).get(0).streamName()).isEqualTo(SCM_STREAM);
             assertThat(consumer.trackedConsumers(SCOPE_ID).get(0).isRunning()).isTrue();
         }
@@ -349,16 +333,13 @@ class IntegrationNatsConsumerTest {
             // The webhook pod finished booting and created the stream.
             consumer.failingStreams.clear();
 
-            await()
-                .atMost(Duration.ofSeconds(10))
-                .untilAsserted(() ->
-                    assertThat(consumer.trackedConsumers(SCOPE_ID))
-                        .as("the re-armed retry must bind the stream that failed the first pass")
-                        .hasSize(2)
-                );
+            await().atMost(Duration.ofSeconds(10))
+                    .untilAsserted(() -> assertThat(consumer.trackedConsumers(SCOPE_ID))
+                            .as("the re-armed retry must bind the stream that failed the first pass")
+                            .hasSize(2));
             assertThat(consumer.trackedConsumers(SCOPE_ID))
-                .extracting(ScopeConsumer::streamName)
-                .containsExactlyInAnyOrder(SCM_STREAM, OUTLINE_STREAM);
+                    .extracting(ScopeConsumer::streamName)
+                    .containsExactlyInAnyOrder(SCM_STREAM, OUTLINE_STREAM);
         }
 
         /**
@@ -373,28 +354,21 @@ class IntegrationNatsConsumerTest {
 
             FakeFleet(Set<String> failingStreams) {
                 super(
-                    new NatsConnectionProperties(
-                        true,
-                        "nats://localhost:4222",
-                        "heph",
-                        new NatsConnectionProperties.Consumer(Duration.ofSeconds(60))
-                    ),
-                    NatsConsumerPropertiesFixture.withFastPoisonBackoff(),
-                    scopeId ->
-                        Optional.of(
-                            new NatsSubscriptionInfo(
+                        new NatsConnectionProperties(
+                                true,
+                                "nats://localhost:4222",
+                                "heph",
+                                new NatsConnectionProperties.Consumer(Duration.ofSeconds(60))),
+                        NatsConsumerPropertiesFixture.withFastPoisonBackoff(),
+                        scopeId -> Optional.of(new NatsSubscriptionInfo(
                                 scopeId,
                                 List.of(
-                                    new StreamSubscription(SCM_STREAM, Set.of("github.acme.>")),
-                                    new StreamSubscription(OUTLINE_STREAM, Set.of("outline.acme.>"))
-                                )
-                            )
-                        ),
-                    mock(IntegrationMessageDispatcher.class),
-                    mock(IntegrationPoisonHandler.class),
-                    new IntegrationConsumerStats(),
-                    mock(ConnectionActivityRecorder.class)
-                );
+                                        new StreamSubscription(SCM_STREAM, Set.of("github.acme.>")),
+                                        new StreamSubscription(OUTLINE_STREAM, Set.of("outline.acme.>"))))),
+                        mock(IntegrationMessageDispatcher.class),
+                        mock(IntegrationPoisonHandler.class),
+                        new IntegrationConsumerStats(),
+                        mock(ConnectionActivityRecorder.class));
                 this.failingStreams = new ConcurrentSkipListSet<>(failingStreams);
             }
 
@@ -409,14 +383,13 @@ class IntegrationNatsConsumerTest {
                     throw new IOException("stream not found: " + subscription.streamName());
                 }
                 ScopeConsumer scopeConsumer = new ScopeConsumer(
-                    scopeId,
-                    "heph-scope-" + scopeId + "-" + subscription.streamName(),
-                    subscription.streamName(),
-                    mock(ConsumerContext.class),
-                    mock(StreamContext.class),
-                    subscription.subjects().toArray(String[]::new),
-                    msg -> {}
-                );
+                        scopeId,
+                        "heph-scope-" + scopeId + "-" + subscription.streamName(),
+                        subscription.streamName(),
+                        mock(ConsumerContext.class),
+                        mock(StreamContext.class),
+                        subscription.subjects().toArray(String[]::new),
+                        msg -> {});
                 try {
                     scopeConsumer.start();
                 } catch (Exception e) {

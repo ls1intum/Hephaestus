@@ -49,9 +49,9 @@ public class WorkspaceRegistryController {
 
     @GetMapping("/providers")
     @Operation(
-        summary = "List available workspace creation providers",
-        description = "Returns available workspace providers with their configuration. Public endpoint — no authentication required."
-    )
+            summary = "List available workspace creation providers",
+            description =
+                    "Returns available workspace providers with their configuration. Public endpoint — no authentication required.")
     @SecurityRequirements
     @PreAuthorize("permitAll()")
     public ResponseEntity<WorkspaceProvidersDTO> getProviders() {
@@ -61,28 +61,20 @@ public class WorkspaceRegistryController {
     @PostMapping
     @Operation(summary = "Create a new workspace")
     @ApiResponse(
-        responseCode = "201",
-        description = "Workspace created",
-        content = @Content(schema = @Schema(implementation = WorkspaceDTO.class))
-    )
+            responseCode = "201",
+            description = "Workspace created",
+            content = @Content(schema = @Schema(implementation = WorkspaceDTO.class)))
     public ResponseEntity<WorkspaceDTO> createWorkspace(
-        @Valid @RequestBody CreateWorkspaceRequestDTO createWorkspaceRequest
-    ) {
+            @Valid @RequestBody CreateWorkspaceRequestDTO createWorkspaceRequest) {
         // Actor gate; orthogonal to per-provider availability (the GitLab feature flag below).
-        if (
-            workspaceProperties.creationPolicy() == WorkspaceProperties.CreationPolicy.ADMIN_ONLY &&
-            !SecurityUtils.isSuperAdmin()
-        ) {
+        if (workspaceProperties.creationPolicy() == WorkspaceProperties.CreationPolicy.ADMIN_ONLY
+                && !SecurityUtils.isSuperAdmin()) {
             throw new ResponseStatusException(
-                HttpStatus.FORBIDDEN,
-                "Workspace creation is restricted to instance admins on this deployment"
-            );
+                    HttpStatus.FORBIDDEN, "Workspace creation is restricted to instance admins on this deployment");
         }
 
-        if (
-            createWorkspaceRequest.kind() == IntegrationKind.GITLAB &&
-            !featureFlagService.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION)
-        ) {
+        if (createWorkspaceRequest.kind() == IntegrationKind.GITLAB
+                && !featureFlagService.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "GitLab workspace creation is not enabled");
         }
 
@@ -94,9 +86,9 @@ public class WorkspaceRegistryController {
         Workspace workspace = workspaceService.createWorkspaceWithInitialization(createWorkspaceRequest);
 
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
-            .path("/{workspaceSlug}")
-            .buildAndExpand(workspace.getWorkspaceSlug())
-            .toUri();
+                .path("/{workspaceSlug}")
+                .buildAndExpand(workspace.getWorkspaceSlug())
+                .toUri();
 
         return ResponseEntity.created(location).body(workspaceQueryService.toWorkspaceDTO(workspace));
     }
@@ -104,10 +96,9 @@ public class WorkspaceRegistryController {
     @GetMapping
     @Operation(summary = "List all workspaces")
     @ApiResponse(
-        responseCode = "200",
-        description = "Workspace list",
-        content = @Content(array = @ArraySchema(schema = @Schema(implementation = WorkspaceListItemDTO.class)))
-    )
+            responseCode = "200",
+            description = "Workspace list",
+            content = @Content(array = @ArraySchema(schema = @Schema(implementation = WorkspaceListItemDTO.class))))
     public ResponseEntity<List<WorkspaceListItemDTO>> listWorkspaces() {
         return ResponseEntity.ok(workspaceQueryService.findAccessibleWorkspaceListItems());
     }

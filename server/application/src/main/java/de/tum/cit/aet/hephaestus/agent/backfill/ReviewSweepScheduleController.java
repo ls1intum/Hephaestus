@@ -58,86 +58,74 @@ public class ReviewSweepScheduleController {
 
     @PostMapping
     @Operation(
-        summary = "Start sweeping a kind of work on a cadence",
-        description = "Authorises the recurring spend. The first sweep runs within the hour."
-    )
+            summary = "Start sweeping a kind of work on a cadence",
+            description = "Authorises the recurring spend. The first sweep runs within the hour.")
     @ApiResponse(
-        responseCode = "201",
-        description = "Schedule created",
-        content = @Content(schema = @Schema(implementation = ReviewSweepScheduleDTO.class))
-    )
+            responseCode = "201",
+            description = "Schedule created",
+            content = @Content(schema = @Schema(implementation = ReviewSweepScheduleDTO.class)))
     @ApiResponse(
-        responseCode = "400",
-        description = "The kind cannot be swept, or the lookback is longer than the cadence allows",
-        content = @Content(
-            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-            schema = @Schema(implementation = ProblemDetail.class)
-        )
-    )
+            responseCode = "400",
+            description = "The kind cannot be swept, or the lookback is longer than the cadence allows",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     @ApiResponse(
-        responseCode = "409",
-        description = "This workspace already sweeps that kind of work",
-        content = @Content(
-            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-            schema = @Schema(implementation = ProblemDetail.class)
-        )
-    )
+            responseCode = "409",
+            description = "This workspace already sweeps that kind of work",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "REVIEW_SWEEP_SCHEDULE")
     public ResponseEntity<ReviewSweepScheduleDTO> createSweepSchedule(
-        WorkspaceContext workspaceContext,
-        @Valid @RequestBody CreateReviewSweepScheduleRequestDTO request
-    ) {
+            WorkspaceContext workspaceContext, @Valid @RequestBody CreateReviewSweepScheduleRequestDTO request) {
         ReviewSweepScheduleDTO schedule = reviewSweepScheduleService.create(workspaceContext, request);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
-            .path("/{scheduleId}")
-            .buildAndExpand(schedule.id())
-            .toUri();
+                .path("/{scheduleId}")
+                .buildAndExpand(schedule.id())
+                .toUri();
         return ResponseEntity.created(location).body(schedule);
     }
 
     @PutMapping("/{scheduleId}")
     @Operation(
-        summary = "Replace a sweep schedule's terms",
-        description = "Changes the cadence, the window, or whether the sweep runs at all."
-    )
+            summary = "Replace a sweep schedule's terms",
+            description = "Changes the cadence, the window, or whether the sweep runs at all.")
     @ApiResponse(
-        responseCode = "200",
-        description = "Schedule updated",
-        content = @Content(schema = @Schema(implementation = ReviewSweepScheduleDTO.class))
-    )
+            responseCode = "200",
+            description = "Schedule updated",
+            content = @Content(schema = @Schema(implementation = ReviewSweepScheduleDTO.class)))
     @ApiResponse(
-        responseCode = "404",
-        description = "No such schedule in this workspace",
-        content = @Content(
-            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-            schema = @Schema(implementation = ProblemDetail.class)
-        )
-    )
+            responseCode = "404",
+            description = "No such schedule in this workspace",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "REVIEW_SWEEP_SCHEDULE")
     public ResponseEntity<ReviewSweepScheduleDTO> replaceSweepSchedule(
-        WorkspaceContext workspaceContext,
-        @PathVariable UUID scheduleId,
-        @Valid @RequestBody UpdateReviewSweepScheduleRequestDTO request
-    ) {
+            WorkspaceContext workspaceContext,
+            @PathVariable UUID scheduleId,
+            @Valid @RequestBody UpdateReviewSweepScheduleRequestDTO request) {
         return ResponseEntity.ok(reviewSweepScheduleService.replace(workspaceContext, scheduleId, request));
     }
 
     @DeleteMapping("/{scheduleId}")
     @Operation(
-        summary = "Stop sweeping",
-        description = "Removes the instruction. Campaigns it already opened keep their records."
-    )
+            summary = "Stop sweeping",
+            description = "Removes the instruction. Campaigns it already opened keep their records.")
     @ApiResponse(responseCode = "204", description = "Schedule removed")
     @ApiResponse(
-        responseCode = "404",
-        description = "No such schedule in this workspace",
-        content = @Content(
-            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-            schema = @Schema(implementation = ProblemDetail.class)
-        )
-    )
+            responseCode = "404",
+            description = "No such schedule in this workspace",
+            content =
+                    @Content(
+                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                            schema = @Schema(implementation = ProblemDetail.class)))
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "REVIEW_SWEEP_SCHEDULE")
     public ResponseEntity<Void> deleteSweepSchedule(WorkspaceContext workspaceContext, @PathVariable UUID scheduleId) {

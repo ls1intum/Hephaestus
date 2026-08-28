@@ -37,11 +37,10 @@ public class GitLabNoteSyncService {
     private final GitLabProperties gitLabProperties;
 
     public GitLabNoteSyncService(
-        GitLabGraphQlClientProvider graphQlClientProvider,
-        GitLabGraphQlResponseHandler responseHandler,
-        GitLabIssueCommentProcessor issueCommentProcessor,
-        GitLabProperties gitLabProperties
-    ) {
+            GitLabGraphQlClientProvider graphQlClientProvider,
+            GitLabGraphQlResponseHandler responseHandler,
+            GitLabIssueCommentProcessor issueCommentProcessor,
+            GitLabProperties gitLabProperties) {
         this.graphQlClientProvider = graphQlClientProvider;
         this.responseHandler = responseHandler;
         this.issueCommentProcessor = issueCommentProcessor;
@@ -50,31 +49,30 @@ public class GitLabNoteSyncService {
 
     public int syncNotesForIssue(Long scopeId, Repository repository, int issueIid, Issue parent) {
         return syncNotes(
-            scopeId,
-            repository,
-            GET_ISSUE_NOTES_DOCUMENT,
-            "iid",
-            String.valueOf(issueIid),
-            "project.issue.notes",
-            parent
-        );
+                scopeId,
+                repository,
+                GET_ISSUE_NOTES_DOCUMENT,
+                "iid",
+                String.valueOf(issueIid),
+                "project.issue.notes",
+                parent);
     }
 
     @SuppressWarnings("unchecked")
     private int syncNotes(
-        Long scopeId,
-        Repository repository,
-        String documentName,
-        String iidVariableName,
-        String iidValue,
-        String notesFieldPath,
-        Issue parent
-    ) {
+            Long scopeId,
+            Repository repository,
+            String documentName,
+            String iidVariableName,
+            String iidValue,
+            String notesFieldPath,
+            Issue parent) {
         String projectPath = repository.getNameWithOwner();
         String safeContext = sanitizeForLog(projectPath) + "#" + iidValue;
         Long providerId = Objects.requireNonNull(
-            repository.getProvider() != null ? Objects.requireNonNull(repository.getProvider().getId()) : null
-        );
+                repository.getProvider() != null
+                        ? Objects.requireNonNull(repository.getProvider().getId())
+                        : null);
 
         if (providerId == null) {
             log.warn("Skipping note sync: reason=nullProviderId, context={}", safeContext);
@@ -110,14 +108,13 @@ public class GitLabNoteSyncService {
 
                 HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
-                ClientGraphQlResponse response = client
-                    .documentName(documentName)
-                    .variable("fullPath", projectPath)
-                    .variable(iidVariableName, iidValue)
-                    .variable("first", pageSize)
-                    .variable("after", cursor)
-                    .execute()
-                    .block(gitLabProperties.graphqlTimeout());
+                ClientGraphQlResponse response = client.documentName(documentName)
+                        .variable("fullPath", projectPath)
+                        .variable(iidVariableName, iidValue)
+                        .variable("first", pageSize)
+                        .variable("after", cursor)
+                        .execute()
+                        .block(gitLabProperties.graphqlTimeout());
 
                 var handleResult = responseHandler.handle(response, "notes for " + safeContext, log);
                 if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.RETRY) {
@@ -125,8 +122,7 @@ public class GitLabNoteSyncService {
                 }
                 if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
                     graphQlClientProvider.recordFailure(
-                        new GitLabSyncException("Invalid GraphQL response: context=" + safeContext)
-                    );
+                            new GitLabSyncException("Invalid GraphQL response: context=" + safeContext));
                     break;
                 }
 
@@ -135,8 +131,8 @@ public class GitLabNoteSyncService {
                 if (page == 0) {
                     try {
                         Object countField = Objects.requireNonNull(response)
-                            .field(notesFieldPath + ".count")
-                            .getValue();
+                                .field(notesFieldPath + ".count")
+                                .getValue();
                         if (countField instanceof Number number) {
                             reportedTotalCount = number.intValue();
                         }
@@ -147,8 +143,8 @@ public class GitLabNoteSyncService {
 
                 @SuppressWarnings("rawtypes")
                 List nodesRaw = Objects.requireNonNull(response)
-                    .field(notesFieldPath + ".nodes")
-                    .toEntityList(Map.class);
+                        .field(notesFieldPath + ".nodes")
+                        .toEntityList(Map.class);
                 List<Map<String, Object>> nodes = (List<Map<String, Object>>) nodesRaw;
 
                 if (nodes == null || nodes.isEmpty()) {
@@ -170,8 +166,8 @@ public class GitLabNoteSyncService {
 
                 // Pagination
                 GitLabPageInfo pageInfo = Objects.requireNonNull(response)
-                    .field(notesFieldPath + ".pageInfo")
-                    .toEntity(GitLabPageInfo.class);
+                        .field(notesFieldPath + ".pageInfo")
+                        .toEntity(GitLabPageInfo.class);
 
                 if (pageInfo == null || !pageInfo.hasNextPage()) {
                     break;
@@ -201,12 +197,11 @@ public class GitLabNoteSyncService {
 
         if (reportedTotalCount >= 0 && totalSynced + totalSkipped < reportedTotalCount) {
             log.warn(
-                "Note connection overflow detected: context={}, synced={}, skipped={}, reportedCount={}",
-                safeContext,
-                totalSynced,
-                totalSkipped,
-                reportedTotalCount
-            );
+                    "Note connection overflow detected: context={}, synced={}, skipped={}, reportedCount={}",
+                    safeContext,
+                    totalSynced,
+                    totalSkipped,
+                    reportedTotalCount);
         }
 
         if (totalSynced > 0) {
@@ -248,10 +243,10 @@ public class GitLabNoteSyncService {
 
         // Author
         String authorGlobalId = null,
-            authorUsername = null,
-            authorName = null,
-            authorAvatarUrl = null,
-            authorWebUrl = null;
+                authorUsername = null,
+                authorName = null,
+                authorAvatarUrl = null,
+                authorWebUrl = null;
         Map<String, Object> authorMap = (Map<String, Object>) node.get("author");
         if (authorMap != null) {
             authorGlobalId = (String) authorMap.get("id");
@@ -262,17 +257,16 @@ public class GitLabNoteSyncService {
         }
 
         var syncData = new GitLabIssueCommentProcessor.SyncNoteData(
-            noteId,
-            body,
-            url,
-            authorGlobalId,
-            authorUsername,
-            authorName,
-            authorAvatarUrl,
-            authorWebUrl,
-            createdAt,
-            updatedAt
-        );
+                noteId,
+                body,
+                url,
+                authorGlobalId,
+                authorUsername,
+                authorName,
+                authorAvatarUrl,
+                authorWebUrl,
+                createdAt,
+                updatedAt);
 
         return issueCommentProcessor.processFromSync(syncData, parent, providerId, scopeId) != null;
     }

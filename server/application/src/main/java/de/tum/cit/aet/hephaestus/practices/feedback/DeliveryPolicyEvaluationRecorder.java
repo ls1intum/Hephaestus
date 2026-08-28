@@ -18,8 +18,7 @@ public class DeliveryPolicyEvaluationRecorder {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void record(DeliveryPolicyEvaluationCommand command) {
-        repository.save(
-            DeliveryPolicyEvaluation.builder()
+        repository.save(DeliveryPolicyEvaluation.builder()
                 .workspaceId(command.workspaceId())
                 .agentJobId(command.agentJobId())
                 .feedbackId(command.feedbackId())
@@ -32,7 +31,6 @@ public class DeliveryPolicyEvaluationRecorder {
                 .decisiveReason(command.result().suppressionReason())
                 .checks(objectMapper.valueToTree(command.result().checks()))
                 .facts(objectMapper.valueToTree(command.facts()))
-                .build()
-        );
+                .build());
     }
 }

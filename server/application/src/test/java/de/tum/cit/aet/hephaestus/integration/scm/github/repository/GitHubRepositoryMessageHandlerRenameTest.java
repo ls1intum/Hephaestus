@@ -70,21 +70,19 @@ class GitHubRepositoryMessageHandlerRenameTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         handler = new GitHubRepositoryMessageHandler(
-            provisioningListener,
-            repositoryRepository,
-            projectIntegrityService,
-            gitProviderRepository,
-            syncTargetProvider,
-            deserializer,
-            new TransactionTemplate()
-        );
+                provisioningListener,
+                repositoryRepository,
+                projectIntegrityService,
+                gitProviderRepository,
+                syncTargetProvider,
+                deserializer,
+                new TransactionTemplate());
     }
 
     private void stubProvider() {
         when(gitHubProvider.getId()).thenReturn(PROVIDER_ID);
-        when(
-            gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-        ).thenReturn(Optional.of(gitHubProvider));
+        when(gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com"))
+                .thenReturn(Optional.of(gitHubProvider));
     }
 
     private static GitHubRepositoryRefDTO repositoryRef(String name, String fullName) {
@@ -93,26 +91,18 @@ class GitHubRepositoryMessageHandlerRenameTest extends BaseUnitTest {
 
     private static GitHubRepositoryEventDTO renamedEvent() {
         var changes = new GitHubRepositoryEventDTO.Changes(
-            new GitHubRepositoryEventDTO.Changes.RepositoryChanges(
-                new GitHubRepositoryEventDTO.Changes.NameChange("payload-fixture-repo")
-            ),
-            null
-        );
+                new GitHubRepositoryEventDTO.Changes.RepositoryChanges(
+                        new GitHubRepositoryEventDTO.Changes.NameChange("payload-fixture-repo")),
+                null);
         return new GitHubRepositoryEventDTO("renamed", repositoryRef(NEW_NAME, NEW_FULL_NAME), changes, null, null);
     }
 
     private static GitHubRepositoryEventDTO transferredEvent() {
         var changes = new GitHubRepositoryEventDTO.Changes(
-            null,
-            new GitHubRepositoryEventDTO.Changes.OwnerChanges(Map.of("user", Map.of("login", "FelixTJDietrich")))
-        );
+                null,
+                new GitHubRepositoryEventDTO.Changes.OwnerChanges(Map.of("user", Map.of("login", "FelixTJDietrich"))));
         return new GitHubRepositoryEventDTO(
-            "transferred",
-            repositoryRef("TestRepository", "HephaestusTest/TestRepository"),
-            changes,
-            null,
-            null
-        );
+                "transferred", repositoryRef("TestRepository", "HephaestusTest/TestRepository"), changes, null, null);
     }
 
     @Test
@@ -121,9 +111,8 @@ class GitHubRepositoryMessageHandlerRenameTest extends BaseUnitTest {
         Repository repository = new Repository();
         repository.setName("payload-fixture-repo");
         repository.setNameWithOwner(OLD_FULL_NAME);
-        when(repositoryRepository.findByNativeIdAndProviderId(NATIVE_ID, PROVIDER_ID)).thenReturn(
-            Optional.of(repository)
-        );
+        when(repositoryRepository.findByNativeIdAndProviderId(NATIVE_ID, PROVIDER_ID))
+                .thenReturn(Optional.of(repository));
 
         handler.handleEvent(renamedEvent());
 
@@ -142,9 +131,8 @@ class GitHubRepositoryMessageHandlerRenameTest extends BaseUnitTest {
         stubProvider();
         Repository repository = new Repository();
         repository.setNameWithOwner("FelixTJDietrich/TestRepository");
-        when(repositoryRepository.findByNativeIdAndProviderId(NATIVE_ID, PROVIDER_ID)).thenReturn(
-            Optional.of(repository)
-        );
+        when(repositoryRepository.findByNativeIdAndProviderId(NATIVE_ID, PROVIDER_ID))
+                .thenReturn(Optional.of(repository));
 
         handler.handleEvent(transferredEvent());
 
@@ -155,7 +143,8 @@ class GitHubRepositoryMessageHandlerRenameTest extends BaseUnitTest {
     @Test
     void monitorIsHealedEvenWhenNoDomainRowIsMirroredYet() {
         stubProvider();
-        when(repositoryRepository.findByNativeIdAndProviderId(NATIVE_ID, PROVIDER_ID)).thenReturn(Optional.empty());
+        when(repositoryRepository.findByNativeIdAndProviderId(NATIVE_ID, PROVIDER_ID))
+                .thenReturn(Optional.empty());
         when(repositoryRepository.findByNameWithOwner(OLD_FULL_NAME)).thenReturn(Optional.empty());
 
         handler.handleEvent(renamedEvent());
@@ -170,9 +159,8 @@ class GitHubRepositoryMessageHandlerRenameTest extends BaseUnitTest {
         Repository repository = new Repository();
         repository.setNameWithOwner(OLD_FULL_NAME);
         // No IdentityProvider row configured -> the stable-id lookup cannot run.
-        when(
-            gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-        ).thenReturn(Optional.empty());
+        when(gitProviderRepository.findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com"))
+                .thenReturn(Optional.empty());
         when(repositoryRepository.findByNameWithOwner(OLD_FULL_NAME)).thenReturn(Optional.of(repository));
 
         handler.handleEvent(renamedEvent());
@@ -183,13 +171,8 @@ class GitHubRepositoryMessageHandlerRenameTest extends BaseUnitTest {
 
     @Test
     void unrelatedActionsDoNotTouchTheMonitors() {
-        var archived = new GitHubRepositoryEventDTO(
-            "archived",
-            repositoryRef(NEW_NAME, NEW_FULL_NAME),
-            null,
-            null,
-            null
-        );
+        var archived =
+                new GitHubRepositoryEventDTO("archived", repositoryRef(NEW_NAME, NEW_FULL_NAME), null, null, null);
         when(repositoryRepository.findByNameWithOwner(NEW_FULL_NAME)).thenReturn(Optional.empty());
 
         handler.handleEvent(archived);

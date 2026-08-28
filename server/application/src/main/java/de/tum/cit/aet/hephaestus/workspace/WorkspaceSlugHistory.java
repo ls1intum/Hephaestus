@@ -35,10 +35,9 @@ public class WorkspaceSlugHistory {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
-        name = "workspace_id",
-        nullable = false,
-        foreignKey = @ForeignKey(name = "fk_workspace_slug_history_workspace")
-    )
+            name = "workspace_id",
+            nullable = false,
+            foreignKey = @ForeignKey(name = "fk_workspace_slug_history_workspace"))
     @NotNull(message = "Workspace is required")
     @ToString.Exclude
     private Workspace workspace;

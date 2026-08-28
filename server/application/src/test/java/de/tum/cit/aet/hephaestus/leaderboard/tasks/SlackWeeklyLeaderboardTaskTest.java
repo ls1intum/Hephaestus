@@ -62,25 +62,14 @@ class SlackWeeklyLeaderboardTaskTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        ApplicationProperties appProps = new ApplicationProperties(
-            "https://app.test",
-            new ApplicationProperties.Webapp("https://app.test")
-        );
+        ApplicationProperties appProps =
+                new ApplicationProperties("https://app.test", new ApplicationProperties.Webapp("https://app.test"));
         task = new SlackWeeklyLeaderboardTask(
-            appProps,
-            leaderboardService,
-            connectionService,
-            scheduleResolver,
-            eventPublisher
-        );
+                appProps, leaderboardService, connectionService, scheduleResolver, eventPublisher);
         Mockito.lenient()
-            .when(scheduleResolver.previousCycleWindow(any(Workspace.class)))
-            .thenReturn(
-                new LeaderboardScheduleResolver.CycleWindow(
-                    Instant.parse("2026-01-01T00:00:00Z"),
-                    Instant.parse("2026-01-08T00:00:00Z")
-                )
-            );
+                .when(scheduleResolver.previousCycleWindow(any(Workspace.class)))
+                .thenReturn(new LeaderboardScheduleResolver.CycleWindow(
+                        Instant.parse("2026-01-01T00:00:00Z"), Instant.parse("2026-01-08T00:00:00Z")));
     }
 
     @Test
@@ -97,7 +86,9 @@ class SlackWeeklyLeaderboardTaskTest extends BaseUnitTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("skipScenarios")
     void skipConditions_neverPublishEvent(String name, Workspace w, Optional<ConnectionConfig.SlackConfig> cfg) {
-        Mockito.lenient().when(connectionService.findSlackNotificationConfig(w.getId())).thenReturn(cfg);
+        Mockito.lenient()
+                .when(connectionService.findSlackNotificationConfig(w.getId()))
+                .thenReturn(cfg);
 
         task.runForWorkspace(w);
 
@@ -106,31 +97,26 @@ class SlackWeeklyLeaderboardTaskTest extends BaseUnitTest {
 
     private static Stream<Arguments> skipScenarios() {
         return Stream.of(
-            Arguments.of(
-                "notificationsDisabled",
-                workspace(1L, "acme", false),
-                Optional.of(slackConfig("C0974LJBPBK", "engineering"))
-            ),
-            Arguments.of("noChannelConfigured", workspace(1L, "acme", true), Optional.of(slackConfig(null, null)))
-        );
+                Arguments.of(
+                        "notificationsDisabled",
+                        workspace(1L, "acme", false),
+                        Optional.of(slackConfig("C0974LJBPBK", "engineering"))),
+                Arguments.of("noChannelConfigured", workspace(1L, "acme", true), Optional.of(slackConfig(null, null))));
     }
 
     @Test
     void emptyLeaderboard_doesNotPublishEvent() {
         Workspace w = workspace(99L, "acme", true);
-        when(connectionService.findSlackNotificationConfig(99L)).thenReturn(
-            Optional.of(slackConfig("C0974LJBPBK", null))
-        );
-        when(
-            leaderboardService.createLeaderboard(
-                any(Workspace.class),
-                any(),
-                any(),
-                anyString(),
-                eq(LeaderboardSortType.SCORE),
-                eq(LeaderboardMode.INDIVIDUAL)
-            )
-        ).thenReturn(List.of());
+        when(connectionService.findSlackNotificationConfig(99L))
+                .thenReturn(Optional.of(slackConfig("C0974LJBPBK", null)));
+        when(leaderboardService.createLeaderboard(
+                        any(Workspace.class),
+                        any(),
+                        any(),
+                        anyString(),
+                        eq(LeaderboardSortType.SCORE),
+                        eq(LeaderboardMode.INDIVIDUAL)))
+                .thenReturn(List.of());
 
         task.runForWorkspace(w);
 
@@ -140,19 +126,16 @@ class SlackWeeklyLeaderboardTaskTest extends BaseUnitTest {
     @Test
     void happyPath_publishesOneEventForTheWorkspace() {
         Workspace w = workspace(99L, "acme", true);
-        when(connectionService.findSlackNotificationConfig(99L)).thenReturn(
-            Optional.of(slackConfig("C0974LJBPBK", "engineering"))
-        );
-        when(
-            leaderboardService.createLeaderboard(
-                any(Workspace.class),
-                any(),
-                any(),
-                eq("engineering"),
-                eq(LeaderboardSortType.SCORE),
-                eq(LeaderboardMode.INDIVIDUAL)
-            )
-        ).thenReturn(List.of(leaderboardEntry("alice")));
+        when(connectionService.findSlackNotificationConfig(99L))
+                .thenReturn(Optional.of(slackConfig("C0974LJBPBK", "engineering")));
+        when(leaderboardService.createLeaderboard(
+                        any(Workspace.class),
+                        any(),
+                        any(),
+                        eq("engineering"),
+                        eq(LeaderboardSortType.SCORE),
+                        eq(LeaderboardMode.INDIVIDUAL)))
+                .thenReturn(List.of(leaderboardEntry("alice")));
 
         task.runForWorkspace(w);
 
@@ -183,14 +166,7 @@ class SlackWeeklyLeaderboardTaskTest extends BaseUnitTest {
 
     private static LeaderboardEntryDTO leaderboardEntry(String name) {
         UserInfoDTO user = new UserInfoDTO(
-            1L,
-            name,
-            name + "@example.com",
-            "https://example.com/a.png",
-            name,
-            "https://example.com/" + name,
-            0
-        );
+                1L, name, name + "@example.com", "https://example.com/a.png", name, "https://example.com/" + name, 0);
         return new LeaderboardEntryDTO(1, 10, user, null, List.of(), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     }
 }

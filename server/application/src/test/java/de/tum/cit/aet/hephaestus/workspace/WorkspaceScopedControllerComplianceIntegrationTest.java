@@ -30,10 +30,9 @@ class WorkspaceScopedControllerComplianceIntegrationTest extends AbstractWorkspa
      * itself silently, and off every route that copied the trick.
      */
     private static final Set<String> WORKSPACE_INDEPENDENT_ANSWERS = Set.of(
-        // The instance-wide "may a workspace connect its own AI provider" switch. There is no per-workspace
-        // form of it to consult: WorkspaceLlmConnectionService gates on the instance value alone.
-        "de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmSettingsController#get"
-    );
+            // The instance-wide "may a workspace connect its own AI provider" switch. There is no per-workspace
+            // form of it to consult: WorkspaceLlmConnectionService gates on the instance value alone.
+            "de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmSettingsController#get");
 
     @Autowired
     private ApplicationContext applicationContext;
@@ -47,11 +46,11 @@ class WorkspaceScopedControllerComplianceIntegrationTest extends AbstractWorkspa
         controllers.values().forEach(bean -> inspectController(bean, violations, unusedExemptions));
 
         assertThat(violations)
-            .describedAs("Workspace scoped handler methods must include a WorkspaceContext parameter")
-            .isEmpty();
+                .describedAs("Workspace scoped handler methods must include a WorkspaceContext parameter")
+                .isEmpty();
         assertThat(unusedExemptions)
-            .describedAs("Stale exemption: the handler now takes a WorkspaceContext, or no longer exists")
-            .isEmpty();
+                .describedAs("Stale exemption: the handler now takes a WorkspaceContext, or no longer exists")
+                .isEmpty();
     }
 
     private void inspectController(Object bean, List<String> violations, Set<String> unusedExemptions) {

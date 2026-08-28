@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
@@ -84,7 +83,9 @@ class ObservationHistoryConsentGateIntegrationTest extends AbstractSlackConsentG
         assertThat(root.get("_meta").get("trustLevel").asString()).isEqualTo("UNTRUSTED_EXTERNAL");
 
         List<String> ids = observationIds(root);
-        assertThat(ids).containsExactlyInAnyOrder(activeObs.getId().toString(), prObs.getId().toString());
+        assertThat(ids)
+                .containsExactlyInAnyOrder(
+                        activeObs.getId().toString(), prObs.getId().toString());
         assertThat(ids).doesNotContainNull();
         assertThat(ids).hasSize(2);
     }
@@ -98,10 +99,9 @@ class ObservationHistoryConsentGateIntegrationTest extends AbstractSlackConsentG
         JsonNode root = contribute();
 
         assertThat(root.has("_meta")).isFalse();
-        assertThat(observationIds(root)).containsExactlyInAnyOrder(
-            prObs.getId().toString(),
-            issueObs.getId().toString()
-        );
+        assertThat(observationIds(root))
+                .containsExactlyInAnyOrder(
+                        prObs.getId().toString(), issueObs.getId().toString());
     }
 
     @Test
@@ -120,9 +120,7 @@ class ObservationHistoryConsentGateIntegrationTest extends AbstractSlackConsentG
     private JsonNode contribute() {
         Map<String, byte[]> files = new HashMap<>();
         contentSource.contribute(
-            new ContextRequest.MentorChatRequest(workspace.getId(), recipient.getId(), UUID.randomUUID()),
-            files
-        );
+                new ContextRequest.MentorChatRequest(workspace.getId(), recipient.getId(), UUID.randomUUID()), files);
         return objectMapper.readTree(files.get(ObservationHistoryContentSource.OUTPUT_KEY));
     }
 
@@ -137,31 +135,29 @@ class ObservationHistoryConsentGateIntegrationTest extends AbstractSlackConsentG
     private Observation saveObservation(String occurrenceKey, String artifactKind, long artifactId) {
         UUID id = UUID.randomUUID();
         observationRepository.insertIfAbsent(
-            id,
-            occurrenceKey,
-            job.getId(),
-            practice.getId(),
-            practice.getCurrentRevision().getId(),
-            artifactKind,
-            artifactId,
-            recipient.getId(),
-            "Observation title",
-            "ABSENT",
-            "BAD",
-            "MAJOR",
-            evidence(artifactKind),
-            null,
-            null,
-            Instant.now(),
-            "LIVE"
-        );
+                id,
+                occurrenceKey,
+                job.getId(),
+                practice.getId(),
+                practice.getCurrentRevision().getId(),
+                artifactKind,
+                artifactId,
+                recipient.getId(),
+                "Observation title",
+                "ABSENT",
+                "BAD",
+                "MAJOR",
+                evidence(artifactKind),
+                null,
+                null,
+                Instant.now(),
+                "LIVE");
         return observationRepository.findById(id).orElseThrow();
     }
 
     private static String evidence(String artifactKind) {
-        String sourceKind = "chat.conversation_thread".equals(artifactKind)
-            ? "slack.conversation.thread"
-            : "scm.pull-request.core";
+        String sourceKind =
+                "chat.conversation_thread".equals(artifactKind) ? "slack.conversation.thread" : "scm.pull-request.core";
         return """
         {"citations":[{"sourceKind":"%s","artifactPath":"inputs/context/source.json",\
         "path":"source.json","startLine":1,"endLine":1,"quote":"evidence",\

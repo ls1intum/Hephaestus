@@ -41,12 +41,11 @@ public final class LlmCatalogTestFixtures {
     }
 
     public static LlmModel model(
-        LlmConnection connection,
-        String slug,
-        String upstreamModelId,
-        ModelVisibility visibility,
-        boolean enabled
-    ) {
+            LlmConnection connection,
+            String slug,
+            String upstreamModelId,
+            ModelVisibility visibility,
+            boolean enabled) {
         LlmModel model = new LlmModel();
         model.setConnection(connection);
         model.setSlug(slug);
@@ -64,28 +63,26 @@ public final class LlmCatalogTestFixtures {
      */
     public static MentorLlmConfig admittedMentorConfig() {
         return new MentorLlmConfig(
-            "openai-responses",
-            BASE_URL,
-            "test-model",
-            null,
-            null,
-            false,
-            FundingSource.INSTANCE,
-            1L,
-            1L,
-            null,
-            new LlmPriceSnapshot(
-                FundingSource.INSTANCE,
-                PricingState.PRICED,
-                12L,
+                "openai-responses",
+                BASE_URL,
+                "test-model",
                 null,
-                new BigDecimal("10"),
-                BigDecimal.ZERO,
-                BigDecimal.ZERO,
-                BigDecimal.ZERO
-            ),
-            false,
-            600
-        );
+                null,
+                false,
+                FundingSource.INSTANCE,
+                1L,
+                1L,
+                null,
+                new LlmPriceSnapshot(
+                        FundingSource.INSTANCE,
+                        PricingState.PRICED,
+                        12L,
+                        null,
+                        new BigDecimal("10"),
+                        BigDecimal.ZERO,
+                        BigDecimal.ZERO,
+                        BigDecimal.ZERO),
+                false,
+                600);
     }
 }

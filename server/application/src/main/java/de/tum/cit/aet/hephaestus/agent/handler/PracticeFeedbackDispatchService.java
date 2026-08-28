@@ -48,15 +48,14 @@ class PracticeFeedbackDispatchService {
     private final FeedbackDispatchStateMachine stateMachine;
 
     PracticeFeedbackDispatchService(
-        FeedbackDispatchRepository repository,
-        PracticeFeedbackDeliveryPolicy policy,
-        PullRequestCommentPoster commentPoster,
-        TransactionTemplate transactionTemplate,
-        ObjectMapper objectMapper,
-        FeedbackRepository feedbackRepository,
-        DiffNotePoster diffNotePoster,
-        FeedbackDispatchStateMachine stateMachine
-    ) {
+            FeedbackDispatchRepository repository,
+            PracticeFeedbackDeliveryPolicy policy,
+            PullRequestCommentPoster commentPoster,
+            TransactionTemplate transactionTemplate,
+            ObjectMapper objectMapper,
+            FeedbackRepository feedbackRepository,
+            DiffNotePoster diffNotePoster,
+            FeedbackDispatchStateMachine stateMachine) {
         this.repository = repository;
         this.policy = policy;
         this.commentPoster = commentPoster;
@@ -68,68 +67,56 @@ class PracticeFeedbackDispatchService {
     }
 
     Result dispatchAutomaticPackage(
-        AgentJob job,
-        DeliveryContent packageContent,
-        Set<String> contributingPracticeSlugs
-    ) {
+            AgentJob job, DeliveryContent packageContent, Set<String> contributingPracticeSlugs) {
         return dispatch(
-            insertIfAbsentAndLoad(
-                job,
-                null,
-                "review:" + job.getId(),
-                FeedbackDispatchDestination.AUTOMATIC_REVIEW_PACKAGE,
-                contributingPracticeSlugs,
-                packageContent
-            ),
-            job
-        );
+                insertIfAbsentAndLoad(
+                        job,
+                        null,
+                        "review:" + job.getId(),
+                        FeedbackDispatchDestination.AUTOMATIC_REVIEW_PACKAGE,
+                        contributingPracticeSlugs,
+                        packageContent),
+                job);
     }
 
     Result dispatchApproved(AgentJob job, Feedback feedback) {
         return dispatch(
-            insertIfAbsentAndLoad(
-                job,
-                feedback.getId(),
-                "approved:" + feedback.getId(),
-                FeedbackDispatchDestination.APPROVED_REVIEW_PACKAGE,
-                Set.copyOf(feedback.getProposedPracticeSlugs()),
-                new DeliveryContent(
-                    java.util.Objects.requireNonNull(feedback.getBody()),
-                    proposedInlineNotes(feedback),
-                    List.of()
-                )
-            ),
-            job
-        );
+                insertIfAbsentAndLoad(
+                        job,
+                        feedback.getId(),
+                        "approved:" + feedback.getId(),
+                        FeedbackDispatchDestination.APPROVED_REVIEW_PACKAGE,
+                        Set.copyOf(feedback.getProposedPracticeSlugs()),
+                        new DeliveryContent(
+                                java.util.Objects.requireNonNull(feedback.getBody()),
+                                proposedInlineNotes(feedback),
+                                List.of())),
+                job);
     }
 
     private FeedbackDispatch insertIfAbsentAndLoad(
-        AgentJob job,
-        @Nullable UUID feedbackId,
-        String key,
-        FeedbackDispatchDestination destination,
-        Set<String> contributingPracticeSlugs,
-        DeliveryContent packageContent
-    ) {
+            AgentJob job,
+            @Nullable UUID feedbackId,
+            String key,
+            FeedbackDispatchDestination destination,
+            Set<String> contributingPracticeSlugs,
+            DeliveryContent packageContent) {
         Long workspaceId = job.getWorkspace().getId();
-        transactionTemplate.executeWithoutResult(status ->
-            repository.insertIfAbsent(
-                new FeedbackDispatchInsert(
-                    UUID.randomUUID(),
-                    key,
-                    workspaceId,
-                    job.getId(),
-                    feedbackId,
-                    destination.name(),
-                    packageContent.mrNote() == null ? "" : packageContent.mrNote(),
-                    objectMapper.valueToTree(contributingPracticeSlugs.stream().sorted().toList()).toString(),
-                    objectMapper.valueToTree(packageContent).toString()
-                )
-            )
-        );
+        transactionTemplate.executeWithoutResult(status -> repository.insertIfAbsent(new FeedbackDispatchInsert(
+                UUID.randomUUID(),
+                key,
+                workspaceId,
+                job.getId(),
+                feedbackId,
+                destination.name(),
+                packageContent.mrNote() == null ? "" : packageContent.mrNote(),
+                objectMapper
+                        .valueToTree(contributingPracticeSlugs.stream().sorted().toList())
+                        .toString(),
+                objectMapper.valueToTree(packageContent).toString())));
         FeedbackDispatch dispatch = repository
-            .findByDestinationKeyAndWorkspaceId(key, workspaceId)
-            .orElseThrow(() -> new JobDeliveryException("Dispatch intent was not persisted: " + key));
+                .findByDestinationKeyAndWorkspaceId(key, workspaceId)
+                .orElseThrow(() -> new JobDeliveryException("Dispatch intent was not persisted: " + key));
         if (dispatch.getDestination() != destination) {
             throw new JobDeliveryException("Dispatch key was reused for a different destination: " + key);
         }
@@ -142,25 +129,19 @@ class PracticeFeedbackDispatchService {
         }
         if (dispatch.getState() == FeedbackDispatchState.SUPPRESSED) {
             return Result.suppressed(
-                storedReason(dispatch),
-                dispatch.getDeliveredExternalRef(),
-                deliveredSignals(dispatch)
-            );
+                    storedReason(dispatch), dispatch.getDeliveredExternalRef(), deliveredSignals(dispatch));
         }
         if (dispatch.getState() == FeedbackDispatchState.FAILED) {
             return Result.failed(dispatch.getDeliveredExternalRef(), deliveredSignals(dispatch));
         }
 
         String owner = UUID.randomUUID().toString();
-        Integer claimed = transactionTemplate.execute(status ->
-            repository.claim(
+        Integer claimed = transactionTemplate.execute(status -> repository.claim(
                 dispatch.getId(),
                 dispatch.getWorkspaceId(),
                 owner,
                 Instant.now().plus(LEASE),
-                MAX_ATTEMPTS
-            )
-        );
+                MAX_ATTEMPTS));
         if (claimed == null || claimed == 0) {
             return Result.inProgress();
         }
@@ -173,8 +154,7 @@ class PracticeFeedbackDispatchService {
     }
 
     private Result dispatchAutomaticPackage(FeedbackDispatch dispatch, AgentJob job, String owner) {
-        @Nullable
-        String summaryRef = dispatch.getDeliveredExternalRef();
+        @Nullable String summaryRef = dispatch.getDeliveredExternalRef();
         List<DeliveredSignal> inlineSignals = deliveredSignals(dispatch);
         boolean writeBegan = false;
         try {
@@ -194,9 +174,8 @@ class PracticeFeedbackDispatchService {
             if (hasSummary && summaryRef == null) {
                 PracticeFeedbackDeliveryPolicy.Decision<?> decision = evaluateAtEgress(dispatch, job);
                 if (!decision.allowed()) return stateMachine.refuse(dispatch, owner, decision.refusal());
-                Integer began = transactionTemplate.execute(status ->
-                    repository.beginWrite(dispatch.getId(), dispatch.getWorkspaceId(), owner)
-                );
+                Integer began = transactionTemplate.execute(
+                        status -> repository.beginWrite(dispatch.getId(), dispatch.getWorkspaceId(), owner));
                 if (began == null || began != 1) return Result.inProgress();
                 writeBegan = true;
                 summaryRef = java.util.Objects.requireNonNull(post(dispatch, job));
@@ -205,66 +184,47 @@ class PracticeFeedbackDispatchService {
             List<DiffNote> inlineNotes = inlineNotes(dispatch);
             if (!isIssue(job)) {
                 PracticeFeedbackDeliveryPolicy.Decision<?> decision = evaluateAtEgress(dispatch, job);
-                if (!decision.allowed()) return stateMachine.refuse(
-                    dispatch,
-                    owner,
-                    decision.refusal(),
-                    summaryRef,
-                    inlineSignals
-                );
+                if (!decision.allowed())
+                    return stateMachine.refuse(dispatch, owner, decision.refusal(), summaryRef, inlineSignals);
                 DiffNotePoster.DiffNoteResult inline = diffNotePoster.reconcileInlineNotes(job, inlineNotes);
                 inlineSignals = stateMachine.mergeSignals(inlineSignals, inline.signals());
                 if (inline.failed() > 0 || inline.suppressed()) {
                     return stateMachine.retryPackage(
-                        dispatch,
-                        owner,
-                        "Automatic review package remains incomplete",
-                        summaryRef,
-                        inlineSignals
-                    );
+                            dispatch, owner, "Automatic review package remains incomplete", summaryRef, inlineSignals);
                 }
             }
 
             return stateMachine.sent(dispatch, owner, summaryRef, inlineSignals);
         } catch (JobDeliverySuppressedException exception) {
             return stateMachine.refuse(
-                dispatch,
-                owner,
-                FeedbackSuppressionReason.INSTANCE_SILENCED,
-                summaryRef,
-                inlineSignals
-            );
+                    dispatch, owner, FeedbackSuppressionReason.INSTANCE_SILENCED, summaryRef, inlineSignals);
         } catch (RuntimeException exception) {
             if (summaryRef != null) {
                 return stateMachine.retryPackage(dispatch, owner, exception.getMessage(), summaryRef, inlineSignals);
             }
             return writeBegan
-                ? stateMachine.retryAfterWrite(dispatch, owner, exception.getMessage())
-                : stateMachine.retry(dispatch, owner, exception.getMessage());
+                    ? stateMachine.retryAfterWrite(dispatch, owner, exception.getMessage())
+                    : stateMachine.retry(dispatch, owner, exception.getMessage());
         }
     }
 
     private Result dispatchApprovedPackage(FeedbackDispatch dispatch, AgentJob job, String owner) {
         Feedback feedback = feedbackRepository
-            .findByIdAndWorkspaceId(dispatch.approvedFeedbackId(), dispatch.getWorkspaceId())
-            .orElse(null);
-        if (feedback == null || feedback.getBody() == null || !feedback.getBody().equals(dispatch.getBody())) {
+                .findByIdAndWorkspaceId(dispatch.approvedFeedbackId(), dispatch.getWorkspaceId())
+                .orElse(null);
+        if (feedback == null
+                || feedback.getBody() == null
+                || !feedback.getBody().equals(dispatch.getBody())) {
             return stateMachine.retry(
-                dispatch,
-                owner,
-                "Approved feedback is missing or no longer matches its immutable body"
-            );
+                    dispatch, owner, "Approved feedback is missing or no longer matches its immutable body");
         }
-        @Nullable
-        String summaryRef = dispatch.getDeliveredExternalRef();
+        @Nullable String summaryRef = dispatch.getDeliveredExternalRef();
         List<DeliveredSignal> inlineSignals = deliveredSignals(dispatch);
         boolean writeBegan = false;
         try {
             if (summaryRef == null) {
-                ExistingDeliveryLookup existing = commentPoster.findApprovedProposal(
-                    job,
-                    dispatch.approvedFeedbackId()
-                );
+                ExistingDeliveryLookup existing =
+                        commentPoster.findApprovedProposal(job, dispatch.approvedFeedbackId());
                 if (existing.kind() == ExistingDeliveryLookup.Kind.UNKNOWN) {
                     return stateMachine.retry(dispatch, owner, "Provider lookup was inconclusive");
                 }
@@ -281,14 +241,12 @@ class PracticeFeedbackDispatchService {
                 if (!reviewedRevisionMatches(feedback, decision)) {
                     return stateMachine.refuse(dispatch, owner, FeedbackSuppressionReason.APPROVAL_STALE);
                 }
-                Integer began = transactionTemplate.execute(status ->
-                    repository.beginWrite(dispatch.getId(), dispatch.getWorkspaceId(), owner)
-                );
+                Integer began = transactionTemplate.execute(
+                        status -> repository.beginWrite(dispatch.getId(), dispatch.getWorkspaceId(), owner));
                 if (began == null || began != 1) return Result.inProgress();
                 writeBegan = true;
                 summaryRef = java.util.Objects.requireNonNull(
-                    commentPoster.postApprovedProposal(job, dispatch.approvedFeedbackId(), dispatch.getBody())
-                );
+                        commentPoster.postApprovedProposal(job, dispatch.approvedFeedbackId(), dispatch.getBody()));
             }
 
             String deliveredSummaryRef = java.util.Objects.requireNonNull(summaryRef);
@@ -300,38 +258,28 @@ class PracticeFeedbackDispatchService {
                 }
                 if (!reviewedRevisionMatches(feedback, decision)) {
                     return stateMachine.refuse(
-                        dispatch,
-                        owner,
-                        FeedbackSuppressionReason.APPROVAL_STALE,
-                        deliveredSummaryRef,
-                        inlineSignals
-                    );
+                            dispatch,
+                            owner,
+                            FeedbackSuppressionReason.APPROVAL_STALE,
+                            deliveredSummaryRef,
+                            inlineSignals);
                 }
-                DiffNotePoster.DiffNoteResult inline = diffNotePoster.reconcileApprovedInlineNotes(
-                    job,
-                    feedback.getId(),
-                    inlineNotes
-                );
+                DiffNotePoster.DiffNoteResult inline =
+                        diffNotePoster.reconcileApprovedInlineNotes(job, feedback.getId(), inlineNotes);
                 inlineSignals = stateMachine.mergeSignals(inlineSignals, inline.signals());
                 if (inline.failed() > 0 || inline.suppressed()) {
                     return stateMachine.retryPackage(
-                        dispatch,
-                        owner,
-                        "Approved review package remains incomplete",
-                        deliveredSummaryRef,
-                        inlineSignals
-                    );
+                            dispatch,
+                            owner,
+                            "Approved review package remains incomplete",
+                            deliveredSummaryRef,
+                            inlineSignals);
                 }
             }
             return stateMachine.sent(dispatch, owner, deliveredSummaryRef, inlineSignals);
         } catch (JobDeliverySuppressedException exception) {
             return stateMachine.refuse(
-                dispatch,
-                owner,
-                FeedbackSuppressionReason.INSTANCE_SILENCED,
-                summaryRef,
-                inlineSignals
-            );
+                    dispatch, owner, FeedbackSuppressionReason.INSTANCE_SILENCED, summaryRef, inlineSignals);
         } catch (RuntimeException exception) {
             if (summaryRef != null) {
                 return stateMachine.retryPackage(dispatch, owner, exception.getMessage(), summaryRef, inlineSignals);
@@ -344,23 +292,18 @@ class PracticeFeedbackDispatchService {
     }
 
     private static boolean reviewedRevisionMatches(
-        Feedback feedback,
-        PracticeFeedbackDeliveryPolicy.Decision<?> decision
-    ) {
+            Feedback feedback, PracticeFeedbackDeliveryPolicy.Decision<?> decision) {
         if (feedback.getReviewedRevision() == null) return true;
-        return (
-            decision.target() instanceof PullRequest pullRequest &&
-            feedback.getReviewedRevision().equals(pullRequest.getHeadRefOid())
-        );
+        return (decision.target() instanceof PullRequest pullRequest
+                && feedback.getReviewedRevision().equals(pullRequest.getHeadRefOid()));
     }
 
     private PracticeFeedbackDeliveryPolicy.Decision<?> evaluateAtEgress(FeedbackDispatch dispatch, AgentJob job) {
-        Set<String> practiceSlugs = dispatch
-            .getPracticeSlugs()
-            .valueStream()
-            .filter(tools.jackson.databind.JsonNode::isString)
-            .map(tools.jackson.databind.JsonNode::asString)
-            .collect(Collectors.toUnmodifiableSet());
+        Set<String> practiceSlugs = dispatch.getPracticeSlugs()
+                .valueStream()
+                .filter(tools.jackson.databind.JsonNode::isString)
+                .map(tools.jackson.databind.JsonNode::asString)
+                .collect(Collectors.toUnmodifiableSet());
         if (isIssue(job)) {
             return policy.evaluateIssue(job, DeliveryPolicyStage.EGRESS, dispatch.getFeedbackId(), practiceSlugs);
         }
@@ -376,13 +319,13 @@ class PracticeFeedbackDispatchService {
     }
 
     FeedbackDispatch automaticPackage(AgentJob job) {
-        return findAutomaticPackage(job).orElseThrow(() ->
-            new JobDeliveryException("Automatic review package was not persisted")
-        );
+        return findAutomaticPackage(job)
+                .orElseThrow(() -> new JobDeliveryException("Automatic review package was not persisted"));
     }
 
     Optional<FeedbackDispatch> findAutomaticPackage(AgentJob job) {
-        return repository.findByDestinationKeyAndWorkspaceId("review:" + job.getId(), job.getWorkspace().getId());
+        return repository.findByDestinationKeyAndWorkspaceId(
+                "review:" + job.getId(), job.getWorkspace().getId());
     }
 
     List<DeliveredSignal> deliveredSignals(FeedbackDispatch dispatch) {
@@ -390,20 +333,15 @@ class PracticeFeedbackDispatchService {
     }
 
     private static List<DiffNote> proposedInlineNotes(Feedback feedback) {
-        return feedback
-            .getProposedPlacements()
-            .stream()
-            .filter(placement -> placement.type() == PlacementType.INLINE)
-            .map(placement ->
-                new DiffNote(
-                    java.util.Objects.requireNonNull(placement.path()),
-                    java.util.Objects.requireNonNull(placement.startLine()),
-                    placement.endLine(),
-                    placement.body(),
-                    placement.recurrenceKey()
-                )
-            )
-            .toList();
+        return feedback.getProposedPlacements().stream()
+                .filter(placement -> placement.type() == PlacementType.INLINE)
+                .map(placement -> new DiffNote(
+                        java.util.Objects.requireNonNull(placement.path()),
+                        java.util.Objects.requireNonNull(placement.startLine()),
+                        placement.endLine(),
+                        placement.body(),
+                        placement.recurrenceKey()))
+                .toList();
     }
 
     private @Nullable String post(FeedbackDispatch dispatch, AgentJob job) {
@@ -414,8 +352,8 @@ class PracticeFeedbackDispatchService {
             return commentPoster.postApprovedProposal(job, dispatch.approvedFeedbackId(), dispatch.getBody());
         }
         return isIssue(job)
-            ? commentPoster.postIssueFormattedBody(job, dispatch.getBody())
-            : commentPoster.postFormattedBody(job, dispatch.getBody());
+                ? commentPoster.postIssueFormattedBody(job, dispatch.getBody())
+                : commentPoster.postFormattedBody(job, dispatch.getBody());
     }
 
     private static boolean isIssue(AgentJob job) {
@@ -440,27 +378,26 @@ class PracticeFeedbackDispatchService {
 
     boolean projectRecovered(FeedbackDispatch dispatch, Runnable projection) {
         String owner = UUID.randomUUID().toString();
-        Integer claimed = transactionTemplate.execute(status ->
-            repository.claimProjection(dispatch.getId(), dispatch.getWorkspaceId(), owner, Instant.now().plus(LEASE))
-        );
+        Integer claimed = transactionTemplate.execute(status -> repository.claimProjection(
+                dispatch.getId(),
+                dispatch.getWorkspaceId(),
+                owner,
+                Instant.now().plus(LEASE)));
         if (claimed == null || claimed != 1) return false;
         projection.run();
-        Integer projected = transactionTemplate.execute(status ->
-            repository.markProjected(dispatch.getId(), dispatch.getWorkspaceId(), owner)
-        );
+        Integer projected = transactionTemplate.execute(
+                status -> repository.markProjected(dispatch.getId(), dispatch.getWorkspaceId(), owner));
         return projected != null && projected == 1;
     }
 
     private boolean projectByKey(String destinationKey, Long workspaceId, Runnable projection) {
         String owner = UUID.randomUUID().toString();
-        Integer claimed = transactionTemplate.execute(status ->
-            repository.claimProjectionByKey(destinationKey, workspaceId, owner, Instant.now().plus(LEASE))
-        );
+        Integer claimed = transactionTemplate.execute(status -> repository.claimProjectionByKey(
+                destinationKey, workspaceId, owner, Instant.now().plus(LEASE)));
         if (claimed == null || claimed != 1) return false;
         projection.run();
-        Integer projected = transactionTemplate.execute(status ->
-            repository.markProjectedByKey(destinationKey, workspaceId, owner)
-        );
+        Integer projected = transactionTemplate.execute(
+                status -> repository.markProjectedByKey(destinationKey, workspaceId, owner));
         return projected != null && projected == 1;
     }
 
@@ -469,11 +406,10 @@ class PracticeFeedbackDispatchService {
     }
 
     record Result(
-        Status status,
-        @Nullable String externalRef,
-        @Nullable FeedbackSuppressionReason suppressionReason,
-        List<DeliveredSignal> deliveredSignals
-    ) {
+            Status status,
+            @Nullable String externalRef,
+            @Nullable FeedbackSuppressionReason suppressionReason,
+            List<DeliveredSignal> deliveredSignals) {
         FeedbackSuppressionReason refusal() {
             return java.util.Objects.requireNonNull(suppressionReason, "a refused dispatch always names its reason");
         }
@@ -499,10 +435,7 @@ class PracticeFeedbackDispatchService {
         }
 
         static Result suppressed(
-            @Nullable FeedbackSuppressionReason reason,
-            @Nullable String ref,
-            List<DeliveredSignal> signals
-        ) {
+                @Nullable FeedbackSuppressionReason reason, @Nullable String ref, List<DeliveredSignal> signals) {
             return new Result(Status.SUPPRESSED, ref, reason, List.copyOf(signals));
         }
 

@@ -82,12 +82,10 @@ public final class ReturnToValidator {
         // Reject dangerous URI schemes — case insensitive, defensive lower().
         // Locale.ROOT so a Turkish-locale 'I'→'ı' fold can never let "JAVASCRIPT:" slip past.
         String lower = candidate.toLowerCase(Locale.ROOT);
-        if (
-            lower.startsWith("javascript:") ||
-            lower.startsWith("data:") ||
-            lower.startsWith("vbscript:") ||
-            lower.startsWith("file:")
-        ) {
+        if (lower.startsWith("javascript:")
+                || lower.startsWith("data:")
+                || lower.startsWith("vbscript:")
+                || lower.startsWith("file:")) {
             return false;
         }
         // Must start with exactly one '/' and the next char must NOT be '/' or '\'

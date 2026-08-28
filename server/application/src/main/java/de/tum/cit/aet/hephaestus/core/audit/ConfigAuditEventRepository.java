@@ -38,36 +38,28 @@ public interface ConfigAuditEventRepository extends JpaRepository<ConfigAuditEve
      * it is the tenancy boundary, so it must not be collapsible to "all" by omitting it.
      */
     @Query(
-        value = "SELECT * FROM config_audit_event e WHERE e.workspace_id = :workspaceId" + FILTER_PREDICATES + ORDER,
-        countQuery = "SELECT count(*) FROM config_audit_event e WHERE e.workspace_id = :workspaceId" +
-            FILTER_PREDICATES,
-        nativeQuery = true
-    )
+            value = "SELECT * FROM config_audit_event e WHERE e.workspace_id = :workspaceId" + FILTER_PREDICATES
+                    + ORDER,
+            countQuery =
+                    "SELECT count(*) FROM config_audit_event e WHERE e.workspace_id = :workspaceId" + FILTER_PREDICATES,
+            nativeQuery = true)
     Page<ConfigAuditEvent> findForWorkspace(
-        @Param("workspaceId") Long workspaceId,
-        @Param("f") ConfigAuditFilter filter,
-        Pageable pageable
-    );
+            @Param("workspaceId") Long workspaceId, @Param("f") ConfigAuditFilter filter, Pageable pageable);
 
     /** Instance-admin view; here {@code workspaceId} is an optional filter rather than a boundary. */
     @WorkspaceAgnostic(
-        "Instance-admin config audit spans workspaces; gated by hasAuthority('app_admin') on AdminConfigAuditController"
-    )
+            "Instance-admin config audit spans workspaces; gated by hasAuthority('app_admin') on AdminConfigAuditController")
     @Query(
-        value = "SELECT * FROM config_audit_event e WHERE (CAST(:workspaceId AS bigint) IS NULL OR" +
-            " e.workspace_id = CAST(:workspaceId AS bigint))" +
-            FILTER_PREDICATES +
-            ORDER,
-        countQuery = "SELECT count(*) FROM config_audit_event e WHERE (CAST(:workspaceId AS bigint) IS NULL OR" +
-            " e.workspace_id = CAST(:workspaceId AS bigint))" +
-            FILTER_PREDICATES,
-        nativeQuery = true
-    )
+            value = "SELECT * FROM config_audit_event e WHERE (CAST(:workspaceId AS bigint) IS NULL OR"
+                    + " e.workspace_id = CAST(:workspaceId AS bigint))"
+                    + FILTER_PREDICATES
+                    + ORDER,
+            countQuery = "SELECT count(*) FROM config_audit_event e WHERE (CAST(:workspaceId AS bigint) IS NULL OR"
+                    + " e.workspace_id = CAST(:workspaceId AS bigint))"
+                    + FILTER_PREDICATES,
+            nativeQuery = true)
     Page<ConfigAuditEvent> findForAdmin(
-        @Param("workspaceId") @Nullable Long workspaceId,
-        @Param("f") ConfigAuditFilter filter,
-        Pageable pageable
-    );
+            @Param("workspaceId") @Nullable Long workspaceId, @Param("f") ConfigAuditFilter filter, Pageable pageable);
 
     /**
      * Retention sweep.
@@ -83,8 +75,7 @@ public interface ConfigAuditEventRepository extends JpaRepository<ConfigAuditEve
     @WorkspaceAgnostic("Retention ages out rows across every workspace; there is no single tenant to scope it to")
     @Modifying
     @Query(
-        value = "DELETE FROM config_audit_event WHERE occurred_at < now() - make_interval(days => :days)",
-        nativeQuery = true
-    )
+            value = "DELETE FROM config_audit_event WHERE occurred_at < now() - make_interval(days => :days)",
+            nativeQuery = true)
     int deleteOlderThan(@Param("days") int days);
 }

@@ -13,7 +13,6 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
@@ -123,10 +122,9 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         agentJob = agentJobRepository.save(agentJob);
 
         IdentityProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
         developer = TestUserFactory.createUser(200L, "test-pr-author", provider);
         developer = userRepository.save(developer);
 
@@ -142,41 +140,44 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         Instant now = Instant.now();
         Long providerId = java.util.Objects.requireNonNull(provider.getId());
         pullRequestRepository.upsertCore(
-            5001L,
-            providerId,
-            42,
-            "Test PR",
-            "Test body",
-            "OPEN",
-            null,
-            "https://github.com/org/test-repo/pull/42",
-            false,
-            null,
-            0,
-            now,
-            now,
-            now,
-            developer.getId(),
-            repo.getId(),
-            null,
-            null,
-            false,
-            false,
-            1,
-            10,
-            5,
-            3,
-            null,
-            null,
-            null,
-            "feature/test",
-            "main",
-            "abc123",
-            "def456",
-            null,
-            null // mergeCommitSha
-        );
-        prId = pullRequestRepository.findByRepositoryIdAndNumber(repo.getId(), 42).orElseThrow().getId();
+                5001L,
+                providerId,
+                42,
+                "Test PR",
+                "Test body",
+                "OPEN",
+                null,
+                "https://github.com/org/test-repo/pull/42",
+                false,
+                null,
+                0,
+                now,
+                now,
+                now,
+                developer.getId(),
+                repo.getId(),
+                null,
+                null,
+                false,
+                false,
+                1,
+                10,
+                5,
+                3,
+                null,
+                null,
+                null,
+                "feature/test",
+                "main",
+                "abc123",
+                "def456",
+                null,
+                null // mergeCommitSha
+                );
+        prId = pullRequestRepository
+                .findByRepositoryIdAndNumber(repo.getId(), 42)
+                .orElseThrow()
+                .getId();
 
         ObjectNode metadata = OBJECT_MAPPER.createObjectNode();
         metadata.put("pull_request_id", prId);
@@ -185,37 +186,34 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         metadata.put("pr_number", 42);
         agentJob.setMetadata(metadata);
         ObjectNode snapshot = OBJECT_MAPPER.createObjectNode();
-        var source = snapshot
-            .putObject("manifest")
-            .put("contractVersion", "1.0.0")
-            .putArray("sources")
-            .addObject()
-            .put("kind", "scm.pull-request.diff");
-        source
-            .putObject("state")
-            .put("availability", "AVAILABLE")
-            .put("content", "NON_EMPTY")
-            .put("completeness", "COMPLETE")
-            .putObject("facts")
-            .put("capturedAt", "2026-08-03T00:00:00Z")
-            .put("immutableIdentity", "abc123");
+        var source = snapshot.putObject("manifest")
+                .put("contractVersion", "1.0.0")
+                .putArray("sources")
+                .addObject()
+                .put("kind", "scm.pull-request.diff");
+        source.putObject("state")
+                .put("availability", "AVAILABLE")
+                .put("content", "NON_EMPTY")
+                .put("completeness", "COMPLETE")
+                .putObject("facts")
+                .put("capturedAt", "2026-08-03T00:00:00Z")
+                .put("immutableIdentity", "abc123");
         byte[] diff =
-            "diff --git a/src/Auth.java b/src/Auth.java\n+++ b/src/Auth.java\n@@ -10 +10 @@\n[L10] + insecure();\n".getBytes(
-                StandardCharsets.UTF_8
-            );
-        source
-            .putArray("artifacts")
-            .addObject()
-            .put("path", "inputs/context/diff.patch")
-            .put("mediaType", "text/x-diff")
-            .put("sha256", cas.put(diff))
-            .put("bytes", diff.length);
+                "diff --git a/src/Auth.java b/src/Auth.java\n+++ b/src/Auth.java\n@@ -10 +10 @@\n[L10] + insecure();\n"
+                        .getBytes(StandardCharsets.UTF_8);
+        source.putArray("artifacts")
+                .addObject()
+                .put("path", "inputs/context/diff.patch")
+                .put("mediaType", "text/x-diff")
+                .put("sha256", cas.put(diff))
+                .put("bytes", diff.length);
         var admitted = snapshot.putArray("practices");
-        admitted
-            .addObject()
-            .put("slug", description.getSlug())
-            .put("revisionId", description.getCurrentRevision().getId());
-        admitted.addObject().put("slug", errors.getSlug()).put("revisionId", errors.getCurrentRevision().getId());
+        admitted.addObject()
+                .put("slug", description.getSlug())
+                .put("revisionId", description.getCurrentRevision().getId());
+        admitted.addObject()
+                .put("slug", errors.getSlug())
+                .put("revisionId", errors.getCurrentRevision().getId());
         agentJob.setEvidenceSnapshot(snapshot);
         agentJob = agentJobRepository.save(agentJob);
     }
@@ -239,34 +237,27 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
      * fixtures (pr-description-quality, error-handling): PRESENT→GOOD, ABSENT→BAD, NOT_APPLICABLE→null.
      */
     private ValidatedObservation observation(String slug, Presence presence) {
-        Assessment assessment = switch (presence) {
-            case PRESENT -> Assessment.GOOD;
-            case ABSENT -> Assessment.BAD;
-            case NOT_APPLICABLE, INCONCLUSIVE -> null;
-        };
+        Assessment assessment =
+                switch (presence) {
+                    case PRESENT -> Assessment.GOOD;
+                    case ABSENT -> Assessment.BAD;
+                    case NOT_APPLICABLE, INCONCLUSIVE -> null;
+                };
         return new ValidatedObservation(
-            slug,
-            "Test: " + slug,
-            presence,
-            assessment,
-            Severity.INFO,
-            evidence(presence),
-            null
-        );
+                slug, "Test: " + slug, presence, assessment, Severity.INFO, evidence(presence), null);
     }
 
     private static ObjectNode evidence(Presence presence) {
         ObjectNode evidence = OBJECT_MAPPER.createObjectNode();
-        evidence
-            .putArray("citations")
-            .addObject()
-            .put("sourceKind", "scm.pull-request.diff")
-            .put("artifactPath", "inputs/context/diff.patch")
-            .put("path", "src/Auth.java")
-            .put("side", "NEW")
-            .put("startLine", 10)
-            .put("endLine", 10)
-            .put("quote", "+ insecure();");
+        evidence.putArray("citations")
+                .addObject()
+                .put("sourceKind", "scm.pull-request.diff")
+                .put("artifactPath", "inputs/context/diff.patch")
+                .put("path", "src/Auth.java")
+                .put("side", "NEW")
+                .put("startLine", 10)
+                .put("endLine", 10)
+                .put("quote", "+ insecure();");
         // An ABSENT observation asserts a universal, so delivery requires it to record its search.
         if (presence == Presence.ABSENT) {
             ObjectNode search = evidence.putObject("search");
@@ -283,9 +274,8 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         @Test
         void validObservationsPersistedToDb() {
             var observations = List.of(
-                observation("pr-description-quality", Presence.PRESENT),
-                observation("error-handling", Presence.ABSENT)
-            );
+                    observation("pr-description-quality", Presence.PRESENT),
+                    observation("error-handling", Presence.ABSENT));
 
             var result = deliveryService.deliver(agentJob, observations);
 
@@ -295,45 +285,32 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             List<Observation> persisted = observationRepository.findAll();
             assertThat(persisted).hasSize(2);
             assertThat(persisted)
-                .extracting(Observation::getPresence)
-                .containsExactlyInAnyOrder(Presence.PRESENT, Presence.ABSENT);
+                    .extracting(Observation::getPresence)
+                    .containsExactlyInAnyOrder(Presence.PRESENT, Presence.ABSENT);
         }
 
         @Test
         @DisplayName("returned delivered observations align exactly with the persisted recurrence_key set")
         void returnedFingerprintsMatchPersistedRecurrenceKeys() {
             var observations = List.of(
-                observation("pr-description-quality", Presence.PRESENT),
-                observation("error-handling", Presence.ABSENT)
-            );
+                    observation("pr-description-quality", Presence.PRESENT),
+                    observation("error-handling", Presence.ABSENT));
 
             var result = deliveryService.deliver(agentJob, observations);
 
-            assertThat(
-                result
-                    .delivered()
-                    .stream()
-                    .map(o -> o.recurrenceKey())
-                    .toList()
-            )
-                .as("one stable key returned per delivered observation")
-                .hasSize(2)
-                .allMatch(k -> k != null && k.matches("[0-9a-f]{64}"));
+            assertThat(result.delivered().stream().map(o -> o.recurrenceKey()).toList())
+                    .as("one stable key returned per delivered observation")
+                    .hasSize(2)
+                    .allMatch(k -> k != null && k.matches("[0-9a-f]{64}"));
 
-            List<String> persistedKeys = observationRepository
-                .findAll()
-                .stream()
-                .map(Observation::getRecurrenceKey)
-                .toList();
+            List<String> persistedKeys = observationRepository.findAll().stream()
+                    .map(Observation::getRecurrenceKey)
+                    .toList();
             assertThat(persistedKeys)
-                .as("every returned fingerprint is persisted as a recurrence_key, and vice versa")
-                .containsExactlyInAnyOrderElementsOf(
-                    result
-                        .delivered()
-                        .stream()
-                        .map(o -> o.recurrenceKey())
-                        .toList()
-                );
+                    .as("every returned fingerprint is persisted as a recurrence_key, and vice versa")
+                    .containsExactlyInAnyOrderElementsOf(result.delivered().stream()
+                            .map(o -> o.recurrenceKey())
+                            .toList());
         }
 
         @Test
@@ -357,13 +334,12 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         @Test
         void unknownSlugsFailDelivery() {
             var observations = List.of(
-                observation("pr-description-quality", Presence.PRESENT),
-                observation("nonexistent-practice", Presence.PRESENT)
-            );
+                    observation("pr-description-quality", Presence.PRESENT),
+                    observation("nonexistent-practice", Presence.PRESENT));
 
             assertThatThrownBy(() -> deliveryService.deliver(agentJob, observations))
-                .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("not admitted");
+                    .isInstanceOf(JobDeliveryException.class)
+                    .hasMessageContaining("not admitted");
             assertThat(observationRepository.findAll()).isEmpty();
         }
     }
@@ -375,8 +351,8 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         @DisplayName("persisted observation pins the practice's current definition revision")
         void findingPinsCurrentRevision() {
             Practice practice = practiceRepository
-                .findByWorkspaceIdAndSlug(workspace.getId(), "pr-description-quality")
-                .orElseThrow();
+                    .findByWorkspaceIdAndSlug(workspace.getId(), "pr-description-quality")
+                    .orElseThrow();
             PracticeRevision revision = practice.getCurrentRevision();
 
             var observations = List.of(observation("pr-description-quality", Presence.PRESENT));
@@ -401,17 +377,14 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             // Each idempotency key includes the index, so all 7 are distinct: there is no per-practice cap.
             var observations = new ArrayList<ValidatedObservation>();
             for (int i = 0; i < 7; i++) {
-                observations.add(
-                    new ValidatedObservation(
+                observations.add(new ValidatedObservation(
                         "pr-description-quality",
                         "Negative observation " + i,
                         Presence.ABSENT,
                         Assessment.BAD,
                         Severity.MINOR,
                         evidence(Presence.ABSENT),
-                        null
-                    )
-                );
+                        null));
             }
 
             var result = deliveryService.deliver(agentJob, observations);
@@ -431,9 +404,9 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
 
             deliveryService.deliver(agentJob, observations);
 
-            List<PracticeDetectionCompletedEvent> events = applicationEvents
-                .stream(PracticeDetectionCompletedEvent.class)
-                .toList();
+            List<PracticeDetectionCompletedEvent> events = applicationEvents.stream(
+                            PracticeDetectionCompletedEvent.class)
+                    .toList();
             assertThat(events).hasSize(1);
             PracticeDetectionCompletedEvent event = events.get(0);
             assertThat(event.agentJobId()).isEqualTo(agentJob.getId());
@@ -453,9 +426,9 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             assertThat(result.inserted()).isZero();
             assertThat(result.hasNegative()).isFalse();
 
-            List<PracticeDetectionCompletedEvent> events = applicationEvents
-                .stream(PracticeDetectionCompletedEvent.class)
-                .toList();
+            List<PracticeDetectionCompletedEvent> events = applicationEvents.stream(
+                            PracticeDetectionCompletedEvent.class)
+                    .toList();
             assertThat(events).hasSize(1);
             assertThat(events.get(0).observationsInserted()).isZero();
             assertThat(events.get(0).observationsDiscarded()).isZero();
@@ -469,9 +442,8 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
         @Test
         void positiveObservationsDoNotTriggerHasNegative() {
             var observations = List.of(
-                observation("pr-description-quality", Presence.PRESENT),
-                observation("error-handling", Presence.PRESENT)
-            );
+                    observation("pr-description-quality", Presence.PRESENT),
+                    observation("error-handling", Presence.PRESENT));
 
             var result = deliveryService.deliver(agentJob, observations);
 
@@ -481,8 +453,8 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             List<Observation> persisted = observationRepository.findAll();
             assertThat(persisted).hasSize(2);
             assertThat(persisted)
-                .extracting(Observation::getPresence)
-                .containsExactlyInAnyOrder(Presence.PRESENT, Presence.PRESENT);
+                    .extracting(Observation::getPresence)
+                    .containsExactlyInAnyOrder(Presence.PRESENT, Presence.PRESENT);
         }
     }
 
@@ -499,8 +471,8 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             var observations = List.of(observation("pr-description-quality", Presence.PRESENT));
 
             assertThatThrownBy(() -> deliveryService.deliver(agentJob, observations))
-                .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("Pull request not found");
+                    .isInstanceOf(JobDeliveryException.class)
+                    .hasMessageContaining("Pull request not found");
         }
     }
 }

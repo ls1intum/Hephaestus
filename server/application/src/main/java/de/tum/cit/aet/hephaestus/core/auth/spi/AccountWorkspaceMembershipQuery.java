@@ -31,10 +31,9 @@ public interface AccountWorkspaceMembershipQuery {
      * reaching into the SCM schema themselves.
      */
     record WorkspaceMembershipView(
-        Long workspaceId,
-        String workspaceSlug,
-        String workspaceName,
-        @org.jspecify.annotations.Nullable String role,
-        @org.jspecify.annotations.Nullable Long memberId
-    ) {}
+            Long workspaceId,
+            String workspaceSlug,
+            String workspaceName,
+            @org.jspecify.annotations.Nullable String role,
+            @org.jspecify.annotations.Nullable Long memberId) {}
 }

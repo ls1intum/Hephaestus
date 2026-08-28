@@ -25,15 +25,14 @@ import org.jspecify.annotations.Nullable;
  * @param roles Set of workspace roles for the current user
  */
 public record WorkspaceContext(
-    Long id,
-    String slug,
-    String displayName,
-    @Nullable AccountType accountType,
-    @Nullable Long installationId,
-    boolean publiclyViewable,
-    boolean mentorEnabled,
-    Set<WorkspaceRole> roles
-) {
+        Long id,
+        String slug,
+        String displayName,
+        @Nullable AccountType accountType,
+        @Nullable Long installationId,
+        boolean publiclyViewable,
+        boolean mentorEnabled,
+        Set<WorkspaceRole> roles) {
     /**
      * Builds a context from a {@link Workspace} plus a pre-resolved
      * {@code installationId} (typically pulled from
@@ -41,20 +40,16 @@ public record WorkspaceContext(
      * context record itself stays free of Spring service dependencies).
      */
     public static WorkspaceContext fromWorkspace(
-        Workspace workspace,
-        @Nullable Set<WorkspaceRole> roles,
-        @Nullable Long installationId
-    ) {
+            Workspace workspace, @Nullable Set<WorkspaceRole> roles, @Nullable Long installationId) {
         return new WorkspaceContext(
-            workspace.getId(),
-            workspace.getWorkspaceSlug(),
-            workspace.getDisplayName(),
-            workspace.getAccountType(),
-            installationId,
-            Boolean.TRUE.equals(workspace.getIsPubliclyViewable()),
-            Boolean.TRUE.equals(workspace.getFeatures().getMentorEnabled()),
-            roles != null ? roles : Set.of()
-        );
+                workspace.getId(),
+                workspace.getWorkspaceSlug(),
+                workspace.getDisplayName(),
+                workspace.getAccountType(),
+                installationId,
+                Boolean.TRUE.equals(workspace.getIsPubliclyViewable()),
+                Boolean.TRUE.equals(workspace.getFeatures().getMentorEnabled()),
+                roles != null ? roles : Set.of());
     }
 
     /**

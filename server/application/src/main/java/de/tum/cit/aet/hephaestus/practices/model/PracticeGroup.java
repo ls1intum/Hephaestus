@@ -27,16 +27,15 @@ import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(
-    name = "practice_group",
-    uniqueConstraints = @UniqueConstraint(
-        name = "uk_practice_group_workspace_slug",
-        columnNames = { "workspace_id", "slug" }
-    ),
-    indexes = @Index(
-        name = "idx_practice_group_workspace_dashboard_visibility",
-        columnList = "workspace_id, visible_in_practice_dashboards"
-    )
-)
+        name = "practice_group",
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uk_practice_group_workspace_slug",
+                        columnNames = {"workspace_id", "slug"}),
+        indexes =
+                @Index(
+                        name = "idx_practice_group_workspace_dashboard_visibility",
+                        columnList = "workspace_id, visible_in_practice_dashboards"))
 @Getter
 @Setter
 @NoArgsConstructor

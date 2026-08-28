@@ -40,27 +40,18 @@ public class LeaderboardXpQueryService {
 
     @Transactional(readOnly = true)
     public Map<Long, LeaderboardUserXp> getLeaderboardData(
-        Long workspaceId,
-        Instant since,
-        Instant until,
-        Set<Long> teamIds
-    ) {
+            Long workspaceId, Instant since, Instant until, Set<Long> teamIds) {
         return queryLeaderboardData(workspaceId, since, until, teamIds);
     }
 
     private Map<Long, LeaderboardUserXp> queryLeaderboardData(
-        Long workspaceId,
-        Instant since,
-        Instant until,
-        Set<Long> teamIds
-    ) {
+            Long workspaceId, Instant since, Instant until, Set<Long> teamIds) {
         log.debug(
-            "Fetched leaderboard XP query params: workspaceId={}, since={}, until={}, teamIds={}",
-            workspaceId,
-            since,
-            until,
-            teamIds.isEmpty() ? "all" : teamIds
-        );
+                "Fetched leaderboard XP query params: workspaceId={}, since={}, until={}, teamIds={}",
+                workspaceId,
+                since,
+                until,
+                teamIds.isEmpty() ? "all" : teamIds);
 
         // 1. Get XP totals from activity_event table
         List<ActivityXpProjection> xpData;
@@ -68,11 +59,7 @@ public class LeaderboardXpQueryService {
             xpData = activityEventRepository.findExperiencePointsByWorkspaceAndTimeframe(workspaceId, since, until);
         } else {
             xpData = activityEventRepository.findExperiencePointsByWorkspaceAndTeamsAndTimeframe(
-                workspaceId,
-                teamIds,
-                since,
-                until
-            );
+                    workspaceId, teamIds, since, until);
         }
 
         if (xpData.isEmpty()) {
@@ -81,77 +68,41 @@ public class LeaderboardXpQueryService {
         }
 
         // 2. Get actor IDs for breakdown query
-        Set<Long> actorIds = xpData.stream().map(ActivityXpProjection::getActorId).collect(toSet());
+        Set<Long> actorIds =
+                xpData.stream().map(ActivityXpProjection::getActorId).collect(toSet());
 
         // 3. Get activity breakdown by type
         List<ActivityBreakdownProjection> breakdown = teamIds.isEmpty()
-            ? activityEventRepository.findActivityBreakdown(workspaceId, actorIds, since, until)
-            : activityEventRepository.findActivityBreakdownByWorkspaceAndTeams(
-                  workspaceId,
-                  teamIds,
-                  actorIds,
-                  since,
-                  until
-              );
+                ? activityEventRepository.findActivityBreakdown(workspaceId, actorIds, since, until)
+                : activityEventRepository.findActivityBreakdownByWorkspaceAndTeams(
+                        workspaceId, teamIds, actorIds, since, until);
 
         Map<Long, Long> ownPullRequestReplies = teamIds.isEmpty()
-            ? activityEventRepository.countOwnPullRequestRepliesByActors(workspaceId, actorIds, since, until)
-            : activityEventRepository.countOwnPullRequestRepliesByActorsAndTeams(
-                  workspaceId,
-                  teamIds,
-                  actorIds,
-                  since,
-                  until
-              );
+                ? activityEventRepository.countOwnPullRequestRepliesByActors(workspaceId, actorIds, since, until)
+                : activityEventRepository.countOwnPullRequestRepliesByActorsAndTeams(
+                        workspaceId, teamIds, actorIds, since, until);
         Map<Long, Long> openPullRequests = toAuthorCountMap(
-            teamIds.isEmpty()
-                ? profilePullRequestQueryRepository.countOpenPullRequestsByAuthors(workspaceId, actorIds, since, until)
-                : profilePullRequestQueryRepository.countOpenPullRequestsByAuthorsAndTeams(
-                      workspaceId,
-                      teamIds,
-                      actorIds,
-                      since,
-                      until
-                  )
-        );
+                teamIds.isEmpty()
+                        ? profilePullRequestQueryRepository.countOpenPullRequestsByAuthors(
+                                workspaceId, actorIds, since, until)
+                        : profilePullRequestQueryRepository.countOpenPullRequestsByAuthorsAndTeams(
+                                workspaceId, teamIds, actorIds, since, until));
         Map<Long, Long> mergedPullRequests = toAuthorCountMap(
-            teamIds.isEmpty()
-                ? profilePullRequestQueryRepository.countMergedPullRequestsByAuthors(
-                      workspaceId,
-                      actorIds,
-                      since,
-                      until
-                  )
-                : profilePullRequestQueryRepository.countMergedPullRequestsByAuthorsAndTeams(
-                      workspaceId,
-                      teamIds,
-                      actorIds,
-                      since,
-                      until
-                  )
-        );
+                teamIds.isEmpty()
+                        ? profilePullRequestQueryRepository.countMergedPullRequestsByAuthors(
+                                workspaceId, actorIds, since, until)
+                        : profilePullRequestQueryRepository.countMergedPullRequestsByAuthorsAndTeams(
+                                workspaceId, teamIds, actorIds, since, until));
         Map<Long, Long> closedPullRequests = toAuthorCountMap(
-            teamIds.isEmpty()
-                ? profilePullRequestQueryRepository.countClosedPullRequestsByAuthors(
-                      workspaceId,
-                      actorIds,
-                      since,
-                      until
-                  )
-                : profilePullRequestQueryRepository.countClosedPullRequestsByAuthorsAndTeams(
-                      workspaceId,
-                      teamIds,
-                      actorIds,
-                      since,
-                      until
-                  )
-        );
+                teamIds.isEmpty()
+                        ? profilePullRequestQueryRepository.countClosedPullRequestsByAuthors(
+                                workspaceId, actorIds, since, until)
+                        : profilePullRequestQueryRepository.countClosedPullRequestsByAuthorsAndTeams(
+                                workspaceId, teamIds, actorIds, since, until));
 
         // 4. Hydrate user data
-        Map<Long, User> usersById = userRepository
-            .findAllById(actorIds)
-            .stream()
-            .collect(toMap(User::getId, identity(), (a, b) -> a));
+        Map<Long, User> usersById =
+                userRepository.findAllById(actorIds).stream().collect(toMap(User::getId, identity(), (a, b) -> a));
 
         // 5. Build result map using builders for incremental construction
         Map<Long, LeaderboardUserXp.Builder> builders = new HashMap<>();
@@ -226,14 +177,9 @@ public class LeaderboardXpQueryService {
         // 7. Query distinct PR counts per user from the reviews table
         // This counts DISTINCT PRs, not events (fixing numberOfReviewedPRs regression)
         Map<Long, Long> distinctPrCountsByUser = teamIds.isEmpty()
-            ? activityEventRepository.countDistinctReviewedPullRequestsByActors(workspaceId, actorIds, since, until)
-            : activityEventRepository.countDistinctReviewedPullRequestsByActorsAndTeams(
-                  workspaceId,
-                  teamIds,
-                  actorIds,
-                  since,
-                  until
-              );
+                ? activityEventRepository.countDistinctReviewedPullRequestsByActors(workspaceId, actorIds, since, until)
+                : activityEventRepository.countDistinctReviewedPullRequestsByActorsAndTeams(
+                        workspaceId, teamIds, actorIds, since, until);
 
         // Set the distinct PR counts on each builder
         for (Map.Entry<Long, LeaderboardUserXp.Builder> entry : builders.entrySet()) {
@@ -243,23 +189,17 @@ public class LeaderboardXpQueryService {
         }
 
         // 8. Build immutable results
-        Map<Long, LeaderboardUserXp> result = builders
-            .entrySet()
-            .stream()
-            .collect(toMap(Map.Entry::getKey, e -> e.getValue().build()));
+        Map<Long, LeaderboardUserXp> result = builders.entrySet().stream()
+                .collect(toMap(Map.Entry::getKey, e -> e.getValue().build()));
 
         log.debug("Built leaderboard data: workspaceId={}, userCount={}", workspaceId, result.size());
         return result;
     }
 
     private Map<Long, Long> toAuthorCountMap(List<ProfilePullRequestQueryRepository.AuthorCountProjection> counts) {
-        return counts
-            .stream()
-            .collect(
-                toMap(
-                    ProfilePullRequestQueryRepository.AuthorCountProjection::getAuthorId,
-                    ProfilePullRequestQueryRepository.AuthorCountProjection::getCount
-                )
-            );
+        return counts.stream()
+                .collect(toMap(
+                        ProfilePullRequestQueryRepository.AuthorCountProjection::getAuthorId,
+                        ProfilePullRequestQueryRepository.AuthorCountProjection::getCount));
     }
 }

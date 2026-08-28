@@ -87,9 +87,9 @@ class GithubPrNodeIdResolverTest extends BaseUnitTest {
         when(spec.execute()).thenReturn(Mono.empty());
 
         assertThatThrownBy(() -> resolver.resolve(1L, "owner", "repo", 42))
-            .isInstanceOf(FeedbackDeliveryException.class)
-            .hasMessageContaining("Null response")
-            .hasMessageContaining("owner/repo#42");
+                .isInstanceOf(FeedbackDeliveryException.class)
+                .hasMessageContaining("Null response")
+                .hasMessageContaining("owner/repo#42");
     }
 
     @Test
@@ -103,10 +103,10 @@ class GithubPrNodeIdResolverTest extends BaseUnitTest {
         when(spec.execute()).thenReturn(Mono.just(response));
 
         assertThatThrownBy(() -> resolver.resolve(1L, "owner", "repo", 42))
-            .isInstanceOf(FeedbackDeliveryException.class)
-            .hasMessageContaining("PR not found via GraphQL")
-            .hasMessageContaining("owner/repo#42")
-            .hasMessageContaining("errors=");
+                .isInstanceOf(FeedbackDeliveryException.class)
+                .hasMessageContaining("PR not found via GraphQL")
+                .hasMessageContaining("owner/repo#42")
+                .hasMessageContaining("errors=");
     }
 
     @Test
@@ -116,9 +116,9 @@ class GithubPrNodeIdResolverTest extends BaseUnitTest {
         when(spec.execute()).thenReturn(Mono.just(response));
 
         assertThatThrownBy(() -> resolver.resolveIssue(1L, "owner", "repo", 7))
-            .isInstanceOf(FeedbackDeliveryException.class)
-            .hasMessageContaining("Issue not found via GraphQL")
-            .hasMessageContaining("owner/repo#7");
+                .isInstanceOf(FeedbackDeliveryException.class)
+                .hasMessageContaining("Issue not found via GraphQL")
+                .hasMessageContaining("owner/repo#7");
     }
 
     @SuppressWarnings("unchecked")

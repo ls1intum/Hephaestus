@@ -38,10 +38,9 @@ public class PracticeReviewSettingsController {
     @GetMapping
     @Operation(summary = "Get the workspace's practice-review policy")
     @ApiResponse(
-        responseCode = "200",
-        description = "Policy returned",
-        content = @Content(schema = @Schema(implementation = PracticeReviewSettingsDTO.class))
-    )
+            responseCode = "200",
+            description = "Policy returned",
+            content = @Content(schema = @Schema(implementation = PracticeReviewSettingsDTO.class)))
     @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<PracticeReviewSettingsDTO> getPracticeReviewSettings(WorkspaceContext workspaceContext) {
         return response(practiceReviewSettingsService.getSettings(workspaceContext));
@@ -52,33 +51,24 @@ public class PracticeReviewSettingsController {
     @RequireAtLeastWorkspaceAdmin
     @AuditExempt(reason = "computes a read-only coverage preview; stores no configuration")
     public PracticeReviewCoveragePreviewDTO previewCoverage(
-        WorkspaceContext workspaceContext,
-        @Valid @RequestBody WorkspaceReviewScope proposed
-    ) {
+            WorkspaceContext workspaceContext, @Valid @RequestBody WorkspaceReviewScope proposed) {
         return practiceReviewSettingsService.previewCoverage(workspaceContext, proposed);
     }
 
     @PatchMapping
     @Operation(summary = "Update the workspace's practice-review policy")
     @ApiResponse(
-        responseCode = "200",
-        description = "Policy updated",
-        content = @Content(schema = @Schema(implementation = PracticeReviewSettingsDTO.class))
-    )
+            responseCode = "200",
+            description = "Policy updated",
+            content = @Content(schema = @Schema(implementation = PracticeReviewSettingsDTO.class)))
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_REVIEW_SETTINGS")
     public ResponseEntity<PracticeReviewSettingsDTO> updatePracticeReviewSettings(
-        WorkspaceContext workspaceContext,
-        @RequestHeader(name = HttpHeaders.IF_MATCH, required = false) @Nullable String ifMatch,
-        @Valid @RequestBody UpdatePracticeReviewSettingsRequestDTO request
-    ) {
-        return response(
-            practiceReviewSettingsService.updatePracticeReview(
-                workspaceContext,
-                request,
-                ifMatch == null ? null : EntityTagPrecondition.parse(ifMatch)
-            )
-        );
+            WorkspaceContext workspaceContext,
+            @RequestHeader(name = HttpHeaders.IF_MATCH, required = false) @Nullable String ifMatch,
+            @Valid @RequestBody UpdatePracticeReviewSettingsRequestDTO request) {
+        return response(practiceReviewSettingsService.updatePracticeReview(
+                workspaceContext, request, ifMatch == null ? null : EntityTagPrecondition.parse(ifMatch)));
     }
 
     private static ResponseEntity<PracticeReviewSettingsDTO> response(PracticeReviewSettingsDTO settings) {

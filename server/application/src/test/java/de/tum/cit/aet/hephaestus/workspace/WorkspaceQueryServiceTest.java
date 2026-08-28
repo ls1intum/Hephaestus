@@ -30,14 +30,13 @@ class WorkspaceQueryServiceTest extends BaseUnitTest {
 
     private WorkspaceQueryService newService() {
         return new WorkspaceQueryService(
-            workspaceRepository,
-            workspaceMembershipRepository,
-            repositoryToMonitorRepository,
-            currentAccountUsers,
-            connectionService,
-            new WorkspaceProperties(false, null, false, null, WorkspaceProperties.CreationPolicy.ADMIN_ONLY),
-            List.of()
-        );
+                workspaceRepository,
+                workspaceMembershipRepository,
+                repositoryToMonitorRepository,
+                currentAccountUsers,
+                connectionService,
+                new WorkspaceProperties(false, null, false, null, WorkspaceProperties.CreationPolicy.ADMIN_ONLY),
+                List.of());
     }
 
     @Test
@@ -54,19 +53,17 @@ class WorkspaceQueryServiceTest extends BaseUnitTest {
 
         WorkspaceQueryService service = newService();
 
-        when(workspaceRepository.findByStatusAndIsPubliclyViewableTrue(Workspace.WorkspaceStatus.ACTIVE)).thenReturn(
-            List.of(zuluWorkspace, alphaWorkspace)
-        );
-        when(workspaceMembershipRepository.findByUser_IdIn(Set.of(42L))).thenReturn(
-            List.of(bravoMembership, alphaMembership)
-        );
+        when(workspaceRepository.findByStatusAndIsPubliclyViewableTrue(Workspace.WorkspaceStatus.ACTIVE))
+                .thenReturn(List.of(zuluWorkspace, alphaWorkspace));
+        when(workspaceMembershipRepository.findByUser_IdIn(Set.of(42L)))
+                .thenReturn(List.of(bravoMembership, alphaMembership));
         when(workspaceRepository.findAllById(List.of(2L, 1L))).thenReturn(List.of(bravoWorkspace, alphaWorkspace));
 
         List<Workspace> workspaces = service.findAccessibleWorkspaces(List.of(currentUser));
 
         assertThat(workspaces)
-            .extracting(Workspace::getWorkspaceSlug)
-            .containsExactly("alpha-space", "bravo-space", "zulu-space");
+                .extracting(Workspace::getWorkspaceSlug)
+                .containsExactly("alpha-space", "bravo-space", "zulu-space");
     }
 
     @Test
@@ -76,9 +73,8 @@ class WorkspaceQueryServiceTest extends BaseUnitTest {
 
         WorkspaceQueryService service = newService();
 
-        when(workspaceRepository.findByStatusAndIsPubliclyViewableTrue(Workspace.WorkspaceStatus.ACTIVE)).thenReturn(
-            List.of(zuluWorkspace, alphaWorkspace)
-        );
+        when(workspaceRepository.findByStatusAndIsPubliclyViewableTrue(Workspace.WorkspaceStatus.ACTIVE))
+                .thenReturn(List.of(zuluWorkspace, alphaWorkspace));
 
         List<Workspace> workspaces = service.findAccessibleWorkspaces(List.<User>of());
 
@@ -99,12 +95,10 @@ class WorkspaceQueryServiceTest extends BaseUnitTest {
         WorkspaceQueryService service = newService();
 
         when(currentAccountUsers.resolve()).thenReturn(List.of(gitlabIdentity, githubIdentity));
-        when(workspaceRepository.findByStatusAndIsPubliclyViewableTrue(Workspace.WorkspaceStatus.ACTIVE)).thenReturn(
-            List.of()
-        );
-        when(workspaceMembershipRepository.findByUser_IdIn(Set.of(103L, 2L))).thenReturn(
-            List.of(membership(githubWorkspace))
-        );
+        when(workspaceRepository.findByStatusAndIsPubliclyViewableTrue(Workspace.WorkspaceStatus.ACTIVE))
+                .thenReturn(List.of());
+        when(workspaceMembershipRepository.findByUser_IdIn(Set.of(103L, 2L)))
+                .thenReturn(List.of(membership(githubWorkspace)));
         when(workspaceRepository.findAllById(List.of(1L))).thenReturn(List.of(githubWorkspace));
 
         List<Workspace> workspaces = service.findAccessibleWorkspaces();

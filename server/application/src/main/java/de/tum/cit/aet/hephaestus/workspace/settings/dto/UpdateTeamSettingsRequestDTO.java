@@ -10,7 +10,6 @@ import jakarta.validation.constraints.NotNull;
  */
 @Schema(description = "Request to update team visibility settings in a workspace")
 public record UpdateTeamSettingsRequestDTO(
-    @NotNull(message = "hidden is required")
-    @Schema(description = "Whether the team should be hidden from the leaderboard")
-    Boolean hidden
-) {}
+        @NotNull(message = "hidden is required")
+        @Schema(description = "Whether the team should be hidden from the leaderboard")
+        Boolean hidden) {}

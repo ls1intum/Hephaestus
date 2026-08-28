@@ -14,9 +14,4 @@ import java.util.Map;
  * @param duration wall-clock execution time (container start to exit)
  */
 public record SandboxResult(
-    int exitCode,
-    Map<String, byte[]> outputFiles,
-    String logs,
-    boolean timedOut,
-    Duration duration
-) {}
+        int exitCode, Map<String, byte[]> outputFiles, String logs, boolean timedOut, Duration duration) {}

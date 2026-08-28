@@ -42,7 +42,8 @@ public class ReviewRequestAuthority {
      *     attributed to one — itself a refusal
      */
     public boolean mayRequest(long workspaceId, Issue artifact, @Nullable User requester) {
-        return standingOf(workspaceId, artifact, requester == null ? List.of() : List.of(requester)).isPresent();
+        return standingOf(workspaceId, artifact, requester == null ? List.of() : List.of(requester))
+                .isPresent();
     }
 
     /**
@@ -51,13 +52,11 @@ public class ReviewRequestAuthority {
      * request.
      */
     public Optional<User> standingOf(long workspaceId, Issue artifact, Collection<User> candidates) {
-        return candidates
-            .stream()
-            .filter(candidate -> candidate != null && candidate.getId() != null)
-            .filter(
-                candidate -> isActorOn(artifact, candidate.getId()) || isWorkspaceAdmin(workspaceId, candidate.getId())
-            )
-            .findFirst();
+        return candidates.stream()
+                .filter(candidate -> candidate != null && candidate.getId() != null)
+                .filter(candidate ->
+                        isActorOn(artifact, candidate.getId()) || isWorkspaceAdmin(workspaceId, candidate.getId()))
+                .findFirst();
     }
 
     private boolean isActorOn(Issue artifact, Long requesterId) {
@@ -71,8 +70,8 @@ public class ReviewRequestAuthority {
 
     public boolean isWorkspaceAdmin(long workspaceId, Long requesterId) {
         return memberships
-            .findByWorkspace_IdAndUser_Id(workspaceId, requesterId)
-            .map(membership -> ADMIN_ROLES.contains(membership.getRole()))
-            .orElse(false);
+                .findByWorkspace_IdAndUser_Id(workspaceId, requesterId)
+                .map(membership -> ADMIN_ROLES.contains(membership.getRole()))
+                .orElse(false);
     }
 }

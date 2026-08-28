@@ -32,21 +32,19 @@ public class CrossBoundaryEvaluator implements AchievementEvaluator {
         }
 
         return commitRepository
-            .findByIdWithFileChanges(event.targetId())
-            .map(commit -> {
-                Set<String> languages = commit
-                    .getFileChanges()
-                    .stream()
-                    .map(fc -> LanguageExtensions.detectLanguage(fc.getFilename()))
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toSet());
+                .findByIdWithFileChanges(event.targetId())
+                .map(commit -> {
+                    Set<String> languages = commit.getFileChanges().stream()
+                            .map(fc -> LanguageExtensions.detectLanguage(fc.getFilename()))
+                            .filter(Objects::nonNull)
+                            .collect(Collectors.toSet());
 
-                if (languages.size() >= MIN_LANGUAGES) {
-                    userAchievement.setProgressData(new BinaryAchievementProgress(true));
-                    return true;
-                }
-                return false;
-            })
-            .orElse(false);
+                    if (languages.size() >= MIN_LANGUAGES) {
+                        userAchievement.setProgressData(new BinaryAchievementProgress(true));
+                        return true;
+                    }
+                    return false;
+                })
+                .orElse(false);
     }
 }

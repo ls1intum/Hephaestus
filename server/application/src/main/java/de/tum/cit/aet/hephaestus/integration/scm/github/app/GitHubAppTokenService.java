@@ -63,9 +63,9 @@ public class GitHubAppTokenService {
 
     // Cache installation tokens to avoid re-minting on every call.
     private final Cache<Long, CachedToken> installTokenCache = Caffeine.newBuilder()
-        .expireAfterWrite(Duration.ofMinutes(55))
-        .maximumSize(10000)
-        .build();
+            .expireAfterWrite(Duration.ofMinutes(55))
+            .maximumSize(10000)
+            .build();
 
     // Track suspended installations to fail fast without calling GitHub.
     // This is an in-memory set that all threads see immediately, bypassing DB transaction isolation.
@@ -80,11 +80,11 @@ public class GitHubAppTokenService {
         this.privateKey = credentialsConfigured ? loadKey(privateKeyRes, privateKeyPem) : generateEphemeralRsaKey();
         HttpClient httpClient = HttpClient.create().resolver(DefaultAddressResolverGroup.INSTANCE);
         this.webClient = WebClient.builder()
-            .clientConnector(new ReactorClientHttpConnector(httpClient))
-            .baseUrl(GITHUB_API_BASE_URL)
-            .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
-            .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
-            .build();
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .baseUrl(GITHUB_API_BASE_URL)
+                .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
+                .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
+                .build();
     }
 
     /**
@@ -99,10 +99,10 @@ public class GitHubAppTokenService {
         Instant now = Instant.now();
         Algorithm algorithm = Algorithm.RSA256(null, (RSAPrivateKey) privateKey);
         return JWT.create()
-            .withIssuer(String.valueOf(appId))
-            .withIssuedAt(Date.from(now.minusSeconds(60)))
-            .withExpiresAt(Date.from(now.plusSeconds(9 * 60)))
-            .sign(algorithm);
+                .withIssuer(String.valueOf(appId))
+                .withIssuedAt(Date.from(now.minusSeconds(60)))
+                .withExpiresAt(Date.from(now.plusSeconds(9 * 60)))
+                .sign(algorithm);
     }
 
     /**
@@ -144,12 +144,12 @@ public class GitHubAppTokenService {
             String appJwt = generateAppJWT();
 
             InstallationTokenResponse response = webClient
-                .post()
-                .uri("/app/installations/{installationId}/access_tokens", installationId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + appJwt)
-                .retrieve()
-                .bodyToMono(InstallationTokenResponse.class)
-                .block();
+                    .post()
+                    .uri("/app/installations/{installationId}/access_tokens", installationId)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + appJwt)
+                    .retrieve()
+                    .bodyToMono(InstallationTokenResponse.class)
+                    .block();
 
             if (response == null || response.token() == null) {
                 throw new IllegalStateException("Empty token response from GitHub for installation " + installationId);
@@ -173,8 +173,7 @@ public class GitHubAppTokenService {
             throw e;
         } catch (Exception e) {
             throw new UncheckedIOException(
-                new IOException("GitHub error minting installation token for " + installationId, e)
-            );
+                    new IOException("GitHub error minting installation token for " + installationId, e));
         }
     }
 
@@ -290,7 +289,7 @@ public class GitHubAppTokenService {
 
     private static byte[] convertPkcs1ToPkcs8(byte[] pkcs1) {
         try {
-            byte[] version = new byte[] { 0x02, 0x01, 0x00 };
+            byte[] version = new byte[] {0x02, 0x01, 0x00};
             byte[] algorithmIdentifier = new byte[] {
                 0x30,
                 0x0d,
@@ -335,7 +334,7 @@ public class GitHubAppTokenService {
 
     private static byte[] encodeDerLength(int length) {
         if (length < 0x80) {
-            return new byte[] { (byte) length };
+            return new byte[] {(byte) length};
         }
         int numBytes = 0;
         int temp = length;
@@ -361,10 +360,7 @@ public class GitHubAppTokenService {
     }
 
     private static boolean isKeyMaterialPresent(
-        long appId,
-        @Nullable Resource privateKeyRes,
-        @Nullable String privateKeyPem
-    ) {
+            long appId, @Nullable Resource privateKeyRes, @Nullable String privateKeyPem) {
         if (appId <= 0) {
             return false;
         }
@@ -410,12 +406,12 @@ public class GitHubAppTokenService {
             String appJwt = generateAppJWT();
 
             InstallationStatusResponse response = webClient
-                .get()
-                .uri("/app/installations/{installationId}", installationId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + appJwt)
-                .retrieve()
-                .bodyToMono(InstallationStatusResponse.class)
-                .block();
+                    .get()
+                    .uri("/app/installations/{installationId}", installationId)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + appJwt)
+                    .retrieve()
+                    .bodyToMono(InstallationStatusResponse.class)
+                    .block();
 
             if (response == null) {
                 throw new IllegalStateException("Empty response from GitHub for installation " + installationId);
@@ -428,17 +424,13 @@ public class GitHubAppTokenService {
             throw e;
         } catch (WebClientResponseException e) {
             // Other HTTP errors (403 Forbidden, 500 Internal Server Error, etc.)
-            throw new UncheckedIOException(
-                new IOException(
+            throw new UncheckedIOException(new IOException(
                     "GitHub API error checking installation status for " + installationId + ": " + e.getStatusCode(),
-                    e
-                )
-            );
+                    e));
         } catch (RuntimeException e) {
             // Network errors, timeouts, or other transient issues
             throw new UncheckedIOException(
-                new IOException("GitHub error checking installation status for " + installationId, e)
-            );
+                    new IOException("GitHub error checking installation status for " + installationId, e));
         }
     }
 
@@ -450,21 +442,17 @@ public class GitHubAppTokenService {
         try {
             String appJwt = generateAppJWT();
             webClient
-                .delete()
-                .uri("/app/installations/{installationId}", installationId)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + appJwt)
-                .retrieve()
-                .toBodilessEntity()
-                .block();
+                    .delete()
+                    .uri("/app/installations/{installationId}", installationId)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + appJwt)
+                    .retrieve()
+                    .toBodilessEntity()
+                    .block();
         } catch (WebClientResponseException.NotFound e) {
             // Desired state already reached.
         } catch (WebClientResponseException e) {
-            throw new UncheckedIOException(
-                new IOException(
-                    "GitHub API error deleting installation " + installationId + ": " + e.getStatusCode(),
-                    e
-                )
-            );
+            throw new UncheckedIOException(new IOException(
+                    "GitHub API error deleting installation " + installationId + ": " + e.getStatusCode(), e));
         } catch (RuntimeException e) {
             throw new UncheckedIOException(new IOException("GitHub error deleting installation " + installationId, e));
         } finally {
@@ -479,11 +467,11 @@ public class GitHubAppTokenService {
 
     private record CachedToken(String token, Instant expiresAt) {}
 
-    private record InstallationTokenResponse(String token, @JsonProperty("expires_at") Instant expiresAt) {}
+    private record InstallationTokenResponse(
+            String token, @JsonProperty("expires_at") Instant expiresAt) {}
 
     private record InstallationStatusResponse(
-        Long id,
-        @JsonProperty("suspended_at") Instant suspendedAt,
-        @JsonProperty("suspended_by") Object suspendedBy
-    ) {}
+            Long id,
+            @JsonProperty("suspended_at") Instant suspendedAt,
+            @JsonProperty("suspended_by") Object suspendedBy) {}
 }

@@ -12,7 +12,9 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
  */
 public sealed interface ConnectionLifecycleEvent {
     long connectionId();
+
     long workspaceId();
+
     IntegrationKind kind();
 
     /** The Connection just became ACTIVE (fresh connect or reactivation). */

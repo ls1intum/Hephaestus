@@ -12,28 +12,20 @@ import org.springframework.data.repository.query.Param;
 @WorkspaceAgnostic("Immutable evaluations are tenant-scoped by a raw workspace_id")
 public interface DeliveryPolicyEvaluationRepository extends JpaRepository<DeliveryPolicyEvaluation, UUID> {
     List<DeliveryPolicyEvaluation> findByWorkspaceIdAndFeedbackIdOrderByEvaluatedAtAsc(
-        Long workspaceId,
-        UUID feedbackId
-    );
+            Long workspaceId, UUID feedbackId);
 
     List<DeliveryPolicyEvaluation> findByWorkspaceIdAndAgentJobIdAndFeedbackIdIsNullAndSurfaceOrderByEvaluatedAtAsc(
-        Long workspaceId,
-        UUID agentJobId,
-        DeliveryPolicySurface surface
-    );
+            Long workspaceId, UUID agentJobId, DeliveryPolicySurface surface);
 
     @Modifying
-    @Query(
-        value = """
+    @Query(value = """
         DELETE FROM delivery_policy_evaluation evaluation
         USING agent_job job
         WHERE evaluation.workspace_id = :workspaceId
           AND job.workspace_id = evaluation.workspace_id
           AND job.id = evaluation.agent_job_id
           AND job.artifact_kind IN ('scm.pull_request', 'scm.issue')
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int deleteScmArtifactEvaluations(@Param("workspaceId") long workspaceId);
 
     @Modifying
@@ -41,8 +33,7 @@ public interface DeliveryPolicyEvaluationRepository extends JpaRepository<Delive
     int deleteAllByWorkspaceId(@Param("workspaceId") long workspaceId);
 
     @Modifying
-    @Query(
-        value = """
+    @Query(value = """
         DELETE FROM delivery_policy_evaluation evaluation
         USING agent_job job
         WHERE evaluation.workspace_id = :workspaceId
@@ -66,31 +57,23 @@ public interface DeliveryPolicyEvaluationRepository extends JpaRepository<Delive
                 AND observation.artifact_id IN (:threadIds)
             )
           )
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int deleteConversationEvaluationsForThreads(
-        @Param("workspaceId") long workspaceId,
-        @Param("threadIds") Collection<Long> threadIds
-    );
+            @Param("workspaceId") long workspaceId, @Param("threadIds") Collection<Long> threadIds);
 
     @Modifying
-    @Query(
-        value = """
+    @Query(value = """
         DELETE FROM delivery_policy_evaluation evaluation
         USING agent_job job
         WHERE evaluation.workspace_id = :workspaceId
           AND job.workspace_id = evaluation.workspace_id
           AND job.id = evaluation.agent_job_id
           AND job.artifact_kind = 'chat.conversation_thread'
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int deleteAllConversationEvaluations(@Param("workspaceId") long workspaceId);
 
     @Modifying
-    @Query(
-        value = """
+    @Query(value = """
         DELETE FROM delivery_policy_evaluation evaluation
         USING agent_job job
         WHERE evaluation.workspace_id = :workspaceId
@@ -114,11 +97,7 @@ public interface DeliveryPolicyEvaluationRepository extends JpaRepository<Delive
                 AND observation.about_user_id = :aboutUserId
             )
           )
-        """,
-        nativeQuery = true
-    )
+        """, nativeQuery = true)
     int deleteConversationEvaluationsAboutUser(
-        @Param("workspaceId") long workspaceId,
-        @Param("aboutUserId") long aboutUserId
-    );
+            @Param("workspaceId") long workspaceId, @Param("aboutUserId") long aboutUserId);
 }

@@ -60,16 +60,14 @@ class TestTierTaggingArchTest {
     private static final Pattern DISCOVERABLE_NAME = Pattern.compile("^(Test\\w+|\\w+Test|\\w+Tests|\\w+TestCase)$");
 
     /** Anchored at column 0, so nested types (always indented) and javadoc lines can never match. */
-    private static final Pattern TOP_LEVEL_TYPE_DECL = Pattern.compile(
-        "(?m)^(\\w[\\w\\s-]*?\\s)?(class|@interface)\\s+(\\w+)"
-    );
+    private static final Pattern TOP_LEVEL_TYPE_DECL =
+            Pattern.compile("(?m)^(\\w[\\w\\s-]*?\\s)?(class|@interface)\\s+(\\w+)");
 
     private static final Pattern EXTENDS_CLAUSE = Pattern.compile("\\bextends\\s+(\\w+)");
     private static final Pattern TAG_VALUE = Pattern.compile("@Tag\\(\\s*\"([^\"]+)\"\\s*\\)");
     private static final Pattern ANNOTATION_USE = Pattern.compile("@(\\w+)");
-    private static final Pattern TEST_METHOD = Pattern.compile(
-        "@(Test|ParameterizedTest|RepeatedTest|TestFactory|TestTemplate)\\b"
-    );
+    private static final Pattern TEST_METHOD =
+            Pattern.compile("@(Test|ParameterizedTest|RepeatedTest|TestFactory|TestTemplate)\\b");
 
     /**
      * Block and line comments. Javadoc on the rules in this very package quotes {@code @Tag("...")} to
@@ -79,67 +77,58 @@ class TestTierTaggingArchTest {
     private static final Pattern COMMENT = Pattern.compile("(?s)/\\*.*?\\*/|//[^\\n]*");
 
     private record TypeDecl(
-        String name,
-        boolean isAbstract,
-        boolean isAnnotation,
-        @org.jspecify.annotations.Nullable String superName,
-        Set<String> tags,
-        Set<String> annotations,
-        boolean declaresTests,
-        Path file
-    ) {}
+            String name,
+            boolean isAbstract,
+            boolean isAnnotation,
+            @org.jspecify.annotations.Nullable String superName,
+            Set<String> tags,
+            Set<String> annotations,
+            boolean declaresTests,
+            Path file) {}
 
     @Test
     void everyDiscoverableTestClassCarriesATierTag() {
         Map<String, TypeDecl> types = scanTestSources();
 
-        List<String> violations = types
-            .values()
-            .stream()
-            .filter(decl -> isRunnable(decl, types))
-            .filter(decl -> resolveTiers(decl, types).isEmpty())
-            .map(decl -> "  " + decl.file().getFileName() + "  [" + decl.name() + "]")
-            .sorted()
-            .toList();
+        List<String> violations = types.values().stream()
+                .filter(decl -> isRunnable(decl, types))
+                .filter(decl -> resolveTiers(decl, types).isEmpty())
+                .map(decl -> "  " + decl.file().getFileName() + "  [" + decl.name() + "]")
+                .sorted()
+                .toList();
 
         assertThat(violations)
-            .as(
-                "Every discoverable test class must resolve to at least one of %s — directly, through its " +
-                    "extends chain, or through a meta-annotation. Surefire filters on groups=unit and Failsafe " +
-                    "on groups=integration, so a class with no tier tag runs in no tier and reports no skip: it " +
-                    "is silently dead. Extend BaseUnitTest / BaseIntegrationTest, or add the @Tag the test's " +
-                    "behaviour calls for — a test that boots a Spring context is not a unit test:%n%s",
-                new TreeSet<>(TIERS),
-                String.join("\n", violations)
-            )
-            .isEmpty();
+                .as(
+                        "Every discoverable test class must resolve to at least one of %s — directly, through its "
+                                + "extends chain, or through a meta-annotation. Surefire filters on groups=unit and Failsafe "
+                                + "on groups=integration, so a class with no tier tag runs in no tier and reports no skip: it "
+                                + "is silently dead. Extend BaseUnitTest / BaseIntegrationTest, or add the @Tag the test's "
+                                + "behaviour calls for — a test that boots a Spring context is not a unit test:%n%s",
+                        new TreeSet<>(TIERS), String.join("\n", violations))
+                .isEmpty();
     }
 
     @Test
     void anIntegrationTaggedTestIsNamedSoFailsafeRunsIt() {
         Map<String, TypeDecl> types = scanTestSources();
 
-        List<String> violations = types
-            .values()
-            .stream()
-            .filter(decl -> isRunnable(decl, types))
-            .filter(decl -> resolveTiers(decl, types).contains("integration"))
-            .filter(decl -> FAILSAFE_SUFFIXES.stream().noneMatch(suffix -> decl.name().endsWith(suffix)))
-            .map(
-                decl ->
-                    "  " + decl.name() + " → rename to " + decl.name().replaceFirst("Tests?$", "") + "IntegrationTest"
-            )
-            .sorted()
-            .toList();
+        List<String> violations = types.values().stream()
+                .filter(decl -> isRunnable(decl, types))
+                .filter(decl -> resolveTiers(decl, types).contains("integration"))
+                .filter(decl -> FAILSAFE_SUFFIXES.stream()
+                        .noneMatch(suffix -> decl.name().endsWith(suffix)))
+                .map(decl -> "  " + decl.name() + " → rename to " + decl.name().replaceFirst("Tests?$", "")
+                        + "IntegrationTest")
+                .sorted()
+                .toList();
 
         assertThat(violations)
-            .as(
-                "Failsafe discovers only **/*IntegrationTest.java and **/*LiquibaseTest.java, so an " +
-                    "@Tag(\"integration\") class named anything else is never executed by `mvn verify` — and " +
-                    "Surefire excludes it too, because it runs groups=unit. Rename:%n%s",
-                String.join("\n", violations)
-            )
-            .isEmpty();
+                .as(
+                        "Failsafe discovers only **/*IntegrationTest.java and **/*LiquibaseTest.java, so an "
+                                + "@Tag(\"integration\") class named anything else is never executed by `mvn verify` — and "
+                                + "Surefire excludes it too, because it runs groups=unit. Rename:%n%s",
+                        String.join("\n", violations))
+                .isEmpty();
     }
 
     /**
@@ -151,27 +140,24 @@ class TestTierTaggingArchTest {
     void everyTestFileIsNamedAfterTheClassItDeclares() {
         Map<String, TypeDecl> types = scanTestSources();
 
-        List<String> violations = types
-            .values()
-            .stream()
-            .filter(decl -> !decl.isAnnotation())
-            .filter(decl -> {
-                String fileName = decl.file().getFileName().toString();
-                return !fileName.equals(decl.name() + ".java");
-            })
-            .map(decl -> "  " + decl.file().getFileName() + " declares class " + decl.name())
-            .sorted()
-            .toList();
+        List<String> violations = types.values().stream()
+                .filter(decl -> !decl.isAnnotation())
+                .filter(decl -> {
+                    String fileName = decl.file().getFileName().toString();
+                    return !fileName.equals(decl.name() + ".java");
+                })
+                .map(decl -> "  " + decl.file().getFileName() + " declares class " + decl.name())
+                .sorted()
+                .toList();
 
         assertThat(violations)
-            .as(
-                "A test file must be named after the top-level class it declares. Java only enforces this " +
-                    "for public classes, and every test class here is package-private, so the two drift apart " +
-                    "silently on a rename — leaving `-Dtest=<file name>` matching nothing and every file-based " +
-                    "scan (this one included) reporting the wrong name:%n%s",
-                String.join("\n", violations)
-            )
-            .isEmpty();
+                .as(
+                        "A test file must be named after the top-level class it declares. Java only enforces this "
+                                + "for public classes, and every test class here is package-private, so the two drift apart "
+                                + "silently on a rename — leaving `-Dtest=<file name>` matching nothing and every file-based "
+                                + "scan (this one included) reporting the wrong name:%n%s",
+                        String.join("\n", violations))
+                .isEmpty();
     }
 
     /**
@@ -179,7 +165,9 @@ class TestTierTaggingArchTest {
      * from an abstract base (the {@code *ManifestContractTest} family declares none of its own).
      */
     private static boolean isRunnable(TypeDecl decl, Map<String, TypeDecl> types) {
-        if (decl.isAnnotation() || decl.isAbstract() || !DISCOVERABLE_NAME.matcher(decl.name()).matches()) {
+        if (decl.isAnnotation()
+                || decl.isAbstract()
+                || !DISCOVERABLE_NAME.matcher(decl.name()).matches()) {
             return false;
         }
         return walkSuperChain(decl, types).stream().anyMatch(TypeDecl::declaresTests);
@@ -222,15 +210,14 @@ class TestTierTaggingArchTest {
     private static Map<String, TypeDecl> scanTestSources() {
         Map<String, TypeDecl> types = new HashMap<>();
         try (Stream<Path> sources = Files.walk(locateTestRoot())) {
-            sources
-                .filter(Files::isRegularFile)
-                .filter(path -> path.toString().endsWith(".java"))
-                .forEach(file -> {
-                    TypeDecl decl = parse(file);
-                    if (decl != null) {
-                        types.put(decl.name(), decl);
-                    }
-                });
+            sources.filter(Files::isRegularFile)
+                    .filter(path -> path.toString().endsWith(".java"))
+                    .forEach(file -> {
+                        TypeDecl decl = parse(file);
+                        if (decl != null) {
+                            types.put(decl.name(), decl);
+                        }
+                    });
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -272,15 +259,14 @@ class TestTierTaggingArchTest {
         Matcher ext = EXTENDS_CLAUSE.matcher(brace < 0 ? "" : afterName.substring(0, brace));
 
         return new TypeDecl(
-            decl.group(3),
-            (decl.group(1) == null ? "" : decl.group(1)).contains("abstract"),
-            "@interface".equals(decl.group(2)),
-            ext.find() ? ext.group(1) : null,
-            tags,
-            annotations,
-            TEST_METHOD.matcher(content).find(),
-            file
-        );
+                decl.group(3),
+                (decl.group(1) == null ? "" : decl.group(1)).contains("abstract"),
+                "@interface".equals(decl.group(2)),
+                ext.find() ? ext.group(1) : null,
+                tags,
+                annotations,
+                TEST_METHOD.matcher(content).find(),
+                file);
     }
 
     private static Path locateTestRoot() {

@@ -55,48 +55,54 @@ public class WorkerConfiguration {
     private static void registerCapacityGauges(MeterRegistry registry, WorkerCapacityState state) {
         record G(String name, String type, ToDoubleFunction<WorkerCapacityState> f, String desc) {}
         List.of(
-            new G("worker.capacity.total", "review", s -> s.reviewMax(), "Configured maximum concurrent review jobs"),
-            new G(
-                "worker.capacity.total",
-                "mentor",
-                s -> s.mentorMax(),
-                "Configured maximum concurrent mentor sessions"
-            ),
-            new G(
-                "worker.capacity.in_flight",
-                "review",
-                s -> s.snapshot().inFlightReview(),
-                "Review jobs currently executing"
-            ),
-            new G(
-                "worker.capacity.in_flight",
-                "mentor",
-                s -> s.snapshot().inFlightMentor(),
-                "Mentor sessions currently open"
-            ),
-            new G("worker.capacity.spare", "review", s -> s.snapshot().spareReview(), "Spare review slots"),
-            new G("worker.capacity.spare", "mentor", s -> s.snapshot().spareMentor(), "Spare mentor slots")
-        ).forEach(g ->
-            Gauge.builder(g.name(), state, g.f())
-                .description(g.desc())
-                .tag("type", g.type())
-                .strongReference(true)
-                .register(registry)
-        );
+                        new G(
+                                "worker.capacity.total",
+                                "review",
+                                s -> s.reviewMax(),
+                                "Configured maximum concurrent review jobs"),
+                        new G(
+                                "worker.capacity.total",
+                                "mentor",
+                                s -> s.mentorMax(),
+                                "Configured maximum concurrent mentor sessions"),
+                        new G(
+                                "worker.capacity.in_flight",
+                                "review",
+                                s -> s.snapshot().inFlightReview(),
+                                "Review jobs currently executing"),
+                        new G(
+                                "worker.capacity.in_flight",
+                                "mentor",
+                                s -> s.snapshot().inFlightMentor(),
+                                "Mentor sessions currently open"),
+                        new G(
+                                "worker.capacity.spare",
+                                "review",
+                                s -> s.snapshot().spareReview(),
+                                "Spare review slots"),
+                        new G(
+                                "worker.capacity.spare",
+                                "mentor",
+                                s -> s.snapshot().spareMentor(),
+                                "Spare mentor slots"))
+                .forEach(g -> Gauge.builder(g.name(), state, g.f())
+                        .description(g.desc())
+                        .tag("type", g.type())
+                        .strongReference(true)
+                        .register(registry));
     }
 
     @Bean
     WorkerControlClient workerControlClient(
-        WorkerProperties properties,
-        FrameCodec frameCodec,
-        ObjectMapper objectMapper,
-        MeterRegistry meterRegistry
-    ) {
+            WorkerProperties properties,
+            FrameCodec frameCodec,
+            ObjectMapper objectMapper,
+            MeterRegistry meterRegistry) {
         WorkerControlClient client = new WorkerControlClient(properties, frameCodec, objectMapper, meterRegistry);
         Gauge.builder("worker.control.channel.connected", client, c -> c.isConnected() ? 1.0 : 0.0)
-            .description("1 when the worker control channel is connected, 0 otherwise")
-            .strongReference(true)
-            .register(meterRegistry);
+                .description("1 when the worker control channel is connected, 0 otherwise")
+                .strongReference(true)
+                .register(meterRegistry);
         return client;
     }
 
@@ -108,20 +114,17 @@ public class WorkerConfiguration {
 
     @Bean
     WorkerCapacityReporter workerCapacityReporter(
-        WorkerCapacityState state,
-        WorkerControlClient client,
-        WorkerProperties properties,
-        ScheduledExecutorService workerScheduler,
-        MeterRegistry meterRegistry
-    ) {
+            WorkerCapacityState state,
+            WorkerControlClient client,
+            WorkerProperties properties,
+            ScheduledExecutorService workerScheduler,
+            MeterRegistry meterRegistry) {
         return new WorkerCapacityReporter(state, client, properties, workerScheduler, meterRegistry);
     }
 
     @Bean
     WorkerControlChannelHealthIndicator workerControlChannelHealthIndicator(
-        WorkerControlClient client,
-        WorkerProperties properties
-    ) {
+            WorkerControlClient client, WorkerProperties properties) {
         return new WorkerControlChannelHealthIndicator(client, properties);
     }
 
@@ -132,21 +135,18 @@ public class WorkerConfiguration {
      */
     @Bean
     SmartInitializingSingleton workerCancelHandlerWiring(
-        WorkerControlClient client,
-        Optional<AgentJobExecutor> executor
-    ) {
+            WorkerControlClient client, Optional<AgentJobExecutor> executor) {
         return () -> executor.ifPresent(e -> client.setCancelHandler(e::cancelLocalJob));
     }
 
     @Bean
     WorkerDrainCoordinator workerDrainCoordinator(
-        WorkerControlClient client,
-        WorkerCapacityState state,
-        WorkerProperties properties,
-        Optional<AgentJobExecutor> executor,
-        ApplicationEventPublisher events,
-        MeterRegistry meterRegistry
-    ) {
+            WorkerControlClient client,
+            WorkerCapacityState state,
+            WorkerProperties properties,
+            Optional<AgentJobExecutor> executor,
+            ApplicationEventPublisher events,
+            MeterRegistry meterRegistry) {
         return new WorkerDrainCoordinator(client, state, properties, executor, events, meterRegistry);
     }
 }

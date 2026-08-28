@@ -42,11 +42,10 @@ public class PullRequestSignalResubmitter implements PendingSignalResubmitter {
     private final SignalRecorder signalRecorder;
 
     public PullRequestSignalResubmitter(
-        AgentJobService agentJobService,
-        PullRequestRepository pullRequestRepository,
-        PracticeReviewDetectionGate practiceReviewDetectionGate,
-        SignalRecorder signalRecorder
-    ) {
+            AgentJobService agentJobService,
+            PullRequestRepository pullRequestRepository,
+            PracticeReviewDetectionGate practiceReviewDetectionGate,
+            SignalRecorder signalRecorder) {
         this.agentJobService = agentJobService;
         this.pullRequestRepository = pullRequestRepository;
         this.practiceReviewDetectionGate = practiceReviewDetectionGate;
@@ -66,7 +65,8 @@ public class PullRequestSignalResubmitter implements PendingSignalResubmitter {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void resubmit(ArtifactSignal signal) {
         SignalKey key = signal.key();
-        PullRequest pr = pullRequestRepository.findByIdWithAllForGate(key.artifactId()).orElse(null);
+        PullRequest pr =
+                pullRequestRepository.findByIdWithAllForGate(key.artifactId()).orElse(null);
         if (pr == null || pr.getHeadRefName() == null || pr.getHeadRefOid() == null || pr.getBaseRefName() == null) {
             log.debug("Pending signal has no reviewable pull request left: prId={}", key.artifactId());
             signalRecorder.markRefused(key, SignalStateReason.ARTIFACT_GONE);
@@ -78,23 +78,22 @@ public class PullRequestSignalResubmitter implements PendingSignalResubmitter {
                 log.debug("Pending signal now skipped by practice gate: prId={}, reason={}", pr.getId(), skip.reason());
                 signalRecorder.markRefused(key, skip.resolvedSignalReason());
             }
-            case GateDecision.Detect detect -> agentJobService.submit(
-                detect.workspace().getId(),
-                AgentJobType.PULL_REQUEST_REVIEW,
-                new PullRequestReviewSubmissionRequest(
-                    ScmEventPayload.PullRequestData.from(pr),
-                    pr.getHeadRefName(),
-                    pr.getHeadRefOid(),
-                    pr.getBaseRefName(),
-                    key.signalName(),
-                    // Carried from the ledger row rather than defaulted: a re-offered signal keeps the
-                    // population it was discovered for, so a campaign's budget-deferred tail cannot land
-                    // in the live series hours after the campaign paused.
-                    SignalOrigins.observationOriginOf(signal.getDiscoveredVia())
-                ),
-                key,
-                detect
-            );
+            case GateDecision.Detect detect ->
+                agentJobService.submit(
+                        detect.workspace().getId(),
+                        AgentJobType.PULL_REQUEST_REVIEW,
+                        new PullRequestReviewSubmissionRequest(
+                                ScmEventPayload.PullRequestData.from(pr),
+                                pr.getHeadRefName(),
+                                pr.getHeadRefOid(),
+                                pr.getBaseRefName(),
+                                key.signalName(),
+                                // Carried from the ledger row rather than defaulted: a re-offered signal keeps the
+                                // population it was discovered for, so a campaign's budget-deferred tail cannot land
+                                // in the live series hours after the campaign paused.
+                                SignalOrigins.observationOriginOf(signal.getDiscoveredVia())),
+                        key,
+                        detect);
         }
     }
 }

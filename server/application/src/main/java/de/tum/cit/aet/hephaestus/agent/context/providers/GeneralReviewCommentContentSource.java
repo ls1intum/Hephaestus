@@ -84,13 +84,14 @@ public class GeneralReviewCommentContentSource implements EvidenceSource {
         JsonNode root = objectMapper.readTree(emitted);
         boolean truncated = root.path("truncated").asBoolean(false);
         return new EvidenceContribution(
-            captured.files(),
-            Map.of(KIND, truncated ? SourceCompleteness.PARTIAL : SourceCompleteness.COMPLETE),
-            captured.immutableIdentities(),
-            captured.observedAt(),
-            captured.sourceEffectiveAt(),
-            Map.of(KIND, root.path("comments").isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY)
-        );
+                captured.files(),
+                Map.of(KIND, truncated ? SourceCompleteness.PARTIAL : SourceCompleteness.COMPLETE),
+                captured.immutableIdentities(),
+                captured.observedAt(),
+                captured.sourceEffectiveAt(),
+                Map.of(
+                        KIND,
+                        root.path("comments").isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY));
     }
 
     @Override
@@ -111,13 +112,9 @@ public class GeneralReviewCommentContentSource implements EvidenceSource {
                 throw new EvidenceCollectionException("Review-comment collection has no pull_request_id", null);
             }
 
-            List<IssueComment> comments = new java.util.ArrayList<>(
-                issueCommentRepository.findRecentHumanByIssueIdWithAuthor(
-                    pullRequestId,
-                    HEPHAESTUS_MARKER,
-                    PageRequest.of(0, MAX_COMMENTS + 1)
-                )
-            );
+            List<IssueComment> comments =
+                    new java.util.ArrayList<>(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(
+                            pullRequestId, HEPHAESTUS_MARKER, PageRequest.of(0, MAX_COMMENTS + 1)));
             comments.removeIf(comment -> {
                 String body = comment == null ? null : comment.getBody();
                 return body == null || body.isBlank() || body.contains(HEPHAESTUS_MARKER);
@@ -128,8 +125,7 @@ public class GeneralReviewCommentContentSource implements EvidenceSource {
             boolean truncated = comments.size() > MAX_COMMENTS;
             if (truncated) comments.remove(comments.size() - 1);
             comments.sort(
-                Comparator.comparing(IssueComment::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
-            );
+                    Comparator.comparing(IssueComment::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())));
 
             ArrayNode commentArray = objectMapper.createArrayNode();
             for (IssueComment c : comments) {

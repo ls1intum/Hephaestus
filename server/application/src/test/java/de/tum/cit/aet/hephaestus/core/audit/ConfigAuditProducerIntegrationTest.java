@@ -52,10 +52,8 @@ class ConfigAuditProducerIntegrationTest extends AbstractWorkspaceIntegrationTes
         membershipService.assignRole(workspace.getId(), member.getId(), WorkspaceMembership.WorkspaceRole.MEMBER);
         membershipService.assignRole(workspace.getId(), member.getId(), WorkspaceMembership.WorkspaceRole.ADMIN);
 
-        assertThat(actionsFor(workspace, ConfigAuditEntityType.WORKSPACE_ROLE)).containsExactly(
-            ConfigAuditAction.CREATED,
-            ConfigAuditAction.UPDATED
-        );
+        assertThat(actionsFor(workspace, ConfigAuditEntityType.WORKSPACE_ROLE))
+                .containsExactly(ConfigAuditAction.CREATED, ConfigAuditAction.UPDATED);
     }
 
     @Test
@@ -67,10 +65,8 @@ class ConfigAuditProducerIntegrationTest extends AbstractWorkspaceIntegrationTes
 
         membershipService.removeMembership(workspace.getId(), member.getId());
 
-        assertThat(actionsFor(workspace, ConfigAuditEntityType.WORKSPACE_ROLE)).containsExactly(
-            ConfigAuditAction.CREATED,
-            ConfigAuditAction.DELETED
-        );
+        assertThat(actionsFor(workspace, ConfigAuditEntityType.WORKSPACE_ROLE))
+                .containsExactly(ConfigAuditAction.CREATED, ConfigAuditAction.DELETED);
     }
 
     @Test
@@ -83,8 +79,8 @@ class ConfigAuditProducerIntegrationTest extends AbstractWorkspaceIntegrationTes
         membershipService.updateMemberVisibility(workspace.getId(), member.getId(), true);
 
         assertThat(snapshotsFor(workspace, ConfigAuditEntityType.WORKSPACE_ROLE))
-            .as("hidden decides whether access survives leaving the org")
-            .anyMatch(newValue -> newValue.contains("\"hidden\":true"));
+                .as("hidden decides whether access survives leaving the org")
+                .anyMatch(newValue -> newValue.contains("\"hidden\":true"));
     }
 
     @Test
@@ -95,9 +91,7 @@ class ConfigAuditProducerIntegrationTest extends AbstractWorkspaceIntegrationTes
         membershipService.assignRole(workspace.getId(), member.getId(), WorkspaceMembership.WorkspaceRole.MEMBER);
 
         membershipService.syncWorkspaceMembers(
-            workspace,
-            Map.of(member.getId(), WorkspaceMembership.WorkspaceRole.ADMIN)
-        );
+                workspace, Map.of(member.getId(), WorkspaceMembership.WorkspaceRole.ADMIN));
 
         assertThat(actionsFor(workspace, ConfigAuditEntityType.WORKSPACE_ROLE)).contains(ConfigAuditAction.UPDATED);
     }
@@ -109,9 +103,8 @@ class ConfigAuditProducerIntegrationTest extends AbstractWorkspaceIntegrationTes
 
         settingsService.updatePublicVisibility(workspace.getId(), true);
 
-        assertThat(actionsFor(workspace, ConfigAuditEntityType.WORKSPACE_VISIBILITY)).containsExactly(
-            ConfigAuditAction.UPDATED
-        );
+        assertThat(actionsFor(workspace, ConfigAuditEntityType.WORKSPACE_VISIBILITY))
+                .containsExactly(ConfigAuditAction.UPDATED);
     }
 
     @Test
@@ -123,42 +116,35 @@ class ConfigAuditProducerIntegrationTest extends AbstractWorkspaceIntegrationTes
         settingsService.updatePublicVisibility(workspace.getId(), true);
 
         assertThat(actionsFor(workspace, ConfigAuditEntityType.WORKSPACE_VISIBILITY))
-            .as("re-submitting a form unchanged must not add a row that says nothing")
-            .containsExactly(ConfigAuditAction.UPDATED);
+                .as("re-submitting a form unchanged must not add a row that says nothing")
+                .containsExactly(ConfigAuditAction.UPDATED);
     }
 
     private Workspace workspace(String slug) {
-        Workspace workspace = createWorkspace(
-            slug,
-            "Audit Workspace",
-            slug + "-org",
-            AccountType.ORG,
-            persistUser(slug + "-owner")
-        );
+        Workspace workspace =
+                createWorkspace(slug, "Audit Workspace", slug + "-org", AccountType.ORG, persistUser(slug + "-owner"));
         ensureAdminMembership(workspace);
         return workspace;
     }
 
     private List<ConfigAuditAction> actionsFor(Workspace workspace, ConfigAuditEntityType entityType) {
-        return rowsFor(workspace, entityType).stream().map(ConfigAuditEvent::getAction).toList();
+        return rowsFor(workspace, entityType).stream()
+                .map(ConfigAuditEvent::getAction)
+                .toList();
     }
 
     private List<String> snapshotsFor(Workspace workspace, ConfigAuditEntityType entityType) {
-        return rowsFor(workspace, entityType)
-            .stream()
-            .map(row -> row.getNewValue() == null ? "" : row.getNewValue())
-            .toList();
+        return rowsFor(workspace, entityType).stream()
+                .map(row -> row.getNewValue() == null ? "" : row.getNewValue())
+                .toList();
     }
 
     /** Not {@code findAll()}: the tenancy filter empties an unscoped read when no workspace is bound. */
     private List<ConfigAuditEvent> rowsFor(Workspace workspace, ConfigAuditEntityType entityType) {
         entityManager.flush();
         var filter = new ConfigAuditFilter(List.of(entityType), null, null, null, null, null, null);
-        return repository
-            .findForWorkspace(workspace.getId(), filter, PageRequest.of(0, 50))
-            .getContent()
-            .stream()
-            .sorted(java.util.Comparator.comparing(ConfigAuditEvent::getId))
-            .toList();
+        return repository.findForWorkspace(workspace.getId(), filter, PageRequest.of(0, 50)).getContent().stream()
+                .sorted(java.util.Comparator.comparing(ConfigAuditEvent::getId))
+                .toList();
     }
 }

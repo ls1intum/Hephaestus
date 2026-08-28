@@ -84,9 +84,8 @@ public class GitHubUserProcessor {
         this.userRepository = userRepository;
         // Create a REQUIRES_NEW template so the upsert runs in its own transaction.
         // This isolates deadlock rollbacks from the caller's transaction.
-        this.requiresNewTransaction = new TransactionTemplate(
-            Objects.requireNonNull(transactionTemplate.getTransactionManager())
-        );
+        this.requiresNewTransaction =
+                new TransactionTemplate(Objects.requireNonNull(transactionTemplate.getTransactionManager()));
         this.requiresNewTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
@@ -137,7 +136,8 @@ public class GitHubUserProcessor {
         // Load the entity by nativeId + providerId. Since the upsert ran in a
         // REQUIRES_NEW transaction that has already committed, the JPQL query
         // goes to DB and returns a managed entity in the caller's persistence context.
-        User result = userRepository.findByNativeIdAndProviderId(userId, providerId).orElse(null);
+        User result =
+                userRepository.findByNativeIdAndProviderId(userId, providerId).orElse(null);
         if (result != null) {
             // Refresh to ensure we have the latest data (handles L1 cache staleness
             // if the entity was previously loaded in this transaction).
@@ -157,15 +157,14 @@ public class GitHubUserProcessor {
      * is not affected because we use REQUIRES_NEW propagation.
      */
     private void executeUpsertWithDeadlockRetry(
-        Long userId,
-        Long providerId,
-        String login,
-        @Nullable String name,
-        @Nullable String avatarUrl,
-        @Nullable String htmlUrl,
-        User.Type userType,
-        GitHubUserDTO dto
-    ) {
+            Long userId,
+            Long providerId,
+            String login,
+            @Nullable String name,
+            @Nullable String avatarUrl,
+            @Nullable String htmlUrl,
+            User.Type userType,
+            GitHubUserDTO dto) {
         for (int attempt = 0; attempt <= MAX_DEADLOCK_RETRIES; attempt++) {
             try {
                 requiresNewTransaction.executeWithoutResult(status -> {
@@ -177,25 +176,23 @@ public class GitHubUserProcessor {
                         userRepository.freeLoginConflicts(login, userId, providerId);
                     } else {
                         log.debug(
-                            "Could not acquire advisory lock after {} attempts, proceeding with upsert: login={}",
-                            MAX_LOCK_ATTEMPTS,
-                            login
-                        );
+                                "Could not acquire advisory lock after {} attempts, proceeding with upsert: login={}",
+                                MAX_LOCK_ATTEMPTS,
+                                login);
                     }
 
                     // Step 3: Insert or update the user.
                     userRepository.upsertUser(
-                        userId,
-                        providerId,
-                        login,
-                        name,
-                        avatarUrl,
-                        htmlUrl,
-                        userType.name(),
-                        dto.email(),
-                        dto.createdAt(),
-                        dto.updatedAt()
-                    );
+                            userId,
+                            providerId,
+                            login,
+                            name,
+                            avatarUrl,
+                            htmlUrl,
+                            userType.name(),
+                            dto.email(),
+                            dto.createdAt(),
+                            dto.updatedAt());
                 });
                 // Success — exit the retry loop
                 return;
@@ -203,14 +200,13 @@ public class GitHubUserProcessor {
                 if (attempt < MAX_DEADLOCK_RETRIES) {
                     // Exponential backoff with jitter: base * 2^attempt + random [0, base)
                     long delay =
-                        DEADLOCK_RETRY_BASE_MS * (1L << attempt) + (long) (Math.random() * DEADLOCK_RETRY_BASE_MS);
+                            DEADLOCK_RETRY_BASE_MS * (1L << attempt) + (long) (Math.random() * DEADLOCK_RETRY_BASE_MS);
                     log.warn(
-                        "Deadlock detected during user upsert, retrying: login={}, attempt={}/{}, delayMs={}",
-                        login,
-                        attempt + 1,
-                        MAX_DEADLOCK_RETRIES,
-                        delay
-                    );
+                            "Deadlock detected during user upsert, retrying: login={}, attempt={}/{}, delayMs={}",
+                            login,
+                            attempt + 1,
+                            MAX_DEADLOCK_RETRIES,
+                            delay);
                     try {
                         Thread.sleep(delay);
                     } catch (InterruptedException ie) {
@@ -220,11 +216,10 @@ public class GitHubUserProcessor {
                     }
                 } else {
                     log.error(
-                        "Deadlock persisted after {} retries during user upsert: login={}, userId={}",
-                        MAX_DEADLOCK_RETRIES,
-                        login,
-                        userId
-                    );
+                            "Deadlock persisted after {} retries during user upsert: login={}, userId={}",
+                            MAX_DEADLOCK_RETRIES,
+                            login,
+                            userId);
                     throw e; // Exhausted retries, propagate to caller
                 }
             }

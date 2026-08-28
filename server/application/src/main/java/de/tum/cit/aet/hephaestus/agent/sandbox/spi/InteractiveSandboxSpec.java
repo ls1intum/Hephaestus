@@ -12,18 +12,17 @@ import org.jspecify.annotations.Nullable;
  * concurrent {@link InteractiveSandboxService#attach} calls with the same key share the handle.
  */
 public record InteractiveSandboxSpec(
-    UUID sessionId,
-    String userId,
-    String workspaceId,
-    String image,
-    List<String> command,
-    Map<String, String> environment,
-    @Nullable NetworkPolicy networkPolicy,
-    ResourceLimits resourceLimits,
-    SecurityProfile securityProfile,
-    Map<String, byte[]> inputFiles,
-    Map<String, String> volumeMounts
-) {
+        UUID sessionId,
+        String userId,
+        String workspaceId,
+        String image,
+        List<String> command,
+        Map<String, String> environment,
+        @Nullable NetworkPolicy networkPolicy,
+        ResourceLimits resourceLimits,
+        SecurityProfile securityProfile,
+        Map<String, byte[]> inputFiles,
+        Map<String, String> volumeMounts) {
     /** POSIX-shell env-var name shape: leading letter/underscore, then letters/digits/underscores. */
     private static final Pattern ENV_KEY = Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*$");
 
@@ -52,8 +51,7 @@ public record InteractiveSandboxSpec(
             String key = entry.getKey();
             if (key == null || !ENV_KEY.matcher(key).matches()) {
                 throw new IllegalArgumentException(
-                    "Invalid env var name (must match " + ENV_KEY.pattern() + "): " + key
-                );
+                        "Invalid env var name (must match " + ENV_KEY.pattern() + "): " + key);
             }
             String value = entry.getValue();
             if (value != null && (value.indexOf('\0') >= 0 || value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0)) {

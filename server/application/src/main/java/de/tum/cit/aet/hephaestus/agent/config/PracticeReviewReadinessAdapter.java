@@ -12,9 +12,7 @@ public class PracticeReviewReadinessAdapter implements PracticeReviewReadiness {
     private final LlmModelResolver llmModelResolver;
 
     public PracticeReviewReadinessAdapter(
-        WorkspaceAgentBindingRepository bindingRepository,
-        LlmModelResolver llmModelResolver
-    ) {
+            WorkspaceAgentBindingRepository bindingRepository, LlmModelResolver llmModelResolver) {
         this.bindingRepository = bindingRepository;
         this.llmModelResolver = llmModelResolver;
     }
@@ -23,9 +21,9 @@ public class PracticeReviewReadinessAdapter implements PracticeReviewReadiness {
     @Override
     public boolean hasRunnableAgent(Long workspaceId) {
         return bindingRepository
-            .findByWorkspaceIdAndPurposeWithModels(workspaceId, AgentPurpose.PRACTICE_REVIEW)
-            .filter(WorkspaceAgentBinding::isEnabled)
-            .map(llmModelResolver::isAvailable)
-            .orElse(false);
+                .findByWorkspaceIdAndPurposeWithModels(workspaceId, AgentPurpose.PRACTICE_REVIEW)
+                .filter(WorkspaceAgentBinding::isEnabled)
+                .map(llmModelResolver::isAvailable)
+                .orElse(false);
     }
 }

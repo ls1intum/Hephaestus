@@ -59,8 +59,8 @@ class FixtureIntegrationBootstrapTest extends BaseUnitTest {
         DeclaredSignalCoverage coverage = coverage(false);
 
         assertThat(coverage.compiledCoverage())
-            .as("both fixture signals are declared raised, so both are compiled-covered")
-            .containsExactlyInAnyOrder(FixtureIntegration.WIDGET_ASSEMBLED, FixtureIntegration.WIDGET_SHIPPED);
+                .as("both fixture signals are declared raised, so both are compiled-covered")
+                .containsExactlyInAnyOrder(FixtureIntegration.WIDGET_ASSEMBLED, FixtureIntegration.WIDGET_SHIPPED);
         assertThat(coverage.raisedBy(FixtureIntegration.WIDGET_SHIPPED)).containsExactly(FixtureIntegration.KIND);
     }
 
@@ -75,27 +75,23 @@ class FixtureIntegrationBootstrapTest extends BaseUnitTest {
 
     @Test
     void aPracticeBoundToAnUncoveredSignalIsDormantWithAReason() {
-        PracticeSignalCoverage practiceCoverage = practiceCoverage(
-            false,
-            practiceBoundTo(FixtureIntegration.WIDGET_ASSEMBLED)
-        );
+        PracticeSignalCoverage practiceCoverage =
+                practiceCoverage(false, practiceBoundTo(FixtureIntegration.WIDGET_ASSEMBLED));
 
         List<DormantBinding> dormant = practiceCoverage.dormantBindings(WORKSPACE_ID);
 
         assertThat(dormant).hasSize(1);
         assertThat(dormant.getFirst().signals()).containsExactly(FixtureIntegration.WIDGET_ASSEMBLED);
         assertThat(dormant.getFirst().raisedByAnyOf())
-            .as("the reason names what to connect, so it is actionable rather than merely true")
-            .containsExactly(FixtureIntegration.KIND);
+                .as("the reason names what to connect, so it is actionable rather than merely true")
+                .containsExactly(FixtureIntegration.KIND);
         assertThat(dormant.getFirst().reason()).contains("connect " + FixtureIntegration.KIND.name());
     }
 
     @Test
     void connectingTheIntegrationEndsTheDormancy() {
-        PracticeSignalCoverage practiceCoverage = practiceCoverage(
-            true,
-            practiceBoundTo(FixtureIntegration.WIDGET_ASSEMBLED)
-        );
+        PracticeSignalCoverage practiceCoverage =
+                practiceCoverage(true, practiceBoundTo(FixtureIntegration.WIDGET_ASSEMBLED));
 
         assertThat(practiceCoverage.dormantBindings(WORKSPACE_ID)).isEmpty();
     }
@@ -105,100 +101,83 @@ class FixtureIntegrationBootstrapTest extends BaseUnitTest {
         // Not dormant just because one of two watched signals is unreachable — that would make the
         // dormancy report noise.
         PracticeRepository repository = mock(PracticeRepository.class);
-        when(repository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
-            List.of(practiceBoundTo(FixtureIntegration.WIDGET_ASSEMBLED, FixtureIntegration.WIDGET_SHIPPED))
-        );
+        when(repository.findByWorkspaceId(WORKSPACE_ID))
+                .thenReturn(List.of(
+                        practiceBoundTo(FixtureIntegration.WIDGET_ASSEMBLED, FixtureIntegration.WIDGET_SHIPPED)));
         PracticeSignalCoverage practiceCoverage = new PracticeSignalCoverage(
-            splitCoverage(),
-            new PracticeSignalOptions(FixtureIntegration.artifactCatalog()),
-            repository,
-            workspaceDefaults()
-        );
+                splitCoverage(),
+                new PracticeSignalOptions(FixtureIntegration.artifactCatalog()),
+                repository,
+                workspaceDefaults());
 
         assertThat(practiceCoverage.dormantBindings(WORKSPACE_ID)).isEmpty();
     }
 
     private IntegrationFrameworkBootstrap bootstrap() {
         return new IntegrationFrameworkBootstrap(
-            new IntegrationManifestRegistry(List.of(FixtureIntegration.manifest())),
-            List.of(),
-            List.of(),
-            List.of(),
-            List.of(FixtureIntegration.credentialProvider()),
-            List.of(),
-            List.of(FixtureIntegration.feedbackChannel()),
-            List.of(),
-            List.of(),
-            List.of(FixtureIntegration.lifecycleListener()),
-            validator(),
-            true
-        );
+                new IntegrationManifestRegistry(List.of(FixtureIntegration.manifest())),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(FixtureIntegration.credentialProvider()),
+                List.of(),
+                List.of(FixtureIntegration.feedbackChannel()),
+                List.of(),
+                List.of(),
+                List.of(FixtureIntegration.lifecycleListener()),
+                validator(),
+                true);
     }
 
     private static ReviewContractValidator validator() {
         return new ReviewContractValidator(
-            new ArtifactDescriptorRegistry(List.of(FixtureIntegration.descriptor())),
-            new IntegrationMessageHandlerRegistry(
-                List.of(
-                    FixtureIntegration.handler(FixtureIntegration.ASSEMBLY_EVENT),
-                    FixtureIntegration.handler(FixtureIntegration.SHIPMENT_EVENT)
-                )
-            ),
-            List.of(FixtureIntegration.contextBuilder()),
-            FixtureIntegration.executionCatalog()
-        );
+                new ArtifactDescriptorRegistry(List.of(FixtureIntegration.descriptor())),
+                new IntegrationMessageHandlerRegistry(List.of(
+                        FixtureIntegration.handler(FixtureIntegration.ASSEMBLY_EVENT),
+                        FixtureIntegration.handler(FixtureIntegration.SHIPMENT_EVENT))),
+                List.of(FixtureIntegration.contextBuilder()),
+                FixtureIntegration.executionCatalog());
     }
 
     private static DeclaredSignalCoverage coverage(boolean connected) {
         ConnectionService connections = mock(ConnectionService.class);
         // Lenient: half these tests only ask the compiled question, which never consults a connection.
         lenient()
-            .when(connections.findActive(anyLong(), eq(FixtureIntegration.KIND)))
-            .thenReturn(connected ? Optional.of(mock(Connection.class)) : Optional.empty());
+                .when(connections.findActive(anyLong(), eq(FixtureIntegration.KIND)))
+                .thenReturn(connected ? Optional.of(mock(Connection.class)) : Optional.empty());
         return new DeclaredSignalCoverage(
-            new IntegrationManifestRegistry(List.of(FixtureIntegration.manifest())),
-            connections
-        );
+                new IntegrationManifestRegistry(List.of(FixtureIntegration.manifest())), connections);
     }
 
     private static DeclaredSignalCoverage splitCoverage() {
         ConnectionService connections = mock(ConnectionService.class);
-        when(connections.findActive(WORKSPACE_ID, FixtureIntegration.KIND)).thenReturn(
-            Optional.of(mock(Connection.class))
-        );
+        when(connections.findActive(WORKSPACE_ID, FixtureIntegration.KIND))
+                .thenReturn(Optional.of(mock(Connection.class)));
         when(connections.findActive(WORKSPACE_ID, UNCONNECTED_KIND)).thenReturn(Optional.empty());
         return new DeclaredSignalCoverage(
-            new IntegrationManifestRegistry(
-                List.of(
-                    FixtureIntegration.manifest(
-                        FixtureIntegration.KIND,
-                        Set.of(),
-                        raises(FixtureIntegration.WIDGET_ASSEMBLED)
-                    ),
-                    FixtureIntegration.manifest(UNCONNECTED_KIND, Set.of(), raises(FixtureIntegration.WIDGET_SHIPPED))
-                )
-            ),
-            connections
-        );
+                new IntegrationManifestRegistry(List.of(
+                        FixtureIntegration.manifest(
+                                FixtureIntegration.KIND, Set.of(), raises(FixtureIntegration.WIDGET_ASSEMBLED)),
+                        FixtureIntegration.manifest(
+                                UNCONNECTED_KIND, Set.of(), raises(FixtureIntegration.WIDGET_SHIPPED)))),
+                connections);
     }
 
     private static IntegrationManifest.ReviewContribution raises(SignalName signal) {
         return new IntegrationManifest.ReviewContribution(
-            Set.of(FixtureIntegration.WIDGET),
-            Map.of(FixtureIntegration.WIDGET, Set.of(signal)),
-            Map.of(FixtureIntegration.WIDGET, Set.of(FeedbackLane.IN_CONTEXT_SUMMARY))
-        );
+                Set.of(FixtureIntegration.WIDGET),
+                Map.of(FixtureIntegration.WIDGET, Set.of(signal)),
+                Map.of(FixtureIntegration.WIDGET, Set.of(FeedbackLane.IN_CONTEXT_SUMMARY)));
     }
 
     private static PracticeSignalCoverage practiceCoverage(boolean connected, Practice... practices) {
         PracticeRepository repository = mock(PracticeRepository.class);
         when(repository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(practices));
         return new PracticeSignalCoverage(
-            coverage(connected),
-            new PracticeSignalOptions(FixtureIntegration.artifactCatalog()),
-            repository,
-            workspaceDefaults()
-        );
+                coverage(connected),
+                new PracticeSignalOptions(FixtureIntegration.artifactCatalog()),
+                repository,
+                workspaceDefaults());
     }
 
     /** A workspace with no opinion set, so the fixture practices inherit the default and stay admitted. */

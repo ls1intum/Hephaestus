@@ -14,13 +14,11 @@ import org.jspecify.annotations.Nullable;
  * variant-specific identity instead.
  */
 public sealed interface ContextRequest
-    permits
-        ContextRequest.PracticeReviewRequest,
-        ContextRequest.IssueReviewRequest,
-        ContextRequest.MentorChatRequest,
-        ContextRequest.ConversationReviewRequest,
-        ContextRequest.DocumentReviewRequest
-{
+        permits ContextRequest.PracticeReviewRequest,
+                ContextRequest.IssueReviewRequest,
+                ContextRequest.MentorChatRequest,
+                ContextRequest.ConversationReviewRequest,
+                ContextRequest.DocumentReviewRequest {
     /**
      * Build the materialised PR-review context: metadata, comments, diff, developer history.
      * Carries the {@link AgentJob} the practice runner will execute.
@@ -67,11 +65,10 @@ public sealed interface ContextRequest
      * @param currentUserMessageId message persisted for the active turn; history providers exclude it
      */
     record MentorChatRequest(
-        long workspaceId,
-        long developerId,
-        UUID threadId,
-        @Nullable UUID currentUserMessageId
-    ) implements ContextRequest {
+            long workspaceId,
+            long developerId,
+            UUID threadId,
+            @Nullable UUID currentUserMessageId) implements ContextRequest {
         public MentorChatRequest(long workspaceId, long developerId, UUID threadId) {
             this(workspaceId, developerId, threadId, null);
         }

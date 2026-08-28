@@ -35,9 +35,7 @@ public class OutlineMirrorTransactions {
     private final OutlineCollectionRepository collectionRepository;
 
     public OutlineMirrorTransactions(
-        OutlineDocumentRepository documentRepository,
-        OutlineCollectionRepository collectionRepository
-    ) {
+            OutlineDocumentRepository documentRepository, OutlineCollectionRepository collectionRepository) {
         this.documentRepository = documentRepository;
         this.collectionRepository = collectionRepository;
     }
@@ -50,20 +48,16 @@ public class OutlineMirrorTransactions {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public OutlineDocumentSnapshot upsertDocument(
-        long workspaceId,
-        long connectionId,
-        String documentId,
-        Consumer<OutlineDocument> mutator
-    ) {
+            long workspaceId, long connectionId, String documentId, Consumer<OutlineDocument> mutator) {
         OutlineDocument doc = documentRepository
-            .findByWorkspaceIdAndConnectionIdAndDocumentId(workspaceId, connectionId, documentId)
-            .orElseGet(() -> {
-                OutlineDocument fresh = new OutlineDocument();
-                fresh.setWorkspaceId(workspaceId);
-                fresh.setConnectionId(connectionId);
-                fresh.setDocumentId(documentId);
-                return fresh;
-            });
+                .findByWorkspaceIdAndConnectionIdAndDocumentId(workspaceId, connectionId, documentId)
+                .orElseGet(() -> {
+                    OutlineDocument fresh = new OutlineDocument();
+                    fresh.setWorkspaceId(workspaceId);
+                    fresh.setConnectionId(connectionId);
+                    fresh.setDocumentId(documentId);
+                    return fresh;
+                });
         mutator.accept(doc);
         return OutlineDocumentSnapshot.of(documentRepository.saveAndFlush(doc));
     }
@@ -77,18 +71,14 @@ public class OutlineMirrorTransactions {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public @Nullable OutlineDocumentSnapshot updateDocument(
-        long workspaceId,
-        long connectionId,
-        String documentId,
-        Consumer<OutlineDocument> mutator
-    ) {
+            long workspaceId, long connectionId, String documentId, Consumer<OutlineDocument> mutator) {
         return documentRepository
-            .findByWorkspaceIdAndConnectionIdAndDocumentId(workspaceId, connectionId, documentId)
-            .map(doc -> {
-                mutator.accept(doc);
-                return OutlineDocumentSnapshot.of(documentRepository.saveAndFlush(doc));
-            })
-            .orElse(null);
+                .findByWorkspaceIdAndConnectionIdAndDocumentId(workspaceId, connectionId, documentId)
+                .map(doc -> {
+                    mutator.accept(doc);
+                    return OutlineDocumentSnapshot.of(documentRepository.saveAndFlush(doc));
+                })
+                .orElse(null);
     }
 
     /**
@@ -98,25 +88,18 @@ public class OutlineMirrorTransactions {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void updateCollection(
-        long workspaceId,
-        long connectionId,
-        String collectionId,
-        Consumer<OutlineCollection> mutator
-    ) {
+            long workspaceId, long connectionId, String collectionId, Consumer<OutlineCollection> mutator) {
         collectionRepository
-            .findByWorkspaceIdAndConnectionIdAndCollectionId(workspaceId, connectionId, collectionId)
-            .ifPresentOrElse(
-                row -> {
-                    mutator.accept(row);
-                    collectionRepository.saveAndFlush(row);
-                },
-                () ->
-                    log.debug(
-                        "outline.sync: collection {} vanished from the registry mid-pass (workspaceId={}) — skipping its bookkeeping write",
-                        collectionId,
-                        workspaceId
-                    )
-            );
+                .findByWorkspaceIdAndConnectionIdAndCollectionId(workspaceId, connectionId, collectionId)
+                .ifPresentOrElse(
+                        row -> {
+                            mutator.accept(row);
+                            collectionRepository.saveAndFlush(row);
+                        },
+                        () -> log.debug(
+                                "outline.sync: collection {} vanished from the registry mid-pass (workspaceId={}) — skipping its bookkeeping write",
+                                collectionId,
+                                workspaceId));
     }
 
     /**

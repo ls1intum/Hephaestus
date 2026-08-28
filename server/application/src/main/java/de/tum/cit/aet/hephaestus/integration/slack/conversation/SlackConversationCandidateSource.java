@@ -25,40 +25,35 @@ public class SlackConversationCandidateSource implements ConversationCandidateSo
     private final SlackMessageRepository messageRepository;
 
     public SlackConversationCandidateSource(
-        SlackThreadRepository threadRepository,
-        SlackMessageRepository messageRepository
-    ) {
+            SlackThreadRepository threadRepository, SlackMessageRepository messageRepository) {
         this.threadRepository = threadRepository;
         this.messageRepository = messageRepository;
     }
 
     @Override
     public List<ConversationThreadCandidate> settledCandidates(int minMessageCount) {
-        return threadRepository
-            .findSettledCandidateRows(minMessageCount)
-            .stream()
-            .map(SlackConversationCandidateSource::toCandidate)
-            .toList();
+        return threadRepository.findSettledCandidateRows(minMessageCount).stream()
+                .map(SlackConversationCandidateSource::toCandidate)
+                .toList();
     }
 
     private static ConversationThreadCandidate toCandidate(SlackThreadRepository.SettledCandidateRow row) {
         return new ConversationThreadCandidate(
-            row.getWorkspaceId(),
-            row.getThreadId(),
-            row.getSlackChannelId(),
-            row.getSlackChannelName(),
-            row.getSlackThreadTs(),
-            row.getLastTs(),
-            row.getLastReviewedTs(),
-            row.getParticipantMemberIds()
-        );
+                row.getWorkspaceId(),
+                row.getThreadId(),
+                row.getSlackChannelId(),
+                row.getSlackChannelName(),
+                row.getSlackThreadTs(),
+                row.getLastTs(),
+                row.getLastReviewedTs(),
+                row.getParticipantMemberIds());
     }
 
     @Override
     public Optional<ConversationThreadCandidate> candidateById(long workspaceId, long threadId) {
         return threadRepository
-            .findConsentedCandidateRow(workspaceId, threadId)
-            .map(SlackConversationCandidateSource::toCandidate);
+                .findConsentedCandidateRow(workspaceId, threadId)
+                .map(SlackConversationCandidateSource::toCandidate);
     }
 
     @Override

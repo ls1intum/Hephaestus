@@ -99,17 +99,16 @@ public class GitHubSubIssueSyncService {
     private static final int MAX_RETRY_ATTEMPTS = 3;
 
     public GitHubSubIssueSyncService(
-        IssueRepository issueRepository,
-        RepositoryRepository repositoryRepository,
-        SyncTargetProvider syncTargetProvider,
-        GitHubGraphQlClientProvider graphQlClientProvider,
-        GitHubSyncProperties syncProperties,
-        GitHubExceptionClassifier exceptionClassifier,
-        SyncSchedulerProperties syncSchedulerProperties,
-        GitHubIssueProcessor issueProcessor,
-        PlatformTransactionManager transactionManager,
-        GitHubGraphQlSyncCoordinator graphQlSyncHelper
-    ) {
+            IssueRepository issueRepository,
+            RepositoryRepository repositoryRepository,
+            SyncTargetProvider syncTargetProvider,
+            GitHubGraphQlClientProvider graphQlClientProvider,
+            GitHubSyncProperties syncProperties,
+            GitHubExceptionClassifier exceptionClassifier,
+            SyncSchedulerProperties syncSchedulerProperties,
+            GitHubIssueProcessor issueProcessor,
+            PlatformTransactionManager transactionManager,
+            GitHubGraphQlSyncCoordinator graphQlSyncHelper) {
         this.issueRepository = issueRepository;
         this.repositoryRepository = repositoryRepository;
         this.syncTargetProvider = syncTargetProvider;
@@ -133,26 +132,17 @@ public class GitHubSubIssueSyncService {
      */
     @Transactional
     public void processSubIssueEvent(
-        long subIssueId,
-        long parentIssueId,
-        boolean isLink,
-        @Nullable SubIssuesSummaryDTO parentSummary
-    ) {
+            long subIssueId, long parentIssueId, boolean isLink, @Nullable SubIssuesSummaryDTO parentSummary) {
         processSubIssueEventInternal(subIssueId, parentIssueId, isLink, parentSummary);
     }
 
     private void processSubIssueEventInternal(
-        long subIssueId,
-        long parentIssueId,
-        boolean isLink,
-        @Nullable SubIssuesSummaryDTO parentSummary
-    ) {
+            long subIssueId, long parentIssueId, boolean isLink, @Nullable SubIssuesSummaryDTO parentSummary) {
         log.debug(
-            "Received sub-issue event: subIssueId={}, parentIssueId={}, isLink={}",
-            subIssueId,
-            parentIssueId,
-            isLink
-        );
+                "Received sub-issue event: subIssueId={}, parentIssueId={}, isLink={}",
+                subIssueId,
+                parentIssueId,
+                isLink);
 
         Optional<Issue> subIssueOpt = issueRepository.findById(subIssueId);
         if (subIssueOpt.isEmpty()) {
@@ -188,24 +178,19 @@ public class GitHubSubIssueSyncService {
         updateParentSummary(parentIssue, parentSummary);
 
         log.info(
-            "Linked sub-issue to parent: subIssueNumber={}, parentIssueNumber={}",
-            subIssue.getNumber(),
-            parentIssue.getNumber()
-        );
+                "Linked sub-issue to parent: subIssueNumber={}, parentIssueNumber={}",
+                subIssue.getNumber(),
+                parentIssue.getNumber());
     }
 
     private void unlinkSubIssueFromParent(
-        Issue subIssue,
-        long parentIssueId,
-        @Nullable SubIssuesSummaryDTO parentSummary
-    ) {
+            Issue subIssue, long parentIssueId, @Nullable SubIssuesSummaryDTO parentSummary) {
         Issue currentParent = subIssue.getParentIssue();
         if (currentParent != null) {
             log.info(
-                "Unlinked sub-issue from parent: subIssueNumber={}, parentIssueNumber={}",
-                subIssue.getNumber(),
-                currentParent.getNumber()
-            );
+                    "Unlinked sub-issue from parent: subIssueNumber={}, parentIssueNumber={}",
+                    subIssue.getNumber(),
+                    currentParent.getNumber());
         }
 
         subIssue.setParentIssue(null);
@@ -258,10 +243,9 @@ public class GitHubSubIssueSyncService {
         // Check cooldown
         if (!metadata.needsSubIssuesSync(syncSchedulerProperties.cooldownMinutes())) {
             log.debug(
-                "Skipped sub-issues sync: reason=cooldownActive, scopeId={}, lastSyncedAt={}",
-                scopeId,
-                metadata.subIssuesSyncedAt()
-            );
+                    "Skipped sub-issues sync: reason=cooldownActive, scopeId={}, lastSyncedAt={}",
+                    scopeId,
+                    metadata.subIssuesSyncedAt());
             return -1;
         }
 
@@ -292,9 +276,8 @@ public class GitHubSubIssueSyncService {
             Optional<Repository> repoOpt = repositoryRepository.findByNameWithOwnerWithOrganization(repoNameWithOwner);
             if (repoOpt.isEmpty()) {
                 log.debug(
-                    "Skipped sub-issue sync: reason=repositoryNotFound, repoName={}",
-                    sanitizeForLog(repoNameWithOwner)
-                );
+                        "Skipped sub-issue sync: reason=repositoryNotFound, repoName={}",
+                        sanitizeForLog(repoNameWithOwner));
                 continue;
             }
 
@@ -306,17 +289,14 @@ public class GitHubSubIssueSyncService {
             } catch (Exception e) {
                 failedRepoCount++;
                 ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
-                graphQlSyncHelper.handleGraphQlClassification(
-                    new GraphQlClassificationContext(
+                graphQlSyncHelper.handleGraphQlClassification(new GraphQlClassificationContext(
                         classification,
                         0,
                         MAX_RETRY_ATTEMPTS,
                         "sub-issue sync",
                         "repoName",
                         Objects.requireNonNullElse(sanitizeForLog(repoNameWithOwner), "null"),
-                        log
-                    )
-                );
+                        log));
             }
         }
 
@@ -326,11 +306,10 @@ public class GitHubSubIssueSyncService {
         }
 
         log.info(
-            "Completed sub-issue sync: scopeId={}, subIssueCount={}, failedRepoCount={}",
-            scopeId,
-            totalLinked,
-            failedRepoCount
-        );
+                "Completed sub-issue sync: scopeId={}, subIssueCount={}, failedRepoCount={}",
+                scopeId,
+                totalLinked,
+                failedRepoCount);
 
         return totalLinked;
     }
@@ -343,9 +322,8 @@ public class GitHubSubIssueSyncService {
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repository.getNameWithOwner());
         if (parsedName.isEmpty()) {
             log.warn(
-                "Skipped sub-issue sync: reason=invalidNameFormat, repoName={}",
-                sanitizeForLog(repository.getNameWithOwner())
-            );
+                    "Skipped sub-issue sync: reason=invalidNameFormat, repoName={}",
+                    sanitizeForLog(repository.getNameWithOwner()));
             return 0;
         }
         String owner = parsedName.get().owner();
@@ -365,10 +343,9 @@ public class GitHubSubIssueSyncService {
             pageCount++;
             if (pageCount >= MAX_PAGINATION_PAGES) {
                 log.warn(
-                    "Reached maximum pagination limit for sub-issue sync: repoName={}, limit={}",
-                    sanitizeForLog(repository.getNameWithOwner()),
-                    MAX_PAGINATION_PAGES
-                );
+                        "Reached maximum pagination limit for sub-issue sync: repoName={}, limit={}",
+                        sanitizeForLog(repository.getNameWithOwner()),
+                        MAX_PAGINATION_PAGES);
                 break;
             }
 
@@ -377,61 +354,48 @@ public class GitHubSubIssueSyncService {
                 final String currentCursor = cursor;
                 final int currentPage = pageCount;
 
-                ClientGraphQlResponse graphQlResponse = Mono.defer(() ->
-                    client
-                        .documentName(GET_SUB_ISSUES_DOCUMENT)
-                        .variable("owner", owner)
-                        .variable("name", name)
-                        .variable(
-                            "first",
-                            adaptPageSize(LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId))
-                        )
-                        .variable("after", currentCursor)
-                        .execute()
-                )
-                    .retryWhen(
-                        Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
-                            .maxBackoff(TRANSPORT_MAX_BACKOFF)
-                            .jitter(JITTER_FACTOR)
-                            .filter(ScmTransportErrors::isTransportError)
-                            .doBeforeRetry(signal ->
-                                log.warn(
-                                    "Retrying after transport error: context=subIssueSync, repoName={}, page={}, attempt={}, error={}",
-                                    Objects.requireNonNullElse(sanitizeForLog(repository.getNameWithOwner()), "null"),
-                                    currentPage,
-                                    signal.totalRetries() + 1,
-                                    signal.failure().getMessage()
-                                )
-                            )
-                    )
-                    .block(syncProperties.graphqlTimeout());
+                ClientGraphQlResponse graphQlResponse = Mono.defer(() -> client.documentName(GET_SUB_ISSUES_DOCUMENT)
+                                .variable("owner", owner)
+                                .variable("name", name)
+                                .variable(
+                                        "first",
+                                        adaptPageSize(
+                                                LARGE_PAGE_SIZE, graphQlClientProvider.getRateLimitRemaining(scopeId)))
+                                .variable("after", currentCursor)
+                                .execute())
+                        .retryWhen(Retry.backoff(TRANSPORT_MAX_RETRIES, TRANSPORT_INITIAL_BACKOFF)
+                                .maxBackoff(TRANSPORT_MAX_BACKOFF)
+                                .jitter(JITTER_FACTOR)
+                                .filter(ScmTransportErrors::isTransportError)
+                                .doBeforeRetry(signal -> log.warn(
+                                        "Retrying after transport error: context=subIssueSync, repoName={}, page={}, attempt={}, error={}",
+                                        Objects.requireNonNullElse(
+                                                sanitizeForLog(repository.getNameWithOwner()), "null"),
+                                        currentPage,
+                                        signal.totalRetries() + 1,
+                                        signal.failure().getMessage())))
+                        .block(syncProperties.graphqlTimeout());
 
                 if (graphQlResponse == null || !graphQlResponse.isValid()) {
                     ClassificationResult classification = graphQlSyncHelper.classifyGraphQlErrors(graphQlResponse);
                     if (classification != null) {
-                        if (
-                            graphQlSyncHelper.handleGraphQlClassification(
-                                new GraphQlClassificationContext(
-                                    classification,
-                                    retryAttempt,
-                                    MAX_RETRY_ATTEMPTS,
-                                    "sub-issue repository sync",
-                                    "repoName",
-                                    Objects.requireNonNullElse(sanitizeForLog(repository.getNameWithOwner()), "null"),
-                                    log
-                                )
-                            )
-                        ) {
+                        if (graphQlSyncHelper.handleGraphQlClassification(new GraphQlClassificationContext(
+                                classification,
+                                retryAttempt,
+                                MAX_RETRY_ATTEMPTS,
+                                "sub-issue repository sync",
+                                "repoName",
+                                Objects.requireNonNullElse(sanitizeForLog(repository.getNameWithOwner()), "null"),
+                                log))) {
                             retryAttempt++;
                             continue;
                         }
                         break;
                     }
                     log.warn(
-                        "Received invalid GraphQL response: repoName={}, errors={}",
-                        sanitizeForLog(repository.getNameWithOwner()),
-                        graphQlResponse != null ? graphQlResponse.getErrors() : "null"
-                    );
+                            "Received invalid GraphQL response: repoName={}, errors={}",
+                            sanitizeForLog(repository.getNameWithOwner()),
+                            graphQlResponse != null ? graphQlResponse.getErrors() : "null");
                     break;
                 }
 
@@ -440,28 +404,23 @@ public class GitHubSubIssueSyncService {
 
                 // Check if we should pause due to rate limiting
                 if (graphQlClientProvider.isRateLimitCritical(scopeId)) {
-                    if (
-                        !graphQlSyncHelper.waitForRateLimitIfNeeded(
+                    if (!graphQlSyncHelper.waitForRateLimitIfNeeded(
                             scopeId,
                             "sub-issue repository sync",
                             "repoName",
                             Objects.requireNonNullElse(sanitizeForLog(repository.getNameWithOwner()), "null"),
-                            log
-                        )
-                    ) {
+                            log)) {
                         break;
                     }
                 }
 
-                GHIssueConnection issueConnection = graphQlResponse
-                    .field("repository.issues")
-                    .toEntity(GHIssueConnection.class);
+                GHIssueConnection issueConnection =
+                        graphQlResponse.field("repository.issues").toEntity(GHIssueConnection.class);
 
                 if (issueConnection == null) {
                     log.warn(
-                        "Skipped sub-issue sync: reason=emptyGraphQLResponse, repoName={}",
-                        sanitizeForLog(repository.getNameWithOwner())
-                    );
+                            "Skipped sub-issue sync: reason=emptyGraphQLResponse, repoName={}",
+                            sanitizeForLog(repository.getNameWithOwner()));
                     break;
                 }
 
@@ -472,37 +431,32 @@ public class GitHubSubIssueSyncService {
                 var pageInfo = issueConnection.getPageInfo();
                 if (pageInfo == null) {
                     log.debug(
-                        "Received null pageInfo during sub-issue sync: repoName={}",
-                        sanitizeForLog(repository.getNameWithOwner())
-                    );
+                            "Received null pageInfo during sub-issue sync: repoName={}",
+                            sanitizeForLog(repository.getNameWithOwner()));
                 }
                 hasNextPage = pageInfo != null && Boolean.TRUE.equals(pageInfo.getHasNextPage());
                 cursor = pageInfo != null ? pageInfo.getEndCursor() : null;
                 retryAttempt = 0;
 
-                issuesReceived += issueConnection.getNodes() != null ? issueConnection.getNodes().size() : 0;
+                issuesReceived += issueConnection.getNodes() != null
+                        ? issueConnection.getNodes().size()
+                        : 0;
 
-                linkedCount += transactionTemplate.execute(status ->
-                    processIssueNodes(issueConnection, repository, scopeId)
-                );
+                linkedCount +=
+                        transactionTemplate.execute(status -> processIssueNodes(issueConnection, repository, scopeId));
             } catch (InstallationNotFoundException e) {
                 // Re-throw to abort the entire sync operation
                 throw e;
             } catch (Exception e) {
                 ClassificationResult classification = exceptionClassifier.classifyWithDetails(e);
-                if (
-                    !graphQlSyncHelper.handleGraphQlClassification(
-                        new GraphQlClassificationContext(
-                            classification,
-                            retryAttempt,
-                            MAX_RETRY_ATTEMPTS,
-                            "sub-issue repository sync",
-                            "repoName",
-                            Objects.requireNonNullElse(sanitizeForLog(repository.getNameWithOwner()), "null"),
-                            log
-                        )
-                    )
-                ) {
+                if (!graphQlSyncHelper.handleGraphQlClassification(new GraphQlClassificationContext(
+                        classification,
+                        retryAttempt,
+                        MAX_RETRY_ATTEMPTS,
+                        "sub-issue repository sync",
+                        "repoName",
+                        Objects.requireNonNullElse(sanitizeForLog(repository.getNameWithOwner()), "null"),
+                        log))) {
                     break;
                 }
                 retryAttempt++;
@@ -512,12 +466,11 @@ public class GitHubSubIssueSyncService {
         // Raw issue nodes received (not sub-issue links found) vs issues.totalCount.
         if (reportedTotalCount >= 0) {
             GraphQlConnectionOverflowDetector.checkPaginated(
-                "issues",
-                issuesReceived,
-                reportedTotalCount,
-                hasNextPage,
-                "repoName=" + sanitizeForLog(repository.getNameWithOwner())
-            );
+                    "issues",
+                    issuesReceived,
+                    reportedTotalCount,
+                    hasNextPage,
+                    "repoName=" + sanitizeForLog(repository.getNameWithOwner()));
         }
 
         return linkedCount;
@@ -575,10 +528,9 @@ public class GitHubSubIssueSyncService {
         Issue parent = findOrCreateParentIssue(parentGraphQl, scopeId);
         if (parent == null) {
             log.debug(
-                "Skipped parent relationship: reason=parentNotCreated, subIssueNumber={}, parentNumber={}",
-                graphQlIssue.getNumber(),
-                parentGraphQl.getNumber()
-            );
+                    "Skipped parent relationship: reason=parentNotCreated, subIssueNumber={}, parentNumber={}",
+                    graphQlIssue.getNumber(),
+                    parentGraphQl.getNumber());
             return 0;
         }
 
@@ -592,11 +544,10 @@ public class GitHubSubIssueSyncService {
         issueRepository.save(subIssue);
 
         log.debug(
-            "Linked issue to parent: issueNumber={}, parentIssueNumber={}, repoName={}",
-            subIssue.getNumber(),
-            parent.getNumber(),
-            sanitizeForLog(repository.getNameWithOwner())
-        );
+                "Linked issue to parent: issueNumber={}, parentIssueNumber={}, repoName={}",
+                subIssue.getNumber(),
+                parent.getNumber(),
+                sanitizeForLog(repository.getNameWithOwner()));
         return 1;
     }
 
@@ -621,11 +572,10 @@ public class GitHubSubIssueSyncService {
 
         // Issue doesn't exist - create it from GraphQL data as a stub
         log.debug(
-            "Creating stub issue from sub-issue sync: issueId={}, issueNumber={}, repoName={}",
-            issueId,
-            graphQlIssue.getNumber(),
-            sanitizeForLog(repo.getNameWithOwner())
-        );
+                "Creating stub issue from sub-issue sync: issueId={}, issueNumber={}, repoName={}",
+                issueId,
+                graphQlIssue.getNumber(),
+                sanitizeForLog(repo.getNameWithOwner()));
 
         GitHubIssueDTO dto = GitHubIssueDTO.fromIssue(graphQlIssue);
         if (dto == null) {
@@ -663,19 +613,17 @@ public class GitHubSubIssueSyncService {
         Repository parentRepo = resolveParentRepository(parentGraphQl);
         if (parentRepo == null) {
             log.debug(
-                "Skipped creating parent: reason=repositoryNotFound, parentId={}, parentNumber={}",
-                parentId,
-                parentGraphQl.getNumber()
-            );
+                    "Skipped creating parent: reason=repositoryNotFound, parentId={}, parentNumber={}",
+                    parentId,
+                    parentGraphQl.getNumber());
             return null;
         }
 
         log.debug(
-            "Creating stub parent issue from sub-issue sync: parentId={}, parentNumber={}, repoName={}",
-            parentId,
-            parentGraphQl.getNumber(),
-            sanitizeForLog(parentRepo.getNameWithOwner())
-        );
+                "Creating stub parent issue from sub-issue sync: parentId={}, parentNumber={}, repoName={}",
+                parentId,
+                parentGraphQl.getNumber(),
+                sanitizeForLog(parentRepo.getNameWithOwner()));
 
         GitHubIssueDTO dto = GitHubIssueDTO.fromIssueWithRepository(parentGraphQl);
         if (dto == null) {
@@ -703,7 +651,9 @@ public class GitHubSubIssueSyncService {
             return null;
         }
 
-        return repositoryRepository.findByNameWithOwnerWithOrganization(nameWithOwner).orElse(null);
+        return repositoryRepository
+                .findByNameWithOwnerWithOrganization(nameWithOwner)
+                .orElse(null);
     }
 
     /**
@@ -734,10 +684,9 @@ public class GitHubSubIssueSyncService {
         issueRepository.save(issue);
 
         log.debug(
-            "Updated issue sub-issues summary: issueNumber={}, completedCount={}, totalCount={}",
-            issue.getNumber(),
-            summary.getCompleted(),
-            summary.getTotal()
-        );
+                "Updated issue sub-issues summary: issueNumber={}, completedCount={}, totalCount={}",
+                issue.getNumber(),
+                summary.getCompleted(),
+                summary.getTotal());
     }
 }

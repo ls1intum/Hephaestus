@@ -61,11 +61,8 @@ class GithubSummaryChannelTest extends BaseUnitTest {
 
     @Test
     void postSummaryReturnsCommentNodeId() {
-        FeedbackTarget target = new FeedbackTarget(
-            new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
-            "owner/repo#42",
-            null
-        );
+        FeedbackTarget target =
+                new FeedbackTarget(new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/repo#42", null);
 
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
         when(prNodeIdResolver.resolve(1L, "owner", "repo", 42)).thenReturn("PR_node123");
@@ -89,69 +86,56 @@ class GithubSummaryChannelTest extends BaseUnitTest {
     @Test
     void shouldBlockPostMutationWhenSilentModeIsEngaged() {
         doThrow(new OutboundEgressSuppressedException("test"))
-            .when(egressGuard)
-            .requireDeliveryAllowed("github.post-summary");
+                .when(egressGuard)
+                .requireDeliveryAllowed("github.post-summary");
 
-        assertThatThrownBy(() ->
-            channel.postSummary(
-                new FeedbackTarget(new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/repo#42", null),
-                new FeedbackContent("body", "marker")
-            )
-        ).isInstanceOf(OutboundEgressSuppressedException.class);
+        assertThatThrownBy(() -> channel.postSummary(
+                        new FeedbackTarget(new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/repo#42", null),
+                        new FeedbackContent("body", "marker")))
+                .isInstanceOf(OutboundEgressSuppressedException.class);
         verify(gitHubProvider, never()).forScope(anyLong());
     }
 
     @Test
     void shouldBlockUpdateMutationWhenSilentModeIsEngaged() {
         doThrow(new OutboundEgressSuppressedException("test"))
-            .when(egressGuard)
-            .requireDeliveryAllowed("github.update-summary");
+                .when(egressGuard)
+                .requireDeliveryAllowed("github.update-summary");
 
-        assertThatThrownBy(() ->
-            channel.updateSummary(
-                new FeedbackTarget(new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/repo#42", null),
-                "IC_comment456",
-                new FeedbackContent("body", "marker")
-            )
-        ).isInstanceOf(OutboundEgressSuppressedException.class);
+        assertThatThrownBy(() -> channel.updateSummary(
+                        new FeedbackTarget(new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/repo#42", null),
+                        "IC_comment456",
+                        new FeedbackContent("body", "marker")))
+                .isInstanceOf(OutboundEgressSuppressedException.class);
         verify(gitHubProvider, never()).forScope(anyLong());
     }
 
     @Test
     void postSummaryThrowsOnRateLimit() {
-        FeedbackTarget target = new FeedbackTarget(
-            new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
-            "owner/repo#42",
-            null
-        );
+        FeedbackTarget target =
+                new FeedbackTarget(new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/repo#42", null);
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(true);
 
         assertThatThrownBy(() -> channel.postSummary(target, new FeedbackContent("body", "marker")))
-            .isInstanceOf(FeedbackDeliveryException.class)
-            .hasMessageContaining("rate limit critical");
+                .isInstanceOf(FeedbackDeliveryException.class)
+                .hasMessageContaining("rate limit critical");
     }
 
     @Test
     void postSummaryThrowsOnMalformedSubjectId() {
         FeedbackTarget target = new FeedbackTarget(
-            new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
-            "owner-repo-without-hash",
-            null
-        );
+                new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner-repo-without-hash", null);
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
 
         assertThatThrownBy(() -> channel.postSummary(target, new FeedbackContent("body", "marker")))
-            .isInstanceOf(FeedbackDeliveryException.class)
-            .hasMessageContaining("Invalid GitHub PR subjectExternalId");
+                .isInstanceOf(FeedbackDeliveryException.class)
+                .hasMessageContaining("Invalid GitHub PR subjectExternalId");
     }
 
     @Test
     void postSummaryThrowsOnMutationErrors() {
-        FeedbackTarget target = new FeedbackTarget(
-            new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
-            "owner/repo#42",
-            null
-        );
+        FeedbackTarget target =
+                new FeedbackTarget(new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/repo#42", null);
 
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
         when(prNodeIdResolver.resolve(1L, "owner", "repo", 42)).thenReturn("PR_node123");
@@ -167,17 +151,14 @@ class GithubSummaryChannelTest extends BaseUnitTest {
         when(spec.execute()).thenReturn(Mono.just(errorResponse));
 
         assertThatThrownBy(() -> channel.postSummary(target, new FeedbackContent("body", "marker")))
-            .isInstanceOf(FeedbackDeliveryException.class)
-            .hasMessageContaining("addComment failed");
+                .isInstanceOf(FeedbackDeliveryException.class)
+                .hasMessageContaining("addComment failed");
     }
 
     @Test
     void updateSummary_editsInPlace_returnsEdited() {
-        FeedbackTarget target = new FeedbackTarget(
-            new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
-            "owner/repo#42",
-            null
-        );
+        FeedbackTarget target =
+                new FeedbackTarget(new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/repo#42", null);
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
 
         HttpGraphQlClient client = mock(HttpGraphQlClient.class);
@@ -199,23 +180,17 @@ class GithubSummaryChannelTest extends BaseUnitTest {
 
     @Test
     void updateSummary_blankExternalId_throws() {
-        FeedbackTarget target = new FeedbackTarget(
-            new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
-            "owner/repo#42",
-            null
-        );
+        FeedbackTarget target =
+                new FeedbackTarget(new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/repo#42", null);
         assertThatThrownBy(() -> channel.updateSummary(target, "  ", new FeedbackContent("body", "marker")))
-            .isInstanceOf(FeedbackDeliveryException.class)
-            .hasMessageContaining("external comment id is missing");
+                .isInstanceOf(FeedbackDeliveryException.class)
+                .hasMessageContaining("external comment id is missing");
     }
 
     @Test
     void updateSummary_rateLimitCritical_isTransient_notRepost() {
-        FeedbackTarget target = new FeedbackTarget(
-            new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
-            "owner/repo#42",
-            null
-        );
+        FeedbackTarget target =
+                new FeedbackTarget(new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/repo#42", null);
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(true);
 
         var outcome = channel.updateSummary(target, "IC_prior", new FeedbackContent("body", "marker"));
@@ -225,11 +200,8 @@ class GithubSummaryChannelTest extends BaseUnitTest {
 
     @Test
     void updateSummary_deletedComment_isGone_soCallerReposts() {
-        FeedbackTarget target = new FeedbackTarget(
-            new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
-            "owner/repo#42",
-            null
-        );
+        FeedbackTarget target =
+                new FeedbackTarget(new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/repo#42", null);
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
 
         HttpGraphQlClient client = mock(HttpGraphQlClient.class);
@@ -251,11 +223,8 @@ class GithubSummaryChannelTest extends BaseUnitTest {
 
     @Test
     void postSummary_nullResponse_throwsNullResponse() {
-        FeedbackTarget target = new FeedbackTarget(
-            new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
-            "owner/repo#42",
-            null
-        );
+        FeedbackTarget target =
+                new FeedbackTarget(new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/repo#42", null);
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
         when(prNodeIdResolver.resolve(1L, "owner", "repo", 42)).thenReturn("PR_node123");
 
@@ -267,17 +236,14 @@ class GithubSummaryChannelTest extends BaseUnitTest {
         when(spec.execute()).thenReturn(Mono.empty());
 
         assertThatThrownBy(() -> channel.postSummary(target, new FeedbackContent("body", "marker")))
-            .isInstanceOf(FeedbackDeliveryException.class)
-            .hasMessageContaining("Null response from AddPullRequestComment");
+                .isInstanceOf(FeedbackDeliveryException.class)
+                .hasMessageContaining("Null response from AddPullRequestComment");
     }
 
     @Test
     void postSummary_nullCommentId_throwsNoCommentId() {
-        FeedbackTarget target = new FeedbackTarget(
-            new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
-            "owner/repo#42",
-            null
-        );
+        FeedbackTarget target =
+                new FeedbackTarget(new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/repo#42", null);
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
         when(prNodeIdResolver.resolve(1L, "owner", "repo", 42)).thenReturn("PR_node123");
 
@@ -290,29 +256,26 @@ class GithubSummaryChannelTest extends BaseUnitTest {
         when(spec.execute()).thenReturn(Mono.just(response));
 
         assertThatThrownBy(() -> channel.postSummary(target, new FeedbackContent("body", "marker")))
-            .isInstanceOf(FeedbackDeliveryException.class)
-            .hasMessageContaining("No comment ID in AddPullRequestComment response");
+                .isInstanceOf(FeedbackDeliveryException.class)
+                .hasMessageContaining("No comment ID in AddPullRequestComment response");
     }
 
     @Test
     void postSummary_issueSubjectWithNonNumericId_fallsBackToPrValidation_throwsInvalidPrSubject() {
-        FeedbackTarget target = new FeedbackTarget(
-            new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
-            "owner/issues/x",
-            null
-        );
+        FeedbackTarget target =
+                new FeedbackTarget(new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/issues/x", null);
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
 
         assertThatThrownBy(() -> channel.postSummary(target, new FeedbackContent("body", "marker")))
-            .isInstanceOf(FeedbackDeliveryException.class)
-            .hasMessageContaining("Invalid GitHub PR subjectExternalId");
+                .isInstanceOf(FeedbackDeliveryException.class)
+                .hasMessageContaining("Invalid GitHub PR subjectExternalId");
     }
 
     @Test
     void parseIssueSubjectExternalId_rejectsSubjectWithoutNumber() {
         assertThatThrownBy(() -> GithubSummaryChannel.parseIssueSubjectExternalId("owner/issues/x"))
-            .isInstanceOf(FeedbackDeliveryException.class)
-            .hasMessageContaining("Invalid GitHub issue subjectExternalId");
+                .isInstanceOf(FeedbackDeliveryException.class)
+                .hasMessageContaining("Invalid GitHub issue subjectExternalId");
     }
 
     @SuppressWarnings("unchecked")
@@ -331,26 +294,24 @@ class GithubSummaryChannelTest extends BaseUnitTest {
         assertThat(channel.formatPullRequestSubjectId("owner/repo", 7)).isEqualTo("owner/repo#7");
         // GitHub requires a two-segment owner/repo — fail fast, not late in node-id resolution.
         assertThatThrownBy(() -> channel.formatIssueSubjectId("nope", 7))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("owner/repo");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("owner/repo");
         assertThatThrownBy(() -> channel.formatIssueSubjectId("a/b/c", 7)).isInstanceOf(IllegalArgumentException.class);
         // A blank owner or repo segment must also fail fast, not yield "owner/#42" / "owner//issues/42".
         assertThatThrownBy(() -> channel.formatPullRequestSubjectId("owner/", 7))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("owner/repo");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("owner/repo");
         assertThatThrownBy(() -> channel.formatIssueSubjectId("/repo", 7))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("owner/repo");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("owner/repo");
     }
 
     @Test
     void postSummary_forAnIssueSubject_resolvesViaIssueNodeId_notThePrResolver() {
-        // resolve() targets pullRequest and returns null for an issue, so an issue subject must route through resolveIssue.
-        FeedbackTarget target = new FeedbackTarget(
-            new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
-            "owner/repo/issues/42",
-            null
-        );
+        // resolve() targets pullRequest and returns null for an issue, so an issue subject must route through
+        // resolveIssue.
+        FeedbackTarget target =
+                new FeedbackTarget(new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/repo/issues/42", null);
 
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
         when(prNodeIdResolver.resolveIssue(1L, "owner", "repo", 42)).thenReturn("I_node789");
@@ -370,11 +331,8 @@ class GithubSummaryChannelTest extends BaseUnitTest {
         verify(prNodeIdResolver, never()).resolve(anyLong(), any(), any(), anyInt());
     }
 
-    private static final FeedbackTarget PR_TARGET = new FeedbackTarget(
-        new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
-        "owner/repo#42",
-        null
-    );
+    private static final FeedbackTarget PR_TARGET =
+            new FeedbackTarget(new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/repo#42", null);
 
     private HttpGraphQlClient graphQlClient = mock(HttpGraphQlClient.class);
 
@@ -392,24 +350,20 @@ class GithubSummaryChannelTest extends BaseUnitTest {
      * so a scan that reads {@code hasNextPage}/{@code endCursor} fails these tests instead of passing by coincidence.
      */
     private ClientGraphQlResponse mockCommentsPageResponse(
-        String commentsPath,
-        List<GHIssueComment> nodes,
-        boolean hasPreviousPage,
-        @Nullable String startCursor
-    ) {
+            String commentsPath, List<GHIssueComment> nodes, boolean hasPreviousPage, @Nullable String startCursor) {
         ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
         ClientResponseField field = mock(ClientResponseField.class);
         when(response.field(commentsPath)).thenReturn(field);
         var pageInfo = GHPageInfo.builder()
-            .setHasPreviousPage(hasPreviousPage)
-            .setHasNextPage(!hasPreviousPage)
-            .setEndCursor("forward-cursor-decoy");
+                .setHasPreviousPage(hasPreviousPage)
+                .setHasNextPage(!hasPreviousPage)
+                .setEndCursor("forward-cursor-decoy");
         if (startCursor != null) pageInfo.setStartCursor(startCursor);
         GHIssueCommentConnection connection = GHIssueCommentConnection.builder()
-            .setNodes(nodes)
-            .setPageInfo(pageInfo.build())
-            .setTotalCount(nodes.size())
-            .build();
+                .setNodes(nodes)
+                .setPageInfo(pageInfo.build())
+                .setTotalCount(nodes.size())
+                .build();
         when(field.toEntity(GHIssueCommentConnection.class)).thenReturn(connection);
         lenient().when(response.getErrors()).thenReturn(List.of());
         return response;
@@ -425,11 +379,7 @@ class GithubSummaryChannelTest extends BaseUnitTest {
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
         ClientGraphQlResponse response = mockCommentsPageResponse(
-            "repository.pullRequest.comments",
-            List.of(comment("IC_1", "unrelated")),
-            false,
-            null
-        );
+                "repository.pullRequest.comments", List.of(comment("IC_1", "unrelated")), false, null);
         when(spec.execute()).thenReturn(Mono.just(response));
 
         channel.findExistingSummary(PR_TARGET, "<!-- marker:job-1 -->");
@@ -443,19 +393,12 @@ class GithubSummaryChannelTest extends BaseUnitTest {
 
     @Test
     void findExistingSummary_issueSubject_pagesTheIssueConnectionFromTheNewestEnd() {
-        FeedbackTarget issueTarget = new FeedbackTarget(
-            new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
-            "owner/repo/issues/42",
-            null
-        );
+        FeedbackTarget issueTarget =
+                new FeedbackTarget(new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/repo/issues/42", null);
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
         ClientGraphQlResponse response = mockCommentsPageResponse(
-            "repository.issue.comments",
-            List.of(comment("IC_1", "<!-- marker:job-1 -->body")),
-            false,
-            null
-        );
+                "repository.issue.comments", List.of(comment("IC_1", "<!-- marker:job-1 -->body")), false, null);
         when(spec.execute()).thenReturn(Mono.just(response));
 
         ExistingSummaryLookup result = channel.findExistingSummary(issueTarget, "<!-- marker:job-1 -->");
@@ -470,11 +413,10 @@ class GithubSummaryChannelTest extends BaseUnitTest {
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
         ClientGraphQlResponse newestPage = mockCommentsPageResponse(
-            "repository.pullRequest.comments",
-            List.of(comment("IC_1", "unrelated"), comment("IC_2", "<!-- marker:job-1 -->body")),
-            true,
-            "start-cursor-1"
-        );
+                "repository.pullRequest.comments",
+                List.of(comment("IC_1", "unrelated"), comment("IC_2", "<!-- marker:job-1 -->body")),
+                true,
+                "start-cursor-1");
         when(spec.execute()).thenReturn(Mono.just(newestPage));
 
         ExistingSummaryLookup result = channel.findExistingSummary(PR_TARGET, "<!-- marker:job-1 -->");
@@ -490,17 +432,12 @@ class GithubSummaryChannelTest extends BaseUnitTest {
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
         ClientGraphQlResponse newestPage = mockCommentsPageResponse(
-            "repository.pullRequest.comments",
-            List.of(comment("IC_2", "unrelated")),
-            true,
-            "start-cursor-1"
-        );
+                "repository.pullRequest.comments", List.of(comment("IC_2", "unrelated")), true, "start-cursor-1");
         ClientGraphQlResponse oldestPage = mockCommentsPageResponse(
-            "repository.pullRequest.comments",
-            List.of(comment("IC_1", "also unrelated")),
-            false, // hasPreviousPage=false — the oldest comment was reached, every comment was scanned
-            null
-        );
+                "repository.pullRequest.comments",
+                List.of(comment("IC_1", "also unrelated")),
+                false, // hasPreviousPage=false — the oldest comment was reached, every comment was scanned
+                null);
         when(spec.execute()).thenReturn(Mono.just(newestPage), Mono.just(oldestPage));
 
         ExistingSummaryLookup result = channel.findExistingSummary(PR_TARGET, "<!-- marker:job-1 -->");
@@ -516,23 +453,14 @@ class GithubSummaryChannelTest extends BaseUnitTest {
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
         ClientGraphQlResponse page1 = mockCommentsPageResponse(
-            "repository.pullRequest.comments",
-            List.of(comment("IC_3", "unrelated")),
-            true,
-            "start-cursor-1"
-        );
+                "repository.pullRequest.comments", List.of(comment("IC_3", "unrelated")), true, "start-cursor-1");
         ClientGraphQlResponse page2 = mockCommentsPageResponse(
-            "repository.pullRequest.comments",
-            List.of(comment("IC_2", "unrelated")),
-            true,
-            "start-cursor-2"
-        );
+                "repository.pullRequest.comments", List.of(comment("IC_2", "unrelated")), true, "start-cursor-2");
         ClientGraphQlResponse page3 = mockCommentsPageResponse(
-            "repository.pullRequest.comments",
-            List.of(comment("IC_1", "unrelated")),
-            true, // still older comments left when the budget runs out
-            "start-cursor-3"
-        );
+                "repository.pullRequest.comments",
+                List.of(comment("IC_1", "unrelated")),
+                true, // still older comments left when the budget runs out
+                "start-cursor-3");
         when(spec.execute()).thenReturn(Mono.just(page1), Mono.just(page2), Mono.just(page3));
 
         ExistingSummaryLookup result = channel.findExistingSummary(PR_TARGET, "<!-- marker:job-1 -->");
@@ -547,17 +475,9 @@ class GithubSummaryChannelTest extends BaseUnitTest {
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
         ClientGraphQlResponse newestPage = mockCommentsPageResponse(
-            "repository.pullRequest.comments",
-            List.of(comment("IC_2", "unrelated")),
-            true,
-            "start-cursor-1"
-        );
+                "repository.pullRequest.comments", List.of(comment("IC_2", "unrelated")), true, "start-cursor-1");
         ClientGraphQlResponse olderPage = mockCommentsPageResponse(
-            "repository.pullRequest.comments",
-            List.of(comment("IC_1", "<!-- marker:job-1 -->body")),
-            false,
-            null
-        );
+                "repository.pullRequest.comments", List.of(comment("IC_1", "<!-- marker:job-1 -->body")), false, null);
         when(spec.execute()).thenReturn(Mono.just(newestPage), Mono.just(olderPage));
 
         ExistingSummaryLookup result = channel.findExistingSummary(PR_TARGET, "<!-- marker:job-1 -->");
@@ -573,11 +493,7 @@ class GithubSummaryChannelTest extends BaseUnitTest {
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
         ClientGraphQlResponse response = mockCommentsPageResponse(
-            "repository.pullRequest.comments",
-            List.of(comment("IC_1", "unrelated")),
-            true,
-            null
-        );
+                "repository.pullRequest.comments", List.of(comment("IC_1", "unrelated")), true, null);
         when(spec.execute()).thenReturn(Mono.just(response));
 
         ExistingSummaryLookup result = channel.findExistingSummary(PR_TARGET, "<!-- marker:job-1 -->");

@@ -35,15 +35,11 @@ class InAppFeedbackPreparerTest extends BaseUnitTest {
     private static final int BASE = FeedbackLedgerRecorder.IN_APP_UNIT_ORDINAL_BASE;
 
     private final FeedbackRepository feedbackRepository = mock(FeedbackRepository.class);
-    private final FeedbackObservationRepository feedbackObservationRepository = mock(
-        FeedbackObservationRepository.class
-    );
+    private final FeedbackObservationRepository feedbackObservationRepository =
+            mock(FeedbackObservationRepository.class);
     private final FeedbackSupersession supersession = mock(FeedbackSupersession.class);
-    private final InAppFeedbackPreparer preparer = new InAppFeedbackPreparer(
-        feedbackRepository,
-        feedbackObservationRepository,
-        supersession
-    );
+    private final InAppFeedbackPreparer preparer =
+            new InAppFeedbackPreparer(feedbackRepository, feedbackObservationRepository, supersession);
 
     @Test
     void writesAnAdmittedMessageAsAPreparedInAppUnitCarryingItsBody() {
@@ -78,8 +74,8 @@ class InAppFeedbackPreparerTest extends BaseUnitTest {
         preparer.prepare(JOB_ID, WORKSPACE_ID, 22L, List.of(admitted("a"), admitted("b")), BASE + 2);
 
         assertThat(captureSaved())
-            .extracting(Feedback::getPosition)
-            .containsExactly(BASE, BASE + 1, BASE + 2, BASE + 3);
+                .extracting(Feedback::getPosition)
+                .containsExactly(BASE, BASE + 1, BASE + 2, BASE + 3);
     }
 
     /**
@@ -89,14 +85,12 @@ class InAppFeedbackPreparerTest extends BaseUnitTest {
     @Test
     void writesNothingForAMessageTheRouterRefused() {
         int prepared = preparer.prepare(
-            JOB_ID,
-            WORKSPACE_ID,
-            11L,
-            List.of(
-                new InAppFeedbackPreparer.RoutedMessage(message("x"), InAppRoutingDecision.UNCORROBORATED, List.of())
-            ),
-            BASE
-        );
+                JOB_ID,
+                WORKSPACE_ID,
+                11L,
+                List.of(new InAppFeedbackPreparer.RoutedMessage(
+                        message("x"), InAppRoutingDecision.UNCORROBORATED, List.of())),
+                BASE);
 
         assertThat(prepared).isZero();
         verify(feedbackRepository, never()).save(any());
@@ -104,7 +98,8 @@ class InAppFeedbackPreparerTest extends BaseUnitTest {
 
     @Test
     void isIdempotentOnARerunOfTheSameJob() {
-        when(feedbackRepository.existsByAgentJobIdAndPosition(eq(JOB_ID), anyInt())).thenReturn(true);
+        when(feedbackRepository.existsByAgentJobIdAndPosition(eq(JOB_ID), anyInt()))
+                .thenReturn(true);
 
         int prepared = preparer.prepare(JOB_ID, WORKSPACE_ID, 11L, List.of(admitted("ships-tests")), BASE);
 
@@ -118,10 +113,9 @@ class InAppFeedbackPreparerTest extends BaseUnitTest {
         int lastSlot = BASE + FeedbackLedgerRecorder.UNIT_ORDINAL_BAND_WIDTH - 1;
 
         assertThatThrownBy(() ->
-            preparer.prepare(JOB_ID, WORKSPACE_ID, 11L, List.of(admitted("a"), admitted("b")), lastSlot)
-        )
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("exceed the ordinal band");
+                        preparer.prepare(JOB_ID, WORKSPACE_ID, 11L, List.of(admitted("a"), admitted("b")), lastSlot))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("exceed the ordinal band");
     }
 
     @Test
@@ -131,18 +125,12 @@ class InAppFeedbackPreparerTest extends BaseUnitTest {
         Observation second = Observation.builder().id(UUID.randomUUID()).build();
 
         preparer.prepare(
-            JOB_ID,
-            WORKSPACE_ID,
-            11L,
-            List.of(
-                new InAppFeedbackPreparer.RoutedMessage(
-                    message("ships-tests"),
-                    InAppRoutingDecision.ADMIT,
-                    List.of(first, second)
-                )
-            ),
-            BASE
-        );
+                JOB_ID,
+                WORKSPACE_ID,
+                11L,
+                List.of(new InAppFeedbackPreparer.RoutedMessage(
+                        message("ships-tests"), InAppRoutingDecision.ADMIT, List.of(first, second))),
+                BASE);
 
         verify(feedbackObservationRepository, times(2)).insertIfAbsent(any(), any(), eq("PRIMARY"), anyInt());
     }
@@ -176,17 +164,11 @@ class InAppFeedbackPreparerTest extends BaseUnitTest {
         stubSave();
         UUID retired = UUID.randomUUID();
         String threadKey = threadKeyFor("ships-tests", 11L);
-        when(supersession.supersede(WORKSPACE_ID, 11L, FeedbackChannel.IN_APP, threadKey)).thenReturn(
-            new FeedbackSupersession.Outcome(FeedbackSupersession.Disposition.SUPERSEDED, retired)
-        );
+        when(supersession.supersede(WORKSPACE_ID, 11L, FeedbackChannel.IN_APP, threadKey))
+                .thenReturn(new FeedbackSupersession.Outcome(FeedbackSupersession.Disposition.SUPERSEDED, retired));
 
         preparer.prepare(
-            JOB_ID,
-            WORKSPACE_ID,
-            11L,
-            List.of(admitted(supersedingMessage("ships-tests", threadKey))),
-            BASE
-        );
+                JOB_ID, WORKSPACE_ID, 11L, List.of(admitted(supersedingMessage("ships-tests", threadKey))), BASE);
 
         Feedback written = captureSaved().getFirst();
         assertThat(written.getReplacesId()).isEqualTo(retired);
@@ -202,17 +184,11 @@ class InAppFeedbackPreparerTest extends BaseUnitTest {
     void stillWritesTheCardWhenThereWasNothingLeftToRetire() {
         stubSave();
         String threadKey = threadKeyFor("ships-tests", 11L);
-        when(supersession.supersede(WORKSPACE_ID, 11L, FeedbackChannel.IN_APP, threadKey)).thenReturn(
-            FeedbackSupersession.Outcome.standalone()
-        );
+        when(supersession.supersede(WORKSPACE_ID, 11L, FeedbackChannel.IN_APP, threadKey))
+                .thenReturn(FeedbackSupersession.Outcome.standalone());
 
         int prepared = preparer.prepare(
-            JOB_ID,
-            WORKSPACE_ID,
-            11L,
-            List.of(admitted(supersedingMessage("ships-tests", threadKey))),
-            BASE
-        );
+                JOB_ID, WORKSPACE_ID, 11L, List.of(admitted(supersedingMessage("ships-tests", threadKey))), BASE);
 
         assertThat(prepared).isEqualTo(1);
         assertThat(captureSaved().getFirst().getReplacesId()).isNull();
@@ -228,12 +204,11 @@ class InAppFeedbackPreparerTest extends BaseUnitTest {
         stubSave();
 
         preparer.prepare(
-            JOB_ID,
-            WORKSPACE_ID,
-            11L,
-            List.of(admitted(supersedingMessage("ships-tests", threadKeyFor("small-changes", 11L)))),
-            BASE
-        );
+                JOB_ID,
+                WORKSPACE_ID,
+                11L,
+                List.of(admitted(supersedingMessage("ships-tests", threadKeyFor("small-changes", 11L)))),
+                BASE);
 
         verify(supersession, never()).supersede(anyLong(), anyLong(), any(), any());
         assertThat(captureSaved().getFirst().getReplacesId()).isNull();
@@ -245,15 +220,15 @@ class InAppFeedbackPreparerTest extends BaseUnitTest {
      */
     @Test
     void doesNotRetireASecondCardOnARerun() {
-        when(feedbackRepository.existsByAgentJobIdAndPosition(eq(JOB_ID), anyInt())).thenReturn(true);
+        when(feedbackRepository.existsByAgentJobIdAndPosition(eq(JOB_ID), anyInt()))
+                .thenReturn(true);
 
         preparer.prepare(
-            JOB_ID,
-            WORKSPACE_ID,
-            11L,
-            List.of(admitted(supersedingMessage("ships-tests", threadKeyFor("ships-tests", 11L)))),
-            BASE
-        );
+                JOB_ID,
+                WORKSPACE_ID,
+                11L,
+                List.of(admitted(supersedingMessage("ships-tests", threadKeyFor("ships-tests", 11L)))),
+                BASE);
 
         verify(supersession, never()).supersede(anyLong(), anyLong(), any(), any());
     }
@@ -278,12 +253,7 @@ class InAppFeedbackPreparerTest extends BaseUnitTest {
 
     private static ComposedInAppMessage supersedingMessage(String practiceSlug, String supersedesThreadKey) {
         return new ComposedInAppMessage(
-            practiceSlug,
-            "A pattern",
-            "What keeps happening.",
-            "Do the thing",
-            supersedesThreadKey
-        );
+                practiceSlug, "A pattern", "What keeps happening.", "Do the thing", supersedesThreadKey);
     }
 
     private static InAppFeedbackPreparer.RoutedMessage admitted(ComposedInAppMessage message) {

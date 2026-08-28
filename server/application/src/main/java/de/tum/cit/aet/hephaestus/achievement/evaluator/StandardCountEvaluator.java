@@ -30,10 +30,9 @@ public class StandardCountEvaluator implements AchievementEvaluator {
 
         if (!(userAchievement.getProgressData() instanceof LinearAchievementProgress(int current, int target))) {
             log.warn(
-                "Expected LinearAchievementProgress but received {} for achievement: {}",
-                userAchievement.getProgressData(),
-                userAchievement.getAchievementId()
-            );
+                    "Expected LinearAchievementProgress but received {} for achievement: {}",
+                    userAchievement.getProgressData(),
+                    userAchievement.getAchievementId());
             return false;
         }
 

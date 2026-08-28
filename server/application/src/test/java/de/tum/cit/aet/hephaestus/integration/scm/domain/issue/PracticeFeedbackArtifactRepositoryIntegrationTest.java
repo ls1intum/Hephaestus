@@ -43,8 +43,7 @@ class PracticeFeedbackArtifactRepositoryIntegrationTest extends BaseIntegrationT
     @BeforeEach
     void setUp() {
         IdentityProvider provider = identityProviderRepository.save(
-            new IdentityProvider(IdentityProviderType.GITHUB, "https://github.example")
-        );
+                new IdentityProvider(IdentityProviderType.GITHUB, "https://github.example"));
         User author = userRepository.save(TestUserFactory.createUser(1001L, "developer", provider));
 
         Repository repository = new Repository();
@@ -58,67 +57,71 @@ class PracticeFeedbackArtifactRepositoryIntegrationTest extends BaseIntegrationT
 
         Instant now = Instant.now();
         issueRepository.upsertCore(
-            3001L,
-            persistedId(provider),
-            42,
-            "Issue",
-            "body",
-            "OPEN",
-            null,
-            "https://github.example/owner/repo/issues/42",
-            false,
-            null,
-            0,
-            now,
-            now,
-            now,
-            author.getId(),
-            repository.getId(),
-            null,
-            null,
-            null,
-            null,
-            null,
-            null
-        );
+                3001L,
+                persistedId(provider),
+                42,
+                "Issue",
+                "body",
+                "OPEN",
+                null,
+                "https://github.example/owner/repo/issues/42",
+                false,
+                null,
+                0,
+                now,
+                now,
+                now,
+                author.getId(),
+                repository.getId(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
         pullRequestRepository.upsertCore(
-            4001L,
-            persistedId(provider),
-            42,
-            "Pull request",
-            "body",
-            "OPEN",
-            null,
-            "https://github.example/owner/repo/pull/42",
-            false,
-            null,
-            0,
-            now,
-            now,
-            now,
-            author.getId(),
-            repository.getId(),
-            null,
-            null,
-            false,
-            false,
-            1,
-            2,
-            1,
-            1,
-            null,
-            null,
-            null,
-            "feature",
-            "main",
-            "head",
-            "base",
-            null,
-            null
-        );
+                4001L,
+                persistedId(provider),
+                42,
+                "Pull request",
+                "body",
+                "OPEN",
+                null,
+                "https://github.example/owner/repo/pull/42",
+                false,
+                null,
+                0,
+                now,
+                now,
+                now,
+                author.getId(),
+                repository.getId(),
+                null,
+                null,
+                false,
+                false,
+                1,
+                2,
+                1,
+                1,
+                null,
+                null,
+                null,
+                "feature",
+                "main",
+                "head",
+                "base",
+                null,
+                null);
 
-        issueId = issueRepository.findByRepositoryIdAndNumber(repository.getId(), 42).orElseThrow().getId();
-        pullRequestId = pullRequestRepository.findByRepositoryIdAndNumber(repository.getId(), 42).orElseThrow().getId();
+        issueId = issueRepository
+                .findByRepositoryIdAndNumber(repository.getId(), 42)
+                .orElseThrow()
+                .getId();
+        pullRequestId = pullRequestRepository
+                .findByRepositoryIdAndNumber(repository.getId(), 42)
+                .orElseThrow()
+                .getId();
     }
 
     @Test
@@ -128,12 +131,15 @@ class PracticeFeedbackArtifactRepositoryIntegrationTest extends BaseIntegrationT
         assertNotNull(issue.getAuthor());
         assertThat(issue.getAuthor().getLogin()).isEqualTo("developer");
         assertThat(issue.requireRepository().getNameWithOwner()).isEqualTo("owner/repo");
-        assertThat(issueRepository.findByIdWithAuthorAndRepository(pullRequestId)).isEmpty();
+        assertThat(issueRepository.findByIdWithAuthorAndRepository(pullRequestId))
+                .isEmpty();
     }
 
     @Test
     void pullRequestFinderFetchesDeliveryAssociations() {
-        var pullRequest = pullRequestRepository.findByIdWithAuthorAndRepository(pullRequestId).orElseThrow();
+        var pullRequest = pullRequestRepository
+                .findByIdWithAuthorAndRepository(pullRequestId)
+                .orElseThrow();
 
         assertNotNull(pullRequest.getAuthor());
         assertThat(pullRequest.getAuthor().getLogin()).isEqualTo("developer");

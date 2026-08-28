@@ -69,13 +69,9 @@ public class LoginProviderAdminController {
     @Operation(summary = "List login providers", operationId = "adminListLoginProviders")
     public ResponseEntity<List<LoginProviderViewDTO>> list() {
         String callbackBase = callbackBase();
-        return ResponseEntity.ok(
-            loginProviderService
-                .listAll()
-                .stream()
+        return ResponseEntity.ok(loginProviderService.listAll().stream()
                 .map(p -> toView(p, callbackBase))
-                .toList()
-        );
+                .toList());
     }
 
     @PostMapping
@@ -83,22 +79,19 @@ public class LoginProviderAdminController {
     @ApiResponse(responseCode = "201", description = "Login provider created; URL in the Location header")
     @Audited(ledger = AuditLedger.AUTH_EVENT, type = "LOGIN_PROVIDER_CREATED")
     public ResponseEntity<LoginProviderViewDTO> create(@Valid @RequestBody CreateLoginProviderRequestDTO body) {
-        LoginProvider created = loginProviderService.create(
-            new LoginProviderService.Draft(
+        LoginProvider created = loginProviderService.create(new LoginProviderService.Draft(
                 body.registrationId(),
                 body.type(),
                 body.displayName(),
                 body.baseUrl(),
                 body.clientId(),
                 body.clientSecret(),
-                body.scopes()
-            )
-        );
+                body.scopes()));
         LoginProviderViewDTO view = toView(created, callbackBase());
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
-            .path("/{registrationId}")
-            .buildAndExpand(created.getRegistrationId())
-            .toUri();
+                .path("/{registrationId}")
+                .buildAndExpand(created.getRegistrationId())
+                .toUri();
         return ResponseEntity.created(location).body(view);
     }
 
@@ -106,20 +99,16 @@ public class LoginProviderAdminController {
     @Operation(summary = "Update a login provider", operationId = "adminUpdateLoginProvider")
     @Audited(ledger = AuditLedger.AUTH_EVENT, type = "LOGIN_PROVIDER_UPDATED")
     public ResponseEntity<LoginProviderViewDTO> update(
-        @PathVariable String registrationId,
-        @Valid @RequestBody UpdateLoginProviderRequestDTO body
-    ) {
+            @PathVariable String registrationId, @Valid @RequestBody UpdateLoginProviderRequestDTO body) {
         LoginProvider updated = loginProviderService.update(
-            registrationId,
-            new LoginProviderService.Patch(
-                body.displayName(),
-                body.baseUrl(),
-                body.clientId(),
-                body.clientSecret(),
-                body.scopes(),
-                body.enabled()
-            )
-        );
+                registrationId,
+                new LoginProviderService.Patch(
+                        body.displayName(),
+                        body.baseUrl(),
+                        body.clientId(),
+                        body.clientSecret(),
+                        body.scopes(),
+                        body.enabled()));
         return ResponseEntity.ok(toView(updated, callbackBase()));
     }
 
@@ -133,59 +122,68 @@ public class LoginProviderAdminController {
 
     private static LoginProviderViewDTO toView(LoginProvider p, String callbackBase) {
         return new LoginProviderViewDTO(
-            p.getRegistrationId(),
-            p.getType().name(),
-            p.getDisplayName(),
-            p.getBaseUrl(),
-            p.getScopes(),
-            p.isEnabled(),
-            p.isSeededFromEnv(),
-            callbackBase + "/login/oauth2/code/" + p.getRegistrationId(),
-            p.getCreatedAt(),
-            p.getUpdatedAt()
-        );
+                p.getRegistrationId(),
+                p.getType().name(),
+                p.getDisplayName(),
+                p.getBaseUrl(),
+                p.getScopes(),
+                p.isEnabled(),
+                p.isSeededFromEnv(),
+                callbackBase + "/login/oauth2/code/" + p.getRegistrationId(),
+                p.getCreatedAt(),
+                p.getUpdatedAt());
     }
 
     /** Admin view of a login provider. The client secret is never included. */
     public record LoginProviderViewDTO(
-        @NonNull String registrationId,
-        @NonNull String type,
-        @NonNull String displayName,
-        @NonNull String baseUrl,
-        @NonNull String scopes,
-        boolean enabled,
-        boolean seededFromEnv,
-        @NonNull @Schema(
-            description = "Redirect/callback URI to register on the upstream OAuth app"
-        ) String redirectUri,
-        @NonNull Instant createdAt,
-        @NonNull Instant updatedAt
-    ) {}
+            @NonNull String registrationId,
+            @NonNull String type,
+            @NonNull String displayName,
+            @NonNull String baseUrl,
+            @NonNull String scopes,
+            boolean enabled,
+            boolean seededFromEnv,
+
+            @NonNull @Schema(description = "Redirect/callback URI to register on the upstream OAuth app")
+            String redirectUri,
+
+            @NonNull Instant createdAt,
+            @NonNull Instant updatedAt) {}
 
     public record CreateLoginProviderRequestDTO(
-        @NotBlank @Schema(
-            description = "Stable id used in the OAuth callback path and identity resolution",
-            example = "gitlab-acme"
-        ) String registrationId,
-        @NotNull LoginProvider.ProviderType type,
-        @Nullable @Schema(
-            description = "Label shown on the login button; defaults to the registrationId"
-        ) String displayName,
-        @Nullable @Schema(
-            description = "Instance base URL (GitLab only; GitHub is always github.com)",
-            example = "https://gitlab.example.com"
-        ) String baseUrl,
-        @NotBlank String clientId,
-        @NotBlank @Schema(description = "OAuth client secret; sealed at rest, never returned") String clientSecret,
-        @Nullable @Schema(description = "Space-separated scopes; defaulted by provider type if omitted") String scopes
-    ) {}
+            @NotBlank
+            @Schema(
+                    description = "Stable id used in the OAuth callback path and identity resolution",
+                    example = "gitlab-acme")
+            String registrationId,
+
+            @NotNull LoginProvider.ProviderType type,
+
+            @Nullable @Schema(description = "Label shown on the login button; defaults to the registrationId")
+            String displayName,
+
+            @Nullable
+            @Schema(
+                    description = "Instance base URL (GitLab only; GitHub is always github.com)",
+                    example = "https://gitlab.example.com")
+            String baseUrl,
+
+            @NotBlank String clientId,
+
+            @NotBlank @Schema(description = "OAuth client secret; sealed at rest, never returned")
+            String clientSecret,
+
+            @Nullable @Schema(description = "Space-separated scopes; defaulted by provider type if omitted")
+            String scopes) {}
 
     public record UpdateLoginProviderRequestDTO(
-        @Nullable String displayName,
-        @Nullable String baseUrl,
-        @Nullable String clientId,
-        @Nullable @Schema(description = "Omit to leave the existing secret unchanged") String clientSecret,
-        @Nullable String scopes,
-        @Nullable Boolean enabled
-    ) {}
+            @Nullable String displayName,
+            @Nullable String baseUrl,
+            @Nullable String clientId,
+
+            @Nullable @Schema(description = "Omit to leave the existing secret unchanged")
+            String clientSecret,
+
+            @Nullable String scopes,
+            @Nullable Boolean enabled) {}
 }

@@ -92,10 +92,8 @@ class WorkerRegistryOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         runningJob("w-new", Instant.now().minus(Duration.ofSeconds(30))); // younger than the 2-min grace
         // no registry row — but grace must protect it
 
-        List<OrphanedJobRef> orphans = jobRepository.findOrphanedRunningJobs(
-            Instant.now().minus(Duration.ofMinutes(2)),
-            LEASE_TTL_SECONDS
-        );
+        List<OrphanedJobRef> orphans =
+                jobRepository.findOrphanedRunningJobs(Instant.now().minus(Duration.ofMinutes(2)), LEASE_TTL_SECONDS);
         assertThat(orphans).isEmpty();
     }
 
@@ -108,20 +106,11 @@ class WorkerRegistryOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         // "w-stale" is the row's actual owner both times, so the fence itself doesn't
         // block the second call; status alone (no longer RUNNING after the first win) does.
         String newToken = AgentJob.generateJobToken();
-        int firstWin = transactionTemplate.execute(s ->
-            jobRepository.requeueOrphan(id, "w-stale", 5, Instant.now(), newToken, AgentJob.computeTokenHash(newToken))
-        );
+        int firstWin = transactionTemplate.execute(s -> jobRepository.requeueOrphan(
+                id, "w-stale", 5, Instant.now(), newToken, AgentJob.computeTokenHash(newToken)));
         String secondToken = AgentJob.generateJobToken();
-        int secondWin = transactionTemplate.execute(s ->
-            jobRepository.requeueOrphan(
-                id,
-                "w-stale",
-                5,
-                Instant.now(),
-                secondToken,
-                AgentJob.computeTokenHash(secondToken)
-            )
-        );
+        int secondWin = transactionTemplate.execute(s -> jobRepository.requeueOrphan(
+                id, "w-stale", 5, Instant.now(), secondToken, AgentJob.computeTokenHash(secondToken)));
         assertThat(firstWin).isEqualTo(1);
         assertThat(secondWin).isEqualTo(0); // already QUEUED — lost the race
 
@@ -137,9 +126,8 @@ class WorkerRegistryOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         registerWorker("w-fresh", Instant.now());
         registerWorker("w-dead", Instant.now().minus(Duration.ofHours(2)));
 
-        int removed = transactionTemplate.execute(s ->
-            workerRegistryRepository.deleteStale(Duration.ofHours(1).toSeconds())
-        );
+        int removed = transactionTemplate.execute(
+                s -> workerRegistryRepository.deleteStale(Duration.ofHours(1).toSeconds()));
 
         assertThat(removed).isEqualTo(1);
         assertThat(workerRegistryRepository.findById("w-fresh")).isPresent();
@@ -150,8 +138,8 @@ class WorkerRegistryOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     @DisplayName("worker identity binds on the worker role WITHOUT a WSS endpoint (orphan recovery always armed)")
     void workerIdentityBoundWithoutWssEndpoint() {
         assertThat(workerProperties)
-            .as("WorkerProperties must bind on the worker role independent of the WSS control endpoint")
-            .isNotNull();
+                .as("WorkerProperties must bind on the worker role independent of the WSS control endpoint")
+                .isNotNull();
         String id = workerProperties.resolvedWorkerId();
         assertThat(id).isNotBlank();
         // Stable per process (the instance suffix is computed once) — both the executor's job-ownership

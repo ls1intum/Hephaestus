@@ -56,11 +56,10 @@ public class CatalogProvenanceBackfill {
             }
         }
         log.info(
-            "Stamped catalog provenance for {} workspace(s): {} practices, {} groups",
-            completed,
-            total.practices(),
-            total.groups()
-        );
+                "Stamped catalog provenance for {} workspace(s): {} practices, {} groups",
+                completed,
+                total.practices(),
+                total.groups());
         return total;
     }
 
@@ -71,11 +70,9 @@ public class CatalogProvenanceBackfill {
                 transactionOperations.executeWithoutResult(ignored -> {
                     Practice managed = practiceRepository.findById(practiceId).orElseThrow();
                     String sourceSlug = Objects.requireNonNull(managed.getSourceCuratedSlug());
-                    catalog
-                        .practice(sourceSlug)
-                        .ifPresent(entry -> {
-                            PracticeDefinition effective = entry.effective();
-                            PracticeDefinition aligned = new PracticeDefinition(
+                    catalog.practice(sourceSlug).ifPresent(entry -> {
+                        PracticeDefinition effective = entry.effective();
+                        PracticeDefinition aligned = new PracticeDefinition(
                                 managed.getName(),
                                 managed.getBindings(),
                                 managed.getCriteria(),
@@ -83,19 +80,17 @@ public class CatalogProvenanceBackfill {
                                 effective.automatedReviewPolicy(),
                                 managed.getWhyItMatters(),
                                 managed.getWhatGoodLooksLike(),
-                                managed.getGroup() == null ? null : managed.getGroup().getSlug()
-                            );
-                            if (
-                                !aligned
-                                    .provenanceFingerprint(entry.slug())
-                                    .equals(effective.provenanceFingerprint(entry.slug()))
-                            ) {
-                                return;
-                            }
-                            managed.setAutomatedReviewPolicy(effective.automatedReviewPolicy());
-                            managed.setSourceCuratedFingerprint(effective.provenanceFingerprint(entry.slug()));
-                            revisionService.append(managed);
-                        });
+                                managed.getGroup() == null
+                                        ? null
+                                        : managed.getGroup().getSlug());
+                        if (!aligned.provenanceFingerprint(entry.slug())
+                                .equals(effective.provenanceFingerprint(entry.slug()))) {
+                            return;
+                        }
+                        managed.setAutomatedReviewPolicy(effective.automatedReviewPolicy());
+                        managed.setSourceCuratedFingerprint(effective.provenanceFingerprint(entry.slug()));
+                        revisionService.append(managed);
+                    });
                 });
             } catch (RuntimeException exception) {
                 log.error("Could not align catalog evidence: practiceId={}", practiceId, exception);
@@ -120,9 +115,8 @@ public class CatalogProvenanceBackfill {
     }
 
     private Stamped stamp(Long workspaceId, EffectiveCatalog catalog) {
-        PracticeCatalogInstallation installation = installationRepository
-            .findByWorkspaceIdForUpdate(workspaceId)
-            .orElse(null);
+        PracticeCatalogInstallation installation =
+                installationRepository.findByWorkspaceIdForUpdate(workspaceId).orElse(null);
         if (installation == null || installation.getProvenanceLinkedAt() != null) {
             return new Stamped(0, 0);
         }
@@ -136,9 +130,7 @@ public class CatalogProvenanceBackfill {
     private void fingerprintMigratedRevisions(Long workspaceId) {
         for (PracticeRevision revision : revisionRepository.findDefinitionRevisionsMissingFingerprint(workspaceId)) {
             revisionRepository.setReviewRuleFingerprint(
-                Objects.requireNonNull(revision.getId()),
-                revision.computeReviewRuleFingerprint()
-            );
+                    Objects.requireNonNull(revision.getId()), revision.computeReviewRuleFingerprint());
         }
     }
 
@@ -149,13 +141,13 @@ public class CatalogProvenanceBackfill {
                 continue;
             }
             String fingerprint = PracticeDefinition.from(practice).provenanceFingerprint(practice.getSlug());
-            boolean matchesCatalog = catalog
-                .practices()
-                .stream()
-                .filter(entry -> entry.slug().equals(practice.getSlug()))
-                .findFirst()
-                .map(entry -> entry.effective().provenanceFingerprint(entry.slug()).equals(fingerprint))
-                .orElse(false);
+            boolean matchesCatalog = catalog.practices().stream()
+                    .filter(entry -> entry.slug().equals(practice.getSlug()))
+                    .findFirst()
+                    .map(entry -> entry.effective()
+                            .provenanceFingerprint(entry.slug())
+                            .equals(fingerprint))
+                    .orElse(false);
             if (!matchesCatalog) {
                 continue;
             }
@@ -169,20 +161,19 @@ public class CatalogProvenanceBackfill {
 
     private int stampGroups(Long workspaceId, EffectiveCatalog catalog) {
         int stamped = 0;
-        for (PracticeGroup group : practiceGroupRepository.findByWorkspaceIdOrderByDisplayOrderAscNameAsc(
-            workspaceId
-        )) {
+        for (PracticeGroup group :
+                practiceGroupRepository.findByWorkspaceIdOrderByDisplayOrderAscNameAsc(workspaceId)) {
             if (group.getSourceCuratedSlug() != null) {
                 continue;
             }
             String fingerprint = GroupDefinition.from(group).provenanceFingerprint(group.getSlug());
-            boolean matchesCatalog = catalog
-                .groups()
-                .stream()
-                .filter(entry -> entry.slug().equals(group.getSlug()))
-                .findFirst()
-                .map(entry -> entry.effective().provenanceFingerprint(entry.slug()).equals(fingerprint))
-                .orElse(false);
+            boolean matchesCatalog = catalog.groups().stream()
+                    .filter(entry -> entry.slug().equals(group.getSlug()))
+                    .findFirst()
+                    .map(entry -> entry.effective()
+                            .provenanceFingerprint(entry.slug())
+                            .equals(fingerprint))
+                    .orElse(false);
             if (!matchesCatalog) {
                 continue;
             }

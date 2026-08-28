@@ -34,43 +34,39 @@ import reactor.core.publisher.Mono;
 class OutlineAuthInfoUserServiceTest extends BaseUnitTest {
 
     private static final String AUTH_INFO_BODY =
-        "{\"data\":{" +
-        "\"user\":{\"id\":\"0aa1bb2c-user\",\"name\":\"Ada Lovelace\"," +
-        "\"email\":\"ada@example.com\",\"avatarUrl\":\"https://wiki.example.com/a.png\"}," +
-        "\"team\":{\"id\":\"9ff8ee7d-team\",\"name\":\"Acme\"}}}";
+            "{\"data\":{" + "\"user\":{\"id\":\"0aa1bb2c-user\",\"name\":\"Ada Lovelace\","
+                    + "\"email\":\"ada@example.com\",\"avatarUrl\":\"https://wiki.example.com/a.png\"},"
+                    + "\"team\":{\"id\":\"9ff8ee7d-team\",\"name\":\"Acme\"}}}";
 
     private static ClientRegistration outlineRegistration() {
         return ClientRegistration.withRegistrationId("outline")
-            .clientId("client")
-            .clientSecret("secret")
-            .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
-            .redirectUri("{baseUrl}/login/oauth2/code/outline")
-            .authorizationUri("https://wiki.example.com/oauth/authorize")
-            .tokenUri("https://wiki.example.com/oauth/token")
-            .userInfoUri("https://wiki.example.com/api/auth.info")
-            .userNameAttributeName("id")
-            .build();
+                .clientId("client")
+                .clientSecret("secret")
+                .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                .redirectUri("{baseUrl}/login/oauth2/code/outline")
+                .authorizationUri("https://wiki.example.com/oauth/authorize")
+                .tokenUri("https://wiki.example.com/oauth/token")
+                .userInfoUri("https://wiki.example.com/api/auth.info")
+                .userNameAttributeName("id")
+                .build();
     }
 
     private static OAuth2UserRequest userRequest() {
         OAuth2AccessToken accessToken = new OAuth2AccessToken(
-            OAuth2AccessToken.TokenType.BEARER,
-            "outline-access-token",
-            Instant.now(),
-            Instant.now().plusSeconds(3600)
-        );
+                OAuth2AccessToken.TokenType.BEARER,
+                "outline-access-token",
+                Instant.now(),
+                Instant.now().plusSeconds(3600));
         return new OAuth2UserRequest(outlineRegistration(), accessToken);
     }
 
     private static WebClient respondingWith(int status, String body, AtomicReference<ClientRequest> captured) {
         ExchangeFunction exchange = request -> {
             captured.set(request);
-            return Mono.just(
-                ClientResponse.create(HttpStatus.valueOf(status))
+            return Mono.just(ClientResponse.create(HttpStatus.valueOf(status))
                     .header("Content-Type", "application/json")
                     .body(body)
-                    .build()
-            );
+                    .build());
         };
         return WebClient.builder().exchangeFunction(exchange).build();
     }
@@ -81,9 +77,8 @@ class OutlineAuthInfoUserServiceTest extends BaseUnitTest {
     @DisplayName("loadUser POSTs the registration's auth.info endpoint with the user's bearer token")
     void loadUser_postsAuthInfoWithBearerToken() {
         AtomicReference<ClientRequest> captured = new AtomicReference<>();
-        OutlineAuthInfoUserService service = new OutlineAuthInfoUserService(
-            respondingWith(200, AUTH_INFO_BODY, captured)
-        );
+        OutlineAuthInfoUserService service =
+                new OutlineAuthInfoUserService(respondingWith(200, AUTH_INFO_BODY, captured));
 
         OAuth2User user = service.loadUser(userRequest());
 
@@ -99,36 +94,32 @@ class OutlineAuthInfoUserServiceTest extends BaseUnitTest {
     @Test
     @DisplayName("the nested {data:{user,team}} payload flattens to principal attributes with a flat team_id")
     void loadUser_flattensNestedPayload() {
-        OutlineAuthInfoUserService service = new OutlineAuthInfoUserService(
-            respondingWith(200, AUTH_INFO_BODY, new AtomicReference<>())
-        );
+        OutlineAuthInfoUserService service =
+                new OutlineAuthInfoUserService(respondingWith(200, AUTH_INFO_BODY, new AtomicReference<>()));
 
         OAuth2User user = service.loadUser(userRequest());
 
         assertThat(user.getAttributes())
-            .containsEntry("id", "0aa1bb2c-user")
-            .containsEntry("name", "Ada Lovelace")
-            .containsEntry("email", "ada@example.com")
-            .containsEntry("avatar_url", "https://wiki.example.com/a.png")
-            // The flat tenant key AccountProvisioningService.teamIdOf resolves without a special case.
-            .containsEntry("team_id", "9ff8ee7d-team")
-            .containsEntry("team_name", "Acme");
+                .containsEntry("id", "0aa1bb2c-user")
+                .containsEntry("name", "Ada Lovelace")
+                .containsEntry("email", "ada@example.com")
+                .containsEntry("avatar_url", "https://wiki.example.com/a.png")
+                // The flat tenant key AccountProvisioningService.teamIdOf resolves without a special case.
+                .containsEntry("team_id", "9ff8ee7d-team")
+                .containsEntry("team_name", "Acme");
     }
 
     @Test
     @DisplayName("an HTTP failure fails the login (identity IS this call — no best-effort fallback)")
     void loadUser_httpFailureFailsClosed() {
-        OutlineAuthInfoUserService service = new OutlineAuthInfoUserService(
-            respondingWith(500, "{}", new AtomicReference<>())
-        );
+        OutlineAuthInfoUserService service =
+                new OutlineAuthInfoUserService(respondingWith(500, "{}", new AtomicReference<>()));
 
         assertThatThrownBy(() -> service.loadUser(userRequest()))
-            .isInstanceOf(OAuth2AuthenticationException.class)
-            .satisfies(ex ->
-                assertThat(((OAuth2AuthenticationException) ex).getError().getErrorCode()).isEqualTo(
-                    "outline_auth_info_unavailable"
-                )
-            );
+                .isInstanceOf(OAuth2AuthenticationException.class)
+                .satisfies(ex -> assertThat(
+                                ((OAuth2AuthenticationException) ex).getError().getErrorCode())
+                        .isEqualTo("outline_auth_info_unavailable"));
     }
 
     // --- the flattening / fail-closed policy (pure) ---
@@ -136,18 +127,14 @@ class OutlineAuthInfoUserServiceTest extends BaseUnitTest {
     @Test
     @DisplayName("a missing user id fails closed with a clear error code")
     void toAttributes_missingUserId_failsClosed() {
-        Map<String, Object> body = Map.of(
-            "data",
-            Map.of("user", Map.of("name", "Ada"), "team", Map.of("id", "9ff8ee7d-team"))
-        );
+        Map<String, Object> body =
+                Map.of("data", Map.of("user", Map.of("name", "Ada"), "team", Map.of("id", "9ff8ee7d-team")));
 
         assertThatThrownBy(() -> OutlineAuthInfoUserService.toAttributes(body))
-            .isInstanceOf(OAuth2AuthenticationException.class)
-            .satisfies(ex ->
-                assertThat(((OAuth2AuthenticationException) ex).getError().getErrorCode()).isEqualTo(
-                    "outline_missing_user_id"
-                )
-            );
+                .isInstanceOf(OAuth2AuthenticationException.class)
+                .satisfies(ex -> assertThat(
+                                ((OAuth2AuthenticationException) ex).getError().getErrorCode())
+                        .isEqualTo("outline_missing_user_id"));
     }
 
     @Test
@@ -156,29 +143,24 @@ class OutlineAuthInfoUserServiceTest extends BaseUnitTest {
         Map<String, Object> body = Map.of("data", Map.of("user", Map.of("id", "0aa1bb2c-user", "name", "Ada")));
 
         assertThatThrownBy(() -> OutlineAuthInfoUserService.toAttributes(body))
-            .isInstanceOf(OAuth2AuthenticationException.class)
-            .satisfies(ex ->
-                assertThat(((OAuth2AuthenticationException) ex).getError().getErrorCode()).isEqualTo(
-                    "outline_missing_team_id"
-                )
-            );
+                .isInstanceOf(OAuth2AuthenticationException.class)
+                .satisfies(ex -> assertThat(
+                                ((OAuth2AuthenticationException) ex).getError().getErrorCode())
+                        .isEqualTo("outline_missing_team_id"));
     }
 
     @Test
     @DisplayName("an empty/absent data envelope fails closed rather than NPEing")
     void toAttributes_absentEnvelope_failsClosed() {
-        assertThatThrownBy(() -> OutlineAuthInfoUserService.toAttributes(Map.of())).isInstanceOf(
-            OAuth2AuthenticationException.class
-        );
+        assertThatThrownBy(() -> OutlineAuthInfoUserService.toAttributes(Map.of()))
+                .isInstanceOf(OAuth2AuthenticationException.class);
     }
 
     @Test
     @DisplayName("optional fields (name/email/avatar) are omitted when absent, not nulled")
     void toAttributes_omitsAbsentOptionals() {
-        Map<String, Object> body = Map.of(
-            "data",
-            Map.of("user", Map.of("id", "0aa1bb2c-user"), "team", Map.of("id", "9ff8ee7d-team"))
-        );
+        Map<String, Object> body =
+                Map.of("data", Map.of("user", Map.of("id", "0aa1bb2c-user"), "team", Map.of("id", "9ff8ee7d-team")));
 
         Map<String, Object> attributes = OutlineAuthInfoUserService.toAttributes(body);
 

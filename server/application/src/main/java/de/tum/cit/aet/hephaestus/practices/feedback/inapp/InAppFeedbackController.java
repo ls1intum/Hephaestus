@@ -34,18 +34,16 @@ public class InAppFeedbackController {
 
     @GetMapping
     @Operation(
-        summary = "The current developer's in-app feedback",
-        description = "Process-level messages prepared for the authenticated developer: for each habit " +
-            "that recurs in their work, what the pattern is, the pieces of work it was observed on, and " +
-            "one thing to try next. Distinct from in-context notes (which say what is wrong in one diff) " +
-            "and from the mentor conversation (which asks rather than tells). Reading a message is what " +
-            "delivers it, so this GET records the delivery."
-    )
+            summary = "The current developer's in-app feedback",
+            description = "Process-level messages prepared for the authenticated developer: for each habit "
+                    + "that recurs in their work, what the pattern is, the pieces of work it was observed on, and "
+                    + "one thing to try next. Distinct from in-context notes (which say what is wrong in one diff) "
+                    + "and from the mentor conversation (which asks rather than tells). Reading a message is what "
+                    + "delivers it, so this GET records the delivery.")
     @ApiResponse(
-        responseCode = "200",
-        description = "In-app messages returned, newest first",
-        content = @Content(array = @ArraySchema(schema = @Schema(implementation = InAppFeedbackDTO.class)))
-    )
+            responseCode = "200",
+            description = "In-app messages returned, newest first",
+            content = @Content(array = @ArraySchema(schema = @Schema(implementation = InAppFeedbackDTO.class))))
     public ResponseEntity<List<InAppFeedbackDTO>> getInAppFeedback(WorkspaceContext workspaceContext) {
         return ResponseEntity.ok(inAppFeedbackService.getInAppFeedback(workspaceContext.id()));
     }

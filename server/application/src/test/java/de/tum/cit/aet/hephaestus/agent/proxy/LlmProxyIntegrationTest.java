@@ -79,9 +79,9 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         assertThat(result.status()).isEqualTo(200);
         assertThat(result.authentication())
-            .isNotNull()
-            .extracting(Authentication::getPrincipal)
-            .isInstanceOf(ProxyRouting.class);
+                .isNotNull()
+                .extracting(Authentication::getPrincipal)
+                .isInstanceOf(ProxyRouting.class);
     }
 
     @Test
@@ -90,11 +90,9 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         long connectionId = job.getConfigSnapshot().get("connectionId").asLong();
         long modelId = job.getConfigSnapshot().get("modelId").asLong();
 
-        assertThat(
-            modelResolver.resolveProxyCredential(
-                new ConnectionRef(FundingSource.INSTANCE, connectionId, modelId, workspace.getId())
-            )
-        ).isNull();
+        assertThat(modelResolver.resolveProxyCredential(
+                        new ConnectionRef(FundingSource.INSTANCE, connectionId, modelId, workspace.getId())))
+                .isNull();
     }
 
     private AuthenticationResult authenticate(String token) throws Exception {
@@ -104,9 +102,11 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         request.addHeader("Authorization", "Bearer " + token);
         MockHttpServletResponse response = new MockHttpServletResponse();
         AtomicReference<Authentication> authentication = new AtomicReference<>();
-        filter.doFilter(request, response, (filteredRequest, filteredResponse) ->
-            authentication.set(Objects.requireNonNull(SecurityContextHolder.getContext().getAuthentication()))
-        );
+        filter.doFilter(
+                request,
+                response,
+                (filteredRequest, filteredResponse) -> authentication.set(Objects.requireNonNull(
+                        SecurityContextHolder.getContext().getAuthentication())));
         return new AuthenticationResult(response.getStatus(), authentication.get());
     }
 
@@ -120,15 +120,8 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         connection.setApiKey("upstream-secret");
         connection = connectionRepository.save(connection);
 
-        LlmModel model = modelRepository.save(
-            LlmCatalogTestFixtures.model(
-                connection,
-                "model-" + System.nanoTime(),
-                "catalog-model",
-                ModelVisibility.PUBLIC,
-                modelEnabled
-            )
-        );
+        LlmModel model = modelRepository.save(LlmCatalogTestFixtures.model(
+                connection, "model-" + System.nanoTime(), "catalog-model", ModelVisibility.PUBLIC, modelEnabled));
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
         binding.setWorkspace(workspace);
         binding.setPurpose(AgentPurpose.PRACTICE_REVIEW);

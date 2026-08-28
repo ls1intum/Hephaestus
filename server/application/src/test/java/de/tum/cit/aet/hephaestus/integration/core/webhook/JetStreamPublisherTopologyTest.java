@@ -31,29 +31,27 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 class JetStreamPublisherTopologyTest {
 
     private final WebhookProperties properties = new WebhookProperties(
-        null,
-        null,
-        new WebhookProperties.TokenRotation(7, 90),
-        new WebhookProperties.Publish(Duration.ofSeconds(2), 3, Duration.ofMillis(10)),
-        WebhookPropertiesFixture.stream(),
-        new WebhookProperties.Shutdown(Duration.ofSeconds(15)),
-        new WebhookProperties.Http(26_214_400L)
-    );
+            null,
+            null,
+            new WebhookProperties.TokenRotation(7, 90),
+            new WebhookProperties.Publish(Duration.ofSeconds(2), 3, Duration.ofMillis(10)),
+            WebhookPropertiesFixture.stream(),
+            new WebhookProperties.Shutdown(Duration.ofSeconds(15)),
+            new WebhookProperties.Http(26_214_400L));
 
     private ApplicationContextRunner baseRunner() {
         return new ApplicationContextRunner()
-            .withUserConfiguration(WebhookConfiguration.class)
-            .withBean(WebhookProperties.class, () -> properties)
-            // The stream monitor charges loss only to durables under this deployment's own name.
-            .withBean(NatsConnectionProperties.class, () ->
-                new NatsConnectionProperties(
-                    false,
-                    null,
-                    "hephaestus",
-                    new NatsConnectionProperties.Consumer(Duration.ofSeconds(60))
-                )
-            )
-            .withBean(MeterRegistry.class, SimpleMeterRegistry::new);
+                .withUserConfiguration(WebhookConfiguration.class)
+                .withBean(WebhookProperties.class, () -> properties)
+                // The stream monitor charges loss only to durables under this deployment's own name.
+                .withBean(
+                        NatsConnectionProperties.class,
+                        () -> new NatsConnectionProperties(
+                                false,
+                                null,
+                                "hephaestus",
+                                new NatsConnectionProperties.Consumer(Duration.ofSeconds(60))))
+                .withBean(MeterRegistry.class, SimpleMeterRegistry::new);
     }
 
     private ApplicationContextRunner withNats(ApplicationContextRunner runner) {
@@ -80,16 +78,16 @@ class JetStreamPublisherTopologyTest {
     private StreamInfo streamInfoWithExpectedConfig() {
         WebhookProperties.Stream stream = properties.stream();
         StreamConfiguration config = StreamConfiguration.builder()
-            .name("existing")
-            .subjects("existing.>")
-            .retentionPolicy(RetentionPolicy.Limits)
-            .discardPolicy(DiscardPolicy.Old)
-            .storageType(StorageType.File)
-            .duplicateWindow(stream.duplicateWindow())
-            .maxAge(stream.maxAge())
-            .maxMessages(-1)
-            .maxBytes(stream.maxBytes().toBytes())
-            .build();
+                .name("existing")
+                .subjects("existing.>")
+                .retentionPolicy(RetentionPolicy.Limits)
+                .discardPolicy(DiscardPolicy.Old)
+                .storageType(StorageType.File)
+                .duplicateWindow(stream.duplicateWindow())
+                .maxAge(stream.maxAge())
+                .maxMessages(-1)
+                .maxBytes(stream.maxBytes().toBytes())
+                .build();
         StreamInfo info = mock(StreamInfo.class);
         lenient().when(info.getConfiguration()).thenReturn(config);
         lenient().when(info.getStreamState()).thenReturn(mock(io.nats.client.api.StreamState.class));
@@ -104,44 +102,44 @@ class JetStreamPublisherTopologyTest {
     @Test
     void webhookOn_natsOn_slackOff_webhookConfigOwnsTheSinglePublisher() {
         withNats(baseRunner())
-            .withPropertyValues("hephaestus.runtime.webhook.enabled=true", "hephaestus.integration.slack.enabled=false")
-            .run(context -> assertPublisherCount(context, 1));
+                .withPropertyValues(
+                        "hephaestus.runtime.webhook.enabled=true", "hephaestus.integration.slack.enabled=false")
+                .run(context -> assertPublisherCount(context, 1));
     }
 
     @Test
     void webhookOn_natsOn_slackOn_stillExactlyOnePublisher() {
         withNats(baseRunner())
-            .withPropertyValues("hephaestus.runtime.webhook.enabled=true", "hephaestus.integration.slack.enabled=true")
-            .run(context -> assertPublisherCount(context, 1));
+                .withPropertyValues(
+                        "hephaestus.runtime.webhook.enabled=true", "hephaestus.integration.slack.enabled=true")
+                .run(context -> assertPublisherCount(context, 1));
     }
 
     @Test
     void webhookOff_slackOn_natsOn_noPublisher() {
         withNats(baseRunner())
-            .withPropertyValues("hephaestus.runtime.webhook.enabled=false", "hephaestus.integration.slack.enabled=true")
-            .run(context -> assertPublisherCount(context, 0));
+                .withPropertyValues(
+                        "hephaestus.runtime.webhook.enabled=false", "hephaestus.integration.slack.enabled=true")
+                .run(context -> assertPublisherCount(context, 0));
     }
 
     @Test
     void webhookOff_slackOff_natsOn_noPublisher() {
         withNats(baseRunner())
-            .withPropertyValues(
-                "hephaestus.runtime.webhook.enabled=false",
-                "hephaestus.integration.slack.enabled=false"
-            )
-            .run(context -> assertPublisherCount(context, 0));
+                .withPropertyValues(
+                        "hephaestus.runtime.webhook.enabled=false", "hephaestus.integration.slack.enabled=false")
+                .run(context -> assertPublisherCount(context, 0));
     }
 
     @Test
     void natsOff_neverWiresAPublisher_acrossEveryRoleSlackCombo() {
-        String[][] combos = { { "true", "true" }, { "true", "false" }, { "false", "true" }, { "false", "false" } };
+        String[][] combos = {{"true", "true"}, {"true", "false"}, {"false", "true"}, {"false", "false"}};
         for (String[] combo : combos) {
             baseRunner()
-                .withPropertyValues(
-                    "hephaestus.runtime.webhook.enabled=" + combo[0],
-                    "hephaestus.integration.slack.enabled=" + combo[1]
-                )
-                .run(context -> assertPublisherCount(context, 0));
+                    .withPropertyValues(
+                            "hephaestus.runtime.webhook.enabled=" + combo[0],
+                            "hephaestus.integration.slack.enabled=" + combo[1])
+                    .run(context -> assertPublisherCount(context, 0));
         }
     }
 }

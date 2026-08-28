@@ -50,15 +50,14 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
     private final String appBaseUrl;
 
     public HephaestusAuthSuccessHandler(
-        AccountProvisioningService provisioningService,
-        HephaestusJwtIssuer jwtIssuer,
-        JwtPrincipalFactory principalFactory,
-        AuthIntentCookie authIntentCookie,
-        AuthProperties authProperties,
-        AuthEventLogger authEventLogger,
-        Clock clock,
-        @Value("${hephaestus.webapp.url:}") String webappBaseUrl
-    ) {
+            AccountProvisioningService provisioningService,
+            HephaestusJwtIssuer jwtIssuer,
+            JwtPrincipalFactory principalFactory,
+            AuthIntentCookie authIntentCookie,
+            AuthProperties authProperties,
+            AuthEventLogger authEventLogger,
+            Clock clock,
+            @Value("${hephaestus.webapp.url:}") String webappBaseUrl) {
         this.provisioningService = provisioningService;
         this.jwtIssuer = jwtIssuer;
         this.principalFactory = principalFactory;
@@ -81,10 +80,8 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
 
     @Override
     public void onAuthenticationSuccess(
-        HttpServletRequest request,
-        HttpServletResponse response,
-        Authentication authentication
-    ) throws IOException {
+            HttpServletRequest request, HttpServletResponse response, Authentication authentication)
+            throws IOException {
         if (!(authentication instanceof OAuth2AuthenticationToken token)) {
             log.error("auth.success: unexpected authentication type {}", authentication.getClass());
             redirectToApp(request, response, "/auth/error?code=unexpected_auth_type");
@@ -123,38 +120,34 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
         // login decision is made, so it must be rejected here too. No cookie is set on this path.
         if (account.getStatus() != Account.Status.ACTIVE) {
             log.warn(
-                "auth.success: rejecting login for non-ACTIVE accountId={} status={}",
-                account.getId(),
-                account.getStatus()
-            );
+                    "auth.success: rejecting login for non-ACTIVE accountId={} status={}",
+                    account.getId(),
+                    account.getStatus());
             redirectToApp(request, response, "/auth/error?code=account_inactive");
             return;
         }
 
         HephaestusJwtIssuer.Token issued = jwtIssuer.issue(
-            principalFactory.forAccount(account),
-            /* impersonator */ null,
-            /* impersonationExpiresAt */ null,
-            // Absolute session ceiling, stamped once at login and carried through every refresh.
-            clock.instant().plus(authProperties.sessionMaxLifetime()),
-            request
-        );
+                principalFactory.forAccount(account),
+                /* impersonator */ null,
+                /* impersonationExpiresAt */ null,
+                // Absolute session ceiling, stamped once at login and carried through every refresh.
+                clock.instant().plus(authProperties.sessionMaxLifetime()),
+                request);
         setAccessCookie(
-            response,
-            issued.value(),
-            issued.expiresAt().getEpochSecond() - clock.instant().getEpochSecond()
-        );
+                response,
+                issued.value(),
+                issued.expiresAt().getEpochSecond() - clock.instant().getEpochSecond());
 
         // Audit the completed authentication, symmetric with AuthSessionService's LOGOUT. IDENTITY_LINKED
         // only when a NEW identity was actually attached to an existing account (per the provisioning
         // result); otherwise LOGIN. Audit writes are best-effort and never break the login — see AuthEventLogger.
         authEventLogger
-            .event(
-                provisioned.identityLinked() ? AuthEvent.EventType.IDENTITY_LINKED : AuthEvent.EventType.LOGIN,
-                AuthEvent.Result.SUCCESS
-            )
-            .account(account.getId())
-            .record();
+                .event(
+                        provisioned.identityLinked() ? AuthEvent.EventType.IDENTITY_LINKED : AuthEvent.EventType.LOGIN,
+                        AuthEvent.Result.SUCCESS)
+                .account(account.getId())
+                .record();
 
         String redirectTo = (intent != null) ? ReturnToValidator.safeOrFallback(intent.returnTo()) : "/";
         redirectToApp(request, response, redirectTo);
@@ -166,7 +159,7 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
      * so prefixing a trusted, configured origin cannot widen it into an open redirect.
      */
     private void redirectToApp(HttpServletRequest request, HttpServletResponse response, String path)
-        throws IOException {
+            throws IOException {
         getRedirectStrategy().sendRedirect(request, response, appBaseUrl + path);
     }
 

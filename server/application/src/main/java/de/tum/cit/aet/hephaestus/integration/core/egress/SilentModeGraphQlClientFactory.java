@@ -16,33 +16,37 @@ public class SilentModeGraphQlClientFactory {
     }
 
     public HttpGraphQlClient create(WebClient webClient, DocumentSource documentSource) {
-        WebClient guardedWebClient = webClient.mutate().filter(interceptor.httpAttemptFilter()).build();
+        WebClient guardedWebClient =
+                webClient.mutate().filter(interceptor.httpAttemptFilter()).build();
         return HttpGraphQlClient.builder(guardedWebClient)
-            .documentSource(documentSource)
-            .interceptor(interceptor)
-            .build();
+                .documentSource(documentSource)
+                .interceptor(interceptor)
+                .build();
     }
 
     public HttpGraphQlClient withBearerToken(HttpGraphQlClient baseClient, String token) {
-        return baseClient.mutate().header(HttpHeaders.AUTHORIZATION, "Bearer " + token).build();
+        return baseClient
+                .mutate()
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .build();
     }
 
     public HttpGraphQlClient withBearerToken(HttpGraphQlClient baseClient, String url, String token) {
-        return baseClient.mutate().url(url).header(HttpHeaders.AUTHORIZATION, "Bearer " + token).build();
+        return baseClient
+                .mutate()
+                .url(url)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .build();
     }
 
     public HttpGraphQlClient withBearerTokenAndAttribute(
-        HttpGraphQlClient baseClient,
-        String url,
-        String token,
-        String attributeName,
-        Object attributeValue
-    ) {
+            HttpGraphQlClient baseClient, String url, String token, String attributeName, Object attributeValue) {
         return baseClient
-            .mutate()
-            .url(url)
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
-            .webClient(builder -> builder.defaultRequest(request -> request.attribute(attributeName, attributeValue)))
-            .build();
+                .mutate()
+                .url(url)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .webClient(
+                        builder -> builder.defaultRequest(request -> request.attribute(attributeName, attributeValue)))
+                .build();
     }
 }

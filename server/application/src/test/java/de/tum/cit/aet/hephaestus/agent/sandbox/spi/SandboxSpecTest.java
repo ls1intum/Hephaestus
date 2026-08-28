@@ -16,22 +16,19 @@ class SandboxSpecTest extends BaseUnitTest {
 
     @Test
     void shouldRejectBlankImage() {
-        assertThatThrownBy(() ->
-            new SandboxSpec(
-                UUID.randomUUID(),
-                "  ",
-                List.of(),
-                Map.of(),
-                null,
-                ResourceLimits.DEFAULT,
-                SecurityProfile.DEFAULT,
-                Map.of(),
-                "/workspace/out",
-                null
-            )
-        )
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("blank");
+        assertThatThrownBy(() -> new SandboxSpec(
+                        UUID.randomUUID(),
+                        "  ",
+                        List.of(),
+                        Map.of(),
+                        null,
+                        ResourceLimits.DEFAULT,
+                        SecurityProfile.DEFAULT,
+                        Map.of(),
+                        "/workspace/out",
+                        null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("blank");
     }
 
     @Test
@@ -39,17 +36,16 @@ class SandboxSpecTest extends BaseUnitTest {
         // networkPolicy, securityProfile can be null
         // command, environment, inputFiles are defaulted to empty collections
         var spec = new SandboxSpec(
-            UUID.randomUUID(),
-            "alpine:latest",
-            null,
-            null,
-            null,
-            ResourceLimits.DEFAULT,
-            null,
-            null,
-            "/workspace/out",
-            null
-        );
+                UUID.randomUUID(),
+                "alpine:latest",
+                null,
+                null,
+                null,
+                ResourceLimits.DEFAULT,
+                null,
+                null,
+                "/workspace/out",
+                null);
         assertThat(spec.jobId()).isNotNull();
         assertThat(spec.command()).isEmpty();
         assertThat(spec.environment()).isEmpty();
@@ -63,36 +59,36 @@ class SandboxSpecTest extends BaseUnitTest {
         @Test
         void shouldRejectZeroMemory() {
             assertThatThrownBy(() -> new ResourceLimits(0, 2.0, 256, Duration.ofMinutes(10)))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("memoryBytes");
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("memoryBytes");
         }
 
         @Test
         void shouldRejectNegativeCpus() {
             assertThatThrownBy(() -> new ResourceLimits(4L * 1024 * 1024 * 1024, -1.0, 256, Duration.ofMinutes(10)))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("cpus");
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("cpus");
         }
 
         @Test
         void shouldRejectZeroPids() {
             assertThatThrownBy(() -> new ResourceLimits(4L * 1024 * 1024 * 1024, 2.0, 0, Duration.ofMinutes(10)))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("pidsLimit");
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("pidsLimit");
         }
 
         @Test
         void shouldRejectNullMaxRuntime() {
             assertThatNullPointerException()
-                .isThrownBy(() -> new ResourceLimits(4L * 1024 * 1024 * 1024, 2.0, 256, null))
-                .withMessageContaining("maxRuntime");
+                    .isThrownBy(() -> new ResourceLimits(4L * 1024 * 1024 * 1024, 2.0, 256, null))
+                    .withMessageContaining("maxRuntime");
         }
 
         @Test
         void shouldRejectZeroMaxRuntime() {
             assertThatThrownBy(() -> new ResourceLimits(4L * 1024 * 1024 * 1024, 2.0, 256, Duration.ZERO))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("maxRuntime");
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("maxRuntime");
         }
 
         @Test
@@ -106,47 +102,42 @@ class SandboxSpecTest extends BaseUnitTest {
         @Test
         void shouldRejectExcessiveMemory() {
             assertThatThrownBy(() ->
-                new ResourceLimits(ResourceLimits.MAX_MEMORY_BYTES + 1, 2.0, 256, Duration.ofMinutes(10))
-            )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("exceeds maximum");
+                            new ResourceLimits(ResourceLimits.MAX_MEMORY_BYTES + 1, 2.0, 256, Duration.ofMinutes(10)))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("exceeds maximum");
         }
 
         @Test
         void shouldRejectExcessiveCpus() {
-            assertThatThrownBy(() ->
-                new ResourceLimits(4L * 1024 * 1024 * 1024, ResourceLimits.MAX_CPUS + 0.1, 256, Duration.ofMinutes(10))
-            )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("exceeds maximum");
+            assertThatThrownBy(() -> new ResourceLimits(
+                            4L * 1024 * 1024 * 1024, ResourceLimits.MAX_CPUS + 0.1, 256, Duration.ofMinutes(10)))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("exceeds maximum");
         }
 
         @Test
         void shouldRejectExcessivePids() {
-            assertThatThrownBy(() ->
-                new ResourceLimits(4L * 1024 * 1024 * 1024, 2.0, ResourceLimits.MAX_PIDS + 1, Duration.ofMinutes(10))
-            )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("exceeds maximum");
+            assertThatThrownBy(() -> new ResourceLimits(
+                            4L * 1024 * 1024 * 1024, 2.0, ResourceLimits.MAX_PIDS + 1, Duration.ofMinutes(10)))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("exceeds maximum");
         }
 
         @Test
         void shouldRejectExcessiveRuntime() {
-            assertThatThrownBy(() ->
-                new ResourceLimits(4L * 1024 * 1024 * 1024, 2.0, 256, ResourceLimits.MAX_RUNTIME.plusSeconds(1))
-            )
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("exceeds maximum");
+            assertThatThrownBy(() -> new ResourceLimits(
+                            4L * 1024 * 1024 * 1024, 2.0, 256, ResourceLimits.MAX_RUNTIME.plusSeconds(1)))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("exceeds maximum");
         }
 
         @Test
         void shouldAcceptAtMaximumBounds() {
             var limits = new ResourceLimits(
-                ResourceLimits.MAX_MEMORY_BYTES,
-                ResourceLimits.MAX_CPUS,
-                ResourceLimits.MAX_PIDS,
-                ResourceLimits.MAX_RUNTIME
-            );
+                    ResourceLimits.MAX_MEMORY_BYTES,
+                    ResourceLimits.MAX_CPUS,
+                    ResourceLimits.MAX_PIDS,
+                    ResourceLimits.MAX_RUNTIME);
             assertThat(limits.memoryBytes()).isEqualTo(ResourceLimits.MAX_MEMORY_BYTES);
         }
     }

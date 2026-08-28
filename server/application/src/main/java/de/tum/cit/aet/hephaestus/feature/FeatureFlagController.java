@@ -35,10 +35,9 @@ public class FeatureFlagController {
 
     @GetMapping("/features")
     @Operation(
-        summary = "Get feature flags for the current user",
-        description = "Returns all feature flags evaluated for the authenticated user. " +
-            "Combines role checks and server-side config toggles."
-    )
+            summary = "Get feature flags for the current user",
+            description = "Returns all feature flags evaluated for the authenticated user. "
+                    + "Combines role checks and server-side config toggles.")
     @ApiResponse(responseCode = "200", description = "Feature flags evaluated successfully")
     public ResponseEntity<FeatureFlagsDTO> getUserFeatures() {
         return ResponseEntity.ok(FeatureFlagsDTO.from(featureFlagService));

@@ -58,8 +58,8 @@ class SubjectGrammarRoundTripTest extends BaseUnitTest {
             return Stream.empty();
         }
         return Files.list(dir)
-            .filter(p -> p.getFileName().toString().endsWith(".json"))
-            .sorted();
+                .filter(p -> p.getFileName().toString().endsWith(".json"))
+                .sorted();
     }
 
     @ParameterizedTest(name = "GitLab fixture {0}")
@@ -70,7 +70,8 @@ class SubjectGrammarRoundTripTest extends BaseUnitTest {
         // path_with_namespace, then a subgroup's group.full_path / full_path. The full_path fallbacks are
         // what let subgroup.create (which has no path_with_namespace) reach the org-filter assertion instead
         // of being skipped by the '/' guard below.
-        String pathWithNamespace = payload.path("project").path("path_with_namespace").asString("");
+        String pathWithNamespace =
+                payload.path("project").path("path_with_namespace").asString("");
         if (pathWithNamespace.isEmpty()) {
             pathWithNamespace = payload.path("path_with_namespace").asString("");
         }
@@ -96,19 +97,16 @@ class SubjectGrammarRoundTripTest extends BaseUnitTest {
             String rootGroup = pathWithNamespace.substring(0, pathWithNamespace.indexOf('/'));
             String orgFilter = ConsumerSubjectMath.organizationFilter("gitlab", rootGroup);
             assertThat(subjectMatchesFilter(publisherSubject, orgFilter))
-                .as(
-                    "group-tier publisher %s (%s) should be matched by org filter '%s'",
-                    fixture.getFileName(),
-                    publisherSubject,
-                    orgFilter
-                )
-                .isTrue();
+                    .as(
+                            "group-tier publisher %s (%s) should be matched by org filter '%s'",
+                            fixture.getFileName(), publisherSubject, orgFilter)
+                    .isTrue();
             return;
         }
         String consumerPrefix = ConsumerSubjectMath.buildSubjectPrefix("gitlab", pathWithNamespace);
         assertThat(publisherSubject)
-            .as("publisher %s should start with consumer prefix '%s.'", fixture.getFileName(), consumerPrefix)
-            .startsWith(consumerPrefix + ".");
+                .as("publisher %s should start with consumer prefix '%s.'", fixture.getFileName(), consumerPrefix)
+                .startsWith(consumerPrefix + ".");
     }
 
     /**
@@ -148,10 +146,8 @@ class SubjectGrammarRoundTripTest extends BaseUnitTest {
         if (owner.isEmpty() || repo.isEmpty()) {
             return;
         }
-        String publisherSubject = GITHUB.deriveSubject(
-            payload,
-            Map.of("X-GitHub-Event", eventTypeFromFilename(fixture))
-        );
+        String publisherSubject =
+                GITHUB.deriveSubject(payload, Map.of("X-GitHub-Event", eventTypeFromFilename(fixture)));
         // Repository-lifecycle events (repository.renamed/.transferred/…) are ORG-scoped for the same
         // reason GitLab's group-tier events are: the repo-name token is unstable across a
         // rename/transfer, so the subject carries the '?' placeholder in the repo slot and must route
@@ -162,19 +158,16 @@ class SubjectGrammarRoundTripTest extends BaseUnitTest {
         if (subjectParts.length >= 3 && "?".equals(subjectParts[2])) {
             String orgFilter = ConsumerSubjectMath.organizationFilter("github", owner);
             assertThat(subjectMatchesFilter(publisherSubject, orgFilter))
-                .as(
-                    "org-tier publisher %s (%s) should be matched by org filter '%s'",
-                    fixture.getFileName(),
-                    publisherSubject,
-                    orgFilter
-                )
-                .isTrue();
+                    .as(
+                            "org-tier publisher %s (%s) should be matched by org filter '%s'",
+                            fixture.getFileName(), publisherSubject, orgFilter)
+                    .isTrue();
             return;
         }
         String consumerPrefix = ConsumerSubjectMath.buildSubjectPrefix("github", owner + "/" + repo);
         assertThat(publisherSubject)
-            .as("publisher %s should start with consumer prefix '%s.'", fixture.getFileName(), consumerPrefix)
-            .startsWith(consumerPrefix + ".");
+                .as("publisher %s should start with consumer prefix '%s.'", fixture.getFileName(), consumerPrefix)
+                .startsWith(consumerPrefix + ".");
     }
 
     /**
@@ -189,18 +182,19 @@ class SubjectGrammarRoundTripTest extends BaseUnitTest {
             Path fixture = GITHUB_DIR.resolve(name);
             assertThat(Files.exists(fixture)).as("fixture %s must exist", name).isTrue();
             JsonNode payload = MAPPER.readTree(Files.readAllBytes(fixture));
-            String owner = payload.path("repository").path("owner").path("login").asString("");
+            String owner =
+                    payload.path("repository").path("owner").path("login").asString("");
             String subject = GITHUB.deriveSubject(payload, Map.of("X-GitHub-Event", "repository"));
 
             assertThat(subject).isEqualTo("github." + owner + ".?.repository");
             assertThat(subjectMatchesFilter(subject, ConsumerSubjectMath.organizationFilter("github", owner)))
-                .as("%s must be routed by the workspace org filter, not a (stale) repo filter", name)
-                .isTrue();
+                    .as("%s must be routed by the workspace org filter, not a (stale) repo filter", name)
+                    .isTrue();
             // The repo filter built from the OLD name cannot match — which is why only the org tier heals a
             // rename in real time.
-            assertThat(
-                subjectMatchesFilter(subject, ConsumerSubjectMath.repositoryFilter("github", owner + "/anything"))
-            ).isFalse();
+            assertThat(subjectMatchesFilter(
+                            subject, ConsumerSubjectMath.repositoryFilter("github", owner + "/anything")))
+                    .isFalse();
         }
     }
 
@@ -215,8 +209,8 @@ class SubjectGrammarRoundTripTest extends BaseUnitTest {
         String publisherSubject = OUTLINE.deriveSubject(payload, Map.of());
         String consumerPrefix = consumerSubscriptionPrefix(subscriptionId);
         assertThat(publisherSubject)
-            .as("publisher %s should start with consumer prefix '%s'", fixture.getFileName(), consumerPrefix)
-            .startsWith(consumerPrefix);
+                .as("publisher %s should start with consumer prefix '%s'", fixture.getFileName(), consumerPrefix)
+                .startsWith(consumerPrefix);
     }
 
     /**
@@ -229,8 +223,7 @@ class SubjectGrammarRoundTripTest extends BaseUnitTest {
     void outlineMixedCaseSubscriptionRoundTrips() throws IOException {
         String subscriptionId = "Sub-ABC-123";
         JsonNode payload = MAPPER.readTree(
-            "{\"webhookSubscriptionId\":\"" + subscriptionId + "\",\"event\":\"documents.update\"}"
-        );
+                "{\"webhookSubscriptionId\":\"" + subscriptionId + "\",\"event\":\"documents.update\"}");
         String publisherSubject = OUTLINE.deriveSubject(payload, Map.of());
         assertThat(publisherSubject).startsWith(consumerSubscriptionPrefix(subscriptionId));
     }
@@ -249,9 +242,8 @@ class SubjectGrammarRoundTripTest extends BaseUnitTest {
     @Test
     void gitlabMixedCasePathRoundTrips() throws IOException {
         String pathWithNamespace = "MyGroup/Sub-Group/My.Project";
-        JsonNode payload = MAPPER.readTree(
-            "{\"object_kind\":\"merge_request\",\"project\":{\"path_with_namespace\":\"" + pathWithNamespace + "\"}}"
-        );
+        JsonNode payload = MAPPER.readTree("{\"object_kind\":\"merge_request\",\"project\":{\"path_with_namespace\":\""
+                + pathWithNamespace + "\"}}");
         String publisherSubject = GITLAB.deriveSubject(payload, Map.of());
         String consumerPrefix = ConsumerSubjectMath.buildSubjectPrefix("gitlab", pathWithNamespace);
         assertThat(publisherSubject).startsWith(consumerPrefix + ".");

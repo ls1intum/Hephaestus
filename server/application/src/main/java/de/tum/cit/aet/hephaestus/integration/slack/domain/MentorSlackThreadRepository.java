@@ -10,10 +10,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
  */
 public interface MentorSlackThreadRepository extends JpaRepository<MentorSlackThread, UUID> {
     Optional<MentorSlackThread> findByWorkspaceIdAndSlackChannelIdAndSlackThreadTs(
-        Long workspaceId,
-        String slackChannelId,
-        String slackThreadTs
-    );
+            Long workspaceId, String slackChannelId, String slackThreadTs);
 
     long deleteByWorkspaceId(Long workspaceId);
 

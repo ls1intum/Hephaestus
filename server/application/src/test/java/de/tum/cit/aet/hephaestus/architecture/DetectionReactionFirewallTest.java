@@ -33,19 +33,17 @@ class DetectionReactionFirewallTest extends HephaestusArchitectureTest {
     @Test
     void detectionContextProvidersAreReactionBlind() {
         ArchRule rule = noClasses()
-            .that()
-            .resideInAPackage(CONTEXT_PROVIDERS)
-            .and()
-            .resideOutsideOfPackage(MENTOR_PROVIDERS)
-            .should()
-            .dependOnClassesThat()
-            .resideInAPackage(REACTION_PACKAGE)
-            .because(
-                "the detection sandbox must be blind to contributor reactions (#895 / ADR 0021 F-9): a " +
-                    "finding is emitted without knowing whether earlier findings were applied or disputed, or " +
-                    "the accuracy measurement the research depends on is contaminated. Reaction-aware behaviour " +
-                    "belongs in the delivery layer, never in the context providers."
-            );
+                .that()
+                .resideInAPackage(CONTEXT_PROVIDERS)
+                .and()
+                .resideOutsideOfPackage(MENTOR_PROVIDERS)
+                .should()
+                .dependOnClassesThat()
+                .resideInAPackage(REACTION_PACKAGE)
+                .because("the detection sandbox must be blind to contributor reactions (#895 / ADR 0021 F-9): a "
+                        + "finding is emitted without knowing whether earlier findings were applied or disputed, or "
+                        + "the accuracy measurement the research depends on is contaminated. Reaction-aware behaviour "
+                        + "belongs in the delivery layer, never in the context providers.");
         rule.check(classes);
     }
 }

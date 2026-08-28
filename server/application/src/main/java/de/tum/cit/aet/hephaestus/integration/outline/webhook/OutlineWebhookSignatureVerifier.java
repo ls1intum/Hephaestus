@@ -63,11 +63,10 @@ public class OutlineWebhookSignatureVerifier implements WebhookSignatureVerifier
     }
 
     private static WebhookSecretSource pickOutlineSource(List<WebhookSecretSource> sources) {
-        return sources
-            .stream()
-            .filter(s -> s.kind() == IntegrationKind.OUTLINE)
-            .findFirst()
-            .orElseThrow(() -> new IllegalStateException("No WebhookSecretSource bean registered for OUTLINE"));
+        return sources.stream()
+                .filter(s -> s.kind() == IntegrationKind.OUTLINE)
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("No WebhookSecretSource bean registered for OUTLINE"));
     }
 
     @Override
@@ -117,7 +116,7 @@ public class OutlineWebhookSignatureVerifier implements WebhookSignatureVerifier
         return new VerificationResult.Invalid("signature-mismatch");
     }
 
-    private static byte@Nullable [] computeHmac(byte[] secret, String timestamp, byte[] body) {
+    private static byte @Nullable [] computeHmac(byte[] secret, String timestamp, byte[] body) {
         try {
             Mac mac = Mac.getInstance(HMAC_ALG);
             mac.init(new SecretKeySpec(secret, HMAC_ALG));

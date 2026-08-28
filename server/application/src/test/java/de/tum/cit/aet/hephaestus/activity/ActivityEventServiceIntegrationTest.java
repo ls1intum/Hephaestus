@@ -73,10 +73,9 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
 
         // Create git provider
         gitProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
 
         // Create user
         testUser = new User();
@@ -114,15 +113,14 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
             Instant occurredAt = Instant.parse("2024-01-15T10:30:00Z");
 
             boolean result = activityEventService.record(
-                testWorkspace.getId(),
-                ActivityEventType.PULL_REQUEST_OPENED,
-                occurredAt,
-                testUser,
-                testRepository,
-                ActivityTargetType.PULL_REQUEST,
-                100L,
-                1.5
-            );
+                    testWorkspace.getId(),
+                    ActivityEventType.PULL_REQUEST_OPENED,
+                    occurredAt,
+                    testUser,
+                    testRepository,
+                    ActivityTargetType.PULL_REQUEST,
+                    100L,
+                    1.5);
 
             assertThat(result).isTrue();
 
@@ -144,15 +142,14 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
         @Test
         void persistsEventWithoutOptionalFields() {
             boolean result = activityEventService.record(
-                testWorkspace.getId(),
-                ActivityEventType.ISSUE_CREATED,
-                Instant.now(),
-                null, // No actor (system event)
-                null, // No repository
-                ActivityTargetType.ISSUE,
-                200L,
-                0.0
-            );
+                    testWorkspace.getId(),
+                    ActivityEventType.ISSUE_CREATED,
+                    Instant.now(),
+                    null, // No actor (system event)
+                    null, // No repository
+                    ActivityTargetType.ISSUE,
+                    200L,
+                    0.0);
 
             assertThat(result).isTrue();
 
@@ -172,27 +169,25 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
 
             // First record - should succeed
             boolean first = activityEventService.record(
-                testWorkspace.getId(),
-                ActivityEventType.PULL_REQUEST_OPENED,
-                occurredAt,
-                testUser,
-                testRepository,
-                ActivityTargetType.PULL_REQUEST,
-                100L,
-                1.0
-            );
+                    testWorkspace.getId(),
+                    ActivityEventType.PULL_REQUEST_OPENED,
+                    occurredAt,
+                    testUser,
+                    testRepository,
+                    ActivityTargetType.PULL_REQUEST,
+                    100L,
+                    1.0);
 
             // Second record with same key - should be rejected
             boolean second = activityEventService.record(
-                testWorkspace.getId(),
-                ActivityEventType.PULL_REQUEST_OPENED,
-                occurredAt,
-                testUser,
-                testRepository,
-                ActivityTargetType.PULL_REQUEST,
-                100L,
-                1.0
-            );
+                    testWorkspace.getId(),
+                    ActivityEventType.PULL_REQUEST_OPENED,
+                    occurredAt,
+                    testUser,
+                    testRepository,
+                    ActivityTargetType.PULL_REQUEST,
+                    100L,
+                    1.0);
 
             assertThat(first).isTrue();
             assertThat(second).isFalse();
@@ -205,26 +200,24 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
             Instant time2 = Instant.parse("2024-01-15T11:00:00Z");
 
             boolean first = activityEventService.record(
-                testWorkspace.getId(),
-                ActivityEventType.REVIEW_APPROVED,
-                time1,
-                testUser,
-                testRepository,
-                ActivityTargetType.REVIEW,
-                100L,
-                2.0
-            );
+                    testWorkspace.getId(),
+                    ActivityEventType.REVIEW_APPROVED,
+                    time1,
+                    testUser,
+                    testRepository,
+                    ActivityTargetType.REVIEW,
+                    100L,
+                    2.0);
 
             boolean second = activityEventService.record(
-                testWorkspace.getId(),
-                ActivityEventType.REVIEW_APPROVED,
-                time2,
-                testUser,
-                testRepository,
-                ActivityTargetType.REVIEW,
-                100L,
-                2.5
-            );
+                    testWorkspace.getId(),
+                    ActivityEventType.REVIEW_APPROVED,
+                    time2,
+                    testUser,
+                    testRepository,
+                    ActivityTargetType.REVIEW,
+                    100L,
+                    2.5);
 
             assertThat(first).isTrue();
             assertThat(second).isTrue();
@@ -238,15 +231,14 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
         @Test
         void clampsNegativeXpToZero() {
             activityEventService.record(
-                testWorkspace.getId(),
-                ActivityEventType.PULL_REQUEST_OPENED,
-                Instant.now(),
-                testUser,
-                testRepository,
-                ActivityTargetType.PULL_REQUEST,
-                100L,
-                -50.0
-            );
+                    testWorkspace.getId(),
+                    ActivityEventType.PULL_REQUEST_OPENED,
+                    Instant.now(),
+                    testUser,
+                    testRepository,
+                    ActivityTargetType.PULL_REQUEST,
+                    100L,
+                    -50.0);
 
             List<ActivityEvent> events = activityEventRepository.findAll();
             assertThat(events).hasSize(1);
@@ -256,15 +248,15 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
         @Test
         void roundsXpTo2DecimalPlaces() {
             activityEventService.record(
-                testWorkspace.getId(),
-                ActivityEventType.REVIEW_APPROVED,
-                Instant.now(),
-                testUser,
-                testRepository,
-                ActivityTargetType.REVIEW,
-                100L,
-                3.14159 // Should be rounded to 3.14
-            );
+                    testWorkspace.getId(),
+                    ActivityEventType.REVIEW_APPROVED,
+                    Instant.now(),
+                    testUser,
+                    testRepository,
+                    ActivityTargetType.REVIEW,
+                    100L,
+                    3.14159 // Should be rounded to 3.14
+                    );
 
             List<ActivityEvent> events = activityEventRepository.findAll();
             assertThat(events).hasSize(1);
@@ -274,15 +266,15 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
         @Test
         void roundsXpWithHalfUp() {
             activityEventService.record(
-                testWorkspace.getId(),
-                ActivityEventType.REVIEW_CHANGES_REQUESTED,
-                Instant.now(),
-                testUser,
-                testRepository,
-                ActivityTargetType.REVIEW,
-                101L, // Different target to avoid duplicate
-                2.555 // Should round UP to 2.56 (HALF_UP)
-            );
+                    testWorkspace.getId(),
+                    ActivityEventType.REVIEW_CHANGES_REQUESTED,
+                    Instant.now(),
+                    testUser,
+                    testRepository,
+                    ActivityTargetType.REVIEW,
+                    101L, // Different target to avoid duplicate
+                    2.555 // Should round UP to 2.56 (HALF_UP)
+                    );
 
             List<ActivityEvent> events = activityEventRepository.findAll();
             assertThat(events).hasSize(1);
@@ -296,15 +288,14 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
         @Test
         void returnsFalseForNonExistentWorkspace() {
             boolean result = activityEventService.record(
-                999999L, // Non-existent workspace ID
-                ActivityEventType.PULL_REQUEST_OPENED,
-                Instant.now(),
-                testUser,
-                testRepository,
-                ActivityTargetType.PULL_REQUEST,
-                100L,
-                1.0
-            );
+                    999999L, // Non-existent workspace ID
+                    ActivityEventType.PULL_REQUEST_OPENED,
+                    Instant.now(),
+                    testUser,
+                    testRepository,
+                    ActivityTargetType.PULL_REQUEST,
+                    100L,
+                    1.0);
 
             assertThat(result).isFalse();
             assertThat(activityEventRepository.findAll()).isEmpty();
@@ -319,15 +310,14 @@ class ActivityEventServiceIntegrationTest extends BaseIntegrationTest {
             Instant occurredAt = Instant.parse("2024-01-15T10:30:00.000Z");
 
             activityEventService.record(
-                testWorkspace.getId(),
-                ActivityEventType.PULL_REQUEST_OPENED,
-                occurredAt,
-                testUser,
-                testRepository,
-                ActivityTargetType.PULL_REQUEST,
-                42L,
-                1.0
-            );
+                    testWorkspace.getId(),
+                    ActivityEventType.PULL_REQUEST_OPENED,
+                    occurredAt,
+                    testUser,
+                    testRepository,
+                    ActivityTargetType.PULL_REQUEST,
+                    42L,
+                    1.0);
 
             List<ActivityEvent> events = activityEventRepository.findAll();
             assertThat(events).hasSize(1);

@@ -13,10 +13,14 @@ import org.jspecify.annotations.NonNull;
  */
 @Schema(description = "Team visibility settings for a specific workspace")
 public record WorkspaceTeamSettingsDTO(
-    @NonNull @Schema(description = "The workspace ID these settings belong to") Long workspaceId,
-    @NonNull @Schema(description = "The team ID these settings apply to") Long teamId,
-    @NonNull @Schema(description = "Whether the team is hidden in the leaderboard for this workspace") Boolean hidden
-) {
+        @NonNull @Schema(description = "The workspace ID these settings belong to")
+        Long workspaceId,
+
+        @NonNull @Schema(description = "The team ID these settings apply to")
+        Long teamId,
+
+        @NonNull @Schema(description = "Whether the team is hidden in the leaderboard for this workspace")
+        Boolean hidden) {
     /**
      * Creates a DTO from the entity.
      *
@@ -25,10 +29,7 @@ public record WorkspaceTeamSettingsDTO(
      */
     public static WorkspaceTeamSettingsDTO from(WorkspaceTeamSettings settings) {
         return new WorkspaceTeamSettingsDTO(
-            settings.getId().getWorkspaceId(),
-            settings.getId().getTeamId(),
-            settings.isHidden()
-        );
+                settings.getId().getWorkspaceId(), settings.getId().getTeamId(), settings.isHidden());
     }
 
     /**

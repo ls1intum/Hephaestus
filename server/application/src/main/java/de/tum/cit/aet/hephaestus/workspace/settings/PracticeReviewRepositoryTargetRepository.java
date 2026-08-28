@@ -9,8 +9,7 @@ import org.springframework.data.repository.query.Param;
 
 @WorkspaceAgnostic("Every target operation carries its explicit workspace_id tenant boundary")
 public interface PracticeReviewRepositoryTargetRepository
-    extends JpaRepository<PracticeReviewRepositoryTarget, PracticeReviewRepositoryTarget.Key>
-{
+        extends JpaRepository<PracticeReviewRepositoryTarget, PracticeReviewRepositoryTarget.Key> {
     List<PracticeReviewRepositoryTarget> findByWorkspaceId(Long workspaceId);
 
     @Modifying

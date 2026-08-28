@@ -20,14 +20,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 @WorkspaceAgnostic(
-    "Workspace-scoped via custom queries that all include workspaceId; PK-only DML allowed for delete/save"
-)
+        "Workspace-scoped via custom queries that all include workspaceId; PK-only DML allowed for delete/save")
 public interface PracticeRepository extends JpaRepository<Practice, Long> {
     /**
      * Every practice of the workspace, at any autonomy — including {@code OFF}, so the detection gate can tell
      * "nothing is bound to this signal" apart from "something is bound and turned off".
      */
-    @EntityGraph(attributePaths = { "group", "currentRevision" })
+    @EntityGraph(attributePaths = {"group", "currentRevision"})
     List<Practice> findByWorkspaceId(Long workspaceId);
 
     /**
@@ -36,22 +35,20 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
      * {@code NULL <> 'OFF'} is UNKNOWN and an inheriting practice would silently vanish from the query.
      * Autonomy is resolved in the JVM by {@link de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver}.
      */
-    @EntityGraph(attributePaths = { "group", "currentRevision" })
+    @EntityGraph(attributePaths = {"group", "currentRevision"})
     List<Practice> findByWorkspaceIdAndArtifactKind(Long workspaceId, ArtifactKind artifactKind);
 
     /**
      * The raw autonomy columns of every practice in a workspace, with its group's, for callers that only need to
      * count or test autonomy states without hydrating the whole catalogue.
      */
-    @Query(
-        """
+    @Query("""
         SELECT p.autonomy AS practiceAutonomy, a.autonomy AS groupAutonomy,
                a.id AS groupId, p.artifactKind AS artifactKind
         FROM Practice p
         LEFT JOIN p.group a
         WHERE p.workspace.id = :workspaceId
-        """
-    )
+        """)
     List<PracticeAutonomyRow> findAutonomyRows(@Param("workspaceId") Long workspaceId);
 
     /** One practice's autonomy and its group's, without hydrating either entity. */
@@ -68,35 +65,29 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
         ArtifactKind getArtifactKind();
     }
 
-    @EntityGraph(attributePaths = { "group", "currentRevision" })
+    @EntityGraph(attributePaths = {"group", "currentRevision"})
     Optional<Practice> findByWorkspaceIdAndSlug(Long workspaceId, String slug);
 
-    @EntityGraph(attributePaths = { "group" })
+    @EntityGraph(attributePaths = {"group"})
     List<Practice> findByWorkspaceIdAndSlugIn(Long workspaceId, Collection<String> slugs);
 
-    @EntityGraph(attributePaths = { "group" })
-    @Query(
-        """
+    @EntityGraph(attributePaths = {"group"})
+    @Query("""
         SELECT DISTINCT fo.observation.practice FROM FeedbackObservation fo
         WHERE fo.feedback.id = :feedbackId
           AND fo.feedback.workspaceId = :workspaceId
-        """
-    )
+        """)
     List<Practice> findContributingPractices(
-        @Param("workspaceId") Long workspaceId,
-        @Param("feedbackId") java.util.UUID feedbackId
-    );
+            @Param("workspaceId") Long workspaceId, @Param("feedbackId") java.util.UUID feedbackId);
 
     List<Practice> findByWorkspaceIdAndGroupIdOrderByDisplayOrderAscNameAsc(Long workspaceId, Long groupId);
 
-    @Query(
-        """
+    @Query("""
         SELECT COALESCE(MAX(p.displayOrder), -1)
         FROM Practice p
         WHERE p.workspace.id = :workspaceId
         AND ((:groupId IS NULL AND p.group IS NULL) OR p.group.id = :groupId)
-        """
-    )
+        """)
     int findMaxDisplayOrder(@Param("workspaceId") Long workspaceId, @Param("groupId") @Nullable Long groupId);
 
     /**
@@ -112,14 +103,12 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
 
     boolean existsByWorkspaceIdAndSlug(Long workspaceId, String slug);
 
-    @Query(
-        "SELECT DISTINCT p.id FROM Practice p JOIN p.currentRevision current, PracticeRevision previous " +
-            "WHERE p.sourceCuratedSlug IS NOT NULL " +
-            "AND previous.practice = p " +
-            "AND previous.revisionNumber = current.revisionNumber - 1 " +
-            "AND p.sourceCuratedFingerprint = previous.reviewRuleFingerprint " +
-            "AND p.sourceCuratedFingerprint LIKE 'v1:%'"
-    )
+    @Query("SELECT DISTINCT p.id FROM Practice p JOIN p.currentRevision current, PracticeRevision previous "
+            + "WHERE p.sourceCuratedSlug IS NOT NULL "
+            + "AND previous.practice = p "
+            + "AND previous.revisionNumber = current.revisionNumber - 1 "
+            + "AND p.sourceCuratedFingerprint = previous.reviewRuleFingerprint "
+            + "AND p.sourceCuratedFingerprint LIKE 'v1:%'")
     List<Long> findSourceAlignedV1PracticeIds();
 
     /**
@@ -127,15 +116,13 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
      * predicate: filtering to an autonomy means filtering to an <em>effective</em> autonomy, which is not a column
      * on this row — the caller resolves, then filters.
      */
-    @EntityGraph(attributePaths = { "group", "currentRevision" })
-    @Query(
-        """
+    @EntityGraph(attributePaths = {"group", "currentRevision"})
+    @Query("""
         SELECT p FROM Practice p
         LEFT JOIN FETCH p.group a
         WHERE p.workspace.id = :workspaceId
         ORDER BY a.displayOrder ASC NULLS LAST, p.displayOrder ASC, p.name ASC
-        """
-    )
+        """)
     List<Practice> findAllForCatalog(@Param("workspaceId") Long workspaceId);
 
     /** Deletes all practices for the workspace. Cascades to observation via ON DELETE CASCADE. */

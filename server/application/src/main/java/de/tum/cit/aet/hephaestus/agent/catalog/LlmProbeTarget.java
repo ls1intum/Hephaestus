@@ -9,4 +9,5 @@ import org.jspecify.annotations.Nullable;
  *
  * @param apiKey {@code null} for a deliberately keyless connection (self-hosted vLLM/Ollama gateway)
  */
-public record LlmProbeTarget(String baseUrl, LlmAuthMode authMode, @Nullable String apiKey) {}
+public record LlmProbeTarget(
+        String baseUrl, LlmAuthMode authMode, @Nullable String apiKey) {}

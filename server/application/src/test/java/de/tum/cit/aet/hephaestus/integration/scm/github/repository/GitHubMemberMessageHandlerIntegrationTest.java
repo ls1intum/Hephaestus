@@ -12,7 +12,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubMemberEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -69,10 +68,9 @@ class GitHubMemberMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private void setupTestData() {
         // Create git provider
         gitProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
 
         // Create organization
         Organization org = new Organization();
@@ -127,9 +125,9 @@ class GitHubMemberMessageHandlerIntegrationTest extends BaseIntegrationTest {
         assertThat(event.action()).isEqualTo("added");
         // User should be created if member contains user info
         if (event.member() != null) {
-            assertThat(
-                userRepository.findByNativeIdAndProviderId(required(event.member().id()), gitProviderId())
-            ).isPresent();
+            assertThat(userRepository.findByNativeIdAndProviderId(
+                            required(event.member().id()), gitProviderId()))
+                    .isPresent();
         }
     }
 

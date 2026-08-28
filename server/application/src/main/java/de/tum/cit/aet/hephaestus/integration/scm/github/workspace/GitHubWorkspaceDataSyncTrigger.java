@@ -46,12 +46,11 @@ public class GitHubWorkspaceDataSyncTrigger implements WorkspaceDataSyncTrigger 
     private final AsyncTaskExecutor monitoringExecutor;
 
     public GitHubWorkspaceDataSyncTrigger(
-        ObjectProvider<GithubDataSyncService> dataSyncServiceProvider,
-        ObjectProvider<SyncTargetProvider> syncTargetProvider,
-        ObjectProvider<ConnectionRepository> connectionRepositoryProvider,
-        ObjectProvider<SyncJobService> syncJobServiceProvider,
-        @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor
-    ) {
+            ObjectProvider<GithubDataSyncService> dataSyncServiceProvider,
+            ObjectProvider<SyncTargetProvider> syncTargetProvider,
+            ObjectProvider<ConnectionRepository> connectionRepositoryProvider,
+            ObjectProvider<SyncJobService> syncJobServiceProvider,
+            @Qualifier("monitoringExecutor") AsyncTaskExecutor monitoringExecutor) {
         this.dataSyncServiceProvider = dataSyncServiceProvider;
         this.syncTargetProvider = syncTargetProvider;
         this.connectionRepositoryProvider = connectionRepositoryProvider;
@@ -74,14 +73,10 @@ public class GitHubWorkspaceDataSyncTrigger implements WorkspaceDataSyncTrigger 
     public void syncAllRepositories(long workspaceId) {
         ConnectionRepository connectionRepository = connectionRepositoryProvider.getIfAvailable();
         SyncJobService syncJobService = syncJobServiceProvider.getIfAvailable();
-        Optional<Connection> connection =
-            connectionRepository == null
+        Optional<Connection> connection = connectionRepository == null
                 ? Optional.empty()
                 : connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                      workspaceId,
-                      IntegrationKind.GITHUB,
-                      IntegrationState.ACTIVE
-                  );
+                        workspaceId, IntegrationKind.GITHUB, IntegrationState.ACTIVE);
 
         if (connection.isEmpty()) {
             dataSyncServiceProvider.getObject().syncAllRepositories(workspaceId);
@@ -94,22 +89,19 @@ public class GitHubWorkspaceDataSyncTrigger implements WorkspaceDataSyncTrigger 
 
         try {
             syncJobService.run(
-                new SyncJobRequest(
-                    workspaceId,
-                    connection.get().getId(),
-                    IntegrationKind.GITHUB,
-                    SyncJobType.INITIAL,
-                    SyncJobTrigger.LIFECYCLE,
-                    null
-                ),
-                handle -> dataSyncServiceProvider.getObject().syncAllRepositories(workspaceId, handle)
-            );
+                    new SyncJobRequest(
+                            workspaceId,
+                            connection.get().getId(),
+                            IntegrationKind.GITHUB,
+                            SyncJobType.INITIAL,
+                            SyncJobTrigger.LIFECYCLE,
+                            null),
+                    handle -> dataSyncServiceProvider.getObject().syncAllRepositories(workspaceId, handle));
         } catch (SyncJobConflictException e) {
             log.info(
-                "Skipped lifecycle sync: reason=activeJobAlready, workspaceId={}, activeJobId={}",
-                workspaceId,
-                e.activeJob().getId()
-            );
+                    "Skipped lifecycle sync: reason=activeJobAlready, workspaceId={}, activeJobId={}",
+                    workspaceId,
+                    e.activeJob().getId());
         }
     }
 
@@ -119,9 +111,8 @@ public class GitHubWorkspaceDataSyncTrigger implements WorkspaceDataSyncTrigger 
         if (provider == null) {
             return;
         }
-        provider
-            .findSyncTargetById(syncTargetId)
-            .ifPresent(target -> monitoringExecutor.execute(() -> syncTarget(target)));
+        provider.findSyncTargetById(syncTargetId)
+                .ifPresent(target -> monitoringExecutor.execute(() -> syncTarget(target)));
     }
 
     private void syncTarget(SyncTargetProvider.SyncTarget target) {
@@ -129,50 +120,42 @@ public class GitHubWorkspaceDataSyncTrigger implements WorkspaceDataSyncTrigger 
         SyncJobService syncJobService = syncJobServiceProvider.getIfAvailable();
         if (connectionRepository == null || syncJobService == null) {
             log.warn(
-                "Skipped single-target sync: reason=controlPlaneUnavailable, workspaceId={}, syncTargetId={}",
-                target.scopeId(),
-                target.id()
-            );
+                    "Skipped single-target sync: reason=controlPlaneUnavailable, workspaceId={}, syncTargetId={}",
+                    target.scopeId(),
+                    target.id());
             return;
         }
         Optional<Connection> connection =
-            connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                target.scopeId(),
-                IntegrationKind.GITHUB,
-                IntegrationState.ACTIVE
-            );
+                connectionRepository.findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
+                        target.scopeId(), IntegrationKind.GITHUB, IntegrationState.ACTIVE);
         if (connection.isEmpty()) {
             log.debug(
-                "Skipped single-target sync: reason=noActiveConnection, workspaceId={}, syncTargetId={}",
-                target.scopeId(),
-                target.id()
-            );
+                    "Skipped single-target sync: reason=noActiveConnection, workspaceId={}, syncTargetId={}",
+                    target.scopeId(),
+                    target.id());
             return;
         }
         try {
             syncJobService.run(
-                new SyncJobRequest(
-                    target.scopeId(),
-                    connection.get().getId(),
-                    IntegrationKind.GITHUB,
-                    SyncJobType.INITIAL,
-                    SyncJobTrigger.LIFECYCLE,
-                    null
-                ),
-                // The job handle is NOT threaded into syncSyncTarget: a single sync-target refresh is a
-                // short, indivisible GraphQL unit, so cooperative cancel/progress (which only make sense
-                // across the multi-repo loop of a full sync) add nothing here. When a broader sync is
-                // already running on this connection, the SyncJobConflictException below intentionally
-                // absorbs this single-target resync, since the in-flight full sync already covers it.
-                handle -> dataSyncServiceProvider.getObject().syncSyncTarget(target)
-            );
+                    new SyncJobRequest(
+                            target.scopeId(),
+                            connection.get().getId(),
+                            IntegrationKind.GITHUB,
+                            SyncJobType.INITIAL,
+                            SyncJobTrigger.LIFECYCLE,
+                            null),
+                    // The job handle is NOT threaded into syncSyncTarget: a single sync-target refresh is a
+                    // short, indivisible GraphQL unit, so cooperative cancel/progress (which only make sense
+                    // across the multi-repo loop of a full sync) add nothing here. When a broader sync is
+                    // already running on this connection, the SyncJobConflictException below intentionally
+                    // absorbs this single-target resync, since the in-flight full sync already covers it.
+                    handle -> dataSyncServiceProvider.getObject().syncSyncTarget(target));
         } catch (SyncJobConflictException e) {
             log.info(
-                "Skipped single-target sync: reason=activeJobAlready, workspaceId={}, syncTargetId={}, activeJobId={}",
-                target.scopeId(),
-                target.id(),
-                e.activeJob().getId()
-            );
+                    "Skipped single-target sync: reason=activeJobAlready, workspaceId={}, syncTargetId={}, activeJobId={}",
+                    target.scopeId(),
+                    target.id(),
+                    e.activeJob().getId());
         }
     }
 }

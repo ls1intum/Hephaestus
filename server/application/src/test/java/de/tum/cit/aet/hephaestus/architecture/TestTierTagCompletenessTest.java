@@ -9,7 +9,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -31,23 +30,19 @@ class TestTierTagCompletenessTest {
 
     private static final Set<String> TIER_TAGS = Set.of("unit", "architecture", "database", "integration", "live");
 
-    private static final Pattern CLASS_DECL = Pattern.compile(
-        "\\b(abstract\\s+)?class\\s+(\\w+)\\b([^\\n{]*)\\{",
-        Pattern.DOTALL
-    );
+    private static final Pattern CLASS_DECL =
+            Pattern.compile("\\b(abstract\\s+)?class\\s+(\\w+)\\b([^\\n{]*)\\{", Pattern.DOTALL);
     private static final Pattern EXTENDS = Pattern.compile("\\bextends\\s+(\\w+)");
     private static final Pattern TAG = Pattern.compile("@Tag\\s*\\(\\s*\"(\\w+)\"");
-    private static final Pattern TEST_METHOD = Pattern.compile(
-        "@(Test|ParameterizedTest|RepeatedTest|TestFactory|Nested)\\b"
-    );
+    private static final Pattern TEST_METHOD =
+            Pattern.compile("@(Test|ParameterizedTest|RepeatedTest|TestFactory|Nested)\\b");
     private static final Pattern BLOCK_COMMENT = Pattern.compile("/\\*.*?\\*/", Pattern.DOTALL);
 
     private record TypeInfo(
-        Set<String> tags,
-        @org.jspecify.annotations.Nullable String superType,
-        boolean isAbstract,
-        boolean hasTestMethods
-    ) {}
+            Set<String> tags,
+            @org.jspecify.annotations.Nullable String superType,
+            boolean isAbstract,
+            boolean hasTestMethods) {}
 
     @Test
     void everyConcreteTestClassResolvesToATierTag() {
@@ -55,10 +50,9 @@ class TestTierTagCompletenessTest {
         Map<String, TypeInfo> types = new HashMap<>();
 
         try (Stream<Path> sources = Files.walk(testRoot)) {
-            sources
-                .filter(Files::isRegularFile)
-                .filter(p -> p.toString().endsWith(".java"))
-                .forEach(p -> parse(p, types));
+            sources.filter(Files::isRegularFile)
+                    .filter(p -> p.toString().endsWith(".java"))
+                    .forEach(p -> parse(p, types));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -75,13 +69,11 @@ class TestTierTagCompletenessTest {
         }
 
         assertThat(violations)
-            .as(
-                "These concrete test classes carry no tier tag (unit/architecture/integration/live) " +
-                    "directly or via a tagged base, so no CI tier runs them — they never execute. " +
-                    "Add the correct @Tag (or extend a tagged base):\n" +
-                    String.join("\n", violations)
-            )
-            .isEmpty();
+                .as("These concrete test classes carry no tier tag (unit/architecture/integration/live) "
+                        + "directly or via a tagged base, so no CI tier runs them — they never execute. "
+                        + "Add the correct @Tag (or extend a tagged base):\n"
+                        + String.join("\n", violations))
+                .isEmpty();
     }
 
     private static boolean resolvesToTier(String type, Map<String, TypeInfo> types, Set<String> seen) {

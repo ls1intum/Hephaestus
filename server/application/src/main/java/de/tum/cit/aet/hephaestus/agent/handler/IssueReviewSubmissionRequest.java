@@ -8,18 +8,18 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 public record IssueReviewSubmissionRequest(
-    long issueId,
-    int issueNumber,
-    long repositoryId,
-    String repositoryFullName,
-    String title,
-    String body,
-    String state,
-    @Nullable String url,
-    @Nullable Instant updatedAt,
-    @Nullable SignalName triggerSignal,
-    @Nullable ObservationOrigin observationOrigin
-) implements JobSubmissionRequest {
+        long issueId,
+        int issueNumber,
+        long repositoryId,
+        String repositoryFullName,
+        String title,
+        String body,
+        String state,
+        @Nullable String url,
+        @Nullable Instant updatedAt,
+        @Nullable SignalName triggerSignal,
+        @Nullable ObservationOrigin observationOrigin)
+        implements JobSubmissionRequest {
     public IssueReviewSubmissionRequest {
         Objects.requireNonNull(repositoryFullName, "repositoryFullName must not be null");
         Objects.requireNonNull(title, "title must not be null");
@@ -44,29 +44,27 @@ public record IssueReviewSubmissionRequest(
 
     /** Constructor for the event-driven and resubmission paths, which take the origin rule as it stands. */
     public IssueReviewSubmissionRequest(
-        long issueId,
-        int issueNumber,
-        long repositoryId,
-        String repositoryFullName,
-        String title,
-        String body,
-        String state,
-        @Nullable String url,
-        @Nullable Instant updatedAt,
-        @Nullable SignalName triggerSignal
-    ) {
+            long issueId,
+            int issueNumber,
+            long repositoryId,
+            String repositoryFullName,
+            String title,
+            String body,
+            String state,
+            @Nullable String url,
+            @Nullable Instant updatedAt,
+            @Nullable SignalName triggerSignal) {
         this(
-            issueId,
-            issueNumber,
-            repositoryId,
-            repositoryFullName,
-            title,
-            body,
-            state,
-            url,
-            updatedAt,
-            triggerSignal,
-            null
-        );
+                issueId,
+                issueNumber,
+                repositoryId,
+                repositoryFullName,
+                title,
+                body,
+                state,
+                url,
+                updatedAt,
+                triggerSignal,
+                null);
     }
 }

@@ -27,24 +27,24 @@ class SandboxArchitectureTest extends HephaestusArchitectureTest {
         @Test
         void spiHasNoSpringDeps() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage(SANDBOX_SPI)
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("org.springframework..")
-                .because("SPI types must be framework-agnostic for portability");
+                    .that()
+                    .resideInAPackage(SANDBOX_SPI)
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAPackage("org.springframework..")
+                    .because("SPI types must be framework-agnostic for portability");
             rule.check(classes);
         }
 
         @Test
         void spiHasNoDockerDeps() {
             ArchRule rule = noClasses()
-                .that()
-                .resideInAPackage(SANDBOX_SPI)
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage("com.github.dockerjava..")
-                .because("SPI types must not leak implementation details");
+                    .that()
+                    .resideInAPackage(SANDBOX_SPI)
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAPackage("com.github.dockerjava..")
+                    .because("SPI types must not leak implementation details");
             rule.check(classes);
         }
     }
@@ -55,24 +55,24 @@ class SandboxArchitectureTest extends HephaestusArchitectureTest {
         @Test
         void dockerNotImportedOutsideSandbox() {
             ArchRule rule = noClasses()
-                .that()
-                .resideOutsideOfPackage("..agent.sandbox..")
-                .should()
-                .dependOnClassesThat()
-                .resideInAPackage(SANDBOX_DOCKER)
-                .because("Docker implementation is an internal detail of the sandbox module");
+                    .that()
+                    .resideOutsideOfPackage("..agent.sandbox..")
+                    .should()
+                    .dependOnClassesThat()
+                    .resideInAPackage(SANDBOX_DOCKER)
+                    .because("Docker implementation is an internal detail of the sandbox module");
             rule.check(classes);
         }
 
         @Test
         void dockerClientEncapsulated() {
             ArchRule rule = noClasses()
-                .that()
-                .resideOutsideOfPackage(SANDBOX_DOCKER)
-                .should()
-                .dependOnClassesThat()
-                .haveFullyQualifiedName("com.github.dockerjava.api.DockerClient")
-                .because("DockerClient must be encapsulated within the docker implementation package");
+                    .that()
+                    .resideOutsideOfPackage(SANDBOX_DOCKER)
+                    .should()
+                    .dependOnClassesThat()
+                    .haveFullyQualifiedName("com.github.dockerjava.api.DockerClient")
+                    .because("DockerClient must be encapsulated within the docker implementation package");
             rule.check(classes);
         }
     }

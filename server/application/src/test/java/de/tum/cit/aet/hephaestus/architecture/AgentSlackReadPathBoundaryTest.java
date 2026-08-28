@@ -43,9 +43,8 @@ class AgentSlackReadPathBoundaryTest extends HephaestusArchitectureTest {
     /** SQL keyword immediately preceding a Slack table — precise enough to ignore job-metadata JSON keys
      * ({@code "slack_thread_ts"}) and javadoc mentions ({@code {@code slack_thread}}). {@code \\s+} spans newlines
      * so it also catches multi-line text-block SQL. */
-    private static final Pattern SLACK_TABLE_IN_SQL = Pattern.compile(
-        "(?is)\\b(from|join|into|update)\\s+slack_(thread|message|monitored_channel)\\b"
-    );
+    private static final Pattern SLACK_TABLE_IN_SQL =
+            Pattern.compile("(?is)\\b(from|join|into|update)\\s+slack_(thread|message|monitored_channel)\\b");
 
     @Test
     @DisplayName("the slack_* SQL detector matches real tunnels and ignores JSON-key / javadoc lookalikes")
@@ -53,31 +52,44 @@ class AgentSlackReadPathBoundaryTest extends HephaestusArchitectureTest {
         // Self-test of the guard's regex: if a future weakening made it match nothing (or match the lookalikes
         // vacuously), agentSourcesDoNotNameSlackTablesInSql would silently pass forever. This pins that the detector
         // still fires on a reintroduced raw-SQL Slack tunnel and still ignores the two things that must NOT trip it.
-        assertThat(SLACK_TABLE_IN_SQL.matcher("SELECT 1 FROM slack_thread WHERE workspace_id = ?").find()).isTrue();
-        assertThat(SLACK_TABLE_IN_SQL.matcher("... JOIN slack_message m ON ...").find()).isTrue();
-        assertThat(
-            SLACK_TABLE_IN_SQL.matcher("UPDATE slack_monitored_channel SET consent_state = 'ACTIVE'").find()
-        ).isTrue();
-        assertThat(SLACK_TABLE_IN_SQL.matcher("INSERT INTO slack_message (workspace_id) VALUES (?)").find()).isTrue();
+        assertThat(SLACK_TABLE_IN_SQL
+                        .matcher("SELECT 1 FROM slack_thread WHERE workspace_id = ?")
+                        .find())
+                .isTrue();
+        assertThat(SLACK_TABLE_IN_SQL.matcher("... JOIN slack_message m ON ...").find())
+                .isTrue();
+        assertThat(SLACK_TABLE_IN_SQL
+                        .matcher("UPDATE slack_monitored_channel SET consent_state = 'ACTIVE'")
+                        .find())
+                .isTrue();
+        assertThat(SLACK_TABLE_IN_SQL
+                        .matcher("INSERT INTO slack_message (workspace_id) VALUES (?)")
+                        .find())
+                .isTrue();
 
         // Lookalikes that must NOT match: a JSON metadata key and a javadoc {@code} mention.
-        assertThat(SLACK_TABLE_IN_SQL.matcher("payload.path(\"slack_thread_ts\").asString()").find()).isFalse();
-        assertThat(SLACK_TABLE_IN_SQL.matcher(" * reads the {@code slack_thread} aggregate.").find()).isFalse();
+        assertThat(SLACK_TABLE_IN_SQL
+                        .matcher("payload.path(\"slack_thread_ts\").asString()")
+                        .find())
+                .isFalse();
+        assertThat(SLACK_TABLE_IN_SQL
+                        .matcher(" * reads the {@code slack_thread} aggregate.")
+                        .find())
+                .isFalse();
     }
 
     @Test
     @DisplayName("agent must not import any integration.slack type")
     void agentDoesNotImportSlack() {
         ArchRule rule = noClasses()
-            .that()
-            .resideInAPackage(AGENT)
-            .should()
-            .dependOnClassesThat()
-            .resideInAPackage("de.tum.cit.aet.hephaestus.integration.slack..")
-            .because(
-                "The agent conversation read path is inverted through the agent-owned agent.conversation SPIs " +
-                    "(implemented by integration.slack); the agent must never depend on the Slack module directly"
-            );
+                .that()
+                .resideInAPackage(AGENT)
+                .should()
+                .dependOnClassesThat()
+                .resideInAPackage("de.tum.cit.aet.hephaestus.integration.slack..")
+                .because(
+                        "The agent conversation read path is inverted through the agent-owned agent.conversation SPIs "
+                                + "(implemented by integration.slack); the agent must never depend on the Slack module directly");
         rule.check(classes);
     }
 
@@ -85,16 +97,15 @@ class AgentSlackReadPathBoundaryTest extends HephaestusArchitectureTest {
     @DisplayName("agent must not use JdbcTemplate (the raw-JDBC tunnel vector)")
     void agentDoesNotUseJdbcTemplate() {
         ArchRule rule = noClasses()
-            .that()
-            .resideInAPackage(AGENT)
-            .should()
-            .dependOnClassesThat()
-            .haveFullyQualifiedName("org.springframework.jdbc.core.JdbcTemplate")
-            .because(
-                "Raw JdbcTemplate is how the agent used to tunnel into Slack's private tables past the tenancy " +
-                    "StatementInspector and the Modulith import check; the agent reads its own storage via JPA " +
-                    "repositories and reaches Slack only through the agent.conversation SPIs"
-            );
+                .that()
+                .resideInAPackage(AGENT)
+                .should()
+                .dependOnClassesThat()
+                .haveFullyQualifiedName("org.springframework.jdbc.core.JdbcTemplate")
+                .because(
+                        "Raw JdbcTemplate is how the agent used to tunnel into Slack's private tables past the tenancy "
+                                + "StatementInspector and the Modulith import check; the agent reads its own storage via JPA "
+                                + "repositories and reaches Slack only through the agent.conversation SPIs");
         rule.check(classes);
     }
 
@@ -103,30 +114,23 @@ class AgentSlackReadPathBoundaryTest extends HephaestusArchitectureTest {
     void agentSourcesDoNotNameSlackTablesInSql() {
         Path agentDir = Path.of("src/main/java/de/tum/cit/aet/hephaestus/agent");
         if (!Files.isDirectory(agentDir)) {
-            fail(
-                "Could not locate the agent source directory at %s (cwd=%s)".formatted(
-                    agentDir,
-                    Path.of("").toAbsolutePath()
-                )
-            );
+            fail("Could not locate the agent source directory at %s (cwd=%s)"
+                    .formatted(agentDir, Path.of("").toAbsolutePath()));
         }
         List<String> offenders;
         try (Stream<Path> paths = Files.walk(agentDir)) {
-            offenders = paths
-                .filter(p -> p.toString().endsWith(".java"))
-                .filter(AgentSlackReadPathBoundaryTest::namesSlackTableInSql)
-                .map(Path::toString)
-                .toList();
+            offenders = paths.filter(p -> p.toString().endsWith(".java"))
+                    .filter(AgentSlackReadPathBoundaryTest::namesSlackTableInSql)
+                    .map(Path::toString)
+                    .toList();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
         assertThat(offenders)
-            .as(
-                "agent source files must not embed raw SQL against Slack's private tables " +
-                    "(slack_thread/slack_message/slack_monitored_channel) — read them through the " +
-                    "agent.conversation SPIs implemented by integration.slack"
-            )
-            .isEmpty();
+                .as("agent source files must not embed raw SQL against Slack's private tables "
+                        + "(slack_thread/slack_message/slack_monitored_channel) — read them through the "
+                        + "agent.conversation SPIs implemented by integration.slack")
+                .isEmpty();
     }
 
     private static boolean namesSlackTableInSql(Path javaFile) {

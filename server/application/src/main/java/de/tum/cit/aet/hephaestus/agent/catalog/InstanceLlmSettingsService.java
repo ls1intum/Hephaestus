@@ -32,15 +32,17 @@ public class InstanceLlmSettingsService {
     @Transactional
     public InstanceLlmSettings update(UpdateInstanceLlmSettingsRequestDTO request) {
         InstanceLlmSettings settings = settingsRepository
-            .findByIdForUpdate(SINGLETON_ID)
-            .orElseGet(() -> {
-                InstanceLlmSettings created = defaults();
-                created.setId(SINGLETON_ID);
-                return created;
-            });
+                .findByIdForUpdate(SINGLETON_ID)
+                .orElseGet(() -> {
+                    InstanceLlmSettings created = defaults();
+                    created.setId(SINGLETON_ID);
+                    return created;
+                });
 
         if (request.allowedEgressHosts() != null) {
-            String hosts = request.allowedEgressHosts().isBlank() ? null : request.allowedEgressHosts().trim();
+            String hosts = request.allowedEgressHosts().isBlank()
+                    ? null
+                    : request.allowedEgressHosts().trim();
             settings.setAllowedEgressHosts(hosts);
         }
         if (request.allowWorkspaceConnections() != null) {

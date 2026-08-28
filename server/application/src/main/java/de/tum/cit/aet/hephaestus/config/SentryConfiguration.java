@@ -22,10 +22,9 @@ public class SentryConfiguration {
     private final SentryProperties sentryProperties;
 
     public SentryConfiguration(
-        Environment environment,
-        @Value("${spring.application.version}") String hephaestusVersion,
-        SentryProperties sentryProperties
-    ) {
+            Environment environment,
+            @Value("${spring.application.version}") String hephaestusVersion,
+            SentryProperties sentryProperties) {
         this.environment = environment;
         this.hephaestusVersion = hephaestusVersion;
         this.sentryProperties = sentryProperties;

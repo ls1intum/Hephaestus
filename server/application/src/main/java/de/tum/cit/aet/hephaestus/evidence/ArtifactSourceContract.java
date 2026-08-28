@@ -5,22 +5,21 @@ import java.util.Set;
 
 /** Versioned semantics for one logical evidence source. */
 public record ArtifactSourceContract(
-    SourceKind kind,
-    String displayName,
-    String description,
-    String selectionScope,
-    Set<String> artifactKinds,
-    boolean defaultRequirement,
-    SourceAuthority authority,
-    IdentityPolicy identityPolicy,
-    CompletenessPolicy completenessPolicy,
-    RequiredCaptureQuality requiredQuality,
-    PrivacyClass privacyClass,
-    Set<SourceAbsenceState> supportedAbsenceStates,
-    RetentionPolicy retentionPolicy,
-    ErasurePolicy erasurePolicy,
-    Set<String> useDecisionIds
-) {
+        SourceKind kind,
+        String displayName,
+        String description,
+        String selectionScope,
+        Set<String> artifactKinds,
+        boolean defaultRequirement,
+        SourceAuthority authority,
+        IdentityPolicy identityPolicy,
+        CompletenessPolicy completenessPolicy,
+        RequiredCaptureQuality requiredQuality,
+        PrivacyClass privacyClass,
+        Set<SourceAbsenceState> supportedAbsenceStates,
+        RetentionPolicy retentionPolicy,
+        ErasurePolicy erasurePolicy,
+        Set<String> useDecisionIds) {
     public ArtifactSourceContract {
         Objects.requireNonNull(kind, "kind");
         displayName = requireText(displayName, "displayName", kind);
@@ -37,11 +36,9 @@ public record ArtifactSourceContract(
         // can be anchored to an identity that cannot change under it. A mirror reflects upstream state
         // that moves independently, so calling its capture pinned would report a copy that has since
         // drifted as demonstrably current.
-        if (
-            identityPolicy.mode() == IdentityMode.PINNED_IDENTITY &&
-            authority != SourceAuthority.UPSTREAM_SNAPSHOT &&
-            authority != SourceAuthority.DETERMINISTIC_DERIVATION
-        ) {
+        if (identityPolicy.mode() == IdentityMode.PINNED_IDENTITY
+                && authority != SourceAuthority.UPSTREAM_SNAPSHOT
+                && authority != SourceAuthority.DETERMINISTIC_DERIVATION) {
             throw new IllegalArgumentException("Only an upstream or lossless source can pin an identity: " + kind);
         }
         // A lossy derivation is a bounded summary of its subject, not the subject. Reporting one as
@@ -61,8 +58,7 @@ public record ArtifactSourceContract(
         // non-emptiness of it says nothing and hides which sources the demand is really about.
         if (requiredQuality.demandsContent() && !completenessPolicy.supportsEmpty()) {
             throw new IllegalArgumentException(
-                "A source that cannot be validly empty cannot demand non-emptiness: " + kind
-            );
+                    "A source that cannot be validly empty cannot demand non-emptiness: " + kind);
         }
         Objects.requireNonNull(privacyClass, "privacyClass");
         supportedAbsenceStates = Set.copyOf(Objects.requireNonNull(supportedAbsenceStates, "supportedAbsenceStates"));

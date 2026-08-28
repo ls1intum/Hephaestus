@@ -58,15 +58,14 @@ class SlackMentorServiceTest extends BaseUnitTest {
     private SlackMentorService service() {
         when(mentorReadinessQuery.isEnabled(WORKSPACE)).thenReturn(true);
         return new SlackMentorService(
-            workspaceResolver,
-            threadLinker,
-            mentorTurnRunner,
-            slackMessageService,
-            identityResolver,
-            new KeywordSlackMentorInputGuard(),
-            onboardingService,
-            mentorReadinessQuery
-        );
+                workspaceResolver,
+                threadLinker,
+                mentorTurnRunner,
+                slackMessageService,
+                identityResolver,
+                new KeywordSlackMentorInputGuard(),
+                onboardingService,
+                mentorReadinessQuery);
     }
 
     @Test
@@ -85,7 +84,8 @@ class SlackMentorServiceTest extends BaseUnitTest {
         when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(WORKSPACE));
         when(identityResolver.resolveDeveloperLogin(WORKSPACE, TEAM, USER)).thenReturn(Optional.of("alice"));
         UUID threadId = UUID.randomUUID();
-        when(threadLinker.findOrCreateThread(WORKSPACE, TEAM, CHANNEL, "100.1", USER, "alice")).thenReturn(threadId);
+        when(threadLinker.findOrCreateThread(WORKSPACE, TEAM, CHANNEL, "100.1", USER, "alice"))
+                .thenReturn(threadId);
         SlackMentorService service = service();
         service.handleDm(TEAM, CHANNEL, USER, "Can you review my work?", "100.1", "100.1");
 
@@ -100,13 +100,13 @@ class SlackMentorServiceTest extends BaseUnitTest {
 
         service.handleDm(TEAM, CHANNEL, USER, "I want to kill myself", "100.1", "100.1");
 
-        verify(slackMessageService).sendForWorkspace(
-            eq(WORKSPACE),
-            eq(CHANNEL),
-            eq("100.1"),
-            eq(List.of()),
-            eq(KeywordSlackMentorInputGuard.SELF_HARM_RESPONSE)
-        );
+        verify(slackMessageService)
+                .sendForWorkspace(
+                        eq(WORKSPACE),
+                        eq(CHANNEL),
+                        eq("100.1"),
+                        eq(List.of()),
+                        eq(KeywordSlackMentorInputGuard.SELF_HARM_RESPONSE));
         verify(mentorTurnRunner, never()).run(any(), any(), any());
         verifyNoInteractions(identityResolver);
     }
@@ -118,13 +118,8 @@ class SlackMentorServiceTest extends BaseUnitTest {
 
         service.handleDm(TEAM, CHANNEL, USER, "stupid bot", "100.1", "100.1");
 
-        verify(slackMessageService, never()).sendForWorkspace(
-            anyLong(),
-            anyString(),
-            anyString(),
-            anyList(),
-            anyString()
-        );
+        verify(slackMessageService, never())
+                .sendForWorkspace(anyLong(), anyString(), anyString(), anyList(), anyString());
         verify(mentorTurnRunner, never()).run(any(), any(), any());
         verifyNoInteractions(identityResolver);
     }
@@ -139,13 +134,13 @@ class SlackMentorServiceTest extends BaseUnitTest {
 
         service.handleDm(TEAM, CHANNEL, USER, "Can you review my PR practice?", "100.1", "100.1");
 
-        verify(slackMessageService).sendForWorkspace(
-            eq(WORKSPACE),
-            eq(CHANNEL),
-            eq("100.1"),
-            eq(List.of()),
-            eq("Connect your Slack account to Hephaestus so the mentor can find your work.")
-        );
+        verify(slackMessageService)
+                .sendForWorkspace(
+                        eq(WORKSPACE),
+                        eq(CHANNEL),
+                        eq("100.1"),
+                        eq(List.of()),
+                        eq("Connect your Slack account to Hephaestus so the mentor can find your work."));
         verify(mentorTurnRunner, never()).run(any(), any(), any());
     }
 
@@ -154,8 +149,10 @@ class SlackMentorServiceTest extends BaseUnitTest {
         when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(WORKSPACE));
         when(identityResolver.resolveDeveloperLogin(WORKSPACE, TEAM, USER)).thenReturn(Optional.of("alice"));
         UUID threadId = UUID.randomUUID();
-        when(threadLinker.findOrCreateThread(WORKSPACE, TEAM, CHANNEL, "100.1", USER, "alice")).thenReturn(threadId);
-        when(threadLinker.findOrCreateThread(WORKSPACE, TEAM, CHANNEL, "100.2", USER, "alice")).thenReturn(threadId);
+        when(threadLinker.findOrCreateThread(WORKSPACE, TEAM, CHANNEL, "100.1", USER, "alice"))
+                .thenReturn(threadId);
+        when(threadLinker.findOrCreateThread(WORKSPACE, TEAM, CHANNEL, "100.2", USER, "alice"))
+                .thenReturn(threadId);
 
         SlackMentorService service = service();
 
@@ -164,14 +161,13 @@ class SlackMentorServiceTest extends BaseUnitTest {
 
         ArgumentCaptor<MentorTurnRequest> requestCaptor = ArgumentCaptor.forClass(MentorTurnRequest.class);
         verify(mentorTurnRunner, times(2)).run(requestCaptor.capture(), any(), eq("alice"));
-        assertThat(requestCaptor.getAllValues()).allSatisfy(request ->
-            assertThat(request.threadId()).isEqualTo(threadId)
-        );
-        assertThat(
-            requestCaptor.getAllValues().stream().map(MentorTurnRequest::clientUserMessageId).toList()
-        ).containsExactly(
-            UUID.nameUUIDFromBytes("slack:T1:D9:100.1".getBytes(StandardCharsets.UTF_8)),
-            UUID.nameUUIDFromBytes("slack:T1:D9:100.2".getBytes(StandardCharsets.UTF_8))
-        );
+        assertThat(requestCaptor.getAllValues())
+                .allSatisfy(request -> assertThat(request.threadId()).isEqualTo(threadId));
+        assertThat(requestCaptor.getAllValues().stream()
+                        .map(MentorTurnRequest::clientUserMessageId)
+                        .toList())
+                .containsExactly(
+                        UUID.nameUUIDFromBytes("slack:T1:D9:100.1".getBytes(StandardCharsets.UTF_8)),
+                        UUID.nameUUIDFromBytes("slack:T1:D9:100.2".getBytes(StandardCharsets.UTF_8)));
     }
 }

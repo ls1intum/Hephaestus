@@ -68,27 +68,27 @@ class ConversationReviewSubmitterTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         submitter = new ConversationReviewSubmitter(
-            candidateSource,
-            agentJobService,
-            signalRecorder,
-            transactionTemplate,
-            workspaceRepository,
-            detectionGate
-        );
+                candidateSource,
+                agentJobService,
+                signalRecorder,
+                transactionTemplate,
+                workspaceRepository,
+                detectionGate);
         lenient()
-            .doAnswer(invocation -> {
-                Consumer<TransactionStatus> callback = invocation.getArgument(0);
-                callback.accept(mock(TransactionStatus.class));
-                return null;
-            })
-            .when(transactionTemplate)
-            .executeWithoutResult(any());
+                .doAnswer(invocation -> {
+                    Consumer<TransactionStatus> callback = invocation.getArgument(0);
+                    callback.accept(mock(TransactionStatus.class));
+                    return null;
+                })
+                .when(transactionTemplate)
+                .executeWithoutResult(any());
         Workspace workspace = new Workspace();
         workspace.setId(WORKSPACE_ID);
         lenient().when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(workspace));
         lenient()
-            .when(detectionGate.evaluateSignal(eq(workspace), any(), eq(TriggerMode.AUTO), any(ReviewSubject.class)))
-            .thenReturn(new GateDecision.Detect(workspace, java.util.List.of(), 0, TriggerMode.AUTO));
+                .when(detectionGate.evaluateSignal(
+                        eq(workspace), any(), eq(TriggerMode.AUTO), any(ReviewSubject.class)))
+                .thenReturn(new GateDecision.Detect(workspace, java.util.List.of(), 0, TriggerMode.AUTO));
     }
 
     @Test
@@ -98,22 +98,21 @@ class ConversationReviewSubmitterTest extends BaseUnitTest {
         long started = submitter.submitAndSettle(candidate(11L, 12L, 13L), key());
 
         assertThat(started).isEqualTo(3);
-        verify(agentJobService, times(3)).submitWithOutcome(
-            eq(WORKSPACE_ID),
-            eq(AgentJobType.CONVERSATION_REVIEW),
-            any(),
-            eq(null),
-            any(GateDecision.Detect.class)
-        );
+        verify(agentJobService, times(3))
+                .submitWithOutcome(
+                        eq(WORKSPACE_ID),
+                        eq(AgentJobType.CONVERSATION_REVIEW),
+                        any(),
+                        eq(null),
+                        any(GateDecision.Detect.class));
         verify(signalRecorder).markTriggered(eq(key()), any());
         verify(signalRecorder, never()).markRefused(any(), any());
     }
 
     @Test
     void anOccurrenceNothingRanForIsRefusedWithTheReasonThatStoppedIt() {
-        when(agentJobService.submitWithOutcome(anyLong(), any(), any(), any(), any())).thenReturn(
-            SubmissionOutcome.refused(SignalStateReason.BUDGET_EXHAUSTED)
-        );
+        when(agentJobService.submitWithOutcome(anyLong(), any(), any(), any(), any()))
+                .thenReturn(SubmissionOutcome.refused(SignalStateReason.BUDGET_EXHAUSTED));
 
         long started = submitter.submitAndSettle(candidate(11L), key());
 
@@ -125,10 +124,8 @@ class ConversationReviewSubmitterTest extends BaseUnitTest {
     void aPartialFanOutStillCountsAsAnOccurrenceThatWasReviewed() {
         AgentJob job = new AgentJob();
         job.setId(UUID.randomUUID());
-        when(agentJobService.submitWithOutcome(anyLong(), any(), any(), any(), any())).thenReturn(
-            SubmissionOutcome.refused(SignalStateReason.SUBJECT_UNLINKED),
-            SubmissionOutcome.of(job)
-        );
+        when(agentJobService.submitWithOutcome(anyLong(), any(), any(), any(), any()))
+                .thenReturn(SubmissionOutcome.refused(SignalStateReason.SUBJECT_UNLINKED), SubmissionOutcome.of(job));
 
         assertThat(submitter.submitAndSettle(candidate(11L, 12L), key())).isEqualTo(1);
         verify(signalRecorder).markTriggered(key(), job.getId());
@@ -144,9 +141,8 @@ class ConversationReviewSubmitterTest extends BaseUnitTest {
 
     @Test
     void aParticipantOutsideReviewCoverageDoesNotStartCompute() {
-        when(detectionGate.evaluateSignal(any(), any(), any(), any())).thenReturn(
-            new GateDecision.Skip("outside review coverage", SignalStateReason.OUT_OF_REVIEW_SCOPE)
-        );
+        when(detectionGate.evaluateSignal(any(), any(), any(), any()))
+                .thenReturn(new GateDecision.Skip("outside review coverage", SignalStateReason.OUT_OF_REVIEW_SCOPE));
 
         assertThat(submitter.submitAndSettle(candidate(11L), key())).isZero();
 
@@ -171,13 +167,8 @@ class ConversationReviewSubmitterTest extends BaseUnitTest {
 
         submitter.resubmit(pendingSignal());
 
-        verify(agentJobService).submitWithOutcome(
-            eq(WORKSPACE_ID),
-            any(),
-            any(),
-            eq(null),
-            any(GateDecision.Detect.class)
-        );
+        verify(agentJobService)
+                .submitWithOutcome(eq(WORKSPACE_ID), any(), any(), eq(null), any(GateDecision.Detect.class));
         verify(signalRecorder).markTriggered(eq(key()), any());
     }
 
@@ -189,11 +180,12 @@ class ConversationReviewSubmitterTest extends BaseUnitTest {
     // Fixtures
 
     private void givenSubmissionSucceeds() {
-        when(agentJobService.submitWithOutcome(anyLong(), any(), any(), any(), any())).thenAnswer(invocation -> {
-            AgentJob job = new AgentJob();
-            job.setId(UUID.randomUUID());
-            return SubmissionOutcome.of(job);
-        });
+        when(agentJobService.submitWithOutcome(anyLong(), any(), any(), any(), any()))
+                .thenAnswer(invocation -> {
+                    AgentJob job = new AgentJob();
+                    job.setId(UUID.randomUUID());
+                    return SubmissionOutcome.of(job);
+                });
     }
 
     private static SignalKey key() {
@@ -202,15 +194,14 @@ class ConversationReviewSubmitterTest extends BaseUnitTest {
 
     private static ConversationThreadCandidate candidate(long... participants) {
         return new ConversationThreadCandidate(
-            WORKSPACE_ID,
-            THREAD_ID,
-            "C123",
-            "#design",
-            "1700000000.000100",
-            "1700000600.000200",
-            null,
-            participants
-        );
+                WORKSPACE_ID,
+                THREAD_ID,
+                "C123",
+                "#design",
+                "1700000000.000100",
+                "1700000600.000200",
+                null,
+                participants);
     }
 
     private static ArtifactSignal pendingSignal() {

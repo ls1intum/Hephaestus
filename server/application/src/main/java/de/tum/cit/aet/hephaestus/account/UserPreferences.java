@@ -36,11 +36,10 @@ public class UserPreferences {
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(
-        name = "user_id",
-        nullable = false,
-        unique = true,
-        foreignKey = @ForeignKey(name = "fk_user_preferences_user")
-    )
+            name = "user_id",
+            nullable = false,
+            unique = true,
+            foreignKey = @ForeignKey(name = "fk_user_preferences_user"))
     @ToString.Exclude
     private User user;
 
@@ -49,7 +48,7 @@ public class UserPreferences {
 
     @Column(name = "ai_review_enabled", nullable = false)
     private boolean practiceFeedbackDeliveryEnabled =
-        AccountPreferencesQuery.PreferencesView.PRACTICE_FEEDBACK_DELIVERY_ENABLED_BY_DEFAULT;
+            AccountPreferencesQuery.PreferencesView.PRACTICE_FEEDBACK_DELIVERY_ENABLED_BY_DEFAULT;
 
     public UserPreferences(User user) {
         this.user = user;

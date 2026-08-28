@@ -28,9 +28,8 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
 
     private final JsonMapper mapper = JsonMapper.builder().build();
     private final PracticeDefinitionValidator validator = new PracticeDefinitionValidator(
-        new ClasspathArtifactSourceCatalogRegistry(mapper, java.time.Clock.systemUTC()),
-        PracticeSignalOptionsFixture.real()
-    );
+            new ClasspathArtifactSourceCatalogRegistry(mapper, java.time.Clock.systemUTC()),
+            PracticeSignalOptionsFixture.real());
 
     /**
      * The artifact kind is derived from the signal's prefix, so a misspelled signal would otherwise
@@ -38,40 +37,29 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
      */
     @Test
     void rejectsASignalNoRegisteredDomainDeclares() {
-        assertThatThrownBy(() ->
-            validator.validate(
-                definition(SignalName.of("scm.pull_request.rebased"), null, List.of(need(DIFF)), languageModel())
-            )
-        )
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Choose signals declared for the selected work type");
+        assertThatThrownBy(() -> validator.validate(definition(
+                        SignalName.of("scm.pull_request.rebased"), null, List.of(need(DIFF)), languageModel())))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Choose signals declared for the selected work type");
     }
 
     @Test
     void rejectsUnknownEvidenceSource() {
-        assertThatThrownBy(() ->
-            validator.validate(
-                definition(
-                    ScmSignals.PULL_REQUEST_OPENED,
-                    null,
-                    List.of(need(new SourceKind("scm.pull-request.unknown"))),
-                    languageModel()
-                )
-            )
-        )
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("Unknown source");
+        assertThatThrownBy(() -> validator.validate(definition(
+                        ScmSignals.PULL_REQUEST_OPENED,
+                        null,
+                        List.of(need(new SourceKind("scm.pull-request.unknown"))),
+                        languageModel())))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unknown source");
     }
 
     @Test
     void rejectsEvidenceThatCannotExistForTheReviewedKind() {
-        assertThatThrownBy(() ->
-            validator.validate(
-                definition(ScmSignals.PULL_REQUEST_OPENED, null, List.of(need(FOR_ANOTHER_KIND)), languageModel())
-            )
-        )
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Evidence source is not available for the selected work type");
+        assertThatThrownBy(() -> validator.validate(definition(
+                        ScmSignals.PULL_REQUEST_OPENED, null, List.of(need(FOR_ANOTHER_KIND)), languageModel())))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Evidence source is not available for the selected work type");
     }
 
     /**
@@ -82,46 +70,38 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
     @Test
     void rejectsASecondOccasion() {
         PracticeDefinition definition = new PracticeDefinition(
-            "Focused review",
-            List.of(
-                PracticeBinding.on(ScmSignals.PULL_REQUEST_OPENED, List.of(need(DIFF))),
-                PracticeBinding.on(ScmSignals.PULL_REQUEST_MERGED, List.of(need(DIFF)))
-            ),
-            "Assess the review",
-            null,
-            languageModel(),
-            null,
-            null,
-            null
-        );
+                "Focused review",
+                List.of(
+                        PracticeBinding.on(ScmSignals.PULL_REQUEST_OPENED, List.of(need(DIFF))),
+                        PracticeBinding.on(ScmSignals.PULL_REQUEST_MERGED, List.of(need(DIFF)))),
+                "Assess the review",
+                null,
+                languageModel(),
+                null,
+                null,
+                null);
 
         assertThatThrownBy(() -> validator.validate(definition))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage(
-                "A practice is reviewed on one occasion. To read different evidence at a different moment, " +
-                    "split this into two practices."
-            );
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("A practice is reviewed on one occasion. To read different evidence at a different moment, "
+                        + "split this into two practices.");
     }
 
     /** Several signals on the one occasion stay legal: that is how a practice judged all along is written. */
     @Test
     void acceptsSeveralSignalsOnTheOneOccasion() {
         PracticeDefinition definition = new PracticeDefinition(
-            "Focused review",
-            List.of(
-                new PracticeBinding(
-                    List.of(ScmSignals.PULL_REQUEST_OPENED, ScmSignals.PULL_REQUEST_MERGED),
-                    List.of(need(DIFF)),
-                    false
-                )
-            ),
-            "Assess the review",
-            null,
-            languageModel(),
-            null,
-            null,
-            null
-        );
+                "Focused review",
+                List.of(new PracticeBinding(
+                        List.of(ScmSignals.PULL_REQUEST_OPENED, ScmSignals.PULL_REQUEST_MERGED),
+                        List.of(need(DIFF)),
+                        false)),
+                "Assess the review",
+                null,
+                languageModel(),
+                null,
+                null,
+                null);
 
         assertThatCode(() -> validator.validate(definition)).doesNotThrowAnyException();
     }
@@ -132,14 +112,11 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
      */
     @Test
     void rejectsBindingToAReviewSomebodyAsksForByHand() {
-        assertThatThrownBy(() ->
-            validator.validate(
-                definition(ScmSignals.PULL_REQUEST_MANUAL_REVIEW, null, List.of(need(DIFF)), languageModel())
-            )
-        )
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("not an occasion to choose")
-            .hasMessageContaining("scm.pull_request.manual_review");
+        assertThatThrownBy(() -> validator.validate(
+                        definition(ScmSignals.PULL_REQUEST_MANUAL_REVIEW, null, List.of(need(DIFF)), languageModel())))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not an occasion to choose")
+                .hasMessageContaining("scm.pull_request.manual_review");
     }
 
     /**
@@ -149,83 +126,66 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
      */
     @Test
     void rejectsAnAbsenceClaimOverASourceThatIsNeverComplete() {
-        assertThatThrownBy(() ->
-            validator.validate(
-                definition(
-                    ScmSignals.PULL_REQUEST_OPENED,
-                    null,
-                    List.of(
-                        need(DIFF),
-                        new PracticeEvidenceRequirement(
-                            new SourceKind("scm.linked-work-items"),
-                            EvidenceStance.EXHAUSTIVE
-                        )
-                    ),
-                    languageModel()
-                )
-            )
-        )
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("can never be captured completely");
+        assertThatThrownBy(() -> validator.validate(definition(
+                        ScmSignals.PULL_REQUEST_OPENED,
+                        null,
+                        List.of(
+                                need(DIFF),
+                                new PracticeEvidenceRequirement(
+                                        new SourceKind("scm.linked-work-items"), EvidenceStance.EXHAUSTIVE)),
+                        languageModel())))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("can never be captured completely");
     }
 
     @Test
     void acceptsAnAbsenceClaimOverASourceThatCanBeComplete() {
-        assertThatCode(() ->
-            validator.validate(
-                definition(
-                    ScmSignals.PULL_REQUEST_OPENED,
-                    null,
-                    List.of(
-                        new PracticeEvidenceRequirement(new SourceKind("scm.review-threads"), EvidenceStance.EXHAUSTIVE)
-                    ),
-                    languageModel()
-                )
-            )
-        ).doesNotThrowAnyException();
+        assertThatCode(() -> validator.validate(definition(
+                        ScmSignals.PULL_REQUEST_OPENED,
+                        null,
+                        List.of(new PracticeEvidenceRequirement(
+                                new SourceKind("scm.review-threads"), EvidenceStance.EXHAUSTIVE)),
+                        languageModel())))
+                .doesNotThrowAnyException();
     }
 
     @Test
     void acceptsGuidanceOnlyPracticeWithoutAutomatedInputs() {
-        assertThatCode(() ->
-            validator.validate(definition(ScmSignals.PULL_REQUEST_OPENED, null, List.of(), withoutAutomatedReview()))
-        ).doesNotThrowAnyException();
+        assertThatCode(() -> validator.validate(
+                        definition(ScmSignals.PULL_REQUEST_OPENED, null, List.of(), withoutAutomatedReview())))
+                .doesNotThrowAnyException();
     }
 
     @Test
     void acceptsHumanReviewPracticeThatStillSaysWhatItIsAbout() {
-        assertThatCode(() ->
-            validator.validate(definition(ScmSignals.PULL_REQUEST_OPENED, null, List.of(need(DIFF)), humanReview()))
-        ).doesNotThrowAnyException();
+        assertThatCode(() -> validator.validate(
+                        definition(ScmSignals.PULL_REQUEST_OPENED, null, List.of(need(DIFF)), humanReview())))
+                .doesNotThrowAnyException();
     }
 
     @Test
     void rejectsPrecomputeScriptWithoutAutomatedReview() {
-        assertThatThrownBy(() ->
-            validator.validate(
-                definition(ScmSignals.PULL_REQUEST_OPENED, "export default {}", List.of(), withoutAutomatedReview())
-            )
-        )
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("A practice Hephaestus cannot review cannot define a precompute script");
+        assertThatThrownBy(() -> validator.validate(definition(
+                        ScmSignals.PULL_REQUEST_OPENED, "export default {}", List.of(), withoutAutomatedReview())))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("A practice Hephaestus cannot review cannot define a precompute script");
     }
 
     @Test
     void rejectsDetectorVocabularyInDeveloperFacingGuidance() {
         PracticeDefinition definition = new PracticeDefinition(
-            "Focused review",
-            List.of(PracticeBinding.on(ScmSignals.PULL_REQUEST_OPENED, List.of(need(DIFF)))),
-            "Assess the review",
-            null,
-            languageModel(),
-            "A description that is ABSENT tells a reviewer nothing.",
-            null,
-            null
-        );
+                "Focused review",
+                List.of(PracticeBinding.on(ScmSignals.PULL_REQUEST_OPENED, List.of(need(DIFF)))),
+                "Assess the review",
+                null,
+                languageModel(),
+                "A description that is ABSENT tells a reviewer nothing.",
+                null,
+                null);
 
         assertThatThrownBy(() -> validator.validate(definition))
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("must not use detector result labels");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must not use detector result labels");
     }
 
     /**
@@ -243,99 +203,80 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
         var catalogs = new ClasspathArtifactSourceCatalogRegistry(mapper, java.time.Clock.systemUTC());
 
         for (SubjectEvidenceCollection collection : SubjectEvidenceCollection.values()) {
-            assertThat(catalogs.requireSource(VERSION, collection.sourceKind()).completenessPolicy().supportsComplete())
-                .as(
-                    "%s is read from %s, which can never report a complete capture",
-                    collection,
-                    collection.sourceKind()
-                )
-                .isTrue();
+            assertThat(catalogs.requireSource(VERSION, collection.sourceKind())
+                            .completenessPolicy()
+                            .supportsComplete())
+                    .as(
+                            "%s is read from %s, which can never report a complete capture",
+                            collection, collection.sourceKind())
+                    .isTrue();
         }
     }
 
     @Test
     void rejectsASubjectReadFromASourceThisWorkTypeDoesNotHave() {
-        assertThatThrownBy(() ->
-            validator.validate(
-                new PracticeDefinition(
-                    "Focused review",
-                    List.of(
-                        new PracticeBinding(
-                            List.of(ScmSignals.ISSUE_OPENED),
-                            List.of(need(new SourceKind("scm.issue.core"))),
-                            false,
-                            de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole.AUTHOR,
-                            new PracticeSubject(
-                                "the change touches no dependency manifest",
-                                List.of(PracticeSubjectClause.changedPathMatches(List.of("**/pom.xml")))
-                            )
-                        )
-                    ),
-                    "Assess the review",
-                    null,
-                    languageModel(),
-                    null,
-                    null,
-                    null
-                )
-            )
-        )
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("could never be decided about it");
+        assertThatThrownBy(() -> validator.validate(new PracticeDefinition(
+                        "Focused review",
+                        List.of(new PracticeBinding(
+                                List.of(ScmSignals.ISSUE_OPENED),
+                                List.of(need(new SourceKind("scm.issue.core"))),
+                                false,
+                                de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole.AUTHOR,
+                                new PracticeSubject(
+                                        "the change touches no dependency manifest",
+                                        List.of(PracticeSubjectClause.changedPathMatches(List.of("**/pom.xml")))))),
+                        "Assess the review",
+                        null,
+                        languageModel(),
+                        null,
+                        null,
+                        null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("could never be decided about it");
     }
 
     @Test
     void acceptsASubjectDecidableFromASourceTheWorkTypeCapturesWhole() {
-        assertThatCode(() ->
-            validator.validate(
-                withSubject(
-                    new PracticeSubject(
-                        "the change touches no dependency manifest or lockfile",
-                        List.of(PracticeSubjectClause.changedPathMatches(List.of("**/pom.xml", "**/package.json")))
-                    ),
-                    DIFF
-                )
-            )
-        ).doesNotThrowAnyException();
+        assertThatCode(() -> validator.validate(withSubject(
+                        new PracticeSubject(
+                                "the change touches no dependency manifest or lockfile",
+                                List.of(PracticeSubjectClause.changedPathMatches(
+                                        List.of("**/pom.xml", "**/package.json")))),
+                        DIFF)))
+                .doesNotThrowAnyException();
     }
 
     private static PracticeDefinition withSubject(PracticeSubject subject, SourceKind reads) {
         return new PracticeDefinition(
-            "Focused review",
-            List.of(
-                new PracticeBinding(
-                    List.of(ScmSignals.PULL_REQUEST_OPENED),
-                    List.of(need(reads)),
-                    false,
-                    de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole.AUTHOR,
-                    subject
-                )
-            ),
-            "Assess the review",
-            null,
-            languageModel(),
-            null,
-            null,
-            null
-        );
+                "Focused review",
+                List.of(new PracticeBinding(
+                        List.of(ScmSignals.PULL_REQUEST_OPENED),
+                        List.of(need(reads)),
+                        false,
+                        de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole.AUTHOR,
+                        subject)),
+                "Assess the review",
+                null,
+                languageModel(),
+                null,
+                null,
+                null);
     }
 
     private static PracticeDefinition definition(
-        SignalName signal,
-        @Nullable String precomputeScript,
-        List<PracticeEvidenceRequirement> needs,
-        PracticeAutomatedReviewPolicy policy
-    ) {
+            SignalName signal,
+            @Nullable String precomputeScript,
+            List<PracticeEvidenceRequirement> needs,
+            PracticeAutomatedReviewPolicy policy) {
         return new PracticeDefinition(
-            "Focused review",
-            List.of(PracticeBinding.on(signal, needs)),
-            "Assess the review",
-            precomputeScript,
-            policy,
-            null,
-            null,
-            null
-        );
+                "Focused review",
+                List.of(PracticeBinding.on(signal, needs)),
+                "Assess the review",
+                precomputeScript,
+                policy,
+                null,
+                null,
+                null);
     }
 
     private static PracticeEvidenceRequirement need(SourceKind sourceKind) {
@@ -344,37 +285,32 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
 
     private static PracticeAutomatedReviewPolicy languageModel() {
         return new PracticeAutomatedReviewPolicy(
-            VERSION,
-            new PracticeAutomatedReview(
-                PracticeAutomatedReviewMode.LANGUAGE_MODEL,
-                PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
-            ),
-            PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
-            List.of(),
-            null
-        );
+                VERSION,
+                new PracticeAutomatedReview(
+                        PracticeAutomatedReviewMode.LANGUAGE_MODEL,
+                        PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET),
+                PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
+                List.of(),
+                null);
     }
 
     private static PracticeAutomatedReviewPolicy withoutAutomatedReview() {
         return new PracticeAutomatedReviewPolicy(
-            VERSION,
-            new PracticeAutomatedReview(PracticeAutomatedReviewMode.NONE, PracticeEvidenceSufficiency.NONE),
-            PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
-            List.of(),
-            null
-        );
+                VERSION,
+                new PracticeAutomatedReview(PracticeAutomatedReviewMode.NONE, PracticeEvidenceSufficiency.NONE),
+                PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
+                List.of(),
+                null);
     }
 
     private static PracticeAutomatedReviewPolicy humanReview() {
         return new PracticeAutomatedReviewPolicy(
-            VERSION,
-            new PracticeAutomatedReview(
-                PracticeAutomatedReviewMode.LANGUAGE_MODEL,
-                PracticeEvidenceSufficiency.DECLARED_EVIDENCE_INSUFFICIENT
-            ),
-            PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
-            List.of(),
-            new PracticeEvidenceLimitation("HUMAN_CONTEXT", "A person must review this practice.")
-        );
+                VERSION,
+                new PracticeAutomatedReview(
+                        PracticeAutomatedReviewMode.LANGUAGE_MODEL,
+                        PracticeEvidenceSufficiency.DECLARED_EVIDENCE_INSUFFICIENT),
+                PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
+                List.of(),
+                new PracticeEvidenceLimitation("HUMAN_CONTEXT", "A person must review this practice."));
     }
 }

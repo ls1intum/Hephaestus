@@ -34,13 +34,12 @@ public class LeaguePointsUpdateTask {
     private final WorkspaceRepository workspaceRepository;
 
     public LeaguePointsUpdateTask(
-        UserRepository userRepository,
-        LeaderboardService leaderboardService,
-        LeaguePointsService leaguePointsService,
-        WorkspaceMembershipService workspaceMembershipService,
-        LeaderboardScheduleResolver scheduleResolver,
-        WorkspaceRepository workspaceRepository
-    ) {
+            UserRepository userRepository,
+            LeaderboardService leaderboardService,
+            LeaguePointsService leaguePointsService,
+            WorkspaceMembershipService workspaceMembershipService,
+            LeaderboardScheduleResolver scheduleResolver,
+            WorkspaceRepository workspaceRepository) {
         this.userRepository = userRepository;
         this.leaderboardService = leaderboardService;
         this.leaguePointsService = leaguePointsService;
@@ -74,22 +73,15 @@ public class LeaguePointsUpdateTask {
         Instant lastCycle = managed.getLeaderboardLeagueCycleAt();
         if (lastCycle != null && !window.before().isAfter(lastCycle)) {
             log.debug(
-                "Skipped league points update: reason=cycleAlreadyApplied, workspaceId={}, cycleEnd={}",
-                workspaceId,
-                window.before()
-            );
+                    "Skipped league points update: reason=cycleAlreadyApplied, workspaceId={}, cycleEnd={}",
+                    workspaceId,
+                    window.before());
             return;
         }
 
         log.debug("Started league points update: workspaceId={}", workspaceId);
         List<LeaderboardEntryDTO> leaderboard = leaderboardService.createLeaderboard(
-            managed,
-            window.after(),
-            window.before(),
-            "all",
-            LeaderboardSortType.SCORE,
-            LeaderboardMode.INDIVIDUAL
-        );
+                managed, window.after(), window.before(), "all", LeaderboardSortType.SCORE, LeaderboardMode.INDIVIDUAL);
         leaderboard.forEach(updateLeaderboardEntry(workspaceId));
         managed.setLeaderboardLeagueCycleAt(window.before());
 
@@ -107,7 +99,9 @@ public class LeaguePointsUpdateTask {
             if (leaderboardUser == null) {
                 return;
             }
-            var user = userRepository.findByLoginWithEagerMergedPullRequests(leaderboardUser.login()).orElseThrow();
+            var user = userRepository
+                    .findByLoginWithEagerMergedPullRequests(leaderboardUser.login())
+                    .orElseThrow();
             int currentPoints = workspaceMembershipService.getCurrentLeaguePoints(workspaceId, user);
             int newPoints = leaguePointsService.calculateNewPoints(user, currentPoints, entry);
             workspaceMembershipService.updateLeaguePoints(workspaceId, user, newPoints);

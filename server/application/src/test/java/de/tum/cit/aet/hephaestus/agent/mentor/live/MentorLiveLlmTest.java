@@ -74,13 +74,8 @@ class MentorLiveLlmTest {
     /** Project-relative location of the SDK install. Build output, never vendored. Gitignored. */
     private static final Path SDK_DIR = Path.of("target", "pi-sdk").toAbsolutePath();
 
-    private static final Path RUNNER = Path.of(
-        "src",
-        "main",
-        "resources",
-        "agent",
-        "pi-mentor-runner.ts"
-    ).toAbsolutePath();
+    private static final Path RUNNER =
+            Path.of("src", "main", "resources", "agent", "pi-mentor-runner.ts").toAbsolutePath();
 
     private final List<Path> workspaceDirs = new ArrayList<>();
     private @Nullable Path workspaceDir;
@@ -96,11 +91,9 @@ class MentorLiveLlmTest {
             return;
         }
         Path lockFile = SDK_DIR.resolve(".install.lock");
-        try (
-            var raf = new java.io.RandomAccessFile(lockFile.toFile(), "rw");
-            var channel = raf.getChannel();
-            var lock = channel.lock()
-        ) {
+        try (var raf = new java.io.RandomAccessFile(lockFile.toFile(), "rw");
+                var channel = raf.getChannel();
+                var lock = channel.lock()) {
             // Re-check under lock — a parallel JVM may have just finished.
             if (Files.exists(marker)) {
                 return;
@@ -109,14 +102,13 @@ class MentorLiveLlmTest {
             // mutate its node_modules tree.
             Files.writeString(SDK_DIR.resolve("package.json"), "{\"name\":\"pi-sdk-test-deps\",\"private\":true}");
             ProcessBuilder pb = new ProcessBuilder(
-                "npm",
-                "install",
-                "--no-audit",
-                "--no-fund",
-                "--prefix",
-                SDK_DIR.toString(),
-                "@earendil-works/pi-coding-agent@" + PI_SDK_VERSION
-            );
+                    "npm",
+                    "install",
+                    "--no-audit",
+                    "--no-fund",
+                    "--prefix",
+                    SDK_DIR.toString(),
+                    "@earendil-works/pi-coding-agent@" + PI_SDK_VERSION);
             pb.redirectErrorStream(true);
             pb.inheritIO();
             Process p = pb.start();
@@ -190,16 +182,18 @@ class MentorLiveLlmTest {
         // Every TextDelta in the stream must share the same block id as the opening TextStart;
         // a regression here breaks AI SDK's client-side reconciliation (deltas get split into
         // separate parts).
-        List<UIMessageChunk.TextDelta> deltas = chunks
-            .stream()
-            .filter(UIMessageChunk.TextDelta.class::isInstance)
-            .map(UIMessageChunk.TextDelta.class::cast)
-            .toList();
-        assertThat(deltas).as("at least two text deltas (else merge logic untested)").hasSizeGreaterThanOrEqualTo(2);
+        List<UIMessageChunk.TextDelta> deltas = chunks.stream()
+                .filter(UIMessageChunk.TextDelta.class::isInstance)
+                .map(UIMessageChunk.TextDelta.class::cast)
+                .toList();
+        assertThat(deltas)
+                .as("at least two text deltas (else merge logic untested)")
+                .hasSizeGreaterThanOrEqualTo(2);
         String firstBlockId = deltas.get(0).id();
         assertThat(deltas).allMatch(d -> firstBlockId.equals(d.id()), "all deltas share one block id");
 
-        String concatenated = deltas.stream().map(UIMessageChunk.TextDelta::delta).reduce("", String::concat);
+        String concatenated =
+                deltas.stream().map(UIMessageChunk.TextDelta::delta).reduce("", String::concat);
         assertThat(concatenated.trim()).as("LLM responded with non-blank text").isNotEmpty();
         // Log a snippet so the test report shows what the model actually said — saves a debug round
         // when the response is unexpected.
@@ -216,12 +210,11 @@ class MentorLiveLlmTest {
         assertThat(usage.input()).as("usage.input ≥ 1").isGreaterThanOrEqualTo(1);
         assertThat(usage.output()).as("usage.output ≥ 1").isGreaterThanOrEqualTo(1);
         System.out.printf(
-            "[hero] usage: input=%d output=%d totalTokens=%s model=%s%n",
-            usage.input(),
-            usage.output(),
-            usage.totalTokens(),
-            finish.messageMetadata().model()
-        );
+                "[hero] usage: input=%d output=%d totalTokens=%s model=%s%n",
+                usage.input(),
+                usage.output(),
+                usage.totalTokens(),
+                finish.messageMetadata().model());
 
         // Persistence snapshot
         // partsSnapshot is what lands in chat_message.parts JSONB — a single text part once the
@@ -262,31 +255,24 @@ class MentorLiveLlmTest {
         driver.openThread(threadId);
 
         // Turn 1: plant a token only the assistant can have seen.
-        String t1Text = runTurnAndCollect(
-            driver,
-            threadId,
-            "Remember the number forty-two. Reply with exactly: noted."
-        );
+        String t1Text =
+                runTurnAndCollect(driver, threadId, "Remember the number forty-two. Reply with exactly: noted.");
         System.out.printf("[multi-turn] turn 1 (%d chars): %s%n", t1Text.length(), trim(t1Text, 200));
         assertThat(t1Text.trim()).as("turn 1 produced a non-empty response").isNotEmpty();
 
         // Turn 2: ask the LLM to recall the fact. If agent._state.messages was not threaded
         // through turn 1 → turn 2, the LLM has no way to answer this.
         String t2Text = runTurnAndCollect(
-            driver,
-            threadId,
-            "What number did I ask you to remember? Reply with only the digits."
-        );
+                driver, threadId, "What number did I ask you to remember? Reply with only the digits.");
         System.out.printf("[multi-turn] turn 2 (%d chars): %s%n", t2Text.length(), trim(t2Text, 200));
         // Accept either the numeric or spelled-out form so the assertion is model-agnostic.
         String t2Lower = t2Text.toLowerCase();
         assertThat(t2Lower)
-            .as(
-                "turn 2 must recall the planted number — if this fails, the Pi SDK's session-bound " +
-                    "agent._state.messages is not being fed through between turns on the same warm " +
-                    "runner and multi-turn conversation is broken"
-            )
-            .satisfiesAnyOf(s -> assertThat(s).contains("42"), s -> assertThat(s).contains("forty-two"));
+                .as("turn 2 must recall the planted number — if this fails, the Pi SDK's session-bound "
+                        + "agent._state.messages is not being fed through between turns on the same warm "
+                        + "runner and multi-turn conversation is broken")
+                .satisfiesAnyOf(
+                        s -> assertThat(s).contains("42"), s -> assertThat(s).contains("forty-two"));
     }
 
     @Test
@@ -312,35 +298,34 @@ class MentorLiveLlmTest {
         driver.openThread(threadId);
 
         // Turns 1-4: add one fruit per turn, ask for a one-word ack.
-        String[] fruits = { "apple", "banana", "cherry", "date" };
+        String[] fruits = {"apple", "banana", "cherry", "date"};
         for (int i = 0; i < fruits.length; i++) {
             String resp = runTurnAndCollect(
-                driver,
-                threadId,
-                "Add the fruit '" + fruits[i] + "' to the list. Reply with exactly one word: ok."
-            );
+                    driver,
+                    threadId,
+                    "Add the fruit '" + fruits[i] + "' to the list. Reply with exactly one word: ok.");
             System.out.printf("[5-turn] turn %d (%s): %s%n", i + 1, fruits[i], trim(resp, 60));
-            assertThat(resp.trim()).as("turn %d must produce a non-empty response", i + 1).isNotEmpty();
+            assertThat(resp.trim())
+                    .as("turn %d must produce a non-empty response", i + 1)
+                    .isNotEmpty();
         }
 
         // Turn 5: ask for the full list. Only correct if all four prior user+assistant pairs
         // landed in agent._state.messages.
         String summary = runTurnAndCollect(
-            driver,
-            threadId,
-            "List every fruit I have added so far, in the order I added them. " +
-                "Reply with just the fruit names separated by commas. No commentary."
-        );
+                driver,
+                threadId,
+                "List every fruit I have added so far, in the order I added them. "
+                        + "Reply with just the fruit names separated by commas. No commentary.");
         System.out.printf("[5-turn] turn 5 summary (%d chars): %s%n", summary.length(), trim(summary, 200));
         String lower = summary.toLowerCase();
         for (String fruit : fruits) {
             assertThat(lower)
-                .as(
-                    "turn 5 must include '%s' — its absence proves a turn earlier in the chain " +
-                        "did not thread through agent._state.messages",
-                    fruit
-                )
-                .contains(fruit);
+                    .as(
+                            "turn 5 must include '%s' — its absence proves a turn earlier in the chain "
+                                    + "did not thread through agent._state.messages",
+                            fruit)
+                    .contains(fruit);
         }
     }
 
@@ -350,21 +335,19 @@ class MentorLiveLlmTest {
         UUID threadId = UUID.randomUUID();
 
         byte[] bytesA = captureSessionBytesAfterTurn(
-            creds,
-            threadId,
-            "Remember: my favorite framework is Spring Boot. Reply with exactly: noted."
-        );
-        assertThat(bytesA).as("runner emitted session_persisted before the terminal wire event").isNotNull();
+                creds, threadId, "Remember: my favorite framework is Spring Boot. Reply with exactly: noted.");
+        assertThat(bytesA)
+                .as("runner emitted session_persisted before the terminal wire event")
+                .isNotNull();
 
         respawnWithSession(creds, threadId, bytesA);
         String followUp = runTurnAndCollect(
-            new RunnerDriver(activeSandbox()),
-            threadId,
-            "What framework am I using? Reply with only the framework name."
-        );
+                new RunnerDriver(activeSandbox()),
+                threadId,
+                "What framework am I using? Reply with only the framework name.");
         assertThat(followUp.toLowerCase())
-            .as("Pi SDK rehydrated agent state from injected .sessions/<id>.jsonl")
-            .contains("spring");
+                .as("Pi SDK rehydrated agent state from injected .sessions/<id>.jsonl")
+                .contains("spring");
     }
 
     @Test
@@ -375,10 +358,8 @@ class MentorLiveLlmTest {
         workspaceDir = stageWorkspace(creds);
 
         sandbox = spawnRunner(creds, workspaceDir);
-        var driver = new RunnerDriver(sandbox).withContext(
-            "inputs/context/recent_authored_work.json",
-            MAPPER.readTree(
-                """
+        var driver =
+                new RunnerDriver(sandbox).withContext("inputs/context/recent_authored_work.json", MAPPER.readTree("""
                 {
                   "user": {"login": "octo", "name": "Octo Example"},
                   "pullRequests": [
@@ -386,9 +367,7 @@ class MentorLiveLlmTest {
                   ],
                   "issues": []
                 }
-                """
-            )
-        );
+                """));
         driver.expectRunnerReady();
         driver.helloOk();
         driver.openThread(threadId);
@@ -407,44 +386,45 @@ class MentorLiveLlmTest {
         });
 
         driver.prompt(
-            threadId,
-            "Use fetch_context with path inputs/context/recent_authored_work.json, then tell me the PR number and title. " +
-                "You MUST use fetch_context. Do NOT guess."
-        );
+                threadId,
+                "Use fetch_context with path inputs/context/recent_authored_work.json, then tell me the PR number and title. "
+                        + "You MUST use fetch_context. Do NOT guess.");
         done.get(TURN_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
 
         // At least one tool was invoked.
-        List<UIMessageChunk.ToolInputStart> toolStarts = chunks
-            .stream()
-            .filter(UIMessageChunk.ToolInputStart.class::isInstance)
-            .map(UIMessageChunk.ToolInputStart.class::cast)
-            .toList();
-        assertThat(toolStarts).as("agent must invoke fetch_context to answer the question").isNotEmpty();
+        List<UIMessageChunk.ToolInputStart> toolStarts = chunks.stream()
+                .filter(UIMessageChunk.ToolInputStart.class::isInstance)
+                .map(UIMessageChunk.ToolInputStart.class::cast)
+                .toList();
+        assertThat(toolStarts)
+                .as("agent must invoke fetch_context to answer the question")
+                .isNotEmpty();
 
-        List<String> toolNames = toolStarts.stream().map(UIMessageChunk.ToolInputStart::toolName).toList();
+        List<String> toolNames =
+                toolStarts.stream().map(UIMessageChunk.ToolInputStart::toolName).toList();
         assertThat(toolNames).as("tools used should include fetch_context").contains("fetch_context");
         System.out.printf("[tool-use] tools invoked: %s%n", toolNames);
 
         // Tool produced output (not error).
-        List<UIMessageChunk.ToolOutputAvailable> toolOutputs = chunks
-            .stream()
-            .filter(UIMessageChunk.ToolOutputAvailable.class::isInstance)
-            .map(UIMessageChunk.ToolOutputAvailable.class::cast)
-            .toList();
-        assertThat(toolOutputs).as("at least one tool call completed with output").isNotEmpty();
+        List<UIMessageChunk.ToolOutputAvailable> toolOutputs = chunks.stream()
+                .filter(UIMessageChunk.ToolOutputAvailable.class::isInstance)
+                .map(UIMessageChunk.ToolOutputAvailable.class::cast)
+                .toList();
+        assertThat(toolOutputs)
+                .as("at least one tool call completed with output")
+                .isNotEmpty();
 
         // Agent's text response should reference the planted content.
-        String text = chunks
-            .stream()
-            .filter(UIMessageChunk.TextDelta.class::isInstance)
-            .map(UIMessageChunk.TextDelta.class::cast)
-            .map(UIMessageChunk.TextDelta::delta)
-            .reduce("", String::concat);
+        String text = chunks.stream()
+                .filter(UIMessageChunk.TextDelta.class::isInstance)
+                .map(UIMessageChunk.TextDelta.class::cast)
+                .map(UIMessageChunk.TextDelta::delta)
+                .reduce("", String::concat);
         System.out.printf("[tool-use] LLM response (%d chars): %s%n", text.length(), trim(text, 300));
         assertThat(text)
-            .as("agent must answer from recent_authored_work.json")
-            .contains("12")
-            .containsIgnoringCase("Slack mentor onboarding");
+                .as("agent must answer from recent_authored_work.json")
+                .contains("12")
+                .containsIgnoringCase("Slack mentor onboarding");
     }
 
     @Test
@@ -461,8 +441,8 @@ class MentorLiveLlmTest {
         byte[] bytesAfterB = Files.readAllBytes(sessionFile);
         assertThat(bytesAfterB.length).isGreaterThanOrEqualTo(bytesA.length);
         assertThat(Arrays.copyOfRange(bytesAfterB, 0, bytesA.length))
-            .as("Pi SDK must append, not rewrite — prompt-cache prefix must survive")
-            .isEqualTo(bytesA);
+                .as("Pi SDK must append, not rewrite — prompt-cache prefix must survive")
+                .isEqualTo(bytesA);
     }
 
     /**
@@ -470,7 +450,7 @@ class MentorLiveLlmTest {
      * Tears the runner down before returning so the caller can stage a fresh container.
      */
     private byte[] captureSessionBytesAfterTurn(LiveLlmCredentials creds, UUID threadId, String prompt)
-        throws Exception {
+            throws Exception {
         workspaceDir = stageWorkspace(creds);
         sandbox = spawnRunner(creds, workspaceDir);
         var driver = new RunnerDriver(sandbox);
@@ -521,14 +501,14 @@ class MentorLiveLlmTest {
     private static void deleteRecursive(Path root) {
         if (root == null || !Files.exists(root)) return;
         try (var stream = Files.walk(root)) {
-            stream
-                .sorted(Comparator.reverseOrder())
-                .forEach(p -> {
-                    try {
-                        Files.deleteIfExists(p);
-                    } catch (IOException ignored) {}
-                });
-        } catch (IOException ignored) {}
+            stream.sorted(Comparator.reverseOrder()).forEach(p -> {
+                try {
+                    Files.deleteIfExists(p);
+                } catch (IOException ignored) {
+                }
+            });
+        } catch (IOException ignored) {
+        }
     }
 
     /**
@@ -552,12 +532,11 @@ class MentorLiveLlmTest {
         try {
             driver.prompt(threadId, prompt);
             done.get(TURN_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
-            return chunks
-                .stream()
-                .filter(UIMessageChunk.TextDelta.class::isInstance)
-                .map(UIMessageChunk.TextDelta.class::cast)
-                .map(UIMessageChunk.TextDelta::delta)
-                .reduce("", String::concat);
+            return chunks.stream()
+                    .filter(UIMessageChunk.TextDelta.class::isInstance)
+                    .map(UIMessageChunk.TextDelta.class::cast)
+                    .map(UIMessageChunk.TextDelta::delta)
+                    .reduce("", String::concat);
         } finally {
             unsubscribe.dispose();
         }
@@ -588,27 +567,24 @@ class MentorLiveLlmTest {
         Path systemPromptDir = tmp.resolve("agent").resolve("mentor");
         Files.createDirectories(systemPromptDir);
         Files.writeString(
-            systemPromptDir.resolve("system.md"),
-            "You are a software engineering mentor. Answer concisely.\n"
-        );
+                systemPromptDir.resolve("system.md"), "You are a software engineering mentor. Answer concisely.\n");
 
         // Use the REAL production PiRuntimeFactory paths so this test fails the moment the
         // factory regresses (e.g. a provider refactor breaking the pi-provider.json contract).
         PiRuntimeFactory factory = new PiRuntimeFactory(MAPPER);
         PiPlanSpec spec = new PiPlanSpec(
-            "openai-completions",
-            creds.model(),
-            null,
-            null,
-            false,
-            "live-test-token",
-            // never actually checked — no real proxy sits in front of this test
-            true,
-            300,
-            new MentorRunnerProfile(),
-            Map.of(),
-            ""
-        );
+                "openai-completions",
+                creds.model(),
+                null,
+                null,
+                false,
+                "live-test-token",
+                // never actually checked — no real proxy sits in front of this test
+                true,
+                300,
+                new MentorRunnerProfile(),
+                Map.of(),
+                "");
         byte[] settingsBytes = factory.buildPiSettingsJson(spec.upstreamModelId());
 
         // Pi loads its on-disk settings from `~/.pi/settings.json`; redirect with env vars so we
@@ -619,16 +595,14 @@ class MentorLiveLlmTest {
 
         // pi-provider.json — the single non-secret provider spec both runners read via the shared
         // pi-provider.ts helper. Written at the workspace root (mirrors PiRuntimeFactory.build()).
-        byte[] providerConfigBytes = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(
-            java.util.Map.of(
-                "apiProtocol",
-                spec.apiProtocol(),
-                "modelId",
-                spec.upstreamModelId(),
-                "supportsReasoning",
-                false
-            )
-        );
+        byte[] providerConfigBytes = MAPPER.writerWithDefaultPrettyPrinter()
+                .writeValueAsBytes(java.util.Map.of(
+                        "apiProtocol",
+                        spec.apiProtocol(),
+                        "modelId",
+                        spec.upstreamModelId(),
+                        "supportsReasoning",
+                        false));
         Files.write(tmp.resolve("pi-provider.json"), providerConfigBytes);
 
         // No extension file is written: pi-mentor-runner.ts registers the hephaestus provider
@@ -658,9 +632,12 @@ class MentorLiveLlmTest {
         env.put("MENTOR_RUNNER_CWD", workspace.toString());
         env.put("MENTOR_RUNNER_SESSIONS_DIR", workspace.resolve(".sessions").toString());
         env.put(
-            "MENTOR_RUNNER_SYSTEM_PROMPT_PATH",
-            workspace.resolve("agent").resolve("mentor").resolve("system.md").toString()
-        );
+                "MENTOR_RUNNER_SYSTEM_PROMPT_PATH",
+                workspace
+                        .resolve("agent")
+                        .resolve("mentor")
+                        .resolve("system.md")
+                        .toString());
         pb.directory(workspace.toFile());
 
         pb.command("bun", workspace.resolve("pi-mentor-runner.ts").toString());
@@ -698,10 +675,12 @@ class MentorLiveLlmTest {
                     responses.add(frame);
                 } else if ("fetch_context".equals(frame.path("method").asString())) {
                     respondToFetchContext(frame);
-                } else if (
-                    "event".equals(frame.path("method").asString()) &&
-                    "runner_ready".equals(frame.path("params").path("event").path("type").asString())
-                ) {
+                } else if ("event".equals(frame.path("method").asString())
+                        && "runner_ready"
+                                .equals(frame.path("params")
+                                        .path("event")
+                                        .path("type")
+                                        .asString())) {
                     readyNotifications.add(frame);
                 }
             });
@@ -713,17 +692,16 @@ class MentorLiveLlmTest {
         }
 
         void expectRunnerReady() {
-            await()
-                .atMost(Duration.ofSeconds(30))
-                .pollInterval(Duration.ofMillis(50))
-                .until(() -> !readyNotifications.isEmpty());
+            await().atMost(Duration.ofSeconds(30))
+                    .pollInterval(Duration.ofMillis(50))
+                    .until(() -> !readyNotifications.isEmpty());
         }
 
         void helloOk() {
             JsonNode response = call("hello", MAPPER.createObjectNode(), Duration.ofSeconds(10));
             assertThat(response.path("result").path("protocolVersion").asInt(0))
-                .as("hello returns protocolVersion 1")
-                .isEqualTo(1);
+                    .as("hello returns protocolVersion 1")
+                    .isEqualTo(1);
         }
 
         void openThread(UUID threadId) {
@@ -731,8 +709,8 @@ class MentorLiveLlmTest {
             params.put("threadId", threadId.toString());
             JsonNode response = call("open_thread", params, Duration.ofSeconds(30));
             assertThat(response.path("result").path("threadId").asString())
-                .as("open_thread acks with threadId")
-                .isEqualTo(threadId.toString());
+                    .as("open_thread acks with threadId")
+                    .isEqualTo(threadId.toString());
         }
 
         void prompt(UUID threadId, String text) {
@@ -741,8 +719,8 @@ class MentorLiveLlmTest {
             params.put("text", text);
             JsonNode response = call("prompt", params, Duration.ofSeconds(10));
             assertThat(response.path("result").path("accepted").asBoolean())
-                .as("prompt accepted (turn streams via events)")
-                .isTrue();
+                    .as("prompt accepted (turn streams via events)")
+                    .isTrue();
         }
 
         private JsonNode call(String method, JsonNode params, Duration timeout) {
@@ -755,23 +733,22 @@ class MentorLiveLlmTest {
             sandbox.send(request);
             // Drain matching response from the queue (out-of-order responses are not expected for
             // the request methods we call, but we still match by id to be safe).
-            JsonNode response = await()
-                .atMost(timeout)
-                .pollInterval(Duration.ofMillis(20))
-                .until(
-                    () -> {
-                        for (JsonNode candidate : responses) {
-                            if (candidate.path("id").asInt(-1) == id) {
-                                responses.remove(candidate);
-                                return candidate;
-                            }
-                        }
-                        return null;
-                    },
-                    Objects::nonNull
-                );
+            JsonNode response = await().atMost(timeout)
+                    .pollInterval(Duration.ofMillis(20))
+                    .until(
+                            () -> {
+                                for (JsonNode candidate : responses) {
+                                    if (candidate.path("id").asInt(-1) == id) {
+                                        responses.remove(candidate);
+                                        return candidate;
+                                    }
+                                }
+                                return null;
+                            },
+                            Objects::nonNull);
             if (response.has("error")) {
-                throw new IllegalStateException("RPC " + method + " failed: " + response.path("error").toString());
+                throw new IllegalStateException(
+                        "RPC " + method + " failed: " + response.path("error").toString());
             }
             return response;
         }

@@ -13,14 +13,29 @@ import org.jspecify.annotations.Nullable;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @Schema(description = "A scored review activity entry with XP score for profile display")
 public record ProfileReviewActivityDTO(
-    @NonNull @Schema(description = "Unique identifier of the review") Long id,
-    @NonNull @Schema(description = "Whether the review was dismissed") Boolean isDismissed,
-    @Schema(description = "State of the review (APPROVED, CHANGES_REQUESTED, COMMENTED, etc.)")
-    PullRequestReview.@NonNull State state,
-    @NonNull @Schema(description = "Number of inline code comments in the review", example = "3") Integer codeComments,
-    @Schema(description = "Author of the review") @Nullable UserInfoDTO author,
-    @Schema(description = "Pull request that was reviewed") @Nullable PullRequestBaseInfoDTO pullRequest,
-    @NonNull @Schema(description = "URL to the review on the git provider") String htmlUrl,
-    @NonNull @Schema(description = "XP score earned for this review", example = "25") Integer score,
-    @NonNull @Schema(description = "Timestamp when the review was submitted") @Nullable Instant submittedAt
-) {}
+        @NonNull @Schema(description = "Unique identifier of the review")
+        Long id,
+
+        @NonNull @Schema(description = "Whether the review was dismissed")
+        Boolean isDismissed,
+
+        @Schema(description = "State of the review (APPROVED, CHANGES_REQUESTED, COMMENTED, etc.)")
+        PullRequestReview.@NonNull State state,
+
+        @NonNull @Schema(description = "Number of inline code comments in the review", example = "3")
+        Integer codeComments,
+
+        @Schema(description = "Author of the review") @Nullable
+        UserInfoDTO author,
+
+        @Schema(description = "Pull request that was reviewed") @Nullable
+        PullRequestBaseInfoDTO pullRequest,
+
+        @NonNull @Schema(description = "URL to the review on the git provider")
+        String htmlUrl,
+
+        @NonNull @Schema(description = "XP score earned for this review", example = "25")
+        Integer score,
+
+        @NonNull @Schema(description = "Timestamp when the review was submitted") @Nullable
+        Instant submittedAt) {}

@@ -25,6 +25,7 @@ public class TestSecurityConfig {
 
     /** Stable token strings + claims used by the impersonation-guard integration test. */
     public static final String IMPERSONATION_TOKEN = "mock-jwt-token-for-impersonation";
+
     public static final String NUMERIC_SUBJECT_TOKEN = "mock-jwt-token-for-numeric-user";
     private static final String IMPERSONATION_JTI = "11111111-1111-1111-1111-111111111111";
     private static final String NUMERIC_JTI = "22222222-2222-2222-2222-222222222222";
@@ -48,32 +49,32 @@ public class TestSecurityConfig {
             // the session as read-only. A valid jti keeps the controller path (logout) clean.
             if (IMPERSONATION_TOKEN.equals(token)) {
                 return Jwt.withTokenValue(token)
-                    .header("alg", "ES256")
-                    .header("typ", "JWT")
-                    .claim("sub", "1")
-                    .claim("preferred_username", "impersonated")
-                    .claim("iss", "https://test-issuer")
-                    .claim("aud", "test-audience")
-                    .claim("jti", IMPERSONATION_JTI)
-                    .claim("roles", Arrays.asList("app_admin"))
-                    .claim("act", Map.of("sub", "2"))
-                    .issuedAt(Instant.now())
-                    .expiresAt(Instant.now().plusSeconds(3600))
-                    .build();
+                        .header("alg", "ES256")
+                        .header("typ", "JWT")
+                        .claim("sub", "1")
+                        .claim("preferred_username", "impersonated")
+                        .claim("iss", "https://test-issuer")
+                        .claim("aud", "test-audience")
+                        .claim("jti", IMPERSONATION_JTI)
+                        .claim("roles", Arrays.asList("app_admin"))
+                        .claim("act", Map.of("sub", "2"))
+                        .issuedAt(Instant.now())
+                        .expiresAt(Instant.now().plusSeconds(3600))
+                        .build();
             }
             // Plain (non-act) token with a numeric sub + valid jti — a normal write must be allowed.
             if (NUMERIC_SUBJECT_TOKEN.equals(token)) {
                 return Jwt.withTokenValue(token)
-                    .header("alg", "ES256")
-                    .header("typ", "JWT")
-                    .claim("sub", "1")
-                    .claim("preferred_username", "numericuser")
-                    .claim("iss", "https://test-issuer")
-                    .claim("aud", "test-audience")
-                    .claim("jti", NUMERIC_JTI)
-                    .issuedAt(Instant.now())
-                    .expiresAt(Instant.now().plusSeconds(3600))
-                    .build();
+                        .header("alg", "ES256")
+                        .header("typ", "JWT")
+                        .claim("sub", "1")
+                        .claim("preferred_username", "numericuser")
+                        .claim("iss", "https://test-issuer")
+                        .claim("aud", "test-audience")
+                        .claim("jti", NUMERIC_JTI)
+                        .issuedAt(Instant.now())
+                        .expiresAt(Instant.now().plusSeconds(3600))
+                        .build();
             }
 
             // Dynamic numeric-subject token: "mock-jwt-sub-<accountId>" decodes to that exact `sub`,
@@ -83,16 +84,16 @@ public class TestSecurityConfig {
             if (token.startsWith("mock-jwt-sub-")) {
                 String sub = token.substring("mock-jwt-sub-".length());
                 return Jwt.withTokenValue(token)
-                    .header("alg", "HS256")
-                    .header("typ", "JWT")
-                    .claim("sub", sub)
-                    .claim("preferred_username", "account-" + sub)
-                    .claim("iss", "https://test-issuer")
-                    .claim("aud", "test-audience")
-                    .claim("roles", Arrays.asList("mentor_access", "app_admin"))
-                    .issuedAt(Instant.now())
-                    .expiresAt(Instant.now().plusSeconds(3600))
-                    .build();
+                        .header("alg", "HS256")
+                        .header("typ", "JWT")
+                        .claim("sub", sub)
+                        .claim("preferred_username", "account-" + sub)
+                        .claim("iss", "https://test-issuer")
+                        .claim("aud", "test-audience")
+                        .claim("roles", Arrays.asList("mentor_access", "app_admin"))
+                        .issuedAt(Instant.now())
+                        .expiresAt(Instant.now().plusSeconds(3600))
+                        .build();
             }
 
             // Determine user based on token pattern
@@ -103,11 +104,11 @@ public class TestSecurityConfig {
             if ("mock-jwt-token-for-mentor-user".equals(token)) {
                 username = "mentor";
                 userId = "mentor-user-id";
-                roles = new String[] { "mentor_access" };
+                roles = new String[] {"mentor_access"};
             } else if ("mock-jwt-token-for-admin-user".equals(token)) {
                 username = "admin";
                 userId = "admin-user-id";
-                roles = new String[] { "app_admin" };
+                roles = new String[] {"app_admin"};
             } else if ("mock-jwt-token-for-test-user".equals(token)) {
                 username = "testuser";
                 userId = "test-user-id";
@@ -132,12 +133,12 @@ public class TestSecurityConfig {
             }
 
             return Jwt.withTokenValue(token)
-                .header("alg", "HS256")
-                .header("typ", "JWT")
-                .claims(claimsMap -> claimsMap.putAll(claims))
-                .issuedAt(Instant.now())
-                .expiresAt(Instant.now().plusSeconds(3600))
-                .build();
+                    .header("alg", "HS256")
+                    .header("typ", "JWT")
+                    .claims(claimsMap -> claimsMap.putAll(claims))
+                    .issuedAt(Instant.now())
+                    .expiresAt(Instant.now().plusSeconds(3600))
+                    .build();
         };
     }
 }

@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
@@ -31,13 +30,10 @@ class ProgressFooterRendererTest extends BaseUnitTest {
 
     @Test
     void render_resolvedAndNew_rendersCollapsedFooterWithCounts() {
-        TrendDelta d = delta(
-            List.of(
+        TrendDelta d = delta(List.of(
                 transition("k1", TransitionStatus.RESOLVED, "Unused import removed", "code-hygiene"),
                 transition("k2", TransitionStatus.NEW, "New dead branch", "control-flow"),
-                transition("k3", TransitionStatus.PERSISTED, "still open thing", "naming")
-            )
-        );
+                transition("k3", TransitionStatus.PERSISTED, "still open thing", "naming")));
 
         String out = ProgressFooterRenderer.render(d);
 
@@ -56,23 +52,15 @@ class ProgressFooterRendererTest extends BaseUnitTest {
         // A BAD→GOOD improvement is PERSISTED with currentAssessment=GOOD (satisfied, not open); only
         // genuinely-open (BAD) persisted loci count as "still open".
         LocusTransition newProblem = new LocusTransition(
-            "k-new",
-            TransitionStatus.NEW,
-            "control-flow",
-            "New dead branch",
-            null,
-            Assessment.BAD,
-            Severity.MAJOR
-        );
+                "k-new", TransitionStatus.NEW, "control-flow", "New dead branch", null, Assessment.BAD, Severity.MAJOR);
         LocusTransition nowSatisfied = new LocusTransition(
-            "k-fixed",
-            TransitionStatus.PERSISTED,
-            "naming",
-            "Name now clear",
-            Assessment.BAD,
-            Assessment.GOOD,
-            Severity.MINOR
-        );
+                "k-fixed",
+                TransitionStatus.PERSISTED,
+                "naming",
+                "Name now clear",
+                Assessment.BAD,
+                Assessment.GOOD,
+                Severity.MINOR);
         TrendDelta d = delta(List.of(newProblem, nowSatisfied));
 
         String out = ProgressFooterRenderer.render(d);
@@ -84,9 +72,8 @@ class ProgressFooterRendererTest extends BaseUnitTest {
 
     @Test
     void render_regressed_rendersSlippedBackSection() {
-        TrendDelta d = delta(
-            List.of(transition("k1", TransitionStatus.REGRESSED, "Tests dropped again", "ships-tests"))
-        );
+        TrendDelta d =
+                delta(List.of(transition("k1", TransitionStatus.REGRESSED, "Tests dropped again", "ships-tests")));
 
         String out = ProgressFooterRenderer.render(d);
 
@@ -114,14 +101,13 @@ class ProgressFooterRendererTest extends BaseUnitTest {
 
     private static TrendDelta delta(List<LocusTransition> transitions) {
         return new TrendDelta(
-            ArtifactKinds.PULL_REQUEST,
-            100L,
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            Instant.parse("2026-06-15T10:00:00Z"),
-            Instant.parse("2026-06-14T10:00:00Z"),
-            transitions
-        );
+                ArtifactKinds.PULL_REQUEST,
+                100L,
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                Instant.parse("2026-06-15T10:00:00Z"),
+                Instant.parse("2026-06-14T10:00:00Z"),
+                transitions);
     }
 
     private static LocusTransition transition(String key, TransitionStatus status, String title, String slug) {

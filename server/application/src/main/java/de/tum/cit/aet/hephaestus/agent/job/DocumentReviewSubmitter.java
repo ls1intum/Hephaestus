@@ -38,13 +38,12 @@ public class DocumentReviewSubmitter implements DocumentReviewTrigger, PendingSi
     private final TransactionTemplate transactionTemplate;
 
     public DocumentReviewSubmitter(
-        AgentJobService agentJobService,
-        DocumentProjection documentProjection,
-        WorkspaceRepository workspaceRepository,
-        PracticeReviewDetectionGate practiceReviewDetectionGate,
-        SignalRecorder signalRecorder,
-        TransactionTemplate transactionTemplate
-    ) {
+            AgentJobService agentJobService,
+            DocumentProjection documentProjection,
+            WorkspaceRepository workspaceRepository,
+            PracticeReviewDetectionGate practiceReviewDetectionGate,
+            SignalRecorder signalRecorder,
+            TransactionTemplate transactionTemplate) {
         this.agentJobService = agentJobService;
         this.documentProjection = documentProjection;
         this.workspaceRepository = workspaceRepository;
@@ -76,9 +75,9 @@ public class DocumentReviewSubmitter implements DocumentReviewTrigger, PendingSi
         }
 
         DocumentProjection.ProjectedDocument document = documentProjection
-            .documentById(key.workspaceId(), key.artifactId())
-            .filter(found -> !found.deleted())
-            .orElse(null);
+                .documentById(key.workspaceId(), key.artifactId())
+                .filter(found -> !found.deleted())
+                .orElse(null);
         if (document == null) {
             log.debug("Document signal has no reviewable document left: documentId={}", key.artifactId());
             refuse(key, SignalStateReason.ARTIFACT_GONE);
@@ -88,45 +87,38 @@ public class DocumentReviewSubmitter implements DocumentReviewTrigger, PendingSi
         Long aboutUserId = document.createdByMemberId();
         if (aboutUserId == null || aboutUserId <= 0) {
             log.debug(
-                "Document signal has no linked author to attribute to: documentId={}, subject={}",
-                key.artifactId(),
-                document.createdBySubject()
-            );
+                    "Document signal has no linked author to attribute to: documentId={}, subject={}",
+                    key.artifactId(),
+                    document.createdBySubject());
             refuse(key, SignalStateReason.SUBJECT_UNLINKED);
             return;
         }
 
-        switch (
-            practiceReviewDetectionGate.evaluateSignal(
-                workspace,
-                key.signalName(),
-                TriggerMode.AUTO,
-                new ReviewSubject(aboutUserId, true)
-            )
-        ) {
+        switch (practiceReviewDetectionGate.evaluateSignal(
+                workspace, key.signalName(), TriggerMode.AUTO, new ReviewSubject(aboutUserId, true))) {
             case GateDecision.Skip skip -> {
                 log.debug(
-                    "Document signal skipped by practice gate: documentId={}, reason={}",
-                    key.artifactId(),
-                    skip.reason()
-                );
+                        "Document signal skipped by practice gate: documentId={}, reason={}",
+                        key.artifactId(),
+                        skip.reason());
                 refuse(key, skip.resolvedSignalReason());
             }
-            case GateDecision.Detect detect -> agentJobService.submit(
-                detect.workspace().getId(),
-                AgentJobType.DOCUMENT_REVIEW,
-                new DocumentReviewSubmissionRequest(
-                    key.artifactId(),
-                    document.title(),
-                    document.collectionName() != null ? document.collectionName() : document.collectionSlug(),
-                    aboutUserId,
-                    key.signalName(),
-                    key.revision(),
-                    SignalOrigins.observationOriginOf(discoveredVia)
-                ),
-                key,
-                detect
-            );
+            case GateDecision.Detect detect ->
+                agentJobService.submit(
+                        detect.workspace().getId(),
+                        AgentJobType.DOCUMENT_REVIEW,
+                        new DocumentReviewSubmissionRequest(
+                                key.artifactId(),
+                                document.title(),
+                                document.collectionName() != null
+                                        ? document.collectionName()
+                                        : document.collectionSlug(),
+                                aboutUserId,
+                                key.signalName(),
+                                key.revision(),
+                                SignalOrigins.observationOriginOf(discoveredVia)),
+                        key,
+                        detect);
         }
     }
 

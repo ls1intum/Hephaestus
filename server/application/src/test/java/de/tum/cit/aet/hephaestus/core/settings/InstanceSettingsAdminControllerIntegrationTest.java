@@ -9,7 +9,6 @@ import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -53,22 +52,22 @@ class InstanceSettingsAdminControllerIntegrationTest extends AbstractWorkspaceIn
     @WithUser
     void nonAdminCannotReadOrWriteSettings() {
         webTestClient
-            .get()
-            .uri("/admin/settings")
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .get()
+                .uri("/admin/settings")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isForbidden();
 
         webTestClient
-            .patch()
-            .uri("/admin/settings/silent-mode")
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("engaged", true))
-            .exchange()
-            .expectStatus()
-            .isForbidden();
+                .patch()
+                .uri("/admin/settings/silent-mode")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("engaged", true))
+                .exchange()
+                .expectStatus()
+                .isForbidden();
     }
 
     @Test
@@ -94,7 +93,9 @@ class InstanceSettingsAdminControllerIntegrationTest extends AbstractWorkspaceIn
 
         InstanceSettingsDTO released = patchSilentMode(Map.of("engaged", false), engaged.etag());
         assertThat(released.silentModeEngaged()).isFalse();
-        assertThat(released.silentModeReason()).as("reason is cleared on release").isNull();
+        assertThat(released.silentModeReason())
+                .as("reason is cleared on release")
+                .isNull();
     }
 
     @Test
@@ -104,15 +105,15 @@ class InstanceSettingsAdminControllerIntegrationTest extends AbstractWorkspaceIn
         InstanceSettingsDTO engaged = patchSilentMode(Map.of("engaged", true), null);
 
         webTestClient
-            .patch()
-            .uri("/admin/settings/silent-mode")
-            .headers(TestAuthUtils.withCurrentUser())
-            .header(HttpHeaders.IF_MATCH, initial.etag())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("engaged", false))
-            .exchange()
-            .expectStatus()
-            .isEqualTo(412);
+                .patch()
+                .uri("/admin/settings/silent-mode")
+                .headers(TestAuthUtils.withCurrentUser())
+                .header(HttpHeaders.IF_MATCH, initial.etag())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("engaged", false))
+                .exchange()
+                .expectStatus()
+                .isEqualTo(412);
 
         assertThat(getSettings().silentModeEngaged()).isTrue();
         assertThat(getSettings().etag()).isEqualTo(engaged.etag());
@@ -122,14 +123,14 @@ class InstanceSettingsAdminControllerIntegrationTest extends AbstractWorkspaceIn
     @WithAdminUser
     void shouldRejectReleaseWhenIfMatchIsMissing() {
         webTestClient
-            .patch()
-            .uri("/admin/settings/silent-mode")
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("engaged", false))
-            .exchange()
-            .expectStatus()
-            .isEqualTo(428);
+                .patch()
+                .uri("/admin/settings/silent-mode")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("engaged", false))
+                .exchange()
+                .expectStatus()
+                .isEqualTo(428);
     }
 
     @Test
@@ -181,26 +182,26 @@ class InstanceSettingsAdminControllerIntegrationTest extends AbstractWorkspaceIn
     @WithAdminUser
     void missingEngagedFieldIsRejectedNotDefaultedToRelease() {
         webTestClient
-            .patch()
-            .uri("/admin/settings/silent-mode")
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("reason", "no engaged flag"))
-            .exchange()
-            .expectStatus()
-            .isBadRequest();
+                .patch()
+                .uri("/admin/settings/silent-mode")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("reason", "no engaged flag"))
+                .exchange()
+                .expectStatus()
+                .isBadRequest();
     }
 
     private InstanceSettingsDTO getSettings() {
         var result = webTestClient
-            .get()
-            .uri("/admin/settings")
-            .headers(TestAuthUtils.withCurrentUser())
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(InstanceSettingsDTO.class)
-            .returnResult();
+                .get()
+                .uri("/admin/settings")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(InstanceSettingsDTO.class)
+                .returnResult();
         InstanceSettingsDTO dto = result.getResponseBody();
         assertThat(dto).isNotNull();
         assertThat(result.getResponseHeaders().getETag()).isEqualTo(dto.etag());
@@ -209,21 +210,20 @@ class InstanceSettingsAdminControllerIntegrationTest extends AbstractWorkspaceIn
 
     private InstanceSettingsDTO patchSilentMode(Map<String, Object> body, @Nullable String currentEtag) {
         WebTestClient.RequestBodySpec request = webTestClient
-            .patch()
-            .uri("/admin/settings/silent-mode")
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON);
+                .patch()
+                .uri("/admin/settings/silent-mode")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON);
         if (currentEtag != null) {
             request.header(HttpHeaders.IF_MATCH, currentEtag);
         }
-        InstanceSettingsDTO dto = request
-            .bodyValue(body)
-            .exchange()
-            .expectStatus()
-            .isOk()
-            .expectBody(InstanceSettingsDTO.class)
-            .returnResult()
-            .getResponseBody();
+        InstanceSettingsDTO dto = request.bodyValue(body)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(InstanceSettingsDTO.class)
+                .returnResult()
+                .getResponseBody();
         org.junit.jupiter.api.Assertions.assertNotNull(dto);
         return dto;
     }
@@ -232,11 +232,7 @@ class InstanceSettingsAdminControllerIntegrationTest extends AbstractWorkspaceIn
         InstanceSettings current = instanceSettingsService.get();
         if (current.isSilentModeEngaged()) {
             instanceSettingsService.updateSilentMode(
-                false,
-                null,
-                null,
-                EntityTagPrecondition.parse(etag(current.getVersion()))
-            );
+                    false, null, null, EntityTagPrecondition.parse(etag(current.getVersion())));
         }
     }
 
@@ -252,20 +248,12 @@ class InstanceSettingsAdminControllerIntegrationTest extends AbstractWorkspaceIn
     }
 
     private @Nullable Exception updateAfter(
-        CountDownLatch ready,
-        CountDownLatch start,
-        boolean engaged,
-        @Nullable Long version
-    ) {
+            CountDownLatch ready, CountDownLatch start, boolean engaged, @Nullable Long version) {
         try {
             ready.countDown();
             await(start);
             instanceSettingsService.updateSilentMode(
-                engaged,
-                null,
-                null,
-                version == null ? null : EntityTagPrecondition.parse(etag(version))
-            );
+                    engaged, null, null, version == null ? null : EntityTagPrecondition.parse(etag(version)));
             return null;
         } catch (Exception failure) {
             return failure;

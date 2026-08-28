@@ -58,52 +58,48 @@ public interface DocumentProjection {
      * {@code collectionSlug} is the stable identity.
      */
     record ProjectedDocument(
-        String collectionSlug,
-        String slug,
-        String title,
-        @Nullable String bodyMarkdown,
-        boolean deleted,
-        @Nullable Instant createdAt,
-        @Nullable Instant updatedAt,
-        @Nullable String createdByName,
-        @Nullable String createdBySubject,
-        @Nullable Long createdByMemberId,
-        @Nullable String updatedByName,
-        @Nullable String updatedBySubject,
-        @Nullable Long updatedByMemberId,
-        List<Collaborator> collaborators,
-        boolean archived,
-        @Nullable String collectionName
-    ) {
-        /** One document editor: provider-native subject, display name if known, resolved member id if linked. */
-        public record Collaborator(String subject, @Nullable String name, @Nullable Long memberId) {}
-
-        /** No substrate captured, or tombstoned — every author/collection field {@code null}. */
-        public static ProjectedDocument withoutAuthors(
             String collectionSlug,
             String slug,
             String title,
             @Nullable String bodyMarkdown,
-            boolean deleted
-        ) {
+            boolean deleted,
+            @Nullable Instant createdAt,
+            @Nullable Instant updatedAt,
+            @Nullable String createdByName,
+            @Nullable String createdBySubject,
+            @Nullable Long createdByMemberId,
+            @Nullable String updatedByName,
+            @Nullable String updatedBySubject,
+            @Nullable Long updatedByMemberId,
+            List<Collaborator> collaborators,
+            boolean archived,
+            @Nullable String collectionName) {
+        /** One document editor: provider-native subject, display name if known, resolved member id if linked. */
+        public record Collaborator(
+                String subject,
+                @Nullable String name,
+                @Nullable Long memberId) {}
+
+        /** No substrate captured, or tombstoned — every author/collection field {@code null}. */
+        public static ProjectedDocument withoutAuthors(
+                String collectionSlug, String slug, String title, @Nullable String bodyMarkdown, boolean deleted) {
             return new ProjectedDocument(
-                collectionSlug,
-                slug,
-                title,
-                bodyMarkdown,
-                deleted,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                List.of(),
-                false,
-                null
-            );
+                    collectionSlug,
+                    slug,
+                    title,
+                    bodyMarkdown,
+                    deleted,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    List.of(),
+                    false,
+                    null);
         }
     }
 }

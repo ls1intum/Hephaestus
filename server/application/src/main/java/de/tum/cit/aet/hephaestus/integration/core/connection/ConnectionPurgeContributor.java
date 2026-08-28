@@ -26,10 +26,9 @@ public class ConnectionPurgeContributor implements WorkspacePurgeContributor {
     private final Map<IntegrationKind, ConnectionStrategy> strategies;
 
     public ConnectionPurgeContributor(
-        ConnectionRepository connectionRepository,
-        ConnectionService connectionService,
-        List<ConnectionStrategy> strategyBeans
-    ) {
+            ConnectionRepository connectionRepository,
+            ConnectionService connectionService,
+            List<ConnectionStrategy> strategyBeans) {
         this.connectionRepository = connectionRepository;
         this.connectionService = connectionService;
         this.strategies = new EnumMap<>(IntegrationKind.class);
@@ -49,51 +48,42 @@ public class ConnectionPurgeContributor implements WorkspacePurgeContributor {
             }
             ConnectionStrategy strategy = strategies.get(c.getKind());
             connectionService.disconnectForErasure(
-                c,
-                new ConnectionService.TransitionRequest(
-                    IntegrationState.UNINSTALLED,
-                    "WORKSPACE_PURGED",
-                    "SYSTEM",
-                    "workspace-purge",
-                    "workspace-" + workspaceId + "-purge-" + c.getId(),
-                    "Cascade from workspace PURGE"
-                ),
-                () -> revokeProvider(c, strategy)
-            );
+                    c,
+                    new ConnectionService.TransitionRequest(
+                            IntegrationState.UNINSTALLED,
+                            "WORKSPACE_PURGED",
+                            "SYSTEM",
+                            "workspace-purge",
+                            "workspace-" + workspaceId + "-purge-" + c.getId(),
+                            "Cascade from workspace PURGE"),
+                    () -> revokeProvider(c, strategy));
         }
     }
 
     private void revokeProvider(Connection connection, @Nullable ConnectionStrategy strategy) {
         if (strategy == null) {
             log.warn(
-                "Provider teardown unavailable during workspace purge: kind={}, connectionId={}; continuing with local erasure",
-                connection.getKind(),
-                connection.getId()
-            );
+                    "Provider teardown unavailable during workspace purge: kind={}, connectionId={}; continuing with local erasure",
+                    connection.getKind(),
+                    connection.getId());
             return;
         }
         try {
-            strategy.revokeProvider(
-                new IntegrationRef(
+            strategy.revokeProvider(new IntegrationRef(
                     connection.getKind(),
                     connection.getWorkspace().getId(),
                     connection.getInstanceKey(),
-                    connection.getId()
-                )
-            );
+                    connection.getId()));
         } catch (RuntimeException e) {
             log.warn(
-                "Provider teardown failed during workspace purge: kind={}, connectionId={}, error={}",
-                connection.getKind(),
-                connection.getId(),
-                e.toString()
-            );
+                    "Provider teardown failed during workspace purge: kind={}, connectionId={}, error={}",
+                    connection.getKind(),
+                    connection.getId(),
+                    e.toString());
             throw new WorkspacePurgeBlockedException(
-                "Could not confirm disconnecting " +
-                    providerName(connection.getKind()) +
-                    ". No local data was deleted; retry when the provider is available.",
-                e
-            );
+                    "Could not confirm disconnecting " + providerName(connection.getKind())
+                            + ". No local data was deleted; retry when the provider is available.",
+                    e);
         }
     }
 

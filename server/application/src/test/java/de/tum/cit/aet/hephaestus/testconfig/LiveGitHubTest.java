@@ -15,7 +15,7 @@ import org.junit.jupiter.api.parallel.ExecutionMode;
  * runs a runtime check on {@code github.app.id} + private key material so PEM parse failures
  * surface as a skip rather than a hard test error.
  */
-@Target({ ElementType.TYPE, ElementType.METHOD })
+@Target({ElementType.TYPE, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 @Tag("live")
 @EnabledIfEnvironmentVariable(named = "GH_APP_INSTALLATION_ID", matches = ".+")

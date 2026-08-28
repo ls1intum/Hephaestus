@@ -52,16 +52,13 @@ public class ReviewContractValidator {
      * Which capability a vendor must own to claim a lane. {@link FeedbackLane#IN_APP} maps to no
      * capability because it is ours — no integration can reach it.
      */
-    static final Map<FeedbackLane, Capability> LANE_CAPABILITIES = new EnumMap<>(
-        Map.of(
+    static final Map<FeedbackLane, Capability> LANE_CAPABILITIES = new EnumMap<>(Map.of(
             FeedbackLane.IN_CONTEXT_SUMMARY,
             Capability.FEEDBACK_DELIVERY,
             FeedbackLane.IN_CONTEXT_INLINE,
             Capability.INLINE_FEEDBACK,
             FeedbackLane.IN_CHAT,
-            Capability.FEEDBACK_DELIVERY
-        )
-    );
+            Capability.FEEDBACK_DELIVERY));
 
     /**
      * Lanes that exist but that no integration can reach, because the surface is ours.
@@ -78,16 +75,14 @@ public class ReviewContractValidator {
     private final ReviewExecutionCatalog executionCatalog;
 
     public ReviewContractValidator(
-        ArtifactDescriptorRegistry descriptors,
-        IntegrationMessageHandlerRegistry handlers,
-        List<ReviewContextBuilder> contextBuilders,
-        ReviewExecutionCatalog executionCatalog
-    ) {
+            ArtifactDescriptorRegistry descriptors,
+            IntegrationMessageHandlerRegistry handlers,
+            List<ReviewContextBuilder> contextBuilders,
+            ReviewExecutionCatalog executionCatalog) {
         this.descriptors = descriptors;
         this.handlers = handlers;
-        this.contextBuilders = contextBuilders
-            .stream()
-            .collect(Collectors.groupingBy(ReviewContextBuilder::artifactKind));
+        this.contextBuilders =
+                contextBuilders.stream().collect(Collectors.groupingBy(ReviewContextBuilder::artifactKind));
         this.executionCatalog = executionCatalog;
     }
 
@@ -101,28 +96,25 @@ public class ReviewContractValidator {
             }
             for (Signal signal : descriptor.signals()) {
                 if (!kind.equals(signal.name().artifactKind())) {
-                    violations.add(
-                        kind + " declares signal " + signal.name() + " whose name belongs to another artifact kind"
-                    );
+                    violations.add(kind + " declares signal " + signal.name()
+                            + " whose name belongs to another artifact kind");
                 }
             }
-            long distinctNames = descriptor.signals().stream().map(Signal::name).distinct().count();
+            long distinctNames =
+                    descriptor.signals().stream().map(Signal::name).distinct().count();
             if (distinctNames != descriptor.signals().size()) {
                 violations.add(kind + " declares the same signal name twice");
             }
             validateManualRequestSignal(descriptor, kind, violations);
             if (descriptor.reviewable()) {
                 if (!contextBuilders.containsKey(kind)) {
-                    violations.add(
-                        kind + " is declared reviewable but no ReviewContextBuilder can assemble its review context"
-                    );
+                    violations.add(kind
+                            + " is declared reviewable but no ReviewContextBuilder can assemble its review context");
                 }
                 if (!executionCatalog.executableKinds().contains(kind)) {
                     violations.add(
-                        kind +
-                            " is declared reviewable but no job type and handler can run a review of it — " +
-                            "a kind that can be authored against and never executed is silence by declaration"
-                    );
+                            kind + " is declared reviewable but no job type and handler can run a review of it — "
+                                    + "a kind that can be authored against and never executed is silence by declaration");
                 }
                 if (descriptor.roles().isEmpty()) {
                     violations.add(kind + " is declared reviewable but names nobody to attribute an observation to");
@@ -131,16 +123,12 @@ public class ReviewContractValidator {
                     violations.add(kind + " is declared reviewable but declares no lane to deliver feedback on");
                 }
                 if (descriptor.reviewLimitations().isEmpty()) {
-                    violations.add(
-                        kind +
-                            " is declared reviewable but names nothing its evidence cannot settle — " +
-                            "a kind whose evidence answers every question is not a claim anyone can make"
-                    );
+                    violations.add(kind + " is declared reviewable but names nothing its evidence cannot settle — "
+                            + "a kind whose evidence answers every question is not a claim anyone can make");
                 }
             } else if (!descriptor.lanes().isEmpty()) {
-                violations.add(
-                    kind + " is not reviewable yet declares feedback lanes " + descriptor.lanes() + " nothing can fill"
-                );
+                violations.add(kind + " is not reviewable yet declares feedback lanes " + descriptor.lanes()
+                        + " nothing can fill");
             }
         }
         return violations;
@@ -152,51 +140,39 @@ public class ReviewContractValidator {
      * event's) under {@code uq_artifact_signal}.
      */
     private void validateManualRequestSignal(
-        ArtifactDescriptor descriptor,
-        ArtifactKind kind,
-        List<String> violations
-    ) {
-        List<Signal> requests = descriptor.signals().stream().filter(Signal::requestedByHand).toList();
+            ArtifactDescriptor descriptor, ArtifactKind kind, List<String> violations) {
+        List<Signal> requests =
+                descriptor.signals().stream().filter(Signal::requestedByHand).toList();
         if (requests.isEmpty()) {
             return;
         }
         if (requests.size() > 1) {
-            violations.add(
-                kind +
-                    " declares " +
-                    requests.size() +
-                    " signals as the one a person's review request raises (" +
-                    requests
-                        .stream()
-                        .map(signal -> signal.name().value())
-                        .sorted()
-                        .toList() +
-                    ") — the manual path must resolve exactly one, or a request's ledger identity depends on " +
-                    "declaration order"
-            );
+            violations.add(kind + " declares "
+                    + requests.size()
+                    + " signals as the one a person's review request raises ("
+                    + requests.stream()
+                            .map(signal -> signal.name().value())
+                            .sorted()
+                            .toList()
+                    + ") — the manual path must resolve exactly one, or a request's ledger identity depends on "
+                    + "declaration order");
         }
         for (Signal request : requests) {
             if (request.revision() != RevisionScheme.RUN_ID) {
-                violations.add(
-                    kind +
-                        " raises " +
-                        request.name() +
-                        " when somebody asks for a review, but keys it on " +
-                        request.revision() +
-                        " — a request has no identity but its own, so anything other than RUN_ID deduplicates " +
-                        "a second person's ask against the first, or against an event's"
-                );
+                violations.add(kind + " raises "
+                        + request.name()
+                        + " when somebody asks for a review, but keys it on "
+                        + request.revision()
+                        + " — a request has no identity but its own, so anything other than RUN_ID deduplicates "
+                        + "a second person's ask against the first, or against an event's");
             }
             if (!request.producedBy().isEmpty()) {
-                violations.add(
-                    kind +
-                        " raises " +
-                        request.name() +
-                        " when somebody asks for a review, yet declares ingested events " +
-                        request.producedBy() +
-                        " produce it — a request comes from a person, and claiming otherwise puts it back " +
-                        "under the coverage checks it is rightly exempt from"
-                );
+                violations.add(kind + " raises "
+                        + request.name()
+                        + " when somebody asks for a review, yet declares ingested events "
+                        + request.producedBy()
+                        + " produce it — a request comes from a person, and claiming otherwise puts it back "
+                        + "under the coverage checks it is rightly exempt from");
             }
         }
     }
@@ -209,16 +185,14 @@ public class ReviewContractValidator {
 
         for (ArtifactKind observed : contribution.observes()) {
             if (descriptors.descriptorFor(observed).isEmpty()) {
-                violations.add(
-                    kind +
-                        " observes " +
-                        observed +
-                        " but no module contributes an ArtifactDescriptor for it — the kind is undefined"
-                );
+                violations.add(kind + " observes "
+                        + observed
+                        + " but no module contributes an ArtifactDescriptor for it — the kind is undefined");
             }
         }
 
-        for (Map.Entry<ArtifactKind, Set<SignalName>> entry : contribution.raises().entrySet()) {
+        for (Map.Entry<ArtifactKind, Set<SignalName>> entry :
+                contribution.raises().entrySet()) {
             ArtifactKind raisedKind = entry.getKey();
             if (!contribution.observes().contains(raisedKind)) {
                 violations.add(kind + " raises signals for " + raisedKind + " without observing it");
@@ -227,20 +201,16 @@ public class ReviewContractValidator {
             for (SignalName signalName : entry.getValue()) {
                 if (!raisedKind.equals(signalName.artifactKind())) {
                     violations.add(
-                        kind + " files signal " + signalName + " under the wrong artifact kind " + raisedKind
-                    );
+                            kind + " files signal " + signalName + " under the wrong artifact kind " + raisedKind);
                     continue;
                 }
                 Optional<Signal> declared = descriptor.flatMap(d -> d.signal(signalName));
                 if (declared.isEmpty()) {
-                    violations.add(
-                        kind +
-                            " claims to raise " +
-                            signalName +
-                            " which " +
-                            raisedKind +
-                            "'s descriptor does not declare — raises must be a subset of the descriptor"
-                    );
+                    violations.add(kind + " claims to raise "
+                            + signalName
+                            + " which "
+                            + raisedKind
+                            + "'s descriptor does not declare — raises must be a subset of the descriptor");
                     continue;
                 }
                 violations.addAll(validateProvenance(kind, declared.get()));
@@ -253,32 +223,23 @@ public class ReviewContractValidator {
 
     private List<String> validateProvenance(IntegrationKind kind, Signal signal) {
         List<String> violations = new ArrayList<>();
-        Set<EventTypeKey> own = signal
-            .producedBy()
-            .stream()
-            .filter(key -> key.kind() == kind)
-            .collect(Collectors.toUnmodifiableSet());
+        Set<EventTypeKey> own =
+                signal.producedBy().stream().filter(key -> key.kind() == kind).collect(Collectors.toUnmodifiableSet());
         if (own.isEmpty()) {
-            violations.add(
-                kind +
-                    " claims to raise " +
-                    signal.name() +
-                    " but no ingested event of " +
-                    kind +
-                    " is declared to produce it — the signal could only ever be aspirational"
-            );
+            violations.add(kind + " claims to raise "
+                    + signal.name()
+                    + " but no ingested event of "
+                    + kind
+                    + " is declared to produce it — the signal could only ever be aspirational");
             return violations;
         }
         for (EventTypeKey key : own) {
             if (handlers.resolve(key).isEmpty()) {
-                violations.add(
-                    kind +
-                        " declares " +
-                        signal.name() +
-                        " is produced by event " +
-                        key.eventType() +
-                        " but no IntegrationMessageHandler is registered for it"
-                );
+                violations.add(kind + " declares "
+                        + signal.name()
+                        + " is produced by event "
+                        + key.eventType()
+                        + " but no IntegrationMessageHandler is registered for it");
             }
         }
         return violations;
@@ -287,32 +248,30 @@ public class ReviewContractValidator {
     private List<String> validateLanes(IntegrationManifest manifest, ReviewContribution contribution) {
         IntegrationKind kind = manifest.kind();
         List<String> violations = new ArrayList<>();
-        for (Map.Entry<ArtifactKind, Set<FeedbackLane>> entry : contribution.delivers().entrySet()) {
+        for (Map.Entry<ArtifactKind, Set<FeedbackLane>> entry :
+                contribution.delivers().entrySet()) {
             ArtifactKind deliveredKind = entry.getKey();
             if (!contribution.observes().contains(deliveredKind)) {
                 violations.add(kind + " delivers feedback for " + deliveredKind + " without observing it");
             }
             Set<FeedbackLane> allowed = descriptors
-                .descriptorFor(deliveredKind)
-                .map(ArtifactDescriptor::lanes)
-                .orElse(Set.of());
+                    .descriptorFor(deliveredKind)
+                    .map(ArtifactDescriptor::lanes)
+                    .orElse(Set.of());
             for (FeedbackLane lane : entry.getValue()) {
                 if (HEPHAESTUS_OWNED_LANES.contains(lane)) {
-                    violations.add(
-                        kind + " claims lane " + lane + " for " + deliveredKind + ", which no integration can deliver"
-                    );
+                    violations.add(kind + " claims lane " + lane + " for " + deliveredKind
+                            + ", which no integration can deliver");
                     continue;
                 }
                 if (!allowed.contains(lane)) {
-                    violations.add(
-                        kind + " delivers " + lane + " for " + deliveredKind + ", a lane that artifact does not have"
-                    );
+                    violations.add(kind + " delivers " + lane + " for " + deliveredKind
+                            + ", a lane that artifact does not have");
                 }
                 Capability required = LANE_CAPABILITIES.get(lane);
                 if (!manifest.declaredCapabilities().contains(required)) {
                     violations.add(
-                        kind + " delivers " + lane + " for " + deliveredKind + " without declaring " + required
-                    );
+                            kind + " delivers " + lane + " for " + deliveredKind + " without declaring " + required);
                 }
             }
         }

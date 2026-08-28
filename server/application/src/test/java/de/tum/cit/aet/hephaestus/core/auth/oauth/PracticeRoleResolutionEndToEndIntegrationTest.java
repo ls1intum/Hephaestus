@@ -21,7 +21,6 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -72,23 +71,27 @@ class PracticeRoleResolutionEndToEndIntegrationTest extends RealAuthIntegrationT
 
         // Pin the production seam that makes subject numeric: the real ClientRegistration's name attr.
         ClientRegistration registration = clientRegistrationRepository.findByRegistrationId(REGISTRATION_ID);
-        String nameAttr = registration.getProviderDetails().getUserInfoEndpoint().getUserNameAttributeName();
-        assertThat(nameAttr).as("login must key the principal name on the provider's numeric id").isEqualTo("id");
+        String nameAttr =
+                registration.getProviderDetails().getUserInfoEndpoint().getUserNameAttributeName();
+        assertThat(nameAttr)
+                .as("login must key the principal name on the provider's numeric id")
+                .isEqualTo("id");
 
         // Principal name keyed by the PRODUCTION attr (asserted == "id" above); subject is derived the
         // way HephaestusAuthSuccessHandler does — principal.getName() — and stored unchanged.
         OAuth2User principal = new DefaultOAuth2User(
-            List.of(new SimpleGrantedAuthority("ROLE_USER")),
-            Map.of("id", String.valueOf(NATIVE_ID), "login", "octocat", "name", "Octo Cat"),
-            nameAttr
-        );
+                List.of(new SimpleGrantedAuthority("ROLE_USER")),
+                Map.of("id", String.valueOf(NATIVE_ID), "login", "octocat", "name", "Octo Cat"),
+                nameAttr);
         String subject = principal.getName();
 
-        Account account = service
-            .resolveOrProvision(REGISTRATION_ID, subject, principal, AuthIntentCookie.Intent.login(null, null))
-            .account();
+        Account account = service.resolveOrProvision(
+                        REGISTRATION_ID, subject, principal, AuthIntentCookie.Intent.login(null, null))
+                .account();
 
-        IdentityLink link = identityLinkRepository.findActiveByAccountId(persistedId(account.getId())).get(0);
+        IdentityLink link = identityLinkRepository
+                .findActiveByAccountId(persistedId(account.getId()))
+                .get(0);
         // (a) the stored subject IS the numeric id — exactly what the gate stringifies from User.nativeId.
         assertThat(link.getSubject()).isEqualTo(String.valueOf(NATIVE_ID));
         long loginResolvedProviderId = link.getProviderId();
@@ -96,14 +99,9 @@ class PracticeRoleResolutionEndToEndIntegrationTest extends RealAuthIntegrationT
         // (b) the SCM side independently resolves the SAME git_provider row at the canonical origin.
         String origin = originOf(LOGIN_BASE_URL);
         IdentityProvider scmProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, origin)
-            .orElseThrow(() ->
-                new AssertionError(
-                    "login created no git_provider at canonical origin " +
-                        origin +
-                        " — login/SCM canonicalization diverged"
-                )
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, origin)
+                .orElseThrow(() -> new AssertionError("login created no git_provider at canonical origin " + origin
+                        + " — login/SCM canonicalization diverged"));
         assertThat(persistedId(scmProvider.getId())).isEqualTo(loginResolvedProviderId);
 
         // Synced SCM User for the same person under that same provider row.
@@ -111,13 +109,9 @@ class PracticeRoleResolutionEndToEndIntegrationTest extends RealAuthIntegrationT
         accountFeatureRepository.save(new AccountFeature(persistedId(account.getId()), ROLE));
 
         // THE PROOF: the (provider.id, valueOf(nativeId)) tuple the gate passes resolves the granted flag.
-        assertThat(
-            accountFeatureRepository.existsActiveFeatureForProviderSubject(
-                persistedId(user.getProvider().getId()),
-                String.valueOf(user.getNativeId()),
-                ROLE
-            )
-        ).isTrue();
+        assertThat(accountFeatureRepository.existsActiveFeatureForProviderSubject(
+                        persistedId(user.getProvider().getId()), String.valueOf(user.getNativeId()), ROLE))
+                .isTrue();
     }
 
     // Cross-provider isolation (same numeric subject on a different instance must NOT inherit the flag)

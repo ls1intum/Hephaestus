@@ -24,7 +24,10 @@ import org.jspecify.annotations.Nullable;
  * present. We perform a light prefix/scheme check on template URLs and defer full URI
  * validation to the adapter (which sees the resolved value).
  */
-public record NetworkPolicy(boolean internetAccess, @Nullable String llmProxyUrl, @Nullable String llmProxyToken) {
+public record NetworkPolicy(
+        boolean internetAccess,
+        @Nullable String llmProxyUrl,
+        @Nullable String llmProxyToken) {
     private static final Set<String> ALLOWED_SCHEMES = Set.of("http", "https");
 
     /** Matches the documented template placeholder produced before adapter resolution. */
@@ -63,8 +66,7 @@ public record NetworkPolicy(boolean internetAccess, @Nullable String llmProxyUrl
         String lower = url.toLowerCase();
         if (!lower.startsWith("http://") && !lower.startsWith("https://")) {
             throw new IllegalArgumentException(
-                "llmProxyUrl must start with http:// or https:// (templated form): " + url
-            );
+                    "llmProxyUrl must start with http:// or https:// (templated form): " + url);
         }
     }
 }

@@ -30,53 +30,39 @@ public class ProfileActivityQueryService {
     @Transactional(readOnly = true)
     public ProfileActivityStatsDTO getActivityStats(Long workspaceId, Long actorId, Instant since, Instant until) {
         log.debug(
-            "Fetching profile activity stats: workspaceId={}, actorId={}, since={}, until={}",
-            workspaceId,
-            actorId,
-            since,
-            until
-        );
+                "Fetching profile activity stats: workspaceId={}, actorId={}, since={}, until={}",
+                workspaceId,
+                actorId,
+                since,
+                until);
 
         Set<Long> actorIds = Set.of(actorId);
 
         // 1. Get XP totals from activity_event table
-        List<ActivityXpProjection> xpData = activityEventRepository.findExperiencePointsByWorkspaceAndTimeframe(
-            workspaceId,
-            since,
-            until
-        );
+        List<ActivityXpProjection> xpData =
+                activityEventRepository.findExperiencePointsByWorkspaceAndTimeframe(workspaceId, since, until);
 
-        int totalScore = xpData
-            .stream()
-            .filter(xp -> actorId.equals(xp.getActorId()))
-            .findFirst()
-            .map(ActivityXpProjection::getTotalExperiencePoints)
-            .map(XpPrecision::roundToInt)
-            .orElse(0);
+        int totalScore = xpData.stream()
+                .filter(xp -> actorId.equals(xp.getActorId()))
+                .findFirst()
+                .map(ActivityXpProjection::getTotalExperiencePoints)
+                .map(XpPrecision::roundToInt)
+                .orElse(0);
 
         // 2. Get activity breakdown by type
-        List<ActivityBreakdownProjection> breakdown = activityEventRepository.findActivityBreakdown(
-            workspaceId,
-            actorIds,
-            since,
-            until
-        );
+        List<ActivityBreakdownProjection> breakdown =
+                activityEventRepository.findActivityBreakdown(workspaceId, actorIds, since, until);
 
-        Map<Long, Long> ownReplies = activityEventRepository.countOwnPullRequestRepliesByActors(
-            workspaceId,
-            actorIds,
-            since,
-            until
-        );
+        Map<Long, Long> ownReplies =
+                activityEventRepository.countOwnPullRequestRepliesByActors(workspaceId, actorIds, since, until);
         Map<Long, Long> openPullRequests = toAuthorCountMap(
-            profilePullRequestQueryRepository.countOpenPullRequestsByAuthors(workspaceId, actorIds, since, until)
-        );
-        Map<Long, Long> mergedPullRequests = toAuthorCountMap(
-            profilePullRequestQueryRepository.countMergedPullRequestsByAuthors(workspaceId, actorIds, since, until)
-        );
-        Map<Long, Long> closedPullRequests = toAuthorCountMap(
-            profilePullRequestQueryRepository.countClosedPullRequestsByAuthors(workspaceId, actorIds, since, until)
-        );
+                profilePullRequestQueryRepository.countOpenPullRequestsByAuthors(workspaceId, actorIds, since, until));
+        Map<Long, Long> mergedPullRequests =
+                toAuthorCountMap(profilePullRequestQueryRepository.countMergedPullRequestsByAuthors(
+                        workspaceId, actorIds, since, until));
+        Map<Long, Long> closedPullRequests =
+                toAuthorCountMap(profilePullRequestQueryRepository.countClosedPullRequestsByAuthors(
+                        workspaceId, actorIds, since, until));
 
         // 3. Aggregate breakdown stats
         int approvals = 0;
@@ -105,41 +91,34 @@ public class ProfileActivityQueryService {
         }
 
         // 4. Query distinct PR count (with self-review exclusion)
-        Map<Long, Long> distinctPrCounts = activityEventRepository.countDistinctReviewedPullRequestsByActors(
-            workspaceId,
-            actorIds,
-            since,
-            until
-        );
+        Map<Long, Long> distinctPrCounts =
+                activityEventRepository.countDistinctReviewedPullRequestsByActors(workspaceId, actorIds, since, until);
         int reviewedPrCount = distinctPrCounts.getOrDefault(actorId, 0L).intValue();
 
         log.debug(
-            "Built profile activity stats: actorId={}, totalScore={}, reviewedPrCount={}",
-            actorId,
-            totalScore,
-            reviewedPrCount
-        );
+                "Built profile activity stats: actorId={}, totalScore={}, reviewedPrCount={}",
+                actorId,
+                totalScore,
+                reviewedPrCount);
 
         return new ProfileActivityStatsDTO(
-            totalScore,
-            reviewedPrCount,
-            approvals,
-            changeRequests,
-            comments,
-            codeComments,
-            unknowns,
-            ownReplies.getOrDefault(actorId, 0L).intValue(),
-            openPullRequests.getOrDefault(actorId, 0L).intValue(),
-            mergedPullRequests.getOrDefault(actorId, 0L).intValue(),
-            closedPullRequests.getOrDefault(actorId, 0L).intValue(),
-            openedIssues,
-            closedIssues
-        );
+                totalScore,
+                reviewedPrCount,
+                approvals,
+                changeRequests,
+                comments,
+                codeComments,
+                unknowns,
+                ownReplies.getOrDefault(actorId, 0L).intValue(),
+                openPullRequests.getOrDefault(actorId, 0L).intValue(),
+                mergedPullRequests.getOrDefault(actorId, 0L).intValue(),
+                closedPullRequests.getOrDefault(actorId, 0L).intValue(),
+                openedIssues,
+                closedIssues);
     }
 
     private static Map<Long, Long> toAuthorCountMap(List<AuthorCountProjection> counts) {
-        return counts
-            .stream()
-            .collect(Collectors.toMap(AuthorCountProjection::getAuthorId, AuthorCountProjection::getCount));
+        return counts.stream()
+                .collect(Collectors.toMap(AuthorCountProjection::getAuthorId, AuthorCountProjection::getCount));
     }
 }

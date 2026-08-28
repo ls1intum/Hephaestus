@@ -38,13 +38,12 @@ public class ConversationReviewSubmitter implements PendingSignalResubmitter {
     private final PracticeReviewDetectionGate detectionGate;
 
     public ConversationReviewSubmitter(
-        ConversationCandidateSource candidateSource,
-        AgentJobService agentJobService,
-        SignalRecorder signalRecorder,
-        TransactionTemplate transactionTemplate,
-        WorkspaceRepository workspaceRepository,
-        PracticeReviewDetectionGate detectionGate
-    ) {
+            ConversationCandidateSource candidateSource,
+            AgentJobService agentJobService,
+            SignalRecorder signalRecorder,
+            TransactionTemplate transactionTemplate,
+            WorkspaceRepository workspaceRepository,
+            PracticeReviewDetectionGate detectionGate) {
         this.candidateSource = candidateSource;
         this.agentJobService = agentJobService;
         this.signalRecorder = signalRecorder;
@@ -62,14 +61,13 @@ public class ConversationReviewSubmitter implements PendingSignalResubmitter {
     public void resubmit(ArtifactSignal signal) {
         long workspaceId = signal.getWorkspace().getId();
         ConversationThreadCandidate candidate = candidateSource
-            .candidateById(workspaceId, signal.getArtifactId())
-            .orElse(null);
+                .candidateById(workspaceId, signal.getArtifactId())
+                .orElse(null);
         if (candidate == null) {
             log.debug(
-                "Conversation signal has no consented thread left to review: workspaceId={}, threadId={}",
-                workspaceId,
-                signal.getArtifactId()
-            );
+                    "Conversation signal has no consented thread left to review: workspaceId={}, threadId={}",
+                    workspaceId,
+                    signal.getArtifactId());
             settleRefused(signal.key(), SignalStateReason.ARTIFACT_GONE);
             return;
         }
@@ -77,7 +75,8 @@ public class ConversationReviewSubmitter implements PendingSignalResubmitter {
     }
 
     public long submitAndSettle(ConversationThreadCandidate candidate, SignalKey key) {
-        Workspace workspace = workspaceRepository.findById(candidate.workspaceId()).orElse(null);
+        Workspace workspace =
+                workspaceRepository.findById(candidate.workspaceId()).orElse(null);
         if (workspace == null) {
             settleRefused(key, SignalStateReason.ARTIFACT_GONE);
             return 0;
@@ -91,23 +90,18 @@ public class ConversationReviewSubmitter implements PendingSignalResubmitter {
             }
             try {
                 GateDecision decision = detectionGate.evaluateSignal(
-                    workspace,
-                    key.signalName(),
-                    TriggerMode.AUTO,
-                    new ReviewSubject(participant, true)
-                );
+                        workspace, key.signalName(), TriggerMode.AUTO, new ReviewSubject(participant, true));
                 if (decision instanceof GateDecision.Skip skip) {
                     if (firstRefusal == null) firstRefusal = skip.resolvedSignalReason();
                     continue;
                 }
                 GateDecision.Detect detect = (GateDecision.Detect) decision;
                 SubmissionOutcome outcome = agentJobService.submitWithOutcome(
-                    candidate.workspaceId(),
-                    AgentJobType.CONVERSATION_REVIEW,
-                    requestFor(candidate, participant),
-                    null,
-                    detect
-                );
+                        candidate.workspaceId(),
+                        AgentJobType.CONVERSATION_REVIEW,
+                        requestFor(candidate, participant),
+                        null,
+                        detect);
                 if (outcome.job() != null) {
                     started++;
                     if (firstJobId == null) {
@@ -118,11 +112,10 @@ public class ConversationReviewSubmitter implements PendingSignalResubmitter {
                 }
             } catch (RuntimeException e) {
                 log.warn(
-                    "conversation.detect: enqueue failed for threadId={}, participant={}: {}",
-                    candidate.threadId(),
-                    participant,
-                    e.toString()
-                );
+                        "conversation.detect: enqueue failed for threadId={}, participant={}: {}",
+                        candidate.threadId(),
+                        participant,
+                        e.toString());
             }
         }
 
@@ -136,13 +129,12 @@ public class ConversationReviewSubmitter implements PendingSignalResubmitter {
 
     private ConversationReviewSubmissionRequest requestFor(ConversationThreadCandidate candidate, long participant) {
         return new ConversationReviewSubmissionRequest(
-            candidate.threadId(),
-            candidate.channelId(),
-            candidate.channelName(),
-            candidate.threadTs(),
-            participant,
-            candidate.lastTs()
-        );
+                candidate.threadId(),
+                candidate.channelId(),
+                candidate.channelName(),
+                candidate.threadTs(),
+                participant,
+                candidate.lastTs());
     }
 
     private void settleTriggered(SignalKey key, UUID jobId) {

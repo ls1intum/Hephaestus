@@ -79,40 +79,33 @@ class AccountExportServiceTest extends BaseUnitTest {
         when(accountService.activeIdentities(ACCOUNT_ID)).thenReturn(List.of(link));
         when(featureRepo.findFlagsByAccountId(ACCOUNT_ID)).thenReturn(List.of("mentor_access"));
         when(authEventRepo.findByAccountSince(eq(ACCOUNT_ID), any())).thenReturn(List.of());
-        when(membershipQuery.membershipsForLogins(any())).thenReturn(
-            List.of(new WorkspaceMembershipView(7L, "tum-ase", "TUM ASE", "MEMBER", 314L))
-        );
-        when(preferencesQuery.preferencesForLogin("ada")).thenReturn(
-            Optional.of(new AccountPreferencesQuery.PreferencesView(true, false))
-        );
+        when(membershipQuery.membershipsForLogins(any()))
+                .thenReturn(List.of(new WorkspaceMembershipView(7L, "tum-ase", "TUM ASE", "MEMBER", 314L)));
+        when(preferencesQuery.preferencesForLogin("ada"))
+                .thenReturn(Optional.of(new AccountPreferencesQuery.PreferencesView(true, false)));
 
         ExportBundleAssembler assembler = new ExportBundleAssembler(
-            accountService,
-            featureRepo,
-            authEventRepo,
-            membershipQuery,
-            preferencesQuery,
-            gitProviderRegistry,
-            clock
-        );
+                accountService,
+                featureRepo,
+                authEventRepo,
+                membershipQuery,
+                preferencesQuery,
+                gitProviderRegistry,
+                clock);
 
         ExportBundle bundle = assembler.assemble(ACCOUNT_ID);
 
         assertThat(bundle.schemaVersion()).isEqualTo(ExportBundle.SCHEMA_VERSION);
         assertThat(bundle.account().id()).isEqualTo(ACCOUNT_ID);
         assertThat(bundle.account().primaryEmail()).isEqualTo("ada@example.com");
-        assertThat(bundle.identities())
-            .singleElement()
-            .satisfies(i -> {
-                assertThat(i.provider()).isEqualTo("GITLAB");
-                assertThat(i.usernameAtSignup()).isEqualTo("ada");
-            });
-        assertThat(bundle.workspaceMemberships())
-            .singleElement()
-            .satisfies(m -> {
-                assertThat(m.slug()).isEqualTo("tum-ase");
-                assertThat(m.role()).isEqualTo("MEMBER");
-            });
+        assertThat(bundle.identities()).singleElement().satisfies(i -> {
+            assertThat(i.provider()).isEqualTo("GITLAB");
+            assertThat(i.usernameAtSignup()).isEqualTo("ada");
+        });
+        assertThat(bundle.workspaceMemberships()).singleElement().satisfies(m -> {
+            assertThat(m.slug()).isEqualTo("tum-ase");
+            assertThat(m.role()).isEqualTo("MEMBER");
+        });
         assertThat(bundle.featureFlags()).containsExactly("mentor_access");
         assertNotNull(bundle.preferences());
         assertThat(bundle.preferences().participateInResearch()).isTrue();
@@ -124,12 +117,12 @@ class AccountExportServiceTest extends BaseUnitTest {
         String json = new ObjectMapper().writeValueAsString(bundle);
         assertThat(json).contains("\"ada@example.com\"", "tum-ase", "mentor_access");
         assertThat(json.toLowerCase())
-            .as("export bundle must never disclose tokens / credentials / signing keys")
-            .doesNotContain("access_token")
-            .doesNotContain("refresh_token")
-            .doesNotContain("private_key")
-            .doesNotContain("client_secret")
-            .doesNotContain("password");
+                .as("export bundle must never disclose tokens / credentials / signing keys")
+                .doesNotContain("access_token")
+                .doesNotContain("refresh_token")
+                .doesNotContain("private_key")
+                .doesNotContain("client_secret")
+                .doesNotContain("password");
     }
 
     // ── Ownership / enumeration defense ────────────────────────────────────────────────────
@@ -233,8 +226,8 @@ class AccountExportServiceTest extends BaseUnitTest {
         AccountExportService service = new AccountExportService(repo, worker, logger, clock);
 
         assertThatExceptionOfType(ResponseStatusException.class)
-            .isThrownBy(() -> service.requestExport(ACCOUNT_ID))
-            .satisfies(ex -> assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+                .isThrownBy(() -> service.requestExport(ACCOUNT_ID))
+                .satisfies(ex -> assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
         verify(repo, never()).save(any());
         verify(worker, never()).generate(any(), any());
     }

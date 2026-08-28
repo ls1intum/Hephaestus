@@ -58,15 +58,14 @@ class GithubIntegrationSyncRunnerTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         SyncSchedulerProperties properties = new SyncSchedulerProperties(
-            true,
-            7,
-            "0 0 3 * * *",
-            15,
-            new BackfillProperties(true, 50, 100, 60),
-            new FilterProperties(Set.of(), Set.of(), Set.of()),
-            null,
-            null
-        );
+                true,
+                7,
+                "0 0 3 * * *",
+                15,
+                new BackfillProperties(true, 50, 100, 60),
+                new FilterProperties(Set.of(), Set.of(), Set.of()),
+                null,
+                null);
         runner = new GithubIntegrationSyncRunner(dataSyncScheduler, syncTargetProvider, backfillService, properties);
         ref = new IntegrationRef(IntegrationKind.GITHUB, WORKSPACE_ID, "100");
     }
@@ -74,11 +73,11 @@ class GithubIntegrationSyncRunnerTest extends BaseUnitTest {
     private static SyncTarget pendingTarget(long id, String repoName) {
         // issueBackfillHighWaterMark left null (not initialized) -> isBackfillComplete() == false
         return SyncTargetTestBuilder.syncTarget()
-            .id(id)
-            .scopeId(WORKSPACE_ID)
-            .authMode(AuthMode.INSTALLATION_APP)
-            .repositoryNameWithOwner(repoName)
-            .build();
+                .id(id)
+                .scopeId(WORKSPACE_ID)
+                .authMode(AuthMode.INSTALLATION_APP)
+                .repositoryNameWithOwner(repoName)
+                .build();
     }
 
     @Nested
@@ -110,21 +109,16 @@ class GithubIntegrationSyncRunnerTest extends BaseUnitTest {
         @Test
         void supportsBackfill_isStillOfferedWhenTheScheduledCycleIsDisabled() {
             SyncSchedulerProperties cycleDisabled = new SyncSchedulerProperties(
-                true,
-                7,
-                "0 0 3 * * *",
-                15,
-                new BackfillProperties(false, 50, 100, 60),
-                new FilterProperties(Set.of(), Set.of(), Set.of()),
-                null,
-                null
-            );
+                    true,
+                    7,
+                    "0 0 3 * * *",
+                    15,
+                    new BackfillProperties(false, 50, 100, 60),
+                    new FilterProperties(Set.of(), Set.of(), Set.of()),
+                    null,
+                    null);
             GithubIntegrationSyncRunner runnerWithCycleDisabled = new GithubIntegrationSyncRunner(
-                dataSyncScheduler,
-                syncTargetProvider,
-                backfillService,
-                cycleDisabled
-            );
+                    dataSyncScheduler, syncTargetProvider, backfillService, cycleDisabled);
 
             // hephaestus.sync.backfill.enabled gates the scheduled cycle, not the capability —
             // GitHubHistoricalBackfillService#runBackfillBatch deliberately ignores it, so an
@@ -139,12 +133,9 @@ class GithubIntegrationSyncRunnerTest extends BaseUnitTest {
             // The runner re-reads the scope once per outer pass and again after each repository's batch
             // (to fold in the checkpoints that batch just persisted): 1 + 2 reads for the first pass,
             // then an empty scope so the second pass finds nothing pending and stops.
-            when(syncTargetProvider.getSyncTargetsForScope(WORKSPACE_ID)).thenReturn(
-                List.of(targetA, targetB),
-                List.of(targetA, targetB),
-                List.of(targetA, targetB),
-                List.of()
-            );
+            when(syncTargetProvider.getSyncTargetsForScope(WORKSPACE_ID))
+                    .thenReturn(
+                            List.of(targetA, targetB), List.of(targetA, targetB), List.of(targetA, targetB), List.of());
             when(handle.isCancellationRequested()).thenReturn(false);
             when(backfillService.runBackfillBatch(any(), anyInt(), any())).thenReturn(true);
 
@@ -162,10 +153,10 @@ class GithubIntegrationSyncRunnerTest extends BaseUnitTest {
             SyncTarget targetA = pendingTarget(1L, "acme/repo-a");
             SyncTarget targetB = pendingTarget(2L, "acme/repo-b");
             SyncTarget targetC = pendingTarget(3L, "acme/repo-c");
-            when(syncTargetProvider.getSyncTargetsForScope(WORKSPACE_ID)).thenReturn(
-                List.of(targetA, targetB, targetC)
-            );
-            // outer-check(false) -> inner: targetA(false, processed) -> targetB(true, cancel: break) -> outer-check(true, stop)
+            when(syncTargetProvider.getSyncTargetsForScope(WORKSPACE_ID))
+                    .thenReturn(List.of(targetA, targetB, targetC));
+            // outer-check(false) -> inner: targetA(false, processed) -> targetB(true, cancel: break) ->
+            // outer-check(true, stop)
             when(handle.isCancellationRequested()).thenReturn(false, false, true, true);
             when(backfillService.runBackfillBatch(any(), anyInt(), any())).thenReturn(true);
 
@@ -216,15 +207,15 @@ class GithubIntegrationSyncRunnerTest extends BaseUnitTest {
 
         private SyncTarget initializedTarget(long id, String repoName, Integer issueHwm, Integer issueCheckpoint) {
             return SyncTargetTestBuilder.syncTarget()
-                .id(id)
-                .scopeId(WORKSPACE_ID)
-                .authMode(AuthMode.INSTALLATION_APP)
-                .repositoryNameWithOwner(repoName)
-                .issueBackfillHighWaterMark(issueHwm)
-                .issueBackfillCheckpoint(issueCheckpoint)
-                .pullRequestBackfillHighWaterMark(0)
-                .pullRequestBackfillCheckpoint(0)
-                .build();
+                    .id(id)
+                    .scopeId(WORKSPACE_ID)
+                    .authMode(AuthMode.INSTALLATION_APP)
+                    .repositoryNameWithOwner(repoName)
+                    .issueBackfillHighWaterMark(issueHwm)
+                    .issueBackfillCheckpoint(issueCheckpoint)
+                    .pullRequestBackfillHighWaterMark(0)
+                    .pullRequestBackfillCheckpoint(0)
+                    .build();
         }
 
         /** Drives the observer the runner hands to the backfill service, as pages would. */
@@ -233,12 +224,11 @@ class GithubIntegrationSyncRunnerTest extends BaseUnitTest {
                 BackfillPageObserver observer = inv.getArgument(2);
                 for (int i = 0; i < lowestNumbersSeen.length; i++) {
                     observer.onPageComplete(
-                        target.id(),
-                        target.repositoryNameWithOwner(),
-                        SyncPhase.ISSUES,
-                        lowestNumbersSeen[i],
-                        (i + 1) * 100
-                    );
+                            target.id(),
+                            target.repositoryNameWithOwner(),
+                            SyncPhase.ISSUES,
+                            lowestNumbersSeen[i],
+                            (i + 1) * 100);
                 }
                 return true;
             });

@@ -57,7 +57,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -158,18 +157,14 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         Practice errors = createPractice("error-handling", "Error Handling");
 
         IdentityProvider provider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
 
         User developer = TestUserFactory.createUser(500L, "pipeline-author", provider);
         developer = userRepository.save(developer);
         workspaceMembershipService.createMembership(
-            workspace,
-            developer.getId(),
-            WorkspaceMembership.WorkspaceRole.MEMBER
-        );
+                workspace, developer.getId(), WorkspaceMembership.WorkspaceRole.MEMBER);
 
         Repository repo = new Repository();
         repo.setNativeId(4001L);
@@ -184,41 +179,44 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         Instant now = Instant.now();
         Long providerId = java.util.Objects.requireNonNull(provider.getId());
         pullRequestRepository.upsertCore(
-            8001L,
-            providerId,
-            50,
-            "Pipeline Test PR",
-            "Test body",
-            "OPEN",
-            null,
-            "https://github.com/org/pipeline-repo/pull/50",
-            false,
-            null,
-            0,
-            now,
-            now,
-            now,
-            developer.getId(),
-            repo.getId(),
-            null,
-            null,
-            false,
-            false,
-            1,
-            10,
-            5,
-            3,
-            null,
-            null,
-            null,
-            "feature/pipeline",
-            "main",
-            "pipelinesha",
-            "basesha",
-            null,
-            null // mergeCommitSha
-        );
-        prId = pullRequestRepository.findByRepositoryIdAndNumber(repo.getId(), 50).orElseThrow().getId();
+                8001L,
+                providerId,
+                50,
+                "Pipeline Test PR",
+                "Test body",
+                "OPEN",
+                null,
+                "https://github.com/org/pipeline-repo/pull/50",
+                false,
+                null,
+                0,
+                now,
+                now,
+                now,
+                developer.getId(),
+                repo.getId(),
+                null,
+                null,
+                false,
+                false,
+                1,
+                10,
+                5,
+                3,
+                null,
+                null,
+                null,
+                "feature/pipeline",
+                "main",
+                "pipelinesha",
+                "basesha",
+                null,
+                null // mergeCommitSha
+                );
+        prId = pullRequestRepository
+                .findByRepositoryIdAndNumber(repo.getId(), 50)
+                .orElseThrow()
+                .getId();
 
         agentJob = new AgentJob();
         agentJob.setWorkspace(workspace);
@@ -226,8 +224,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         agentJob.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         agentJob.setStatus(AgentJobStatus.COMPLETED);
         agentJob.setConfigSnapshot(
-            OBJECT_MAPPER.valueToTree(Map.of("model", "claude-3.5", "agentType", "CLAUDE_CODE"))
-        );
+                OBJECT_MAPPER.valueToTree(Map.of("model", "claude-3.5", "agentType", "CLAUDE_CODE")));
 
         ObjectNode metadata = OBJECT_MAPPER.createObjectNode();
         metadata.put("pull_request_id", prId);
@@ -243,9 +240,8 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         agentJob = agentJobRepository.save(agentJob);
 
         handler = handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW);
-        when(diffNotePoster.reconcileInlineNotes(any(), any())).thenReturn(
-            new DiffNotePoster.DiffNoteResult(0, 0, List.of())
-        );
+        when(diffNotePoster.reconcileInlineNotes(any(), any()))
+                .thenReturn(new DiffNotePoster.DiffNoteResult(0, 0, List.of()));
         when(accountPreferencesQuery.practiceFeedbackDeliveryEnabled(anyLong())).thenReturn(true);
     }
 
@@ -314,48 +310,44 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
     private ObjectNode evidenceSnapshot(Practice... practices) {
         ObjectNode snapshot = OBJECT_MAPPER.createObjectNode();
-        var sources = snapshot.putObject("manifest").put("contractVersion", "1.0.0").putArray("sources");
+        var sources =
+                snapshot.putObject("manifest").put("contractVersion", "1.0.0").putArray("sources");
         addArtifact(
-            sources.addObject().put("kind", "scm.pull-request.core"),
-            "inputs/context/metadata.json",
-            "{\"body\":\"Test body\"}"
-        );
+                sources.addObject().put("kind", "scm.pull-request.core"),
+                "inputs/context/metadata.json",
+                "{\"body\":\"Test body\"}");
         addArtifact(
-            sources.addObject().put("kind", "scm.pull-request.diff"),
-            "inputs/context/diff.patch",
-            "diff --git a/src/Main.java b/src/Main.java\n+++ b/src/Main.java\n@@ -10 +10 @@\n[L10] + insecure();\n"
-        );
+                sources.addObject().put("kind", "scm.pull-request.diff"),
+                "inputs/context/diff.patch",
+                "diff --git a/src/Main.java b/src/Main.java\n+++ b/src/Main.java\n@@ -10 +10 @@\n[L10] + insecure();\n");
         var admitted = snapshot.putArray("practices");
         for (Practice practice : practices) {
-            admitted
-                .addObject()
-                .put("slug", practice.getSlug())
-                .put("revisionId", practice.getCurrentRevision().getId());
+            admitted.addObject()
+                    .put("slug", practice.getSlug())
+                    .put("revisionId", practice.getCurrentRevision().getId());
         }
         return snapshot;
     }
 
     private void addArtifact(ObjectNode source, String path, String content) {
-        var facts = source
-            .putObject("state")
-            .put("availability", "AVAILABLE")
-            .put("content", "NON_EMPTY")
-            .put("completeness", "COMPLETE")
-            .putObject("facts")
-            .put("capturedAt", "2026-08-03T00:00:00Z");
+        var facts = source.putObject("state")
+                .put("availability", "AVAILABLE")
+                .put("content", "NON_EMPTY")
+                .put("completeness", "COMPLETE")
+                .putObject("facts")
+                .put("capturedAt", "2026-08-03T00:00:00Z");
         if ("scm.pull-request.diff".equals(source.path("kind").asString())) {
             facts.put("immutableIdentity", "pipelinesha");
         } else {
             facts.put("sourceEffectiveAt", "2026-08-03T00:00:00Z");
         }
         byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
-        source
-            .putArray("artifacts")
-            .addObject()
-            .put("path", path)
-            .put("mediaType", path.endsWith(".json") ? "application/json" : "text/x-diff")
-            .put("sha256", cas.put(bytes))
-            .put("bytes", bytes.length);
+        source.putArray("artifacts")
+                .addObject()
+                .put("path", path)
+                .put("mediaType", path.endsWith(".json") ? "application/json" : "text/x-diff")
+                .put("sha256", cas.put(bytes))
+                .put("bytes", bytes.length);
     }
 
     private String withEvidence(String rawOutput) {
@@ -363,7 +355,10 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             var root = OBJECT_MAPPER.readTree(rawOutput);
             for (var observation : root.path("observations")) {
                 if (!observation.has("evidence")) {
-                    var citation = ((ObjectNode) observation).putObject("evidence").putArray("citations").addObject();
+                    var citation = ((ObjectNode) observation)
+                            .putObject("evidence")
+                            .putArray("citations")
+                            .addObject();
                     citation.put("sourceKind", "scm.pull-request.core");
                     citation.put("artifactPath", "inputs/context/metadata.json");
                     citation.put("path", "body");
@@ -422,16 +417,15 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
             assertThat(observationRepository.findAll()).hasSize(2);
             assertThat(feedbackRepository.findAll())
-                .singleElement()
-                .extracting(Feedback::getDeliveryState, Feedback::getSuppressionReason)
-                .containsExactly(FeedbackDeliveryState.SUPPRESSED, FeedbackSuppressionReason.INSTANCE_SILENCED);
+                    .singleElement()
+                    .extracting(Feedback::getDeliveryState, Feedback::getSuppressionReason)
+                    .containsExactly(FeedbackDeliveryState.SUPPRESSED, FeedbackSuppressionReason.INSTANCE_SILENCED);
             verify(commentPoster, never()).postFormattedBody(any(), any());
             verify(diffNotePoster, never()).reconcileInlineNotes(any(), any());
 
             releaseSilentMode();
-            assertThat(feedbackRepository.findAll()).noneMatch(
-                feedback -> feedback.getDeliveryState() == FeedbackDeliveryState.PREPARED
-            );
+            assertThat(feedbackRepository.findAll())
+                    .noneMatch(feedback -> feedback.getDeliveryState() == FeedbackDeliveryState.PREPARED);
 
             AgentJob newEvent = newJobWithOutput(validAgentOutput());
             when(commentPoster.postFormattedBody(any(), any())).thenReturn("comment-after-release");
@@ -441,29 +435,28 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             verify(diffNotePoster).reconcileInlineNotes(eq(newEvent), any());
             assertThat(observationRepository.findAll()).hasSize(4);
             assertThat(feedbackRepository.findAll())
-                .extracting(Feedback::getDeliveryState)
-                .containsExactlyInAnyOrder(FeedbackDeliveryState.SUPPRESSED, FeedbackDeliveryState.DELIVERED);
+                    .extracting(Feedback::getDeliveryState)
+                    .containsExactlyInAnyOrder(FeedbackDeliveryState.SUPPRESSED, FeedbackDeliveryState.DELIVERED);
         }
 
         @Test
         void fullPipelineFromParseToDelivery() {
             setJobOutput(validAgentOutput());
             when(commentPoster.postFormattedBody(any(), any())).thenReturn("comment-123");
-            when(diffNotePoster.reconcileInlineNotes(any(), any())).thenReturn(
-                new DiffNotePoster.DiffNoteResult(1, 0, List.of())
-            );
+            when(diffNotePoster.reconcileInlineNotes(any(), any()))
+                    .thenReturn(new DiffNotePoster.DiffNoteResult(1, 0, List.of()));
 
             handler.deliver(agentJob);
 
             List<Observation> observations = observationRepository.findAll();
             assertThat(observations).hasSize(2);
             assertThat(observations)
-                .extracting(Observation::getPresence)
-                .containsExactlyInAnyOrder(Presence.PRESENT, Presence.ABSENT);
+                    .extracting(Observation::getPresence)
+                    .containsExactlyInAnyOrder(Presence.PRESENT, Presence.ABSENT);
 
-            List<PracticeDetectionCompletedEvent> events = applicationEvents
-                .stream(PracticeDetectionCompletedEvent.class)
-                .toList();
+            List<PracticeDetectionCompletedEvent> events = applicationEvents.stream(
+                            PracticeDetectionCompletedEvent.class)
+                    .toList();
             assertThat(events).hasSize(1);
             assertThat(events.get(0).observationsInserted()).isEqualTo(2);
             assertThat(events.get(0).hasNegative()).isTrue();
@@ -552,8 +545,8 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             JsonNode submitted = OBJECT_MAPPER.readTree(withEvidence(output)).path("observations");
 
             assertThatThrownBy(() -> ((PullRequestReviewHandler) handler).admitObservations(agentJob, submitted))
-                .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("practice not admitted to the job");
+                    .isInstanceOf(JobDeliveryException.class)
+                    .hasMessageContaining("practice not admitted to the job");
 
             assertThat(observationRepository.findAll()).isEmpty();
             verify(commentPoster, never()).postFormattedBody(any(), any());
@@ -567,40 +560,40 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             var author = java.util.Objects.requireNonNull(pr.getAuthor());
             var createdAt = java.util.Objects.requireNonNull(pr.getCreatedAt());
             pullRequestRepository.upsertCore(
-                8001L,
-                java.util.Objects.requireNonNull(provider.getId()),
-                50,
-                "Pipeline Test PR",
-                "Test body",
-                "CLOSED",
-                null,
-                "https://github.com/org/pipeline-repo/pull/50",
-                false,
-                null,
-                0,
-                createdAt,
-                Instant.now(),
-                createdAt,
-                author.getId(),
-                pr.requireRepository().getId(),
-                null,
-                null,
-                false,
-                false,
-                1,
-                10,
-                5,
-                3,
-                null,
-                null,
-                null,
-                "feature/pipeline",
-                "main",
-                "pipelinesha",
-                "basesha",
-                null,
-                null // mergeCommitSha
-            );
+                    8001L,
+                    java.util.Objects.requireNonNull(provider.getId()),
+                    50,
+                    "Pipeline Test PR",
+                    "Test body",
+                    "CLOSED",
+                    null,
+                    "https://github.com/org/pipeline-repo/pull/50",
+                    false,
+                    null,
+                    0,
+                    createdAt,
+                    Instant.now(),
+                    createdAt,
+                    author.getId(),
+                    pr.requireRepository().getId(),
+                    null,
+                    null,
+                    false,
+                    false,
+                    1,
+                    10,
+                    5,
+                    3,
+                    null,
+                    null,
+                    null,
+                    "feature/pipeline",
+                    "main",
+                    "pipelinesha",
+                    "basesha",
+                    null,
+                    null // mergeCommitSha
+                    );
 
             setJobOutput(validAgentOutput());
 
@@ -625,9 +618,8 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         void redeliveryNoDuplicates() {
             setJobOutput(validAgentOutput());
             when(commentPoster.postFormattedBody(any(), any())).thenReturn("comment-789");
-            when(diffNotePoster.reconcileInlineNotes(any(), any())).thenReturn(
-                new DiffNotePoster.DiffNoteResult(1, 0, List.of())
-            );
+            when(diffNotePoster.reconcileInlineNotes(any(), any()))
+                    .thenReturn(new DiffNotePoster.DiffNoteResult(1, 0, List.of()));
 
             handler.deliver(agentJob);
             assertThat(observationRepository.findAll()).hasSize(2);
@@ -635,9 +627,9 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             handler.deliver(agentJob);
             assertThat(observationRepository.findAll()).hasSize(2);
 
-            List<PracticeDetectionCompletedEvent> events = applicationEvents
-                .stream(PracticeDetectionCompletedEvent.class)
-                .toList();
+            List<PracticeDetectionCompletedEvent> events = applicationEvents.stream(
+                            PracticeDetectionCompletedEvent.class)
+                    .toList();
             assertThat(events).hasSize(1);
             assertThat(events.get(0).observationsInserted()).isEqualTo(2);
         }

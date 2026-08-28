@@ -46,15 +46,12 @@ public class WorkerTokenExchangeController {
      * impractical, but the counter bounds noise and makes auth-failure alerting tractable.
      */
     private final Cache<String, AtomicInteger> failuresByIp = Caffeine.newBuilder()
-        .expireAfterWrite(Duration.ofMinutes(1))
-        .maximumSize(10_000)
-        .build();
+            .expireAfterWrite(Duration.ofMinutes(1))
+            .maximumSize(10_000)
+            .build();
 
     public WorkerTokenExchangeController(
-        WorkerJwtIssuer issuer,
-        WorkerTokenProperties properties,
-        MeterRegistry meterRegistry
-    ) {
+            WorkerJwtIssuer issuer, WorkerTokenProperties properties, MeterRegistry meterRegistry) {
         this.issuer = issuer;
         this.properties = properties;
         this.meterRegistry = meterRegistry;
@@ -65,43 +62,49 @@ public class WorkerTokenExchangeController {
     public ResponseEntity<?> exchange(@Valid @RequestBody ExchangeRequest request, HttpServletRequest http) {
         if (!properties.isExchangeEnabled()) {
             log.warn("worker token exchange attempted but no registration token is configured");
-            meterRegistry.counter(AUDIT_METRIC, "outcome", "failed", "reason", "disabled").increment();
+            meterRegistry
+                    .counter(AUDIT_METRIC, "outcome", "failed", "reason", "disabled")
+                    .increment();
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
         String sourceIp = resolveSourceIp(http);
         AtomicInteger failures = failuresByIp.get(sourceIp, k -> new AtomicInteger(0));
         if (failures.get() >= MAX_FAILURES_PER_IP_PER_MINUTE) {
             log.warn("worker token exchange throttled: too many failures from sourceIp={}", sourceIp);
-            meterRegistry.counter(AUDIT_METRIC, "outcome", "failed", "reason", "throttled").increment();
+            meterRegistry
+                    .counter(AUDIT_METRIC, "outcome", "failed", "reason", "throttled")
+                    .increment();
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
         }
         if (request == null || request.workerId() == null || request.workerId().isBlank()) {
             failures.incrementAndGet();
-            meterRegistry.counter(AUDIT_METRIC, "outcome", "failed", "reason", "bad-payload").increment();
+            meterRegistry
+                    .counter(AUDIT_METRIC, "outcome", "failed", "reason", "bad-payload")
+                    .increment();
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         }
         if (!constantTimeEquals(request.registrationToken(), properties.registrationToken())) {
             failures.incrementAndGet();
             log.warn(
-                "worker token exchange rejected: bad registration token for workerId={} sourceIp={}",
-                request.workerId(),
-                sourceIp
-            );
-            meterRegistry.counter(AUDIT_METRIC, "outcome", "failed", "reason", "bad-token").increment();
+                    "worker token exchange rejected: bad registration token for workerId={} sourceIp={}",
+                    request.workerId(),
+                    sourceIp);
+            meterRegistry
+                    .counter(AUDIT_METRIC, "outcome", "failed", "reason", "bad-token")
+                    .increment();
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
         WorkerJwtIssuer.IssuedWorkerJwt issued = issuer.issue(request.workerId().trim());
         meterRegistry.counter(AUDIT_METRIC, "outcome", "success").increment();
         log.info(
-            "worker token exchange ok: workerId={} sourceIp={} jti={} exp={}",
-            request.workerId(),
-            sourceIp,
-            issued.jti(),
-            issued.expiresAt()
-        );
+                "worker token exchange ok: workerId={} sourceIp={} jti={} exp={}",
+                request.workerId(),
+                sourceIp,
+                issued.jti(),
+                issued.expiresAt());
         return ResponseEntity.ok()
-            .cacheControl(CacheControl.noStore())
-            .body(new ExchangeResponse(issued.token(), issued.expiresAt()));
+                .cacheControl(CacheControl.noStore())
+                .body(new ExchangeResponse(issued.token(), issued.expiresAt()));
     }
 
     /**
@@ -131,7 +134,8 @@ public class WorkerTokenExchangeController {
         return MessageDigest.isEqual(ba, bb);
     }
 
-    public record ExchangeRequest(@Nullable String workerId, @Nullable String registrationToken) {}
+    public record ExchangeRequest(
+            @Nullable String workerId, @Nullable String registrationToken) {}
 
     public record ExchangeResponse(String token, Instant expiresAt) {}
 }

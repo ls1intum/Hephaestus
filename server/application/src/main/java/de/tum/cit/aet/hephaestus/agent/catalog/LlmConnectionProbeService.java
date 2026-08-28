@@ -40,11 +40,10 @@ public class LlmConnectionProbeService {
     private final RestClient restClient;
 
     LlmConnectionProbeService(
-        LlmConnectionRepository connectionRepository,
-        EgressPolicy egressPolicy,
-        ObjectMapper objectMapper,
-        LlmProperties llmProperties
-    ) {
+            LlmConnectionRepository connectionRepository,
+            EgressPolicy egressPolicy,
+            ObjectMapper objectMapper,
+            LlmProperties llmProperties) {
         boolean allowLoopback = llmProperties.egress().allowLoopback();
         this.connectionRepository = connectionRepository;
         this.egressPolicy = egressPolicy;
@@ -54,8 +53,8 @@ public class LlmConnectionProbeService {
         // The guarded resolver re-runs the private-address check on the resolution actually connected
         // to, closing the DNS-rebind window that validate-time checking leaves open.
         HttpClient httpClient = HttpClient.create()
-            .resolver(WebClientConnectors.resolverGroup(allowLoopback))
-            .followRedirect(false);
+                .resolver(WebClientConnectors.resolverGroup(allowLoopback))
+                .followRedirect(false);
         ReactorClientHttpRequestFactory factory = new ReactorClientHttpRequestFactory(httpClient);
         factory.setConnectTimeout(PROBE_TIMEOUT);
         factory.setReadTimeout(PROBE_TIMEOUT);
@@ -68,8 +67,8 @@ public class LlmConnectionProbeService {
      */
     public LlmProbeResultDTO probeStored(Long connectionId) {
         LlmProbeTarget target = connectionRepository
-            .findProbeTargetById(connectionId)
-            .orElseThrow(() -> new EntityNotFoundException("LlmConnection", connectionId));
+                .findProbeTargetById(connectionId)
+                .orElseThrow(() -> new EntityNotFoundException("LlmConnection", connectionId));
         egressPolicy.validate(target.baseUrl());
         return probe(target.baseUrl(), target.authMode(), target.apiKey());
     }
@@ -89,34 +88,35 @@ public class LlmConnectionProbeService {
         String url = stripTrailingSlash(baseUrl) + "/models";
         try {
             return restClient
-                .get()
-                .uri(url)
-                .headers(headers -> {
-                    headers.setAccept(List.of(MediaType.APPLICATION_JSON));
-                    if (StringUtils.hasText(apiKey)) {
-                        if (authMode == LlmAuthMode.API_KEY) {
-                            headers.set("api-key", apiKey);
-                        } else {
-                            headers.setBearerAuth(apiKey);
+                    .get()
+                    .uri(url)
+                    .headers(headers -> {
+                        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+                        if (StringUtils.hasText(apiKey)) {
+                            if (authMode == LlmAuthMode.API_KEY) {
+                                headers.set("api-key", apiKey);
+                            } else {
+                                headers.setBearerAuth(apiKey);
+                            }
                         }
-                    }
-                })
-                .exchange((clientRequest, clientResponse) -> {
-                    int status = clientResponse.getStatusCode().value();
-                    if (!clientResponse.getStatusCode().is2xxSuccessful()) {
-                        return LlmProbeResultDTO.unreachable(status, "Provider returned HTTP " + status);
-                    }
-                    byte[] response = clientResponse.getBody().readNBytes(MAX_RESPONSE_BYTES + 1);
-                    if (response.length > MAX_RESPONSE_BYTES) {
-                        return LlmProbeResultDTO.unreachable(status, "Provider response was too large");
-                    }
-                    JsonNode body = objectMapper.readTree(response);
-                    return LlmProbeResultDTO.reachable(extractModelIds(body), status);
-                });
+                    })
+                    .exchange((clientRequest, clientResponse) -> {
+                        int status = clientResponse.getStatusCode().value();
+                        if (!clientResponse.getStatusCode().is2xxSuccessful()) {
+                            return LlmProbeResultDTO.unreachable(status, "Provider returned HTTP " + status);
+                        }
+                        byte[] response = clientResponse.getBody().readNBytes(MAX_RESPONSE_BYTES + 1);
+                        if (response.length > MAX_RESPONSE_BYTES) {
+                            return LlmProbeResultDTO.unreachable(status, "Provider response was too large");
+                        }
+                        JsonNode body = objectMapper.readTree(response);
+                        return LlmProbeResultDTO.reachable(extractModelIds(body), status);
+                    });
         } catch (Exception e) {
             // The exception message may carry host detail, so keep it out of the response.
             log.info("LLM connection probe failed: reason={}", e.getClass().getSimpleName());
-            return LlmProbeResultDTO.unreachable(null, "Could not reach the provider: " + e.getClass().getSimpleName());
+            return LlmProbeResultDTO.unreachable(
+                    null, "Could not reach the provider: " + e.getClass().getSimpleName());
         }
     }
 

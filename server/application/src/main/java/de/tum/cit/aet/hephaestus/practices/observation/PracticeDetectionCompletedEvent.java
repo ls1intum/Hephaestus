@@ -10,12 +10,11 @@ import java.util.UUID;
  * @param observationsDiscarded number of observations discarded (unknown slug, over cap, duplicate)
  */
 public record PracticeDetectionCompletedEvent(
-    UUID agentJobId,
-    Long workspaceId,
-    ArtifactKind artifactKind,
-    Long artifactId,
-    Long developerId,
-    int observationsInserted,
-    int observationsDiscarded,
-    boolean hasNegative
-) {}
+        UUID agentJobId,
+        Long workspaceId,
+        ArtifactKind artifactKind,
+        Long artifactId,
+        Long developerId,
+        int observationsInserted,
+        int observationsDiscarded,
+        boolean hasNegative) {}

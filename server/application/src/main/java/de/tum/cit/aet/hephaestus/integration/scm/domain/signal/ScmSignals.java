@@ -52,43 +52,40 @@ public final class ScmSignals {
     public static final SignalName ISSUE_MANUAL_REVIEW = SignalName.of("scm.issue.manual_review");
 
     private static final Map<String, SignalName> BY_TRIGGER_EVENT = Map.of(
-        TriggerEventNames.PULL_REQUEST_CREATED,
-        PULL_REQUEST_OPENED,
-        TriggerEventNames.PULL_REQUEST_READY,
-        PULL_REQUEST_READY,
-        TriggerEventNames.PULL_REQUEST_SYNCHRONIZED,
-        PULL_REQUEST_SYNCHRONIZED,
-        TriggerEventNames.REVIEW_SUBMITTED,
-        PULL_REQUEST_REVIEWED,
-        TriggerEventNames.PULL_REQUEST_MERGED,
-        PULL_REQUEST_MERGED,
-        TriggerEventNames.PULL_REQUEST_CLOSED,
-        PULL_REQUEST_CLOSED,
-        TriggerEventNames.ISSUE_CREATED,
-        ISSUE_OPENED,
-        TriggerEventNames.ISSUE_LABELED,
-        ISSUE_LABELED,
-        TriggerEventNames.ISSUE_CLOSED,
-        ISSUE_CLOSED
-    );
+            TriggerEventNames.PULL_REQUEST_CREATED,
+            PULL_REQUEST_OPENED,
+            TriggerEventNames.PULL_REQUEST_READY,
+            PULL_REQUEST_READY,
+            TriggerEventNames.PULL_REQUEST_SYNCHRONIZED,
+            PULL_REQUEST_SYNCHRONIZED,
+            TriggerEventNames.REVIEW_SUBMITTED,
+            PULL_REQUEST_REVIEWED,
+            TriggerEventNames.PULL_REQUEST_MERGED,
+            PULL_REQUEST_MERGED,
+            TriggerEventNames.PULL_REQUEST_CLOSED,
+            PULL_REQUEST_CLOSED,
+            TriggerEventNames.ISSUE_CREATED,
+            ISSUE_OPENED,
+            TriggerEventNames.ISSUE_LABELED,
+            ISSUE_LABELED,
+            TriggerEventNames.ISSUE_CLOSED,
+            ISSUE_CLOSED);
 
-    private static final Map<SignalName, String> TRIGGER_EVENT_BY_SIGNAL = BY_TRIGGER_EVENT.entrySet()
-        .stream()
-        .collect(Collectors.toUnmodifiableMap(Map.Entry::getValue, Map.Entry::getKey));
+    private static final Map<SignalName, String> TRIGGER_EVENT_BY_SIGNAL = BY_TRIGGER_EVENT.entrySet().stream()
+            .collect(Collectors.toUnmodifiableMap(Map.Entry::getValue, Map.Entry::getKey));
 
     private static final Map<SignalName, RevisionScheme> SCHEMES = Map.ofEntries(
-        Map.entry(PULL_REQUEST_OPENED, RevisionScheme.HEAD_COMMIT),
-        Map.entry(PULL_REQUEST_READY, RevisionScheme.HEAD_COMMIT),
-        Map.entry(PULL_REQUEST_SYNCHRONIZED, RevisionScheme.HEAD_COMMIT),
-        Map.entry(PULL_REQUEST_REVIEWED, RevisionScheme.EVENT_ID),
-        Map.entry(PULL_REQUEST_MERGED, RevisionScheme.TERMINAL_STATE),
-        Map.entry(PULL_REQUEST_CLOSED, RevisionScheme.TERMINAL_STATE),
-        Map.entry(PULL_REQUEST_MANUAL_REVIEW, RevisionScheme.RUN_ID),
-        Map.entry(ISSUE_OPENED, RevisionScheme.CONTENT_DIGEST),
-        Map.entry(ISSUE_LABELED, RevisionScheme.CONTENT_DIGEST),
-        Map.entry(ISSUE_CLOSED, RevisionScheme.TERMINAL_STATE),
-        Map.entry(ISSUE_MANUAL_REVIEW, RevisionScheme.RUN_ID)
-    );
+            Map.entry(PULL_REQUEST_OPENED, RevisionScheme.HEAD_COMMIT),
+            Map.entry(PULL_REQUEST_READY, RevisionScheme.HEAD_COMMIT),
+            Map.entry(PULL_REQUEST_SYNCHRONIZED, RevisionScheme.HEAD_COMMIT),
+            Map.entry(PULL_REQUEST_REVIEWED, RevisionScheme.EVENT_ID),
+            Map.entry(PULL_REQUEST_MERGED, RevisionScheme.TERMINAL_STATE),
+            Map.entry(PULL_REQUEST_CLOSED, RevisionScheme.TERMINAL_STATE),
+            Map.entry(PULL_REQUEST_MANUAL_REVIEW, RevisionScheme.RUN_ID),
+            Map.entry(ISSUE_OPENED, RevisionScheme.CONTENT_DIGEST),
+            Map.entry(ISSUE_LABELED, RevisionScheme.CONTENT_DIGEST),
+            Map.entry(ISSUE_CLOSED, RevisionScheme.TERMINAL_STATE),
+            Map.entry(ISSUE_MANUAL_REVIEW, RevisionScheme.RUN_ID));
 
     private ScmSignals() {}
 
@@ -121,19 +118,17 @@ public final class ScmSignals {
      *                   no head ref yet, in which case there is nothing stable to key on
      */
     public static Optional<SignalKey> pullRequestKey(
-        long workspaceId,
-        long pullRequestId,
-        SignalName signal,
-        @Nullable String headRefOid,
-        String title,
-        @Nullable String body
-    ) {
+            long workspaceId,
+            long pullRequestId,
+            SignalName signal,
+            @Nullable String headRefOid,
+            String title,
+            @Nullable String body) {
         if (!PULL_REQUEST.equals(signal.artifactKind())) {
             return Optional.empty();
         }
-        return revisionFor(signal, headRefOid, title, body).map(revision ->
-            new SignalKey(workspaceId, pullRequestId, signal, revision)
-        );
+        return revisionFor(signal, headRefOid, title, body)
+                .map(revision -> new SignalKey(workspaceId, pullRequestId, signal, revision));
     }
 
     /**
@@ -147,13 +142,12 @@ public final class ScmSignals {
      *                  every other signal.
      */
     public static Optional<SignalKey> issueKey(
-        long workspaceId,
-        long issueId,
-        SignalName signal,
-        String title,
-        @Nullable String body,
-        @Nullable String labelName
-    ) {
+            long workspaceId,
+            long issueId,
+            SignalName signal,
+            String title,
+            @Nullable String body,
+            @Nullable String labelName) {
         if (!ISSUE.equals(signal.artifactKind())) {
             return Optional.empty();
         }
@@ -161,10 +155,9 @@ public final class ScmSignals {
         if (labelling && (labelName == null || labelName.isBlank())) {
             return Optional.empty();
         }
-        String[] content = labelling ? new String[] { title, body, labelName } : new String[] { title, body };
-        return revisionFor(signal, null, content).map(revision ->
-            new SignalKey(workspaceId, issueId, signal, revision)
-        );
+        String[] content = labelling ? new String[] {title, body, labelName} : new String[] {title, body};
+        return revisionFor(signal, null, content)
+                .map(revision -> new SignalKey(workspaceId, issueId, signal, revision));
     }
 
     /** The ledger identity of an explicitly requested review: the ask itself, so two asks are two runs. */
@@ -178,14 +171,12 @@ public final class ScmSignals {
     }
 
     private static Optional<SignalRevision> revisionFor(
-        SignalName signal,
-        @Nullable String headRefOid,
-        @Nullable String... content
-    ) {
+            SignalName signal, @Nullable String headRefOid, @Nullable String... content) {
         return switch (revisionScheme(signal)) {
-            case HEAD_COMMIT -> headRefOid == null || headRefOid.isBlank()
-                ? Optional.empty()
-                : Optional.of(SignalRevision.ofHeadCommit(headRefOid));
+            case HEAD_COMMIT ->
+                headRefOid == null || headRefOid.isBlank()
+                        ? Optional.empty()
+                        : Optional.of(SignalRevision.ofHeadCommit(headRefOid));
             case CONTENT_DIGEST -> Optional.of(SignalRevision.ofContentDigest(content));
             // Constant by construction: the artifact reached a state it cannot leave, so the signal can
             // occur once and a redelivery has nothing new to say.

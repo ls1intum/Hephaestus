@@ -112,8 +112,6 @@ jobs:
         run: |
           pnpm install --frozen-lockfile
 
-          # Every gate below is also in `pnpm run check`, which the pre-push hook runs and
-          # `--no-verify` skips. This step is the only place they are mandatory.
           ISSUES_FOUND=()
           FMT_OK=true; PMD_OK=true; LINT_OK=true; PIN_OK=true; TESTS_OK=true; TYPES_OK=true; SCRIPT_TYPES_OK=true; CONTRACTS_OK=true; ENV_OK=true; DOCS_OK=true; DIAGRAMS_OK=true; INSTRUCTIONS_OK=true
 

@@ -2,9 +2,6 @@ package de.tum.cit.aet.hephaestus.integration.core.consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 
 import de.tum.cit.aet.hephaestus.integration.core.handler.IntegrationMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.core.handler.IntegrationMessageHandlerRegistry;
@@ -22,48 +19,37 @@ import org.junit.jupiter.api.Test;
 
 class IntegrationMessageDispatcherTest extends BaseUnitTest {
 
-    private static final List<SubjectParser> ALL_PARSERS = List.of(
-        new GithubSubjectParser(),
-        new GitlabSubjectParser(),
-        new SlackSubjectParser()
-    );
+    private static final List<SubjectParser> ALL_PARSERS =
+            List.of(new GithubSubjectParser(), new GitlabSubjectParser(), new SlackSubjectParser());
 
     @Test
     void githubSubjectWithoutHandlerReturnsEmpty() {
-        IntegrationMessageDispatcher dispatcher = new IntegrationMessageDispatcher(
-            new IntegrationMessageHandlerRegistry(List.of()),
-            ALL_PARSERS
-        );
+        IntegrationMessageDispatcher dispatcher =
+                new IntegrationMessageDispatcher(new IntegrationMessageHandlerRegistry(List.of()), ALL_PARSERS);
 
         assertThat(dispatcher.dispatch("github.acme.foo.issues")).isEmpty();
     }
 
     @Test
     void slackSubjectWithoutHandlerReturnsEmpty() {
-        IntegrationMessageDispatcher dispatcher = new IntegrationMessageDispatcher(
-            new IntegrationMessageHandlerRegistry(List.of()),
-            ALL_PARSERS
-        );
+        IntegrationMessageDispatcher dispatcher =
+                new IntegrationMessageDispatcher(new IntegrationMessageHandlerRegistry(List.of()), ALL_PARSERS);
 
         assertThat(dispatcher.dispatch("slack.T0123.C456.message")).isEmpty();
     }
 
     @Test
     void gitlabSubjectWithoutHandlerReturnsEmpty() {
-        IntegrationMessageDispatcher dispatcher = new IntegrationMessageDispatcher(
-            new IntegrationMessageHandlerRegistry(List.of()),
-            ALL_PARSERS
-        );
+        IntegrationMessageDispatcher dispatcher =
+                new IntegrationMessageDispatcher(new IntegrationMessageHandlerRegistry(List.of()), ALL_PARSERS);
 
         assertThat(dispatcher.dispatch("gitlab.acme~group.project.push")).isEmpty();
     }
 
     @Test
     void unknownPrefixReturnsEmpty() {
-        IntegrationMessageDispatcher dispatcher = new IntegrationMessageDispatcher(
-            new IntegrationMessageHandlerRegistry(List.of()),
-            ALL_PARSERS
-        );
+        IntegrationMessageDispatcher dispatcher =
+                new IntegrationMessageDispatcher(new IntegrationMessageHandlerRegistry(List.of()), ALL_PARSERS);
 
         // All collapse to empty before any parser is consulted — the allow-list never reflects on input.
         assertThat(dispatcher.dispatch("bitbucket.foo")).isEmpty();
@@ -75,10 +61,8 @@ class IntegrationMessageDispatcherTest extends BaseUnitTest {
 
     @Test
     void malformedSubjectForKnownPrefixReturnsEmpty() {
-        IntegrationMessageDispatcher dispatcher = new IntegrationMessageDispatcher(
-            new IntegrationMessageHandlerRegistry(List.of()),
-            ALL_PARSERS
-        );
+        IntegrationMessageDispatcher dispatcher =
+                new IntegrationMessageDispatcher(new IntegrationMessageHandlerRegistry(List.of()), ALL_PARSERS);
 
         // The prefix matches, but the parser rejects the structure — the dispatcher
         // must absorb the IllegalArgumentException and return empty so the consumer
@@ -90,10 +74,8 @@ class IntegrationMessageDispatcherTest extends BaseUnitTest {
     @Test
     void dispatchResolvesRegisteredHandler() {
         RecordingHandler handler = new RecordingHandler(new EventTypeKey(IntegrationKind.GITHUB, "repository.issues"));
-        IntegrationMessageDispatcher dispatcher = new IntegrationMessageDispatcher(
-            new IntegrationMessageHandlerRegistry(List.of(handler)),
-            ALL_PARSERS
-        );
+        IntegrationMessageDispatcher dispatcher =
+                new IntegrationMessageDispatcher(new IntegrationMessageHandlerRegistry(List.of(handler)), ALL_PARSERS);
 
         Optional<IntegrationMessageHandler> resolved = dispatcher.dispatch("github.acme.foo.issues");
         assertThat(resolved).contains(handler);
@@ -103,14 +85,10 @@ class IntegrationMessageDispatcherTest extends BaseUnitTest {
     void dispatchSkipsHandlerThatDeclaresItselfDisabled() {
         // A handler whose feature flag is off reports isEnabled()=false; the dispatcher must
         // treat it as no handler so the consumer ACKs and skips.
-        RecordingHandler disabled = new RecordingHandler(
-            new EventTypeKey(IntegrationKind.GITHUB, "repository.issues"),
-            false
-        );
-        IntegrationMessageDispatcher dispatcher = new IntegrationMessageDispatcher(
-            new IntegrationMessageHandlerRegistry(List.of(disabled)),
-            ALL_PARSERS
-        );
+        RecordingHandler disabled =
+                new RecordingHandler(new EventTypeKey(IntegrationKind.GITHUB, "repository.issues"), false);
+        IntegrationMessageDispatcher dispatcher =
+                new IntegrationMessageDispatcher(new IntegrationMessageHandlerRegistry(List.of(disabled)), ALL_PARSERS);
 
         assertThat(dispatcher.dispatch("github.acme.foo.issues")).isEmpty();
     }
@@ -122,10 +100,10 @@ class IntegrationMessageDispatcherTest extends BaseUnitTest {
         IntegrationMessageHandlerRegistry emptyRegistry = new IntegrationMessageHandlerRegistry(List.of());
 
         assertThatThrownBy(() -> new IntegrationMessageDispatcher(emptyRegistry, List.of(first, second)))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("Duplicate SubjectParser")
-            .hasMessageContaining("GITHUB")
-            .hasMessageContaining(GithubSubjectParser.class.getName());
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Duplicate SubjectParser")
+                .hasMessageContaining("GITHUB")
+                .hasMessageContaining(GithubSubjectParser.class.getName());
     }
 
     private static class RecordingHandler implements IntegrationMessageHandler {

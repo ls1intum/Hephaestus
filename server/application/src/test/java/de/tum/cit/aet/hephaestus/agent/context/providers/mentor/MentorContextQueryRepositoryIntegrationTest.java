@@ -59,10 +59,9 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
         workspace = workspaceRepository.save(workspace);
 
         IdentityProvider gitProvider = gitProviderRepository
-            .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.com")
-            .orElseGet(() ->
-                gitProviderRepository.save(new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.com"))
-            );
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.com")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.com")));
 
         user = new User();
         user.setNativeId(8_001L);
@@ -89,9 +88,7 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
         ChatThread t2 = seedThreadWithUserMessage("what makes a good test?");
 
         List<Object[]> rows = queryRepository.findFirstUserMessagePartsByThreadIds(
-            workspace.getId(),
-            List.of(t1.getId(), t2.getId())
-        );
+                workspace.getId(), List.of(t1.getId(), t2.getId()));
 
         Map<UUID, String> byThread = new HashMap<>();
         for (Object[] row : rows) {
@@ -118,9 +115,7 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
         persistence.persistInFlight(foreign, "foreign prompt", UUID.randomUUID(), null, admittedMentorConfig());
 
         List<Object[]> rows = queryRepository.findFirstUserMessagePartsByThreadIds(
-            workspace.getId(),
-            List.of(mine.getId(), foreign.getId())
-        );
+                workspace.getId(), List.of(mine.getId(), foreign.getId()));
 
         assertThat(rows).hasSize(1);
         assertThat((UUID) rows.get(0)[0]).isEqualTo(mine.getId());

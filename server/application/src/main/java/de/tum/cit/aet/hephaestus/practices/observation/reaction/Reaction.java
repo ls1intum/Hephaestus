@@ -36,12 +36,13 @@ import org.jspecify.annotations.Nullable;
 @Entity
 @Immutable
 @Table(
-    name = "reaction",
-    indexes = {
-        @Index(name = "idx_reaction_reactor_created", columnList = "reactor_user_id, created_at DESC"),
-        @Index(name = "idx_reaction_feedback_reactor", columnList = "feedback_id, reactor_user_id, created_at DESC"),
-    }
-)
+        name = "reaction",
+        indexes = {
+            @Index(name = "idx_reaction_reactor_created", columnList = "reactor_user_id, created_at DESC"),
+            @Index(
+                    name = "idx_reaction_feedback_reactor",
+                    columnList = "feedback_id, reactor_user_id, created_at DESC"),
+        })
 @Getter
 @Builder
 @NoArgsConstructor

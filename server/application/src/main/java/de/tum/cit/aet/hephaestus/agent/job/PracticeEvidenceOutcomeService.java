@@ -26,17 +26,12 @@ public class PracticeEvidenceOutcomeService {
 
     @Transactional(readOnly = true)
     public List<PracticeEvidenceOutcomeDTO> recentOutcomes(Long workspaceId) {
-        return agentJobRepository
-            .findReadinessOutcomes(workspaceId, REVIEW_WINDOW)
-            .stream()
-            .map(row ->
-                new PracticeEvidenceOutcomeDTO(
-                    row.getPracticeSlug(),
-                    row.getConsideredReviews(),
-                    row.getReviewedCount(),
-                    objectMapper.readValue(row.getBlockersObserved(), BLOCKERS)
-                )
-            )
-            .toList();
+        return agentJobRepository.findReadinessOutcomes(workspaceId, REVIEW_WINDOW).stream()
+                .map(row -> new PracticeEvidenceOutcomeDTO(
+                        row.getPracticeSlug(),
+                        row.getConsideredReviews(),
+                        row.getReviewedCount(),
+                        objectMapper.readValue(row.getBlockersObserved(), BLOCKERS)))
+                .toList();
     }
 }

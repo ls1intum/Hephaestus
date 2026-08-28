@@ -57,29 +57,24 @@ class ConnectionDisconnectRevokeIsolationIntegrationTest extends AbstractWorkspa
         succeedingOperation.reset();
         User owner = persistUser("revoke-isolation-owner-" + System.nanoTime());
         workspace = createWorkspace(
-            "revoke-isolation-ws-" + System.nanoTime(),
-            "Revoke Isolation Test",
-            "revoke-isolation-org",
-            AccountType.ORG,
-            owner
-        );
-        connection = connectionRepository.save(
-            new Connection(
+                "revoke-isolation-ws-" + System.nanoTime(),
+                "Revoke Isolation Test",
+                "revoke-isolation-org",
+                AccountType.ORG,
+                owner);
+        connection = connectionRepository.save(new Connection(
                 workspace,
                 IntegrationKind.GITHUB,
                 "300",
-                new ConnectionConfig.GitHubAppConfig(300L, "revoke-isolation-org", null, Set.of())
-            )
-        );
+                new ConnectionConfig.GitHubAppConfig(300L, "revoke-isolation-org", null, Set.of())));
         connection.setState(IntegrationState.ACTIVE);
         connection = connectionRepository.save(connection);
     }
 
     @Test
     void revokeFailingWithDataAccessException_stillCommitsTheLocalUninstalledTransition() {
-        Connection result = connectionService.disconnect(connection, disconnectRequest("corr-erase-fails"), () ->
-            failingOperation.execute()
-        );
+        Connection result = connectionService.disconnect(
+                connection, disconnectRequest("corr-erase-fails"), () -> failingOperation.execute());
 
         // No exception escaped: the endpoint returns 200, not 500.
         assertThat(result.getState()).isEqualTo(IntegrationState.UNINSTALLED);
@@ -93,36 +88,30 @@ class ConnectionDisconnectRevokeIsolationIntegrationTest extends AbstractWorkspa
         // Read through the workspace-scoped query, not findAll(): connection_audit is a
         // workspace-scoped table, so an unscoped read is rejected by the tenancy statement inspector.
         assertThat(connectionAuditRepository.findByWorkspaceId(workspace.getId()))
-            .as("the disconnect is auditable even though the erase failed")
-            .anySatisfy(audit -> assertThat(audit.getCorrelationId()).isEqualTo("corr-erase-fails"));
+                .as("the disconnect is auditable even though the erase failed")
+                .anySatisfy(audit -> assertThat(audit.getCorrelationId()).isEqualTo("corr-erase-fails"));
     }
 
     /** The happy path must be untouched: the revoke runs, and the transition still commits. */
     @Test
     void revokeSucceeding_runsTheRevokeAndCommitsTheUninstalledTransition() {
-        Connection result = connectionService.disconnect(connection, disconnectRequest("corr-erase-ok"), () ->
-            succeedingOperation.execute()
-        );
+        Connection result = connectionService.disconnect(
+                connection, disconnectRequest("corr-erase-ok"), () -> succeedingOperation.execute());
 
         assertThat(result.getState()).isEqualTo(IntegrationState.UNINSTALLED);
-        assertThat(succeedingOperation.calls()).as("the revoke callback still runs exactly once").isEqualTo(1);
+        assertThat(succeedingOperation.calls())
+                .as("the revoke callback still runs exactly once")
+                .isEqualTo(1);
 
         Connection reloaded = connectionRepository.findById(connection.getId()).orElseThrow();
         assertThat(reloaded.getState()).isEqualTo(IntegrationState.UNINSTALLED);
-        assertThat(connectionAuditRepository.findByWorkspaceId(workspace.getId())).anySatisfy(audit ->
-            assertThat(audit.getCorrelationId()).isEqualTo("corr-erase-ok")
-        );
+        assertThat(connectionAuditRepository.findByWorkspaceId(workspace.getId()))
+                .anySatisfy(audit -> assertThat(audit.getCorrelationId()).isEqualTo("corr-erase-ok"));
     }
 
     private ConnectionService.TransitionRequest disconnectRequest(String correlationId) {
         return new ConnectionService.TransitionRequest(
-            IntegrationState.UNINSTALLED,
-            "DISCONNECT",
-            "ADMIN",
-            "test-admin",
-            correlationId,
-            "disconnect"
-        );
+                IntegrationState.UNINSTALLED, "DISCONNECT", "ADMIN", "test-admin", correlationId, "disconnect");
     }
 
     /**

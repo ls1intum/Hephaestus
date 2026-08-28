@@ -26,20 +26,18 @@ class LlmProxySecurityConfig {
     @Bean
     @Order(1)
     SecurityFilterChain llmProxyFilterChain(
-        HttpSecurity http,
-        AgentJobRepository agentJobRepository,
-        MentorProxyCredentialRegistry mentorRegistry,
-        ObjectMapper objectMapper
-    ) throws Exception {
-        http
-            .securityMatcher("/internal/llm/**")
-            .csrf(csrf -> csrf.disable())
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
-            .addFilterBefore(
-                new JobTokenAuthenticationFilter(agentJobRepository, mentorRegistry, objectMapper),
-                UsernamePasswordAuthenticationFilter.class
-            );
+            HttpSecurity http,
+            AgentJobRepository agentJobRepository,
+            MentorProxyCredentialRegistry mentorRegistry,
+            ObjectMapper objectMapper)
+            throws Exception {
+        http.securityMatcher("/internal/llm/**")
+                .csrf(csrf -> csrf.disable())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                .addFilterBefore(
+                        new JobTokenAuthenticationFilter(agentJobRepository, mentorRegistry, objectMapper),
+                        UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

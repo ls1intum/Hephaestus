@@ -7,6 +7,7 @@ import org.jspecify.annotations.NonNull;
 
 @Schema(description = "Request to add a group to the instance catalog")
 public record CreateCuratedGroupRequestDTO(
-    @NonNull @CuratedSlug @Schema(example = "reviewing-work") String slug,
-    @NonNull @NotNull @Valid CuratedGroupRequestDTO definition
-) {}
+        @NonNull @CuratedSlug @Schema(example = "reviewing-work")
+        String slug,
+
+        @NonNull @NotNull @Valid CuratedGroupRequestDTO definition) {}

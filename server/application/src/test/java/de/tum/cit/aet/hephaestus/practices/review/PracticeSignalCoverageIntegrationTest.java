@@ -54,6 +54,8 @@ class PracticeSignalCoverageIntegrationTest extends BaseIntegrationTest {
 
         assertThat(offered).as("no artifact descriptor is registered").isNotEmpty();
         assertThat(compiled).as("no manifest declares it raises anything").isNotEmpty();
-        assertThat(compiled).as("the manifests raise nothing an author can bind to").containsAnyElementsOf(offered);
+        assertThat(compiled)
+                .as("the manifests raise nothing an author can bind to")
+                .containsAnyElementsOf(offered);
     }
 }

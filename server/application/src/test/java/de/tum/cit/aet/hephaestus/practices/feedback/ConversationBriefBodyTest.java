@@ -18,15 +18,14 @@ class ConversationBriefBodyTest extends BaseUnitTest {
     private static final String SITUATION = "On !18, !20 and !22 the test landed a push after the review comment.";
     private static final String COACHING_GOAL = "Writing the test last is what makes the review find the gap.";
     private static final String EVIDENCE_SUMMARY =
-        "On !18, !20 and !22 the test arrived a push later.\n\nNo test was wrong.";
+            "On !18, !20 and !22 the test arrived a push later.\n\nNo test was wrong.";
     private static final String SUCCESS_SIGNAL = "They name a check they could run before pushing.";
 
     @Test
     @DisplayName("every note survives the round trip, newlines and all")
     void roundTrips() {
         ConversationBriefBody.Brief brief = ConversationBriefBody.parse(
-            ConversationBriefBody.render(TITLE, SITUATION, COACHING_GOAL, EVIDENCE_SUMMARY, SUCCESS_SIGNAL, null)
-        );
+                ConversationBriefBody.render(TITLE, SITUATION, COACHING_GOAL, EVIDENCE_SUMMARY, SUCCESS_SIGNAL, null));
 
         assertThat(brief).isNotNull();
         assertThat(brief.title()).isEqualTo(TITLE);
@@ -44,18 +43,17 @@ class ConversationBriefBodyTest extends BaseUnitTest {
     @ParameterizedTest
     @DisplayName("nothing this class did not write parses as a brief")
     @ValueSource(
-        strings = {
-            "### You keep shipping untested changes\n\nthe process-level message",
-            "plain prose that happens to mention situation and evidenceSummary and inConversationSignal",
-            "{",
-            "{\"kind\":\"conversation-brief\",\"title\":\"t\",\"situation\":\"s\"}",
-            "{\"kind\":\"in-app\",\"title\":\"t\",\"situation\":\"s\",\"capability\":\"g\"," +
-                "\"evidenceSummary\":\"e\",\"inConversationSignal\":\"x\"}",
-            "{\"kind\":\"conversation-brief\",\"title\":\"t\",\"situation\":\"s\"," +
-                "\"capability\":\"g\",\"evidenceSummary\":\"e\"}",
-            "  ",
-        }
-    )
+            strings = {
+                "### You keep shipping untested changes\n\nthe process-level message",
+                "plain prose that happens to mention situation and evidenceSummary and inConversationSignal",
+                "{",
+                "{\"kind\":\"conversation-brief\",\"title\":\"t\",\"situation\":\"s\"}",
+                "{\"kind\":\"in-app\",\"title\":\"t\",\"situation\":\"s\",\"capability\":\"g\","
+                        + "\"evidenceSummary\":\"e\",\"inConversationSignal\":\"x\"}",
+                "{\"kind\":\"conversation-brief\",\"title\":\"t\",\"situation\":\"s\","
+                        + "\"capability\":\"g\",\"evidenceSummary\":\"e\"}",
+                "  ",
+            })
     void refusesAnythingElse(String body) {
         assertThat(ConversationBriefBody.parse(body)).isNull();
     }
@@ -68,15 +66,14 @@ class ConversationBriefBodyTest extends BaseUnitTest {
     @ParameterizedTest
     @DisplayName("nothing another producer wrote is recognised as a brief")
     @ValueSource(
-        strings = {
-            "### You keep shipping untested changes\n\nthe process-level message",
-            "plain prose that happens to mention situation and evidenceSummary and inConversationSignal",
-            "{",
-            "{\"kind\":\"in-app\",\"title\":\"t\",\"situation\":\"s\",\"capability\":\"g\"," +
-                "\"evidenceSummary\":\"e\",\"inConversationSignal\":\"x\"}",
-            "  ",
-        }
-    )
+            strings = {
+                "### You keep shipping untested changes\n\nthe process-level message",
+                "plain prose that happens to mention situation and evidenceSummary and inConversationSignal",
+                "{",
+                "{\"kind\":\"in-app\",\"title\":\"t\",\"situation\":\"s\",\"capability\":\"g\","
+                        + "\"evidenceSummary\":\"e\",\"inConversationSignal\":\"x\"}",
+                "  ",
+            })
     void recognisesNoOtherProducersBody(String body) {
         assertThat(ConversationBriefBody.isBrief(body)).isFalse();
     }
@@ -92,14 +89,8 @@ class ConversationBriefBodyTest extends BaseUnitTest {
     @Test
     @DisplayName("a brief carries no in-app headline")
     void isNotAnInAppBody() {
-        String body = ConversationBriefBody.render(
-            TITLE,
-            SITUATION,
-            COACHING_GOAL,
-            EVIDENCE_SUMMARY,
-            SUCCESS_SIGNAL,
-            null
-        );
+        String body =
+                ConversationBriefBody.render(TITLE, SITUATION, COACHING_GOAL, EVIDENCE_SUMMARY, SUCCESS_SIGNAL, null);
 
         assertThat(InAppFeedbackBody.headlineOf(body)).isNull();
         assertThat(ConversationBriefBody.isBrief(body)).isTrue();

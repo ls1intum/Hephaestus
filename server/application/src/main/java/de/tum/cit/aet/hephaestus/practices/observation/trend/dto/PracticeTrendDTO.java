@@ -7,11 +7,10 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 public record PracticeTrendDTO(
-    @NonNull String slug,
-    @NonNull TrendScope scope,
-    @NonNull TrendDirection direction,
-    @NonNull TrendSupportDTO support,
-    @Nullable OutcomeVectorDTO currentOutcomes,
-    @Nullable OutcomeVectorDTO previousOutcomes,
-    @NonNull List<TrendOpportunityDTO> opportunities
-) {}
+        @NonNull String slug,
+        @NonNull TrendScope scope,
+        @NonNull TrendDirection direction,
+        @NonNull TrendSupportDTO support,
+        @Nullable OutcomeVectorDTO currentOutcomes,
+        @Nullable OutcomeVectorDTO previousOutcomes,
+        @NonNull List<TrendOpportunityDTO> opportunities) {}

@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -32,11 +31,8 @@ class MentorTurnMeterCommitOrderingTest extends BaseUnitTest {
     private final MentorProxyCredentialRegistry credentialRegistry = mock(MentorProxyCredentialRegistry.class);
     private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
 
-    private final MentorTurnUsageAccumulator accumulator = new MentorTurnUsageAccumulator(
-        chatMessageRepository,
-        credentialRegistry,
-        meterRegistry
-    );
+    private final MentorTurnUsageAccumulator accumulator =
+            new MentorTurnUsageAccumulator(chatMessageRepository, credentialRegistry, meterRegistry);
 
     @AfterEach
     void clearSynchronization() {
@@ -51,7 +47,8 @@ class MentorTurnMeterCommitOrderingTest extends BaseUnitTest {
         TransactionSynchronizationManager.initSynchronization();
         UUID turnId = UUID.randomUUID();
         ProxyTokenUsage usage = usageOf(turnId);
-        when(chatMessageRepository.accumulateLlmUsage(any(), anyLong(), anyLong(), anyLong(), anyLong())).thenReturn(1);
+        when(chatMessageRepository.accumulateLlmUsage(any(), anyLong(), anyLong(), anyLong(), anyLong()))
+                .thenReturn(1);
 
         accumulator.accumulate(attempt(turnId), usage);
 
@@ -67,13 +64,15 @@ class MentorTurnMeterCommitOrderingTest extends BaseUnitTest {
     void shouldNotMirrorASupersededWrite() {
         TransactionSynchronizationManager.initSynchronization();
         UUID turnId = UUID.randomUUID();
-        when(chatMessageRepository.accumulateLlmUsage(any(), anyLong(), anyLong(), anyLong(), anyLong())).thenReturn(0);
+        when(chatMessageRepository.accumulateLlmUsage(any(), anyLong(), anyLong(), anyLong(), anyLong()))
+                .thenReturn(0);
 
         accumulator.accumulate(attempt(turnId), usageOf(turnId));
         TransactionSynchronizationUtils.triggerAfterCommit();
 
         verify(credentialRegistry, never()).accumulate(any(), any());
-        assertThat(meterRegistry.counter("llm.proxy.usage.mentor.superseded").count()).isEqualTo(1.0);
+        assertThat(meterRegistry.counter("llm.proxy.usage.mentor.superseded").count())
+                .isEqualTo(1.0);
     }
 
     private static ProxyRouting.BilledAttempt attempt(UUID turnId) {

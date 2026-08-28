@@ -35,7 +35,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Live end-to-end test for the practice-review {@code pi-runner.ts} against a real LLM.
@@ -61,20 +60,15 @@ class PracticeRunnerLiveLlmTest {
     private static final String PI_SDK_VERSION = "0.84.3";
 
     private static final Path SDK_DIR = Path.of("target", "pi-sdk").toAbsolutePath();
-    private static final Path RUNNER = Path.of("src", "main", "resources", "agent", "pi-runner.ts").toAbsolutePath();
-    private static final Path FIXTURE_DIR = Path.of(
-        "src",
-        "test",
-        "resources",
-        "agent",
-        "live-practice"
-    ).toAbsolutePath();
+    private static final Path RUNNER =
+            Path.of("src", "main", "resources", "agent", "pi-runner.ts").toAbsolutePath();
+    private static final Path FIXTURE_DIR =
+            Path.of("src", "test", "resources", "agent", "live-practice").toAbsolutePath();
 
     /** The runner reads/writes here verbatim; we own the directory for the duration of one test. */
     // Somewhere writable, rather than a root-owned /workspace this harness may not be able to create.
-    private static final Path WORKSPACE = Path.of(
-        System.getenv().getOrDefault("PI_RUNNER_CWD", "/workspace")
-    ).toAbsolutePath();
+    private static final Path WORKSPACE =
+            Path.of(System.getenv().getOrDefault("PI_RUNNER_CWD", "/workspace")).toAbsolutePath();
 
     /** Wall-clock cap for the whole runner — initial + retry budgets are derived from this. */
     private static final long AGENT_BUDGET_MS = 240_000L;
@@ -89,24 +83,21 @@ class PracticeRunnerLiveLlmTest {
             return;
         }
         Path lockFile = SDK_DIR.resolve(".install.lock");
-        try (
-            var raf = new java.io.RandomAccessFile(lockFile.toFile(), "rw");
-            var channel = raf.getChannel();
-            var lock = channel.lock()
-        ) {
+        try (var raf = new java.io.RandomAccessFile(lockFile.toFile(), "rw");
+                var channel = raf.getChannel();
+                var lock = channel.lock()) {
             if (Files.exists(marker)) {
                 return;
             }
             Files.writeString(SDK_DIR.resolve("package.json"), "{\"name\":\"pi-sdk-test-deps\",\"private\":true}");
             ProcessBuilder pb = new ProcessBuilder(
-                "npm",
-                "install",
-                "--no-audit",
-                "--no-fund",
-                "--prefix",
-                SDK_DIR.toString(),
-                "@earendil-works/pi-coding-agent@" + PI_SDK_VERSION
-            );
+                    "npm",
+                    "install",
+                    "--no-audit",
+                    "--no-fund",
+                    "--prefix",
+                    SDK_DIR.toString(),
+                    "@earendil-works/pi-coding-agent@" + PI_SDK_VERSION);
             pb.redirectErrorStream(true);
             pb.inheritIO();
             Process p = pb.start();
@@ -125,10 +116,8 @@ class PracticeRunnerLiveLlmTest {
         // surface that clearly instead of letting Pi blow up with a cryptic ESM error.
         if (!Files.isDirectory(SDK_DIR.resolve("node_modules/@earendil-works/pi-coding-agent"))) {
             throw new IllegalStateException(
-                "Pi SDK install marker present but @earendil-works/pi-coding-agent is missing under " +
-                    SDK_DIR +
-                    " — delete target/pi-sdk and re-run."
-            );
+                    "Pi SDK install marker present but @earendil-works/pi-coding-agent is missing under " + SDK_DIR
+                            + " — delete target/pi-sdk and re-run.");
         }
     }
 
@@ -160,8 +149,8 @@ class PracticeRunnerLiveLlmTest {
         // before the agent process starts. In particular, a developer's GH_TOKEN/GITHUB_TOKEN is never
         // exposed to the model's bash tool.
         assertThat(Files.exists(WORKSPACE.resolve(SandboxLayout.FEEDBACK_COMPOSITION_PATH)))
-            .as("live harness does not request feedback composition")
-            .isFalse();
+                .as("live harness does not request feedback composition")
+                .isFalse();
         Process runner = spawnRunner(creds);
 
         // Drain stdout/stderr into the JVM console with a tag so failures show what the agent said.
@@ -173,10 +162,8 @@ class PracticeRunnerLiveLlmTest {
             runner.destroyForcibly();
             stdoutPump.join(5_000);
             stderrPump.join(5_000);
-            fail(
-                "pi-runner did not exit within 240s — likely an LLM stall or watchdog miss. Check " +
-                    "the [practice-runner *] output above for diagnostics."
-            );
+            fail("pi-runner did not exit within 240s — likely an LLM stall or watchdog miss. Check "
+                    + "the [practice-runner *] output above for diagnostics.");
             return;
         }
         stdoutPump.join(5_000);
@@ -187,12 +174,9 @@ class PracticeRunnerLiveLlmTest {
         // The runner returns 0 on success, 1 on retry-budget exhaustion. Anything else (2 fatal,
         // 3 watchdog kill, 42 envelope mismatch) is a real bug.
         if (exitCode != 0 && exitCode != 1) {
-            fail(
-                "pi-runner exited with unexpected code " +
-                    exitCode +
-                    " (0=success, 1=retry-exhausted, 2=fatal, 3=watchdog, 42=envelope mismatch). " +
-                    "See [practice-runner *] output above."
-            );
+            fail("pi-runner exited with unexpected code " + exitCode
+                    + " (0=success, 1=retry-exhausted, 2=fatal, 3=watchdog, 42=envelope mismatch). "
+                    + "See [practice-runner *] output above.");
         }
 
         // Parse via the real production parser. The parser tolerates fallback through review-state.json
@@ -204,15 +188,21 @@ class PracticeRunnerLiveLlmTest {
         // If exit code is 1 (retry-exhausted) we don't enforce success() — but we still demand
         // observations below, which is the real product invariant.
         if (exitCode == 0) {
-            assertThat(result.success()).as("PiResultParser.success() reflects exit code 0").isTrue();
+            assertThat(result.success())
+                    .as("PiResultParser.success() reflects exit code 0")
+                    .isTrue();
         }
 
         String rawOutput = (String) result.output().get("rawOutput");
-        assertThat(rawOutput).as("result.json (or review-state.json fallback) yielded a parsed payload").isNotNull();
+        assertThat(rawOutput)
+                .as("result.json (or review-state.json fallback) yielded a parsed payload")
+                .isNotNull();
 
         JsonNode parsed = MAPPER.readTree(rawOutput);
         JsonNode observations = parsed.path("observations");
-        assertThat(observations.isArray()).as("observations must be a JSON array").isTrue();
+        assertThat(observations.isArray())
+                .as("observations must be a JSON array")
+                .isTrue();
         assertThat(observations.size()).as("at least one observation emitted").isGreaterThanOrEqualTo(1);
 
         // Strict shape: every observation must match the wire schema PiResultParser exposes to downstream
@@ -221,25 +211,27 @@ class PracticeRunnerLiveLlmTest {
             JsonNode observation = observations.get(i);
             String tag = "observation[" + i + "]";
             assertThat(observation.path("practiceSlug").asString())
-                .as(tag + ".practiceSlug")
-                .isEqualTo("avoids-insecure-defaults-and-over-broad-permissions");
+                    .as(tag + ".practiceSlug")
+                    .isEqualTo("avoids-insecure-defaults-and-over-broad-permissions");
             assertThat(observation.path("presence").asString())
-                .as(tag + ".presence")
-                .isIn("PRESENT", "ABSENT", "NOT_APPLICABLE", "INCONCLUSIVE");
+                    .as(tag + ".presence")
+                    .isIn("PRESENT", "ABSENT", "NOT_APPLICABLE", "INCONCLUSIVE");
             // The two valence-free presences carry no assessment.
-            if (
-                !"NOT_APPLICABLE".equals(observation.path("presence").asString()) &&
-                !"INCONCLUSIVE".equals(observation.path("presence").asString())
-            ) {
-                assertThat(observation.path("assessment").asString()).as(tag + ".assessment").isIn("GOOD", "BAD");
+            if (!"NOT_APPLICABLE".equals(observation.path("presence").asString())
+                    && !"INCONCLUSIVE".equals(observation.path("presence").asString())) {
+                assertThat(observation.path("assessment").asString())
+                        .as(tag + ".assessment")
+                        .isIn("GOOD", "BAD");
             }
             assertThat(observation.path("severity").asString())
-                .as(tag + ".severity")
-                .isIn("CRITICAL", "MAJOR", "MINOR", "INFO");
-            assertThat(observation.has("confidence")).as(tag + " has no confidence field").isFalse();
+                    .as(tag + ".severity")
+                    .isIn("CRITICAL", "MAJOR", "MINOR", "INFO");
+            assertThat(observation.has("confidence"))
+                    .as(tag + " has no confidence field")
+                    .isFalse();
             assertThat(observation.path("evidence").path("citations").isArray())
-                .as(tag + ".evidence.citations is an array")
-                .isTrue();
+                    .as(tag + ".evidence.citations is an array")
+                    .isTrue();
         }
 
         // Planted-violation detection: this practice must be detected when the violation is present.
@@ -247,37 +239,28 @@ class PracticeRunnerLiveLlmTest {
         // observation: the bad signal IS present and that is a violation.
         boolean foundViolation = false;
         for (JsonNode observation : observations) {
-            if (
-                "avoids-insecure-defaults-and-over-broad-permissions".equals(
-                    observation.path("practiceSlug").asString()
-                ) &&
-                "PRESENT".equals(observation.path("presence").asString()) &&
-                "BAD".equals(observation.path("assessment").asString())
-            ) {
+            if ("avoids-insecure-defaults-and-over-broad-permissions"
+                            .equals(observation.path("practiceSlug").asString())
+                    && "PRESENT".equals(observation.path("presence").asString())
+                    && "BAD".equals(observation.path("assessment").asString())) {
                 foundViolation = true;
                 break;
             }
         }
         assertThat(foundViolation)
-            .as(
-                "at least one (PRESENT, BAD) avoids-insecure-defaults-and-over-broad-permissions observation for the planted apiKey/dbPassword. " +
-                    "Observations payload: " +
-                    rawOutput
-            )
-            .isTrue();
+                .as(
+                        "at least one (PRESENT, BAD) avoids-insecure-defaults-and-over-broad-permissions observation for the planted apiKey/dbPassword. "
+                                + "Observations payload: "
+                                + rawOutput)
+                .isTrue();
 
         // Usage diagnostics — surfaces token totals to the console so flakes show whether the call
         // even reached the LLM. Not asserted as the watchdog branch may leave usage=0.
         AgentResult.LlmUsage usage = result.usage();
         if (usage != null) {
             System.out.printf(
-                "[practice-live] usage: model=%s, input=%s, output=%s, totalCalls=%d, cost=$%s%n",
-                usage.model(),
-                usage.inputTokens(),
-                usage.outputTokens(),
-                usage.totalCalls(),
-                usage.costUsd()
-            );
+                    "[practice-live] usage: model=%s, input=%s, output=%s, totalCalls=%d, cost=$%s%n",
+                    usage.model(), usage.inputTokens(), usage.outputTokens(), usage.totalCalls(), usage.costUsd());
         }
         System.out.printf("[practice-live] %d observation(s); violation=%s%n", observations.size(), foundViolation);
     }
@@ -297,10 +280,9 @@ class PracticeRunnerLiveLlmTest {
         Files.copy(RUNNER, WORKSPACE.resolve("pi-runner.ts"), StandardCopyOption.REPLACE_EXISTING);
         for (String sidecar : new PracticeRunnerProfile().sidecarScripts()) {
             Files.copy(
-                Path.of("src", "main", "resources", "agent", sidecar),
-                WORKSPACE.resolve(sidecar),
-                StandardCopyOption.REPLACE_EXISTING
-            );
+                    Path.of("src", "main", "resources", "agent", sidecar),
+                    WORKSPACE.resolve(sidecar),
+                    StandardCopyOption.REPLACE_EXISTING);
         }
 
         // Orchestrator instructions live at WORKSPACE/.pi/AGENTS.md — same layout production uses,
@@ -308,10 +290,10 @@ class PracticeRunnerLiveLlmTest {
         Path piDir = WORKSPACE.resolve(SandboxLayout.PI_AGENT_PREFIX);
         Files.createDirectories(piDir);
         Files.copy(
-            Path.of("src", "main", "resources", "agent", "pi-orchestrator.md").toAbsolutePath(),
-            piDir.resolve(SandboxLayout.ORCHESTRATOR_FILENAME),
-            StandardCopyOption.REPLACE_EXISTING
-        );
+                Path.of("src", "main", "resources", "agent", "pi-orchestrator.md")
+                        .toAbsolutePath(),
+                piDir.resolve(SandboxLayout.ORCHESTRATOR_FILENAME),
+                StandardCopyOption.REPLACE_EXISTING);
 
         // The same pi-provider.json contract production uses, not a parallel models.json that could drift.
         Path piHome = WORKSPACE.resolve(".pi-home");
@@ -327,9 +309,8 @@ class PracticeRunnerLiveLlmTest {
         copyFixture("practices/index.json", practicesDir.resolve("index.json"));
         copyFixture("practices/all-criteria.md", practicesDir.resolve("all-criteria.md"));
         copyFixture(
-            "practices/avoids-insecure-defaults-and-over-broad-permissions.md",
-            practicesDir.resolve("avoids-insecure-defaults-and-over-broad-permissions.md")
-        );
+                "practices/avoids-insecure-defaults-and-over-broad-permissions.md",
+                practicesDir.resolve("avoids-insecure-defaults-and-over-broad-permissions.md"));
 
         // Context fixture — diff, metadata, comments, diff_summary. Mirrors what
         // PullRequestContentSource materialises in production.
@@ -354,23 +335,20 @@ class PracticeRunnerLiveLlmTest {
         // Task envelope at /workspace/task.json — built via the production TaskEnvelope record so
         // any future field addition fails this test at compile time, not at runtime.
         TaskEnvelope envelope = TaskEnvelope.of(
-            UUID.randomUUID(),
-            1L,
-            new Task.PracticeReview(
-                "Review merge request #1 in test/fixture. Read inputs/context/diff_summary.md, " +
-                    "inputs/practices/all-criteria.md, inputs/practices/index.json, and inputs/context/metadata.json. " +
-                    "Apply the avoids-insecure-defaults-and-over-broad-permissions practice to inputs/context/diff.patch. Persist each " +
-                    "justified observation via report_observation (one tool call per observation). Follow " +
-                    SandboxLayout.ORCHESTRATOR_PATH +
-                    " for the schema and review rules.",
-                1,
-                "test/fixture"
-            )
-        );
+                UUID.randomUUID(),
+                1L,
+                new Task.PracticeReview(
+                        "Review merge request #1 in test/fixture. Read inputs/context/diff_summary.md, "
+                                + "inputs/practices/all-criteria.md, inputs/practices/index.json, and inputs/context/metadata.json. "
+                                + "Apply the avoids-insecure-defaults-and-over-broad-permissions practice to inputs/context/diff.patch. Persist each "
+                                + "justified observation via report_observation (one tool call per observation). Follow "
+                                + SandboxLayout.ORCHESTRATOR_PATH
+                                + " for the schema and review rules.",
+                        1,
+                        "test/fixture"));
         Files.write(
-            WORKSPACE.resolve(SandboxLayout.TASK_ENVELOPE_FILENAME),
-            MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(envelope)
-        );
+                WORKSPACE.resolve(SandboxLayout.TASK_ENVELOPE_FILENAME),
+                MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(envelope));
     }
 
     private static byte[] buildSettingsJson(String modelId) throws IOException {
@@ -430,22 +408,18 @@ class PracticeRunnerLiveLlmTest {
 
     private static Thread pumpStream(java.io.InputStream stream, String tag) {
         Thread t = new Thread(
-            () -> {
-                try (
-                    var reader = new java.io.BufferedReader(
-                        new java.io.InputStreamReader(stream, StandardCharsets.UTF_8)
-                    )
-                ) {
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        System.out.println(tag + " " + line);
+                () -> {
+                    try (var reader =
+                            new java.io.BufferedReader(new java.io.InputStreamReader(stream, StandardCharsets.UTF_8))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            System.out.println(tag + " " + line);
+                        }
+                    } catch (IOException ignored) {
+                        // Stream closed when the child exits — nothing to do.
                     }
-                } catch (IOException ignored) {
-                    // Stream closed when the child exits — nothing to do.
-                }
-            },
-            "practice-runner-log-" + tag.hashCode()
-        );
+                },
+                "practice-runner-log-" + tag.hashCode());
         t.setDaemon(true);
         t.start();
         return t;

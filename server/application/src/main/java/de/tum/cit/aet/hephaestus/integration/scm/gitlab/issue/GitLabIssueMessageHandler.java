@@ -45,18 +45,16 @@ public class GitLabIssueMessageHandler extends AbstractIntegrationMessageHandler
     private final GitLabWebhookContextResolver contextResolver;
 
     GitLabIssueMessageHandler(
-        GitLabIssueProcessor issueProcessor,
-        GitLabWebhookContextResolver contextResolver,
-        NatsMessageDeserializer deserializer,
-        TransactionTemplate transactionTemplate
-    ) {
+            GitLabIssueProcessor issueProcessor,
+            GitLabWebhookContextResolver contextResolver,
+            NatsMessageDeserializer deserializer,
+            TransactionTemplate transactionTemplate) {
         super(
-            IntegrationKind.GITLAB,
-            GitLabEventType.ISSUE.getValue(),
-            GitLabIssueEventDTO.class,
-            deserializer,
-            transactionTemplate
-        );
+                IntegrationKind.GITLAB,
+                GitLabEventType.ISSUE.getValue(),
+                GitLabIssueEventDTO.class,
+                deserializer,
+                transactionTemplate);
         this.issueProcessor = issueProcessor;
         this.contextResolver = contextResolver;
     }
@@ -90,17 +88,18 @@ public class GitLabIssueMessageHandler extends AbstractIntegrationMessageHandler
         // also have any snapshot we mirrored while it was public purged — otherwise a stale public copy of
         // now-restricted data lingers. Resolve the context first so we know the repository, then tombstone.
         if (event.isConfidential()) {
-            log.debug("Confidential issue event: purging any public snapshot, iid={}", event.objectAttributes().iid());
+            log.debug(
+                    "Confidential issue event: purging any public snapshot, iid={}",
+                    event.objectAttributes().iid());
             issueProcessor.purgeConfidential(event, context);
             return;
         }
 
         log.info(
-            "Processing issue event: projectPath={}, iid={}, action={}",
-            safeProjectPath,
-            event.objectAttributes().iid(),
-            action
-        );
+                "Processing issue event: projectPath={}, iid={}, action={}",
+                safeProjectPath,
+                event.objectAttributes().iid(),
+                action);
 
         switch (action) {
             case OPEN -> issueProcessor.process(event, context);
