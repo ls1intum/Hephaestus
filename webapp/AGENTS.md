@@ -11,11 +11,11 @@ already tells you are not here.
 
 | Task | Command |
 |------|---------|
-| Dev server | `pnpm run dev:webapp` — port 4200, `strictPort`, overridable with `WEBAPP_PORT` |
-| Type check | `pnpm run typecheck:webapp` |
-| Lint + format | `pnpm run check:webapp` — does **not** type-check; that is the separate leg above |
-| Tests | `pnpm run test:webapp` |
-| Storybook | `pnpm --filter webapp run storybook` |
+| Dev server | `bun run dev:webapp` — port 4200, `strictPort`, overridable with `WEBAPP_PORT` |
+| Type check | `bun run typecheck:webapp` |
+| Lint + format | `bun run check:webapp` — does **not** type-check; that is the separate leg above |
+| Tests | `bun run test:webapp` |
+| Storybook | `bun run --filter webapp storybook:dev` |
 
 ## Ask first
 
@@ -127,7 +127,7 @@ in the tree. The prefix answers it, and it also shows up in imports and in the S
 - **Components** (`src/components/**`): presentational, with no exception for a "cohesive section".
   They take their data as props and never import the query layer.
 
-`scripts/check-presentational-components.ts` enforces it, and `pnpm run check` runs it. Two halves,
+`scripts/check-presentational-components.ts` enforces it, and `bun run check` runs it. Two halves,
 because they fail differently:
 
 - **A component may not import the generated query layer or call a TanStack query hook.**
@@ -293,8 +293,9 @@ an assertion out of a story into a route test is exactly how this bites.
 Type checking runs on TypeScript 7 through the `typescript7` alias, invoked by path because both it
 and `typescript` install a `tsc` bin and the winner is undefined. `typescript` itself stays on 6
 because `@hey-api/openapi-ts` calls the TypeScript compiler API at runtime and the 7 package ships
-only `tsc` — its peer range accepts 7, so nothing warns you before the generator dies. A scoped
-`parent>typescript` pnpm override does **not** help: peers resolve from this package, not the override.
+only `tsc` — its peer range accepts 7, so nothing warns you before the generator dies.
+An override cannot provide different compiler implementations to the typechecker and generator;
+the alias keeps both runtimes explicit.
 
 **A dot-directory is invisible to a `**/*` include.** `tsconfig.json`'s `**/*.ts` does not match
 `.storybook/`, so a file there is type-checked only if something names the directory explicitly —
@@ -490,4 +491,3 @@ the label about 60px and the row squashes.
 
 Fixed widths on a control inside a responsive field must be breakpoint-scoped for the same reason —
 `w-56` alone cannot stack.
-

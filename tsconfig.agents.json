@@ -3,8 +3,8 @@
 		"target": "ES2023",
 		"module": "Preserve",
 		"moduleResolution": "Bundler",
-		"lib": ["ES2023"],
-		"types": ["bun"],
+		"lib": ["ES2023", "DOM"],
+		"types": ["bun", "node"],
 		// Bun resolves ./x.ts directly, so that is what the runner imports; nothing is ever emitted.
 		"allowImportingTsExtensions": true,
 		"strict": true,

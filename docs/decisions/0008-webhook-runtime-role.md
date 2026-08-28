@@ -23,7 +23,7 @@ operational requirement, not a nice-to-have. ADR 0005 anticipated this and liste
 - **Single artifact:** ADR 0005's principle was *"single JAR ships as either role; deploy config
   selects which."* A third role must compose with the existing two without forking the artifact.
 - **Default-on monolith:** ADR 0005's DX invariant — zero env vars boots the full stack — must
-  hold. `pnpm dev` starts one process that handles everything.
+  hold. `bun run dev` starts one process that handles everything.
 - **No multi-Maven-module split:** ADR 0005 rejected this. We honour that.
 - **Cycle through NATS, not direct coupling:** the publisher and the sync consumer agree on the
   subject grammar; nothing else couples them.

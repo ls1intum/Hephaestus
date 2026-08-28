@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Components under `webapp/src/components/**` are presentational: they take data as props and never
  * fetch. Fetching lives in the route file (or a `src/hooks/use-*.ts` it calls), which passes plain

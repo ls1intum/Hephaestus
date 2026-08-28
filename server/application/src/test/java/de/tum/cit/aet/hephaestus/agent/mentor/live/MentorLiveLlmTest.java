@@ -84,7 +84,7 @@ class MentorLiveLlmTest {
     @BeforeAll
     static void installPiSdk() throws Exception {
         // The marker file lets parallel test JVMs and repeated runs short-circuit. The file lock
-        // is acquired on a sibling lockfile so two JVMs racing to install don't both spawn npm.
+        // is acquired on a sibling lockfile so two JVMs racing to install do not both spawn Bun.
         Files.createDirectories(SDK_DIR);
         Path marker = SDK_DIR.resolve(".installed-" + PI_SDK_VERSION);
         if (Files.exists(marker)) {
@@ -98,26 +98,23 @@ class MentorLiveLlmTest {
             if (Files.exists(marker)) {
                 return;
             }
-            // Write a stub package.json so npm doesn't traverse upward to the project root and
-            // mutate its node_modules tree.
-            Files.writeString(SDK_DIR.resolve("package.json"), "{\"name\":\"pi-sdk-test-deps\",\"private\":true}");
+            // Keep live-test dependencies isolated from the repository install.
+            Files.writeString(
+                    SDK_DIR.resolve("package.json"),
+                    "{\"name\":\"pi-sdk-test-deps\",\"private\":true,\"dependencies\":{\"@earendil-works/pi-coding-agent\":\""
+                            + PI_SDK_VERSION
+                            + "\"}}");
             ProcessBuilder pb = new ProcessBuilder(
-                    "npm",
-                    "install",
-                    "--no-audit",
-                    "--no-fund",
-                    "--prefix",
-                    SDK_DIR.toString(),
-                    "@earendil-works/pi-coding-agent@" + PI_SDK_VERSION);
+                    "bun", "install", "--cwd", SDK_DIR.toString(), "--ignore-scripts", "--no-progress");
             pb.redirectErrorStream(true);
             pb.inheritIO();
             Process p = pb.start();
             if (!p.waitFor(180, TimeUnit.SECONDS)) {
                 p.destroyForcibly();
-                throw new IllegalStateException("npm install for Pi SDK timed out after 180s");
+                throw new IllegalStateException("Bun install for Pi SDK timed out after 180s");
             }
             if (p.exitValue() != 0) {
-                throw new IllegalStateException("npm install for Pi SDK failed; see stderr above");
+                throw new IllegalStateException("Bun install for Pi SDK failed; see stderr above");
             }
             Files.writeString(marker, "ok\n");
         }
@@ -625,10 +622,7 @@ class MentorLiveLlmTest {
         // Pi looks for settings under PI_CODING_AGENT_DIR; pin it inside our temp dir so the
         // runtime never touches the user's real ~/.pi.
         env.put("PI_CODING_AGENT_DIR", workspace.resolve(".pi-home").toString());
-        // The runner hard-codes CWD/SESSIONS_DIR/SYSTEM_PROMPT_PATH to /workspace/... paths.
-        // ESM named imports (`import { mkdirSync } from "node:fs"`) capture bindings at module
-        // evaluation time, so a monkey-patch shim on the `fs` default export object does NOT
-        // affect them in Node 22+. Use the runner's own env var overrides instead.
+        // Use supported runner overrides for workspace paths.
         env.put("MENTOR_RUNNER_CWD", workspace.toString());
         env.put("MENTOR_RUNNER_SESSIONS_DIR", workspace.resolve(".sessions").toString());
         env.put(

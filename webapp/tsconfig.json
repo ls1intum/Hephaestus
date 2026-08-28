@@ -23,10 +23,6 @@
 		"noImplicitReturns": true,
 		"allowUnreachableCode": false,
 		"allowUnusedLabels": false,
-		/* The `.ts` scripts here are handed straight to Node (`export:readme-assets` is
-		   `node <script>.ts`), which strips types rather than compiling them, so syntax this flag
-		   rejects — enums, namespaces, parameter properties — is syntax Node cannot run. */
-		"erasableSyntaxOnly": true,
 		"paths": {
 			"@/*": ["./src/*"]
 		}

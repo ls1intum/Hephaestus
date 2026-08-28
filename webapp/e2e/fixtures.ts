@@ -1,5 +1,7 @@
 import { test as base, expect, type Page } from "@playwright/test";
 
+import { E2E_BASE_URL } from "./urls.ts";
+
 const SERVER_URL = process.env.E2E_SERVER_URL ?? "http://localhost:8080";
 
 export const test = base.extend({
@@ -9,7 +11,7 @@ export const test = base.extend({
 				contentType: "application/javascript",
 				body: `window.__ENV__ = ${JSON.stringify({
 					APPLICATION_SERVER_URL: SERVER_URL,
-					APPLICATION_CLIENT_URL: process.env.E2E_BASE_URL ?? "http://localhost:4200",
+					APPLICATION_CLIENT_URL: E2E_BASE_URL,
 					XSRF_COOKIE_NAME: "XSRF-TOKEN",
 					TANSTACK_DEVTOOLS_ENABLED: "false",
 					SENTRY_DSN: "",

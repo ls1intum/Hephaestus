@@ -44,11 +44,7 @@ import tools.jackson.databind.node.ObjectNode;
  *   <li><b>Turn latency</b> (prompt → settled terminal event) against the live LLM.</li>
  * </ul>
  *
- * <p>This deliberately bypasses Docker (Path C of the stress plan). The runner footprint
- * measured here is the FLOOR for sizing the per-(userId, workspaceId) container — Docker adds
- * cgroup overhead + image base layer but does NOT change Node/Pi-SDK heap. Multiplying these
- * numbers by the configured ceiling (`maxSessionsTotal=50`) tells us whether the policy
- * matches reality.
+ * <p>This bypasses Docker, so it measures direct runner RSS and latency without container overhead.
  *
  * <p>Run with: {@code N=10 ./mvnw -Plive-tests test -Dtest=MentorSandboxStressTest}.
  * Defaults to N=5 to stay polite on shared infra.

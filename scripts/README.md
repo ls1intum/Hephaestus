@@ -1,10 +1,10 @@
 # Scripts
 
-Utility scripts for Hephaestus development. All TypeScript scripts run via `tsx` (no compilation needed).
+Utility scripts for Hephaestus development. Bun executes TypeScript scripts directly.
 
 ## Prerequisites
 
-Scripts use dependencies from the root `package.json`. Run `pnpm install` at the repo root first.
+Scripts use dependencies from the root `package.json`. Run `bun install` at the repo root first.
 
 ## Available Scripts
 
@@ -13,8 +13,8 @@ Scripts use dependencies from the root `package.json`. Run `pnpm install` at the
 Database documentation commands use `db-utils.sh` and require Docker with the Compose plugin:
 
 ```bash
-pnpm run db:generate-erd-docs                    # Generate Mermaid ERD diagram
-pnpm run db:draft-changelog                       # Generate Liquibase changelog diff
+bun run db:generate-erd-docs                    # Generate Mermaid ERD diagram
+bun run db:draft-changelog                       # Generate Liquibase changelog diff
 ```
 
 **ERD generation environment variables:**
@@ -34,7 +34,7 @@ Rewrite `server/application/src/main/resources/achievements/achievements.yml` in
 [Achievements](../docs/contributor/achievements.mdx).
 
 ```bash
-pnpm run format:achievements
+bun run format:achievements
 ```
 
 ### NATS Webhook Example Extraction
@@ -42,9 +42,9 @@ pnpm run format:achievements
 Extract webhook payloads from NATS JetStream for test fixtures:
 
 ```bash
-pnpm run nats:extract-examples
+bun run nats:extract-examples
 # With options:
-pnpm run nats:extract-examples -- --event push --event pull_request:opened
+bun run nats:extract-examples -- --event push --event pull_request:opened
 ```
 
 **Environment variables:**
@@ -68,7 +68,6 @@ pnpm run nats:extract-examples -- --event push --event pull_request:opened
 
 Scripts depend on packages in root `package.json`:
 
-- `tsx` - TypeScript execution
 - `commander` - CLI parsing
 - `pg` and `@types/pg` - PostgreSQL client with TypeScript types
 - `@nats-io/jetstream` and `@nats-io/transport-node` - NATS JetStream client

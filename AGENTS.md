@@ -13,12 +13,12 @@ feedback to the developer in-context, in a reflection page, or in conversation.
   See `webapp/AGENTS.md`.
 - `docs/` — contributor docs published to GitHub Pages, including the generated ERD.
 
-Node is pinned in `.node-version` and drives the repo's own tooling; the repo is pnpm 11 workspaces.
-`webapp` is the main TypeScript package; `docs` is a second, with its own tooling. The agent sandbox runs no Node at all: the runner
+The repository uses Bun for JavaScript and TypeScript execution and package management;
+`package.json#packageManager` is the authoritative version. `webapp` is the main TypeScript
+package; `docs` is a second. The runner
 (`server/application/src/main/resources/agent/`), the precompute runner and lib (`docker/agents/precompute/`) and
 the per-practice precompute scripts (`server/application/src/main/resources/practices/precompute/`) are
-TypeScript executed directly by Bun, whose version the agent image pins in
-`docker/agents/pi/Dockerfile`. They are type-checked as one project via `tsconfig.agents.json` and
+type-checked as one project via `tsconfig.agents.json` and
 linted by the root `.oxlintrc.json` and formatted by the root `.oxfmtrc.json`. JDK 21, and Docker
 for the database helpers.
 
@@ -40,22 +40,22 @@ drifts. Copy a skill nowhere else.
 
 ## Quality gates
 
-Finish every change set with `pnpm run format` then `pnpm run check`, so styling and type checks
+Finish every change set with `bun run format` then `bun run check`, so styling and type checks
 reflect the final state. Document any skipped gate in the PR description.
 
 | Command | Does |
 |---|---|
-| `pnpm run format` / `format:check` | Apply / verify formatting (Java + TypeScript) |
-| `pnpm run check` | Static analysis, formatting checks, agent tests, and repository policy checks — every leg is listed in the root `package.json` |
-| `pnpm run test:webapp` | Vitest |
-| `pnpm run test:agents` | Agent runtime and precompute specs, on Bun |
+| `bun run format` / `format:check` | Apply / verify formatting (Java + TypeScript) |
+| `bun run check` | Static analysis, formatting checks, agent tests, and repository policy checks — every leg is listed in the root `package.json` |
+| `bun run test:webapp` | Vitest |
+| `bun run test:agents` | Agent runtime and precompute specs, on Bun |
 | `cd server && ./mvnw test` | Server unit tests — see `server/AGENTS.md` for all four tiers |
 
 Naming: `format` applies, `format:check` verifies read-only for CI, `lint` lints, `check` is the
 comprehensive local quality gate. A `:webapp`, `:server` or `:agents` suffix scopes any of them; `:java`
 scopes `format` and `lint` only — the Java leg of `check` is `check:server`.
 
-`pnpm run check` is the complete local quality gate. CI distributes its legs across required jobs,
+`bun run check` is the complete local quality gate. CI distributes its legs across required jobs,
 using path filters where appropriate, and adds builds, generated-file checks, broader tests, image
 checks, and security scans. Run `check` before pushing, then run the affected tests or builds.
 
@@ -72,7 +72,7 @@ checks, and security scans. Run `check` before pushing, then run the affected te
 
 `docs:lint` is **not** the oxlint leg — it is the docs package's own `typecheck` plus
 `markdownlint-cli2`, configured by `docs/.markdownlint-cli2.jsonc`, which states both the file scope
-and the rules. It is the last leg of `pnpm run check` and runs on the App Server CI leg, which
+and the rules. It is the last leg of `bun run check` and runs on the App Server CI leg, which
 `docs/**` already triggers.
 
 **Start every oxlint run from the repo root.** A nested config *replaces* the root's rules for the
@@ -110,9 +110,9 @@ Holds wherever TypeScript is written here, the Bun agent trees and `scripts/**` 
 
 | Artefact | Command |
 |---|---|
-| `server/openapi.yaml` | `pnpm run generate:api:application-server:specs` |
-| `webapp/src/api/**` | `pnpm run generate:api:application-server:client` |
-| `docs/contributor/erd/schema.mmd` | `pnpm run db:generate-erd-docs` |
+| `server/openapi.yaml` | `bun run generate:api:application-server:specs` |
+| `webapp/src/api/**` | `bun run generate:api:application-server:client` |
+| `docs/contributor/erd/schema.mmd` | `bun run db:generate-erd-docs` |
 | `webapp/src/routeTree.gen.ts` | TanStack Router Vite plugin |
 | `server/generated-clients/target/generated-sources/**` | GraphQL and Outline codegen, owned by the generated-clients Maven module |
 
@@ -123,8 +123,8 @@ change that produced them.
 ## Database changes (Liquibase)
 
 Changelogs live in `server/application/src/main/resources/db/changelog/` and are included from `master.xml`.
-Draft with `pnpm run db:draft-changelog` (needs Docker; CI sets `CI=true`), then **prune the diff to
-the real deltas** — never commit the raw diff. Then `pnpm run db:generate-erd-docs`.
+Draft with `bun run db:draft-changelog` (needs Docker; CI sets `CI=true`), then **prune the diff to
+the real deltas** — never commit the raw diff. Then `bun run db:generate-erd-docs`.
 
 - **Filename**: `<epoch-ms-timestamp>_changelog.xml` — a real millisecond timestamp (`date +%s%3N`),
   strictly greater than the latest existing one. No round numbers, no descriptive suffix. `changeSet`
@@ -156,9 +156,9 @@ as a Liquibase `<changeSet>` — a schema change needs both. Full flow:
 `docs/contributor/release-management.mdx`; the file's shape is in `.changeset/README.md`.
 
 - **Every PR that changes shipped code** (`server/`, `webapp/`, `docker/`, excluding tests and in-tree
-  docs) ships one, and `verify-changesets` fails the PR otherwise. `pnpm changeset` is interactive;
+  docs) ships one, and `verify-changesets` fails the PR otherwise. `bun changeset` is interactive;
   with no TTY, hand-writing `.changeset/<slug>.md` is the one sanctioned hand-write — never hand-edit
-  `CHANGELOG.md`. If the change is invisible to operators and users, `pnpm changeset --empty` and say
+  `CHANGELOG.md`. If the change is invisible to operators and users, `bun changeset --empty` and say
   why in the body.
 - **The summary lands in `CHANGELOG.md` verbatim, in the operator's or user's voice.** Lead with what
   they can now do, or the symptom a fix removes. No class names, hook names or file paths. No

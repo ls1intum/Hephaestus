@@ -89,24 +89,22 @@ class PracticeRunnerLiveLlmTest {
             if (Files.exists(marker)) {
                 return;
             }
-            Files.writeString(SDK_DIR.resolve("package.json"), "{\"name\":\"pi-sdk-test-deps\",\"private\":true}");
+            Files.writeString(
+                    SDK_DIR.resolve("package.json"),
+                    "{\"name\":\"pi-sdk-test-deps\",\"private\":true,\"dependencies\":{\"@earendil-works/pi-coding-agent\":\""
+                            + PI_SDK_VERSION
+                            + "\"}}");
             ProcessBuilder pb = new ProcessBuilder(
-                    "npm",
-                    "install",
-                    "--no-audit",
-                    "--no-fund",
-                    "--prefix",
-                    SDK_DIR.toString(),
-                    "@earendil-works/pi-coding-agent@" + PI_SDK_VERSION);
+                    "bun", "install", "--cwd", SDK_DIR.toString(), "--ignore-scripts", "--no-progress");
             pb.redirectErrorStream(true);
             pb.inheritIO();
             Process p = pb.start();
             if (!p.waitFor(180, TimeUnit.SECONDS)) {
                 p.destroyForcibly();
-                throw new IllegalStateException("npm install for Pi SDK timed out after 180s");
+                throw new IllegalStateException("Bun install for Pi SDK timed out after 180s");
             }
             if (p.exitValue() != 0) {
-                throw new IllegalStateException("npm install for Pi SDK failed; see stderr above");
+                throw new IllegalStateException("Bun install for Pi SDK failed; see stderr above");
             }
             Files.writeString(marker, "ok\n");
             //noinspection ResultOfMethodCallIgnored

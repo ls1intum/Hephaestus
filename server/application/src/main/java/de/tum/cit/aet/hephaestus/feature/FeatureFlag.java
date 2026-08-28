@@ -15,7 +15,7 @@ package de.tum.cit.aet.hephaestus.feature;
  *       (e.g. via /admin/users); the {@code admin} app role implies all of them</li>
  *   <li>For {@code CONFIG} flags: add the property under
  *       {@code hephaestus.features.flags.<key>} in {@code application.yml}</li>
- *   <li>Run {@code npm run openapi-ts} to update the TypeScript client types</li>
+ *   <li>Run {@code bun run generate:api:application-server:client} to update the TypeScript client</li>
  * </ol>
  *
  * @see FeatureFlagService
