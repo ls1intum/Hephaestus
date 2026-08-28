@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.practices.observation;
 
-import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
@@ -29,12 +28,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Repository for immutable practice observations with idempotent insertion.
- *
- * <p>Workspace-agnostic: observations are scoped through {@code Practice.workspace}
- * relationship, not via a direct workspace_id column.
  */
 @Repository
-@WorkspaceAgnostic("Findings scoped through Practice.workspace relationship")
 public interface ObservationRepository extends JpaRepository<Observation, UUID> {
     /**
      * Excludes observations about an artifact in a repository a workspace team has hidden from contributions.
@@ -53,7 +48,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                       SELECT 1
                       FROM issue target_artifact
                       JOIN workspace_team_repository_settings wtrs
-                        ON wtrs.workspace_id = p.workspace_id
+                        ON wtrs.workspace_id = f.workspace_id
                        AND wtrs.repository_id = target_artifact.repository_id
                        AND wtrs.hidden_from_contributions = true
                       WHERE f.artifact_kind IN ('scm.pull_request', 'scm.issue')
@@ -62,7 +57,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         """;
 
     @EntityGraph(attributePaths = {"practice.currentRevision", "practiceRevision"})
-    @Query("SELECT f FROM Observation f JOIN f.practice p WHERE f.id = :id AND p.workspace.id = :workspaceId")
+    @Query("SELECT f FROM Observation f WHERE f.id = :id AND f.workspaceId = :workspaceId")
     Optional<Observation> findByIdAndWorkspaceId(@Param("id") UUID id, @Param("workspaceId") Long workspaceId);
 
     /**
@@ -78,7 +73,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * {@link Optional} reports empty. Callers guard an empty {@code ids}.
      */
     @EntityGraph(attributePaths = {"practice.currentRevision", "practiceRevision"})
-    @Query("SELECT f FROM Observation f JOIN f.practice p WHERE f.id IN :ids AND p.workspace.id = :workspaceId")
+    @Query("SELECT f FROM Observation f WHERE f.id IN :ids AND f.workspaceId = :workspaceId")
     List<Observation> findAllByIdInAndWorkspaceId(
             @Param("ids") Collection<UUID> ids, @Param("workspaceId") Long workspaceId);
 
@@ -89,8 +84,9 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * a re-run of a multi-subject / multi-artifact job.
      */
     @EntityGraph(attributePaths = {"practice", "practiceRevision"})
-    @Query("SELECT f FROM Observation f WHERE f.agentJobId = :agentJobId ORDER BY f.id ASC")
-    List<Observation> findByAgentJobId(@Param("agentJobId") UUID agentJobId);
+    @Query(
+            "SELECT f FROM Observation f WHERE f.agentJobId = :agentJobId AND f.workspaceId = :workspaceId ORDER BY f.id ASC")
+    List<Observation> findByAgentJobId(@Param("agentJobId") UUID agentJobId, @Param("workspaceId") Long workspaceId);
 
     @Query(value = """
         SELECT o.agent_job_id AS "jobId",
@@ -99,8 +95,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                COUNT(*) FILTER (WHERE o.presence = 'NOT_APPLICABLE') AS "notApplicable",
                COUNT(*) FILTER (WHERE o.presence = 'INCONCLUSIVE') AS "inconclusive"
         FROM observation o
-        JOIN practice p ON p.id = o.practice_id
-        WHERE p.workspace_id = :workspaceId
+        WHERE o.workspace_id = :workspaceId
           AND o.agent_job_id IN :jobIds
         GROUP BY o.agent_job_id
         """, nativeQuery = true)
@@ -136,25 +131,28 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     @Transactional
     @Query(value = """
         INSERT INTO observation (
-            id, occurrence_key, agent_job_id, practice_id, practice_revision_id,
+            id, occurrence_key, agent_job_id, workspace_id, practice_id, practice_revision_id,
             artifact_kind, artifact_id, about_user_id,
             summary, presence, assessment, severity,
             evidence, evidence_rationale,
             recurrence_key, observed_at, origin
         )
-        VALUES (
-            :id, :idempotencyKey, :agentJobId, :practiceId, :practiceRevisionId,
+        SELECT
+            :id, :idempotencyKey, :agentJobId,
+            p.workspace_id, p.id, COALESCE(:practiceRevisionId, p.current_revision_id),
             :artifactKind, :artifactId, :aboutUserId,
             :summary, :presence, :assessment, :severity,
             CAST(:evidence AS jsonb), :evidenceRationale,
             :recurrenceKey, :observedAt, :origin
-        )
+        FROM practice p
+        WHERE p.id = :practiceId AND p.workspace_id = :workspaceId
         ON CONFLICT (occurrence_key) DO NOTHING
         """, nativeQuery = true)
     int insertIfAbsent(
             @Param("id") UUID id,
             @Param("idempotencyKey") String idempotencyKey,
             @Param("agentJobId") UUID agentJobId,
+            @Param("workspaceId") Long workspaceId,
             @Param("practiceId") Long practiceId,
             @Param("practiceRevisionId") @Nullable Long practiceRevisionId,
             @Param("artifactKind") String artifactKind,
@@ -172,18 +170,14 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
 
     @Modifying
     @Transactional
-    @Query(
-            value =
-                    "DELETE FROM observation WHERE practice_id IN (SELECT id FROM practice WHERE workspace_id = :workspaceId)",
-            nativeQuery = true)
+    @Query(value = "DELETE FROM observation WHERE workspace_id = :workspaceId", nativeQuery = true)
     void deleteAllByPracticeWorkspaceId(@Param("workspaceId") Long workspaceId);
 
     /**
      * Hard-delete the {@code chat.conversation_thread} observations for a workspace whose {@code artifact_id} (the
      * {@code slack_thread} id) is one of {@code artifactIds} — the derived-content erasure the Slack module invokes
      * through {@link de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure} when a channel's consent is
-     * withdrawn. Workspace is scoped through the {@code Practice.workspace} relationship (this repo is
-     * {@code @WorkspaceAgnostic}); the {@code artifactKind} + {@code artifactId} predicates keep PR/ISSUE observations
+     * withdrawn. the {@code artifactKind} + {@code artifactId} predicates keep PR/ISSUE observations
      * and other tenants' rows untouched. DB {@code ON DELETE CASCADE} clears any bound {@code feedback_observation} /
      * {@code reaction} children. Callers guard an empty {@code artifactIds}.
      *
@@ -195,7 +189,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         DELETE FROM Observation o
         WHERE o.artifactKind = :artifactKind
           AND o.artifactId IN :artifactIds
-          AND o.practice.id IN (SELECT p.id FROM Practice p WHERE p.workspace.id = :workspaceId)
+          AND o.workspaceId = :workspaceId
         """)
     int deleteObservationsOfKind(
             @Param("workspaceId") Long workspaceId,
@@ -219,7 +213,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     @Query("""
         DELETE FROM Observation o
         WHERE o.artifactKind IN :artifactKinds
-          AND o.practice.id IN (SELECT p.id FROM Practice p WHERE p.workspace.id = :workspaceId)
+          AND o.workspaceId = :workspaceId
         """)
     int deleteAllObservationsOfKinds(
             @Param("workspaceId") Long workspaceId, @Param("artifactKinds") Collection<ArtifactKind> artifactKinds);
@@ -244,7 +238,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     @Query("""
         DELETE FROM Observation o
         WHERE o.artifactKind IN :artifactKinds
-          AND o.practice.id IN (SELECT p.id FROM Practice p WHERE p.workspace.id = :workspaceId)
+          AND o.workspaceId = :workspaceId
         """)
     int deleteAllScmObservationsOfKinds(
             @Param("workspaceId") Long workspaceId, @Param("artifactKinds") Collection<ArtifactKind> artifactKinds);
@@ -268,7 +262,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         DELETE FROM Observation o
         WHERE o.artifactKind = :artifactKind
           AND o.aboutUserId = :aboutUserId
-          AND o.practice.id IN (SELECT p.id FROM Practice p WHERE p.workspace.id = :workspaceId)
+          AND o.workspaceId = :workspaceId
         """)
     int deleteObservationsOfKindAboutUser(
             @Param("workspaceId") Long workspaceId,
@@ -304,7 +298,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         JOIN FETCH f.practice p
         LEFT JOIN p.group a
         WHERE f.aboutUserId = :aboutUserId
-        AND p.workspace.id = :workspaceId
+        AND f.workspaceId = :workspaceId
         AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
         AND (:groupSlug IS NULL OR a.slug = :groupSlug)
         AND (:presence IS NULL OR f.presence = :presence)
@@ -316,7 +310,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         JOIN f.practice p
         LEFT JOIN p.group a
         WHERE f.aboutUserId = :aboutUserId
-        AND p.workspace.id = :workspaceId
+        AND f.workspaceId = :workspaceId
         AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
         AND (:groupSlug IS NULL OR a.slug = :groupSlug)
         AND (:presence IS NULL OR f.presence = :presence)
@@ -354,7 +348,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         JOIN FETCH f.practice p
         LEFT JOIN p.group a
         WHERE f.aboutUserId = :aboutUserId
-        AND p.workspace.id = :workspaceId
+        AND f.workspaceId = :workspaceId
         AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
         AND (:groupSlug IS NULL OR a.slug = :groupSlug)
         AND (:presence IS NULL OR f.presence = :presence)
@@ -373,7 +367,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         JOIN f.practice p
         LEFT JOIN p.group a
         WHERE f.aboutUserId = :aboutUserId
-        AND p.workspace.id = :workspaceId
+        AND f.workspaceId = :workspaceId
         AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
         AND (:groupSlug IS NULL OR a.slug = :groupSlug)
         AND (:presence IS NULL OR f.presence = :presence)
@@ -411,7 +405,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                     JOIN practice p ON p.id = f.practice_id
                     JOIN practice_group a ON a.id = p.practice_group_id
                     WHERE f.about_user_id = :aboutUserId
-                      AND p.workspace_id = :workspaceId
+                      AND f.workspace_id = :workspaceId
                       AND a.slug = :groupSlug
                       AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
                       AND (:artifactKinds IS NULL OR f.artifact_kind = ANY(string_to_array(:artifactKinds, ',')))
@@ -445,7 +439,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         JOIN p.group a
         WHERE o.agentJobId IN :jobIds
           AND o.aboutUserId = :aboutUserId
-          AND p.workspace.id = :workspaceId
+          AND o.workspaceId = :workspaceId
           AND a.slug = :groupSlug
           AND o.presence <> de.tum.cit.aet.hephaestus.practices.model.Presence.NOT_APPLICABLE
         ORDER BY o.observedAt DESC, o.id ASC
@@ -487,13 +481,13 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                     FROM observation f
                     JOIN practice p ON p.id = f.practice_id
                     WHERE f.about_user_id = :aboutUserId
-                      AND p.workspace_id = :workspaceId
+                      AND f.workspace_id = :workspaceId
             """ + HIDDEN_REPOSITORY_GUARD + """
               AND f.origin <> 'BACKFILL'
               AND f.agent_job_id = (
                   SELECT f2.agent_job_id FROM observation f2
                   JOIN practice p2 ON p2.id = f2.practice_id
-                  WHERE p2.workspace_id = p.workspace_id
+                  WHERE f2.workspace_id = f.workspace_id
                     AND f2.practice_id = f.practice_id
                     AND f2.about_user_id = f.about_user_id
                     AND f2.artifact_kind = f.artifact_kind
@@ -520,7 +514,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         JOIN FETCH f.practice p
         WHERE f.id = :observationId
         AND f.aboutUserId = :aboutUserId
-        AND p.workspace.id = :workspaceId
+        AND f.workspaceId = :workspaceId
         """)
     Optional<Observation> findByIdAndDeveloperAndWorkspace(
             @Param("observationId") UUID observationId,
@@ -533,7 +527,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         JOIN FETCH f.practice p
         WHERE f.artifactKind = :artifactKind
         AND f.artifactId = :pullRequestId
-        AND p.workspace.id = :workspaceId
+        AND f.workspaceId = :workspaceId
         ORDER BY f.observedAt DESC
         """)
     List<Observation> findByPullRequestAndWorkspace(
@@ -584,7 +578,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                     SELECT f.* FROM observation f
                     JOIN practice p ON p.id = f.practice_id
                     WHERE f.about_user_id = :aboutUserId
-                      AND p.workspace_id = :workspaceId
+                      AND f.workspace_id = :workspaceId
             """ + HIDDEN_REPOSITORY_GUARD + """
               AND f.observed_at >= :since
               AND (:verdictsOnly = FALSE OR f.presence IN ('PRESENT', 'ABSENT'))
@@ -618,7 +612,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                     FROM observation f
                     JOIN practice p ON p.id = f.practice_id
                     WHERE f.about_user_id = :aboutUserId
-                      AND p.workspace_id = :workspaceId
+                      AND f.workspace_id = :workspaceId
             """ + HIDDEN_REPOSITORY_GUARD + """
               AND f.observed_at >= :since
               AND f.severity IS NOT NULL
@@ -626,7 +620,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
               AND f.agent_job_id = (
                   SELECT f2.agent_job_id FROM observation f2
                   JOIN practice p2 ON p2.id = f2.practice_id
-                  WHERE p2.workspace_id = p.workspace_id
+                  WHERE f2.workspace_id = f.workspace_id
                     AND f2.practice_id = f.practice_id
                     AND f2.about_user_id = f.about_user_id
                     AND f2.artifact_kind = f.artifact_kind AND f2.artifact_id = f.artifact_id
@@ -650,14 +644,14 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                     FROM observation f
                     JOIN practice p ON p.id = f.practice_id
                     WHERE f.about_user_id = :aboutUserId
-                      AND p.workspace_id = :workspaceId
+                      AND f.workspace_id = :workspaceId
             """ + HIDDEN_REPOSITORY_GUARD + """
               AND f.observed_at >= :since
               AND f.origin <> 'BACKFILL'
               AND f.agent_job_id = (
                   SELECT f2.agent_job_id FROM observation f2
                   JOIN practice p2 ON p2.id = f2.practice_id
-                  WHERE p2.workspace_id = p.workspace_id
+                  WHERE f2.workspace_id = f.workspace_id
                     AND f2.practice_id = f.practice_id
                     AND f2.about_user_id = f.about_user_id
                     AND f2.artifact_kind = f.artifact_kind AND f2.artifact_id = f.artifact_id
@@ -685,7 +679,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     @Query("""
         SELECT f.agentJobId AS agentJobId, MAX(f.observedAt) AS runAt
         FROM Observation f JOIN f.practice p
-        WHERE f.artifactKind = :artifactKind AND f.artifactId = :artifactId AND p.workspace.id = :workspaceId
+        WHERE f.artifactKind = :artifactKind AND f.artifactId = :artifactId AND f.workspaceId = :workspaceId
           AND f.recurrenceKey IS NOT NULL
           AND f.origin <> de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin.BACKFILL
         GROUP BY f.agentJobId
@@ -703,7 +697,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                f.assessment AS assessment, f.severity AS severity, p.slug AS practiceSlug,
                f.summary AS summary, f.observedAt AS observedAt
         FROM Observation f JOIN f.practice p
-        WHERE f.agentJobId IN :agentJobIds AND p.workspace.id = :workspaceId AND f.recurrenceKey IS NOT NULL
+        WHERE f.agentJobId IN :agentJobIds AND f.workspaceId = :workspaceId AND f.recurrenceKey IS NOT NULL
           AND f.presence IN (de.tum.cit.aet.hephaestus.practices.model.Presence.PRESENT,
                              de.tum.cit.aet.hephaestus.practices.model.Presence.ABSENT)
         ORDER BY f.observedAt DESC
@@ -802,7 +796,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
             LEFT JOIN practice_revision evaluated_revision ON evaluated_revision.id = o.practice_revision_id
             LEFT JOIN practice_revision current_revision ON current_revision.id = p.current_revision_id
             LEFT JOIN practice_group pa ON pa.id = p.practice_group_id
-            WHERE p.workspace_id = :workspaceId
+            WHERE o.workspace_id = :workspaceId
             """ + OPERATOR_PREDICATES + """
              ORDER BY
                CASE WHEN :prioritizeActionable THEN
@@ -824,7 +818,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
             FROM observation o
             JOIN practice p ON p.id = o.practice_id
             LEFT JOIN practice_group pa ON pa.id = p.practice_group_id
-            WHERE p.workspace_id = :workspaceId
+            WHERE o.workspace_id = :workspaceId
             """ + OPERATOR_PREDICATES, nativeQuery = true)
     Page<OperatorObservationRow> findForWorkspace(
             @Param("workspaceId") Long workspaceId,
@@ -930,9 +924,10 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         FROM Observation o
         JOIN o.practice p
         LEFT JOIN p.group a
-        WHERE o.id IN :observationIds
+        WHERE o.id IN :observationIds AND o.workspaceId = :workspaceId
         """)
-    List<ObservationPracticeAutonomy> findPracticeAutonomyFor(@Param("observationIds") Collection<UUID> observationIds);
+    List<ObservationPracticeAutonomy> findPracticeAutonomyFor(
+            @Param("observationIds") Collection<UUID> observationIds, @Param("workspaceId") Long workspaceId);
 
     /**
      * The practice each of {@code observationIds} measures, by slug.
@@ -947,9 +942,10 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         SELECT o.id AS observationId, p.slug AS practiceSlug
         FROM Observation o
         JOIN o.practice p
-        WHERE o.id IN :observationIds
+        WHERE o.id IN :observationIds AND o.workspaceId = :workspaceId
         """)
-    List<ObservationPracticeSlug> practiceSlugsFor(@Param("observationIds") Collection<UUID> observationIds);
+    List<ObservationPracticeSlug> practiceSlugsFor(
+            @Param("observationIds") Collection<UUID> observationIds, @Param("workspaceId") Long workspaceId);
 
     /** One observation's practice slug, without loading either entity. */
     interface ObservationPracticeSlug {
@@ -979,7 +975,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     @Query("""
         SELECT o.practice.id AS practiceId, o.agentJobId AS reviewId, o.observedAt AS observedAt
         FROM Observation o
-        WHERE o.practice.workspace.id = :workspaceId
+        WHERE o.workspaceId = :workspaceId
           AND o.artifactKind = :artifactKind
           AND o.artifactId = :artifactId
         """)
@@ -1012,7 +1008,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     @Query("""
         SELECT o FROM Observation o
         JOIN o.practice p
-        WHERE p.workspace.id = :workspaceId
+        WHERE o.workspaceId = :workspaceId
           AND p.slug = :practiceSlug
           AND o.aboutUserId = :aboutUserId
           AND o.observedAt >= :since
@@ -1031,6 +1027,8 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * <p>Ordered, because callers hand each recipient a slice of a fixed ordinal band and a re-run has to
      * assign the same slices for its idempotency guard to recognise what it already wrote.
      */
-    @Query("SELECT DISTINCT o.aboutUserId FROM Observation o WHERE o.agentJobId = :agentJobId ORDER BY o.aboutUserId")
-    List<Long> findSubjectUserIdsByAgentJobId(@Param("agentJobId") UUID agentJobId);
+    @Query(
+            "SELECT DISTINCT o.aboutUserId FROM Observation o WHERE o.agentJobId = :agentJobId AND o.workspaceId = :workspaceId ORDER BY o.aboutUserId")
+    List<Long> findSubjectUserIdsByAgentJobId(
+            @Param("agentJobId") UUID agentJobId, @Param("workspaceId") Long workspaceId);
 }

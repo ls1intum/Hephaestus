@@ -345,6 +345,7 @@ class ArtifactTraceControllerIntegrationTest extends AbstractWorkspaceIntegratio
                 id,
                 "occurrence-" + id,
                 job.getId(),
+                job.getWorkspace().getId(),
                 practice.getId(),
                 null,
                 ArtifactKinds.PULL_REQUEST.value(),

@@ -69,7 +69,7 @@ class InContextDeliveryGateTest extends BaseUnitTest {
                 InContextDeliveryGateFixtures.workspaceDefaults(),
                 InContextDeliveryGateFixtures.workspacesAtRevision(7L));
         List<Observation> persisted = List.of(observation("occ-1"));
-        when(observationRepository.findByAgentJobId(JOB_ID)).thenReturn(persisted);
+        when(observationRepository.findByAgentJobId(JOB_ID, WORKSPACE_ID)).thenReturn(persisted);
 
         assertThat(gate.admitInContext(job(), List.of(observation("loud", "occ-1"))))
                 .isEmpty();
@@ -138,7 +138,7 @@ class InContextDeliveryGateTest extends BaseUnitTest {
     void aWithheldObservationThatWasNeverPersistedGetsNoLedgerRow() {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID))
                 .thenReturn(List.of(practice("measured", PracticeAutonomy.OFF)));
-        when(observationRepository.findByAgentJobId(JOB_ID)).thenReturn(List.of());
+        when(observationRepository.findByAgentJobId(JOB_ID, WORKSPACE_ID)).thenReturn(List.of());
 
         assertThat(gate().admitInContext(job(), List.of(observation("measured", null))))
                 .isEmpty();
@@ -152,7 +152,7 @@ class InContextDeliveryGateTest extends BaseUnitTest {
                 .thenReturn(List.of(
                         practice("measured", PracticeAutonomy.OFF), practice("loud", PracticeAutonomy.AUTOMATIC)));
         List<Observation> persisted = List.of(observation("occ-1"));
-        when(observationRepository.findByAgentJobId(JOB_ID)).thenReturn(persisted);
+        when(observationRepository.findByAgentJobId(JOB_ID, WORKSPACE_ID)).thenReturn(persisted);
         doThrow(new IllegalStateException("ledger down"))
                 .when(feedbackLedgerRecorder)
                 .recordWithheld(any(), any(), any(), eq(0));
@@ -169,7 +169,7 @@ class InContextDeliveryGateTest extends BaseUnitTest {
     @Test
     void aBackfilledRunSaysNothingOnTheArtifactWhateverTheTierIs() {
         List<Observation> persisted = List.of(observation("occ-1"), observation("occ-2"));
-        when(observationRepository.findByAgentJobId(JOB_ID)).thenReturn(persisted);
+        when(observationRepository.findByAgentJobId(JOB_ID, WORKSPACE_ID)).thenReturn(persisted);
         ValidatedObservation loud = observation("loud", "occ-1");
         ValidatedObservation alsoLoud = observation("also-loud", "occ-2");
 
@@ -187,7 +187,7 @@ class InContextDeliveryGateTest extends BaseUnitTest {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID))
                 .thenReturn(List.of(practice("measured", PracticeAutonomy.OFF)));
         List<Observation> persisted = List.of(observation("occ-1"));
-        when(observationRepository.findByAgentJobId(JOB_ID)).thenReturn(persisted);
+        when(observationRepository.findByAgentJobId(JOB_ID, WORKSPACE_ID)).thenReturn(persisted);
 
         assertThat(gate().admitInContext(job(), List.of(observation("measured", "occ-1"))))
                 .isEmpty();

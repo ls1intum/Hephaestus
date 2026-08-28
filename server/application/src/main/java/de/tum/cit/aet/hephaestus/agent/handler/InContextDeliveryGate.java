@@ -155,7 +155,8 @@ class InContextDeliveryGate {
 
     private void recordWithheld(AgentJob job, List<ValidatedObservation> withheld, FeedbackSuppressionReason reason) {
         Map<String, Observation> byOccurrence = new HashMap<>();
-        for (Observation observation : observationRepository.findByAgentJobId(job.getId())) {
+        for (Observation observation : observationRepository.findByAgentJobId(
+                job.getId(), job.getWorkspace().getId())) {
             byOccurrence.put(observation.getOccurrenceKey(), observation);
         }
         int index = 0;

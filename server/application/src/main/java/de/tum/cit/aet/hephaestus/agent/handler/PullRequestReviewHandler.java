@@ -301,7 +301,9 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
     private void deliverAdmitted(AgentJob job) {
         List<PracticeDetectionResultParser.ValidatedObservation> scopedObservations =
-                observationRepository.findByAgentJobId(job.getId()).stream()
+                observationRepository
+                        .findByAgentJobId(job.getId(), job.getWorkspace().getId())
+                        .stream()
                         .map(this::validated)
                         .toList();
         if (scopedObservations.isEmpty()) throw new JobDeliveryException("Admitted observation set is empty");

@@ -137,6 +137,7 @@ class PracticeGroupReviewRunIntegrationTest extends AbstractWorkspaceIntegration
                 id,
                 "key-" + id,
                 reviewJob.getId(),
+                observedPractice.getWorkspace().getId(),
                 observedPractice.getId(),
                 observedPractice.getCurrentRevision().getId(),
                 artifactKind,

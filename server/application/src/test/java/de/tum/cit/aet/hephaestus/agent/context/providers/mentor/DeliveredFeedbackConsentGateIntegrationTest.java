@@ -148,6 +148,7 @@ class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGa
                 observationId,
                 "observation-" + nextPosition,
                 job.getId(),
+                job.getWorkspace().getId(),
                 practice.getId(),
                 practice.getCurrentRevision().getId(),
                 artifactKind.value(),

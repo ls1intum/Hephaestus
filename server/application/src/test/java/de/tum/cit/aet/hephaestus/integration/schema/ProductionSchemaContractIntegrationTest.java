@@ -114,6 +114,29 @@ class ProductionSchemaContractIntegrationTest {
     private IdentityProviderRepository identityProviderRepository;
 
     @Test
+    void observationForeignKeysPreserveTenantAndProvenance() {
+        List<String> foreignKeys = jdbcTemplate.queryForList("""
+            SELECT DISTINCT rc.constraint_name || ':' || parent.table_name || ':' || rc.delete_rule
+            FROM information_schema.referential_constraints rc
+            JOIN information_schema.key_column_usage child
+              ON child.constraint_schema = rc.constraint_schema AND child.constraint_name = rc.constraint_name
+            JOIN information_schema.constraint_column_usage parent
+              ON parent.constraint_schema = rc.unique_constraint_schema
+             AND parent.constraint_name = rc.unique_constraint_name
+            WHERE rc.constraint_schema = current_schema()
+              AND child.table_name = 'observation'
+            """, String.class);
+        assertThat(foreignKeys)
+                .noneMatch(foreignKey -> foreignKey.endsWith(":CASCADE"))
+                .contains(
+                        "fk_observation_workspace:workspace:NO ACTION",
+                        "fk_observation_practice:practice:NO ACTION",
+                        "fk_observation_revision:practice_revision:SET NULL");
+
+        assertColumnRequired("observation", "workspace_id");
+    }
+
+    @Test
     void accountFeatureIsScopedToTheProviderIdentity() {
         long providerA = provider("https://provider-a.example");
         long providerB = provider("https://provider-b.example");
@@ -524,6 +547,16 @@ class ProductionSchemaContractIntegrationTest {
                 .as("Liquibase-built schema must contain column %s.%s", table, column)
                 .isNotNull()
                 .isEqualTo(1);
+    }
+
+    private void assertColumnRequired(String table, String column) {
+        String nullable = jdbcTemplate.queryForObject(
+                "SELECT is_nullable FROM information_schema.columns "
+                        + "WHERE table_schema = 'public' AND table_name = ? AND column_name = ?",
+                String.class,
+                table,
+                column);
+        assertThat(nullable).isEqualTo("NO");
     }
 
     @Test

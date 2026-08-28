@@ -50,7 +50,7 @@ public class FeedbackChannelRouter {
     public List<Observation> admit(List<Observation> observations, long workspaceId, RoutingContext context) {
         WorkspaceReviewDefaults defaults = workspaceDefaults.forWorkspace(workspaceId);
         Map<UUID, PracticeAutonomy> autonomyByPracticeId =
-                autonomyByPracticeId(observations, defaults.defaultAutonomy());
+                autonomyByPracticeId(observations, workspaceId, defaults.defaultAutonomy());
         List<Observation> admitted = new ArrayList<>();
         for (Observation observation : observations) {
             ConversationRoutingDecision decision =
@@ -88,7 +88,7 @@ public class FeedbackChannelRouter {
     }
 
     private Map<UUID, PracticeAutonomy> autonomyByPracticeId(
-            List<Observation> observations, PracticeAutonomy workspaceDefault) {
+            List<Observation> observations, long workspaceId, PracticeAutonomy workspaceDefault) {
         List<UUID> ids = observations.stream()
                 .map(Observation::getId)
                 .filter(Objects::nonNull)
@@ -97,7 +97,7 @@ public class FeedbackChannelRouter {
             return Map.of();
         }
         Map<UUID, PracticeAutonomy> autonomyByPracticeId = new HashMap<>();
-        for (var row : observationRepository.findPracticeAutonomyFor(ids)) {
+        for (var row : observationRepository.findPracticeAutonomyFor(ids, workspaceId)) {
             autonomyByPracticeId.put(
                     row.getObservationId(),
                     AutonomyResolver.resolvePractice(

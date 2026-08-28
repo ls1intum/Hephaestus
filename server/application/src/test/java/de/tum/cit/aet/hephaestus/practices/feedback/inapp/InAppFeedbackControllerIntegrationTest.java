@@ -239,6 +239,7 @@ class InAppFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegratio
                 id,
                 "occ-" + id,
                 agentJob.getId(),
+                agentJob.getWorkspace().getId(),
                 about.getId(),
                 about.getCurrentRevision().getId(),
                 "scm.pull_request",

@@ -160,6 +160,7 @@ public final class SlackConversationTestSupport {
                 observationId,
                 "occ-" + observationId,
                 jobId,
+                workspaceId,
                 practiceId,
                 null,
                 ArtifactKinds.CONVERSATION_THREAD.value(),

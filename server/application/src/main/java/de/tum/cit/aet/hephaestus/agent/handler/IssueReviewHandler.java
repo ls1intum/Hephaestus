@@ -237,7 +237,9 @@ public class IssueReviewHandler implements JobTypeHandler {
         if (feedbackDeliveryService.recoverAutomaticPackageIfPresent(job)) return;
         ObservationAdmissionService.requireMatchingCompositionDigest(job);
         List<PracticeDetectionResultParser.ValidatedObservation> observations =
-                observationRepository.findByAgentJobId(job.getId()).stream()
+                observationRepository
+                        .findByAgentJobId(job.getId(), job.getWorkspace().getId())
+                        .stream()
                         .map(this::validated)
                         .toList();
         List<PracticeDetectionResultParser.ValidatedObservation> eligible =

@@ -206,7 +206,10 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
         AgentJob job = newJob();
         savePullRequestObservation(job, "occ-composed", 4242L);
         List<Observation> admitted = router.admit(
-                observationRepository.findByAgentJobId(job.getId()), workspace.getId(), RoutingContext.author());
+                observationRepository.findByAgentJobId(
+                        job.getId(), job.getWorkspace().getId()),
+                workspace.getId(),
+                RoutingContext.author());
         preparer.prepare(
                 job.getId(),
                 workspace.getId(),
@@ -282,7 +285,8 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
     }
 
     private void prepareFor(AgentJob job) {
-        List<Observation> observations = observationRepository.findByAgentJobId(job.getId());
+        List<Observation> observations = observationRepository.findByAgentJobId(
+                job.getId(), job.getWorkspace().getId());
         List<Observation> admitted = router.admit(observations, workspace.getId(), RoutingContext.author());
         preparer.prepare(job.getId(), workspace.getId(), admitted, List.of(conversationUnit(admitted)));
     }
@@ -301,6 +305,7 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
                 id,
                 occurrenceKey,
                 job.getId(),
+                job.getWorkspace().getId(),
                 practice.getId(),
                 practice.getCurrentRevision().getId(),
                 artifactKind,

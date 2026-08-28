@@ -138,6 +138,7 @@ class ObservationHistoryConsentGateIntegrationTest extends AbstractSlackConsentG
                 id,
                 occurrenceKey,
                 job.getId(),
+                job.getWorkspace().getId(),
                 practice.getId(),
                 practice.getCurrentRevision().getId(),
                 artifactKind,

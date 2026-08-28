@@ -533,7 +533,9 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                     approvalGated, "Unhandled error path", de.tum.cit.aet.hephaestus.practices.model.Severity.MAJOR);
             var auto = persisted(
                     automatic, "No rationale sentence", de.tum.cit.aet.hephaestus.practices.model.Severity.MINOR);
-            when(observationRepository.findByAgentJobId(job.getId())).thenReturn(java.util.List.of(gated, auto));
+            when(observationRepository.findByAgentJobId(
+                            job.getId(), job.getWorkspace().getId()))
+                    .thenReturn(java.util.List.of(gated, auto));
 
             handler.deliver(job);
 

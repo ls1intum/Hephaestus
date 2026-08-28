@@ -66,7 +66,10 @@ public class ObservationAdmissionService {
                 : currentMetadata.path(DIGEST_METADATA_KEY).asString();
         if (!existing.isBlank()) {
             if (!existing.equals(digest)) throw new AdmissionConflictException();
-            return response(job, existing, observations.findByAgentJobId(jobId));
+            return response(
+                    job,
+                    existing,
+                    observations.findByAgentJobId(jobId, job.getWorkspace().getId()));
         }
         switch (job.getJobType()) {
             case PULL_REQUEST_REVIEW -> pullRequests.admitObservations(job, submitted);
@@ -79,7 +82,10 @@ public class ObservationAdmissionService {
         metadata.put(DIGEST_METADATA_KEY, digest);
         job.setMetadata(metadata);
         jobs.save(job);
-        return response(job, digest, observations.findByAgentJobId(jobId));
+        return response(
+                job,
+                digest,
+                observations.findByAgentJobId(jobId, job.getWorkspace().getId()));
     }
 
     private byte[] serializedPayload(JsonNode submitted) {

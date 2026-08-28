@@ -227,7 +227,8 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
     }
 
     private void prepareFor(AgentJob job) {
-        List<Observation> observations = observationRepository.findByAgentJobId(job.getId());
+        List<Observation> observations = observationRepository.findByAgentJobId(
+                job.getId(), job.getWorkspace().getId());
         List<Observation> admitted = router.admit(observations, workspace.getId(), RoutingContext.author());
         preparer.prepare(job.getId(), workspace.getId(), admitted, List.of(conversationUnit(admitted)));
     }
@@ -285,6 +286,7 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
                 id,
                 occurrenceKey,
                 job.getId(),
+                job.getWorkspace().getId(),
                 practice.getId(),
                 practice.getCurrentRevision().getId(),
                 "scm.pull_request",

@@ -54,10 +54,14 @@ import org.jspecify.annotations.Nullable;
 @Entity
 @Table(
         name = "practice",
-        uniqueConstraints =
-                @UniqueConstraint(
-                        name = "uk_practice_workspace_slug",
-                        columnNames = {"workspace_id", "slug"}),
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "uk_practice_workspace_slug",
+                    columnNames = {"workspace_id", "slug"}),
+            @UniqueConstraint(
+                    name = "uk_practice_workspace_id",
+                    columnNames = {"id", "workspace_id"}),
+        },
         indexes = {
             @Index(name = "idx_practice_workspace_autonomy", columnList = "workspace_id, autonomy"),
             @Index(name = "idx_practice_practice_group", columnList = "practice_group_id"),

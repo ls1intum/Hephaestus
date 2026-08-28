@@ -119,7 +119,7 @@ public class ConversationalFeedbackPreparer {
         // observations arrive from whichever caller routed them and may be detached, so walking
         // o.practice.slug would make a row supersedable — or a composed message deliverable — depending on
         // whether that caller happened to hold a session.
-        Map<UUID, String> practiceSlugs = practiceSlugsOf(ordered);
+        Map<UUID, String> practiceSlugs = practiceSlugsOf(ordered, workspaceId);
         Map<Long, Integer> perRecipientCount = new HashMap<>();
         // Newly CREATED units only (re-run no-ops excluded) — feeds the per-recipient prepared event.
         Map<Long, Integer> newlyPreparedByRecipient = new HashMap<>();
@@ -312,7 +312,7 @@ public class ConversationalFeedbackPreparer {
      * and, because a habit thread is scoped to the practice, the same spelling is what the continuity key is
      * derived from, on this lane and on the in-app lane alike.
      */
-    private Map<UUID, String> practiceSlugsOf(List<Observation> observations) {
+    private Map<UUID, String> practiceSlugsOf(List<Observation> observations, Long workspaceId) {
         List<UUID> ids = observations.stream()
                 .map(Observation::getId)
                 .filter(Objects::nonNull)
@@ -321,7 +321,8 @@ public class ConversationalFeedbackPreparer {
             return Map.of();
         }
         Map<UUID, String> slugs = new HashMap<>(ids.size());
-        for (ObservationRepository.ObservationPracticeSlug row : observationRepository.practiceSlugsFor(ids)) {
+        for (ObservationRepository.ObservationPracticeSlug row :
+                observationRepository.practiceSlugsFor(ids, workspaceId)) {
             String slug = row.getPracticeSlug();
             if (slug != null && !slug.isBlank()) {
                 slugs.put(row.getObservationId(), normalizeSlug(slug));
