@@ -176,6 +176,32 @@ class GitlabWebhookSignatureVerifierTest extends BaseUnitTest {
     }
 
     @Test
+    void whsecTimestampAtToleranceBoundaryIsAccepted() {
+        byte[] body = body("{}");
+        String msgId = "msg_x";
+        String timestamp = String.valueOf(NOW.minusSeconds(5 * 60).getEpochSecond());
+        String mac = computeBase64Mac(WHSEC_KEY, msgId, timestamp, body);
+        var request = req(
+                body,
+                header("webhook-id", msgId),
+                header("webhook-timestamp", timestamp),
+                header("X-Gitlab-Signature", "v1," + mac));
+
+        assertThat(newVerifierWhsec().verify(request)).isInstanceOf(VerificationResult.Verified.class);
+    }
+
+    @Test
+    void danglingSignatureSchemeIsRejected() {
+        var request = req(
+                body("{}"),
+                header("webhook-id", "msg_x"),
+                header("webhook-timestamp", String.valueOf(NOW.getEpochSecond())),
+                header("X-Gitlab-Signature", "v1"));
+
+        assertThat(newVerifierWhsec().verify(request)).isInstanceOf(VerificationResult.Invalid.class);
+    }
+
+    @Test
     void whsecMissingWebhookIdInvalid() {
         var verifier = newVerifierWhsec();
         var request = req(

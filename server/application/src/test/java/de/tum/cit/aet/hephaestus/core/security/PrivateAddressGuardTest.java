@@ -9,11 +9,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/**
- * The SSRF target predicate that backs both {@code IssuerDiscoveryProbe} and the
- * {@code SsrfGuardedResolverGroup} HTTP-client resolver. All inputs are IP literals so
- * {@link InetAddress#getByName} performs no DNS.
- */
 class PrivateAddressGuardTest extends BaseUnitTest {
 
     @ParameterizedTest

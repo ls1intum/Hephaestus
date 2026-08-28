@@ -15,4 +15,21 @@ class OutlineOriginPolicyTest extends BaseUnitTest {
         assertThat(policy.allows("https://wiki.example.com:443")).isTrue();
         assertThat(policy.allows("https://wiki.example.com:8443")).isFalse();
     }
+
+    @Test
+    void preservesExplicitPortBoundaries() {
+        OutlineOriginPolicy policy = new OutlineOriginPolicy(Set.of("https://wiki.example.com:8443"));
+
+        assertThat(policy.allows("https://wiki.example.com:8443")).isTrue();
+        assertThat(policy.allows("https://wiki.example.com:0")).isFalse();
+    }
+
+    @Test
+    void rejectsUrlsThatOnlyMatchAfterRemovingUnsafeComponents() {
+        OutlineOriginPolicy policy = new OutlineOriginPolicy(Set.of("https://wiki.example.com"));
+
+        assertThat(policy.allows("https://attacker@wiki.example.com")).isFalse();
+        assertThat(policy.allows("http://wiki.example.com")).isFalse();
+        assertThat(policy.allows("not a URL")).isFalse();
+    }
 }

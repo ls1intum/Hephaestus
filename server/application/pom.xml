@@ -777,15 +777,6 @@
                 <failsafe.includedGroups />
             </properties>
         </profile>
-        <!--
-            Mutation testing (PIT) for the security-critical auth logic. Opt-in and NEVER part of CI:
-            run locally with
-              ./mvnw -o -f application/pom.xml -Ppitest -Dmaven.build.cache.enabled=false test-compile org.pitest:pitest-maven:mutationCoverage
-            then open target/pit-reports/index.html. Scoped to small, branch-heavy, pure-logic classes
-            (SSRF deny-list, HMAC state, admin allowlist, open-redirect guard, AAD framing, reserved-range
-            probe) whose tests are pure-unit (@ExtendWith(MockitoExtension)) so PIT forks stay fast and
-            need no Spring context / database. A surviving mutant here means a test asserts too weakly.
-        -->
         <profile>
             <id>pitest</id>
             <build>
@@ -793,7 +784,7 @@
                     <plugin>
                         <groupId>org.pitest</groupId>
                         <artifactId>pitest-maven</artifactId>
-                        <version>1.19.0</version>
+                        <version>1.30.0</version>
                         <dependencies>
                             <dependency>
                                 <groupId>org.pitest</groupId>
@@ -802,41 +793,42 @@
                             </dependency>
                         </dependencies>
                         <configuration>
-                            <!-- Do NOT inherit surefire's argLine: it carries the jacoco late-binding
-                                 token @{argLine}, which is unresolved outside surefire and makes the PIT
-                                 minion JVM die with "Could not find or load main class @{argLine}". Give
-                                 the minion its own args instead (EnableDynamicAgentLoading for Mockito). -->
+                            <!-- Surefire's JaCoCo argLine is invalid in PIT minion JVMs. -->
                             <parseSurefireConfig>false</parseSurefireConfig>
-                            <!-- Serialize minions: the default (one minion JVM per core) starves
-                                 fork/socket resources in constrained CI/sandbox containers and every
-                                 minion TIMED_OUT. One minion at a time with a modest heap is reliable;
-                                 these target classes are small so wall-clock stays low. -->
+                            <!-- Keep peak PIT resource use within the advisory runner budget. -->
                             <threads>1</threads>
-                            <!-- Cold-JVM startup in constrained containers (~8s, large classpath) can
-                                 exceed PIT's default 4s minion timeout, killing every minion before its
-                                 tests run. Give the minion ample headroom; these tests are sub-second once
-                                 the JVM is up so the constant dominates, not real per-test time. -->
+                            <failWhenNoMutations>true</failWhenNoMutations>
+                            <!-- Account for cold minion startup on the application classpath. -->
                             <timeoutConstant>30000</timeoutConstant>
                             <jvmArgs>
                                 <value>-Xmx1g</value>
                                 <value>-XX:+EnableDynamicAgentLoading</value>
-                                <value>-Dnet.bytebuddy.experimental=true</value>
                             </jvmArgs>
                             <targetClasses>
                                 <param>de.tum.cit.aet.hephaestus.core.security.ServerUrlValidator</param>
+                                <param>de.tum.cit.aet.hephaestus.core.security.PrivateAddressGuard</param>
+                                <param>de.tum.cit.aet.hephaestus.core.security.OutlineOriginPolicy</param>
+                                <param>de.tum.cit.aet.hephaestus.core.security.ImpersonationGuard</param>
                                 <param>de.tum.cit.aet.hephaestus.integration.core.oauth.state.HmacOAuthStateService</param>
                                 <param>de.tum.cit.aet.hephaestus.core.auth.oauth.AdminBootstrapPolicy</param>
                                 <param>de.tum.cit.aet.hephaestus.core.auth.oauth.ReturnToValidator</param>
+                                <param>de.tum.cit.aet.hephaestus.core.auth.oauth.AuthIntentCookie</param>
+                                <param>de.tum.cit.aet.hephaestus.core.auth.oauth.CookieOAuth2AuthorizationRequestRepository</param>
                                 <param>de.tum.cit.aet.hephaestus.integration.core.connection.EncryptionContext</param>
-                                <param>de.tum.cit.aet.hephaestus.integration.identity.connect.IssuerDiscoveryProbe</param>
+                                <param>de.tum.cit.aet.hephaestus.integration.scm.gitlab.webhook.GitlabWebhookSignatureVerifier</param>
                             </targetClasses>
                             <targetTests>
                                 <param>de.tum.cit.aet.hephaestus.core.security.ServerUrlValidatorTest</param>
+                                <param>de.tum.cit.aet.hephaestus.core.security.PrivateAddressGuardTest</param>
+                                <param>de.tum.cit.aet.hephaestus.core.security.OutlineOriginPolicyTest</param>
+                                <param>de.tum.cit.aet.hephaestus.core.security.ImpersonationGuardTest</param>
                                 <param>de.tum.cit.aet.hephaestus.integration.core.oauth.state.HmacOAuthStateServiceTest</param>
                                 <param>de.tum.cit.aet.hephaestus.core.auth.oauth.AdminBootstrapPolicyTest</param>
                                 <param>de.tum.cit.aet.hephaestus.core.auth.oauth.ReturnToValidatorTest</param>
+                                <param>de.tum.cit.aet.hephaestus.core.auth.oauth.AuthIntentCookieTest</param>
+                                <param>de.tum.cit.aet.hephaestus.core.auth.oauth.CookieOAuth2AuthorizationRequestRepositoryTest</param>
                                 <param>de.tum.cit.aet.hephaestus.integration.core.connection.EncryptionContextTest</param>
-                                <param>de.tum.cit.aet.hephaestus.integration.identity.connect.IssuerDiscoveryProbeTest</param>
+                                <param>de.tum.cit.aet.hephaestus.integration.scm.gitlab.webhook.GitlabWebhookSignatureVerifierTest</param>
                             </targetTests>
                             <outputFormats>
                                 <param>HTML</param>

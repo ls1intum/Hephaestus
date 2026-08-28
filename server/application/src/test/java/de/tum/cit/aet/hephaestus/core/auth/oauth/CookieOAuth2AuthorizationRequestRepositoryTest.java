@@ -62,6 +62,12 @@ class CookieOAuth2AuthorizationRequestRepositoryTest extends BaseUnitTest {
     void roundTripsAValidRequest() {
         Cookie cookie = saveAndExtractCookie(repo);
 
+        assertThat(cookie.isHttpOnly()).isTrue();
+        assertThat(cookie.getSecure()).isTrue();
+        assertThat(cookie.getPath()).isEqualTo("/");
+        assertThat(cookie.getMaxAge()).isPositive();
+        assertThat(cookie.getAttribute("SameSite")).isEqualTo("Lax");
+
         MockHttpServletRequest load = new MockHttpServletRequest();
         load.setCookies(cookie);
         OAuth2AuthorizationRequest loaded = repo.loadAuthorizationRequest(load);
@@ -154,6 +160,27 @@ class CookieOAuth2AuthorizationRequestRepositoryTest extends BaseUnitTest {
         Cookie cleared = res.getCookie(CookieOAuth2AuthorizationRequestRepository.COOKIE_NAME);
         assertThat(cleared).isNotNull();
         assertThat(cleared.getMaxAge()).isZero();
+        assertThat(cleared.isHttpOnly()).isTrue();
+        assertThat(cleared.getSecure()).isTrue();
+        assertThat(cleared.getPath()).isEqualTo("/");
+        assertThat(cleared.getAttribute("SameSite")).isEqualTo("Lax");
+    }
+
+    @Test
+    void usesFreshCiphertextForEachAuthorizationRequest() {
+        assertThat(saveAndExtractCookie(repo).getValue())
+                .isNotEqualTo(saveAndExtractCookie(repo).getValue());
+    }
+
+    @Test
+    void savingNullClearsTheAuthorizationCookie() {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        repo.saveAuthorizationRequest(null, new MockHttpServletRequest(), response);
+
+        Cookie cookie = response.getCookie(CookieOAuth2AuthorizationRequestRepository.COOKIE_NAME);
+        assertThat(cookie).isNotNull();
+        assertThat(cookie.getMaxAge()).isZero();
     }
 
     @Test
