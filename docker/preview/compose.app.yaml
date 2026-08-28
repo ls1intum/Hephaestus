@@ -327,7 +327,6 @@ services:
           cpus: "1.0"
           memory: 2G
           pids: 512
-
   webapp:
     image: ghcr.io/ls1intum/hephaestus/webapp:${SOURCE_COMMIT:?Coolify supplies the deployed commit}
     # `expose` is how Coolify learns which port to route ${SERVICE_FQDN_WEBAPP} to; the image's own
@@ -351,6 +350,13 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    # nginx's master chowns its cache directories and then runs its workers as the nginx user. With
+    # CHOWN alone the master survives and every worker exits "fatal code 2 and cannot be respawned",
+    # which leaves a container that looks up and serves nothing.
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:80/"]
       interval: 10s
