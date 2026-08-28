@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
+
 import type { LoginProviderView } from "@/api/types.gen";
+
 import { LoginProvidersTable } from "./LoginProvidersTable";
 
 const providers: LoginProviderView[] = [

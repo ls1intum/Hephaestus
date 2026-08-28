@@ -17,6 +17,7 @@ import {
 	SquaresIntersectIcon,
 	UsersIcon,
 } from "lucide-react";
+
 import type { AchievementId } from "@/api";
 import { SingularityIcon } from "@/components/achievements/singularity-icon";
 import { defaultCategoryIcons } from "@/components/achievements/styles";

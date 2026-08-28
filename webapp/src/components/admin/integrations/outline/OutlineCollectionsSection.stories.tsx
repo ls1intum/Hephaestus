@@ -1,8 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { expect, fn } from "storybook/test";
+
 import type { OutlineCollection } from "@/api/types.gen";
 import { daysBefore, minutesBefore } from "@/components/common/story-clock";
+
 import { OutlineCollectionsSection } from "./OutlineCollectionsSection";
 
 /**

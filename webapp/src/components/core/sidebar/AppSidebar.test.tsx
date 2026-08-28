@@ -7,7 +7,9 @@ import {
 } from "@tanstack/react-router";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+
 import { AppSidebar } from "./AppSidebar";
 
 vi.mock("@/hooks/use-mobile", () => ({ useIsMobile: () => true }));

@@ -6,9 +6,11 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { HttpResponse, http } from "msw";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
+
 import { sessions } from "@/mocks/fixtures/auth";
 import { noSessions, sessionsError } from "@/mocks/handlers";
 import { server } from "@/mocks/server";
+
 import { SessionsSection } from "./SessionsSection";
 
 function renderWithClient(node: ReactNode) {

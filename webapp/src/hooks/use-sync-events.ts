@@ -1,5 +1,6 @@
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+
 import {
 	getConnectionSyncStatusQueryKey,
 	getIntegrationCatalogQueryKey,

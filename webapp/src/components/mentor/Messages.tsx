@@ -2,10 +2,12 @@ import type { UseChatHelpers } from "@ai-sdk/react";
 import { isStaticToolUIPart } from "ai";
 import { motion } from "motion/react";
 import type { RefObject } from "react";
+
 import type { ChatMessageVote } from "@/api/types.gen";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ChatMessage, ChatTools } from "@/lib/types";
 import { cn } from "@/lib/utils";
+
 import { Greeting } from "./Greeting";
 import { PreviewMessage, ThinkingMessage } from "./Message";
 import type { PartRendererMap, ToolPartState } from "./renderers/types";

@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen } from "storybook/test";
+
 import type { CatalogEntryStatus } from "@/api/types.gen";
 import { DetailDrawerStack } from "@/components/core/detail-drawer/DetailDrawerStack";
 import { LevelCancel } from "@/components/core/detail-drawer/LevelCancel";
@@ -7,9 +8,10 @@ import { withPageBehind } from "@/stories/decorators";
 import { Stateful } from "@/stories/stateful";
 import { settledDrawerPanel } from "@/test/overlay";
 import { expectNoPanelOverflow, expectPanelContentInset } from "@/test/reflow";
+
+import { curatedGroupLevel, GUARDED_CURATED_LEVEL_KINDS } from "./curated-catalog-search";
 import { CuratedFormLevel } from "./CuratedFormLevel";
 import { CuratedGroupForm } from "./CuratedGroupForm";
-import { curatedGroupLevel, GUARDED_CURATED_LEVEL_KINDS } from "./curated-catalog-search";
 
 const status = (overrides: Partial<CatalogEntryStatus> = {}): CatalogEntryStatus => ({
 	etag: "tag",

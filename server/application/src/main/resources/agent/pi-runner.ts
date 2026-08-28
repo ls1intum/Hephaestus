@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+
 import {
 	type AgentSession,
 	type AgentSessionEvent,
@@ -9,6 +10,7 @@ import {
 	SessionManager,
 	SettingsManager,
 } from "@earendil-works/pi-coding-agent";
+
 import { errorText } from "./pi-error-text.ts";
 import {
 	citationMatchesArtifact,
@@ -1023,17 +1025,15 @@ function leanObservations(observations: readonly AdmittedObservation[]): LeanObs
 		assessment: observation.assessment,
 		severity: observation.severity,
 		anchorable: observation.anchorable,
-		citations: observation.citations.map(
-			(citation): LeanCitation => ({
-				index: citation.index,
-				sourceKind: citation.sourceKind,
-				path: citation.path,
-				side: citation.side,
-				startLine: citation.startLine,
-				endLine: citation.endLine,
-				anchorable: citation.anchorable,
-			}),
-		),
+		citations: observation.citations.map((citation): LeanCitation => ({
+			index: citation.index,
+			sourceKind: citation.sourceKind,
+			path: citation.path,
+			side: citation.side,
+			startLine: citation.startLine,
+			endLine: citation.endLine,
+			anchorable: citation.anchorable,
+		})),
 	}));
 }
 

@@ -5,6 +5,7 @@ import {
 	GitPullRequestIcon,
 } from "@primer/octicons-react";
 import { describe, expect, it } from "vitest";
+
 import {
 	GitLabMergeIcon,
 	GitLabMergeRequestClosedIcon,

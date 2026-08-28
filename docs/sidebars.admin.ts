@@ -1,40 +1,40 @@
-import type {SidebarsConfig} from '@docusaurus/plugin-content-docs';
+import type { SidebarsConfig } from "@docusaurus/plugin-content-docs";
 
 const sidebars: SidebarsConfig = {
-  adminSidebar: [
-    {type: 'doc', id: 'install', label: 'Install (Self-Hosted)'},
-    {type: 'doc', id: 'github-integration', label: 'GitHub Integration'},
-    {type: 'doc', id: 'ai-providers', label: 'Connect an AI Provider'},
-    {
-      type: 'category',
-      label: 'Practices',
-      collapsed: false,
-      items: [
-        {type: 'doc', id: 'practice-catalog', label: 'Practice Catalog'},
-        {type: 'doc', id: 'practice-review', label: 'Practice Review'},
-        {type: 'doc', id: 'practice-review-operations', label: 'Practice Review Operations'},
-      ],
-    },
-    {type: 'doc', id: 'webhook-ingestion-operations', label: 'Webhook Ingestion Operations'},
-    {type: 'doc', id: 'backup-restore', label: 'Backup & Restore'},
-    {type: 'doc', id: 'production-setup', label: 'Integrations & Reference Deployment'},
-    {type: 'doc', id: 'compatibility-policy', label: 'Compatibility Policy'},
-    {type: 'doc', id: 'runtime-roles', label: 'Runtime Roles'},
-    {type: 'doc', id: 'agent-image-digests', label: 'Agent image digests'},
-    {type: 'doc', id: 'buildpacks-cds-decision', label: 'Server image build (Buildpacks + CDS)'},
-    {type: 'doc', id: 'legal-pages', label: 'Legal Pages'},
-    {
-      type: 'category',
-      label: 'Data-Protection Documentation',
-      link: {type: 'doc', id: 'dsms/dsms'},
-      items: [
-        {type: 'doc', id: 'dsms/record-of-processing', label: 'Record of Processing (Art. 30)'},
-        {type: 'doc', id: 'dsms/dpia-prescreen', label: 'DPIA Pre-Screen (Art. 35)'},
-        {type: 'doc', id: 'dsms/processor-checklist', label: 'Processor Checklist (Art. 28)'},
-        {type: 'doc', id: 'dsms/artifact-source-governance', label: 'Artifact-Source Governance'},
-      ],
-    },
-  ],
+	adminSidebar: [
+		{ type: "doc", id: "install", label: "Install (Self-Hosted)" },
+		{ type: "doc", id: "github-integration", label: "GitHub Integration" },
+		{ type: "doc", id: "ai-providers", label: "Connect an AI Provider" },
+		{
+			type: "category",
+			label: "Practices",
+			collapsed: false,
+			items: [
+				{ type: "doc", id: "practice-catalog", label: "Practice Catalog" },
+				{ type: "doc", id: "practice-review", label: "Practice Review" },
+				{ type: "doc", id: "practice-review-operations", label: "Practice Review Operations" },
+			],
+		},
+		{ type: "doc", id: "webhook-ingestion-operations", label: "Webhook Ingestion Operations" },
+		{ type: "doc", id: "backup-restore", label: "Backup & Restore" },
+		{ type: "doc", id: "production-setup", label: "Integrations & Reference Deployment" },
+		{ type: "doc", id: "compatibility-policy", label: "Compatibility Policy" },
+		{ type: "doc", id: "runtime-roles", label: "Runtime Roles" },
+		{ type: "doc", id: "agent-image-digests", label: "Agent image digests" },
+		{ type: "doc", id: "buildpacks-cds-decision", label: "Server image build (Buildpacks + CDS)" },
+		{ type: "doc", id: "legal-pages", label: "Legal Pages" },
+		{
+			type: "category",
+			label: "Data-Protection Documentation",
+			link: { type: "doc", id: "dsms/dsms" },
+			items: [
+				{ type: "doc", id: "dsms/record-of-processing", label: "Record of Processing (Art. 30)" },
+				{ type: "doc", id: "dsms/dpia-prescreen", label: "DPIA Pre-Screen (Art. 35)" },
+				{ type: "doc", id: "dsms/processor-checklist", label: "Processor Checklist (Art. 28)" },
+				{ type: "doc", id: "dsms/artifact-source-governance", label: "Artifact-Source Governance" },
+			],
+		},
+	],
 };
 
 export default sidebars;

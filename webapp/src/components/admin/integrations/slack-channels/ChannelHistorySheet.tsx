@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ArrowRightIcon, HistoryIcon } from "lucide-react";
+
 import { listSlackChannelConsentEventsOptions } from "@/api/@tanstack/react-query.gen";
 import type { SlackChannelConsentEvent, SlackMonitoredChannel } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
@@ -22,6 +23,7 @@ import {
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { asDate } from "@/lib/dates";
+
 import { ConsentStateBadge } from "./consent-terms";
 
 export interface ChannelHistorySheetProps {

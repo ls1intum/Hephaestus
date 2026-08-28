@@ -1,10 +1,12 @@
 import { Eye, EyeOff, Settings } from "lucide-react";
+
 import type { LabelInfo, RepositoryInfo, TeamInfo } from "@/api/types.gen";
 import { LabelBadge } from "@/components/shared/LabelBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+
 import { RepositoryLabelsToggle } from "./RepositoryLabelsToggle";
 
 export interface RepositoryCardProps {

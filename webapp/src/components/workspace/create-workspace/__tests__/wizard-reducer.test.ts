@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import type { GitLabGroup, GitLabPreflightResponse } from "@/api/types.gen";
 import {
 	initialWizardState,

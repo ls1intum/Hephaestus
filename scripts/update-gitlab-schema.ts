@@ -8,12 +8,14 @@
 
 import { mkdirSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+
 import {
 	buildClientSchema,
 	getIntrospectionQuery,
 	type IntrospectionQuery,
 	printSchema,
 } from "graphql";
+
 import { isRecord, parseJson } from "./lib/json.ts";
 
 const SCHEMA_DIR = resolve(

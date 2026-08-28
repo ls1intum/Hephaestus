@@ -1,4 +1,5 @@
 import { ExternalLinkIcon } from "lucide-react";
+
 import type { ArtifactTrace } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import { ARTIFACT_KIND, artifactKindIcon, artifactKindLabel } from "@/lib/artifact-kinds";

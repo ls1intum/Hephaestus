@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
+
 import { mockDocumentWorkType, mockPullRequestWorkType } from "@/mocks/fixtures/practice";
+
 import { PracticeEvidenceOutcomeSummary } from "./PracticeEvidenceOutcomeSummary";
 import { outcome } from "./story-mock-data";
 

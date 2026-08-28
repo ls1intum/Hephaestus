@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { MessageSquareTextIcon, ScanSearchIcon } from "lucide-react";
 import { useId } from "react";
+
 import type { AgentJob, Practice, ReviewFeedback, ReviewObservation } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import {
@@ -11,6 +12,7 @@ import {
 	EmptyTitle,
 } from "@/components/ui/empty";
 import type { KnownArtifactKind } from "@/lib/artifact-kinds";
+
 import { FeedbackRow } from "./FeedbackResults";
 import { ObservationRow } from "./ObservationResults";
 import { ReviewResultsSkeleton } from "./ReviewResultsSkeleton";

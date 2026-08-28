@@ -1,7 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { endOfISOWeek, formatISO, startOfISOWeek } from "date-fns";
 import { fn } from "storybook/test";
+
 import { daysBefore, STORY_NOW } from "@/components/common/story-clock";
+
 import { ProfileContent } from "./ProfileContent";
 
 const now = new Date(STORY_NOW);

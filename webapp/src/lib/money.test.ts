@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { formatCapUsd, formatCostUsd, formatRateUsd } from "./money";
 
 describe("formatCostUsd", () => {

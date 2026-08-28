@@ -10,6 +10,7 @@ import {
 } from "@primer/octicons-react";
 import { MilestoneIcon } from "lucide-react";
 import type React from "react";
+
 import type {
 	AchievementCategory,
 	AchievementRarity,

@@ -1,8 +1,10 @@
 import { SlidersHorizontal } from "lucide-react";
+
 import type { LeaderboardVariant } from "@/components/leaderboard/LeaderboardPage";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+
 import { type LeaderboardSortType, SortFilter } from "./SortFilter";
 import { TeamFilter, type TeamFilterOption } from "./TeamFilter";
 import { TimeframeFilter } from "./TimeframeFilter";

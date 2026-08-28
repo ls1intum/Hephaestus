@@ -1,10 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { ExternalLinkIcon } from "lucide-react";
 import { expect, fn, screen, userEvent } from "storybook/test";
+
 import type { ConnectionSyncStatus, SyncJob } from "@/api/types.gen";
 import { minutesAfter, minutesBefore } from "@/components/common/story-clock";
 import { buttonVariants } from "@/components/ui/button";
 import { expectSettledVisible } from "@/test/overlay";
+
 import { SyncStatusHeader } from "./SyncStatusHeader";
 
 const SYNC_INTERVAL_SECONDS = 3_600;

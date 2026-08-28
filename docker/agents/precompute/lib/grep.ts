@@ -1,4 +1,5 @@
 import { join, relative } from "node:path";
+
 import { isInDiff } from "./diff-parser";
 import type { DiffFile, Hint } from "./types";
 

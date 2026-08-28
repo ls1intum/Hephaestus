@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { assert, describe, expect, it, vi } from "vitest";
+
 import { AddChannelDialog } from "./AddChannelDialog";
 
 describe("AddChannelDialog — form submit", () => {

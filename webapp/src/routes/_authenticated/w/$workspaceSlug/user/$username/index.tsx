@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router";
 import { z } from "zod";
+
 import {
 	getActivityMonitorOptions,
 	getUserProfileOptions,

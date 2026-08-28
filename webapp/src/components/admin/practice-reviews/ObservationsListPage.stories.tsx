@@ -1,14 +1,16 @@
 import type { Meta, StoryContext, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, within } from "storybook/test";
+
 import type { ListPracticeReviewObservationsResponse, ReviewObservation } from "@/api/types.gen";
 import type { FacetSource } from "@/components/common/FacetMultiSelect";
 import { withStandardPage, withWidePage } from "@/stories/decorators";
 import { StatefulPatch } from "@/stories/stateful";
 import { expectNoPageOverflow } from "@/test/reflow";
+
 import { groupFacetOptions, practiceFacetOptions } from "./ObservationFilters";
 import { ObservationsListPage } from "./ObservationsListPage";
-import type { ReviewPeople } from "./ReviewPersonFacet";
 import { type ObservationsSearch, observationsQuery, REVIEW_PAGE_SIZE } from "./review-search";
+import type { ReviewPeople } from "./ReviewPersonFacet";
 import {
 	manyObservations,
 	practiceGroups,

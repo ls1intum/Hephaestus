@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+
 import { XpProgress } from "@/components/profile/XpProgress";
 
 const meta = {

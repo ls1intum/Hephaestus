@@ -1,5 +1,6 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { type ComponentProps, type ReactNode, useId } from "react";
+
 import { cn } from "@/lib/utils";
 
 const sectionTitleVariants = cva("text-foreground", {
@@ -15,8 +16,7 @@ const sectionTitleVariants = cva("text-foreground", {
 });
 
 export interface SectionProps
-	extends Omit<ComponentProps<"section">, "title">,
-		VariantProps<typeof sectionTitleVariants> {
+	extends Omit<ComponentProps<"section">, "title">, VariantProps<typeof sectionTitleVariants> {
 	title: ReactNode;
 	description?: ReactNode;
 	actions?: ReactNode;

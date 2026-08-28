@@ -1,5 +1,6 @@
 import { Users } from "lucide-react";
 import { useLayoutEffect } from "react";
+
 import type { TeamInfo } from "@/api/types.gen";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";

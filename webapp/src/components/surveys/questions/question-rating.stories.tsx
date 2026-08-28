@@ -3,6 +3,7 @@
  */
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn } from "storybook/test";
+
 import { QuestionRating } from "./question-rating";
 
 const meta = {

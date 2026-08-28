@@ -1,4 +1,3 @@
-import { type AuthContextType, AuthProvider, useAuth } from "./AuthContext";
 import {
 	applyStateChangingHeaders,
 	authClient,
@@ -6,6 +5,7 @@ import {
 	csrfHeaders,
 	type UserProfile,
 } from "./auth-client";
+import { type AuthContextType, AuthProvider, useAuth } from "./AuthContext";
 
 export {
 	type AuthContextType,

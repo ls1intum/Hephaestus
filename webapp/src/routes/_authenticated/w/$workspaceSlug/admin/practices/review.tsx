@@ -21,6 +21,7 @@ import type {
 	CreateReviewBackfillRunRequest,
 	UpdatePracticeReviewSettingsRequest,
 } from "@/api/types.gen";
+import { PracticeAutonomyPage } from "@/components/admin/practices/practice-autonomy/PracticeAutonomyPage";
 import { PracticeReviewBackfill } from "@/components/admin/practices/PracticeReviewBackfill";
 import {
 	type PracticeReviewField,
@@ -32,8 +33,6 @@ import {
 	PracticeDefinitionSkeleton,
 	ReviewSettingsSkeleton,
 } from "@/components/admin/practices/PracticeSkeletons";
-import { PracticeAutonomyPage } from "@/components/admin/practices/practice-autonomy/PracticeAutonomyPage";
-import { ReviewPage } from "@/components/admin/practices/review/ReviewPage";
 import type {
 	ReviewModelState,
 	ReviewRunningState,
@@ -42,6 +41,7 @@ import {
 	DEFAULT_REVIEW_SECTION,
 	reviewSearchSchema,
 } from "@/components/admin/practices/review/review-sections";
+import { ReviewPage } from "@/components/admin/practices/review/ReviewPage";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import environment from "@/environment";

@@ -2,6 +2,7 @@ import type { ReviewSubject } from "@/api/types.gen";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
+
 import { subjectLabel } from "./review-format";
 
 export interface ReviewPersonProps {

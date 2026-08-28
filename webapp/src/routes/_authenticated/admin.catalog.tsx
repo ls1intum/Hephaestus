@@ -1,4 +1,5 @@
 import { createFileRoute, Outlet, retainSearchParams } from "@tanstack/react-router";
+
 import {
 	CURATED_CATALOG_SEARCH_PARAMS,
 	curatedCatalogSearchSchema,

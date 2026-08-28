@@ -1,5 +1,6 @@
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import type { ComponentProps, ReactElement, ReactNode } from "react";
+
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
 	Pagination,

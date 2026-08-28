@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
+
 import { AutonomySourceNote } from "./AutonomySourceNote";
 
 const meta = {

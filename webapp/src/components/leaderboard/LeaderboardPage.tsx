@@ -1,9 +1,11 @@
 import { Trophy } from "lucide-react";
 import type { ReactNode } from "react";
+
 import type { LeaderboardEntry, UserInfo } from "@/api/types.gen";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import type { ProviderType } from "@/lib/provider";
+
 import { LeaderboardFilter } from "./LeaderboardFilter";
 import { LeaderboardLegend } from "./LeaderboardLegend";
 import { LeaderboardOverview } from "./LeaderboardOverview";

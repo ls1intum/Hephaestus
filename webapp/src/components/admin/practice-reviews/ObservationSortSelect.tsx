@@ -1,5 +1,6 @@
 import { ArrowDownWideNarrowIcon } from "lucide-react";
 import { useId } from "react";
+
 import { Field, FieldLabel } from "@/components/ui/field";
 import {
 	Select,
@@ -8,6 +9,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+
 import type { ObservationSort } from "./review-search";
 
 /**

@@ -10,6 +10,7 @@ import {
 	Settings2,
 	Users,
 } from "lucide-react";
+
 import { ADMIN_NAV_LABELS } from "@/components/core/sidebar/admin-nav-labels";
 import {
 	SidebarGroup,
@@ -18,6 +19,7 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
+
 import { NavContextHeader } from "./NavContextHeader";
 
 const ADMIN_NAV_GROUPS = [

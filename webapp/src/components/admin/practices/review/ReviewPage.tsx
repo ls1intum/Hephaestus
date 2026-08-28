@@ -1,11 +1,13 @@
 import { ScanEye } from "lucide-react";
 import type { ReactNode } from "react";
+
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ReviewRunningBanner } from "./ReviewRunningBanner";
+
 import type { ReviewRunningState } from "./review-readiness";
 import { REVIEW_SECTIONS, type ReviewSectionId } from "./review-sections";
+import { ReviewRunningBanner } from "./ReviewRunningBanner";
 
 export interface ReviewPageProps {
 	section: ReviewSectionId;

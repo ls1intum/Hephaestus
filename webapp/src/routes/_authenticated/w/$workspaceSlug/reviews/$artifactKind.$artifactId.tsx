@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { toast } from "sonner";
+
 import {
 	getArtifactTraceOptions,
 	getArtifactTraceQueryKey,

@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
+
 import { ruleTester } from "../rule-tester.ts";
 import { ASSERT_FUNCTION_NAMES, asRegExp, playMustAssert } from "./play-must-assert.ts";
 

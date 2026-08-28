@@ -1,4 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
+
 import { getCurrentUserQueryKey } from "@/api/@tanstack/react-query.gen";
 import environment from "@/environment";
 import { safeReturnTo } from "@/integrations/auth/guard";

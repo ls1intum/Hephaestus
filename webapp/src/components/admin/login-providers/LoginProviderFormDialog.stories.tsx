@@ -1,7 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent } from "storybook/test";
+
 import type { LoginProviderView } from "@/api/types.gen";
 import { expectSettledVisible } from "@/test/overlay";
+
 import { LoginProviderFormDialog } from "./LoginProviderFormDialog";
 
 const editing: LoginProviderView = {

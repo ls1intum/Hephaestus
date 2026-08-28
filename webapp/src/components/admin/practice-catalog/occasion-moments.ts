@@ -15,6 +15,7 @@ import {
 	MessagesSquareIcon,
 	TagIcon,
 } from "lucide-react";
+
 import type { PracticeSignalOption, PracticeWorkTypeDefinitionOptions } from "@/api/types.gen";
 
 /**

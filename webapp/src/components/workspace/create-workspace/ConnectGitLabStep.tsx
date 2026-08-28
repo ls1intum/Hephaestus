@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { CircleCheckIcon, EyeIcon, EyeOffIcon, OctagonXIcon } from "lucide-react";
 import { useEffect, useState } from "react";
+
 import { gitLabPreflightMutation } from "@/api/@tanstack/react-query.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { firstNonBlank } from "@/lib/text";
+
 import { type ConnectionFormData, connectionSchema } from "./schemas";
 import { useWizard } from "./wizard-context";
 

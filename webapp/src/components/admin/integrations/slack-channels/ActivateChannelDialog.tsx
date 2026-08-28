@@ -1,5 +1,6 @@
 import { MegaphoneIcon } from "lucide-react";
 import { useState } from "react";
+
 import type { SlackMonitoredChannel } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import {

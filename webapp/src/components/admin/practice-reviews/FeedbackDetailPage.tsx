@@ -25,6 +25,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { APPROVAL_DECISION_DEFS } from "./approval-decision-defs";
 import { FeedbackBody } from "./FeedbackBody";
 import { proposalRejectionReasonLabel } from "./proposal-rejection-vocabulary";
+import { subjectLabel } from "./review-format";
+import { type FeedbackSearch, reviewScopeSearch } from "./review-search";
 import { ReviewArtifactLink, reviewArtifactTypeSlug } from "./ReviewArtifact";
 import { ClaimCurrentnessBadge, ObservationResultBadge } from "./ReviewBadges";
 import { ReviewBreadcrumbs } from "./ReviewBreadcrumbs";
@@ -38,8 +40,6 @@ import { ReviewPackage } from "./ReviewPackage";
 import { ReviewPerson } from "./ReviewPerson";
 import { ReviewPracticeLink } from "./ReviewPracticeLink";
 import { ReviewRow, ReviewRowList, ReviewRowMeta } from "./ReviewRow";
-import { subjectLabel } from "./review-format";
-import { type FeedbackSearch, reviewScopeSearch } from "./review-search";
 
 export interface FeedbackDetailPageProps {
 	workspaceSlug: string;

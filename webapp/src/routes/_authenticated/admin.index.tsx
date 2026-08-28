@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { Building2, Gauge, Users } from "lucide-react";
+
 import {
 	adminGetInstanceSettingsOptions,
 	adminListAuthEventsOptions,

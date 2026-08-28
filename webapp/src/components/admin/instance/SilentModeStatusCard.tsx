@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, Volume2, VolumeX } from "lucide-react";
+
 import type { InstanceSettings } from "@/api/types.gen";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { Badge } from "@/components/ui/badge";

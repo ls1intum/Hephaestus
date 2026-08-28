@@ -1,9 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent } from "storybook/test";
+
 import type { OutlineCollection } from "@/api/types.gen";
 import { daysBefore, minutesBefore } from "@/components/common/story-clock";
 import { Table, TableBody } from "@/components/ui/table";
 import { expectSettledVisible } from "@/test/overlay";
+
 import { OutlineCollectionRow } from "./OutlineCollectionRow";
 
 /**

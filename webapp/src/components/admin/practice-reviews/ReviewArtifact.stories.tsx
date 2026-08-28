@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
+
 import { expectNoPageOverflow } from "@/test/reflow";
+
 import { ReviewArtifactLabel, ReviewArtifactLink } from "./ReviewArtifact";
 import {
 	gitlabMergeRequest,

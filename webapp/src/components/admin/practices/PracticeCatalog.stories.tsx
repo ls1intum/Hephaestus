@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, waitFor, within } from "storybook/test";
+
 import { AUTONOMY_DEFS } from "@/components/practice-vocabulary/autonomy-defs";
 import {
 	mockAuthorDeclaredEvidenceValidation,
@@ -7,6 +8,7 @@ import {
 } from "@/mocks/fixtures/practice";
 import { StatefulPatch } from "@/stories/stateful";
 import { expectNoPageOverflow } from "@/test/reflow";
+
 import { PracticeCatalog } from "./PracticeCatalog";
 import {
 	chosenAutonomy,

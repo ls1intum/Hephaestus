@@ -1,4 +1,5 @@
 import type { ReviewObservation } from "@/api/types.gen";
+
 import { ASSESSMENT_DEFS } from "./assessment-defs";
 import { PRESENCE_DEFS } from "./presence-defs";
 import type { StatusDef } from "./status-def";

@@ -1,4 +1,5 @@
 import { Check, Lock } from "lucide-react";
+
 import { AchievementProgressDisplay } from "@/components/achievements/AchievementProgressDisplay";
 import { categoryLabels, rarityLabels, statusBackgrounds } from "@/components/achievements/styles";
 import type {

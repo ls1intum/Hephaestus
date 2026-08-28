@@ -1,5 +1,6 @@
 import { render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import type { WorkspaceListItem } from "@/api/types.gen";
 import type { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import type { AuthContextType } from "@/integrations/auth/AuthContext";

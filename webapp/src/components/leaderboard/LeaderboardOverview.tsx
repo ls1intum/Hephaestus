@@ -1,10 +1,12 @@
 import { differenceInHours, differenceInMinutes, differenceInSeconds, isPast } from "date-fns";
 import { CalendarClock, MoveRight, TrendingDown, TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
+
 import type { LeaderboardEntry } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { getInitials } from "@/lib/avatar";
+
 import { LeagueInfoDialog } from "./LeagueInfoDialog";
 import { LeagueProgressCard } from "./LeagueProgressCard";
 

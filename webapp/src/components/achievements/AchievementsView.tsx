@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { ReactFlowProvider } from "@xyflow/react";
 import { useState } from "react";
+
 import { getUserProfileOptions } from "@/api/@tanstack/react-query.gen";
 import { AchievementSidebar } from "@/components/achievements/AchievementSidebar";
 import { AchievementsListView } from "@/components/achievements/AchievementsListView";

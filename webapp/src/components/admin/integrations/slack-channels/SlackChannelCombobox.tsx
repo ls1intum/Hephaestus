@@ -1,5 +1,6 @@
 import { ChevronsUpDownIcon, LockIcon } from "lucide-react";
 import type { ReactNode } from "react";
+
 import type { SlackChannelCandidate } from "@/api/types.gen";
 import { Badge } from "@/components/ui/badge";
 import {

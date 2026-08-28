@@ -1,5 +1,6 @@
 import { Pencil, Plug, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
+
 import type { LlmConnection } from "@/api/types.gen";
 import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";

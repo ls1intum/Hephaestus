@@ -1,6 +1,7 @@
 import deepEqual from "fast-deep-equal";
 import { ChevronRightIcon, RotateCcwIcon } from "lucide-react";
 import { useState } from "react";
+
 import type {
 	PracticeEvidenceRequirement,
 	PracticeEvidenceSourceOption,

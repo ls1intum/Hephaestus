@@ -1,10 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
+
 import { STORY_NOW } from "@/components/common/story-clock";
 import Header from "@/components/core/Header";
 import { useSurveyNotificationStore } from "@/stores/survey-notification-store";
 import type { PostHogSurvey } from "@/types/survey";
+
 import { SurveyContainer } from "./survey-container";
 import { SURVEY_LAYOUT_ID, SurveyNotificationButton } from "./survey-notification-button";
 

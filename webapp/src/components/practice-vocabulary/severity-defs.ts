@@ -1,5 +1,7 @@
 import { CircleAlertIcon, InfoIcon, OctagonAlertIcon, TriangleAlertIcon } from "lucide-react";
+
 import type { ReviewObservation } from "@/api/types.gen";
+
 import type { StatusDefs } from "./status-def";
 
 export type Severity = NonNullable<ReviewObservation["severity"]>;

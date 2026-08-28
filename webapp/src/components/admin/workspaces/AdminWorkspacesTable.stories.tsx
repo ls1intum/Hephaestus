@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, userEvent } from "storybook/test";
+
 import type { AdminWorkspaceView } from "@/api/types.gen";
+
 import { AdminWorkspacesTable } from "./AdminWorkspacesTable";
 
 const workspaceWithOwner: AdminWorkspaceView = {

@@ -1,8 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn } from "storybook/test";
+
 import type { FxRateInfo, WorkspaceLlmUsageReport } from "@/api/types.gen";
 import { withStandardPage } from "@/stories/decorators";
 import { expectNoPageOverflow, expectTablesScrollInPlace } from "@/test/reflow";
+
 import { AdminLlmUsagePage } from "./AdminLlmUsagePage";
 
 const FX_DISCLOSURE = /reference rate published on/;

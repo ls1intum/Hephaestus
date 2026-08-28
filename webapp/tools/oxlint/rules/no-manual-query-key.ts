@@ -1,4 +1,5 @@
 import { defineRule, type ESTree } from "@oxlint/plugins";
+
 import { propertyName } from "../property.ts";
 
 /** The module the generated client exports its key helpers from. */

@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
+
 import type { TeamInfo } from "@/api/types.gen";
+
 import { TeamCard } from "./TeamCard";
 
 /**

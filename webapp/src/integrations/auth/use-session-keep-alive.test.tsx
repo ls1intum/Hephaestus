@@ -3,7 +3,9 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
+
 import { server } from "@/mocks/server";
+
 import { useSessionKeepAlive } from "./use-session-keep-alive";
 
 // Real behaviour, no mocks of our own code: the hook fetches /user through the actual client + query

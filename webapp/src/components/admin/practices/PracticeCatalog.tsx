@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { GripVertical, Library, ListChecks, MoreHorizontal, Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
+
 import type {
 	CatalogPracticeSummary,
 	Practice,
@@ -22,8 +23,8 @@ import {
 	SortableCatalogTree,
 	UNASSIGNED_CATALOG_BUCKET,
 } from "@/components/admin/practice-catalog/SortableCatalogTree";
-import { PracticeListSkeleton } from "@/components/admin/practices/PracticeSkeletons";
 import { practiceFormLevel } from "@/components/admin/practices/practice-search";
+import { PracticeListSkeleton } from "@/components/admin/practices/PracticeSkeletons";
 import { FilterToggle } from "@/components/common/FilterToggle";
 import { MetaRow } from "@/components/common/MetaRow";
 import type { PanelState } from "@/components/common/panel-state";
@@ -62,6 +63,7 @@ import { Toggle } from "@/components/ui/toggle";
 import { artifactKindPluralLabel, type KnownArtifactKind } from "@/lib/artifact-kinds";
 import { autonomySourceOf } from "@/lib/practice-autonomy";
 import { cn } from "@/lib/utils";
+
 import { CatalogOriginBadge } from "./CatalogOriginBadge";
 
 export type FocusFilter = "ALL" | KnownArtifactKind;

@@ -1,6 +1,7 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http, type PathParams } from "msw";
 import { describe, expect, it, vi } from "vitest";
+
 import { listAgentsQueryKey } from "@/api/@tanstack/react-query.gen";
 import type { AgentBinding } from "@/api/types.gen";
 import { server } from "@/mocks/server";

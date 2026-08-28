@@ -1,19 +1,19 @@
-import type {SidebarsConfig} from '@docusaurus/plugin-content-docs';
+import type { SidebarsConfig } from "@docusaurus/plugin-content-docs";
 
 const sidebars: SidebarsConfig = {
-  userSidebar: [
-    {
-      type: 'category',
-      label: 'Getting Started',
-      collapsible: false,
-      items: ['overview', 'getting-started'],
-    },
-    {
-      type: 'category',
-      label: 'Core Experiences',
-      items: ['workspace', 'ai-code-review', 'ai-mentor', 'leaderboard', 'achievements'],
-    },
-  ],
+	userSidebar: [
+		{
+			type: "category",
+			label: "Getting Started",
+			collapsible: false,
+			items: ["overview", "getting-started"],
+		},
+		{
+			type: "category",
+			label: "Core Experiences",
+			items: ["workspace", "ai-code-review", "ai-mentor", "leaderboard", "achievements"],
+		},
+	],
 };
 
 export default sidebars;

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { problemDetailOf, problemStatusOf } from "./problem-detail";
 
 describe("problemDetailOf", () => {

@@ -2,6 +2,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+
 import {
 	AckPolicy,
 	type ConsumerConfig,
@@ -14,6 +15,7 @@ import {
 } from "@nats-io/jetstream";
 import { connect, type NatsConnection } from "@nats-io/transport-node";
 import { Command, InvalidArgumentError, Option } from "commander";
+
 import { isRecord, parseJson } from "./lib/json.ts";
 
 const messageOf = (error: unknown): string =>

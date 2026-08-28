@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from "motion/react";
 import type { ElementType } from "react";
+
 import { Badge } from "@/components/ui/badge";
 
 export interface FeatureData {

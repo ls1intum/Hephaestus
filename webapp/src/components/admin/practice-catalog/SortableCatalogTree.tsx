@@ -24,6 +24,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
+
 import {
 	Accordion,
 	AccordionContent,
@@ -34,6 +35,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Item, ItemActions, ItemGroup } from "@/components/ui/item";
 import { cn } from "@/lib/utils";
+
 import { type CatalogDropTarget, getCatalogDropTarget } from "./catalog-tree-dnd";
 
 export const UNASSIGNED_CATALOG_BUCKET = "__unassigned__";

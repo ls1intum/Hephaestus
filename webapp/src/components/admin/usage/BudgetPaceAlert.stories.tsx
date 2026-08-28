@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
+
 import type { FxRateInfo } from "@/api/types.gen";
+
 import { BudgetPaceAlert } from "./BudgetPaceAlert";
 
 const eur: FxRateInfo = {

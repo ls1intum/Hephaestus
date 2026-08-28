@@ -3,11 +3,13 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { HttpResponse, http, type PathParams } from "msw";
 import { toast } from "sonner";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useOutlineIntegration } from "@/hooks/use-outline-integration";
 import { SyncLivenessProvider } from "@/hooks/use-sync-liveness";
 import { server } from "@/mocks/server";
+
 import { ConnectionStateNotice } from "./ConnectionStateNotice";
 import { OutlineCollectionsSection } from "./outline/OutlineCollectionsSection";
 import { OutlineConnectCard } from "./outline/OutlineConnectCard";

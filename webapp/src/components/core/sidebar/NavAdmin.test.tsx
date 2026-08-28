@@ -7,7 +7,9 @@ import {
 } from "@tanstack/react-router";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { SidebarProvider } from "@/components/ui/sidebar";
+
 import { NavAdmin } from "./NavAdmin";
 
 const PATHS = [

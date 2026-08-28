@@ -14,11 +14,12 @@ import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
 import { statusFacetOptions } from "@/components/practice-vocabulary/status-def";
 import { fromDateRange, toDateRange } from "@/lib/date-range-search";
 import { nonEmpty } from "@/lib/search-params";
+
 import { AppliedFacetPills, facetPills } from "./AppliedFacetPills";
 import { ObservationSortSelect } from "./ObservationSortSelect";
+import type { ObservationsSearch } from "./review-search";
 import { reviewArtifactScopeLabel } from "./ReviewArtifact";
 import { type ReviewPeople, ReviewPersonFacet } from "./ReviewPersonFacet";
-import type { ObservationsSearch } from "./review-search";
 
 /** Every option wears the badge its rows wear; see the note on `FeedbackFilters`' facets. */
 const ASSESSMENT_OPTIONS = statusFacetOptions(ASSESSMENT_DEFS);

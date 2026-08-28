@@ -1,4 +1,5 @@
 import { type ReactNode, type SubmitEvent, useId, useState } from "react";
+
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -14,6 +15,7 @@ import {
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+
 import { type Fx, FxApprox, fxCapHint } from "./fx";
 
 export interface BudgetAmountDialogProps {

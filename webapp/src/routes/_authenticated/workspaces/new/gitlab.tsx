@@ -3,6 +3,7 @@ import { createFileRoute, Link, Navigate, useNavigate } from "@tanstack/react-ro
 import { ArrowLeftIcon, OctagonXIcon } from "lucide-react";
 import { useEffect, useReducer, useRef } from "react";
 import { toast } from "sonner";
+
 import {
 	createWorkspaceMutation,
 	getProvidersOptions,
@@ -15,15 +16,15 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { ConfigureWorkspaceStep } from "@/components/workspace/create-workspace/ConfigureWorkspaceStep";
 import { ConnectGitLabStep } from "@/components/workspace/create-workspace/ConnectGitLabStep";
-import { SelectGroupStep } from "@/components/workspace/create-workspace/SelectGroupStep";
 import { workspaceDetailsSchema } from "@/components/workspace/create-workspace/schemas";
-import { WizardStepIndicator } from "@/components/workspace/create-workspace/WizardStepIndicator";
+import { SelectGroupStep } from "@/components/workspace/create-workspace/SelectGroupStep";
 import {
 	createInitialWizardState,
 	WizardContext,
 	type WizardStep,
 	wizardReducer,
 } from "@/components/workspace/create-workspace/wizard-context";
+import { WizardStepIndicator } from "@/components/workspace/create-workspace/WizardStepIndicator";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { isRecord } from "@/lib/is-record";
 import { firstNonBlank } from "@/lib/text";

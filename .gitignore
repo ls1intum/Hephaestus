@@ -79,7 +79,6 @@ htmlcov/
 .hypothesis/
 #.idea/
 **/.idea/artifacts
-**/.idea/**/biome.xml
 **/.idea/compiler.xml
 **/.idea/**/contentModel.xml
 **/.idea/**/copilot.data.migration.*.xml

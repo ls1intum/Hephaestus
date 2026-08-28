@@ -1,6 +1,8 @@
 import { Hammer } from "lucide-react";
+
 import { MentorIcon } from "@/components/mentor/MentorIcon";
 import { Badge } from "@/components/ui/badge";
+
 import { FeatureCard, type FeatureData } from "./FeatureCard";
 
 const FEATURES_DATA: FeatureData[] = [

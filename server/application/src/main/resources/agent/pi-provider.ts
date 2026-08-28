@@ -1,5 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
+
 import type { ModelRuntime, ProviderModelConfig } from "@earendil-works/pi-coding-agent";
+
 import { errorText } from "./pi-error-text.ts";
 
 export interface ProviderConfig {

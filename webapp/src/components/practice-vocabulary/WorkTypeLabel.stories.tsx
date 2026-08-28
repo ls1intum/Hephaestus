@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
+
 import { ARTIFACT_KIND_VALUES } from "@/lib/artifact-kinds";
+
 import { WorkTypeLabel } from "./WorkTypeLabel";
 
 const meta = {

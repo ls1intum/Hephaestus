@@ -7,27 +7,27 @@
 		"editor.formatOnSave": true
 	},
 	"[typescript]": {
-		"editor.defaultFormatter": "biomejs.biome",
+		"editor.defaultFormatter": "oxc.oxc-vscode",
 		"editor.formatOnSave": true
 	},
 	"[typescriptreact]": {
-		"editor.defaultFormatter": "biomejs.biome",
+		"editor.defaultFormatter": "oxc.oxc-vscode",
 		"editor.formatOnSave": true
 	},
 	"[javascript]": {
-		"editor.defaultFormatter": "biomejs.biome",
+		"editor.defaultFormatter": "oxc.oxc-vscode",
 		"editor.formatOnSave": true
 	},
 	"[javascriptreact]": {
-		"editor.defaultFormatter": "biomejs.biome",
+		"editor.defaultFormatter": "oxc.oxc-vscode",
 		"editor.formatOnSave": true
 	},
 	"[json]": {
-		"editor.defaultFormatter": "biomejs.biome",
+		"editor.defaultFormatter": "oxc.oxc-vscode",
 		"editor.formatOnSave": true
 	},
 	"[jsonc]": {
-		"editor.defaultFormatter": "biomejs.biome",
+		"editor.defaultFormatter": "oxc.oxc-vscode",
 		"editor.formatOnSave": true
 	},
 	"tailwindCSS.experimental.classRegex": [
@@ -36,8 +36,5 @@
 		"cn\\(([^)]*)\\)",
 		"hlm\\(([^)]*)\\)",
 		"[\"'`]([^\"'`]*).*?[\"'`]"
-	],
-	"editor.codeActionsOnSave": {
-		"source.organizeImports.biome": "explicit"
-	}
+	]
 }

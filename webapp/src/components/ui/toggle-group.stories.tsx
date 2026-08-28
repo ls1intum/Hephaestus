@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { CodeIcon, TextIcon } from "lucide-react";
 import { expect } from "storybook/test";
+
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 /**

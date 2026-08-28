@@ -1,5 +1,7 @@
 import { CircleStopIcon, SendIcon, UserRoundCheckIcon } from "lucide-react";
+
 import type { PracticeAutonomy } from "@/lib/practice-autonomy";
+
 import type { StatusDefs } from "./status-def";
 
 export const AUTONOMY_DEFS: StatusDefs<PracticeAutonomy> = {

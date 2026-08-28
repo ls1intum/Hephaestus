@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ExternalLinkIcon, WebhookIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+
 import {
 	addRepositoryToMonitorMutation,
 	getConnectionSyncStatusOptions,
@@ -22,12 +23,12 @@ import { AdminRepositoriesSettings } from "@/components/admin/integrations/Admin
 import { ConnectionStateNotice } from "@/components/admin/integrations/ConnectionStateNotice";
 import { IntegrationCardHeading } from "@/components/admin/integrations/IntegrationCardHeading";
 import { JobHistoryCard } from "@/components/admin/integrations/JobHistoryCard";
+import { syncPollInterval } from "@/components/admin/integrations/sync-format";
 import {
 	SCM_CLASS_KEYS,
 	SyncResourcesTable,
 } from "@/components/admin/integrations/SyncResourcesTable";
 import { SyncStatusHeader } from "@/components/admin/integrations/SyncStatusHeader";
-import { syncPollInterval } from "@/components/admin/integrations/sync-format";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { GithubIcon, GitlabIcon } from "@/components/icons/brand";

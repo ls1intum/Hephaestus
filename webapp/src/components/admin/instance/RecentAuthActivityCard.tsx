@@ -1,13 +1,14 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, ScrollText } from "lucide-react";
+
 import type { AuthEventView } from "@/api/types.gen";
+import { refLabel } from "@/components/admin/audit-shared/ref-label";
 import {
 	eventLabel,
 	eventSeverity,
 	severityDotClass,
 	severityScreenReaderPrefix,
 } from "@/components/admin/audit/audit-format";
-import { refLabel } from "@/components/admin/audit-shared/ref-label";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { Button } from "@/components/ui/button";

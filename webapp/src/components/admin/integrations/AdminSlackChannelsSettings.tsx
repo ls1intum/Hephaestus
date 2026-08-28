@@ -1,5 +1,6 @@
 import { PlugZapIcon, PlusIcon, RadioIcon } from "lucide-react";
 import { useState } from "react";
+
 import type {
 	SlackChannelCandidate as ApiSlackChannelCandidate,
 	SlackMonitoredChannel,
@@ -16,6 +17,7 @@ import {
 	EmptyTitle,
 } from "@/components/ui/empty";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
 import { IntegrationCardHeading } from "./IntegrationCardHeading";
 import { ActivateChannelDialog } from "./slack-channels/ActivateChannelDialog";
 import { AddChannelDialog } from "./slack-channels/AddChannelDialog";

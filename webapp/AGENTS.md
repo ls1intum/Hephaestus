@@ -1,7 +1,7 @@
 # Webapp
 
 React 19 SPA on TanStack Router/Query, Tailwind 4, shadcn primitives over **Base UI**
-(`@base-ui/react`) — not Radix. Vitest + Storybook for tests, oxlint for lint and Biome for format,
+(`@base-ui/react`) — not Radix. Vitest + Storybook for tests, oxlint for lint and oxfmt for format,
 Vite for the build. React Compiler runs at build time.
 
 This file is the gotchas. Conventions that a look at the tree, or a lint message at the call site,
@@ -58,7 +58,7 @@ derives URL segments from the filenames there and the router owns that naming.
 
 ## Linting
 
-**oxlint lints, Biome formats.** `.oxlintrc.json` is the whole rule set, every rule it turns off
+**oxlint lints, oxfmt formats.** `.oxlintrc.json` is the whole rule set, every rule it turns off
 carries the reason beside it, and every restriction states itself at the call site when it fires. None
 of that is repeated here, and the repo-root `AGENTS.md` § Lint and format scopes explains why `lint`
 is spelled `cd .. && oxlint webapp`. What follows is what no diagnostic will ever tell you.

@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
+
 import type { SyncJob } from "@/api/types.gen";
+
 import { ActiveJobProgress } from "./ActiveJobProgress";
 
 const base: SyncJob = {

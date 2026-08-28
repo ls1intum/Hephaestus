@@ -1,4 +1,5 @@
 import { definePlugin } from "@oxlint/plugins";
+
 import { noManualQueryKey } from "./rules/no-manual-query-key.ts";
 import { noNonAsciiFilename } from "./rules/no-non-ascii-filename.ts";
 import { noNondeterministicRender } from "./rules/no-nondeterministic-render.ts";

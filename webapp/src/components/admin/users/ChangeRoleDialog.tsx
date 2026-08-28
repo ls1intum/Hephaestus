@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+
 import type { AdminAccountView } from "@/api/types.gen";
 import {
 	AlertDialog,

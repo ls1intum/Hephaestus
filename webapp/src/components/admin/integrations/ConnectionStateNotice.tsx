@@ -1,6 +1,8 @@
 import { CircleAlertIcon, CircleDashedIcon, PlugZapIcon } from "lucide-react";
 import type * as React from "react";
+
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
 import type { ConnectionState } from "./sync-format";
 
 interface StateCopy {

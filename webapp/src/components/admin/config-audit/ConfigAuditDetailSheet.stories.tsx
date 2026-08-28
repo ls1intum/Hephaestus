@@ -1,7 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent, within } from "storybook/test";
+
 import type { ConfigAuditEntryView } from "@/api/types.gen";
 import { expectSettledVisible } from "@/test/overlay";
+
 import { ConfigAuditDetailSheet } from "./ConfigAuditDetailSheet";
 
 const baseEntry: ConfigAuditEntryView = {

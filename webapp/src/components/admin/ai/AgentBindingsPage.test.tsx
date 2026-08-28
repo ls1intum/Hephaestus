@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+
 import type { AgentBinding, AvailableLlmModel } from "@/api/types.gen";
+
 import { AgentBindingsPage, type AgentBindingsPageProps } from "./AgentBindingsPage";
 
 const model: AvailableLlmModel = {

@@ -1,5 +1,7 @@
 import { CircleCheckIcon, WrenchIcon } from "lucide-react";
+
 import type { ReviewObservation } from "@/api/types.gen";
+
 import type { StatusDefs } from "./status-def";
 
 export type Assessment = NonNullable<ReviewObservation["assessment"]>;

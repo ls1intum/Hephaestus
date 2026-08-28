@@ -1,5 +1,6 @@
 import { Bot, History, UserCog } from "lucide-react";
 import { useState } from "react";
+
 import type { ConfigAuditEntryView } from "@/api/types.gen";
 import { FilterLink } from "@/components/admin/audit-shared/FilterLink";
 import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
@@ -24,7 +25,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { ConfigAuditDetailSheet } from "./ConfigAuditDetailSheet";
+
 import {
 	ACTION_BADGE,
 	actionLabel,
@@ -32,6 +33,7 @@ import {
 	changeSummary,
 	subjectLabel,
 } from "./config-audit-format";
+import { ConfigAuditDetailSheet } from "./ConfigAuditDetailSheet";
 
 export interface ConfigAuditTableProps {
 	entries: ConfigAuditEntryView[];

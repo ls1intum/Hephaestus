@@ -1,5 +1,6 @@
 import { ScrollText } from "lucide-react";
 import { useState } from "react";
+
 import type { AuthEventView } from "@/api/types.gen";
 import { FilterLink } from "@/components/admin/audit-shared/FilterLink";
 import { refLabel } from "@/components/admin/audit-shared/ref-label";
@@ -25,7 +26,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { AuditEventDetailSheet } from "./AuditEventDetailSheet";
+
 import {
 	eventLabel,
 	eventSeverity,
@@ -33,6 +34,7 @@ import {
 	severityDotClass,
 	severityScreenReaderPrefix,
 } from "./audit-format";
+import { AuditEventDetailSheet } from "./AuditEventDetailSheet";
 
 export interface AdminAuditTableProps {
 	events: AuthEventView[];
