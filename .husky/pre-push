@@ -1,1 +1,11 @@
-bun run pre-push
+if [ "${HEPHAESTUS_SKIP_PRE_PUSH:-}" = "1" ]; then
+	echo "WARNING: pre-push verification skipped. Run: bun run check"
+	exit 0
+fi
+
+echo "Pre-push: bun run check"
+if ! bun run check; then
+	echo "Pre-push failed. Run: bun run check"
+	exit 1
+fi
+echo "Pre-push passed."

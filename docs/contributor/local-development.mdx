@@ -41,9 +41,8 @@ bun run typecheck:webapp      # The SPA's typecheck — a separate leg, not part
 bun run check                 # Complete local quality gate
 ```
 
-Run `bun run check` before pushing for the complete local gate. CI distributes those checks across
-required jobs, using path filters where appropriate, and adds builds, generated-file checks, broader
-tests, image checks, and security scans.
+Use the [local verification contract](./local-verification.mdx) for affected checks, the pre-push gate,
+budgets, and CI exclusions.
 
 IntelliJ and WebStorm are also supported.
 

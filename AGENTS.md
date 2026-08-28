@@ -43,10 +43,14 @@ drifts. Copy a skill nowhere else.
 Finish every change set with `bun run format` then `bun run check`, so styling and type checks
 reflect the final state. Document any skipped gate in the PR description.
 
+Use `bun run check:affected` for in-session feedback; it is not the pre-push gate. Its contract is in
+`docs/contributor/local-verification.mdx`.
+
 | Command | Does |
 |---|---|
 | `bun run format` / `format:check` | Apply / verify formatting (Java + TypeScript) |
 | `bun run check` | Static analysis, formatting checks, agent tests, and repository policy checks — every leg is listed in the root `package.json` |
+| `bun run verify` | Complete local CI mirror for checks that need no live service, image build, or hosted credential |
 | `bun run test:webapp` | Vitest |
 | `bun run test:agents` | Agent runtime and precompute specs, on Bun |
 | `cd server && ./mvnw test` | Server unit tests — see `server/AGENTS.md` for all four tiers |
@@ -55,9 +59,10 @@ Naming: `format` applies, `format:check` verifies read-only for CI, `lint` lints
 comprehensive local quality gate. A `:webapp`, `:server` or `:agents` suffix scopes any of them; `:java`
 scopes `format` and `lint` only — the Java leg of `check` is `check:server`.
 
-`bun run check` is the complete local quality gate. CI distributes its legs across required jobs,
+`bun run check` is the complete local quality gate; `bun run verify` adds locally runnable builds and
+broader tests. CI distributes these checks across required jobs,
 using path filters where appropriate, and adds builds, generated-file checks, broader tests, image
-checks, and security scans. Run `check` before pushing, then run the affected tests or builds.
+checks, and security scans. Run `check` before pushing and `verify` before requesting review.
 
 ### Lint and format scopes
 

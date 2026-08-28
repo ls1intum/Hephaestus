@@ -14,7 +14,7 @@ TITLE FORMAT (required):
   ✗ Bad:  Added weekly ranking filter to leaderboard
 
 BEFORE PUSHING:
-  bun run format && bun run check     # Format + lint + typecheck all services
+  bun run format && bun run check     # Apply formatting, then run the local quality gate
 
 AFTER API CHANGES:
   bun run generate:api                # Regenerate all OpenAPI clients

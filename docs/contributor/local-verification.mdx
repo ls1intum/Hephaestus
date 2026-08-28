@@ -1,0 +1,78 @@
+---
+title: Local verification
+---
+
+# Local verification
+
+| Command | What success proves | Excludes | Warm budget |
+|---|---|---|---:|
+| `bun run check:affected` | Static and policy checks selected for the branch and working tree passed | Tests, builds, unaffected scopes, and CI-only checks | Webapp 6 s; server 12 s; agents/docs 3 s |
+| `bun run check` | Every script in `package.json#scripts.check` passed | Builds, browser and live-service tests, images, mutation analysis, and release security | 4 min |
+| `bun run verify` | The complete credential-free local CI inventory passed | Live-service integration and E2E tests, images, mutation analysis, and release security | 10 min |
+
+Run `check:affected` while working, `check` before pushing, and `verify` before requesting review. Each
+success message names a different level of evidence.
+
+## Affected selection
+
+The command compares committed, staged, unstaged, untracked, and deleted paths with the merge base of
+`origin/main`. For another target, run `bun run check:affected --base <revision>`.
+
+| Changed path | Commands |
+|---|---|
+| `webapp/**` | `check:webapp:affected` |
+| Handwritten `server/**` | `check:server:affected` |
+| Agent runtime or precompute TypeScript | `check:agent-runtime` |
+| `docs/**` | `check:docs` |
+| `docs/images/readme/**` | `check:docs` and `check:webapp:affected` |
+| Shared tooling, instructions, generated artifacts, or any unclassified path | `check` |
+
+The exact checks behind each scoped command are defined in the root `package.json`. Selection uses
+`git diff --no-renames`, so both sides of a rename are evaluated. Git documents the underlying change
+statuses in [`git diff`](https://git-scm.com/docs/git-diff#Documentation/git-diff.txt---diff-filterACDMRTUXB).
+
+## Pre-push hook
+
+The hook runs the read-only `bun run check`. For an emergency bypass,
+`HEPHAESTUS_SKIP_PRE_PUSH=1 git push` prints an unverified result and the corrective command. Git's
+standard `git push --no-verify` skips the hook without output.
+
+## Complete local verification
+
+`bun run verify` adds the complete webapp test suites, Storybook browser tests and production build,
+server unit and architecture tests with coverage, webapp build and generated-route comparison, and
+docs build. The webapp build check restores the generated route file before it exits, so verification
+never rewrites the working tree.
+
+## Measurement snapshot
+
+Measured 2026-08-28 on Ubuntu 24.04, Intel Core i5-13500 (20 logical CPUs), 62 GiB RAM, Bun 1.4.0,
+and JDK 21. Dependencies were cached. “First” and “warm” are consecutive processes in the same
+checkout; GNU `time` reports wall time and largest-child RSS.
+
+| Path | First | Warm | Largest-child RSS | Observed first failure |
+|---|---:|---:|---:|---|
+| `format:check` | 21 s | 20 s | 841 MiB | Not measured |
+| `check:webapp` | 5 s | 4 s | 1.6 GiB | Not measured |
+| `test:agents` | 3 s | 3 s | 141 MiB | Not measured |
+| `check` | 63 s (failed) | 42 s | 1.6 GiB | Tooling lint at 63 s |
+| `verify` | Not measured | 8 min 27 s | 5.3 GiB | Not measured |
+
+The selected commands were also run twice on the same checkout:
+
+| Scope | First | Warm | Largest-child RSS | Planted failure detected after |
+|---|---:|---:|---:|---:|
+| Webapp | 4.6 s | 5.7 s | 1.7 GiB | 2.5 s |
+| Server | 12.1 s | 11.9 s | 1.3 GiB | 3.0 s |
+| Agent runtime | 1.3 s | 1.4 s | 458 MiB | 0.8 s |
+| Docs | 2.3 s | 2.3 s | 190 MiB | 1.0 s |
+
+The failures were invalid source files placed in each selected tree and removed after the command
+failed. Automated tests additionally plant committed, staged, unstaged, untracked, deleted, and
+renamed paths in a temporary Git repository. Table-driven cases assert fail-closed expansion for
+shared configuration, generated API and route artifacts, cross-workspace tooling, hooks, and unknown
+root inputs.
+
+The live hosted-check inventory is documented in [CI/CD](./ci-cd.mdx). CI additionally owns checks
+that need browsers, services, images, release infrastructure, or credentials. Hosted CI performance is
+tracked in [issue #1496](https://github.com/ls1intum/Hephaestus/issues/1496).

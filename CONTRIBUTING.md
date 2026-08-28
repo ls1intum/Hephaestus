@@ -28,6 +28,10 @@ Contributions that do not adhere to these guidelines will be rejected. We align 
 
 ## Contribution Process
 
+Use `bun run check:affected` for fast feedback. Before pushing, run `bun run check`; the hook runs it
+automatically. Run `bun run verify` before requesting review. Scope, budgets, and exclusions are documented in the
+[local verification guide](https://ls1intum.github.io/Hephaestus/contributor/local-verification).
+
 1. **External contributors only**: Fork the Repository and create a branch.
 2. **Create a feature branch**: Work on your changes in a separate branch.
 3. **Follow pull request title guidelines**: Ensure your PR title follows the [Conventional Commits](https://www.conventionalcommits.org/) specification.
