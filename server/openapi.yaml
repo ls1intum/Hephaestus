@@ -77,6 +77,8 @@ tags:
   name: o-auth-callback-controller
 - description: Recurring reviews of recent work
   name: Practice Review Sweep
+- description: Redacted production configuration facts
+  name: Configuration Readiness
 - description: Identity provider discovery (public)
   name: Auth discovery
 - description: Global contributor information
@@ -439,6 +441,21 @@ paths:
         \ first)"
       tags:
       - Admin
+  /admin/configuration-readiness:
+    get:
+      operationId: adminGetConfigurationReadiness
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConfigurationFact"
+          description: OK
+      summary: Get redacted configuration readiness
+      tags:
+      - Configuration Readiness
   /admin/llm/connections:
     get:
       operationId: adminListLlmConnections
@@ -8507,6 +8524,46 @@ components:
         workspaceId:
           type: integer
           format: int64
+    ConfigurationFact:
+      type: object
+      properties:
+        documentationUrl:
+          type: string
+        explanation:
+          type: string
+        id:
+          type: string
+        requirement:
+          type: string
+          enum:
+          - REQUIRED
+          - RECOMMENDED
+          - OPTIONAL
+        roles:
+          type: array
+          items:
+            type: string
+            enum:
+            - SERVER
+            - WORKER
+            - WEBHOOK
+        status:
+          type: string
+          enum:
+          - SATISFIED
+          - ACTION_REQUIRED
+          - NOT_CONFIGURED
+          - NOT_APPLICABLE
+        subject:
+          type: string
+      required:
+      - documentationUrl
+      - explanation
+      - id
+      - requirement
+      - roles
+      - status
+      - subject
     ConnectionAuditEntry:
       type: object
       description: |-

@@ -95,6 +95,11 @@ adding a rule there enables it nowhere. `webapp/AGENTS.md` § Linting has the re
 Holds wherever TypeScript is written here, the Bun agent trees and `scripts/**` included.
 `webapp/AGENTS.md` wins over it inside the SPA.
 
+Prefer typed Bun/TypeScript for repository automation, validation, and tests. Keep shell only at a
+real runtime boundary where Bun is unavailable, such as an end-user bootstrap that must run before
+the application toolchain is installed; keep that boundary POSIX-compatible and move its substantive
+test orchestration into TypeScript.
+
 - Separate import groups with blank lines wherever their relative evaluation order must not change; oxfmt sorts within each group.
 - **A leading `_` marks what the language or a tool reads that way** — an intentionally unused
   binding, a server field name (`_id`), a runtime global. It never marks something private, which

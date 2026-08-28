@@ -83,7 +83,7 @@
 		"check:stories": "bun scripts/check-story-prose.ts",
 		"check:components": "bun scripts/check-presentational-components.ts",
 		"check:diagrams": "bun scripts/check-mermaid-diagrams.ts",
-		"check:env": "bun scripts/check-env-defaults.ts && bun scripts/check-env-roles.ts && bun test scripts/check-env-roles.test.ts",
+		"check:env": "bun scripts/check-env-defaults.ts && bun scripts/check-env-roles.ts && bun test scripts/check-env-roles.test.ts scripts/self-host-setup.test.ts",
 		"check:agent-runtime-pins": "bun scripts/check-agent-runtime-pins.ts",
 		"check:java-nullness": "bun scripts/check-java-nullness.ts && bun test scripts/check-java-nullness.test.ts",
 		"check:instructions": "bun scripts/check-agent-instructions.ts && bun test scripts/check-agent-instructions.test.ts",
