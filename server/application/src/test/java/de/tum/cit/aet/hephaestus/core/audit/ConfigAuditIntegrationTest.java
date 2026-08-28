@@ -469,10 +469,26 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     private void patchPracticeReview(Workspace workspace, Map<String, Object> body) {
+        String slug = workspace.getWorkspaceSlug();
+        String version = webTestClient
+                .get()
+                .uri("/workspaces/{slug}/practices/review-settings", slug)
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .returnResult(String.class)
+                .getResponseHeaders()
+                .getETag();
+        String etag = java.util.Objects.requireNonNull(version, "the settings endpoint always answers with an ETag");
+
         webTestClient
                 .patch()
-                .uri("/workspaces/{slug}/practices/review-settings", workspace.getWorkspaceSlug())
-                .headers(TestAuthUtils.withCurrentUser())
+                .uri("/workspaces/{slug}/practices/review-settings", slug)
+                .headers(headers -> {
+                    TestAuthUtils.withCurrentUser().accept(headers);
+                    headers.setIfMatch(etag);
+                })
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(body)
                 .exchange()

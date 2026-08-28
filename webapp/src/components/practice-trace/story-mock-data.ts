@@ -1,5 +1,6 @@
 import type {
 	ArtifactTrace,
+	DeliveryPolicyTrace,
 	PagedModelTracedArtifact,
 	PracticeTraceEntry,
 	TracedArtifact,
@@ -287,6 +288,43 @@ export const practiceTraceEntries = [
 		withheldReasons: [],
 	},
 ] satisfies PracticeTraceEntry[];
+
+export const deniedDeliveryPolicyEvaluation: DeliveryPolicyTrace = {
+	reviewId: "22222222-2222-2222-2222-222222222222",
+	admittedRevision: 4,
+	evaluatedRevision: 5,
+	facts: {
+		artifactKind: "scm.pull_request",
+		repository: "ls1intum/Hephaestus",
+		baseBranch: "develop",
+		subject: "RESOLVED_LINKED_HUMAN",
+		repositoryMode: "SELECTED",
+		personMode: "SELECTED",
+		repositoryMatched: true,
+		branchMatched: true,
+		personMatched: true,
+		recipientConsent: false,
+		deliveryStatus: "ACTIVE",
+		triggerMode: "AUTO",
+		contributingPractices: [{ slug: "review-feedback", autonomy: "AUTOMATIC" }],
+	},
+	resolverVersion: "1",
+	surface: "ARTIFACT",
+	stage: "EGRESS",
+	allowed: false,
+	decisiveReason: "RECIPIENT_OPTED_OUT",
+	evaluatedAt: new Date("2026-08-06T10:20:30Z"),
+	checks: [
+		{ check: "INSTANCE_SILENT_MODE", status: "PASSED" },
+		{ check: "WORKSPACE_ENABLED", status: "PASSED" },
+		{ check: "ROLLOUT_REVISION", status: "PASSED" },
+		{ check: "WORKSPACE_DELIVERY", status: "PASSED" },
+		{ check: "CURRENT_COVERAGE", status: "PASSED" },
+		{ check: "PRACTICE_AUTHORITY", status: "PASSED" },
+		{ check: "RECIPIENT_CONSENT", status: "DENIED" },
+		{ check: "ARTIFACT_ELIGIBILITY", status: "NOT_REACHED" },
+	],
+};
 
 export const artifactTrace = {
 	artifactKind: "scm.pull_request",

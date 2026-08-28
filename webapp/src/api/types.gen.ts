@@ -45,39 +45,24 @@ export type WorkspaceTeamRepositorySettings = {
 };
 
 /**
- * The workspace's answer to "which of our work is reviewed at all", ANDed onto every practice binding.
- * It exists because a binding says <code>scm.pull_request.merged</code> and cannot say <em>merged into
- * what</em>: a trunk is named <code>main</code> here and <code>develop</code> there, which is a deployment fact
- * about one workspace that a centrally curated catalogue cannot carry.
- *
- * <p>The scope only ever narrows, never widens: an empty or absent list means "no restriction on this
- * axis".
- *
- * <h2>What this cannot express, and why</h2>
- *
- * <ul>
- * <li><strong>Changed paths.</strong> Not decidable here: the detection gate holds the
- * <code>PullRequest</code> row, not the diff, and changed paths do not exist until the evidence stage,
- * by which point the review has been admitted and paid for. A path axis here would be a predicate
- * that quietly never narrows anything.
- * <li><strong>Branch patterns.</strong> Exact names only; adding globs later stays backward
- * compatible, taking them away would not.
- * <li><strong>Any third key.</strong> The vocabulary is closed at the column
- * (<code>chk_workspace_review_scope</code>), not by this type: a reader configured to ignore unknown
- * fields would drop the key in silence, leaving a workspace believing a restriction was in force.
- * </ul>
+ * Selecting specific repositories or people with an empty selection admits nobody. A selected repository without branches admits all its branches.
  */
 export type WorkspaceReviewScope = {
+    personMode: 'ALL_ELIGIBLE' | 'SELECTED';
+    personUserIds: Array<number>;
+    repositories: Array<ReviewRepositoryTarget>;
+    repositoryMode: 'ALL_MONITORED' | 'SELECTED';
+};
+
+export type ReviewRepositoryTarget = {
     /**
-     * exact <code>owner/name</code> repository identifiers. Empty = every monitored
-     * repository. This narrows <em>review</em> within the set the workspace already syncs; it never
-     * adds one.
+     * Exact pull-request base branches to cover; empty covers every base branch
      */
-    repositories?: Array<string>;
+    baseBranches: Array<string>;
     /**
-     * exact target-branch names (a PR's base ref). Empty = every branch.
+     * Exact provider repository name, including its owner
      */
-    targetBranches?: Array<string>;
+    nameWithOwner: string;
 };
 
 /**
@@ -126,6 +111,10 @@ export type WorkspaceMembership = {
      * Timestamp when the membership was created
      */
     createdAt?: Date;
+    /**
+     * Whether this linked human member can be selected for practice-review coverage
+     */
+    eligibleForPracticeReview?: boolean;
     /**
      * Whether the member is hidden from the leaderboard
      */
@@ -991,11 +980,15 @@ export type UpdatePracticeReviewSettingsRequest = {
      */
     deliverToMerged?: boolean;
     /**
+     * Pause or activate external feedback. Resume never releases work from an older revision.
+     */
+    deliveryStatus?: 'ACTIVE' | 'PAUSED';
+    /**
      * Fields to reset back to inherit
      */
     reset?: Array<'SKIP_DRAFTS' | 'DELIVER_TO_MERGED' | 'COOLDOWN_MINUTES' | 'REVIEW_SCOPE' | 'DEFAULT_AUTONOMY'>;
     /**
-     * Replaces the review scope wholesale (the lists ARE the setting, so a merge could only ever add). Null leaves it unchanged; two empty lists clear it back to unrestricted.
+     * Replaces repository and person coverage wholesale. Null leaves it unchanged.
      */
     reviewScope?: WorkspaceReviewScope;
 };
@@ -1486,7 +1479,7 @@ export type TracedSignal = {
     /**
      * Why it ended in that state; null once it triggered a review
      */
-    stateReason?: 'GATE_SKIPPED' | 'COOLDOWN_ACTIVE' | 'REQUEST_COOLDOWN_ACTIVE' | 'REQUESTER_QUOTA_EXHAUSTED' | 'CONCURRENT_DUPLICATE' | 'OUT_OF_REVIEW_SCOPE' | 'WORKSPACE_INACTIVE' | 'PRACTICES_DISABLED' | 'NO_ACTIVE_PRACTICE' | 'REVIEW_MODEL_UNBOUND' | 'PRACTICE_AUTONOMY_OFF' | 'BUDGET_EXHAUSTED' | 'SUBJECT_UNLINKED' | 'MODEL_UNAVAILABLE' | 'PENDING_DEADLINE_EXCEEDED' | 'ARTIFACT_GONE';
+    stateReason?: 'GATE_SKIPPED' | 'COOLDOWN_ACTIVE' | 'REQUEST_COOLDOWN_ACTIVE' | 'REQUESTER_QUOTA_EXHAUSTED' | 'CONCURRENT_DUPLICATE' | 'OUT_OF_REVIEW_SCOPE' | 'STALE_ROLLOUT_REVISION' | 'WORKSPACE_INACTIVE' | 'PRACTICES_DISABLED' | 'NO_ACTIVE_PRACTICE' | 'REVIEW_MODEL_UNBOUND' | 'PRACTICE_AUTONOMY_OFF' | 'BUDGET_EXHAUSTED' | 'SUBJECT_UNLINKED' | 'MODEL_UNAVAILABLE' | 'PENDING_DEADLINE_EXCEEDED' | 'ARTIFACT_GONE';
 };
 
 /**
@@ -2059,7 +2052,7 @@ export type ReviewRequestOutcome = {
     /**
      * The controlled-vocabulary reason nothing was started; absent when a review was started
      */
-    reason?: 'GATE_SKIPPED' | 'COOLDOWN_ACTIVE' | 'REQUEST_COOLDOWN_ACTIVE' | 'REQUESTER_QUOTA_EXHAUSTED' | 'CONCURRENT_DUPLICATE' | 'OUT_OF_REVIEW_SCOPE' | 'WORKSPACE_INACTIVE' | 'PRACTICES_DISABLED' | 'NO_ACTIVE_PRACTICE' | 'REVIEW_MODEL_UNBOUND' | 'PRACTICE_AUTONOMY_OFF' | 'BUDGET_EXHAUSTED' | 'SUBJECT_UNLINKED' | 'MODEL_UNAVAILABLE' | 'PENDING_DEADLINE_EXCEEDED' | 'ARTIFACT_GONE';
+    reason?: 'GATE_SKIPPED' | 'COOLDOWN_ACTIVE' | 'REQUEST_COOLDOWN_ACTIVE' | 'REQUESTER_QUOTA_EXHAUSTED' | 'CONCURRENT_DUPLICATE' | 'OUT_OF_REVIEW_SCOPE' | 'STALE_ROLLOUT_REVISION' | 'WORKSPACE_INACTIVE' | 'PRACTICES_DISABLED' | 'NO_ACTIVE_PRACTICE' | 'REVIEW_MODEL_UNBOUND' | 'PRACTICE_AUTONOMY_OFF' | 'BUDGET_EXHAUSTED' | 'SUBJECT_UNLINKED' | 'MODEL_UNAVAILABLE' | 'PENDING_DEADLINE_EXCEEDED' | 'ARTIFACT_GONE';
     /**
      * The reason as one sentence for the person who asked. Render it verbatim: it is written next to the reason it explains so that every surface says the same thing, and a re-worded copy is how a screen and a support answer come to disagree.
      */
@@ -2068,6 +2061,26 @@ export type ReviewRequestOutcome = {
      * Whether a review is now running, or nothing was started
      */
     status: 'SUBMITTED' | 'REFUSED';
+};
+
+/**
+ * One exact provider message included in a review awaiting approval
+ */
+export type ReviewProposedPlacement = {
+    body: string;
+    /**
+     * Last 1-based line; null for a single-line comment or summary
+     */
+    endLine?: number;
+    /**
+     * Head-side file path; null for the summary
+     */
+    path?: string;
+    /**
+     * First 1-based line; null for the summary
+     */
+    startLine?: number;
+    type: 'SUMMARY' | 'INLINE' | 'CONVERSATION_TURN';
 };
 
 export type ReviewPracticeGroup = {
@@ -2178,16 +2191,16 @@ export type ReviewBoundFeedback = {
      * When the message was placed; null if it was not delivered
      */
     deliveredAt?: Date;
-    deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED';
+    deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'PARTIALLY_FAILED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED';
     feedbackId: string;
     /**
      * Whether the observation led the feedback or reinforced it
      */
     role: 'PRIMARY' | 'SUPPORTING';
     /**
-     * Why the message was withheld; null unless the state is SUPPRESSED
+     * Why delivery stopped; set on withheld or terminally partial feedback
      */
-    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET';
+    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET';
 };
 
 /**
@@ -2319,11 +2332,15 @@ export type ReviewFeedbackDisposition = {
 export type ReviewFeedbackDetail = {
     agentJobId: string;
     /**
+     * Immutable human decision for this proposal, when one has been made
+     */
+    approval?: FeedbackApproval;
+    /**
      * Work item the feedback targets; null when it is unanchored
      */
     artifact?: ReviewArtifact;
     /**
-     * Stored composed body; null when none was produced, and always null on the IN_APP and IN_CHAT channels — neither the developer's practice pages nor the mentor's queued move is readable by an operator
+     * Stored composed body; null when none was produced, and always null on the IN_APP and IN_CHAT channels — neither the developer's practice pages nor the mentor's prepared context is readable by an operator
      */
     body?: string;
     channel: 'IN_CONTEXT' | 'IN_CHAT' | 'IN_APP';
@@ -2332,7 +2349,11 @@ export type ReviewFeedbackDetail = {
      * When the feedback was placed; null if it was not delivered
      */
     deliveredAt?: Date;
-    deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED';
+    /**
+     * Ordered delivery-policy evaluations for this feedback's review
+     */
+    deliveryPolicy: Array<DeliveryPolicyTrace>;
+    deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'PARTIALLY_FAILED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED';
     id: string;
     /**
      * Source observations in render order
@@ -2343,6 +2364,10 @@ export type ReviewFeedbackDetail = {
      */
     placements: Array<ReviewPlacement>;
     /**
+     * Exact ordered summary and inline messages covered by the approval decision
+     */
+    proposedPlacements: Array<ReviewProposedPlacement>;
+    /**
      * Who the feedback is addressed to; null when the identity is no longer resolvable
      */
     recipient?: ReviewSubject;
@@ -2351,13 +2376,17 @@ export type ReviewFeedbackDetail = {
      */
     replacesId?: string;
     /**
+     * Reviewed source revision for an immutable approval package
+     */
+    reviewedRevision?: string;
+    /**
      * Whose work the feedback addresses; may equal the recipient
      */
     subject?: ReviewSubject;
     /**
-     * Why the feedback was withheld; null unless the state is SUPPRESSED
+     * Why delivery stopped; set on withheld or terminally partial feedback
      */
-    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET';
+    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET';
     /**
      * Cross-run continuity key tying successive deliveries together
      */
@@ -2400,6 +2429,55 @@ export type ReviewBoundObservation = {
     summary: string;
 };
 
+export type PracticeFact = {
+    autonomy?: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
+    slug?: string;
+};
+
+export type DeliveryPolicyFactsSnapshot = {
+    artifactKind?: string;
+    baseBranch?: string;
+    branchMatched?: boolean;
+    contributingPractices?: Array<PracticeFact>;
+    deliveryStatus?: 'ACTIVE' | 'PAUSED';
+    personMatched?: boolean;
+    personMode?: 'ALL_ELIGIBLE' | 'SELECTED';
+    recipientConsent?: boolean;
+    repository?: string;
+    repositoryMatched?: boolean;
+    repositoryMode?: 'ALL_MONITORED' | 'SELECTED';
+    subject?: 'RESOLVED_LINKED_HUMAN' | 'MISSING' | 'NON_HUMAN' | 'UNLINKED';
+    triggerMode?: 'AUTO' | 'MANUAL';
+};
+
+export type DeliveryPolicyTraceCheck = {
+    check: 'INSTANCE_SILENT_MODE' | 'WORKSPACE_ENABLED' | 'ROLLOUT_REVISION' | 'WORKSPACE_DELIVERY' | 'CURRENT_COVERAGE' | 'PRACTICE_AUTHORITY' | 'RECIPIENT_CONSENT' | 'ARTIFACT_ELIGIBILITY';
+    status: 'PASSED' | 'DENIED' | 'NOT_APPLICABLE' | 'NOT_REACHED';
+};
+
+export type DeliveryPolicyTrace = {
+    admittedRevision: number;
+    allowed: boolean;
+    checks: Array<DeliveryPolicyTraceCheck>;
+    decisiveReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET';
+    evaluatedAt: Date;
+    evaluatedRevision?: number;
+    facts: DeliveryPolicyFactsSnapshot;
+    resolverVersion: string;
+    reviewId: string;
+    stage: 'COMPOSITION' | 'AUTOMATIC' | 'APPROVED' | 'EGRESS';
+    surface: 'ARTIFACT' | 'IN_APP' | 'CONVERSATION';
+};
+
+export type FeedbackApproval = {
+    actorAccountId?: number;
+    decidedAt?: Date;
+    decision?: 'APPROVED' | 'REJECTED';
+    feedbackId?: string;
+    rejectionNote?: string;
+    rejectionReason?: 'INCORRECT' | 'MISSING_CONTEXT' | 'UNHELPFUL' | 'DUPLICATE' | 'INAPPROPRIATE_PLACEMENT' | 'OTHER';
+};
+
 export type ReviewFeedback = {
     agentJobId: string;
     /**
@@ -2417,7 +2495,7 @@ export type ReviewFeedback = {
      * When the feedback was placed; null if it was not delivered
      */
     deliveredAt?: Date;
-    deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED';
+    deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'PARTIALLY_FAILED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED';
     id: string;
     /**
      * Number of observations used to compose the feedback
@@ -2436,9 +2514,9 @@ export type ReviewFeedback = {
      */
     subject?: ReviewSubject;
     /**
-     * Why the feedback was withheld; null unless the state is SUPPRESSED
+     * Why delivery stopped; set on withheld or terminally partial feedback
      */
-    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET';
+    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET';
 };
 
 /**
@@ -3037,7 +3115,7 @@ export type PracticeTraceEntry = {
     /**
      * Why prepared feedback was withheld. Non-empty with observations present means we measured and deliberately said nothing.
      */
-    withheldReasons: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET'>;
+    withheldReasons: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET'>;
 };
 
 /**
@@ -3144,6 +3222,7 @@ export type PracticeReviewSettings = {
      * Raw override; null = inheriting the fleet default
      */
     cooldownMinutesOverride?: number;
+    coverageSummary: PracticeReviewCoverageSummary;
     /**
      * Effective: how much autonomy the system has over practices and groups that hold no autonomy of their own — the bottom of the practice → group → workspace chain
      */
@@ -3161,9 +3240,63 @@ export type PracticeReviewSettings = {
      */
     deliverToMergedOverride?: boolean;
     /**
-     * Which work is reviewed at all, ANDed onto every practice binding. Empty lists mean no restriction on that axis. Exact names only — no patterns, and no path scope (changed paths are not known where the decision is made).
+     * Whether new external practice feedback may be sent
+     */
+    deliveryStatus: 'ACTIVE' | 'PAUSED';
+    /**
+     * Strong entity tag to send in If-Match when updating this rollout
+     */
+    etag: string;
+    /**
+     * Explicit all-or-selected repository and person coverage. Selected-empty means nobody.
      */
     reviewScope: WorkspaceReviewScope;
+    /**
+     * Monotonic rollout revision carried by automatically admitted review jobs
+     */
+    revision: number;
+};
+
+export type PracticeReviewCoverageSummary = {
+    /**
+     * Eligible linked members admitted by the people coverage axis
+     */
+    coveredPeople: number;
+    /**
+     * Monitored repositories admitted by the repository coverage axis
+     */
+    coveredRepositories: number;
+    /**
+     * Eligible linked human members in the workspace
+     */
+    eligiblePeople: number;
+    /**
+     * Number of days included in recentReviewVolume
+     */
+    estimateWindowDays: number;
+    /**
+     * Repositories currently monitored by the workspace
+     */
+    monitoredRepositories: number;
+    /**
+     * Workspace-wide practice-review jobs created during the estimate window
+     */
+    recentReviewVolume: number;
+};
+
+export type PracticeReviewCoveragePreview = {
+    /**
+     * Effective coverage before the proposed change
+     */
+    current: PracticeReviewCoverageSummary;
+    /**
+     * Effective coverage if the proposed change is applied
+     */
+    proposed: PracticeReviewCoverageSummary;
+    /**
+     * Whether the proposal admits any repository, branch, or person excluded now
+     */
+    widens: boolean;
 };
 
 export type PracticeGroupTrend = {
@@ -4703,15 +4836,6 @@ export type FeedbackResolutionCounts = {
     addressed?: number;
     disputed?: number;
     notApplicable?: number;
-};
-
-export type FeedbackApproval = {
-    actorAccountId?: number;
-    decidedAt?: Date;
-    decision?: 'APPROVED' | 'REJECTED';
-    feedbackId?: string;
-    rejectionNote?: string;
-    rejectionReason?: 'INCORRECT' | 'MISSING_CONTEXT' | 'UNHELPFUL' | 'DUPLICATE' | 'INAPPROPRIATE_PLACEMENT' | 'OTHER';
 };
 
 /**
@@ -10192,6 +10316,9 @@ export type GetPracticeReviewSettingsResponse = GetPracticeReviewSettingsRespons
 
 export type UpdatePracticeReviewSettingsData = {
     body: UpdatePracticeReviewSettingsRequest;
+    headers?: {
+        'If-Match'?: string;
+    };
     path: {
         /**
          * Workspace slug
@@ -10210,6 +10337,27 @@ export type UpdatePracticeReviewSettingsResponses = {
 };
 
 export type UpdatePracticeReviewSettingsResponse = UpdatePracticeReviewSettingsResponses[keyof UpdatePracticeReviewSettingsResponses];
+
+export type PreviewCoverageData = {
+    body: WorkspaceReviewScope;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/review-settings/coverage-preview';
+};
+
+export type PreviewCoverageResponses = {
+    /**
+     * OK
+     */
+    200: PracticeReviewCoveragePreview;
+};
+
+export type PreviewCoverageResponse = PreviewCoverageResponses[keyof PreviewCoverageResponses];
 
 export type ListReviewedPracticesData = {
     body?: never;
@@ -10306,8 +10454,8 @@ export type ListPracticeReviewFeedbackData = {
     query?: {
         page?: number;
         size?: number;
-        deliveryState?: Array<'AWAITING_APPROVAL' | 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED'>;
-        suppressionReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET'>;
+        deliveryState?: Array<'AWAITING_APPROVAL' | 'PREPARED' | 'PARTIALLY_DELIVERED' | 'PARTIALLY_FAILED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED'>;
+        suppressionReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET'>;
         channel?: Array<'IN_CONTEXT' | 'IN_CHAT' | 'IN_APP'>;
         agentJobId?: string;
         /**

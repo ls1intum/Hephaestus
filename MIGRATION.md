@@ -65,6 +65,23 @@ Entries exist only for releases that need operator action. Everything else is in
 
 ### v0.75.0
 
+#### 🔴 Practice reviews now require the person being evaluated to be a workspace member
+
+**Affected**: every workspace with practice reviews turned on, and in particular any workspace whose
+monitored repositories take pull requests from outside the organization.
+
+**Before**: a review ran on any pull request or issue in a monitored repository, whoever it evaluated.
+
+**After**: coverage has two dimensions — repositories and people — and both must admit the work. The
+people dimension is workspace membership. Most practices evaluate the pull-request or issue author;
+reviewer practices evaluate the reviewer. If that person is not an identifiable linked human member, no
+review runs and no feedback is prepared about them.
+
+**Migration**: nothing to change before upgrading.
+
+**Operator action after upgrading**: open **Practices → Review → When and where** and confirm the
+**People** and **Repositories** counts. Existing members need no action. If expected contributors are
+missing, follow [Who counts as a person](https://ls1intum.github.io/Hephaestus/admin/practice-review#who-counts-as-a-person).
 #### 🔴 Practice area API names are replaced by practice group names
 
 **Affected**: anything calling the application API directly. The generated Hephaestus web client is

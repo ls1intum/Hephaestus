@@ -22,7 +22,7 @@ public record ReviewBoundFeedbackDTO(
         @NonNull FeedbackChannel channel,
         @NonNull FeedbackDeliveryState deliveryState,
 
-        @Schema(description = "Why the message was withheld; null unless the state is SUPPRESSED") @Nullable
+        @Schema(description = "Why delivery stopped; set on withheld or terminally partial feedback") @Nullable
         FeedbackSuppressionReason suppressionReason,
 
         @NonNull Instant createdAt,

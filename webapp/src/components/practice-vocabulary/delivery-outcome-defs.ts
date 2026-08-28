@@ -11,9 +11,7 @@ import {
 	UserRoundIcon,
 	XCircleIcon,
 } from "lucide-react";
-
 import type { ReviewFeedback } from "@/api/types.gen";
-
 import type { StatusDef, StatusDefs } from "./status-def";
 
 export type DeliveryState = ReviewFeedback["deliveryState"];
@@ -50,6 +48,20 @@ export const DELIVERY_STATE_DEFS: StatusDefs<DeliveryState> = {
 		badgeVariant: "secondary",
 		description:
 			"Composed, and waiting for the moment that delivers it — which differs by channel.",
+	},
+	PARTIALLY_DELIVERED: {
+		label: "Partially delivered",
+		icon: CircleAlertIcon,
+		badgeVariant: "warning",
+		description:
+			"Some approved comments reached the provider. The remaining comments are retrying or were withheld for the reason shown.",
+	},
+	PARTIALLY_FAILED: {
+		label: "Partially delivered · retries exhausted",
+		icon: CircleAlertIcon,
+		badgeVariant: "destructive",
+		description:
+			"Some approved comments reached the provider, but the remaining comments could not be delivered after bounded retries.",
 	},
 	SUPERSEDED: {
 		label: "Replaced by newer",
@@ -119,6 +131,16 @@ const IN_APP_OVERRIDES = {
 	},
 } as const satisfies Record<string, StatusDef>;
 
+const IN_CONTEXT_OVERRIDES = {
+	PREPARED: {
+		label: "Prepared · approved, sending",
+		icon: ClockIcon,
+		badgeVariant: "secondary",
+		description:
+			"The decision is recorded. Provider delivery is still in progress and may be retried safely.",
+	},
+} as const satisfies Record<string, StatusDef>;
+
 /** What a row should say became of this feedback. */
 export function deliveryOutcome(feedback: DeliveryFacts): StatusDef {
 	const { channel, deliveryState, suppressionReason } = feedback;
@@ -130,9 +152,15 @@ export function deliveryOutcome(feedback: DeliveryFacts): StatusDef {
 	if (channel === "IN_APP" && deliveryState === "PREPARED") {
 		return IN_APP_OVERRIDES.PREPARED;
 	}
+	if (channel === "IN_CONTEXT" && deliveryState === "PREPARED") {
+		return IN_CONTEXT_OVERRIDES.PREPARED;
+	}
 	return DELIVERY_STATE_DEFS[deliveryState];
 }
 
 export function isWithheld(feedback: DeliveryFacts): boolean {
-	return feedback.deliveryState === "SUPPRESSED";
+	return (
+		feedback.deliveryState === "SUPPRESSED" ||
+		(feedback.deliveryState === "PARTIALLY_DELIVERED" && feedback.suppressionReason !== undefined)
+	);
 }

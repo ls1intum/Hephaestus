@@ -28,7 +28,7 @@ public record ReviewFeedbackDTO(
         @NonNull FeedbackChannel channel,
         @NonNull FeedbackDeliveryState deliveryState,
 
-        @Schema(description = "Why the feedback was withheld; null unless the state is SUPPRESSED") @Nullable
+        @Schema(description = "Why delivery stopped; set on withheld or terminally partial feedback") @Nullable
         FeedbackSuppressionReason suppressionReason,
 
         @Schema(description = "The feedback this one replaced; null on a first delivery") @Nullable

@@ -28,8 +28,8 @@ All three scopes use the same definition fields. What differs is who owns the va
   on the instance, then owned outright by a workspace once adopted.
 - **Inclusion** — an instance decision only. Excluding an entry removes it from what workspaces may
   adopt and changes nothing that is already adopted.
-- **Autonomy and review scope** — workspace decisions only. A curator never sets either, and a
-  practice Hephaestus cannot review is forced to `OFF`.
+- **Autonomy, review coverage, and delivery status** — workspace decisions only. A curator never sets
+  any of them, and a practice Hephaestus cannot review is forced to `OFF`.
 - **Group and order** — repository array order, overridable on the instance, then independent per
   workspace.
 

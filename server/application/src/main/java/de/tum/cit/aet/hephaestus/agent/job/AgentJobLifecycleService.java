@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerJobCancelDispatcher;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
@@ -35,6 +36,7 @@ public class AgentJobLifecycleService {
     private final Optional<WorkerJobCancelDispatcher> workerJobCancelDispatcher;
     private final LlmUsageRecorder usageRecorder;
     private final ObjectMapper objectMapper;
+    private final FeedbackDispatchRepository feedbackDispatchRepository;
 
     public AgentJobLifecycleService(
             AgentJobRepository agentJobRepository,
@@ -43,7 +45,8 @@ public class AgentJobLifecycleService {
             @Nullable SandboxManager sandboxManager,
             Optional<WorkerJobCancelDispatcher> workerJobCancelDispatcher,
             LlmUsageRecorder usageRecorder,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            FeedbackDispatchRepository feedbackDispatchRepository) {
         this.agentJobRepository = agentJobRepository;
         this.handlerRegistry = handlerRegistry;
         this.transactionTemplate = transactionTemplate;
@@ -51,6 +54,7 @@ public class AgentJobLifecycleService {
         this.workerJobCancelDispatcher = workerJobCancelDispatcher;
         this.usageRecorder = usageRecorder;
         this.objectMapper = objectMapper;
+        this.feedbackDispatchRepository = feedbackDispatchRepository;
     }
 
     /**
@@ -62,9 +66,12 @@ public class AgentJobLifecycleService {
     public AgentJob retryDelivery(Long workspaceId, UUID jobId) {
         int updated = transactionTemplate.execute(status -> {
             requireJob(workspaceId, jobId);
-
-            return agentJobRepository.transitionDeliveryStatus(
+            int transitioned = agentJobRepository.transitionDeliveryStatus(
                     jobId, DeliveryStatus.PENDING, Set.of(DeliveryStatus.FAILED));
+            if (transitioned == 1) {
+                feedbackDispatchRepository.resetFailedAutomaticPackage(jobId, workspaceId);
+            }
+            return transitioned;
         });
 
         if (updated == 0) {
@@ -229,7 +236,7 @@ public class AgentJobLifecycleService {
             return false;
         }
 
-        if (existing.kind() == ExistingDeliveryLookup.Kind.FOUND) {
+        if (existing.kind() == ExistingDeliveryLookup.Kind.FOUND && !handler.reconcilesMoreThanOneProviderObject()) {
             String existingCommentId = existing.commentId();
             boolean won =
                     fencedDeliveryWrite(job.getId(), DeliveryStatus.DELIVERED, existingCommentId, claimedAttempts);
@@ -242,7 +249,6 @@ public class AgentJobLifecycleService {
             return won;
         }
 
-        // ABSENT — confirmed safe to post.
         try {
             handler.deliver(job);
             boolean won = fencedDeliveryWrite(

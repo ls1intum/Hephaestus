@@ -156,11 +156,7 @@ class PullRequestCommentPoster {
 
     private String postFormattedBody(AgentJob job, String formattedBody, String marker) {
         long workspaceId = job.getWorkspace().getId();
-        IntegrationKind kind = job.getIntegrationKind();
-        if (kind == null) {
-            throw new JobDeliveryException(
-                    "AgentJob.integrationKind is null — cannot resolve a delivery channel. jobId=" + job.getId());
-        }
+        IntegrationKind kind = requireIntegrationKind(job);
         SummaryChannel channel = requireChannel(kind);
         FeedbackTarget target = buildTarget(job, kind, workspaceId);
         try {
@@ -175,95 +171,23 @@ class PullRequestCommentPoster {
         }
     }
 
-    /**
-     * Edits an already-posted summary in place so re-reviews keep one evolving thread. A
-     * {@code TRANSIENT} outcome means keep the prior summary: a flaky update must not double-post.
-     *
-     * @param externalRef the vendor comment id returned by a prior {@link #postFormattedBody}
-     */
-    UpdateResult updateFormattedBody(AgentJob job, String externalRef, String formattedBody) {
-        long workspaceId = job.getWorkspace().getId();
-        IntegrationKind kind = job.getIntegrationKind();
-        if (kind == null) {
-            throw new JobDeliveryException(
-                    "AgentJob.integrationKind is null — cannot resolve a delivery channel. jobId=" + job.getId());
-        }
-        SummaryChannel channel = requireChannel(kind);
-        FeedbackTarget target = buildTarget(job, kind, workspaceId);
-        SummaryChannel.UpdateOutcome outcome;
-        try {
-            outcome = channel.updateSummary(
-                    target, externalRef, new FeedbackContent(formattedBody, summaryMarkerFor(job)));
-        } catch (OutboundEgressSuppressedException e) {
-            throw new JobDeliverySuppressedException(e.toString(), e);
-        }
-        return switch (outcome.kind()) {
-            case EDITED -> {
-                log.info(
-                        "Edited feedback summary in place: jobId={}, kind={}, commentId={}",
-                        job.getId(),
-                        kind,
-                        Objects.requireNonNull(outcome.handle()).externalId());
-                yield new UpdateResult(
-                        UpdateResult.Kind.EDITED,
-                        Objects.requireNonNull(outcome.handle()).externalId());
-            }
-            case GONE -> {
-                log.info(
-                        "Summary edit found the prior comment gone; will post anew: jobId={}, reason={}",
-                        job.getId(),
-                        outcome.reason());
-                yield new UpdateResult(UpdateResult.Kind.GONE, null);
-            }
-            case TRANSIENT -> {
-                log.warn(
-                        "Summary edit hit a transient error; keeping the prior summary, not re-posting: jobId={}, reason={}",
-                        job.getId(),
-                        outcome.reason());
-                yield new UpdateResult(UpdateResult.Kind.TRANSIENT, null);
-            }
-            case UNSUPPORTED -> {
-                log.debug(
-                        "Channel {} cannot edit a summary in place; caller will post anew: jobId={}",
-                        kind,
-                        job.getId());
-                yield new UpdateResult(UpdateResult.Kind.UNSUPPORTED, null);
-            }
-        };
-    }
-
-    record UpdateResult(Kind kind, @Nullable String externalId) {
-        enum Kind {
-            EDITED,
-            GONE,
-            TRANSIENT,
-            UNSUPPORTED,
-        }
+    @Nullable
+    String postIssueFormattedBody(AgentJob job, String formattedBody) {
+        return postIssueFormattedBody(job, formattedBody, summaryMarkerFor(job));
     }
 
     @Nullable
-    String postIssueFormattedBody(AgentJob job, String formattedBody) {
+    String postIssueApprovedProposal(AgentJob job, java.util.UUID feedbackId, String formattedBody) {
+        return postIssueFormattedBody(job, formattedBody, "<!-- hephaestus:approved-feedback:" + feedbackId + " -->");
+    }
+
+    private String postIssueFormattedBody(AgentJob job, String formattedBody, String marker) {
         long workspaceId = job.getWorkspace().getId();
-        IntegrationKind kind = job.getIntegrationKind();
-        if (kind == null) {
-            throw new JobDeliveryException(
-                    "AgentJob.integrationKind is null — cannot resolve a delivery channel. jobId=" + job.getId());
-        }
+        IntegrationKind kind = requireIntegrationKind(job);
         SummaryChannel channel = requireChannel(kind);
-        JsonNode metadata = job.getMetadata();
-        String repoFullName = requireMetadataText(metadata, "repository_full_name");
-        int issueNumber = requireMetadataInt(metadata, "issue_number");
-        String subjectExternalId;
+        FeedbackTarget target = buildIssueTarget(job, kind, workspaceId);
         try {
-            subjectExternalId = channel.formatIssueSubjectId(repoFullName, issueNumber);
-        } catch (IllegalArgumentException e) {
-            throw new JobDeliveryException(e.toString(), e);
-        }
-        FeedbackTarget target =
-                new FeedbackTarget(new IntegrationRef(kind, workspaceId, null), subjectExternalId, null);
-        try {
-            SummaryHandle handle =
-                    channel.postSummary(target, new FeedbackContent(formattedBody, summaryMarkerFor(job)));
+            SummaryHandle handle = channel.postSummary(target, new FeedbackContent(formattedBody, marker));
             log.info(
                     "Posted issue feedback comment: jobId={}, kind={}, commentId={}",
                     job.getId(),
@@ -324,7 +248,7 @@ class PullRequestCommentPoster {
             log.debug(
                     "Existing-summary dedup lookup failed (treated as unknown): jobId={}, error={}",
                     job.getId(),
-                    e.getMessage());
+                    e.toString());
             return ExistingDeliveryLookup.unknown();
         }
     }
@@ -336,6 +260,28 @@ class PullRequestCommentPoster {
                     + " — check that the vendor integration is enabled and its channel bean is registered");
         }
         return channel;
+    }
+
+    private IntegrationKind requireIntegrationKind(AgentJob job) {
+        IntegrationKind kind = job.getIntegrationKind();
+        if (kind == null) {
+            throw new JobDeliveryException(
+                    "AgentJob.integrationKind is null — cannot resolve a delivery channel. jobId=" + job.getId());
+        }
+        return kind;
+    }
+
+    private FeedbackTarget buildIssueTarget(AgentJob job, IntegrationKind kind, long workspaceId) {
+        JsonNode metadata = job.getMetadata();
+        String repoFullName = requireMetadataText(metadata, "repository_full_name");
+        int issueNumber = requireMetadataInt(metadata, "issue_number");
+        String subjectExternalId;
+        try {
+            subjectExternalId = requireChannel(kind).formatIssueSubjectId(repoFullName, issueNumber);
+        } catch (IllegalArgumentException e) {
+            throw new JobDeliveryException(e.toString(), e);
+        }
+        return new FeedbackTarget(new IntegrationRef(kind, workspaceId, null), subjectExternalId, null);
     }
 
     FeedbackTarget buildTarget(AgentJob job, IntegrationKind kind, long workspaceId) {

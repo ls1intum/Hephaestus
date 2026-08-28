@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
+import static de.tum.cit.aet.hephaestus.practices.review.GateDecisionTestFixtures.automaticDetection;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
@@ -117,8 +118,7 @@ class DevTriggerControllerTest extends BaseUnitTest {
     void shouldSettleNothingWhenTheGatePasses() {
         PullRequest pr = pullRequest();
         when(artifactLoader.findPullRequestForGate(WORKSPACE_ID, PR_ID)).thenReturn(Optional.of(pr));
-        when(detectionGate.evaluate(any(), any(), any()))
-                .thenReturn(new GateDecision.Detect(new Workspace(), List.of()));
+        when(detectionGate.evaluate(any(), any(), any())).thenReturn(automaticDetection(new Workspace(), List.of()));
         when(agentJobService.buildReviewRequest(any(), any())).thenReturn(null);
 
         controller.triggerReview(PR_ID, null, WORKSPACE_ID, "scm.pull_request.merged");

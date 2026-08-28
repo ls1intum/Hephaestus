@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.handler.inapp;
 
 import de.tum.cit.aet.hephaestus.agent.handler.FeedbackLedgerRecorder;
+import de.tum.cit.aet.hephaestus.agent.handler.PracticeFeedbackDeliveryPolicy;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedbackUnit;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser;
 import de.tum.cit.aet.hephaestus.agent.handler.conversation.PracticeDetectionDeliveredEvent;
@@ -10,6 +11,7 @@ import de.tum.cit.aet.hephaestus.config.FeedbackLaneExecutor;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
 import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicySurface;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
@@ -70,6 +72,7 @@ public class InAppCompositionListener {
     private final WorkspaceReviewDefaultsProvider workspaceDefaults;
     private final FeedbackCompositionResultParser resultParser;
     private final InAppFeedbackPreparer preparer;
+    private final PracticeFeedbackDeliveryPolicy deliveryPolicy;
 
     public InAppCompositionListener(
             AgentJobRepository agentJobRepository,
@@ -78,7 +81,8 @@ public class InAppCompositionListener {
             ObservationVisibilityPolicy visibilityPolicy,
             WorkspaceReviewDefaultsProvider workspaceDefaults,
             FeedbackCompositionResultParser resultParser,
-            InAppFeedbackPreparer preparer) {
+            InAppFeedbackPreparer preparer,
+            PracticeFeedbackDeliveryPolicy deliveryPolicy) {
         this.agentJobRepository = agentJobRepository;
         this.observationRepository = observationRepository;
         this.feedbackRepository = feedbackRepository;
@@ -86,6 +90,7 @@ public class InAppCompositionListener {
         this.workspaceDefaults = workspaceDefaults;
         this.resultParser = resultParser;
         this.preparer = preparer;
+        this.deliveryPolicy = deliveryPolicy;
     }
 
     @Async(FeedbackLaneExecutor.BEAN_NAME)
@@ -128,6 +133,10 @@ public class InAppCompositionListener {
     }
 
     private int route(UUID agentJobId, UUID outputJobId, Long workspaceId) {
+        AgentJob sourceJob = agentJobRepository.findById(agentJobId).orElse(null);
+        if (sourceJob == null || !deliveryPolicy.allowsComposition(sourceJob, DeliveryPolicySurface.IN_APP)) {
+            return 0;
+        }
         AgentJob job = agentJobRepository.findById(outputJobId).orElse(null);
         if (job == null) {
             return 0;

@@ -19,10 +19,12 @@ those inventories into another deployment manifest from this page.
 A working deployment must:
 
 - enable the agent runtime on both the submitting server and claiming worker;
-- enable practice review for the intended population;
 - make repository checkout and the shared fabric volume available to every worker that captures repository
   evidence;
 - set campaign, request-rate, retry, and retention limits appropriate to its budget and governance policy.
+
+Who gets practice review is **not** among them. There is no instance-wide population flag: each workspace
+turns itself on, and decides its own coverage.
 
 See the
 [server configuration](https://github.com/ls1intum/Hephaestus/blob/main/server/application/src/main/resources/application.yml)
@@ -37,12 +39,11 @@ Source authorization is not a deployment toggle. The shipped artifact-source con
 sources each purpose may use; integrations only determine which authorized sources are available. See
 [Artifact-source governance](./dsms/artifact-source-governance.md).
 
-## Workspace controls
+## Running instance
 
-Workspace administrators configure model readiness under **AI models**, review scope and autonomy under
-**Practices**, and spend under **AI usage**. **Review activity** explains what happened to an individual
-piece of work. These product-level destinations are intentionally broader than a click-by-click path so the
-guide survives navigation changes; [Practice review](./practice-review.mdx) gives the task sequence.
+Nothing on this page configures a workspace. Model readiness, coverage, delivery status, autonomy, spend
+and the per-artifact trace are all workspace-administrator screens, and
+[Practice review](./practice-review.mdx) is the guide to them.
 
 ### Queue health
 
@@ -64,6 +65,9 @@ The job queue exposes its own signals — alert off these rather than reading ap
 - **`llm.budget.exhausted`** / **`llm.budget.blocked`** — a cap crossed, and work refused at a cap.
 - **`practice.review.refused`** — refused reviews, tagged by `phase` (`submission` or `execution`) and
   `reason`.
+- **`practice.feedback.dispatch`** — durable-dispatch outcomes, tagged by bounded `destination` and
+  `state`. Alert on sustained `UNCERTAIN` or `FAILED` outcomes. `UNCERTAIN` means delivery is not yet
+  confirmed; `FAILED` is terminal after the retry limit or an unrecoverable dispatch record.
 
 Query `/actuator/health/readiness` for aggregate readiness. An authorized response includes the
 **`practiceReview`** component. An enabled review worker reports `OUT_OF_SERVICE` with
@@ -74,9 +78,31 @@ visible in **Review activity** and the refusal counter; they do not remove the w
 Gauges are sampled periodically; timers and counters are recorded when the corresponding event occurs.
 Metric names in the instrumented code are the source of truth for dashboards and alerts.
 
-**Retention.** Terminal job payloads are stripped before their rows are deleted. Row retention must not be
-shorter than payload retention. Set both against the approved retention policy, verify them in the effective
-application configuration, and treat the fabric root as sensitive storage.
+**Retention.** Terminal job payloads are stripped before their rows are deleted, so row retention shorter
+than payload retention is incoherent — the application refuses to start rather than accept it. Treat the
+fabric root as sensitive storage. Delivery-policy evaluations and dispatch intents follow their owning
+review ledger. Disconnect, person erasure, and workspace purge remove their matching copies. Once a sent
+or withheld dispatch has been projected into that ledger, its duplicate summary and inline-comment payload
+is erased while the destination key and provider references remain as the idempotency record. A failed
+dispatch keeps its package because an administrator can still retry it. Selected coverage targets follow
+their workspace membership or monitored repository.
+
+**Dispatch recovery.** One dispatch owns the exact summary and inline comments in a review. Before each
+provider create, it reconciles the stable marker or recurrence key already stored with the provider. A
+found placement is preserved, a definitive not-found permits the first write, and an inconclusive lookup
+leaves the package `UNCERTAIN` rather than risking a duplicate. The dispatch becomes `SENT` only after the
+whole package converges.
+
+Two consequences to plan for:
+
+- **Sustained `UNCERTAIN` means Hephaestus cannot prove whether the provider accepted the write**, not that
+  feedback is queued. Fix provider connectivity or credentials so reconciliation can continue.
+- **A dispatch interrupted mid-write can outlive its retry budget without reaching `FAILED`.** It is
+  deliberately not failed, because one of its provider objects may be live, and remains uncertain until
+  provider lookup can confirm the outcome.
+
+Do not repair an `UNCERTAIN` dispatch by editing its row. Restore provider lookup instead; the state, write
+fence, retry count, and lease together prevent duplicate provider writes.
 
 ## Limits you should know about
 
@@ -98,10 +124,9 @@ behaviors matter independently of their exact defaults:
   review resolves documents *linked from* the work first and only tops up a small number by search; the
   mentor searches the whole corpus and truncates each document. Neither path can report that it found
   everything, and neither is a substitute for the other when you are diagnosing missing context.
-- **Observation and feedback wording come from different turns in one agent session.** The first turn
-  records evidence-backed observations. After Java admits them, a second turn composes lane-specific
-  feedback from those observations and their evidence. Practice criteria affect what is observed; the
-  composition contract affects what is said. Nothing on the administration screens edits either prompt.
+- **No screen edits what the model is told.** What Hephaestus observes is shaped by each practice's
+  criteria; the wording it then chooses is shaped by a prompt that ships with the release. Changing the
+  latter is a code change.
 
 ## Rollback
 

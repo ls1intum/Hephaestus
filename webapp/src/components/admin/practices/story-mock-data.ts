@@ -18,10 +18,26 @@ export function mockReviewSettings(
 	overrides: Partial<PracticeReviewSettings> = {},
 ): PracticeReviewSettings {
 	return {
+		etag: '"0"',
+		revision: 0,
 		cooldownMinutes: 30,
-		defaultAutonomy: "AUTOMATIC",
+		defaultAutonomy: "HUMAN_APPROVAL",
 		deliverToMerged: true,
-		reviewScope: { targetBranches: [], repositories: [] },
+		deliveryStatus: "ACTIVE",
+		reviewScope: {
+			repositoryMode: "ALL_MONITORED",
+			personMode: "ALL_ELIGIBLE",
+			repositories: [],
+			personUserIds: [],
+		},
+		coverageSummary: {
+			monitoredRepositories: 3,
+			coveredRepositories: 3,
+			eligiblePeople: 8,
+			coveredPeople: 8,
+			recentReviewVolume: 42,
+			estimateWindowDays: 30,
+		},
 		...overrides,
 	};
 }

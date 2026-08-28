@@ -14,17 +14,11 @@ public interface InlineFeedbackChannel {
 
     InlineResult postInlineFeedback(SummaryChannel.FeedbackTarget target, List<InlineFeedback> feedback);
 
-    /**
-     * Removes this run's previously posted inline feedback (matched by {@code marker}) without posting new
-     * ones — the clear half of clear-then-post, callable on a zero-note re-run so stale notes from an earlier
-     * run never survive a review that now finds nothing inline (the empty-diff pathology where a re-reviewed
-     * PR keeps line-numbered notes on code no longer in the diff).
-     *
-     * <p>Default is a no-op for a vendor that offers no reconciliation at all. Both shipped channels override
-     * it: GitLab deletes every marker-bearing note; GitHub (whose threads cannot be deleted, only minimized)
-     * minimizes each vanished thread as {@code OUTDATED}. "Append-only" therefore does NOT mean "no-op" here.
-     */
-    default void clearStaleFeedback(SummaryChannel.FeedbackTarget target, String marker) {}
+    default InlineResult postImmutablePackage(SummaryChannel.FeedbackTarget target, List<InlineFeedback> feedback) {
+        return postInlineFeedback(target, feedback);
+    }
+
+    void clearStaleFeedback(SummaryChannel.FeedbackTarget target, String marker);
 
     /**
      * One piece of feedback to post inline. {@code recurrenceKey} carries the stable

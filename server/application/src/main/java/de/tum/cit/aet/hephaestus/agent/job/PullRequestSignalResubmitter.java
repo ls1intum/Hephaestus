@@ -92,7 +92,8 @@ public class PullRequestSignalResubmitter implements PendingSignalResubmitter {
                                 // population it was discovered for, so a campaign's budget-deferred tail cannot land
                                 // in the live series hours after the campaign paused.
                                 SignalOrigins.observationOriginOf(signal.getDiscoveredVia())),
-                        key);
+                        key,
+                        detect);
         }
     }
 }

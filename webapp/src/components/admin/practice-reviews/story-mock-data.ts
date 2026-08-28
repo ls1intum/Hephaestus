@@ -880,6 +880,8 @@ const DISPOSITION_OF: Record<ReviewFeedback["deliveryState"], Disposition> = {
 	DELIVERED: "delivered",
 	DISCARDED: "suppressed",
 	FAILED: "failed",
+	PARTIALLY_DELIVERED: "prepared",
+	PARTIALLY_FAILED: "failed",
 	PREPARED: "prepared",
 	SUPERSEDED: "superseded",
 	SUPPRESSED: "suppressed",
@@ -1073,8 +1075,6 @@ export function feedbackDetail(feedbackId: string): ReviewFeedbackDetail {
 				summary: source.summary,
 			};
 		}),
-		// Only feedback that reached the work has a placement. Deriving it from the outcome keeps a
-		// withheld record from claiming a place it never occupied.
 		placements:
 			item.outcome !== "DELIVERED" || item.channel !== "IN_CONTEXT"
 				? []
@@ -1092,10 +1092,31 @@ export function feedbackDetail(feedbackId: string): ReviewFeedbackDetail {
 							},
 						]
 					: [{ id: `${item.id}-summary`, placementType: "SUMMARY", postedCommentRef: "2481933" }],
+		proposedPlacements:
+			item.outcome === "AWAITING_APPROVAL" && item.channel === "IN_CONTEXT"
+				? [
+						{ type: "SUMMARY", body: item.body ?? "" },
+						{
+							type: "INLINE",
+							body: "This fallback catches every exception and hides whether the retry is safe. Catch the expected transport error and let programming errors surface.",
+							path: "src/main/java/example/RetryService.java",
+							startLine: 48,
+						},
+						{
+							type: "INLINE",
+							body: "The new branch changes behavior but the description does not explain why. Add the reason so a future maintainer can distinguish intent from accident.",
+							path: "src/main/java/example/ReviewHandler.java",
+							startLine: 91,
+							endLine: 94,
+						},
+					]
+				: [],
 		recipient: item.recipient,
 		replacesId: item.replaces,
+		reviewedRevision: item.outcome === "AWAITING_APPROVAL" ? "27f4e88c9f5a" : undefined,
 		subject: run.developer,
 		suppressionReason: item.withheldFor,
+		deliveryPolicy: [],
 	};
 }
 

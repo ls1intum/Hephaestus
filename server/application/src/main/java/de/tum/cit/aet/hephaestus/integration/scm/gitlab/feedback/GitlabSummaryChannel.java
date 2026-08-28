@@ -96,7 +96,7 @@ public class GitlabSummaryChannel implements SummaryChannel {
             noteableGid =
                     mrResolver.resolve(scopeId, mr.projectPath(), mr.iid()).globalId();
         }
-        String body = escapeSlashCommands(content.body());
+        String body = escapeSlashCommands(content.externalBody());
 
         ClientGraphQlResponse response;
         try {
@@ -162,7 +162,7 @@ public class GitlabSummaryChannel implements SummaryChannel {
         if (gitLabProvider.isRateLimitCritical(scopeId)) {
             return UpdateOutcome.transientFailure("GitLab rate limit critical for scope " + scopeId);
         }
-        String body = escapeSlashCommands(content.body());
+        String body = escapeSlashCommands(content.externalBody());
 
         ClientGraphQlResponse response;
         try {

@@ -1,16 +1,22 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.nullable;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewSubject;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptions;
@@ -23,7 +29,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceFeatures;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceResolver;
-import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
+import de.tum.cit.aet.hephaestus.workspace.settings.PracticeDeliveryStatus;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -55,12 +61,37 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     @Mock(strictness = Mock.Strictness.LENIENT)
     private PracticeSignalOptions signalOptions;
 
+    @Mock(strictness = Mock.Strictness.LENIENT)
+    private PracticeReviewCoverageService coverageService;
+
     private PracticeReviewDetectionGate gate;
 
     @BeforeEach
     void setUp() {
         gate = new PracticeReviewDetectionGate(
-                practiceDetectionReadiness, practiceRepository, workspaceResolver, signalOptions);
+                practiceDetectionReadiness, practiceRepository, workspaceResolver, signalOptions, coverageService);
+        when(coverageService.admits(
+                        any(Workspace.class),
+                        nullable(String.class),
+                        nullable(String.class),
+                        nullable(ReviewSubject.class)))
+                .thenReturn(true);
+        when(coverageService.admits(
+                        any(Workspace.class),
+                        nullable(String.class),
+                        nullable(String.class),
+                        nullable(ReviewSubject.class),
+                        org.mockito.ArgumentMatchers.anyBoolean()))
+                .thenReturn(true);
+        when(coverageService.assessRepositoryless(any(Workspace.class), any(ReviewSubject.class)))
+                .thenReturn(new PracticeReviewCoverageService.CoverageAssessment(
+                        de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryMode.ALL_MONITORED,
+                        de.tum.cit.aet.hephaestus.workspace.settings.ReviewPersonMode.ALL_ELIGIBLE,
+                        ReviewSubjectStatus.RESOLVED_LINKED_HUMAN,
+                        true,
+                        true,
+                        true,
+                        true));
     }
 
     // Helpers
@@ -71,6 +102,10 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         pr.setLabels(new HashSet<>());
         pr.setAssignees(new HashSet<>());
         pr.setDraft(false);
+        User author = new User();
+        author.setId(7L);
+        author.setType(User.Type.USER);
+        pr.setAuthor(author);
 
         Repository repo = new Repository();
         repo.setNameWithOwner("ls1intum/Hephaestus");
@@ -295,6 +330,24 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("practices disabled for workspace");
             verifyNoInteractions(practiceDetectionReadiness, practiceRepository);
+        }
+
+        @Test
+        void practicesDisabledOutranksAnOutOfCoverageSkip() {
+            PullRequest pr = createPullRequest();
+            Workspace workspace = createWorkspace();
+            workspace.getFeatures().setPracticesEnabled(false);
+            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
+            when(coverageService.admits(
+                            any(Workspace.class),
+                            nullable(String.class),
+                            nullable(String.class),
+                            nullable(ReviewSubject.class)))
+                    .thenReturn(false);
+
+            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
+
+            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("practices disabled for workspace");
         }
     }
 
@@ -542,11 +595,19 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     class ReviewScopeTests {
 
         @Test
+        void pausedDeliveryDoesNotStopReviewCompute() {
+            PullRequest pr = createPullRequest();
+            Workspace workspace = setupThroughPracticeMatching(pr, createPractice(SIGNAL));
+            workspace.getReviewSettings().setDeliveryStatus(PracticeDeliveryStatus.PAUSED);
+
+            assertThat(gate.evaluate(pr, SIGNAL, TriggerMode.AUTO)).isInstanceOf(GateDecision.Detect.class);
+        }
+
+        @Test
         void admitsAPullRequestTargetingAScopedBranch() {
             PullRequest pr = createPullRequest();
             pr.setBaseRefName("main");
-            Workspace workspace = setupThroughPracticeMatching(pr, createPractice(SIGNAL));
-            workspace.getReviewSettings().applyScope(new WorkspaceReviewScope(List.of("main"), List.of()));
+            setupThroughPracticeMatching(pr, createPractice(SIGNAL));
 
             assertThat(gate.evaluate(pr, SIGNAL, TriggerMode.AUTO)).isInstanceOf(GateDecision.Detect.class);
         }
@@ -557,17 +618,29 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             pr.setBaseRefName("develop");
             Workspace workspace = createWorkspace();
             when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            workspace.getReviewSettings().applyScope(new WorkspaceReviewScope(List.of("main"), List.of()));
+            when(coverageService.admits(workspace, "ls1intum/Hephaestus", "develop", pr.reviewSubject()))
+                    .thenReturn(false);
 
             GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             GateDecision.Skip skip = (GateDecision.Skip) decision;
-            assertThat(skip.reason()).isEqualTo("outside the workspace review scope");
+            assertThat(skip.reason()).contains("outside review coverage");
             assertThat(skip.resolvedSignalReason()).isEqualTo(SignalStateReason.OUT_OF_REVIEW_SCOPE);
             // Terminal, not pending: the branch the artifact targeted will not change, so re-offering it
             // would be the reaper re-deciding a decision that cannot come out differently.
             assertThat(skip.resolvedSignalReason().isRetryable()).isFalse();
+        }
+
+        @Test
+        void anAdministrativeEvaluationMayRunOutsideCoverage() {
+            PullRequest pr = createPullRequest();
+            pr.setBaseRefName("develop");
+            Workspace workspace = setupThroughPracticeMatching(pr, createPractice(SIGNAL));
+            when(coverageService.admits(workspace, "ls1intum/Hephaestus", "develop", pr.reviewSubject()))
+                    .thenReturn(false);
+
+            assertThat(gate.evaluateAdministrative(pr, SIGNAL)).isInstanceOf(GateDecision.Detect.class);
         }
 
         /** Cheap enough to sit ahead of every query — no catalogue read happens for out-of-scope work. */
@@ -577,7 +650,8 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             pr.setBaseRefName("develop");
             Workspace workspace = createWorkspace();
             when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            workspace.getReviewSettings().applyScope(new WorkspaceReviewScope(List.of("main"), List.of()));
+            when(coverageService.admits(workspace, "ls1intum/Hephaestus", "develop", pr.reviewSubject()))
+                    .thenReturn(false);
 
             gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
 
@@ -591,9 +665,25 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             pr.setBaseRefName("main");
             Workspace workspace = createWorkspace();
             when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            workspace.getReviewSettings().applyScope(new WorkspaceReviewScope(List.of(), List.of("ls1intum/Artemis")));
+            when(coverageService.admits(workspace, "ls1intum/Hephaestus", "main", pr.reviewSubject()))
+                    .thenReturn(false);
 
             assertThat(gate.evaluate(pr, SIGNAL, TriggerMode.AUTO)).isInstanceOf(GateDecision.Skip.class);
+        }
+
+        @Test
+        void reviewerScopeUsesTheReviewerRatherThanThePullRequestAuthor() {
+            PullRequest pr = createPullRequest();
+            pr.setBaseRefName("main");
+            ReviewSubject reviewer = new ReviewSubject(99L, true);
+            Workspace workspace = createWorkspace();
+            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
+            when(coverageService.admits(workspace, "ls1intum/Hephaestus", "main", reviewer))
+                    .thenReturn(false);
+
+            assertThat(gate.evaluate(pr, SIGNAL, TriggerMode.AUTO, reviewer)).isInstanceOf(GateDecision.Skip.class);
+            verify(coverageService).admits(workspace, "ls1intum/Hephaestus", "main", reviewer);
+            verify(coverageService, never()).admits(workspace, "ls1intum/Hephaestus", "main", pr.reviewSubject());
         }
 
         /**
@@ -605,6 +695,10 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             Issue issue = new Issue();
             issue.setId(7L);
             issue.setAssignees(new HashSet<>());
+            User author = new User();
+            author.setId(7L);
+            author.setType(User.Type.USER);
+            issue.setAuthor(author);
             Repository repo = new Repository();
             repo.setNameWithOwner("ls1intum/Hephaestus");
             issue.setRepository(repo);
@@ -613,8 +707,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             when(practiceDetectionReadiness.hasRunnableAgent(WORKSPACE_ID)).thenReturn(true);
             Practice issuePractice = createPractice(ScmSignals.ISSUE_OPENED);
             when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(issuePractice));
-            workspace.getReviewSettings().applyScope(new WorkspaceReviewScope(List.of("main"), List.of()));
-
             GateDecision decision = gate.evaluateIssue(issue, ScmSignals.ISSUE_OPENED, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Detect.class);
@@ -639,7 +731,8 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             when(practiceRepository.findByWorkspaceId(WORKSPACE_ID))
                     .thenReturn(List.of(createPractice(DOCUMENT_PUBLISHED)));
 
-            GateDecision decision = gate.evaluateSignal(workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO);
+            GateDecision decision =
+                    gate.evaluateSignal(workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO, new ReviewSubject(7L, true));
 
             assertThat(decision).isInstanceOf(GateDecision.Detect.class);
             assertThat(((GateDecision.Detect) decision).matchedPractices()).hasSize(1);
@@ -654,14 +747,16 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             silenced.setAutonomy(PracticeAutonomy.OFF);
             when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(silenced));
 
-            GateDecision silencedDecision = gate.evaluateSignal(workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO);
+            GateDecision silencedDecision =
+                    gate.evaluateSignal(workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO, new ReviewSubject(7L, true));
 
             assertThat(silencedDecision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) silencedDecision).resolvedSignalReason())
                     .isEqualTo(SignalStateReason.PRACTICE_AUTONOMY_OFF);
 
             when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of());
-            GateDecision absentDecision = gate.evaluateSignal(workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO);
+            GateDecision absentDecision =
+                    gate.evaluateSignal(workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO, new ReviewSubject(7L, true));
 
             assertThat(((GateDecision.Skip) absentDecision).resolvedSignalReason())
                     .isEqualTo(SignalStateReason.GATE_SKIPPED);
@@ -672,7 +767,8 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             Workspace workspace = createWorkspace();
             workspace.getFeatures().setPracticesEnabled(false);
 
-            GateDecision decision = gate.evaluateSignal(workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO);
+            GateDecision decision =
+                    gate.evaluateSignal(workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO, new ReviewSubject(7L, true));
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             verifyNoInteractions(practiceRepository);
@@ -683,24 +779,29 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             Workspace workspace = createWorkspace();
             workspace.getFeatures().setPracticeReviewAutoTriggerEnabled(false);
 
-            assertThat(gate.evaluateSignal(workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO))
+            assertThat(gate.evaluateSignal(
+                            workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO, new ReviewSubject(7L, true)))
                     .isInstanceOf(GateDecision.Skip.class);
         }
 
         @Test
-        @DisplayName("a repository-scoped workspace does not silence work that has no repository")
-        void reviewScopeDoesNotApplyToAKindWithoutARepository() {
-            // The scope names branches and repositories. A document has neither, so ANDing it on would
-            // silence every document in any workspace that had ever narrowed its SCM review scope — a
-            // refusal about one domain leaking into another.
+        void shouldRefuseRepositorylessKindWhenSpecificRepositoriesAreSelected() {
             Workspace workspace = createWorkspace();
-            workspace.getReviewSettings().applyScope(new WorkspaceReviewScope(List.of("main"), List.of("other/repo")));
-            when(practiceDetectionReadiness.hasRunnableAgent(WORKSPACE_ID)).thenReturn(true);
-            when(practiceRepository.findByWorkspaceId(WORKSPACE_ID))
-                    .thenReturn(List.of(createPractice(DOCUMENT_PUBLISHED)));
+            when(coverageService.assessRepositoryless(any(Workspace.class), any(ReviewSubject.class)))
+                    .thenReturn(new PracticeReviewCoverageService.CoverageAssessment(
+                            de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryMode.SELECTED,
+                            de.tum.cit.aet.hephaestus.workspace.settings.ReviewPersonMode.ALL_ELIGIBLE,
+                            ReviewSubjectStatus.RESOLVED_LINKED_HUMAN,
+                            false,
+                            false,
+                            true,
+                            false));
 
-            assertThat(gate.evaluateSignal(workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO))
-                    .isInstanceOf(GateDecision.Detect.class);
+            GateDecision decision =
+                    gate.evaluateSignal(workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO, new ReviewSubject(7L, true));
+
+            assertThat(((GateDecision.Skip) decision).resolvedSignalReason())
+                    .isEqualTo(SignalStateReason.OUT_OF_REVIEW_SCOPE);
         }
     }
 }

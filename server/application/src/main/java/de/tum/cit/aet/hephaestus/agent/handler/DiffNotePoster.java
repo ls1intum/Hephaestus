@@ -15,6 +15,8 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,7 +24,6 @@ class DiffNotePoster {
 
     private static final Logger log = LoggerFactory.getLogger(DiffNotePoster.class);
 
-    /** Identifies inline feedback created by Hephaestus during reconciliation. */
     static final String HEPHAESTUS_MARKER = "<!-- hephaestus-diff-note -->";
 
     private final PullRequestCommentPoster commentPoster;
@@ -50,6 +51,14 @@ class DiffNotePoster {
     }
 
     DiffNoteResult reconcileInlineNotes(AgentJob job, List<DiffNote> diffNotes) {
+        return reconcileInlineNotes(job, diffNotes, null);
+    }
+
+    DiffNoteResult reconcileApprovedInlineNotes(AgentJob job, UUID feedbackId, List<DiffNote> diffNotes) {
+        return reconcileInlineNotes(job, diffNotes, feedbackId);
+    }
+
+    private DiffNoteResult reconcileInlineNotes(AgentJob job, List<DiffNote> diffNotes, @Nullable UUID packageId) {
         IntegrationKind kind =
                 Objects.requireNonNull(job.getIntegrationKind(), "AgentJob.integrationKind must not be null");
         InlineFeedbackChannel channel = channels.get(kind);
@@ -62,26 +71,23 @@ class DiffNotePoster {
                 commentPoster.buildTarget(job, kind, job.getWorkspace().getId());
 
         List<InlineFeedbackChannel.InlineFeedback> observations =
-                mapObservations(job, diffNotes == null ? List.of() : diffNotes);
+                mapObservations(diffNotes == null ? List.of() : diffNotes, packageId);
 
-        // Clearing on an empty run removes inline feedback that no longer recurs.
         if (observations.isEmpty()) {
             try {
                 channel.clearStaleFeedback(target, HEPHAESTUS_MARKER);
             } catch (OutboundEgressSuppressedException e) {
                 throw new JobDeliverySuppressedException(e.toString(), e);
             } catch (RuntimeException e) {
-                log.warn(
-                        "Stale inline-note clear failed (best-effort), continuing: kind={}, jobId={}, error={}",
-                        kind,
-                        job.getId(),
-                        e.getMessage());
+                throw new JobDeliveryException(e.toString(), e);
             }
             return new DiffNoteResult(0, 0, List.of());
         }
 
         try {
-            InlineFeedbackChannel.InlineResult result = channel.postInlineFeedback(target, observations);
+            InlineFeedbackChannel.InlineResult result = packageId == null
+                    ? channel.postInlineFeedback(target, observations)
+                    : channel.postImmutablePackage(target, observations);
             log.debug(
                     "Inline observation delivery: kind={}, posted={}, failed={}, jobId={}",
                     kind,
@@ -101,24 +107,26 @@ class DiffNotePoster {
         }
     }
 
-    private List<InlineFeedbackChannel.InlineFeedback> mapObservations(AgentJob job, List<DiffNote> diffNotes) {
+    private List<InlineFeedbackChannel.InlineFeedback> mapObservations(
+            List<DiffNote> diffNotes, @Nullable UUID packageId) {
         List<InlineFeedbackChannel.InlineFeedback> observations = new ArrayList<>(diffNotes.size());
-        for (DiffNote note : diffNotes) {
+        for (int index = 0; index < diffNotes.size(); index++) {
+            DiffNote note = diffNotes.get(index);
             String sanitized = PullRequestCommentPoster.sanitize(note.body());
             if (sanitized.isBlank()) {
                 continue;
             }
-            // DiffAnchor expects the range end before its optional start.
             Integer endLine = note.endLine();
             boolean isMultiLine = endLine != null && endLine > note.startLine();
             FeedbackAnchor.DiffAnchor anchor = isMultiLine
-                    ? new FeedbackAnchor.DiffAnchor(note.filePath(), Objects.requireNonNull(endLine), note.startLine())
-                    : new FeedbackAnchor.DiffAnchor(note.filePath(), note.startLine(), null);
+                    ? FeedbackAnchor.DiffAnchor.range(
+                            note.filePath(), note.startLine(), Objects.requireNonNull(endLine))
+                    : FeedbackAnchor.DiffAnchor.singleLine(note.filePath(), note.startLine());
             observations.add(new InlineFeedbackChannel.InlineFeedback(
                     anchor,
-                    commentFormatter.appendInlineFeedbackPrompt(sanitized),
-                    HEPHAESTUS_MARKER,
-                    note.recurrenceKey()));
+                    packageId == null ? commentFormatter.appendInlineFeedbackPrompt(sanitized) : sanitized,
+                    packageId == null ? HEPHAESTUS_MARKER : "<!-- hephaestus-approved-package:" + packageId + " -->",
+                    packageId == null ? note.recurrenceKey() : "approved:" + packageId + ":" + index));
         }
         return observations;
     }

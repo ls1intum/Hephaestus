@@ -294,6 +294,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
     @Override
     public void deliver(AgentJob job) {
+        if (feedbackService.recoverAutomaticPackageIfPresent(job)) return;
         ObservationAdmissionService.requireMatchingCompositionDigest(job);
         deliverAdmitted(job);
     }
@@ -305,25 +306,35 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                         .toList();
         if (scopedObservations.isEmpty()) throw new JobDeliveryException("Admitted observation set is empty");
         String unifiedDiff = capturedDiff(job);
+        List<PracticeDetectionResultParser.ValidatedObservation> eligible = feedbackResponseSuppressionFilter
+                .evaluate(job, scopedObservations)
+                .deliverable();
         List<PracticeDetectionResultParser.ValidatedObservation> proposals =
-                inContextDeliveryGate.awaitingApproval(job, scopedObservations);
+                inContextDeliveryGate.awaitingApproval(job, eligible);
         List<PracticeDetectionResultParser.ValidatedObservation> loudEnough =
-                inContextDeliveryGate.admitInContext(job, scopedObservations);
-        List<PracticeDetectionResultParser.ValidatedObservation> deliverable =
-                feedbackResponseSuppressionFilter.evaluate(job, loudEnough).deliverable();
+                inContextDeliveryGate.admitInContext(job, eligible);
+        List<PracticeDetectionResultParser.ValidatedObservation> deliverable = loudEnough;
         List<ComposedFeedbackUnit> units = compositionResultParser.parse(job.getOutput(), FeedbackChannel.IN_CONTEXT);
         String lead = compositionResultParser.lead(job.getOutput());
         Map<String, String> why = practiceCatalogInjector.whyBySlug(job.getWorkspace(), ArtifactKinds.PULL_REQUEST);
+        if (!proposals.isEmpty()) {
+            Set<String> included = java.util.stream.Stream.concat(proposals.stream(), deliverable.stream())
+                    .map(PracticeDetectionResultParser.ValidatedObservation::occurrenceKey)
+                    .collect(java.util.stream.Collectors.toUnmodifiableSet());
+            List<PracticeDetectionResultParser.ValidatedObservation> reviewPackage = scopedObservations.stream()
+                    .filter(observation -> included.contains(observation.occurrenceKey()))
+                    .toList();
+            feedbackService.recordProposal(
+                    job,
+                    DeliveryComposer.compose(reviewPackage, ArtifactKinds.PULL_REQUEST, why, unifiedDiff, units, lead),
+                    reviewPackage);
+            return;
+        }
         var content = DeliveryComposer.compose(deliverable, ArtifactKinds.PULL_REQUEST, why, unifiedDiff, units, lead);
-        // An approved proposal posts as its own comment, so only one of the two may open on the lead.
-        // The auto-posted note is composed first and takes it; the proposal takes it only when there is
-        // no such note, which is the all-approval workspace where the proposal is the only comment.
-        feedbackService.recordProposal(
-                job,
-                DeliveryComposer.compose(
-                        proposals, ArtifactKinds.PULL_REQUEST, why, unifiedDiff, units, content == null ? lead : null),
-                proposals);
-        feedbackService.deliverFeedback(job, content);
+        Set<String> contributingPracticeSlugs = deliverable.stream()
+                .map(PracticeDetectionResultParser.ValidatedObservation::practiceSlug)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        feedbackService.deliverFeedback(job, content, contributingPracticeSlugs);
     }
 
     private PracticeDetectionResultParser.ValidatedObservation validated(Observation observation) {
@@ -471,8 +482,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                 feedbackResponseSuppressionFilter.evaluate(job, admittedInContext);
         List<PracticeDetectionResultParser.ValidatedObservation> deliverable = suppression.deliverable();
         if (deliverable.isEmpty() && !scopedObservations.isEmpty()) {
-            // A SUCCESS (the student told us to stop nagging), not a delivery failure: the SUPPRESSED
-            // ledger rows are written, and the prior edit-in-place summary stays as-is.
             log.info(
                     "All {} observations suppressed by prior reactions: jobId={}",
                     scopedObservations.size(),
@@ -494,13 +503,14 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         }
     }
 
-    /**
-     * Guards only the summary comment. Inline diff notes are reconciled on every delivery attempt, so a
-     * recovery retry that falls through to {@link #deliver} cannot duplicate them.
-     */
     @Override
     public ExistingDeliveryLookup findExistingDelivery(AgentJob job) {
         return feedbackService.findExistingSummary(job);
+    }
+
+    @Override
+    public boolean reconcilesMoreThanOneProviderObject() {
+        return true;
     }
 
     private List<PracticeDetectionResultParser.ValidatedObservation> scanForSecrets(@Nullable String diff) {

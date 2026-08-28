@@ -30,7 +30,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -187,41 +189,295 @@ class ProductionSchemaContractIntegrationTest {
         assertColumnExists("identity_provider", "type");
         assertIndexExists("idx_slack_thread_participants");
         assertIndexExists("idx_slack_message_ingest");
+        assertConstraintExists("chk_feedback_dispatch_lease");
+        assertConstraintExists("chk_feedback_dispatch_delivery");
+        assertConstraintExists("chk_feedback_dispatch_suppression");
     }
 
-    /**
-     * {@code WorkspaceReviewScope} is a two-key vocabulary whose closure is enforced at the column, not by
-     * the deserializer: a reader configured to ignore unknown fields would drop a third key in silence and
-     * leave a workspace believing a restriction was in force. The column outlives every version of the code
-     * that reads it, so {@code chk_workspace_review_scope} is the thing that has to refuse the write — and
-     * only the Liquibase-built schema carries it, because the shared test profile builds the schema with
-     * Hibernate {@code ddl-auto: create} and never runs a changeset.
-     */
     @Test
-    @DisplayName("The review-scope column refuses a scope key the vocabulary does not have")
-    void reviewScopeColumnRefusesAnythingOutsideItsVocabulary() {
-        long workspaceId = insertWorkspace("review-scope-check");
+    void shouldRejectUnknownCoverageModes() {
+        long workspaceId = insertWorkspace("coverage-mode-check");
 
-        assertThatCode(() -> setReviewScope(workspaceId, "{\"targetBranches\": [\"main\"], \"repositories\": []}"))
-                .as("the two declared keys, each an array, are the shape the entity writes")
+        assertThatCode(() -> setCoverageMode(workspaceId, "practice_repository_coverage_mode", "SELECTED"))
+                .as("a declared mode is what the entity writes")
                 .doesNotThrowAnyException();
 
-        assertThatThrownBy(
-                        () -> setReviewScope(workspaceId, "{\"targetBranches\": [\"main\"], \"paths\": [\"src/**\"]}"))
-                .as("a third key would be read as no restriction at all on that axis")
+        assertThatThrownBy(() -> setCoverageMode(workspaceId, "practice_repository_coverage_mode", "ALL"))
                 .isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining("chk_workspace_review_scope");
+                .hasMessageContaining("chk_workspace_practice_repository_coverage");
 
-        assertThatThrownBy(() -> setReviewScope(workspaceId, "{\"targetBranches\": \"main\"}"))
-                .as("an axis that is not an array cannot be read as the list it claims to be")
+        assertThatThrownBy(() -> setCoverageMode(workspaceId, "practice_person_coverage_mode", "EVERYONE"))
                 .isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessageContaining("chk_workspace_review_scope");
+                .hasMessageContaining("chk_workspace_practice_person_coverage");
+
+        assertThatThrownBy(() -> setCoverageMode(workspaceId, "practice_delivery_status", "STOPPED"))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("chk_workspace_practice_delivery_status");
 
         assertThat(jdbcTemplate.queryForObject(
-                        "SELECT practice_review_scope::text FROM workspace WHERE id = ?", String.class, workspaceId))
-                .as("a refused write leaves the last accepted scope in force")
-                .contains("targetBranches")
-                .doesNotContain("paths");
+                        "SELECT practice_repository_coverage_mode FROM workspace WHERE id = ?",
+                        String.class,
+                        workspaceId))
+                .as("a refused write leaves the last accepted mode in force")
+                .isEqualTo("SELECTED");
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidBaseBranches")
+    void shouldRejectMalformedBaseBranches(String branches) {
+        long workspaceId = insertWorkspace("base-branches-" + UUID.randomUUID());
+        Long monitorId = jdbcTemplate.queryForObject(
+                "INSERT INTO repository_to_monitor (workspace_id, name_with_owner) VALUES (?, ?) RETURNING id",
+                Long.class,
+                workspaceId,
+                "acme/repository");
+        assertThatCode(() -> jdbcTemplate.update(
+                        "INSERT INTO practice_review_repository_target "
+                                + "(workspace_id, repository_monitor_id, base_branches) VALUES (?, ?, '[]'::jsonb)",
+                        workspaceId,
+                        monitorId))
+                .doesNotThrowAnyException();
+
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                        "UPDATE practice_review_repository_target SET base_branches = CAST(? AS jsonb) "
+                                + "WHERE workspace_id = ? AND repository_monitor_id = ?",
+                        branches,
+                        workspaceId,
+                        monitorId))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("chk_practice_review_repository_target_branches");
+    }
+
+    @Test
+    void repositoryCoverageCannotReferenceAnotherWorkspacesMonitor() {
+        long ownerWorkspace = insertWorkspace("monitor-owner-" + UUID.randomUUID());
+        long targetWorkspace = insertWorkspace("monitor-target-" + UUID.randomUUID());
+        Long monitorId = jdbcTemplate.queryForObject(
+                "INSERT INTO repository_to_monitor (workspace_id, name_with_owner) VALUES (?, ?) RETURNING id",
+                Long.class,
+                ownerWorkspace,
+                "acme/repository");
+
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                        "INSERT INTO practice_review_repository_target "
+                                + "(workspace_id, repository_monitor_id, base_branches) VALUES (?, ?, '[]'::jsonb)",
+                        targetWorkspace,
+                        monitorId))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("sfk_practice_review_repository_target_monitor");
+    }
+
+    @Test
+    void peopleCoverageCannotReferenceAnotherWorkspacesMember() {
+        long ownerWorkspace = insertWorkspace("member-owner-" + UUID.randomUUID());
+        long targetWorkspace = insertWorkspace("member-target-" + UUID.randomUUID());
+        Long providerId = jdbcTemplate.queryForObject(
+                "INSERT INTO identity_provider (type, server_url) VALUES ('GITHUB', ?) RETURNING id",
+                Long.class,
+                "https://provider.example/" + UUID.randomUUID());
+        Long userId = jdbcTemplate.queryForObject(
+                "INSERT INTO \"user\" (native_id, provider_id, login, type) VALUES (1, ?, ?, 'USER') RETURNING id",
+                Long.class,
+                providerId,
+                "member-" + UUID.randomUUID());
+        jdbcTemplate.update(
+                "INSERT INTO workspace_membership (workspace_id, user_id, role, league_points, hidden, created_at) "
+                        + "VALUES (?, ?, 'MEMBER', 0, false, now())",
+                ownerWorkspace,
+                userId);
+
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                        "INSERT INTO practice_review_person_target (workspace_id, user_id) VALUES (?, ?)",
+                        targetWorkspace,
+                        userId))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("sfk_practice_review_person_target_membership");
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidDispatchStates")
+    void shouldRejectContradictoryDispatchState(String assignment, String constraint) {
+        UUID dispatchId = insertDispatch("invalid-dispatch-" + UUID.randomUUID());
+
+        assertThatThrownBy(() ->
+                        jdbcTemplate.update("UPDATE feedback_dispatch SET " + assignment + " WHERE id = ?", dispatchId))
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining(constraint);
+    }
+
+    static Stream<org.junit.jupiter.params.provider.Arguments> invalidDispatchStates() {
+        return Stream.of(
+                org.junit.jupiter.params.provider.Arguments.of("state = 'CLAIMED'", "chk_feedback_dispatch_lease"),
+                org.junit.jupiter.params.provider.Arguments.of(
+                        "lease_owner = 'worker', lease_expires_at = now()", "chk_feedback_dispatch_lease"),
+                org.junit.jupiter.params.provider.Arguments.of("state = 'SENT'", "chk_feedback_dispatch_delivery"),
+                org.junit.jupiter.params.provider.Arguments.of(
+                        "state = 'SUPPRESSED'", "chk_feedback_dispatch_suppression"),
+                org.junit.jupiter.params.provider.Arguments.of(
+                        "suppression_reason = 'WORKSPACE_DELIVERY_PAUSED'", "chk_feedback_dispatch_suppression"));
+    }
+
+    @Test
+    void feedbackDispatchAcceptsCompleteTerminalStates() {
+        UUID sent = insertDispatch("valid-sent");
+        UUID suppressed = insertDispatch("valid-suppressed");
+
+        assertThat(jdbcTemplate.update(
+                        "UPDATE feedback_dispatch SET state = 'SENT', delivered_external_ref = 'provider-1' WHERE id = ?",
+                        sent))
+                .isEqualTo(1);
+        assertThat(jdbcTemplate.update(
+                        "UPDATE feedback_dispatch SET state = 'SUPPRESSED', suppression_reason = "
+                                + "'WORKSPACE_DELIVERY_PAUSED' WHERE id = ?",
+                        suppressed))
+                .isEqualTo(1);
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidPracticeSlugs")
+    void feedbackDispatchRequiresAStringArrayOfPracticeSlugs(String practiceSlugs) {
+        UUID dispatchId = insertDispatch("invalid-practice-slugs-" + UUID.randomUUID());
+
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                        "UPDATE feedback_dispatch SET practice_slugs = CAST(? AS jsonb) WHERE id = ?",
+                        practiceSlugs,
+                        dispatchId))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void approvedDispatchRequiresFeedbackAndSummaryDispatchForbidsIt() {
+        DispatchOwner owner = insertDispatchOwner("dispatch-destination");
+        UUID feedbackId = insertFeedback(owner, "destination");
+        UUID summary = insertDispatch(owner, "summary-destination", "AUTOMATIC_REVIEW_PACKAGE", null);
+
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                        "UPDATE feedback_dispatch SET destination = 'APPROVED_REVIEW_PACKAGE' WHERE id = ?", summary))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbcTemplate.update(
+                        "UPDATE feedback_dispatch SET feedback_id = ? WHERE id = ?", feedbackId, summary))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        UUID approved = insertDispatch(owner, "valid-approved", "APPROVED_REVIEW_PACKAGE", feedbackId);
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT destination FROM feedback_dispatch WHERE id = ?", String.class, approved))
+                .isEqualTo("APPROVED_REVIEW_PACKAGE");
+    }
+
+    @Test
+    void deletingAJobErasesItsPolicyEvaluationsAndDispatches() {
+        DispatchOwner owner = insertDispatchOwner("job-erasure");
+        UUID dispatchId = insertDispatch(owner, "job-erasure-dispatch", "AUTOMATIC_REVIEW_PACKAGE", null);
+        UUID evaluationId = insertPolicyEvaluation(owner, null);
+
+        jdbcTemplate.update("DELETE FROM agent_job WHERE id = ?", owner.jobId());
+
+        assertThat(rowExists("feedback_dispatch", dispatchId)).isFalse();
+        assertThat(rowExists("delivery_policy_evaluation", evaluationId)).isFalse();
+    }
+
+    @Test
+    void deletingFeedbackErasesApprovedDispatchAndAnonymizesItsEvaluation() {
+        DispatchOwner owner = insertDispatchOwner("feedback-erasure");
+        UUID feedbackId = insertFeedback(owner, "erasure");
+        UUID dispatchId = insertDispatch(owner, "feedback-erasure-dispatch", "APPROVED_REVIEW_PACKAGE", feedbackId);
+        UUID evaluationId = insertPolicyEvaluation(owner, feedbackId);
+
+        jdbcTemplate.update("DELETE FROM feedback WHERE id = ?", feedbackId);
+
+        assertThat(rowExists("feedback_dispatch", dispatchId)).isFalse();
+        assertThat(jdbcTemplate.queryForObject(
+                        "SELECT feedback_id IS NULL FROM delivery_policy_evaluation WHERE id = ?",
+                        Boolean.class,
+                        evaluationId))
+                .isTrue();
+    }
+
+    private UUID insertDispatch(String key) {
+        DispatchOwner owner = insertDispatchOwner(key);
+        return insertDispatch(owner, key, "AUTOMATIC_REVIEW_PACKAGE", null);
+    }
+
+    private DispatchOwner insertDispatchOwner(String key) {
+        long workspaceId = insertWorkspace(key);
+        UUID jobId = UUID.randomUUID();
+        jdbcTemplate.update(
+                "INSERT INTO agent_job (id, workspace_id, job_type, status, config_snapshot, job_token, retry_count, "
+                        + "created_at, available_at, delivery_attempts, practice_rollout_revision, practice_trigger_mode) "
+                        + "VALUES (?, ?, 'PULL_REQUEST_REVIEW', 'COMPLETED', '{}'::jsonb, ?, 0, now(), now(), 0, 0, 'AUTO')",
+                jobId,
+                workspaceId,
+                "token-" + jobId);
+        return new DispatchOwner(workspaceId, jobId);
+    }
+
+    private UUID insertDispatch(DispatchOwner owner, String key, String destination, @Nullable UUID feedbackId) {
+        UUID dispatchId = UUID.randomUUID();
+        jdbcTemplate.update(
+                "INSERT INTO feedback_dispatch (id, destination_key, workspace_id, agent_job_id, feedback_id, "
+                        + "destination, state, body, practice_slugs, package_content, delivered_placements, write_started, "
+                        + "next_attempt_at, attempt_count, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'PENDING', "
+                        + "'body', '[]'::jsonb, '{\"mrNote\":\"body\",\"diffNotes\":[],\"withheld\":[]}'::jsonb, "
+                        + "'[]'::jsonb, false, now(), 0, now(), now())",
+                dispatchId,
+                key,
+                owner.workspaceId(),
+                owner.jobId(),
+                feedbackId,
+                destination);
+        return dispatchId;
+    }
+
+    private UUID insertFeedback(DispatchOwner owner, String key) {
+        Long providerId = jdbcTemplate.queryForObject(
+                "INSERT INTO identity_provider (type, server_url) VALUES ('GITHUB', ?) RETURNING id",
+                Long.class,
+                "https://provider.example/" + key);
+        Long userId = jdbcTemplate.queryForObject(
+                "INSERT INTO \"user\" (native_id, provider_id, login, type) VALUES (1, ?, ?, 'USER') RETURNING id",
+                Long.class,
+                providerId,
+                "user-" + key);
+        UUID feedbackId = UUID.randomUUID();
+        jdbcTemplate.update(
+                "INSERT INTO feedback (id, agent_job_id, workspace_id, recipient_user_id, about_user_id, channel, "
+                        + "position, delivery_state, source, created_at) VALUES (?, ?, ?, ?, ?, 'IN_CONTEXT', 0, "
+                        + "'AWAITING_APPROVAL', 'AGENT', now())",
+                feedbackId,
+                owner.jobId(),
+                owner.workspaceId(),
+                userId,
+                userId);
+        return feedbackId;
+    }
+
+    private UUID insertPolicyEvaluation(DispatchOwner owner, @Nullable UUID feedbackId) {
+        UUID id = UUID.randomUUID();
+        jdbcTemplate.update(
+                "INSERT INTO delivery_policy_evaluation (id, workspace_id, agent_job_id, feedback_id, "
+                        + "admitted_revision, evaluated_revision, resolver_version, surface, stage, allowed, checks, facts, "
+                        + "evaluated_at) VALUES (?, ?, ?, ?, 0, 0, '1', 'ARTIFACT', 'EGRESS', true, '[]'::jsonb, "
+                        + "'{}'::jsonb, now())",
+                id,
+                owner.workspaceId(),
+                owner.jobId(),
+                feedbackId);
+        return id;
+    }
+
+    private boolean rowExists(String table, UUID id) {
+        return Boolean.TRUE.equals(jdbcTemplate.queryForObject(
+                "SELECT EXISTS (SELECT 1 FROM " + table + " WHERE id = ?)", Boolean.class, id));
+    }
+
+    static Stream<String> invalidPracticeSlugs() {
+        return Stream.of("{}", "[1]", "[\"practice\", 2]");
+    }
+
+    private record DispatchOwner(long workspaceId, UUID jobId) {}
+
+    static Stream<String> invalidBaseBranches() {
+        return Stream.of("\"main\"", "[1]", "[\"\"]", "[\"   \"]", "[\"" + "x".repeat(256) + "\"]");
     }
 
     /** A workspace row with only the columns the schema demands; every setting below is left at its default. */
@@ -236,9 +492,8 @@ class ProductionSchemaContractIntegrationTest {
         return Objects.requireNonNull(id, "workspace insert returned no id");
     }
 
-    private void setReviewScope(long workspaceId, String json) {
-        jdbcTemplate.update(
-                "UPDATE workspace SET practice_review_scope = CAST(? AS jsonb) WHERE id = ?", json, workspaceId);
+    private void setCoverageMode(long workspaceId, String column, String mode) {
+        jdbcTemplate.update("UPDATE workspace SET " + column + " = ? WHERE id = ?", mode, workspaceId);
     }
 
     private void assertIndexExists(String indexName) {
@@ -250,6 +505,12 @@ class ProductionSchemaContractIntegrationTest {
                 .as("Liquibase-built schema must contain index %s", indexName)
                 .isNotNull()
                 .isEqualTo(1);
+    }
+
+    private void assertConstraintExists(String constraintName) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM pg_constraint WHERE conname = ?", Integer.class, constraintName);
+        assertThat(count).isEqualTo(1);
     }
 
     private void assertColumnExists(String table, String column) {

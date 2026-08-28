@@ -48,6 +48,7 @@ set +a
 # deployment must never inherit passwordless app-admin login or the unauthenticated dev job trigger.
 export HEPHAESTUS_AUTH_DEV_LOGIN_ENABLED=false
 export HEPHAESTUS_DEV_TRIGGER_ENABLED=false
+export HEPHAESTUS_WORKSPACE_INIT_DEFAULT=false
 export APPLICATION_HOST_URL="$ORIGIN"
 export HEPHAESTUS_WEBAPP_URL="$ORIGIN"
 export HEPHAESTUS_AUTH_ISSUER="$ORIGIN"

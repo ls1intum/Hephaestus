@@ -18,6 +18,7 @@ import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -54,12 +55,16 @@ class PracticeGroupServiceTest extends BaseUnitTest {
     @InjectMocks
     private PracticeGroupService service;
 
+    private Workspace workspace;
+
     private static final WorkspaceContext CTX =
             new WorkspaceContext(1L, "acme", "Acme", AccountType.ORG, null, false, false, Set.of());
 
     @BeforeEach
     void mockWorkspaceLock() {
-        lenient().when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(new Workspace()));
+        workspace = new Workspace();
+        workspace.setId(1L);
+        lenient().when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(workspace));
         PracticeRevision revision = mock(PracticeRevision.class);
         lenient().when(revision.getRevisionNumber()).thenReturn(1);
         lenient().when(practiceRevisionService.append(any())).thenReturn(revision);
@@ -183,6 +188,46 @@ class PracticeGroupServiceTest extends BaseUnitTest {
 
         verify(practiceRevisionService).append(first);
         verify(practiceRevisionService).append(second);
+    }
+
+    @Test
+    void changingInheritedAuthorityBumpsTheRolloutRevisionOnce() {
+        PracticeGroup group = group("g");
+        group.setId(7L);
+        group.setAutonomy(PracticeAutonomy.HUMAN_APPROVAL);
+        Practice first = practice("first");
+        first.setId(1L);
+        first.setGroup(group);
+        Practice second = practice("second");
+        second.setId(2L);
+        second.setGroup(group);
+        when(practiceGroupRepository.findByWorkspaceIdAndSlug(1L, "g")).thenReturn(Optional.of(group));
+        when(practiceGroupRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(practiceRepository.findByWorkspaceIdAndGroupIdOrderByDisplayOrderAscNameAsc(1L, 7L))
+                .thenReturn(List.of(first, second));
+
+        service.setAutonomy(CTX, "g", PracticeAutonomy.AUTOMATIC);
+
+        assertThat(workspace.getReviewSettings().getRolloutRevision()).isEqualTo(1);
+    }
+
+    @Test
+    void changingAGroupDoesNotBumpWhenPracticesOverrideIt() {
+        PracticeGroup group = group("g");
+        group.setId(7L);
+        group.setAutonomy(PracticeAutonomy.HUMAN_APPROVAL);
+        Practice practice = practice("p");
+        practice.setId(1L);
+        practice.setGroup(group);
+        practice.setAutonomy(PracticeAutonomy.AUTOMATIC);
+        when(practiceGroupRepository.findByWorkspaceIdAndSlug(1L, "g")).thenReturn(Optional.of(group));
+        when(practiceGroupRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(practiceRepository.findByWorkspaceIdAndGroupIdOrderByDisplayOrderAscNameAsc(1L, 7L))
+                .thenReturn(List.of(practice));
+
+        service.setAutonomy(CTX, "g", PracticeAutonomy.OFF);
+
+        assertThat(workspace.getReviewSettings().getRolloutRevision()).isZero();
     }
 
     @Test

@@ -87,7 +87,8 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
             @Param("to") @Nullable Instant to,
             Pageable pageable);
 
-    Optional<AgentJob> findByIdAndWorkspaceId(UUID id, Long workspaceId);
+    @Query("SELECT j FROM AgentJob j JOIN FETCH j.workspace WHERE j.id = :id AND j.workspace.id = :workspaceId")
+    Optional<AgentJob> findByIdAndWorkspaceId(@Param("id") UUID id, @Param("workspaceId") Long workspaceId);
 
     /**
      * Which evidence contract governed a run, without reading the snapshot it is recorded in.
@@ -146,6 +147,9 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
 
     long countByWorkspaceIdAndPurposeAndStatusIn(
             Long workspaceId, AgentPurpose purpose, Collection<AgentJobStatus> statuses);
+
+    long countByWorkspaceIdAndPurposeAndCreatedAtGreaterThanEqual(
+            Long workspaceId, AgentPurpose purpose, Instant createdAt);
 
     List<AgentJob> findByStatus(AgentJobStatus status);
 
@@ -522,6 +526,17 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     @Query("UPDATE AgentJob j SET j.deliveryStatus = :status, j.deliveryCommentId = :commentId " + "WHERE j.id = :id")
     void updateDeliveryStatus(
             @Param("id") UUID id,
+            @Param("status") DeliveryStatus status,
+            @Param("commentId") @Nullable String commentId);
+
+    @WorkspaceAgnostic("Dispatch recovery carries both the tenant id and job id")
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @org.springframework.transaction.annotation.Transactional
+    @Query("UPDATE AgentJob j SET j.deliveryStatus = :status, j.deliveryCommentId = :commentId "
+            + "WHERE j.id = :id AND j.workspace.id = :workspaceId")
+    int reconcileDispatchDeliveryStatus(
+            @Param("id") UUID id,
+            @Param("workspaceId") Long workspaceId,
             @Param("status") DeliveryStatus status,
             @Param("commentId") @Nullable String commentId);
 

@@ -88,7 +88,8 @@ public class IssueSignalResubmitter implements PendingSignalResubmitter {
                                 // See PullRequestSignalResubmitter: the ledger row's discovery mode is the only thing
                                 // that still remembers which population this review was meant to measure.
                                 SignalOrigins.observationOriginOf(signal.getDiscoveredVia())),
-                        key);
+                        key,
+                        detect);
         }
     }
 }

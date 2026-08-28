@@ -1,11 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, within } from "storybook/test";
-
 import { withWidePage } from "@/stories/decorators";
 import { Stateful } from "@/stories/stateful";
 import { expectSettledVisible } from "@/test/overlay";
 import { expectNoPageOverflow } from "@/test/reflow";
-
 import { PracticeAutonomyPage } from "./PracticeAutonomyPage";
 import { type AutonomyFixture, buildAutonomyFixture, scaleFixture } from "./story-mock-data";
 
@@ -338,6 +336,35 @@ export const BulkSet: Story = {
 				"pull-request-hygiene-links-the-issue-it-closes",
 			],
 			"HUMAN_APPROVAL",
+		);
+	},
+};
+
+export const BulkAutomaticShowsBlastRadius: Story = {
+	play: async ({ args, canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: /Pull request hygiene/ }));
+		await userEvent.click(
+			canvas.getByRole("button", { name: /Select all 2 practices in Pull request hygiene/ }),
+		);
+		await userEvent.click(canvas.getByRole("button", { name: "Change the selected" }));
+		await userEvent.click(
+			within(await screen.findByRole("menu")).getByRole("menuitem", {
+				name: "Send automatically",
+			}),
+		);
+
+		const dialog = within(await screen.findByRole("alertdialog"));
+		await expectSettledVisible(dialog.getByText(/2 selected practices/));
+		await expectSettledVisible(dialog.getByText(/42 review jobs entered/));
+		await expect(args.onBulkSetAutonomy).not.toHaveBeenCalled();
+
+		await userEvent.click(dialog.getByRole("button", { name: "Send automatically" }));
+		await expect(args.onBulkSetAutonomy).toHaveBeenCalledWith(
+			[
+				"pull-request-hygiene-states-the-motivation",
+				"pull-request-hygiene-links-the-issue-it-closes",
+			],
+			"AUTOMATIC",
 		);
 	},
 };

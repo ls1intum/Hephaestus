@@ -35,6 +35,8 @@ public enum SignalStateReason {
      */
     OUT_OF_REVIEW_SCOPE(SignalState.SUPPRESSED),
 
+    STALE_ROLLOUT_REVISION(SignalState.SUPPRESSED),
+
     WORKSPACE_INACTIVE(SignalState.PENDING),
 
     PRACTICES_DISABLED(SignalState.PENDING),
@@ -95,6 +97,8 @@ public enum SignalStateReason {
             case CONCURRENT_DUPLICATE -> "Another submission for the same work carries this review.";
             case OUT_OF_REVIEW_SCOPE ->
                 "This artifact is outside the branches and repositories this workspace reviews.";
+            case STALE_ROLLOUT_REVISION ->
+                "The review rollout changed after this work was admitted; it is not replayed under the new configuration.";
             case WORKSPACE_INACTIVE -> "The workspace was not active; it is re-offered when the workspace is.";
             case PRACTICES_DISABLED ->
                 "Practice review is switched off for this workspace; it is re-offered when it is switched on.";
@@ -106,7 +110,7 @@ public enum SignalStateReason {
             case BUDGET_EXHAUSTED ->
                 "The budget funding this review was exhausted; it is re-offered when the budget refills.";
             case SUBJECT_UNLINKED ->
-                "Nobody this could be attributed to has linked their account; linking one re-offers it.";
+                "This work could not be attributed to anybody Hephaestus knows; resolving the author re-offers it.";
             case MODEL_UNAVAILABLE ->
                 "The model this review is bound to left the catalog; re-pointing the binding re-offers it.";
             case PENDING_DEADLINE_EXCEEDED -> "It waited longer than the ledger keeps re-offering a signal.";

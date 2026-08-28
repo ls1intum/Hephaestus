@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.backfill;
 
+import static de.tum.cit.aet.hephaestus.practices.review.GateDecisionTestFixtures.automaticDetection;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -75,7 +76,7 @@ class ReviewBackfillSubmitterTest extends BaseUnitTest {
         when(signalRecorder.record(any(), any(), eq(DiscoveredVia.BACKFILL))).thenReturn(true);
         Workspace workspace = workspace();
         when(detectionGate.evaluate(eq(pr), any(), eq(TriggerMode.MANUAL)))
-                .thenReturn(new GateDecision.Detect(workspace, List.of()));
+                .thenReturn(automaticDetection(workspace, List.of()));
 
         assertThat(submitter().offer(run(), PR_ID)).isEqualTo(ReviewBackfillSubmitter.Outcome.SUBMITTED);
 
@@ -86,7 +87,8 @@ class ReviewBackfillSubmitterTest extends BaseUnitTest {
                         eq(WORKSPACE_ID),
                         eq(AgentJobType.PULL_REQUEST_REVIEW),
                         request.capture(),
-                        any(SignalKey.class));
+                        any(SignalKey.class),
+                        any());
         assertThat(request.getValue().observationOrigin()).isEqualTo(ObservationOrigin.BACKFILL);
     }
 
@@ -102,7 +104,7 @@ class ReviewBackfillSubmitterTest extends BaseUnitTest {
         when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
         when(signalRecorder.record(any(), any(), eq(DiscoveredVia.SWEEP))).thenReturn(true);
         when(detectionGate.evaluate(eq(pr), any(), eq(TriggerMode.MANUAL)))
-                .thenReturn(new GateDecision.Detect(workspace(), List.of()));
+                .thenReturn(automaticDetection(workspace(), List.of()));
         ReviewBackfillRun run = run();
         run.setDiscoveredVia(DiscoveredVia.SWEEP);
 
@@ -111,7 +113,7 @@ class ReviewBackfillSubmitterTest extends BaseUnitTest {
         verify(signalRecorder).record(any(), any(), eq(DiscoveredVia.SWEEP));
         ArgumentCaptor<PullRequestReviewSubmissionRequest> request =
                 ArgumentCaptor.forClass(PullRequestReviewSubmissionRequest.class);
-        verify(agentJobService).submit(eq(WORKSPACE_ID), any(), request.capture(), any(SignalKey.class));
+        verify(agentJobService).submit(eq(WORKSPACE_ID), any(), request.capture(), any(SignalKey.class), any());
         assertThat(request.getValue().observationOrigin()).isEqualTo(ObservationOrigin.LIVE);
     }
 
@@ -140,7 +142,7 @@ class ReviewBackfillSubmitterTest extends BaseUnitTest {
 
         assertThat(submitter().offer(run(), PR_ID)).isEqualTo(ReviewBackfillSubmitter.Outcome.PASSED);
         verify(signalRecorder).markRefused(any(), eq(SignalStateReason.GATE_SKIPPED));
-        verify(agentJobService, never()).submit(any(), any(), any(), any());
+        verify(agentJobService, never()).submit(any(), any(), any(), any(), any());
     }
 
     /** No branch refs, nothing to clone or diff — there was never a reviewable artifact to leave a gap. */

@@ -993,29 +993,38 @@ export const listPracticeReviewFeedbackResponseTransformer = async (data: any): 
     return data;
 };
 
+const feedbackApprovalSchemaResponseTransformer = (data: any) => {
+    if (data.decidedAt) {
+        data.decidedAt = new Date(data.decidedAt);
+    }
+    return data;
+};
+
+const deliveryPolicyTraceSchemaResponseTransformer = (data: any) => {
+    data.evaluatedAt = new Date(data.evaluatedAt);
+    return data;
+};
+
 const reviewBoundObservationSchemaResponseTransformer = (data: any) => {
     data.observedAt = new Date(data.observedAt);
     return data;
 };
 
 const reviewFeedbackDetailSchemaResponseTransformer = (data: any) => {
+    if (data.approval) {
+        data.approval = feedbackApprovalSchemaResponseTransformer(data.approval);
+    }
     data.createdAt = new Date(data.createdAt);
     if (data.deliveredAt) {
         data.deliveredAt = new Date(data.deliveredAt);
     }
+    data.deliveryPolicy = data.deliveryPolicy.map((item: any) => deliveryPolicyTraceSchemaResponseTransformer(item));
     data.observations = data.observations.map((item: any) => reviewBoundObservationSchemaResponseTransformer(item));
     return data;
 };
 
 export const getPracticeReviewFeedbackResponseTransformer = async (data: any): Promise<GetPracticeReviewFeedbackResponse> => {
     data = reviewFeedbackDetailSchemaResponseTransformer(data);
-    return data;
-};
-
-const feedbackApprovalSchemaResponseTransformer = (data: any) => {
-    if (data.decidedAt) {
-        data.decidedAt = new Date(data.decidedAt);
-    }
     return data;
 };
 

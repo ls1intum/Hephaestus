@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
@@ -49,12 +50,13 @@ import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -107,6 +109,9 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     private RepositoryToMonitorRepository repositoryToMonitorRepository;
 
     @Autowired
+    private WorkspaceMembershipService workspaceMembershipService;
+
+    @Autowired
     private PullRequestRepository pullRequestRepository;
 
     @Autowired
@@ -142,6 +147,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         org.mockito.Mockito.reset(commentPoster, diffNotePoster, accountPreferencesQuery);
         databaseTestUtils.cleanDatabase();
         releaseSilentMode();
+        when(commentPoster.findExistingSummaryComment(any())).thenReturn(ExistingDeliveryLookup.absent());
 
         workspace = WorkspaceTestFixtures.activeWorkspace("pipeline-test");
         workspace.getFeatures().setPracticesEnabled(true);
@@ -157,6 +163,8 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
         User developer = TestUserFactory.createUser(500L, "pipeline-author", provider);
         developer = userRepository.save(developer);
+        workspaceMembershipService.createMembership(
+                workspace, developer.getId(), WorkspaceMembership.WorkspaceRole.MEMBER);
 
         Repository repo = new Repository();
         repo.setNativeId(4001L);
@@ -234,8 +242,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         handler = handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW);
         when(diffNotePoster.reconcileInlineNotes(any(), any()))
                 .thenReturn(new DiffNotePoster.DiffNoteResult(0, 0, List.of()));
-        when(accountPreferencesQuery.preferencesForUserId(anyLong()))
-                .thenReturn(Optional.of(new AccountPreferencesQuery.PreferencesView(false, true)));
+        when(accountPreferencesQuery.practiceFeedbackDeliveryEnabled(anyLong())).thenReturn(true);
     }
 
     private Practice createPractice(String slug, String name) {

@@ -3,11 +3,11 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -42,8 +42,6 @@ import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
-import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.nio.charset.StandardCharsets;
@@ -97,7 +95,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         handler = new PullRequestReviewHandler(
                 objectMapper,
                 cas,
-                new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults()),
+                new PracticeCatalogInjector(
+                        objectMapper, practiceRepository, InContextDeliveryGateFixtures.workspaceDefaults()),
                 workspaceContextBuilder,
                 taskEnvelopeWriter,
                 resultParser,
@@ -113,12 +112,11 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                         org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
                         new de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties(
                                 false, 15, 5, false, false)),
-                new InContextDeliveryGate(
+                InContextDeliveryGateFixtures.gate(
                         practiceRepository,
                         org.mockito.Mockito.mock(
                                 de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
-                        org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
-                        workspaceDefaults()),
+                        org.mockito.Mockito.mock(FeedbackLedgerRecorder.class)),
                 observationRepository);
         lenient().when(cas.get(anyString())).thenReturn(java.util.Optional.of(new byte[0]));
     }
@@ -514,7 +512,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldUseLeadOnlyForAutoPostedNoteWhenProposalAlsoExists() {
+        void shouldHoldAutomaticFeedbackInsideTheReviewPackageWhenAnyPracticeNeedsApproval() {
             String lead = "The retry path is covered now, but the description never says why it changed.";
             ObjectNode metadata = sampleJobMetadata();
             metadata.put(ObservationAdmissionService.DIGEST_METADATA_KEY, "digest-1");
@@ -540,14 +538,10 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             handler.deliver(job);
 
             var proposal = org.mockito.ArgumentCaptor.forClass(PracticeDetectionResultParser.DeliveryContent.class);
-            var summary = org.mockito.ArgumentCaptor.forClass(PracticeDetectionResultParser.DeliveryContent.class);
             verify(feedbackService).recordProposal(org.mockito.ArgumentMatchers.eq(job), proposal.capture(), any());
-            verify(feedbackService).deliverFeedback(org.mockito.ArgumentMatchers.eq(job), summary.capture());
+            verify(feedbackService, never()).deliverFeedback(any(), any(), any());
 
-            assertThat(summary.getValue().mrNote()).startsWith(lead);
-            assertThat(proposal.getValue().mrNote())
-                    .as("two comments on one change must not open on the same sentence")
-                    .doesNotContain(lead);
+            assertThat(proposal.getValue().mrNote()).startsWith(lead);
         }
 
         @Test
@@ -724,11 +718,5 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             assertThat(citation.path("quoteSha256").asString())
                     .isEqualTo("b2b88104bf5c02259227480b0eabe2f9b7d63501e03e788b7b82a499b818e12a");
         }
-    }
-
-    private static WorkspaceReviewDefaultsProvider workspaceDefaults() {
-        WorkspaceReviewDefaultsProvider provider = mock(WorkspaceReviewDefaultsProvider.class);
-        lenient().when(provider.forWorkspace(anyLong())).thenReturn(WorkspaceReviewDefaults.UNSET);
-        return provider;
     }
 }

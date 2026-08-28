@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedbackUnit;
@@ -9,6 +10,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.conversation.FeedbackChannelRoute
 import de.tum.cit.aet.hephaestus.agent.handler.conversation.RoutingContext;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
 import de.tum.cit.aet.hephaestus.core.settings.InstanceSettingsService;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
@@ -23,6 +25,8 @@ import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.workspace.settings.PracticeDeliveryStatus;
+import de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryMode;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -51,6 +55,9 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
     private FeedbackObservationRepository feedbackObservationRepository;
 
     @Autowired
+    private AccountPreferencesQuery accountPreferencesQuery;
+
+    @Autowired
     private ObservationRepository observationRepository;
 
     @Autowired
@@ -74,6 +81,8 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
         instanceSettingsService.updateSilentMode(
                 false, null, null, EntityTagPrecondition.parse("\"" + settings.getVersion() + "\""));
         setUpWorkspaceAndRecipient("conv-consent-gate-test");
+        when(accountPreferencesQuery.practiceFeedbackDeliveryEnabled(recipient.getId()))
+                .thenReturn(true);
         practice = new Practice();
         practice.setBindings(PracticeTestEvidence.bindings(ArtifactKinds.CONVERSATION_THREAD));
         practice.setAutomatedReviewPolicy(PracticeTestEvidence.conversationThread());
@@ -139,6 +148,44 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
         assertThat(arr.get(0).get("observationId").asString())
                 .isEqualTo(prObs.getId().toString());
         assertThat(arr.get(0).get("artifactKind").asString()).isEqualTo("scm.pull_request");
+    }
+
+    @Test
+    void aPreparedFactIsWithheldWhenWorkspaceDeliveryPauses() {
+        long threadId = seedThread("C-active", "100.0", ConsentState.ACTIVE);
+        AgentJob job = newJob();
+        Observation observation = saveConversationObservation(job, "occ-paused", threadId);
+        preparer.prepare(
+                job.getId(), workspace.getId(), List.of(observation), List.of(conversationUnit(List.of(observation))));
+        workspace.getReviewSettings().setDeliveryStatus(PracticeDeliveryStatus.PAUSED);
+        workspaceRepository.saveAndFlush(workspace);
+
+        assertThat(contribute().get("preparedConversationFeedback")).isEmpty();
+        assertThat(feedbackObservationRepository.findPreparedConversationFactsForRecipient(
+                        workspace.getId(), recipient.getId(), PageRequest.of(0, 10)))
+                .isEmpty();
+    }
+
+    @Test
+    void aPreparedFactIsWithheldAfterRepositorylessWorkLeavesCoverage() {
+        AgentJob job = newJob();
+        savePullRequestObservation(job, "occ-outside-coverage", 4242L);
+        prepareFor(job);
+        workspace.getReviewSettings().setRepositoryCoverageMode(ReviewRepositoryMode.SELECTED);
+        workspaceRepository.saveAndFlush(workspace);
+
+        assertThat(contribute().get("preparedConversationFeedback")).isEmpty();
+    }
+
+    @Test
+    void aPreparedFactIsWithheldWhenItsPracticeTurnsOff() {
+        AgentJob job = newJob();
+        savePullRequestObservation(job, "occ-practice-off", 4242L);
+        prepareFor(job);
+        practice.setAutonomy(PracticeAutonomy.OFF);
+        practiceRepository.saveAndFlush(practice);
+
+        assertThat(contribute().get("preparedConversationFeedback")).isEmpty();
     }
 
     /**

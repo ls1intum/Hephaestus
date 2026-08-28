@@ -203,7 +203,7 @@ public class IssueAgentJobEventListener {
                 issue.getUpdatedAt(),
                 signalKey.signalName());
         agentJobService
-                .submit(detect.workspace().getId(), AgentJobType.ISSUE_REVIEW, request, signalKey)
+                .submit(detect.workspace().getId(), AgentJobType.ISSUE_REVIEW, request, signalKey, detect)
                 .ifPresent(job -> log.info(
                         "Submitted issue review job: issueId={}, signal={}, workspaceId={}, jobId={}",
                         issue.getId(),

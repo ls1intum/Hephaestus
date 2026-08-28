@@ -3,11 +3,8 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -25,8 +22,6 @@ import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
-import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.List;
@@ -58,7 +53,43 @@ class InContextDeliveryGateTest extends BaseUnitTest {
 
     private InContextDeliveryGate gate() {
         return new InContextDeliveryGate(
-                practiceRepository, observationRepository, feedbackLedgerRecorder, workspaceDefaults());
+                practiceRepository,
+                observationRepository,
+                feedbackLedgerRecorder,
+                InContextDeliveryGateFixtures.workspaceDefaults(),
+                InContextDeliveryGateFixtures.workspacesAtTheDefaultJobRevision());
+    }
+
+    @Test
+    void aJobAdmittedUnderAnOlderRolloutSaysNothingOnTheArtifact() {
+        InContextDeliveryGate gate = new InContextDeliveryGate(
+                practiceRepository,
+                observationRepository,
+                feedbackLedgerRecorder,
+                InContextDeliveryGateFixtures.workspaceDefaults(),
+                InContextDeliveryGateFixtures.workspacesAtRevision(7L));
+        List<Observation> persisted = List.of(observation("occ-1"));
+        when(observationRepository.findByAgentJobId(JOB_ID)).thenReturn(persisted);
+
+        assertThat(gate.admitInContext(job(), List.of(observation("loud", "occ-1"))))
+                .isEmpty();
+        assertThat(gate.awaitingApproval(job(), List.of(observation("loud", "occ-1"))))
+                .isEmpty();
+        verify(feedbackLedgerRecorder)
+                .recordWithheld(any(), any(), eq(FeedbackSuppressionReason.STALE_ROLLOUT_REVISION), anyInt());
+    }
+
+    @Test
+    void aWorkspaceThatNoLongerExistsProducesNoInContextFeedback() {
+        InContextDeliveryGate gate = new InContextDeliveryGate(
+                practiceRepository,
+                observationRepository,
+                feedbackLedgerRecorder,
+                InContextDeliveryGateFixtures.workspaceDefaults(),
+                InContextDeliveryGateFixtures.noWorkspaces());
+
+        assertThat(gate.admitInContext(job(), List.of(observation("loud", "occ-1"))))
+                .isEmpty();
     }
 
     @Test
@@ -71,7 +102,6 @@ class InContextDeliveryGateTest extends BaseUnitTest {
         verifyNoInteractions(feedbackLedgerRecorder);
     }
 
-    /** Human-approval observations are kept for the proposal lane but never reach the artifact directly. */
     @Test
     void proposingPracticesAreWithheldFromTheArtifact() {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID))
@@ -216,12 +246,5 @@ class InContextDeliveryGateTest extends BaseUnitTest {
         Observation observation = org.mockito.Mockito.mock(Observation.class);
         org.mockito.Mockito.lenient().when(observation.getOccurrenceKey()).thenReturn(occurrenceKey);
         return observation;
-    }
-
-    /** Resolves every workspace to the unset defaults — AUTOMATIC autonomy, reach on the work. */
-    private static WorkspaceReviewDefaultsProvider workspaceDefaults() {
-        WorkspaceReviewDefaultsProvider provider = mock(WorkspaceReviewDefaultsProvider.class);
-        lenient().when(provider.forWorkspace(anyLong())).thenReturn(WorkspaceReviewDefaults.UNSET);
-        return provider;
     }
 }

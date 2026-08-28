@@ -31,14 +31,28 @@ export const mockAvailableModels: AvailableLlmModel[] = [
 ];
 
 export const mockPracticeReviewSettings: PracticeReviewSettings = {
+	etag: '"0"',
+	revision: 0,
 	cooldownMinutes: 30,
-	reviewScope: { targetBranches: [], repositories: [] },
+	deliveryStatus: "ACTIVE",
+	reviewScope: {
+		repositoryMode: "ALL_MONITORED",
+		personMode: "ALL_ELIGIBLE",
+		repositories: [],
+		personUserIds: [],
+	},
+	coverageSummary: {
+		monitoredRepositories: 3,
+		coveredRepositories: 3,
+		eligiblePeople: 8,
+		coveredPeople: 8,
+		recentReviewVolume: 42,
+		estimateWindowDays: 30,
+	},
 	deliverToMerged: false,
 	cooldownMinutesOverride: 30,
 	deliverToMergedOverride: undefined,
-	// Never chosen here, so it falls back to what a fresh workspace gets: the bottom of the
-	// practice → group → workspace chain speaks, and it speaks on the work itself.
-	defaultAutonomy: "AUTOMATIC",
+	defaultAutonomy: "HUMAN_APPROVAL",
 	defaultAutonomyOverride: undefined,
 };
 

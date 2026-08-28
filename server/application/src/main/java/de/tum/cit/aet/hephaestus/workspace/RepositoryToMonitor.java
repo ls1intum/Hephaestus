@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -17,7 +18,12 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 @Entity
-@Table(name = "repository_to_monitor")
+@Table(
+        name = "repository_to_monitor",
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uk_repository_to_monitor_workspace_id",
+                        columnNames = {"workspace_id", "id"}))
 @Getter
 @Setter
 @NoArgsConstructor

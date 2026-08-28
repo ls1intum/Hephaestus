@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
+import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel;
@@ -73,19 +74,21 @@ public class JobTypeHandlerConfiguration {
     @Bean
     FeedbackDeliveryService feedbackDeliveryService(
             PullRequestCommentPoster commentPoster,
-            DiffNotePoster diffNotePoster,
             PracticeFeedbackDeliveryPolicy deliveryPolicy,
             FeedbackLedgerRecorder feedbackLedgerRecorder,
             ObservationTrendService observationTrendService,
-            PracticeFeedbackCommentFormatter commentFormatter) {
+            PracticeFeedbackCommentFormatter commentFormatter,
+            PracticeFeedbackDispatchService dispatchService,
+            AgentJobRepository agentJobRepository) {
         return new FeedbackDeliveryService(
                 commentPoster,
-                diffNotePoster,
                 deliveryPolicy,
                 reviewProperties,
                 feedbackLedgerRecorder,
                 observationTrendService,
-                commentFormatter);
+                commentFormatter,
+                dispatchService,
+                agentJobRepository);
     }
 
     @Bean
@@ -136,7 +139,10 @@ public class JobTypeHandlerConfiguration {
             FeedbackLedgerRecorder feedbackLedgerRecorder,
             PracticeFeedbackDeliveryPolicy deliveryPolicy,
             PracticeFeedbackCommentFormatter commentFormatter,
-            ObservationRepository observationRepository) {
+            FeedbackResponseSuppressionFilter feedbackResponseSuppressionFilter,
+            ObservationRepository observationRepository,
+            PracticeFeedbackDispatchService dispatchService,
+            FeedbackDeliveryService feedbackDeliveryService) {
         return new IssueReviewHandler(
                 objectMapper,
                 workspaceContextBuilder,
@@ -150,7 +156,10 @@ public class JobTypeHandlerConfiguration {
                 feedbackLedgerRecorder,
                 deliveryPolicy,
                 commentFormatter,
-                observationRepository);
+                feedbackResponseSuppressionFilter,
+                observationRepository,
+                dispatchService,
+                feedbackDeliveryService);
     }
 
     @Bean

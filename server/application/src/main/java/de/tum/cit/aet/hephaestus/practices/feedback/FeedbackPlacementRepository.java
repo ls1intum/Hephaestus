@@ -4,23 +4,42 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-/**
- * Repository for immutable {@link FeedbackPlacement} rows — where/how a {@link Feedback} unit was
- * physically posted (the SUMMARY comment + each INLINE diff note). Saved via JPA {@code save()} (simple
- * UUID PK + {@code @PrePersist}); the recorder guards against double-writes at the {@link Feedback} level.
- *
- * <p>Workspace-agnostic: a placement carries no tenant column — it is scoped through its parent
- * {@link Feedback} (which holds {@code workspace_id}), so callers tenant-scope at the {@code Feedback} level.
- */
 @Repository
 @WorkspaceAgnostic("FeedbackPlacement is scoped through its parent Feedback's workspace_id, not its own")
 public interface FeedbackPlacementRepository extends JpaRepository<FeedbackPlacement, UUID> {
     List<FeedbackPlacement> findByFeedbackId(UUID feedbackId);
+
+    @Modifying
+    @Query(value = """
+        INSERT INTO feedback_placement (
+            id, feedback_id, placement_type, anchor_kind, anchor_path, anchor_start_line,
+            anchor_end_line, anchor_side, posted_comment_ref, created_at
+        ) VALUES (
+            :#{#placement.id()}, :#{#placement.feedbackId()}, :#{#placement.placementType()},
+            :#{#placement.anchorKind()}, :#{#placement.anchorPath()}, :#{#placement.anchorStartLine()},
+            :#{#placement.anchorEndLine()}, :#{#placement.anchorSide()},
+            :#{#placement.postedCommentRef()}, CURRENT_TIMESTAMP
+        ) ON CONFLICT (feedback_id, posted_comment_ref) DO NOTHING
+        """, nativeQuery = true)
+    int insertProviderPlacementIfAbsent(@Param("placement") ProviderPlacement placement);
+
+    record ProviderPlacement(
+            UUID id,
+            UUID feedbackId,
+            String placementType,
+            @Nullable String anchorKind,
+            @Nullable String anchorPath,
+            @Nullable Integer anchorStartLine,
+            @Nullable Integer anchorEndLine,
+            @Nullable String anchorSide,
+            String postedCommentRef) {}
 
     @Query("""
         SELECT p FROM FeedbackPlacement p

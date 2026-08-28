@@ -4,6 +4,8 @@ import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
+import de.tum.cit.aet.hephaestus.practices.feedback.approval.dto.FeedbackApprovalDTO;
+import de.tum.cit.aet.hephaestus.practices.trace.dto.DeliveryPolicyTraceDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.List;
@@ -29,7 +31,7 @@ public record ReviewFeedbackDetailDTO(
         @NonNull FeedbackChannel channel,
         @NonNull FeedbackDeliveryState deliveryState,
 
-        @Schema(description = "Why the feedback was withheld; null unless the state is SUPPRESSED") @Nullable
+        @Schema(description = "Why delivery stopped; set on withheld or terminally partial feedback") @Nullable
         FeedbackSuppressionReason suppressionReason,
 
         @Schema(description = "The feedback this one replaced; null on a first delivery") @Nullable
@@ -46,7 +48,7 @@ public record ReviewFeedbackDetailDTO(
         @Schema(
                 description = "Stored composed body; null when none was produced, and always null on the IN_APP "
                         + "and IN_CHAT channels — neither the developer's practice pages nor the mentor's "
-                        + "queued move is readable by an operator")
+                        + "prepared context is readable by an operator")
         @Nullable
         String body,
 
@@ -54,12 +56,19 @@ public record ReviewFeedbackDetailDTO(
         List<ReviewBoundObservationDTO> observations,
 
         @NonNull @Schema(description = "Recorded placements; empty when none")
-        List<ReviewPlacementDTO> placements) {
-    /**
-     * @param bodyVisible whether this caller may read the composed text. A withheld body is rendered as
-     *     absent rather than as an empty string, so "we are not showing you this" reads the same as
-     *     "there was nothing to show" on the wire and neither invites a client to display a blank card.
-     */
+        List<ReviewPlacementDTO> placements,
+
+        @Schema(description = "Reviewed source revision for an immutable approval package") @Nullable
+        String reviewedRevision,
+
+        @NonNull @Schema(description = "Exact ordered summary and inline messages covered by the approval decision")
+        List<ReviewProposedPlacementDTO> proposedPlacements,
+
+        @Schema(description = "Immutable human decision for this proposal, when one has been made") @Nullable
+        FeedbackApprovalDTO approval,
+
+        @NonNull @Schema(description = "Ordered delivery-policy evaluations for this feedback's review")
+        List<DeliveryPolicyTraceDTO> deliveryPolicy) {
     public static ReviewFeedbackDetailDTO from(
             Feedback feedback,
             @Nullable ReviewArtifactDTO artifact,
@@ -67,6 +76,8 @@ public record ReviewFeedbackDetailDTO(
             @Nullable ReviewSubjectDTO subject,
             List<ReviewBoundObservationDTO> observations,
             List<ReviewPlacementDTO> placements,
+            @Nullable FeedbackApprovalDTO approval,
+            List<DeliveryPolicyTraceDTO> deliveryPolicy,
             boolean bodyVisible) {
         return new ReviewFeedbackDetailDTO(
                 feedback.getId(),
@@ -83,6 +94,14 @@ public record ReviewFeedbackDetailDTO(
                 feedback.getDeliveredAt(),
                 bodyVisible ? feedback.getBody() : null,
                 observations,
-                placements);
+                placements,
+                feedback.getReviewedRevision(),
+                bodyVisible
+                        ? feedback.getProposedPlacements().stream()
+                                .map(ReviewProposedPlacementDTO::from)
+                                .toList()
+                        : List.of(),
+                approval,
+                deliveryPolicy);
     }
 }

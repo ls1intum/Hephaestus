@@ -31,6 +31,8 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.List;
@@ -62,6 +64,9 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private WorkspaceRepository workspaceRepository;
+
+    @Autowired
+    private WorkspaceMembershipService workspaceMembershipService;
 
     @Autowired
     private IdentityProviderRepository gitProviderRepository;
@@ -127,6 +132,8 @@ class PracticeDetectionGateIntegrationTest extends BaseIntegrationTest {
 
         assignee = TestUserFactory.createUser(400L, "assignee-user", provider);
         assignee = userRepository.save(assignee);
+        workspaceMembershipService.createMembership(
+                workspace, assignee.getId(), WorkspaceMembership.WorkspaceRole.MEMBER);
 
         repo = new Repository();
         repo.setNativeId(3001L);

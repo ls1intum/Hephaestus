@@ -35,6 +35,16 @@ public class FeedbackApprovalService {
         if (feedback.getChannel() != FeedbackChannel.IN_CONTEXT) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only in-context feedback can be approved");
         }
+        if (request.decision() == FeedbackApprovalDecision.APPROVED) {
+            FeedbackSuppressionReason brake = eligibility.brakeOnDelivery(workspaceId);
+            if (brake != null) {
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        brake == FeedbackSuppressionReason.INSTANCE_SILENCED
+                                ? "Silent Mode is engaged for this instance, so approving would not send anything"
+                                : "Sending is paused for this workspace, so approving would not send anything");
+            }
+        }
         if (request.decision() == FeedbackApprovalDecision.APPROVED
                 && !eligibility.isEligible(workspaceId, feedbackId)) {
             feedbackRepository.suppressProposal(
@@ -87,6 +97,9 @@ public class FeedbackApprovalService {
     }
 
     private static void validate(DecideFeedbackProposalRequestDTO request) {
+        if (request.decision() == FeedbackApprovalDecision.REJECTED && request.rejectionReason() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A rejection needs a reason");
+        }
         if (request.decision() == FeedbackApprovalDecision.APPROVED && request.rejectionReason() != null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "An approval cannot have a rejection reason");
         }

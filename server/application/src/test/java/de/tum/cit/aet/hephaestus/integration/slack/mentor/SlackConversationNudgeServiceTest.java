@@ -76,9 +76,8 @@ class SlackConversationNudgeServiceTest extends BaseUnitTest {
     }
 
     private void stubRecipient(boolean practiceFeedbackDeliveryEnabled) {
-        when(accountPreferencesQuery.preferencesForUserId(RECIPIENT))
-                .thenReturn(Optional.of(
-                        new AccountPreferencesQuery.PreferencesView(false, practiceFeedbackDeliveryEnabled)));
+        when(accountPreferencesQuery.practiceFeedbackDeliveryEnabled(RECIPIENT))
+                .thenReturn(practiceFeedbackDeliveryEnabled);
     }
 
     private void stubAllGuardsPass() {
@@ -188,7 +187,7 @@ class SlackConversationNudgeServiceTest extends BaseUnitTest {
     @Test
     void preferenceLookupFailure_failsClosed() {
         stubActiveConnection();
-        when(accountPreferencesQuery.preferencesForUserId(RECIPIENT))
+        when(accountPreferencesQuery.practiceFeedbackDeliveryEnabled(RECIPIENT))
                 .thenThrow(new IllegalStateException("database unavailable"));
 
         service.onConversationFeedbackPrepared(event(2));

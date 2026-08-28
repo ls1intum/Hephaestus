@@ -23,6 +23,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.Optional;
@@ -58,6 +59,9 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
     @Mock
     private LlmUsageRecorder usageRecorder;
 
+    @Mock
+    private FeedbackDispatchRepository feedbackDispatchRepository;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private AgentJobLifecycleService service;
@@ -74,7 +78,8 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
                 sandboxManager,
                 Optional.empty(),
                 usageRecorder,
-                objectMapper);
+                objectMapper,
+                feedbackDispatchRepository);
 
         workspace = new Workspace();
         workspace.setId(1L);
@@ -397,6 +402,7 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
 
             AgentJob result = service.retryDelivery(WORKSPACE_ID, jobId);
 
+            verify(feedbackDispatchRepository).resetFailedAutomaticPackage(jobId, WORKSPACE_ID);
             verify(handler).deliver(completedJob);
             verify(agentJobRepository)
                     .updateDeliveryStatus(
@@ -474,6 +480,21 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
                             "existing-comment-id",
                             java.util.Set.of(DeliveryStatus.PENDING),
                             CLAIMED_ATTEMPTS);
+        }
+
+        @Test
+        void existingSummaryStillReconcilesTheRestOfAProviderPackage() {
+            when(handler.findExistingDelivery(completedJob))
+                    .thenReturn(ExistingDeliveryLookup.found("existing-comment-id"));
+            when(handler.reconcilesMoreThanOneProviderObject()).thenReturn(true);
+            when(agentJobRepository.transitionDeliveryStatusFenced(
+                            eq(jobId), eq(DeliveryStatus.DELIVERED), any(), any(), eq(CLAIMED_ATTEMPTS)))
+                    .thenReturn(1);
+
+            boolean result = service.recoverStuckDelivery(completedJob, CLAIMED_ATTEMPTS);
+
+            assertThat(result).isTrue();
+            verify(handler).deliver(completedJob);
         }
 
         @Test

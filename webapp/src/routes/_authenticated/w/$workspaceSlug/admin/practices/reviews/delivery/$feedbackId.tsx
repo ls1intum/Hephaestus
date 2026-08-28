@@ -1,10 +1,11 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
-
 import {
 	decideFeedbackProposalMutation,
 	getPracticeReviewFeedbackOptions,
+	getPracticeReviewFeedbackQueryKey,
+	listPracticeReviewFeedbackQueryKey,
 	listPracticesOptions,
 } from "@/api/@tanstack/react-query.gen";
 import { FeedbackDetailPage } from "@/components/admin/practice-reviews/FeedbackDetailPage";
@@ -25,23 +26,38 @@ export const Route = createFileRoute(
 function FeedbackDetailRoute() {
 	const { workspaceSlug, feedbackId } = Route.useParams();
 	const search = Route.useSearch();
+	const queryClient = useQueryClient();
+	const detailKey = getPracticeReviewFeedbackQueryKey({ path: { workspaceSlug, feedbackId } });
 
 	const feedbackQueryResult = useQuery({
 		...getPracticeReviewFeedbackOptions({ path: { workspaceSlug, feedbackId } }),
+		refetchInterval: (query) => {
+			const feedback = query.state.data;
+			return feedback?.deliveryState === "PREPARED" ||
+				(feedback?.deliveryState === "PARTIALLY_DELIVERED" && !feedback.suppressionReason)
+				? 2_000
+				: false;
+		},
 	});
 	const practicesQuery = useQuery({ ...listPracticesOptions({ path: { workspaceSlug } }) });
 	const decision = useMutation({
 		...decideFeedbackProposalMutation(),
-		onSuccess: async (_, variables) => {
+		onSettled: () => {
+			void queryClient.invalidateQueries({ queryKey: detailKey });
+			void queryClient.invalidateQueries({
+				queryKey: listPracticeReviewFeedbackQueryKey({ path: { workspaceSlug } }),
+			});
+		},
+		onSuccess: (_, variables) => {
 			toast.success(
 				variables.body.decision === "APPROVED"
-					? "Feedback approved for delivery"
-					: "Proposal rejected",
+					? "Review approved. Delivery is being checked."
+					: "Review rejected",
 			);
-			await feedbackQueryResult.refetch();
 		},
-		onError: (error) =>
-			toast.error("Couldn't decide this proposal", { description: problemDetailOf(error) }),
+		onError: (error) => {
+			toast.error("Couldn't decide this review", { description: problemDetailOf(error) });
+		},
 	});
 
 	const feedback = feedbackQueryResult.data;
@@ -72,10 +88,17 @@ function FeedbackDetailRoute() {
 		<FeedbackDetailPage
 			workspaceSlug={workspaceSlug}
 			search={search}
-			feedback={feedback}
-			isLoading={feedbackQueryResult.isLoading}
-			error={feedbackQueryResult.isError ? feedbackQueryResult.error : undefined}
-			onRetry={() => void feedbackQueryResult.refetch()}
+			state={
+				feedbackQueryResult.isPending
+					? { status: "loading" }
+					: feedbackQueryResult.isError || !feedback
+						? {
+								status: "error",
+								error: feedbackQueryResult.error,
+								onRetry: () => void feedbackQueryResult.refetch(),
+							}
+						: { status: "ready", feedback }
+			}
 			practices={practicesQuery.data}
 		/>
 	);

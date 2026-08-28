@@ -27,6 +27,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     Optional<Feedback> lockByIdAndWorkspaceId(@Param("id") UUID id, @Param("workspaceId") Long workspaceId);
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Transactional
     @Query(
             value = "UPDATE feedback SET delivery_state = :targetState WHERE id = :id AND workspace_id = :workspaceId "
                     + "AND delivery_state = 'AWAITING_APPROVAL'",
@@ -42,19 +43,50 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     int suppressProposal(@Param("workspaceId") Long workspaceId, @Param("id") UUID id, @Param("reason") String reason);
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Transactional
     @Query(
-            value = "UPDATE feedback SET delivery_state = 'DELIVERED', delivered_at = CURRENT_TIMESTAMP "
-                    + "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state = 'PREPARED'",
+            value =
+                    "UPDATE feedback SET delivery_state = 'DELIVERED', delivered_at = CURRENT_TIMESTAMP, suppression_reason = NULL "
+                            + "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state IN ('PREPARED', 'PARTIALLY_DELIVERED')",
             nativeQuery = true)
     int markApprovedDelivered(@Param("workspaceId") Long workspaceId, @Param("id") UUID id);
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Transactional
+    @Query(
+            value =
+                    "UPDATE feedback SET delivery_state = 'PARTIALLY_DELIVERED', suppression_reason = :reason "
+                            + "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state IN ('PREPARED', 'PARTIALLY_DELIVERED')",
+            nativeQuery = true)
+    int markApprovedPartiallyDelivered(
+            @Param("workspaceId") Long workspaceId, @Param("id") UUID id, @Param("reason") @Nullable String reason);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Transactional
     @Query(
             value = "UPDATE feedback SET delivery_state = 'SUPPRESSED', suppression_reason = :reason "
                     + "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state = 'PREPARED'",
             nativeQuery = true)
     int markApprovedSuppressed(
             @Param("workspaceId") Long workspaceId, @Param("id") UUID id, @Param("reason") String reason);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Transactional
+    @Query(
+            value =
+                    "UPDATE feedback SET delivery_state = 'FAILED', suppression_reason = NULL "
+                            + "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state IN ('PREPARED', 'PARTIALLY_DELIVERED')",
+            nativeQuery = true)
+    int markApprovedFailed(@Param("workspaceId") Long workspaceId, @Param("id") UUID id);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Transactional
+    @Query(
+            value =
+                    "UPDATE feedback SET delivery_state = 'PARTIALLY_FAILED', suppression_reason = NULL "
+                            + "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state IN ('PREPARED', 'PARTIALLY_DELIVERED')",
+            nativeQuery = true)
+    int markApprovedPartiallyFailed(@Param("workspaceId") Long workspaceId, @Param("id") UUID id);
 
     /** Idempotency guard for the ledger recorder: has this job already recorded this unit? */
     boolean existsByAgentJobIdAndPosition(UUID agentJobId, Integer position);
@@ -66,11 +98,13 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
 
     @Query(value = """
         SELECT f.agent_job_id AS "jobId",
-               COUNT(*) FILTER (WHERE f.delivery_state = 'PREPARED') AS "prepared",
+               COUNT(*) FILTER (WHERE f.delivery_state = 'PREPARED' OR
+                   (f.delivery_state = 'PARTIALLY_DELIVERED' AND f.suppression_reason IS NULL)) AS "prepared",
                COUNT(*) FILTER (WHERE f.delivery_state = 'DELIVERED') AS "delivered",
                COUNT(*) FILTER (WHERE f.delivery_state = 'SUPERSEDED') AS "superseded",
-               COUNT(*) FILTER (WHERE f.delivery_state = 'SUPPRESSED') AS "suppressed",
-               COUNT(*) FILTER (WHERE f.delivery_state = 'FAILED') AS "failed"
+               COUNT(*) FILTER (WHERE f.delivery_state = 'SUPPRESSED' OR
+                   (f.delivery_state = 'PARTIALLY_DELIVERED' AND f.suppression_reason IS NOT NULL)) AS "suppressed",
+               COUNT(*) FILTER (WHERE f.delivery_state IN ('FAILED', 'PARTIALLY_FAILED')) AS "failed"
         FROM feedback f
         WHERE f.workspace_id = :workspaceId
           AND f.agent_job_id IN :jobIds
@@ -194,6 +228,16 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
                     + "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state = 'PREPARED'",
             nativeQuery = true)
     int markSuperseded(@Param("workspaceId") Long workspaceId, @Param("id") UUID id);
+
+    @Modifying(flushAutomatically = true)
+    @Transactional
+    @Query(
+            value = "UPDATE feedback SET delivery_state = 'SUPERSEDED' "
+                    + "WHERE workspace_id = :workspaceId AND thread_key = :threadKey AND id <> :keepId "
+                    + "AND delivery_state = 'AWAITING_APPROVAL'",
+            nativeQuery = true)
+    int supersedeUndecidedProposals(
+            @Param("workspaceId") Long workspaceId, @Param("threadKey") String threadKey, @Param("keepId") UUID keepId);
 
     /**
      * Whether a unit has been received. Asked only after a supersession compare-and-set matched nothing,
@@ -370,6 +414,15 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
                     + "WHERE id = :id AND delivery_state = 'PREPARED'",
             nativeQuery = true)
     int markConversationSuppressedBySilentMode(@Param("id") UUID id);
+
+    @Modifying
+    @Transactional
+    @Query(
+            value = "UPDATE feedback SET delivery_state = 'SUPPRESSED', suppression_reason = :reason "
+                    + "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state = 'PREPARED'",
+            nativeQuery = true)
+    int markPreparedSuppressed(
+            @Param("id") UUID id, @Param("workspaceId") Long workspaceId, @Param("reason") String reason);
 
     /**
      * Newest PREPARED conversational units for a developer (as recipient) — the mentor's queue. The body on

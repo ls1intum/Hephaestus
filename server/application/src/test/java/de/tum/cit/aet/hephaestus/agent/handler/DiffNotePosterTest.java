@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -10,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.config.ApplicationProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor;
@@ -23,6 +23,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.List;
+import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -58,6 +59,8 @@ class DiffNotePosterTest extends BaseUnitTest {
 
         boolean cleared;
 
+        boolean immutable;
+
         @Nullable
         RuntimeException clearThrows;
 
@@ -70,6 +73,12 @@ class DiffNotePosterTest extends BaseUnitTest {
         public InlineResult postInlineFeedback(FeedbackTarget target, List<InlineFeedback> observations) {
             this.posted = observations;
             return new InlineResult(observations.size(), 0, List.of());
+        }
+
+        @Override
+        public InlineResult postImmutablePackage(FeedbackTarget target, List<InlineFeedback> observations) {
+            this.immutable = true;
+            return postInlineFeedback(target, observations);
         }
 
         @Override
@@ -122,6 +131,24 @@ class DiffNotePosterTest extends BaseUnitTest {
     }
 
     @Test
+    void approvedPackageUsesItsOwnImmutableProviderIdentity() {
+        RecordingChannel channel = new RecordingChannel();
+        UUID feedbackId = UUID.randomUUID();
+
+        poster(channel)
+                .reconcileApprovedInlineNotes(
+                        gitlabJob(),
+                        feedbackId,
+                        List.of(new DiffNote("src/A.java", 10, null, "Exact body", "cross-review-key")));
+
+        InlineFeedback delivered = posted(channel).get(0);
+        assertThat(channel.immutable).isTrue();
+        assertThat(delivered.body()).isEqualTo("Exact body");
+        assertThat(delivered.marker()).isEqualTo("<!-- hephaestus-approved-package:" + feedbackId + " -->");
+        assertThat(delivered.recurrenceKey()).isEqualTo("approved:" + feedbackId + ":0");
+    }
+
+    @Test
     void blankBodyNote_isSkipped_andClearsStaleWhenAllBlank() {
         RecordingChannel channel = new RecordingChannel();
         DiffNotePoster poster = poster(channel);
@@ -135,13 +162,13 @@ class DiffNotePosterTest extends BaseUnitTest {
     }
 
     @Test
-    void noFindings_swallowsClearFailure_bestEffort() {
+    void shouldFailThePackageWhenEmptyReconciliationCannotClearStaleFeedback() {
         RecordingChannel channel = new RecordingChannel();
         channel.clearThrows = new RuntimeException("gitlab down");
         DiffNotePoster poster = poster(channel);
 
-        assertThatCode(() -> poster.reconcileInlineNotes(gitlabJob(), List.of()))
-                .doesNotThrowAnyException();
+        assertThatThrownBy(() -> poster.reconcileInlineNotes(gitlabJob(), List.of()))
+                .isInstanceOf(JobDeliveryException.class);
         assertThat(channel.cleared).isTrue();
     }
 

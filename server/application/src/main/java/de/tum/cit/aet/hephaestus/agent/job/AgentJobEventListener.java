@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewSubject;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -180,7 +181,11 @@ public class AgentJobEventListener {
                 return;
             }
 
-            switch (practiceReviewDetectionGate.evaluate(pr, key.signalName(), TriggerMode.AUTO)) {
+            GateDecision decision = reviewData == null
+                    ? practiceReviewDetectionGate.evaluate(pr, key.signalName(), TriggerMode.AUTO)
+                    : practiceReviewDetectionGate.evaluate(
+                            pr, key.signalName(), TriggerMode.AUTO, new ReviewSubject(reviewData.authorId(), true));
+            switch (decision) {
                 case GateDecision.Skip skip -> {
                     log.debug(
                             "Agent job skipped by practice gate: prNumber={}, repoName={}, event={}, reason={}",
@@ -323,7 +328,7 @@ public class AgentJobEventListener {
 
         try {
             agentJobService
-                    .submit(detect.workspace().getId(), AgentJobType.PULL_REQUEST_REVIEW, request, signalKey)
+                    .submit(detect.workspace().getId(), AgentJobType.PULL_REQUEST_REVIEW, request, signalKey, detect)
                     .ifPresent(job -> log.info(
                             "Agent job submitted: jobId={}, prNumber={}, repoName={}, signal={}, matchedPractices={}",
                             job.getId(),

@@ -88,10 +88,7 @@ public class SlackConversationNudgeService {
             log.debug("slack.nudge: skip, no ACTIVE Slack connection: workspaceId={}", workspaceId);
             return;
         }
-        boolean practiceFeedbackDeliveryEnabled = accountPreferencesQuery
-                .preferencesForUserId(recipientId)
-                .map(AccountPreferencesQuery.PreferencesView::practiceFeedbackDeliveryEnabled)
-                .orElse(true);
+        boolean practiceFeedbackDeliveryEnabled = accountPreferencesQuery.practiceFeedbackDeliveryEnabled(recipientId);
         if (!practiceFeedbackDeliveryEnabled) {
             log.debug("slack.nudge: skip, feedback delivery disabled: recipientUserId={}", recipientId);
             return;

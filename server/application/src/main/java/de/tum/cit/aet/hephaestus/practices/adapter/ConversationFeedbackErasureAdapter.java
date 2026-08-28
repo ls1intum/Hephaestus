@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.adapter;
 
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure;
@@ -20,11 +21,15 @@ public class ConversationFeedbackErasureAdapter implements ConversationFeedbackE
 
     private static final Logger log = LoggerFactory.getLogger(ConversationFeedbackErasureAdapter.class);
 
+    private final DeliveryPolicyEvaluationRepository evaluationRepository;
     private final FeedbackRepository feedbackRepository;
     private final ObservationRepository observationRepository;
 
     public ConversationFeedbackErasureAdapter(
-            FeedbackRepository feedbackRepository, ObservationRepository observationRepository) {
+            DeliveryPolicyEvaluationRepository evaluationRepository,
+            FeedbackRepository feedbackRepository,
+            ObservationRepository observationRepository) {
+        this.evaluationRepository = evaluationRepository;
         this.feedbackRepository = feedbackRepository;
         this.observationRepository = observationRepository;
     }
@@ -35,6 +40,7 @@ public class ConversationFeedbackErasureAdapter implements ConversationFeedbackE
         if (slackThreadIds.isEmpty()) {
             return 0;
         }
+        evaluationRepository.deleteConversationEvaluationsForThreads(workspaceId, slackThreadIds);
         int feedbackDeleted = feedbackRepository.deleteConversationThreadFeedback(workspaceId, slackThreadIds);
         int observationsDeleted =
                 observationRepository.deleteConversationThreadObservations(workspaceId, slackThreadIds);
@@ -52,6 +58,7 @@ public class ConversationFeedbackErasureAdapter implements ConversationFeedbackE
     @Override
     @Transactional
     public int eraseAllConversationForWorkspace(long workspaceId) {
+        evaluationRepository.deleteAllConversationEvaluations(workspaceId);
         int feedbackDeleted = feedbackRepository.deleteAllConversationThreadFeedback(workspaceId);
         int observationsDeleted = observationRepository.deleteAllConversationThreadObservations(workspaceId);
         if (feedbackDeleted > 0 || observationsDeleted > 0) {
@@ -67,6 +74,7 @@ public class ConversationFeedbackErasureAdapter implements ConversationFeedbackE
     @Override
     @Transactional
     public int eraseConversationFeedbackAboutUser(long workspaceId, long aboutUserId) {
+        evaluationRepository.deleteConversationEvaluationsAboutUser(workspaceId, aboutUserId);
         int feedbackDeleted = feedbackRepository.deleteConversationThreadFeedbackAboutUser(workspaceId, aboutUserId);
         int observationsDeleted =
                 observationRepository.deleteConversationThreadObservationsAboutUser(workspaceId, aboutUserId);

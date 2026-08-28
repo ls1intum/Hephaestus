@@ -3,7 +3,10 @@ package de.tum.cit.aet.hephaestus.practices.feedback.approval;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -12,6 +15,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.dto.DecideFeedbackProposalRequestDTO;
 import java.util.Optional;
 import java.util.UUID;
@@ -66,6 +70,50 @@ class FeedbackApprovalServiceTest {
     }
 
     @Test
+    void shouldRefuseApprovalWhileSendingIsPausedAndLeaveTheProposalDecidable() {
+        when(eligibility.brakeOnDelivery(7L)).thenReturn(FeedbackSuppressionReason.WORKSPACE_DELIVERY_PAUSED);
+
+        assertThatThrownBy(() -> service.decide(
+                        7L,
+                        feedbackId,
+                        42L,
+                        new DecideFeedbackProposalRequestDTO(FeedbackApprovalDecision.APPROVED, null, null)))
+                .isInstanceOf(ResponseStatusException.class);
+
+        verify(feedbackRepository, never()).decideProposal(any(), any(), any());
+        verify(feedbackRepository, never()).suppressProposal(any(), any(), any());
+    }
+
+    @Test
+    void shouldRefuseApprovalUnderInstanceSilence() {
+        when(eligibility.brakeOnDelivery(7L)).thenReturn(FeedbackSuppressionReason.INSTANCE_SILENCED);
+
+        assertThatThrownBy(() -> service.decide(
+                        7L,
+                        feedbackId,
+                        42L,
+                        new DecideFeedbackProposalRequestDTO(FeedbackApprovalDecision.APPROVED, null, null)))
+                .isInstanceOf(ResponseStatusException.class);
+
+        verify(feedbackRepository, never()).decideProposal(any(), any(), any());
+    }
+
+    @Test
+    void shouldStillAllowRejectionWhileSendingIsPaused() {
+        lenient().when(eligibility.brakeOnDelivery(7L)).thenReturn(FeedbackSuppressionReason.WORKSPACE_DELIVERY_PAUSED);
+        when(feedbackRepository.decideProposal(7L, feedbackId, "DISCARDED")).thenReturn(1);
+
+        service.decide(
+                7L,
+                feedbackId,
+                42L,
+                new DecideFeedbackProposalRequestDTO(
+                        FeedbackApprovalDecision.REJECTED, FeedbackRejectionReason.UNHELPFUL, null));
+
+        verify(feedbackRepository).decideProposal(7L, feedbackId, "DISCARDED");
+    }
+
+    @Test
     void shouldQueueExactProposalWhenApproved() {
         when(feedbackRepository.decideProposal(7L, feedbackId, "PREPARED")).thenReturn(1);
 
@@ -114,7 +162,7 @@ class FeedbackApprovalServiceTest {
     }
 
     @Test
-    void shouldRejectConcurrentSecondDecision() {
+    void shouldReportACompareAndSetLossAsAlreadyDecided() {
         when(feedbackRepository.decideProposal(7L, feedbackId, "PREPARED")).thenReturn(0);
 
         assertThatThrownBy(() -> service.decide(
@@ -126,13 +174,13 @@ class FeedbackApprovalServiceTest {
     }
 
     @Test
-    void shouldAllowRejectionWithoutCategory() {
-        when(feedbackRepository.decideProposal(7L, feedbackId, "DISCARDED")).thenReturn(1);
-        FeedbackApproval result = service.decide(
-                7L,
-                feedbackId,
-                42L,
-                new DecideFeedbackProposalRequestDTO(FeedbackApprovalDecision.REJECTED, null, null));
-        assertThat(result.getRejectionReason()).isNull();
+    void shouldRequireARejectionCategory() {
+        assertThatThrownBy(() -> service.decide(
+                        7L,
+                        feedbackId,
+                        42L,
+                        new DecideFeedbackProposalRequestDTO(FeedbackApprovalDecision.REJECTED, null, null)))
+                .isInstanceOf(ResponseStatusException.class);
+        verify(feedbackRepository, never()).decideProposal(anyLong(), any(), anyString());
     }
 }

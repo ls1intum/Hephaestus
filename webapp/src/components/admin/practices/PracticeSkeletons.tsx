@@ -70,3 +70,24 @@ export function PracticeDefinitionSkeleton() {
 		</div>
 	);
 }
+
+export function ReviewSettingsSkeleton() {
+	return (
+		<div role="status">
+			<span className="sr-only">Loading review settings</span>
+			<div className="space-y-8" aria-hidden>
+				{["status", "timing", "coverage", "delivery"].map((section) => (
+					<div key={section} className="space-y-4">
+						<div className="space-y-2">
+							<Skeleton className="h-6 w-48" />
+							<Skeleton className="h-4 w-full max-w-lg" />
+						</div>
+						{["first", "second"].map((row) => (
+							<Skeleton key={`${section}-${row}`} className="h-10 w-full" />
+						))}
+					</div>
+				))}
+			</div>
+		</div>
+	);
+}

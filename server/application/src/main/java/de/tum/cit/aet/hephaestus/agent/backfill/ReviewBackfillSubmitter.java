@@ -115,7 +115,8 @@ public class ReviewBackfillSubmitter {
                                 pr.getBaseRefName(),
                                 key.get().signalName(),
                                 SignalOrigins.observationOriginOf(run.getDiscoveredVia())),
-                        key.get());
+                        key.get(),
+                        detect);
                 return Outcome.SUBMITTED;
             }
         }
@@ -155,7 +156,8 @@ public class ReviewBackfillSubmitter {
                                 issue.getUpdatedAt(),
                                 key.get().signalName(),
                                 SignalOrigins.observationOriginOf(run.getDiscoveredVia())),
-                        key.get());
+                        key.get(),
+                        detect);
                 return Outcome.SUBMITTED;
             }
         }

@@ -1,6 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, within } from "storybook/test";
-
 import { RefusalFixLink, type RefusalFixLinkProps } from "./RefusalFixLink";
 import { REFUSAL_FIXES, SIGNAL_STATE_REASON_LABELS, type SignalStateReason } from "./trace-format";
 
@@ -11,6 +10,7 @@ const REASONS: SignalStateReason[] = [
 	"REQUESTER_QUOTA_EXHAUSTED",
 	"CONCURRENT_DUPLICATE",
 	"OUT_OF_REVIEW_SCOPE",
+	"STALE_ROLLOUT_REVISION",
 	"WORKSPACE_INACTIVE",
 	"PRACTICES_DISABLED",
 	"NO_ACTIVE_PRACTICE",

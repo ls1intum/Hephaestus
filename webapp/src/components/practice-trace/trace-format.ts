@@ -33,7 +33,8 @@ export const SIGNAL_STATE_REASON_LABELS: Record<SignalStateReason, string> = {
 	REQUEST_COOLDOWN_ACTIVE: "A review of this was already asked for a moment ago",
 	REQUESTER_QUOTA_EXHAUSTED: "Whoever asked had used up their hour's allowance, which refills",
 	CONCURRENT_DUPLICATE: "The same review was already running",
-	OUT_OF_REVIEW_SCOPE: "This repository or branch is outside the workspace's review scope",
+	OUT_OF_REVIEW_SCOPE:
+		"The author, repository, or base branch is outside the workspace's review coverage",
 	WORKSPACE_INACTIVE: "The workspace was not active",
 	PRACTICES_DISABLED: "Practice reviews are switched off for this workspace",
 	NO_ACTIVE_PRACTICE: "No practice was watching for this when it happened",
@@ -42,10 +43,11 @@ export const SIGNAL_STATE_REASON_LABELS: Record<SignalStateReason, string> = {
 	REVIEW_MODEL_UNBOUND: "No AI model is set up to run reviews",
 	PRACTICE_AUTONOMY_OFF: "Every practice watching this is turned off; raising one lets it run",
 	BUDGET_EXHAUSTED: "The workspace's AI budget was used up; it refills",
-	SUBJECT_UNLINKED: "The author has not linked their account to Hephaestus",
+	SUBJECT_UNLINKED: "Hephaestus could not tell whose work this is",
 	MODEL_UNAVAILABLE: "The AI model set for reviews is no longer available",
 	PENDING_DEADLINE_EXCEEDED: "It waited too long to be picked up",
 	ARTIFACT_GONE: "The work no longer exists",
+	STALE_ROLLOUT_REVISION: "Review settings changed after this review started",
 };
 
 /**

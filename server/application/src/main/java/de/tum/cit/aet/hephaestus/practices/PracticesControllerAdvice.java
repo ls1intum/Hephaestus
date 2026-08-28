@@ -6,6 +6,9 @@ import de.tum.cit.aet.hephaestus.practices.curated.CuratedPreconditionRequiredEx
 import de.tum.cit.aet.hephaestus.practices.curated.StaleCuratedEntryException;
 import de.tum.cit.aet.hephaestus.practices.curated.adoption.CatalogAdoptionPreconditionRequiredException;
 import de.tum.cit.aet.hephaestus.practices.curated.adoption.StaleCatalogAdoptionPlanException;
+import de.tum.cit.aet.hephaestus.practices.review.InvalidReviewCoverageException;
+import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewPreconditionRequiredException;
+import de.tum.cit.aet.hephaestus.practices.review.StalePracticeReviewSettingsException;
 import java.util.Objects;
 import java.util.Optional;
 import org.springframework.core.Ordered;
@@ -76,6 +79,30 @@ public class PracticesControllerAdvice {
         return problem(
                 HttpStatus.PRECONDITION_REQUIRED,
                 "Practice adoption preview required",
+                Objects.toString(exception.getMessage(), "Request failed"));
+    }
+
+    @ExceptionHandler(StalePracticeReviewSettingsException.class)
+    ProblemDetail handleStaleReviewSettings(StalePracticeReviewSettingsException exception) {
+        return problem(
+                HttpStatus.PRECONDITION_FAILED,
+                "Practice review settings changed",
+                Objects.toString(exception.getMessage(), "Request failed"));
+    }
+
+    @ExceptionHandler(PracticeReviewPreconditionRequiredException.class)
+    ProblemDetail handleReviewPreconditionRequired(PracticeReviewPreconditionRequiredException exception) {
+        return problem(
+                HttpStatus.PRECONDITION_REQUIRED,
+                "Practice review settings version required",
+                Objects.toString(exception.getMessage(), "Request failed"));
+    }
+
+    @ExceptionHandler(InvalidReviewCoverageException.class)
+    ProblemDetail handleInvalidReviewCoverage(InvalidReviewCoverageException exception) {
+        return problem(
+                HttpStatus.BAD_REQUEST,
+                "Invalid practice review coverage",
                 Objects.toString(exception.getMessage(), "Request failed"));
     }
 

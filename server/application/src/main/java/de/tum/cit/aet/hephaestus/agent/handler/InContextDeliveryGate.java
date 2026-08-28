@@ -14,10 +14,12 @@ import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -54,16 +56,19 @@ class InContextDeliveryGate {
     private final ObservationRepository observationRepository;
     private final FeedbackLedgerRecorder feedbackLedgerRecorder;
     private final WorkspaceReviewDefaultsProvider workspaceDefaults;
+    private final WorkspaceRepository workspaceRepository;
 
     InContextDeliveryGate(
             PracticeRepository practiceRepository,
             ObservationRepository observationRepository,
             FeedbackLedgerRecorder feedbackLedgerRecorder,
-            WorkspaceReviewDefaultsProvider workspaceDefaults) {
+            WorkspaceReviewDefaultsProvider workspaceDefaults,
+            WorkspaceRepository workspaceRepository) {
         this.practiceRepository = practiceRepository;
         this.observationRepository = observationRepository;
         this.feedbackLedgerRecorder = feedbackLedgerRecorder;
         this.workspaceDefaults = workspaceDefaults;
+        this.workspaceRepository = workspaceRepository;
     }
 
     /** The subset of {@code observations} that may be placed on the artifact, in the order given. */
@@ -73,6 +78,13 @@ class InContextDeliveryGate {
                 || job.getWorkspace() == null
                 || job.getWorkspace().getId() == null) {
             return observations;
+        }
+        long workspaceId = job.getWorkspace().getId();
+        FeedbackSuppressionReason rolloutRefusal =
+                refusalIfRolloutRevisionMoved(job.getPracticeRolloutRevision(), workspaceId);
+        if (rolloutRefusal != null) {
+            recordWithheld(job, observations, rolloutRefusal);
+            return List.of();
         }
         ObservationOrigin origin = PracticeDetectionDeliveryService.originOf(job.getMetadata());
         if (!origin.delivers(FeedbackChannel.IN_CONTEXT)) {
@@ -85,11 +97,9 @@ class InContextDeliveryGate {
             return List.of();
         }
 
-        WorkspaceReviewDefaults defaults =
-                workspaceDefaults.forWorkspace(job.getWorkspace().getId());
+        WorkspaceReviewDefaults defaults = workspaceDefaults.forWorkspace(workspaceId);
         Map<String, PracticeAutonomy> autonomyBySlug = new HashMap<>();
-        for (Practice practice :
-                practiceRepository.findByWorkspaceId(job.getWorkspace().getId())) {
+        for (Practice practice : practiceRepository.findByWorkspaceId(workspaceId)) {
             autonomyBySlug.put(
                     practice.getSlug(), AutonomyResolver.effectiveAutonomyOf(practice, defaults.defaultAutonomy()));
         }
@@ -127,13 +137,13 @@ class InContextDeliveryGate {
         if (observations.isEmpty()
                 || job.getWorkspace() == null
                 || job.getWorkspace().getId() == null) return List.of();
+        long workspaceId = job.getWorkspace().getId();
+        if (refusalIfRolloutRevisionMoved(job.getPracticeRolloutRevision(), workspaceId) != null) return List.of();
         ObservationOrigin origin = PracticeDetectionDeliveryService.originOf(job.getMetadata());
         if (!origin.delivers(FeedbackChannel.IN_CONTEXT)) return List.of();
-        WorkspaceReviewDefaults defaults =
-                workspaceDefaults.forWorkspace(job.getWorkspace().getId());
+        WorkspaceReviewDefaults defaults = workspaceDefaults.forWorkspace(workspaceId);
         Map<String, PracticeAutonomy> autonomyBySlug = new HashMap<>();
-        for (Practice practice :
-                practiceRepository.findByWorkspaceId(job.getWorkspace().getId())) {
+        for (Practice practice : practiceRepository.findByWorkspaceId(workspaceId)) {
             autonomyBySlug.put(
                     practice.getSlug(), AutonomyResolver.effectiveAutonomyOf(practice, defaults.defaultAutonomy()));
         }
@@ -173,5 +183,19 @@ class InContextDeliveryGate {
                 log.warn("Withheld-feedback ledger write failed (delivery unaffected): jobId={}", job.getId(), e);
             }
         }
+    }
+
+    private @Nullable FeedbackSuppressionReason refusalIfRolloutRevisionMoved(
+            @Nullable Long admittedRevision, long workspaceId) {
+        Long revisionInForceNow = workspaceRepository
+                .findById(workspaceId)
+                .map(workspace -> workspace.getReviewSettings().getRolloutRevision())
+                .orElse(null);
+        if (admittedRevision == null
+                || revisionInForceNow == null
+                || admittedRevision.longValue() != revisionInForceNow.longValue()) {
+            return FeedbackSuppressionReason.STALE_ROLLOUT_REVISION;
+        }
+        return null;
     }
 }

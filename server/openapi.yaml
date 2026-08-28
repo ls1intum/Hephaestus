@@ -5304,6 +5304,11 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: header
+        name: If-Match
+        required: false
+        schema:
+          type: string
       requestBody:
         content:
           application/json:
@@ -5318,6 +5323,33 @@ paths:
                 $ref: "#/components/schemas/PracticeReviewSettings"
           description: Policy updated
       summary: Update the workspace's practice-review policy
+      tags:
+      - Practice Review Settings
+  /workspaces/{workspaceSlug}/practices/review-settings/coverage-preview:
+    post:
+      operationId: previewCoverage
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkspaceReviewScope"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeReviewCoveragePreview"
+          description: OK
+      summary: Preview the effective counts for proposed practice-review coverage
       tags:
       - Practice Review Settings
   /workspaces/{workspaceSlug}/practices/reviewed:
@@ -5481,6 +5513,8 @@ paths:
             enum:
             - AWAITING_APPROVAL
             - PREPARED
+            - PARTIALLY_DELIVERED
+            - PARTIALLY_FAILED
             - DELIVERED
             - SUPERSEDED
             - SUPPRESSED
@@ -5507,6 +5541,9 @@ paths:
             - EMPTY_AFTER_SANITIZE
             - INSTANCE_SILENCED
             - WORKSPACE_DISABLED
+            - WORKSPACE_DELIVERY_PAUSED
+            - STALE_ROLLOUT_REVISION
+            - OUTSIDE_CURRENT_COVERAGE
             - APPROVAL_STALE
             - APPROVAL_NO_LONGER_ELIGIBLE
             - PRACTICE_REQUIRES_APPROVAL
@@ -9532,6 +9569,149 @@ components:
           - OTHER
       required:
       - decision
+    DeliveryPolicyFactsSnapshot:
+      type: object
+      properties:
+        artifactKind:
+          type: string
+        baseBranch:
+          type: string
+        branchMatched:
+          type: boolean
+        contributingPractices:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeFact"
+        deliveryStatus:
+          type: string
+          enum:
+          - ACTIVE
+          - PAUSED
+        personMatched:
+          type: boolean
+        personMode:
+          type: string
+          enum:
+          - ALL_ELIGIBLE
+          - SELECTED
+        recipientConsent:
+          type: boolean
+        repository:
+          type: string
+        repositoryMatched:
+          type: boolean
+        repositoryMode:
+          type: string
+          enum:
+          - ALL_MONITORED
+          - SELECTED
+        subject:
+          type: string
+          enum:
+          - RESOLVED_LINKED_HUMAN
+          - MISSING
+          - NON_HUMAN
+          - UNLINKED
+        triggerMode:
+          type: string
+          enum:
+          - AUTO
+          - MANUAL
+    DeliveryPolicyTrace:
+      type: object
+      properties:
+        admittedRevision:
+          type: integer
+          format: int64
+        allowed:
+          type: boolean
+        checks:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeliveryPolicyTraceCheck"
+        decisiveReason:
+          type: string
+          enum:
+          - VOLUME_CAPPED
+          - COMPOSER_DEDUPED
+          - REACTED_DISPUTED
+          - REACTED_NOT_APPLICABLE
+          - CONVERSATION_EXPIRED
+          - ARTIFACT_GONE
+          - ARTIFACT_CLOSED
+          - ARTIFACT_MERGED
+          - ARTIFACT_DRAFT
+          - RECIPIENT_OPTED_OUT
+          - EMPTY_AFTER_SANITIZE
+          - INSTANCE_SILENCED
+          - WORKSPACE_DISABLED
+          - WORKSPACE_DELIVERY_PAUSED
+          - STALE_ROLLOUT_REVISION
+          - OUTSIDE_CURRENT_COVERAGE
+          - APPROVAL_STALE
+          - APPROVAL_NO_LONGER_ELIGIBLE
+          - PRACTICE_REQUIRES_APPROVAL
+          - BACKFILL_QUIET
+        evaluatedAt:
+          type: string
+          format: date-time
+        evaluatedRevision:
+          type: integer
+          format: int64
+        facts:
+          $ref: "#/components/schemas/DeliveryPolicyFactsSnapshot"
+        resolverVersion:
+          type: string
+        reviewId:
+          type: string
+          format: uuid
+        stage:
+          type: string
+          enum:
+          - COMPOSITION
+          - AUTOMATIC
+          - APPROVED
+          - EGRESS
+        surface:
+          type: string
+          enum:
+          - ARTIFACT
+          - IN_APP
+          - CONVERSATION
+      required:
+      - admittedRevision
+      - allowed
+      - checks
+      - evaluatedAt
+      - facts
+      - resolverVersion
+      - reviewId
+      - stage
+      - surface
+    DeliveryPolicyTraceCheck:
+      type: object
+      properties:
+        check:
+          type: string
+          enum:
+          - INSTANCE_SILENT_MODE
+          - WORKSPACE_ENABLED
+          - ROLLOUT_REVISION
+          - WORKSPACE_DELIVERY
+          - CURRENT_COVERAGE
+          - PRACTICE_AUTHORITY
+          - RECIPIENT_CONSENT
+          - ARTIFACT_ELIGIBILITY
+        status:
+          type: string
+          enum:
+          - PASSED
+          - DENIED
+          - NOT_APPLICABLE
+          - NOT_REACHED
+      required:
+      - check
+      - status
     DeveloperPracticeSummary:
       type: object
       description: Per-practice observation summary for a developer
@@ -11544,6 +11724,17 @@ components:
       - selectionScope
       - sourceKind
       - supportsExhaustiveEvidence
+    PracticeFact:
+      type: object
+      properties:
+        autonomy:
+          type: string
+          enum:
+          - "OFF"
+          - HUMAN_APPROVAL
+          - AUTOMATIC
+        slug:
+          type: string
     PracticeGroup:
       type: object
       description: A practice group grouping related practices into a learning objective
@@ -11819,6 +12010,59 @@ components:
       required:
       - displayName
       - signal
+    PracticeReviewCoveragePreview:
+      type: object
+      properties:
+        current:
+          $ref: "#/components/schemas/PracticeReviewCoverageSummary"
+          description: Effective coverage before the proposed change
+        proposed:
+          $ref: "#/components/schemas/PracticeReviewCoverageSummary"
+          description: Effective coverage if the proposed change is applied
+        widens:
+          type: boolean
+          description: "Whether the proposal admits any repository, branch, or person\
+            \ excluded now"
+      required:
+      - current
+      - proposed
+      - widens
+    PracticeReviewCoverageSummary:
+      type: object
+      properties:
+        coveredPeople:
+          type: integer
+          format: int32
+          description: Eligible linked members admitted by the people coverage axis
+        coveredRepositories:
+          type: integer
+          format: int32
+          description: Monitored repositories admitted by the repository coverage
+            axis
+        eligiblePeople:
+          type: integer
+          format: int32
+          description: Eligible linked human members in the workspace
+        estimateWindowDays:
+          type: integer
+          format: int32
+          description: Number of days included in recentReviewVolume
+        monitoredRepositories:
+          type: integer
+          format: int32
+          description: Repositories currently monitored by the workspace
+        recentReviewVolume:
+          type: integer
+          format: int32
+          description: Workspace-wide practice-review jobs created during the estimate
+            window
+      required:
+      - coveredPeople
+      - coveredRepositories
+      - eligiblePeople
+      - estimateWindowDays
+      - monitoredRepositories
+      - recentReviewVolume
     PracticeReviewSettings:
       type: object
       description: "A workspace's practice-review policy: effective values plus raw\
@@ -11832,6 +12076,8 @@ components:
           type: integer
           format: int32
           description: Raw override; null = inheriting the fleet default
+        coverageSummary:
+          $ref: "#/components/schemas/PracticeReviewCoverageSummary"
         defaultAutonomy:
           type: string
           description: "Effective: how much autonomy the system has over practices\
@@ -11855,17 +12101,33 @@ components:
         deliverToMergedOverride:
           type: boolean
           description: Raw override; null = inheriting the fleet default
+        deliveryStatus:
+          type: string
+          description: Whether new external practice feedback may be sent
+          enum:
+          - ACTIVE
+          - PAUSED
+        etag:
+          type: string
+          description: Strong entity tag to send in If-Match when updating this rollout
         reviewScope:
           $ref: "#/components/schemas/WorkspaceReviewScope"
-          description: "Which work is reviewed at all, ANDed onto every practice binding.\
-            \ Empty lists mean no restriction on that axis. Exact names only — no\
-            \ patterns, and no path scope (changed paths are not known where the decision\
-            \ is made)."
+          description: Explicit all-or-selected repository and person coverage. Selected-empty
+            means nobody.
+        revision:
+          type: integer
+          format: int64
+          description: Monotonic rollout revision carried by automatically admitted
+            review jobs
       required:
       - cooldownMinutes
+      - coverageSummary
       - defaultAutonomy
       - deliverToMerged
+      - deliveryStatus
+      - etag
       - reviewScope
+      - revision
     PracticeSignalOption:
       type: object
       description: A signal a practice can start an automated review on
@@ -12128,6 +12390,9 @@ components:
             - EMPTY_AFTER_SANITIZE
             - INSTANCE_SILENCED
             - WORKSPACE_DISABLED
+            - WORKSPACE_DELIVERY_PAUSED
+            - STALE_ROLLOUT_REVISION
+            - OUTSIDE_CURRENT_COVERAGE
             - APPROVAL_STALE
             - APPROVAL_NO_LONGER_ELIGIBLE
             - PRACTICE_REQUIRES_APPROVAL
@@ -12967,6 +13232,8 @@ components:
           enum:
           - AWAITING_APPROVAL
           - PREPARED
+          - PARTIALLY_DELIVERED
+          - PARTIALLY_FAILED
           - DELIVERED
           - SUPERSEDED
           - SUPPRESSED
@@ -12983,7 +13250,8 @@ components:
           - SUPPORTING
         suppressionReason:
           type: string
-          description: Why the message was withheld; null unless the state is SUPPRESSED
+          description: Why delivery stopped; set on withheld or terminally partial
+            feedback
           enum:
           - VOLUME_CAPPED
           - COMPOSER_DEDUPED
@@ -12998,6 +13266,9 @@ components:
           - EMPTY_AFTER_SANITIZE
           - INSTANCE_SILENCED
           - WORKSPACE_DISABLED
+          - WORKSPACE_DELIVERY_PAUSED
+          - STALE_ROLLOUT_REVISION
+          - OUTSIDE_CURRENT_COVERAGE
           - APPROVAL_STALE
           - APPROVAL_NO_LONGER_ELIGIBLE
           - PRACTICE_REQUIRES_APPROVAL
@@ -13110,6 +13381,8 @@ components:
           enum:
           - AWAITING_APPROVAL
           - PREPARED
+          - PARTIALLY_DELIVERED
+          - PARTIALLY_FAILED
           - DELIVERED
           - SUPERSEDED
           - SUPPRESSED
@@ -13135,7 +13408,8 @@ components:
           description: Whose work the feedback addresses; may equal the recipient
         suppressionReason:
           type: string
-          description: Why the feedback was withheld; null unless the state is SUPPRESSED
+          description: Why delivery stopped; set on withheld or terminally partial
+            feedback
           enum:
           - VOLUME_CAPPED
           - COMPOSER_DEDUPED
@@ -13150,6 +13424,9 @@ components:
           - EMPTY_AFTER_SANITIZE
           - INSTANCE_SILENCED
           - WORKSPACE_DISABLED
+          - WORKSPACE_DELIVERY_PAUSED
+          - STALE_ROLLOUT_REVISION
+          - OUTSIDE_CURRENT_COVERAGE
           - APPROVAL_STALE
           - APPROVAL_NO_LONGER_ELIGIBLE
           - PRACTICE_REQUIRES_APPROVAL
@@ -13194,6 +13471,10 @@ components:
         agentJobId:
           type: string
           format: uuid
+        approval:
+          $ref: "#/components/schemas/FeedbackApproval"
+          description: "Immutable human decision for this proposal, when one has been\
+            \ made"
         artifact:
           $ref: "#/components/schemas/ReviewArtifact"
           description: Work item the feedback targets; null when it is unanchored
@@ -13201,7 +13482,7 @@ components:
           type: string
           description: "Stored composed body; null when none was produced, and always\
             \ null on the IN_APP and IN_CHAT channels — neither the developer's practice\
-            \ pages nor the mentor's queued move is readable by an operator"
+            \ pages nor the mentor's prepared context is readable by an operator"
         channel:
           type: string
           enum:
@@ -13215,11 +13496,18 @@ components:
           type: string
           format: date-time
           description: When the feedback was placed; null if it was not delivered
+        deliveryPolicy:
+          type: array
+          description: Ordered delivery-policy evaluations for this feedback's review
+          items:
+            $ref: "#/components/schemas/DeliveryPolicyTrace"
         deliveryState:
           type: string
           enum:
           - AWAITING_APPROVAL
           - PREPARED
+          - PARTIALLY_DELIVERED
+          - PARTIALLY_FAILED
           - DELIVERED
           - SUPERSEDED
           - SUPPRESSED
@@ -13238,6 +13526,12 @@ components:
           description: Recorded placements; empty when none
           items:
             $ref: "#/components/schemas/ReviewPlacement"
+        proposedPlacements:
+          type: array
+          description: Exact ordered summary and inline messages covered by the approval
+            decision
+          items:
+            $ref: "#/components/schemas/ReviewProposedPlacement"
         recipient:
           $ref: "#/components/schemas/ReviewSubject"
           description: Who the feedback is addressed to; null when the identity is
@@ -13246,12 +13540,16 @@ components:
           type: string
           format: uuid
           description: The feedback this one replaced; null on a first delivery
+        reviewedRevision:
+          type: string
+          description: Reviewed source revision for an immutable approval package
         subject:
           $ref: "#/components/schemas/ReviewSubject"
           description: Whose work the feedback addresses; may equal the recipient
         suppressionReason:
           type: string
-          description: Why the feedback was withheld; null unless the state is SUPPRESSED
+          description: Why delivery stopped; set on withheld or terminally partial
+            feedback
           enum:
           - VOLUME_CAPPED
           - COMPOSER_DEDUPED
@@ -13266,6 +13564,9 @@ components:
           - EMPTY_AFTER_SANITIZE
           - INSTANCE_SILENCED
           - WORKSPACE_DISABLED
+          - WORKSPACE_DELIVERY_PAUSED
+          - STALE_ROLLOUT_REVISION
+          - OUTSIDE_CURRENT_COVERAGE
           - APPROVAL_STALE
           - APPROVAL_NO_LONGER_ELIGIBLE
           - PRACTICE_REQUIRES_APPROVAL
@@ -13277,10 +13578,12 @@ components:
       - agentJobId
       - channel
       - createdAt
+      - deliveryPolicy
       - deliveryState
       - id
       - observations
       - placements
+      - proposedPlacements
     ReviewFeedbackDisposition:
       type: object
       description: Counts of feedback by delivery state
@@ -13568,6 +13871,49 @@ components:
       required:
       - name
       - slug
+    ReviewProposedPlacement:
+      type: object
+      description: One exact provider message included in a review awaiting approval
+      properties:
+        body:
+          type: string
+        endLine:
+          type: integer
+          format: int32
+          description: Last 1-based line; null for a single-line comment or summary
+        path:
+          type: string
+          description: Head-side file path; null for the summary
+        startLine:
+          type: integer
+          format: int32
+          description: First 1-based line; null for the summary
+        type:
+          type: string
+          enum:
+          - SUMMARY
+          - INLINE
+          - CONVERSATION_TURN
+      required:
+      - body
+      - type
+    ReviewRepositoryTarget:
+      type: object
+      properties:
+        baseBranches:
+          type: array
+          description: Exact pull-request base branches to cover; empty covers every
+            base branch
+          items:
+            type: string
+        nameWithOwner:
+          type: string
+          description: "Exact provider repository name, including its owner"
+          maxLength: 255
+          minLength: 0
+      required:
+      - baseBranches
+      - nameWithOwner
     ReviewRequestOutcome:
       type: object
       description: What came of asking for a review
@@ -13587,6 +13933,7 @@ components:
           - REQUESTER_QUOTA_EXHAUSTED
           - CONCURRENT_DUPLICATE
           - OUT_OF_REVIEW_SCOPE
+          - STALE_ROLLOUT_REVISION
           - WORKSPACE_INACTIVE
           - PRACTICES_DISABLED
           - NO_ACTIVE_PRACTICE
@@ -14345,6 +14692,7 @@ components:
           - REQUESTER_QUOTA_EXHAUSTED
           - CONCURRENT_DUPLICATE
           - OUT_OF_REVIEW_SCOPE
+          - STALE_ROLLOUT_REVISION
           - WORKSPACE_INACTIVE
           - PRACTICES_DISABLED
           - NO_ACTIVE_PRACTICE
@@ -14799,6 +15147,13 @@ components:
         deliverToMerged:
           type: boolean
           description: Deliver feedback to already-merged PRs/MRs
+        deliveryStatus:
+          type: string
+          description: Pause or activate external feedback. Resume never releases
+            work from an older revision.
+          enum:
+          - ACTIVE
+          - PAUSED
         reset:
           type: array
           description: Fields to reset back to inherit
@@ -14813,9 +15168,8 @@ components:
           uniqueItems: true
         reviewScope:
           $ref: "#/components/schemas/WorkspaceReviewScope"
-          description: "Replaces the review scope wholesale (the lists ARE the setting,\
-            \ so a merge could only ever add). Null leaves it unchanged; two empty\
-            \ lists clear it back to unrestricted."
+          description: Replaces repository and person coverage wholesale. Null leaves
+            it unchanged.
     UpdateRepositorySettingsRequest:
       type: object
       description: Request to update repository contribution visibility settings in
@@ -15640,6 +15994,10 @@ components:
           type: string
           format: date-time
           description: Timestamp when the membership was created
+        eligibleForPracticeReview:
+          type: boolean
+          description: Whether this linked human member can be selected for practice-review
+            coverage
         hidden:
           type: boolean
           description: Whether the member is hidden from the leaderboard
@@ -15684,43 +16042,33 @@ components:
           description: "GitLab workspace provider config, null if not available"
     WorkspaceReviewScope:
       type: object
-      description: |-
-        The workspace's answer to "which of our work is reviewed at all", ANDed onto every practice binding.
-         It exists because a binding says <code>scm.pull_request.merged</code> and cannot say <em>merged into
-         what</em>: a trunk is named <code>main</code> here and <code>develop</code> there, which is a deployment fact
-         about one workspace that a centrally curated catalogue cannot carry.
-
-         <p>The scope only ever narrows, never widens: an empty or absent list means "no restriction on this
-         axis".
-
-         <h2>What this cannot express, and why</h2>
-
-         <ul>
-           <li><strong>Changed paths.</strong> Not decidable here: the detection gate holds the
-               <code>PullRequest</code> row, not the diff, and changed paths do not exist until the evidence stage,
-               by which point the review has been admitted and paid for. A path axis here would be a predicate
-               that quietly never narrows anything.
-           <li><strong>Branch patterns.</strong> Exact names only; adding globs later stays backward
-               compatible, taking them away would not.
-           <li><strong>Any third key.</strong> The vocabulary is closed at the column
-               (<code>chk_workspace_review_scope</code>), not by this type: a reader configured to ignore unknown
-               fields would drop the key in silence, leaving a workspace believing a restriction was in force.
-         </ul>
+      description: Selecting specific repositories or people with an empty selection
+        admits nobody. A selected repository without branches admits all its branches.
       properties:
+        personMode:
+          type: string
+          enum:
+          - ALL_ELIGIBLE
+          - SELECTED
+        personUserIds:
+          type: array
+          items:
+            type: integer
+            format: int64
         repositories:
           type: array
-          description: |-
-            exact <code>owner/name</code> repository identifiers. Empty = every monitored
-                 repository. This narrows <em>review</em> within the set the workspace already syncs; it never
-                 adds one.
           items:
-            type: string
-        targetBranches:
-          type: array
-          description: exact target-branch names (a PR's base ref). Empty = every
-            branch.
-          items:
-            type: string
+            $ref: "#/components/schemas/ReviewRepositoryTarget"
+        repositoryMode:
+          type: string
+          enum:
+          - ALL_MONITORED
+          - SELECTED
+      required:
+      - personMode
+      - personUserIds
+      - repositories
+      - repositoryMode
     WorkspaceTeamRepositorySettings:
       type: object
       description: Repository contribution visibility settings for a specific team

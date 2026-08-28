@@ -2,21 +2,17 @@ package de.tum.cit.aet.hephaestus.workspace.settings;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
+import org.hibernate.annotations.ColumnDefault;
 import org.jspecify.annotations.Nullable;
 
 /**
  * Per-workspace overrides for practice-review trigger/delivery policy. Embedded on
  * {@link de.tum.cit.aet.hephaestus.workspace.Workspace}.
- *
- * <p>Every field is nullable on purpose: {@code null} means "this workspace has not decided". Scalars
- * resolve to the fleet default ({@code hephaestus.practice-review.*}) via the {@code resolveX(fallback)}
- * accessors; {@link #reviewScope} and {@link #defaultAutonomy} have no fleet default and resolve
- * {@code null} to a constant instead, documented at each field.
  *
  * <p>PATCH {@code null} means "no change"; to reset a field back to inherit, name it in the PATCH
  * {@code reset} set (see {@link #reset(java.util.Set)}).
@@ -42,16 +38,28 @@ public class PracticeReviewSettings {
     @Nullable
     private Integer cooldownMinutes;
 
-    /**
-     * Which of the workspace's work is reviewed at all — ANDed onto every practice binding. No fleet
-     * default to inherit (a trunk name is a fact about one deployment); {@code null} means unrestricted.
-     *
-     * @see WorkspaceReviewScope
-     */
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "practice_review_scope", columnDefinition = "jsonb")
-    @Nullable
-    private WorkspaceReviewScope reviewScope;
+    @Enumerated(EnumType.STRING)
+    @ColumnDefault("'ALL_MONITORED'")
+    @Column(name = "practice_repository_coverage_mode", nullable = false, length = 24)
+    private ReviewRepositoryMode repositoryCoverageMode = ReviewRepositoryMode.ALL_MONITORED;
+
+    @Enumerated(EnumType.STRING)
+    @ColumnDefault("'ALL_ELIGIBLE'")
+    @Column(name = "practice_person_coverage_mode", nullable = false, length = 24)
+    private ReviewPersonMode personCoverageMode = ReviewPersonMode.ALL_ELIGIBLE;
+
+    @Enumerated(EnumType.STRING)
+    @ColumnDefault("'ACTIVE'")
+    @Column(name = "practice_delivery_status", nullable = false, length = 16)
+    private PracticeDeliveryStatus deliveryStatus = PracticeDeliveryStatus.ACTIVE;
+
+    @ColumnDefault("0")
+    @Column(name = "practice_rollout_revision", nullable = false)
+    private long rolloutRevision;
+
+    @ColumnDefault("0")
+    @Column(name = "practice_config_version", nullable = false)
+    private long configVersion;
 
     // Kept as a String because the workspace module cannot depend on the practices module.
     @Column(name = "practice_default_autonomy", length = 16)
@@ -66,24 +74,27 @@ public class PracticeReviewSettings {
         return cooldownMinutes != null ? cooldownMinutes : fallback;
     }
 
-    public WorkspaceReviewScope resolveReviewScope() {
-        return reviewScope != null ? reviewScope : WorkspaceReviewScope.UNRESTRICTED;
-    }
-
     /** PATCH semantics: only non-null fields overwrite; null leaves the current value untouched. */
     public void applyPatch(@Nullable Boolean deliverToMerged, @Nullable Integer cooldownMinutes) {
         if (deliverToMerged != null) this.deliverToMerged = deliverToMerged;
         if (cooldownMinutes != null) this.cooldownMinutes = cooldownMinutes;
     }
 
-    /**
-     * Replace the review scope wholesale. Deliberately not a merge: the lists ARE the setting, so
-     * "remove develop" has to be expressible, and a merging patch could only ever add.
-     */
-    public void applyScope(@Nullable WorkspaceReviewScope scope) {
-        if (scope != null) {
-            this.reviewScope = scope.isUnrestricted() ? null : scope;
-        }
+    public void applyRollout(
+            @Nullable ReviewRepositoryMode repositoryMode,
+            @Nullable ReviewPersonMode personMode,
+            @Nullable PracticeDeliveryStatus deliveryStatus) {
+        if (repositoryMode != null) this.repositoryCoverageMode = repositoryMode;
+        if (personMode != null) this.personCoverageMode = personMode;
+        if (deliveryStatus != null) this.deliveryStatus = deliveryStatus;
+    }
+
+    public long incrementRolloutRevision() {
+        return ++rolloutRevision;
+    }
+
+    public long incrementConfigVersion() {
+        return ++configVersion;
     }
 
     /**
@@ -121,7 +132,8 @@ public class PracticeReviewSettings {
                             yield true;
                         }
                         case REVIEW_SCOPE -> {
-                            this.reviewScope = null;
+                            this.repositoryCoverageMode = ReviewRepositoryMode.ALL_MONITORED;
+                            this.personCoverageMode = ReviewPersonMode.ALL_ELIGIBLE;
                             yield true;
                         }
                         case DEFAULT_AUTONOMY -> {

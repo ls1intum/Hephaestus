@@ -36,6 +36,8 @@ import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Duration;
 import java.time.Instant;
@@ -122,6 +124,9 @@ class ReviewSweepSpendGuardIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private WorkspaceMembershipService workspaceMembershipService;
+
     private Workspace workspace;
     private long pullRequestId;
 
@@ -170,6 +175,8 @@ class ReviewSweepSpendGuardIntegrationTest extends BaseIntegrationTest {
                 .orElseGet(() -> gitProviderRepository.save(
                         new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
         User author = userRepository.save(TestUserFactory.createUser(5001L, "sweep-author", provider));
+        workspaceMembershipService.createMembership(
+                workspace, author.getId(), WorkspaceMembership.WorkspaceRole.MEMBER);
 
         Repository repository = new Repository();
         repository.setNativeId(5101L);

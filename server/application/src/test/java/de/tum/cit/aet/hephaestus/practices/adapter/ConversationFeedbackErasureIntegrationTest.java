@@ -14,6 +14,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluation;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyStage;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicySurface;
 import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
@@ -64,6 +68,9 @@ class ConversationFeedbackErasureIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private FeedbackObservationRepository feedbackObservationRepository;
+
+    @Autowired
+    private DeliveryPolicyEvaluationRepository evaluationRepository;
 
     @Autowired
     private PracticeRepository practiceRepository;
@@ -134,6 +141,8 @@ class ConversationFeedbackErasureIntegrationTest extends BaseIntegrationTest {
         UUID otherWsObs = seedBoundObservationAndFeedback(
                 jobB, practiceB, recipientB, ArtifactKinds.CONVERSATION_THREAD, thread1);
         UUID otherWsFb = lastFeedbackId;
+        seedEvaluation(jobA);
+        seedEvaluation(jobB);
 
         assertThat(feedbackObservationRepository.count()).isEqualTo(4);
 
@@ -155,6 +164,8 @@ class ConversationFeedbackErasureIntegrationTest extends BaseIntegrationTest {
         // …and the other workspace's conversation rows (same artifact_id, different tenant) survive.
         assertThat(observationRepository.findById(otherWsObs)).isPresent();
         assertThat(feedbackRepository.findById(otherWsFb)).isPresent();
+        assertThat(evaluationsFor(workspaceA, jobA)).isEmpty();
+        assertThat(evaluationsFor(workspaceB, jobB)).hasSize(1);
 
         // The join rows of the two erased conversation feedback units cascaded away; the 2 survivors' joins remain.
         assertThat(feedbackObservationRepository.count()).isEqualTo(2);
@@ -248,6 +259,19 @@ class ConversationFeedbackErasureIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void erasesConversationPolicyTracesWithTheirSubjectWithoutCrossingTenants() {
+        seedBoundObservationAndFeedback(jobA, practiceA, recipientA, ArtifactKinds.CONVERSATION_THREAD, 9101L);
+        seedEvaluation(jobA);
+        seedBoundObservationAndFeedback(jobB, practiceB, recipientA, ArtifactKinds.CONVERSATION_THREAD, 9102L);
+        seedEvaluation(jobB);
+
+        erasure.eraseConversationFeedbackAboutUser(workspaceA.getId(), recipientA.getId());
+
+        assertThat(evaluationsFor(workspaceA, jobA)).isEmpty();
+        assertThat(evaluationsFor(workspaceB, jobB)).hasSize(1);
+    }
+
+    @Test
     @DisplayName("idempotent: empty thread set and threads with no derived rows delete nothing")
     void idempotentOnEmptyOrUnmatchedInput() {
         UUID convObs =
@@ -323,7 +347,27 @@ class ConversationFeedbackErasureIntegrationTest extends BaseIntegrationTest {
         AgentJob job = new AgentJob();
         job.setWorkspace(workspace);
         job.setJobType(AgentJobType.CONVERSATION_REVIEW);
+        job.setArtifactKind(ArtifactKinds.CONVERSATION_THREAD);
         job.setConfigSnapshot(OM.valueToTree(Map.of("model", "test")));
         return agentJobRepository.save(job);
+    }
+
+    private void seedEvaluation(AgentJob job) {
+        evaluationRepository.save(DeliveryPolicyEvaluation.builder()
+                .workspaceId(job.getWorkspace().getId())
+                .agentJobId(job.getId())
+                .admittedRevision(0L)
+                .resolverVersion("1")
+                .surface(DeliveryPolicySurface.CONVERSATION)
+                .stage(DeliveryPolicyStage.EGRESS)
+                .allowed(true)
+                .checks(OM.createArrayNode())
+                .facts(OM.createObjectNode())
+                .build());
+    }
+
+    private List<DeliveryPolicyEvaluation> evaluationsFor(Workspace workspace, AgentJob job) {
+        return evaluationRepository.findByWorkspaceIdAndAgentJobIdAndFeedbackIdIsNullAndSurfaceOrderByEvaluatedAtAsc(
+                workspace.getId(), job.getId(), DeliveryPolicySurface.CONVERSATION);
     }
 }

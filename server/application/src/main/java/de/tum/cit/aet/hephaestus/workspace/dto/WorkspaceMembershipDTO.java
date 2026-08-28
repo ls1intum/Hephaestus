@@ -29,7 +29,10 @@ public record WorkspaceMembershipDTO(
         Instant createdAt,
 
         @Schema(description = "Whether the member is hidden from the leaderboard")
-        boolean hidden) {
+        boolean hidden,
+
+        @Schema(description = "Whether this linked human member can be selected for practice-review coverage")
+        boolean eligibleForPracticeReview) {
     public static WorkspaceMembershipDTO from(WorkspaceMembership membership) {
         return from(membership, membership.getRole());
     }
@@ -43,6 +46,7 @@ public record WorkspaceMembershipDTO(
                 effectiveRole,
                 membership.getLeaguePoints(),
                 membership.getCreatedAt(),
-                membership.isHidden());
+                membership.isHidden(),
+                membership.hasHumanUser());
     }
 }
