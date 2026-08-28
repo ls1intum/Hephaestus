@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Bug, ShieldCheck, Sparkles, UserRoundCog } from "lucide-react";
+
 import {
 	SidebarMenu,
 	SidebarMenuButton,

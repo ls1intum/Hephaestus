@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { refresh } from "@/api/sdk.gen";
+
 import { refreshAccessToken } from "./session-refresh";
 
 vi.mock("@/api/sdk.gen", () => ({ refresh: vi.fn() }));

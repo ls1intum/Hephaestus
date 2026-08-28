@@ -1,5 +1,7 @@
 import { BotMessageSquareIcon, MessageSquareQuoteIcon, UserRoundIcon } from "lucide-react";
+
 import type { ReviewFeedback } from "@/api/types.gen";
+
 import type { StatusDefs } from "./status-def";
 
 export type DeliveryPlace = ReviewFeedback["channel"];

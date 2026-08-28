@@ -1,8 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect } from "storybook/test";
+
 import type { ChatThreadSummary } from "@/api/types.gen";
 import { minutesBefore, STORY_NOW } from "@/components/common/story-clock";
 import { SidebarProvider } from "@/components/ui/sidebar";
+
 import { AppSidebar } from "./AppSidebar";
 
 const mockWorkspace = {

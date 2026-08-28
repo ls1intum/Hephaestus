@@ -1,5 +1,6 @@
 import { Folder, Rocket } from "lucide-react";
 import { describe, expect, it } from "vitest";
+
 import { getGroupVisual, ICON_NAMES, iconLabel, iconSearchText, PILL } from "./group-visuals";
 
 describe("groupVisuals", () => {

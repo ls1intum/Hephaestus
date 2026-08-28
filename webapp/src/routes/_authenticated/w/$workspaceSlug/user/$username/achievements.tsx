@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
+
 import { AchievementsView } from "@/components/achievements/AchievementsView";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Spinner } from "@/components/ui/spinner";

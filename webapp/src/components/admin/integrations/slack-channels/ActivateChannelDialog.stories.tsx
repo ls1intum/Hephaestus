@@ -1,7 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
+
 import type { SlackMonitoredChannel } from "@/api/types.gen";
 import { expectSettledVisible } from "@/test/overlay";
+
 import { ActivateChannelDialog } from "./ActivateChannelDialog";
 
 const channel: SlackMonitoredChannel = {

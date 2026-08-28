@@ -1,5 +1,7 @@
 import { type ReactNode, useLayoutEffect, useState } from "react";
+
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
+
 import { type DetailStackEntry, detailStackKey } from "./detail-stack";
 
 export interface DetailDrawerLevel {

@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent } from "storybook/test";
+
 import type { InstanceSettings } from "@/api/types.gen";
+
 import { SilentModeCard } from "./SilentModeCard";
 
 const released: InstanceSettings = {

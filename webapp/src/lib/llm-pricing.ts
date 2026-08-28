@@ -1,4 +1,5 @@
 import type { LlmModel } from "@/api/types.gen";
+
 import { formatRateUsd } from "./money";
 
 export type PricingMode = "PRICED" | "NO_CHARGE" | "UNPRICED";

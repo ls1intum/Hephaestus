@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { ScanSearchIcon } from "lucide-react";
+
 import type { GetPracticeReviewFeedbackResponse, Practice, ReviewPlacement } from "@/api/types.gen";
 import { MissingRecordEmpty } from "@/components/common/MissingRecordEmpty";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
@@ -15,7 +16,10 @@ import {
 	EmptyTitle,
 } from "@/components/ui/empty";
 import { Spinner } from "@/components/ui/spinner";
+
 import { FeedbackBody } from "./FeedbackBody";
+import { subjectLabel } from "./review-format";
+import { type FeedbackSearch, reviewScopeSearch } from "./review-search";
 import { ReviewArtifactLink, reviewArtifactTypeSlug } from "./ReviewArtifact";
 import { ClaimCurrentnessBadge, ObservationResultBadge } from "./ReviewBadges";
 import { ReviewBreadcrumbs } from "./ReviewBreadcrumbs";
@@ -28,8 +32,6 @@ import {
 import { ReviewPerson } from "./ReviewPerson";
 import { ReviewPracticeLink } from "./ReviewPracticeLink";
 import { ReviewRow, ReviewRowList, ReviewRowMeta } from "./ReviewRow";
-import { subjectLabel } from "./review-format";
-import { type FeedbackSearch, reviewScopeSearch } from "./review-search";
 
 export interface FeedbackDetailPageProps {
 	workspaceSlug: string;

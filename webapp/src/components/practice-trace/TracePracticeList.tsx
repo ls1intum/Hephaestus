@@ -1,4 +1,5 @@
 import { ArrowUpIcon } from "lucide-react";
+
 import type { PracticeTraceEntry, TracedSignal } from "@/api/types.gen";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { AutonomyBadge } from "@/components/practice-vocabulary/AutonomyBadge";
@@ -9,8 +10,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { artifactKindLabel } from "@/lib/artifact-kinds";
 import { PRACTICE_AUTONOMY_DESCRIPTIONS } from "@/lib/practice-autonomy";
 import { hasText } from "@/lib/text";
-import { TraceOutcomeBadge } from "./TraceOutcomeBadge";
+
 import { deliveryLabel, occurrenceDomId, WITHHELD_REASON_LABELS } from "./trace-format";
+import { TraceOutcomeBadge } from "./TraceOutcomeBadge";
 
 export interface TracePracticeListProps {
 	practices: PracticeTraceEntry[];

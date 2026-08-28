@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { MessageSquareTextIcon } from "lucide-react";
+
 import type { ReviewFeedback } from "@/api/types.gen";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { deliveryOutcome } from "@/components/practice-vocabulary/delivery-outcome-defs";
@@ -15,12 +16,13 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
+
 import { feedbackPreviewText } from "./feedback-preview";
+import { REVIEW_PAGE_SIZE, type ReviewScopeSearch } from "./review-search";
 import { ReviewArtifactLabel } from "./ReviewArtifact";
 import { ReviewPerson } from "./ReviewPerson";
 import { ReviewResultsSkeleton } from "./ReviewResultsSkeleton";
 import { ReviewRow, ReviewRowList, ReviewRowMeta } from "./ReviewRow";
-import { REVIEW_PAGE_SIZE, type ReviewScopeSearch } from "./review-search";
 
 /** See `ObservationResultsState`: a filtered empty state has to carry the way out of itself. */
 export type FeedbackResultsState =

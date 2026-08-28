@@ -1,7 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent } from "storybook/test";
+
 import type { SyncJob } from "@/api/types.gen";
 import { expectSettledVisible } from "@/test/overlay";
+
 import { SyncJobsTable } from "./SyncJobsTable";
 
 const runningJob: SyncJob = {

@@ -1,4 +1,5 @@
 import { assert, describe, expect, it } from "vitest";
+
 import { extractVotesFromThreadDetail, parseThreadMessages } from "./chat-validation";
 
 // chat-validation is the Zod boundary on untrusted server-provided chat content that mentor hydration

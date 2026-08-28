@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect } from "storybook/test";
+
 import { expectGenuinelyDisabled } from "@/test/controls";
+
 import { MonthNavigator } from "./MonthNavigator";
 
 const meta = {

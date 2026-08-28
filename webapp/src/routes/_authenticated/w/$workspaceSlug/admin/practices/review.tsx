@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { InfoIcon } from "lucide-react";
 import { toast } from "sonner";
+
 import {
 	autonomyRollupOptions,
 	getPracticeReviewSettingsOptions,
@@ -18,6 +19,7 @@ import type {
 	CreateReviewBackfillRunRequest,
 	UpdatePracticeReviewSettingsRequest,
 } from "@/api/types.gen";
+import { PracticeAutonomyPage } from "@/components/admin/practices/practice-autonomy/PracticeAutonomyPage";
 import { PracticeReviewBackfill } from "@/components/admin/practices/PracticeReviewBackfill";
 import {
 	type PracticeReviewField,
@@ -26,13 +28,12 @@ import {
 } from "@/components/admin/practices/PracticeReviewSettings";
 import { PracticeReviewSweepSchedule } from "@/components/admin/practices/PracticeReviewSweepSchedule";
 import { PracticeDefinitionSkeleton } from "@/components/admin/practices/PracticeSkeletons";
-import { PracticeAutonomyPage } from "@/components/admin/practices/practice-autonomy/PracticeAutonomyPage";
-import { ReviewPage } from "@/components/admin/practices/review/ReviewPage";
 import type { ReviewRunningState } from "@/components/admin/practices/review/review-readiness";
 import {
 	DEFAULT_REVIEW_SECTION,
 	reviewSearchSchema,
 } from "@/components/admin/practices/review/review-sections";
+import { ReviewPage } from "@/components/admin/practices/review/ReviewPage";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Spinner } from "@/components/ui/spinner";

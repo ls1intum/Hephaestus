@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync } from "node:fs";
+
 import { asRecord, asString, parseJson } from "./lib/json.ts";
 
 const version = asString(

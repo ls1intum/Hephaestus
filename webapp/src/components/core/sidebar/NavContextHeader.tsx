@@ -1,5 +1,6 @@
 import { ChevronLeft } from "lucide-react";
 import type { ReactElement, ReactNode } from "react";
+
 import {
 	SidebarGroup,
 	SidebarMenu,

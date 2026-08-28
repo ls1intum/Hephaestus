@@ -2,6 +2,7 @@ import type { TracedSignal } from "@/api/types.gen";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
 import { RefusalFixLink } from "./RefusalFixLink";
 import {
 	DISCOVERED_VIA_DESCRIPTIONS,

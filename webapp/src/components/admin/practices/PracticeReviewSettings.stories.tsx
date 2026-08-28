@@ -1,7 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent } from "storybook/test";
+
 import type { AgentBinding } from "@/api/types.gen";
 import { expectNoPageOverflow } from "@/test/reflow";
+
 import { PracticeReviewSettings } from "./PracticeReviewSettings";
 import { mockReviewSettings } from "./story-mock-data";
 

@@ -1,4 +1,5 @@
 import { FileQuestionIcon } from "lucide-react";
+
 import type { Practice, ReviewFeedback, ReviewObservation } from "@/api/types.gen";
 import {
 	Empty,
@@ -9,6 +10,7 @@ import {
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { artifactKindLabel, type KnownArtifactKind } from "@/lib/artifact-kinds";
+
 import { ReviewArtifactLink } from "./ReviewArtifact";
 import { ReviewBreadcrumbs } from "./ReviewBreadcrumbs";
 import { ReviewDetailHeader } from "./ReviewDetailHeader";

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { feedbackPreviewText } from "./feedback-preview";
 
 const preview = (bodyPreview: string | undefined, bodyTruncated = false) =>

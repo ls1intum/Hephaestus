@@ -1,5 +1,7 @@
 import type { VariantProps } from "class-variance-authority";
+
 import { Badge, type badgeVariants } from "@/components/ui/badge";
+
 import { type ConnectionHealth, HEALTH_LABEL } from "./sync-format";
 
 type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>["variant"]>;

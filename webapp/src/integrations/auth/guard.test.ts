@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { isAppAdmin, safeReturnTo } from "./guard";
 
 // `safeReturnTo` is the single open-redirect defense for the post-login `?returnTo` param.

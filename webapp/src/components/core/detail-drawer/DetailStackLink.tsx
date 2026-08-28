@@ -1,8 +1,11 @@
 import { Link, type LinkComponentProps } from "@tanstack/react-router";
+
 import { type DetailStackEntry, detailStackKey } from "./detail-stack";
 
-export interface DetailStackLinkProps
-	extends Omit<LinkComponentProps, "to" | "search" | "resetScroll"> {
+export interface DetailStackLinkProps extends Omit<
+	LinkComponentProps,
+	"to" | "search" | "resetScroll"
+> {
 	entry: DetailStackEntry;
 }
 

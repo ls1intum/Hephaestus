@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { Position, ReactFlowProvider } from "@xyflow/react";
 import type { ComponentProps } from "react";
+
 import { AchievementEdge } from "@/components/achievements/AchievementEdge";
 
 /**

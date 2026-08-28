@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
+
 import type { PullRequestInfo } from "@/api/types.gen";
 import { withProvider } from "@/stories/decorators";
+
 import { ReviewsPopover } from "./ReviewsPopover";
 
 const mockPullRequests: PullRequestInfo[] = [

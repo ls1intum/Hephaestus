@@ -1,5 +1,6 @@
 import { AlertTriangle } from "lucide-react";
 import { useState } from "react";
+
 import type { LlmModel, UpdateLlmModelSharingRequest } from "@/api/types.gen";
 import { FacetMultiSelect } from "@/components/common/FacetMultiSelect";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
@@ -14,6 +15,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+
 import { type ModelAccessScope, ModelAccessScopeChoice } from "./ModelAccessScopeChoice";
 import { type WorkspaceOption, workspaceFacetOptions } from "./workspace-options";
 

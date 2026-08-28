@@ -1,4 +1,5 @@
 import type { Edge, EdgeProps } from "@xyflow/react";
+
 import { useAnimationTime } from "@/hooks/use-animation-time";
 
 export type SynthwaveEdge = Edge<{ isEnabled: boolean }, "synthwave">;

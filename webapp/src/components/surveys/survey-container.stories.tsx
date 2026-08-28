@@ -2,10 +2,12 @@ import type { Meta, StoryObj } from "@storybook/react";
 import type * as React from "react";
 import { useState } from "react";
 import { fn } from "storybook/test";
+
 import { STORY_NOW } from "@/components/common/story-clock";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { PostHogSurvey } from "@/types/survey";
+
 import { SurveyContainer } from "./survey-container";
 
 const branchingSurvey: PostHogSurvey = {

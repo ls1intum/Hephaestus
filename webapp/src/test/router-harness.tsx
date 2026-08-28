@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-router";
 import { act, render } from "@testing-library/react";
 import type { ReactNode } from "react";
+
 import { AuthProvider } from "@/integrations/auth/AuthContext";
 import { routeTree } from "@/routeTree.gen";
 

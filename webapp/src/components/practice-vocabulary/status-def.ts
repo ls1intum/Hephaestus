@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+
 import type { FacetOption } from "@/components/common/FacetMultiSelect";
 
 /**

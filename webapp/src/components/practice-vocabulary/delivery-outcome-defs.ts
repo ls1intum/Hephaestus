@@ -11,7 +11,9 @@ import {
 	UserRoundIcon,
 	XCircleIcon,
 } from "lucide-react";
+
 import type { ReviewFeedback } from "@/api/types.gen";
+
 import type { StatusDef, StatusDefs } from "./status-def";
 
 export type DeliveryState = ReviewFeedback["deliveryState"];

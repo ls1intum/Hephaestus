@@ -7,9 +7,11 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { HttpResponse, http } from "msw";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { AuthProvider } from "@/integrations/auth/AuthContext";
 import { currentUser } from "@/mocks/fixtures/auth";
 import { server } from "@/mocks/server";
+
 import { DangerZoneSection } from "./DangerZoneSection";
 
 function renderWithClient(node: ReactNode) {

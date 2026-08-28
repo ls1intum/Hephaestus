@@ -1,5 +1,6 @@
 import type { Contributor } from "@/components/shared/ContributorGrid";
 import { Separator } from "@/components/ui/separator";
+
 import { AboutCallToActionSection } from "./AboutCallToActionSection";
 import { AboutHeroSection } from "./AboutHeroSection";
 import { AboutMissionSection } from "./AboutMissionSection";

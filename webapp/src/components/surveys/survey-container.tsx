@@ -1,6 +1,7 @@
 import { Progress as ProgressRoot } from "@base-ui/react/progress";
 import { AlertCircle, CheckCircle2, X } from "lucide-react";
 import { useState } from "react";
+
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,12 +12,12 @@ import {
 	EmptyTitle,
 } from "@/components/ui/empty";
 import { ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
-
 import type {
 	PostHogSurvey,
 	SurveyQuestion as SurveyQuestionType,
 	SurveyResponse,
 } from "@/types/survey";
+
 import { SurveyQuestion } from "./survey-question";
 import { determineNextQuestionIndex } from "./utils/branching";
 

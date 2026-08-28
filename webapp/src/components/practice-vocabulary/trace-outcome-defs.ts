@@ -10,7 +10,9 @@ import {
 	LoaderIcon,
 	UnplugIcon,
 } from "lucide-react";
+
 import type { PracticeTraceEntry } from "@/api/types.gen";
+
 import type { StatusDefs } from "./status-def";
 
 export type TraceOutcome = PracticeTraceEntry["outcome"];

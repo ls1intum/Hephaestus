@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent } from "storybook/test";
+
 import type { CuratedPracticeDefinition } from "@/api/types.gen";
 import {
 	mockAuthorDeclaredEvidenceValidation,
@@ -9,6 +10,7 @@ import {
 } from "@/mocks/fixtures/practice";
 import { realPracticeDefinition } from "@/mocks/fixtures/practice-catalog";
 import { expectNoOverflowingElement } from "@/test/reflow";
+
 import { PracticeDefinitionPreview } from "./PracticeDefinitionPreview";
 
 const definition: CuratedPracticeDefinition = {

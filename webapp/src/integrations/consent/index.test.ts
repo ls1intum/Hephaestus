@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
 	CONSENT_STORAGE_KEY,
 	CONSENT_VERSION,

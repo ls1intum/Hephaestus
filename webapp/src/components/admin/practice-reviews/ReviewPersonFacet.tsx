@@ -1,4 +1,5 @@
 import { UserRoundIcon } from "lucide-react";
+
 import type { FacetSource } from "@/components/common/FacetMultiSelect";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";

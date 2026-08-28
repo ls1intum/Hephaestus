@@ -1,5 +1,6 @@
 import { Bot, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
+
 import type { WorkspaceLlmModel } from "@/api/types.gen";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { Badge } from "@/components/ui/badge";

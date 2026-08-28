@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, within } from "storybook/test";
+
 import type { PracticeWorkTypeDefinitionOptions } from "@/api/types.gen";
 import { artifactKindLabel } from "@/lib/artifact-kinds";
 import {
@@ -14,6 +15,7 @@ import {
 } from "@/mocks/fixtures/practice";
 import { StatefulPatch } from "@/stories/stateful";
 import { expectNoOverflowingElement } from "@/test/reflow";
+
 import { OccasionLifecycle } from "./OccasionLifecycle";
 
 const meta = {

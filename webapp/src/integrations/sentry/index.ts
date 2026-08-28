@@ -1,4 +1,5 @@
 import * as Sentry from "@sentry/react";
+
 import { hasErrorMonitoringConsent } from "@/integrations/consent";
 import { sentryDsn, sentryEnvironment } from "@/integrations/sentry/config";
 

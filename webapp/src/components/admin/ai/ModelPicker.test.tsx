@@ -1,7 +1,9 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+
 import type { AvailableLlmModel } from "@/api/types.gen";
 import { Label } from "@/components/ui/label";
+
 import { ModelPicker, type ModelPickerProps } from "./ModelPicker";
 
 const models: AvailableLlmModel[] = [

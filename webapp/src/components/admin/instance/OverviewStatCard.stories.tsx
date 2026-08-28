@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { Building2 } from "lucide-react";
+
 import { OverviewStatCard } from "./OverviewStatCard";
 
 const meta = {

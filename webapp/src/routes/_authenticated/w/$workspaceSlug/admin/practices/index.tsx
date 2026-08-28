@@ -3,6 +3,7 @@ import { createFileRoute, Link, retainSearchParams } from "@tanstack/react-route
 import { ListChecks } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+
 import {
 	adoptGroupMutation,
 	adoptPracticeMutation,
@@ -27,6 +28,12 @@ import type {
 import { GroupAdoptionPanel } from "@/components/admin/practice-adoption/GroupAdoptionPanel";
 import { PracticeAdoptionPanel } from "@/components/admin/practice-adoption/PracticeAdoptionPanel";
 import { generateSlug } from "@/components/admin/practice-catalog/constants";
+import {
+	DETAIL_LEVEL_KINDS,
+	GUARDED_LEVEL_KINDS,
+	PRACTICE_SEARCH_PARAMS,
+	practiceSetupSearchSchema,
+} from "@/components/admin/practices/practice-search";
 import { type FocusFilter, PracticeCatalog } from "@/components/admin/practices/PracticeCatalog";
 import { PracticeForm } from "@/components/admin/practices/PracticeForm";
 import { PracticeFormLevel } from "@/components/admin/practices/PracticeFormLevel";
@@ -34,16 +41,10 @@ import {
 	PracticeDefinitionSkeleton,
 	PracticeTreeSkeleton,
 } from "@/components/admin/practices/PracticeSkeletons";
-import {
-	DETAIL_LEVEL_KINDS,
-	GUARDED_LEVEL_KINDS,
-	PRACTICE_SEARCH_PARAMS,
-	practiceSetupSearchSchema,
-} from "@/components/admin/practices/practice-search";
 import { WorkspacePracticePanel } from "@/components/admin/practices/WorkspacePracticePanel";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
-import { DetailDrawerStack } from "@/components/core/detail-drawer/DetailDrawerStack";
 import { detailStackKey, parseDetailStack } from "@/components/core/detail-drawer/detail-stack";
+import { DetailDrawerStack } from "@/components/core/detail-drawer/DetailDrawerStack";
 import { LevelCancel } from "@/components/core/detail-drawer/LevelCancel";
 import { useDetailStack } from "@/components/core/detail-drawer/use-detail-stack";
 import { PageHeader } from "@/components/core/PageHeader";

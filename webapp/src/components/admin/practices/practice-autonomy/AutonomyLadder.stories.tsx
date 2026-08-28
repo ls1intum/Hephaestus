@@ -1,8 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn } from "storybook/test";
+
 import { PRACTICE_AUTONOMY_ADDS } from "@/lib/practice-autonomy";
 import { Stateful } from "@/stories/stateful";
 import { expectNoPageOverflow } from "@/test/reflow";
+
 import { AutonomyLadder } from "./AutonomyLadder";
 
 const LAYOUT_SLACK_PX = 1;

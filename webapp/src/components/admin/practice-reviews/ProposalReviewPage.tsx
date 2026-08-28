@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { CheckIcon, CircleXIcon, Clock3Icon } from "lucide-react";
 import { useState } from "react";
+
 import type {
 	DecideFeedbackProposalRequest,
 	GetPracticeReviewFeedbackResponse,
@@ -24,7 +25,9 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+
 import { FeedbackBody } from "./FeedbackBody";
+import { subjectLabel } from "./review-format";
 import { ReviewArtifactLink } from "./ReviewArtifact";
 import { ClaimCurrentnessBadge, ObservationResultBadge } from "./ReviewBadges";
 import { ReviewBreadcrumbs } from "./ReviewBreadcrumbs";
@@ -32,7 +35,6 @@ import { ReviewDetailHeader, ReviewFact, ReviewFactGrid } from "./ReviewDetailHe
 import { ReviewPerson } from "./ReviewPerson";
 import { ReviewPracticeLink } from "./ReviewPracticeLink";
 import { ReviewRow, ReviewRowList, ReviewRowMeta } from "./ReviewRow";
-import { subjectLabel } from "./review-format";
 
 export type ProposalRejectionReason = NonNullable<DecideFeedbackProposalRequest["rejectionReason"]>;
 

@@ -1,9 +1,11 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowLeftIcon, RadarIcon } from "lucide-react";
+
 import type { GetArtifactTraceResponse, ReviewRequestOutcome } from "@/api/types.gen";
 import { MissingRecordEmpty } from "@/components/common/MissingRecordEmpty";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Skeleton } from "@/components/ui/skeleton";
+
 import { TraceHeader } from "./TraceHeader";
 import { TracePracticeList } from "./TracePracticeList";
 import { TraceRefusalAlert } from "./TraceRefusalAlert";

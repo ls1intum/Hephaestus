@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Navigate } from "@tanstack/react-router";
+
 import { getUsersWithTeamsOptions } from "@/api/@tanstack/react-query.gen";
 import { AdminAchievementsPage } from "@/components/admin/AdminAchievementsPage";
 import { adaptApiUserTeams } from "@/components/admin/types";

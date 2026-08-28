@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
+
 import type { LabelInfo, RepositoryInfo, TeamInfo } from "@/api/types.gen";
+
 import { RepositoryCard } from "./RepositoryCard";
 
 const meta = {

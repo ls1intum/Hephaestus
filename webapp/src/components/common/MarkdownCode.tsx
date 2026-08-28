@@ -6,6 +6,7 @@ import {
 	type ExtraProps,
 	useIsCodeFenceIncomplete,
 } from "streamdown";
+
 import { cn } from "@/lib/utils";
 
 type MarkdownCodeProps = JSX.IntrinsicElements["code"] &

@@ -1,5 +1,6 @@
 import { render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { AuthContextType } from "@/integrations/auth/AuthContext";
 
 /** Only the calls this component makes; `usePostHogClient` is mocked, so nothing wider is needed. */

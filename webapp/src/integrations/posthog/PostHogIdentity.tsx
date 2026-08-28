@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 
 import { getUserSettingsOptions } from "@/api/@tanstack/react-query.gen";
 import { useAuth } from "@/integrations/auth";
+
 import { isPosthogEnabled } from "./config";
 import { usePostHogClient } from "./use-posthog-client";
 

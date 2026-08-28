@@ -6,6 +6,7 @@ import {
 	Trash2Icon,
 	TriangleAlertIcon,
 } from "lucide-react";
+
 import type { OutlineCollection } from "@/api/types.gen";
 import { OutlineCollectionIcon } from "@/components/admin/integrations/outline/OutlineCollectionIcon";
 import { Badge } from "@/components/ui/badge";

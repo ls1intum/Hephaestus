@@ -3,7 +3,9 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+
 import { SessionManager } from "@earendil-works/pi-coding-agent";
+
 import { forkSessions } from "../../../main/resources/agent/pi-session-tree.ts";
 
 function assistantMessage(text: string) {

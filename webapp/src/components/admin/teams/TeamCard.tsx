@@ -1,5 +1,6 @@
 import { Eye, EyeOff, Users } from "lucide-react";
 import type { ReactNode } from "react";
+
 import type { LabelInfo, TeamInfo } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";

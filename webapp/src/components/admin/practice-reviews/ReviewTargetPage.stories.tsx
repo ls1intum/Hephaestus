@@ -1,8 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen } from "storybook/test";
+
 import type { ReviewArtifact } from "@/api/types.gen";
 import { isKnownArtifactKind } from "@/lib/artifact-kinds";
 import { expectNoPageOverflow } from "@/test/reflow";
+
 import { REVIEW_PREVIEW_SIZE, type ReviewSectionState } from "./ReviewOutputSections";
 import { ReviewTargetPage } from "./ReviewTargetPage";
 import {

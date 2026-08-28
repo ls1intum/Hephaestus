@@ -7,6 +7,7 @@
  */
 import { useSyncExternalStore } from "react";
 import { z } from "zod";
+
 import { isPosthogEnabled } from "@/integrations/posthog/config";
 import { isSentryConfigured } from "@/integrations/sentry/config";
 

@@ -1,5 +1,6 @@
 import type { AnchorHTMLAttributes, HTMLAttributes } from "react";
 import { Streamdown } from "streamdown";
+
 import { MarkdownCode } from "@/components/common/MarkdownCode";
 
 const HTTP_URL = /^https?:\/\//i;

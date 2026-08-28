@@ -1,4 +1,5 @@
 import { Building2, LogInIcon } from "lucide-react";
+
 import type { AdminWorkspaceView } from "@/api/types.gen";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

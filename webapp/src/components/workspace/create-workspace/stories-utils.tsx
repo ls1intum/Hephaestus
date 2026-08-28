@@ -1,5 +1,7 @@
 import { fn } from "storybook/test";
+
 import type { GitLabGroup } from "@/api/types.gen";
+
 import { initialWizardState, WizardContext, type WizardState } from "./wizard-context";
 
 export function withWizardState(overrides: Partial<WizardState>) {

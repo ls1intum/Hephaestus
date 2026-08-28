@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+
 import type { SlackMonitoredChannel } from "@/api/types.gen";
+
 import { RemoveChannelAlertDialog } from "./RemoveChannelAlertDialog";
 
 const base = {

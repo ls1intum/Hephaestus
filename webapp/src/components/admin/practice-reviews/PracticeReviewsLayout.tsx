@@ -1,12 +1,14 @@
 import { Link, useMatchRoute, useParams, useSearch } from "@tanstack/react-router";
 import { MessageSquareText, ScanSearch, Workflow } from "lucide-react";
 import type { ReactNode } from "react";
+
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { tabsListVariants } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { reviewArtifactTypeFromSlug } from "./ReviewArtifact";
+
 import type { ReviewScopeSearch } from "./review-search";
+import { reviewArtifactTypeFromSlug } from "./ReviewArtifact";
 
 export interface PracticeReviewsLayoutProps {
 	workspaceSlug: string;

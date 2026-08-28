@@ -14,6 +14,7 @@ import {
 import { ArrowUpDown, ChevronDown, RefreshCw, Search, Sparkles, Users } from "lucide-react";
 // oxlint-disable-next-line no-restricted-imports -- The compiler skips this component (see `useReactTable` below), so the memo on `columns` is written by hand.
 import { useMemo, useState } from "react";
+
 import { TablePagination } from "@/components/common/TablePagination";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -42,6 +43,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils.ts";
+
 import type { ExtendedUserTeams } from "./types";
 
 interface AdminAchievementsTableProps {

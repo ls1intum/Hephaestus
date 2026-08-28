@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactElement } from "react";
+
 import {
 	Breadcrumb,
 	BreadcrumbItem,

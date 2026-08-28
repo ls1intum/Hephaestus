@@ -1,15 +1,14 @@
 import * as Sentry from "@sentry/react";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { PostHogProvider } from "posthog-js/react";
+import { StrictMode, useEffect } from "react";
 import ReactDOM from "react-dom/client";
+
 import { client } from "@/api/client.gen";
-import * as TanstackQuery from "./integrations/tanstack-query/root-provider";
-import { routeTree } from "./routeTree.gen";
+import environment from "@/environment";
 
 import "./styles.css";
-import { StrictMode, useEffect } from "react";
 
-import environment from "@/environment";
 import { AuthProvider, applyStateChangingHeaders, useAuth } from "@/integrations/auth";
 import { handlePossibleSessionExpiry } from "@/integrations/auth/session-expiry";
 import { SessionKeepAlive } from "@/integrations/auth/use-session-keep-alive";
@@ -24,7 +23,10 @@ import {
 import { disableSentry, initSentry } from "@/integrations/sentry";
 import { ThemeProvider } from "@/integrations/theme";
 import { useImpersonationStore } from "@/stores/impersonation-store";
+
+import * as TanstackQuery from "./integrations/tanstack-query/root-provider";
 import reportWebVitals from "./reportWebVitals";
+import { routeTree } from "./routeTree.gen";
 
 // No default request timeout, deliberately: it would have to clear the slowest honest response (a
 // workspace purge is unbounded by design), and aborting a mutation does not abort the server — it

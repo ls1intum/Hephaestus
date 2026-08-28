@@ -1,10 +1,12 @@
 import { fireEvent, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+
 import type {
 	AgentBinding,
 	PracticeReviewSettings as PracticeReviewSettingsData,
 } from "@/api/types.gen";
 import { renderWithRouter } from "@/test/router-harness";
+
 import { PracticeReviewSettings } from "./PracticeReviewSettings";
 
 const readyBinding: AgentBinding = {

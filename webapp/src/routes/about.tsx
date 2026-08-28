@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+
 import { listGlobalContributorsOptions } from "@/api/@tanstack/react-query.gen";
 import { AboutPage } from "@/components/info/about/AboutPage";
 import type { ProjectManager } from "@/components/info/about/ProjectManagerCard";

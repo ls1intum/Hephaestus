@@ -99,6 +99,7 @@ import {
 	Wrench,
 	Zap,
 } from "lucide-react";
+
 import { hasText } from "@/lib/text";
 
 export type GroupVisual = { Icon: LucideIcon; pill: string };

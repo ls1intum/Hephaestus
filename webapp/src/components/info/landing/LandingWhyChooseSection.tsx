@@ -1,4 +1,5 @@
 import { Code, Hammer, Users } from "lucide-react";
+
 import { Badge } from "@/components/ui/badge";
 
 export function LandingWhyChooseSection() {

@@ -1,8 +1,10 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { userEvent } from "storybook/test";
 import { describe, expect, it, vi } from "vitest";
+
 import type { LlmConnection } from "@/api/types.gen";
 import { expectUnavailable } from "@/test/controls";
+
 import { AdminLlmConnectionsTable } from "./AdminLlmConnectionsTable";
 
 const connection: LlmConnection = {

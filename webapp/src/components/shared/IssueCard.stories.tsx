@@ -1,8 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { RefreshCw } from "lucide-react";
+
 import { STORY_NOW } from "@/components/common/story-clock";
 import { Button } from "@/components/ui/button";
 import { withProvider } from "@/stories/decorators";
+
 import { IssueCard } from "./IssueCard";
 
 /**

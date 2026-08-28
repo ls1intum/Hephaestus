@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { getCatalogDropTarget } from "./catalog-tree-dnd";
 
 interface Entry {

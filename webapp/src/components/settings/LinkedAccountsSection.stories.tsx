@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent } from "storybook/test";
+
 import type { IdentityProviderView, IdentityView } from "@/api/types.gen";
+
 import { LinkedAccountsSection } from "./LinkedAccountsSection";
 
 const github: IdentityView = {

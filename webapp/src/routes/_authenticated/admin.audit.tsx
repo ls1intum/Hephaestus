@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ScrollTextIcon } from "lucide-react";
+
 import { adminListWorkspacesOptions } from "@/api/@tanstack/react-query.gen";
-import { AuthAuditPanel } from "@/components/admin/audit/AuthAuditPanel";
 import { type AuditSearch, auditSearchSchema } from "@/components/admin/audit-shared/audit-search";
+import { AuthAuditPanel } from "@/components/admin/audit/AuthAuditPanel";
 import { AdminConfigAuditPanel } from "@/components/admin/config-audit/ConfigAuditPanel";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";

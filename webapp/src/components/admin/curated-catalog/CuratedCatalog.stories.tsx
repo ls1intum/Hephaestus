@@ -1,11 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { type ComponentProps, useState } from "react";
 import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
+
 import type { CatalogEntryStatus, CuratedGroup, CuratedPracticeSummary } from "@/api/types.gen";
 import { withStandardPage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/test/reflow";
-import { CuratedCatalog } from "./CuratedCatalog";
+
 import type { CuratedCatalogSearch } from "./curated-catalog-search";
+import { CuratedCatalog } from "./CuratedCatalog";
 
 const status = (overrides: Partial<CatalogEntryStatus> = {}): CatalogEntryStatus => ({
 	etag: "tag",

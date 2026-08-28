@@ -1,10 +1,12 @@
 import { assert, describe, expect, it } from "vitest";
+
 import type { Practice, PracticeBinding } from "@/api/types.gen";
 import {
 	chosenAutonomy,
 	inheritedAutonomy,
 	mockPractice,
 } from "@/components/admin/practices/story-mock-data";
+
 import {
 	applyDisplayOrder,
 	applyPracticePlacements,

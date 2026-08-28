@@ -2,10 +2,12 @@ import { isStaticToolUIPart } from "ai";
 import { AnimatePresence, motion } from "motion/react";
 import { type InputHTMLAttributes, useState } from "react";
 import { Streamdown } from "streamdown";
+
 import type { ChatMessageVote } from "@/api/types.gen";
 import { MarkdownCode } from "@/components/common/MarkdownCode";
 import type { ChatMessage, ChatTools } from "@/lib/types";
 import { cn, sanitizeText } from "@/lib/utils";
+
 import { MentorAvatar } from "./MentorAvatar";
 import { MessageActions } from "./MessageActions";
 import { MessageEditor } from "./MessageEditor";

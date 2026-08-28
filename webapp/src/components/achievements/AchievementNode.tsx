@@ -1,5 +1,6 @@
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
 import { useState } from "react";
+
 import { AchievementTooltip } from "@/components/achievements/AchievementTooltip";
 import { CENTERED_HANDLE_STYLE } from "@/components/achievements/handle-style";
 import { StandaloneAura } from "@/components/achievements/StandaloneAura";

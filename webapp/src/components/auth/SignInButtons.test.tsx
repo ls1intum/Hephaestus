@@ -9,8 +9,10 @@ import { render, screen } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
+
 import type { IdentityProviderView } from "@/api/types.gen";
 import { server } from "@/mocks/server";
+
 import { SignInButtons } from "./SignInButtons";
 
 function renderWithClient(node: ReactNode) {

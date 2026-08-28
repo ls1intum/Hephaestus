@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
+
 import {
 	analyse,
 	type ComposeFile,
@@ -231,9 +232,10 @@ await test("a scope naming a path application.yml does not have is a failure", (
 await test("the shipped topology delivers every role-scoped variable to a container that runs its role", async () => {
 	const files = ["docker/compose.app.yaml", "docker/compose.core.yaml"];
 	const shipped = await Promise.all(
-		files.map(
-			async (file): Promise<ComposeFile> => [file, await readFile(join(REPO_ROOT, file), "utf8")],
-		),
+		files.map(async (file): Promise<ComposeFile> => [
+			file,
+			await readFile(join(REPO_ROOT, file), "utf8"),
+		]),
 	);
 	// With the profile overlays, exactly as the CLI runs it. Omitting them makes this pass on a
 	// topology the real gate fails, which is the whole defect class the gate is here for.

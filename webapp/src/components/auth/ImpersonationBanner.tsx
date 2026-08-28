@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { toast } from "sonner";
+
 import { exitImpersonationMutation } from "@/api/@tanstack/react-query.gen";
 import {
 	AlertDialog,

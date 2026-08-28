@@ -1,5 +1,6 @@
 import type { Contributor } from "@/components/shared/ContributorGrid";
 import { Badge } from "@/components/ui/badge";
+
 import { ContributorSection } from "./ContributorSection";
 import { type ProjectManager, ProjectManagerCard } from "./ProjectManagerCard";
 

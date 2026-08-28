@@ -14,6 +14,7 @@ import { mkdir, rename, rm } from "node:fs/promises";
  *   bun run runner.ts --repo <path> --diff <path> [--metadata <path>] [--output <path>]
  */
 import { parseArgs } from "node:util";
+
 import { parseDiff } from "./lib/diff-parser";
 import { isJsonObject, isPracticeModule, parseFindings } from "./lib/practice-contract";
 import type { ArtifactMetadata, DiffFile, PracticeResult } from "./lib/types";

@@ -1,4 +1,5 @@
 import { CheckCircleIcon, XCircleIcon } from "@primer/octicons-react";
+
 import type { UIAchievement } from "@/components/achievements/types";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";

@@ -13,6 +13,7 @@ import {
 import { ArrowUpDown, ChevronDown, EyeIcon, EyeOffIcon, Filter, Search, Users } from "lucide-react";
 // oxlint-disable-next-line no-restricted-imports -- The compiler skips this component (see `useReactTable` below), so the memos on `columns` and `filteredData` are written by hand.
 import { type ComponentProps, type ReactElement, useEffect, useMemo, useState } from "react";
+
 import type { TeamInfo } from "@/api/types.gen";
 import { TablePagination } from "@/components/common/TablePagination";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+
 import type { ExtendedUserTeams } from "./types";
 
 interface UsersTableProps {

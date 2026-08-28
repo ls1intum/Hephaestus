@@ -2,9 +2,11 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
+
 import type { PracticeAutomatedReviewPolicy } from "@/api/types.gen";
 import { mockPullRequestWorkType } from "@/mocks/fixtures/practice";
 import { renderWithRouter } from "@/test/router-harness";
+
 import {
 	PracticeMentoringSupportEditor,
 	practicePolicyError,

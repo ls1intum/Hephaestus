@@ -3,8 +3,10 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
+
 import { AuthProvider } from "@/integrations/auth/AuthContext";
 import { server } from "@/mocks/server";
+
 import { useFeatureFlags } from "./hooks";
 
 function wrapper(queryClient: QueryClient) {

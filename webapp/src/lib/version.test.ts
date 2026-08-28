@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { resolveHeaderBadge } from "./version";
 
 describe("resolveHeaderBadge", () => {

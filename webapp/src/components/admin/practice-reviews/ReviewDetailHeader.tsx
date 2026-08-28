@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+
 import { RelativeTime } from "@/components/common/RelativeTime";
 
 export interface ReviewDetailHeaderProps {

@@ -1,4 +1,5 @@
 import type { PracticeAutonomy } from "@/lib/practice-autonomy";
+
 import { AUTONOMY_DEFS } from "./autonomy-defs";
 import { StatusBadge, type StatusBadgeProps } from "./StatusBadge";
 

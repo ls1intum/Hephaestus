@@ -6,57 +6,57 @@
 
 /* You can override the default Infima variables here. */
 :root {
-  --ifm-color-primary: oklch(0.58 0.21 260);
-  --ifm-color-primary-dark: oklch(0.53 0.21 260);
-  --ifm-color-primary-darker: oklch(0.49 0.2 260);
-  --ifm-color-primary-darkest: oklch(0.42 0.18 260);
-  --ifm-color-primary-light: oklch(0.64 0.19 260);
-  --ifm-color-primary-lighter: oklch(0.69 0.16 260);
-  --ifm-color-primary-lightest: oklch(0.82 0.09 260);
-  --ifm-background-color: oklch(1 0 0);
-  --ifm-background-surface-color: oklch(0.967 0.001 286.375);
-  --ifm-card-background-color: oklch(1 0 0);
-  --ifm-font-color-base: oklch(0.141 0.005 285.823);
-  --ifm-navbar-background-color: oklch(1 0 0);
-  --ifm-toc-border-color: oklch(0.92 0.004 286.32);
-  --ifm-code-font-size: 95%;
-  --ifm-hero-text-color: #f5f5ff;
-  --docusaurus-highlighted-code-line-bg: oklch(0.623 0.214 259.815 / 0.08);
+	--ifm-color-primary: oklch(0.58 0.21 260);
+	--ifm-color-primary-dark: oklch(0.53 0.21 260);
+	--ifm-color-primary-darker: oklch(0.49 0.2 260);
+	--ifm-color-primary-darkest: oklch(0.42 0.18 260);
+	--ifm-color-primary-light: oklch(0.64 0.19 260);
+	--ifm-color-primary-lighter: oklch(0.69 0.16 260);
+	--ifm-color-primary-lightest: oklch(0.82 0.09 260);
+	--ifm-background-color: oklch(1 0 0);
+	--ifm-background-surface-color: oklch(0.967 0.001 286.375);
+	--ifm-card-background-color: oklch(1 0 0);
+	--ifm-font-color-base: oklch(0.141 0.005 285.823);
+	--ifm-navbar-background-color: oklch(1 0 0);
+	--ifm-toc-border-color: oklch(0.92 0.004 286.32);
+	--ifm-code-font-size: 95%;
+	--ifm-hero-text-color: #f5f5ff;
+	--docusaurus-highlighted-code-line-bg: oklch(0.623 0.214 259.815 / 0.08);
 }
 
 /* Match the web app's neutral surfaces and blue mentor accent. */
-[data-theme='dark'] {
-  --ifm-color-primary: oklch(0.72 0.15 260);
-  --ifm-color-primary-dark: oklch(0.67 0.17 260);
-  --ifm-color-primary-darker: oklch(0.63 0.19 260);
-  --ifm-color-primary-darkest: oklch(0.56 0.21 260);
-  --ifm-color-primary-light: oklch(0.77 0.12 260);
-  --ifm-color-primary-lighter: oklch(0.82 0.09 260);
-  --ifm-color-primary-lightest: oklch(0.9 0.045 260);
-  --ifm-background-color: oklch(0.141 0.005 285.823);
-  --ifm-background-surface-color: oklch(0.21 0.006 285.885);
-  --ifm-card-background-color: oklch(0.141 0.005 285.823);
-  --ifm-font-color-base: oklch(0.985 0 0);
-  --ifm-navbar-background-color: oklch(0.141 0.005 285.823);
-  --ifm-toc-border-color: oklch(0.274 0.006 286.033);
-  --docusaurus-highlighted-code-line-bg: oklch(0.546 0.245 262.881 / 0.18);
+[data-theme="dark"] {
+	--ifm-color-primary: oklch(0.72 0.15 260);
+	--ifm-color-primary-dark: oklch(0.67 0.17 260);
+	--ifm-color-primary-darker: oklch(0.63 0.19 260);
+	--ifm-color-primary-darkest: oklch(0.56 0.21 260);
+	--ifm-color-primary-light: oklch(0.77 0.12 260);
+	--ifm-color-primary-lighter: oklch(0.82 0.09 260);
+	--ifm-color-primary-lightest: oklch(0.9 0.045 260);
+	--ifm-background-color: oklch(0.141 0.005 285.823);
+	--ifm-background-surface-color: oklch(0.21 0.006 285.885);
+	--ifm-card-background-color: oklch(0.141 0.005 285.823);
+	--ifm-font-color-base: oklch(0.985 0 0);
+	--ifm-navbar-background-color: oklch(0.141 0.005 285.823);
+	--ifm-toc-border-color: oklch(0.274 0.006 286.033);
+	--docusaurus-highlighted-code-line-bg: oklch(0.546 0.245 262.881 / 0.18);
 }
 
-[data-theme='dark'] .navbar__logo img {
-  filter: invert(1);
+[data-theme="dark"] .navbar__logo img {
+	filter: invert(1);
 }
 
 .markdown img {
-  display: block;
-  margin: 2rem auto;
-  border-radius: 12px;
-  border: 1px solid var(--ifm-toc-border-color);
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.15);
-  background: var(--ifm-card-background-color);
-  max-width: min(100%, 960px);
-  height: auto;
+	display: block;
+	margin: 2rem auto;
+	border-radius: 12px;
+	border: 1px solid var(--ifm-toc-border-color);
+	box-shadow: 0 12px 24px rgba(15, 23, 42, 0.15);
+	background: var(--ifm-card-background-color);
+	max-width: min(100%, 960px);
+	height: auto;
 }
 
 .markdown p > img {
-  margin: 2rem auto;
+	margin: 2rem auto;
 }

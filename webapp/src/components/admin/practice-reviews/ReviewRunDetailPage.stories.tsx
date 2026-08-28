@@ -1,7 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, waitFor } from "storybook/test";
+
 import type { ReviewFeedback, ReviewObservation } from "@/api/types.gen";
 import { expectNoPageOverflow } from "@/test/reflow";
+
 import { REVIEW_PREVIEW_SIZE, type ReviewSectionState } from "./ReviewOutputSections";
 import { ReviewRunDetailPage } from "./ReviewRunDetailPage";
 import {

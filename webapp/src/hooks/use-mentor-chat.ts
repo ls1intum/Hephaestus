@@ -4,6 +4,7 @@ import { DefaultChatTransport } from "ai";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
+
 import {
 	getThreadOptions,
 	getThreadQueryKey,
@@ -26,8 +27,10 @@ interface UseMentorChatOptions {
 }
 
 /** `addToolResult` is dropped because it is the SDK's deprecated alias for the forwarded `addToolOutput`. */
-interface UseMentorChatReturn
-	extends Omit<UseChatHelpers<ChatMessage>, "sendMessage" | "addToolResult"> {
+interface UseMentorChatReturn extends Omit<
+	UseChatHelpers<ChatMessage>,
+	"sendMessage" | "addToolResult"
+> {
 	sendMessage: (text: string) => void;
 	threadDetail: ChatThreadDetail | undefined;
 	isThreadLoading: boolean;

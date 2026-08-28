@@ -1,11 +1,13 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { assert, describe, expect, it, vi } from "vitest";
+
 import type {
 	AdminWorkspaceLlmUsage,
 	FxRateInfo,
 	LlmUsageByDay,
 	WorkspaceLlmUsageReport,
 } from "@/api/types.gen";
+
 import { AdminInstanceLlmUsageTable } from "./AdminInstanceLlmUsageTable";
 
 const workspace: AdminWorkspaceLlmUsage = {

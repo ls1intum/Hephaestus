@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn, screen, userEvent, within } from "storybook/test";
+
 import type { LlmConnection } from "@/api/types.gen";
+
 import { AdminLlmConnectionsTable } from "./AdminLlmConnectionsTable";
 
 const mockConnections: LlmConnection[] = [

@@ -8,6 +8,7 @@ import {
 } from "@/components/leaderboard/LeagueIcons";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+
 import { getLeagueLabel, getLeagueTier } from "./utils";
 
 export interface LeagueIconProps {

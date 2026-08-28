@@ -6,6 +6,7 @@
 // `server.use(...)` override in one test never leaks into the next.
 
 import { afterAll, afterEach, beforeAll } from "vitest";
+
 import { client } from "@/api/client.gen";
 import { server } from "@/mocks/server";
 

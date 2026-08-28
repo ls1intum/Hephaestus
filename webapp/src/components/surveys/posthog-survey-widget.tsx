@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from "motion/react";
 import type { Survey as PostHogSurveyRaw } from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
+
 import { usePostHogClient } from "@/integrations/posthog/use-posthog-client";
 import { firstNonBlank } from "@/lib/text";
 import { useSurveyNotificationStore } from "@/stores/survey-notification-store";
@@ -11,6 +12,7 @@ import {
 	type SurveyQuestion,
 	type SurveyResponse,
 } from "@/types/survey";
+
 import { SurveyContainer } from "./survey-container";
 import { SURVEY_LAYOUT_ID } from "./survey-notification-button";
 

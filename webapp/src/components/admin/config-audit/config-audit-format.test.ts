@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+
 import type { ConfigAuditEntryView } from "@/api/types.gen";
+
 import {
 	actionLabel,
 	actorDisplay,

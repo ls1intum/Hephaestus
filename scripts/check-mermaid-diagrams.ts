@@ -18,7 +18,9 @@
 import { readdir, readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { join, resolve, sep } from "node:path";
+
 import { JSDOM } from "jsdom";
+
 import { asRecord, asString, readJsonFile } from "./lib/json.ts";
 
 /** Resolved from this file, so the gate answers the same whatever the working directory is. */

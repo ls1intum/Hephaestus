@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { Settings2 } from "lucide-react";
+
 import {
 	computeUserLeagueStatsQueryKey,
 	getLeaderboardQueryKey,

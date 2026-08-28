@@ -1,5 +1,6 @@
 import { ClockIcon, GitBranchIcon, GitCommitIcon } from "@primer/octicons-react";
 import { Link } from "@tanstack/react-router";
+
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { optionalIntegrationsAvailable, requestConsentReopen } from "@/integrations/consent";

@@ -1,4 +1,5 @@
 import { formatDistanceToNow } from "date-fns";
+
 import type { ConnectionSyncStatus, IntegrationCatalogEntry, SyncJob } from "@/api/types.gen";
 import type { FreshnessTone } from "@/components/common/RelativeTime";
 import { asDate } from "@/lib/dates";

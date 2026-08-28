@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, userEvent } from "storybook/test";
+
 import { SlackChannelPasteField } from "./SlackChannelPasteField";
 
 /**

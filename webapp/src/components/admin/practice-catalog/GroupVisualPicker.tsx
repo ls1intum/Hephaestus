@@ -1,10 +1,12 @@
 import { Check, Search } from "lucide-react";
 import { useId, useState } from "react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
+
 import {
 	COLOR_KEYS,
 	DEFAULT_GROUP_COLOR,

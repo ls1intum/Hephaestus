@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { freshnessTone } from "./sync-format";
 
 describe("freshnessTone", () => {

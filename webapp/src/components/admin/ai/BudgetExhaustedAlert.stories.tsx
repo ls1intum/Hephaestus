@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+
 import { BudgetExhaustedAlert } from "./BudgetExhaustedAlert";
 
 const meta = {

@@ -12,6 +12,7 @@ import {
 	TrendingUp,
 } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
+
 import { MentorIcon } from "@/components/mentor/MentorIcon";
 import { Badge } from "@/components/ui/badge";
 
