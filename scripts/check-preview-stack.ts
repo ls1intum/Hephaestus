@@ -116,11 +116,13 @@ const RENDER_ENV: Record<string, string> = {
 /** Values the server refuses to start without: it validates them before the context is built, so an
  * empty one here is a preview that restart-loops rather than a preview that misbehaves quietly. */
 /**
- * Capabilities a service may add back after `cap_drop: ALL`. PostgreSQL's entrypoint chowns its data
- * directory and drops to its own user, which needs these five; every other service runs with none.
+ * Capabilities a service may add back after `cap_drop: ALL`. Both entries are servers whose root
+ * process prepares a directory and then runs its real work as another user; each set is the minimum
+ * found by running the image with less. The application server needs none.
  */
 const ALLOWED_CAPABILITIES: Record<string, readonly string[]> = {
 	postgres: ["CHOWN", "DAC_OVERRIDE", "FOWNER", "SETGID", "SETUID"],
+	webapp: ["CHOWN", "SETGID", "SETUID"],
 };
 
 const REQUIRED_NON_EMPTY = ["HEPHAESTUS_TRUSTED_PROXIES", "WEBHOOK_SECRET"];
