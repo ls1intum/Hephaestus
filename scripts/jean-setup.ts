@@ -71,7 +71,19 @@ async function main(): Promise<void> {
 		}
 	}
 	console.log("Installing dependencies...");
-	await run("bun", ["install", "--frozen-lockfile"], { cwd: root });
+	// Not a gate: `qualify:bun-lockfile` and every CI install enforce the lockfile. A stale one here
+	// is worth a warning, not a worktree with no node_modules in it.
+	const lockfile = Bun.file(join(root, "bun.lock"));
+	const lockfileBefore = await lockfile.text();
+	try {
+		await run("bun", ["install", "--frozen-lockfile"], { cwd: root });
+	} catch {
+		console.log("  WARN: the frozen install failed — retrying without --frozen-lockfile.");
+		await run("bun", ["install"], { cwd: root });
+		// A network failure fails the frozen install too, and leaves nothing to commit.
+		if ((await lockfile.text()) !== lockfileBefore)
+			console.log("  WARN: bun.lock changed — commit it, or qualify:bun-lockfile fails in CI.");
+	}
 	console.log("✅ Jean worktree setup complete.");
 }
 
