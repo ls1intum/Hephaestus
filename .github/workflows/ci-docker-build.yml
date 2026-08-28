@@ -220,6 +220,7 @@ jobs:
           POSTGRES_IMAGE_CHANGED: ${{ inputs.postgres_image_changed }}
           PR_NUMBER: ${{ github.event.number }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
 
@@ -228,7 +229,16 @@ jobs:
             local source="$image:$BASE_SHA"
             local ref_tag="${GITHUB_REF_NAME//\//-}"
             local digest
-            digest=$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$source")
+            digest=$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$source" 2>/dev/null || true)
+            if [[ ! "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+              local merged_head
+              merged_head=$(gh api "repos/$REPOSITORY/commits/$BASE_SHA/pulls" \
+                --jq '[.[] | select(.merged_at != null)][0].head.sha // empty')
+              if [ -n "$merged_head" ]; then
+                source="$image:$merged_head"
+                digest=$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "$source" 2>/dev/null || true)
+              fi
+            fi
             if [[ ! "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
               echo "::error::Invalid digest for $source: ${digest:-<empty>}"
               return 1
