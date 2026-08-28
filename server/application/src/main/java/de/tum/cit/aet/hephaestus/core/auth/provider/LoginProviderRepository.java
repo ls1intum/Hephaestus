@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.provider;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -22,4 +23,6 @@ public interface LoginProviderRepository extends JpaRepository<LoginProvider, Lo
 
     /** Enabled providers, ordered for a stable login-page display. */
     List<LoginProvider> findByEnabledTrueOrderByDisplayNameAsc();
+
+    boolean existsByEnabledTrueAndTypeIn(Collection<LoginProvider.ProviderType> types);
 }

@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.core.security.OutlineOriginPolicy;
 import java.time.Duration;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
@@ -84,6 +85,12 @@ public class LoginProviderClientRegistrationRepository
                 .filter(this::isApproved)
                 .map(this::toRegistration)
                 .toList();
+    }
+
+    @Override
+    public boolean hasEnabledPrimarySignInProvider() {
+        return loginProviderRepository.existsByEnabledTrueAndTypeIn(
+                Set.of(LoginProvider.ProviderType.GITHUB, LoginProvider.ProviderType.GITLAB));
     }
 
     private boolean isApproved(LoginProvider provider) {

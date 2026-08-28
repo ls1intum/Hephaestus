@@ -2,7 +2,7 @@
 # Hephaestus — the one blessed self-hosted deployment
 # =============================================================================
 #
-#   cp .env.example .env   # fill in the values
+#   ./setup.sh             # generate internal secrets, then fill in external values
 #   docker compose up -d
 #
 # This file composes the same service definitions the maintainers deploy

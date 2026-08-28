@@ -34,11 +34,13 @@ consists of:
 
 ## Base environment variables
 
-The required secrets — `HEPHAESTUS_SECURITY_ENCRYPTION_KEY`, `HEPHAESTUS_AUTH_STATE_COOKIE_KEY`,
-`WEBHOOK_SECRET`, `POSTGRES_PASSWORD`, the GitHub OAuth pair, and
-`HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS` — are documented once, on the
-[Install guide](./install#2-configure-env), along with how to generate each and the warning about
-never changing the encryption key. Everything there applies to this stack too.
+The required base values — `HEPHAESTUS_SECURITY_ENCRYPTION_KEY`,
+`HEPHAESTUS_AUTH_STATE_COOKIE_KEY`, `WEBHOOK_SECRET`, `POSTGRES_PASSWORD`, the GitHub OAuth pair, and
+`HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS` — are documented once in the
+[Install guide](./install#2-configure-env), along with their lifecycle constraints. The self-host
+installer generates its internal secrets; operators of the reference deployment must provision
+equivalent values through its protected secret-management system. The warning about never changing
+the encryption key applies to both stacks.
 
 These variables exist only in the reference deployment, so they live here:
 

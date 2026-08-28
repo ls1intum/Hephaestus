@@ -82,6 +82,22 @@ review runs and no feedback is prepared about them.
 **Operator action after upgrading**: open **Practices → Review → When and where** and confirm the
 **People** and **Repositories** counts. Existing members need no action. If expected contributors are
 missing, follow [Who counts as a person](https://ls1intum.github.io/Hephaestus/admin/practice-review#who-counts-as-a-person).
+
+#### 🔴 Production configuration is validated before startup
+
+**Affected**: deployments that activate the `prod` Spring profile and have a missing, malformed, or
+role-inconsistent required setting.
+
+Production processes now validate the applicable requirements in the configuration readiness
+catalogue together and refuse to start until every reported error is resolved. The failure report
+identifies properties and documentation but never includes configured values.
+
+**Action**: before upgrading, compare every production role's settings with the
+[configuration readiness guide](https://ls1intum.github.io/Hephaestus/admin/configuration-readiness).
+Run a staging process with the production profile and correct every required setting it reports.
+After the server role starts, an instance administrator can inspect the redacted facts through
+`GET /api/admin/configuration-readiness`.
+
 #### 🔴 Practice area API names are replaced by practice group names
 
 **Affected**: anything calling the application API directly. The generated Hephaestus web client is

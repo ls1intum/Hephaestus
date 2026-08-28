@@ -32,7 +32,8 @@ The stack you get:
 - **AI practice review adds real memory**: each concurrent review sandbox may use up to
   4 GiB. The default caps it at 1 concurrent sandbox; raise
   `SANDBOX_MAX_CONCURRENT` only with RAM to match.
-- 64-bit Linux with **Docker Engine ≥ 24** and **Docker Compose ≥ 2.24.4** (`docker compose version`), plus `git`.
+- 64-bit Linux with **Docker Engine ≥ 24** and **Docker Compose ≥ 2.24.4** (`docker compose version`),
+  plus `git` and `openssl`.
 - A **DNS A record** for your hostname pointing at the host, with ports **80 and 443**
   reachable from the internet (Let's Encrypt HTTP-01, OAuth callbacks, webhooks).
 - Outbound HTTPS to `ghcr.io` and `docker.io` (images — NATS and Traefik come from Docker Hub),
@@ -52,28 +53,28 @@ sudo git clone --depth 1 --branch "v$VERSION" \
   https://github.com/ls1intum/Hephaestus.git /opt/hephaestus
 sudo chown -R "$USER" /opt/hephaestus
 cd /opt/hephaestus/docker/self-host
-cp .env.example .env
+./setup.sh
 ```
 
-Everything below runs from `/opt/hephaestus/docker/self-host`. Once step 2 has filled in every
-required value, `docker compose config` renders the effective configuration — it is the quickest way
-to confirm a variable landed where you expected. Before then it exits with the first
-`required variable … is missing a value`, which is also how every other `docker compose` subcommand
-behaves in this directory; see [Troubleshooting](#troubleshooting).
+`setup.sh` creates or updates `.env` with mode `0600` and generates the database password,
+credential-encryption key, OAuth state-cookie key, and webhook secret. It does not replace non-empty
+values and never prints a secret.
+
+Everything below runs from `/opt/hephaestus/docker/self-host`. After step 2 supplies the remaining
+required values, `docker compose config` renders the effective configuration. Before then it exits
+at the first missing required variable, as does every other `docker compose` subcommand in this
+directory; see [Troubleshooting](#troubleshooting).
 
 ## 2. Configure `.env`
 
-Open `.env` and fill in every **REQUIRED** value. The short version:
+Open `.env` and fill in the remaining **REQUIRED** values. `setup.sh` manages the four internal
+secrets listed above; do not replace them manually.
 
 | Variable | What / how |
 | --- | --- |
 | `APP_HOSTNAME` | Your public hostname, e.g. `hephaestus.example.com` |
 | `IMAGE_TAG` | The same `$VERSION` you fetched above — an exact release, never `latest` |
 | `ACME_EMAIL` | Let's Encrypt expiry notices |
-| `POSTGRES_PASSWORD` | `openssl rand -hex 16` |
-| `HEPHAESTUS_SECURITY_ENCRYPTION_KEY` | `openssl rand -base64 24 \| cut -c1-32` — exactly 32 chars (see the warning below) |
-| `HEPHAESTUS_AUTH_STATE_COOKIE_KEY` | `openssl rand -base64 32` |
-| `WEBHOOK_SECRET` | `openssl rand -hex 32` — you'll enter the same value on GitHub later |
 | `GH_OAUTH_CLIENT_ID` / `_SECRET` | From step 3 |
 | `HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS` | From step 4 — set it **before** first boot |
 
@@ -82,6 +83,11 @@ Open `.env` and fill in every **REQUIRED** value. The short version:
 signing key. If you lose or change it, those tokens become unreadable and all sessions
 invalidate. Store it as carefully as the database itself, and never change it after first boot.
 :::
+
+The other generated values also have lifecycle consequences: changing the database password does not
+update an initialized PostgreSQL volume, rotating the state-cookie key invalidates OAuth flows already
+in progress, and rotating the webhook secret requires the same change at every configured provider.
+Back up `.env` with the database as described in [Backup & Restore](./backup-restore).
 
 ## 3. Create the GitHub OAuth App (login — mandatory)
 
@@ -203,7 +209,7 @@ a backup instead. Set up [Backup & Restore](./backup-restore) **before** you hav
 | Symptom | Cause / fix |
 | --- | --- |
 | `application-server` exits: *ProxyTrustGuard* | `HEPHAESTUS_TRUSTED_PROXIES` is blank. The compose default is non-blank, so this means you overrode it to empty — unset your override, or set it to match `reverse-proxy`'s IP if you changed the network. |
-| Exits: encryption-key length error | `HEPHAESTUS_SECURITY_ENCRYPTION_KEY` must be exactly 32 characters — regenerate with the command above. |
+| Exits: encryption-key length error | `HEPHAESTUS_SECURITY_ENCRYPTION_KEY` must be exactly 32 printable, non-space ASCII characters. Restore the original key for an existing database. On a new installation, clear the invalid value and rerun `./setup.sh`. |
 | Login page has no sign-in button | No login provider configured: both `GH_OAUTH_CLIENT_ID` **and** `_SECRET` must be non-empty (a half-filled pair is skipped and logged at ERROR). |
 | OAuth redirect loop / cookie never sticks | A proxy in front of Traefik is injecting a `Domain=` attribute on cookies, which browsers reject for `__Host-` cookies. Serve the stack directly on ports 80/443. |
 | Signed in but not admin | `HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS` didn't match. On the account's **first** login the server logs (INFO) the exact `provider subject username` it saw — copy that into the allowlist and restart. (For an account that already existed, check that log line from its first sign-in, or use the numeric id.) |
