@@ -1,12 +1,15 @@
 package de.tum.cit.aet.hephaestus.agent.runtime;
 
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
+import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,9 +21,8 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Parse Pi-runner output into an {@link AgentResult}.
  *
- * <p>Handles {@code result.json}, falls back to {@code review-state.json}, and surfaces
- * {@code usage.json}, {@code runner-debug.json}, {@code watchdog-killed.json}. Sanitises
- * Swift {@code \(...)} interpolation that produces invalid JSON.
+ * <p>Falls back to persisted review state when the primary result is absent and surfaces auxiliary
+ * runner artifacts. Sanitises Swift {@code \(...)} interpolation that produces invalid JSON.
  *
  * <p>Parse failures are non-fatal (best-effort) and counted by the
  * {@code agent.pi.result.parse.failure{stage}} counter.
@@ -34,10 +36,23 @@ public class PiResultParser {
 
     private final ObjectMapper objectMapper;
     private final MeterRegistry meterRegistry;
+    private final DistributionSummary eligiblePractices;
+    private final DistributionSummary evaluatedPractices;
+    private final DistributionSummary practiceCoverageRatio;
 
     public PiResultParser(ObjectMapper objectMapper, MeterRegistry meterRegistry) {
         this.objectMapper = objectMapper;
         this.meterRegistry = meterRegistry;
+        this.eligiblePractices = DistributionSummary.builder("agent.review.practice.coverage.eligible")
+                .description("Eligible practices per review run.")
+                .register(meterRegistry);
+        this.evaluatedPractices = DistributionSummary.builder("agent.review.practice.coverage.evaluated")
+                .description("Evaluated practices per review run.")
+                .register(meterRegistry);
+        this.practiceCoverageRatio = DistributionSummary.builder("agent.review.practice.coverage.ratio")
+                .description("Fraction of eligible practices evaluated per review run.")
+                .maximumExpectedValue(1.0)
+                .register(meterRegistry);
     }
 
     /** Parse the sandbox result, falling back to {@code review-state.json} when {@code result.json} is absent. */
@@ -49,6 +64,7 @@ public class PiResultParser {
         addWatchdogState(output, sandboxResult.outputFiles().get("watchdog-killed.json"));
         AgentResult.LlmUsage usage = parseUsage(sandboxResult.outputFiles().get("usage.json"));
         addRunnerDebug(output, sandboxResult.outputFiles().get("runner-debug.json"));
+        addPracticeCoverage(output, sandboxResult.outputFiles().get("practice-coverage.json"));
         // Before the result-file branches below, which early-return: the composition stage's output is
         // independent of whether the review's own observations parsed, and losing it because the observations
         // were malformed would silently couple two things that must not be coupled.
@@ -71,6 +87,50 @@ public class PiResultParser {
         String extracted = extractJsonFromText(rawContent);
         output.put("rawOutput", extracted != null ? extracted : rawContent);
         return new AgentResult(success, output, usage);
+    }
+
+    void addPracticeCoverage(Map<String, Object> output, byte @Nullable [] coverageFile) {
+        if (coverageFile == null || coverageFile.length == 0) return;
+        try {
+            JsonNode coverage = objectMapper.readTree(coverageFile);
+            int eligible = coverage.path("eligible").asInt(-1);
+            int evaluated = coverage.path("evaluated").asInt(-1);
+            JsonNode outcomes = coverage.path("outcomes");
+            if (!validCoverage(eligible, evaluated, outcomes)) {
+                throw new IllegalArgumentException("invalid practice coverage");
+            }
+            output.put("practiceCoverage", objectMapper.treeToValue(coverage, Object.class));
+            eligiblePractices.record(eligible);
+            evaluatedPractices.record(evaluated);
+            if (eligible > 0) practiceCoverageRatio.record((double) evaluated / eligible);
+            log.info(
+                    "Practice review coverage: evaluated={}, eligible={}, ratio={}",
+                    evaluated,
+                    eligible,
+                    eligible == 0 ? "n/a" : (double) evaluated / eligible);
+        } catch (JacksonException | IllegalArgumentException e) {
+            recordFailure("practice_coverage", e);
+        }
+    }
+
+    private static boolean validCoverage(int eligible, int evaluated, JsonNode outcomes) {
+        if (eligible < 0
+                || evaluated < 0
+                || evaluated > eligible
+                || !outcomes.isArray()
+                || outcomes.size() != eligible) {
+            return false;
+        }
+        Set<String> slugs = new HashSet<>();
+        int evaluatedOutcomes = 0;
+        for (JsonNode outcome : outcomes) {
+            String slug = outcome.path("practiceSlug").asString(null);
+            String value = outcome.path("outcome").asString();
+            if (slug == null || slug.isBlank() || !slugs.add(slug)) return false;
+            if ("EVALUATED".equals(value)) evaluatedOutcomes++;
+            else if (!"NOT_REACHED".equals(value)) return false;
+        }
+        return evaluatedOutcomes == evaluated;
     }
 
     AgentResult.@Nullable LlmUsage parseUsage(byte @Nullable [] usageFile) {
@@ -245,7 +305,7 @@ public class PiResultParser {
         return observations != null && observations.isArray() ? observations : null;
     }
 
-    private void recordFailure(String stage, JacksonException e) {
+    private void recordFailure(String stage, Exception e) {
         log.warn("Failed to parse Pi {} output: {}", stage, e.getMessage());
         meterRegistry.counter(METRIC_PARSE_FAILURE, Tags.of("stage", stage)).increment();
     }

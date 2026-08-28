@@ -8,13 +8,7 @@ import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-/**
- * What a review run decided, for a surface that has only its id.
- *
- * <p>A port for the same reason {@link ReviewRunTargetLookup} is one: the practices module owns the
- * question and must not import the orchestrator that answers it. The orchestrator implements this
- * against {@code agent_job}, parsing the readiness report beside the code that writes it.
- */
+/** Provides persisted review outcomes without exposing agent-job persistence to the practices module. */
 public interface ReviewOutcomeLookup {
     /** @return outcomes by review id; a run this workspace does not own is simply absent */
     Map<UUID, ReviewOutcome> findByIds(long workspaceId, Collection<UUID> reviewIds);
@@ -22,14 +16,20 @@ public interface ReviewOutcomeLookup {
     /**
      * @param insufficientEvidence the run completed without any model executing because the evidence it
      *                             needed was not readable — distinct from failure, since nothing broke
-     * @param readinessByPracticeSlug what the run decided about each practice it <em>considered</em>; a
-     *                             practice absent here was never considered, not considered and refused
+     * @param readinessByPracticeSlug eligibility decision by practice slug
+     * @param coverageByPracticeSlug outcome for each eligible practice; empty without a valid account
      */
     record ReviewOutcome(
             @NonNull ReviewRunState state,
             boolean insufficientEvidence,
             @Nullable Instant decidedAt,
-            @NonNull Map<String, PracticeReadinessOutcome> readinessByPracticeSlug) {}
+            @NonNull Map<String, PracticeReadinessOutcome> readinessByPracticeSlug,
+            @NonNull Map<String, PracticeCoverageOutcome> coverageByPracticeSlug) {}
+
+    enum PracticeCoverageOutcome {
+        EVALUATED,
+        NOT_REACHED,
+    }
 
     /**
      * @param blockers      already-rendered phrases naming what could not be read, so no consumer has to

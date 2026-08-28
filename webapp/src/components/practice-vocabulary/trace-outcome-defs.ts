@@ -8,6 +8,7 @@ import {
 	ClockIcon,
 	HourglassIcon,
 	LoaderIcon,
+	TimerOffIcon,
 	UnplugIcon,
 } from "lucide-react";
 
@@ -48,6 +49,12 @@ export const TRACE_OUTCOME_DEFS: StatusDefs<TraceOutcome> = {
 		badgeVariant: "outline",
 		description:
 			"The workspace's review settings turned this occurrence away before a review began.",
+	},
+	NOT_REACHED: {
+		label: "Not reached",
+		icon: TimerOffIcon,
+		badgeVariant: "warning",
+		description: "The practice was eligible, but the review ended before it was evaluated.",
 	},
 	NOT_ASSESSABLE: {
 		label: "Couldn't assess",

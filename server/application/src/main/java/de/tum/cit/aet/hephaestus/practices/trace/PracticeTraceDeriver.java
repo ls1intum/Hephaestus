@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.trace;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewOutcomeLookup.PracticeCoverageOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOutcomeLookup.PracticeReadinessOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOutcomeLookup.ReviewOutcome;
 import de.tum.cit.aet.hephaestus.practices.trace.TraceInputs.PracticeOutput;
@@ -18,44 +19,25 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Turns recorded facts into one legible answer per practice.
- *
- * <p><b>The order of the questions is the design.</b> Evidence that a practice <em>was</em> assessed
- * outranks every reason it might not have been, because configuration is read as it stands today while
- * observations are history: a practice measured last week and turned off yesterday must read as
- * measured, not as silenced. Below that, the workspace's own choice outranks anything mechanical —
- * "you turned this off" beats "the cooldown was active" even when both are true.
- *
- * <p>Configuration is therefore current, not as-of-run: an autonomy or binding changed since a review is
- * matched as it reads now, and the outcome is derived from what the run recorded wherever a recording
- * exists.
+ * Derives one trace outcome per practice. Historical observations outrank current configuration, and
+ * recorded run decisions outrank inferred state.
  */
 final class PracticeTraceDeriver {
 
     private PracticeTraceDeriver() {}
 
-    /** Informative answers first, so a reader does not scroll past the practice that did something. */
-    private static final Map<PracticeTraceOutcome, Integer> RANK = Map.of(
-            PracticeTraceOutcome.REVIEWED,
-            0,
-            PracticeTraceOutcome.NOT_ASSESSABLE,
-            1,
-            PracticeTraceOutcome.RUNNING,
-            2,
-            PracticeTraceOutcome.PENDING,
-            3,
-            PracticeTraceOutcome.FAILED,
-            4,
-            PracticeTraceOutcome.LAPSED,
-            5,
-            PracticeTraceOutcome.SKIPPED,
-            6,
-            PracticeTraceOutcome.DORMANT,
-            7,
-            PracticeTraceOutcome.TURNED_OFF,
-            8,
-            PracticeTraceOutcome.NOT_OCCASIONED,
-            9);
+    private static final Map<PracticeTraceOutcome, Integer> RANK = Map.ofEntries(
+            Map.entry(PracticeTraceOutcome.REVIEWED, 0),
+            Map.entry(PracticeTraceOutcome.NOT_ASSESSABLE, 1),
+            Map.entry(PracticeTraceOutcome.RUNNING, 2),
+            Map.entry(PracticeTraceOutcome.PENDING, 3),
+            Map.entry(PracticeTraceOutcome.FAILED, 4),
+            Map.entry(PracticeTraceOutcome.LAPSED, 5),
+            Map.entry(PracticeTraceOutcome.NOT_REACHED, 6),
+            Map.entry(PracticeTraceOutcome.SKIPPED, 7),
+            Map.entry(PracticeTraceOutcome.DORMANT, 8),
+            Map.entry(PracticeTraceOutcome.TURNED_OFF, 9),
+            Map.entry(PracticeTraceOutcome.NOT_OCCASIONED, 10));
 
     static List<PracticeTraceEntryDTO> derive(
             List<TracedPractice> practices,
@@ -89,11 +71,8 @@ final class PracticeTraceDeriver {
                 .toList();
         SignalOccurrence latest = matched.isEmpty() ? null : matched.getFirst();
 
-        // 1. It produced measurements. Nothing below can make that untrue.
         if (output.observations() > 0) {
-            // The occurrence that started the run the measurements came from, not the newest match — a
-            // practice assessed at open and signalled again since must not read as assessed on a signal
-            // it was never run for.
+            // Attribute observations to the occurrence that started their review, not a newer matching signal.
             SignalOccurrence occasion = matched.stream()
                     .filter(occurrence -> Objects.equals(occurrence.reviewId(), output.latestReviewId()))
                     .findFirst()
@@ -108,8 +87,6 @@ final class PracticeTraceDeriver {
                     output);
         }
 
-        // 2. A run recorded what it decided about this practice by name. That recording is authoritative
-        //    over anything re-derived from today's configuration.
         for (SignalOccurrence occurrence : matched) {
             ReviewOutcome review = occurrence.reviewId() == null ? null : reviews.get(occurrence.reviewId());
             if (review == null) {
@@ -119,6 +96,17 @@ final class PracticeTraceDeriver {
                     review.readinessByPracticeSlug().get(practice.slug());
             if (readiness == null) {
                 continue;
+            }
+            if (readiness.ready()
+                    && review.coverageByPracticeSlug().get(practice.slug()) == PracticeCoverageOutcome.NOT_REACHED) {
+                return entry(
+                        practice,
+                        PracticeTraceOutcome.NOT_REACHED,
+                        "The review ended before reaching this practice.",
+                        occurrence,
+                        review.decidedAt(),
+                        occurrence.reviewId(),
+                        output);
             }
             if (readiness.ready()) {
                 return entry(

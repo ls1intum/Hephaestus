@@ -108,6 +108,60 @@ class PiResultParserTest extends BaseUnitTest {
     }
 
     @Test
+    void surfacesPerRunPracticeCoverageAndRecordsItsRatio() {
+        String coverage = """
+                {"eligible":4,"evaluated":2,"outcomes":[
+                  {"practiceSlug":"a","outcome":"EVALUATED"},
+                  {"practiceSlug":"b","outcome":"NOT_REACHED"},
+                  {"practiceSlug":"c","outcome":"EVALUATED"},
+                  {"practiceSlug":"d","outcome":"NOT_REACHED"}]}
+                """;
+
+        var result = parser.parse(new SandboxResult(
+                1,
+                Map.of("practice-coverage.json", coverage.getBytes(StandardCharsets.UTF_8)),
+                "budget exhausted",
+                false,
+                Duration.ofSeconds(10)));
+
+        assertThat(result.output()).containsKey("practiceCoverage");
+        assertThat(meterRegistry
+                        .get("agent.review.practice.coverage.eligible")
+                        .summary()
+                        .totalAmount())
+                .isEqualTo(4);
+        assertThat(meterRegistry
+                        .get("agent.review.practice.coverage.evaluated")
+                        .summary()
+                        .totalAmount())
+                .isEqualTo(2);
+        assertThat(meterRegistry
+                        .get("agent.review.practice.coverage.ratio")
+                        .summary()
+                        .totalAmount())
+                .isEqualTo(0.5);
+    }
+
+    @Test
+    void rejectsIncompleteOrContradictoryPracticeCoverage() {
+        String[] invalid = {
+            "{\"eligible\":2,\"evaluated\":1,\"outcomes\":[]}",
+            "{\"eligible\":2,\"evaluated\":1,\"outcomes\":[{\"practiceSlug\":\"a\",\"outcome\":\"EVALUATED\"},{\"practiceSlug\":\"a\",\"outcome\":\"NOT_REACHED\"}]}",
+            "{\"eligible\":1,\"evaluated\":1,\"outcomes\":[{\"practiceSlug\":\"a\",\"outcome\":\"UNKNOWN\"}]}"
+        };
+
+        for (String coverage : invalid) {
+            Map<String, Object> output = new java.util.HashMap<>();
+            parser.addPracticeCoverage(output, coverage.getBytes(StandardCharsets.UTF_8));
+            assertThat(output).doesNotContainKey("practiceCoverage");
+        }
+        assertThat(meterRegistry
+                        .counter("agent.pi.result.parse.failure", "stage", "practice_coverage")
+                        .count())
+                .isEqualTo(invalid.length);
+    }
+
+    @Test
     @DisplayName("reasoningTokens is populated from the responses-path shape when the runner reports it")
     void populatesReasoningTokensWhenPresent() {
         String usage = "{\"model\":\"gpt-5.4\",\"inputTokens\":100,\"outputTokens\":50,\"reasoningTokens\":30,"
