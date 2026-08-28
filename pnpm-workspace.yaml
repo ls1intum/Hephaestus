@@ -50,9 +50,7 @@ peerDependencyRules:
     tailwindcss: 4.x
     vite: 8.x
 
-# Record platform-specific optional deps (rolldown/lightningcss/biome native bindings)
-# for every OS+arch we run dev or CI on. Without this, a `pnpm install` on macOS
-# would silently drop the Linux binaries from the lockfile, breaking CI.
+# Keep native packages for every supported development and CI platform in the lockfile.
 supportedArchitectures:
   os:
     - linux

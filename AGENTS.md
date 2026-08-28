@@ -19,7 +19,7 @@ Node is pinned in `.node-version` and drives the repo's own tooling; the repo is
 the per-practice precompute scripts (`server/application/src/main/resources/practices/precompute/`) are
 TypeScript executed directly by Bun, whose version the agent image pins in
 `docker/agents/pi/Dockerfile`. They are type-checked as one project via `tsconfig.agents.json` and
-linted by the root `.oxlintrc.json` and formatted by the root `biome.jsonc`. JDK 21, and Docker
+linted by the root `.oxlintrc.json` and formatted by the root `.oxfmtrc.json`. JDK 21, and Docker
 for the database helpers.
 
 ## Skills
@@ -61,13 +61,14 @@ checks, and security scans. Run `check` before pushing, then run the affected te
 
 ### Lint and format scopes
 
-**oxlint lints every TypeScript tree in the repo; Biome formats and sorts imports.**
+**Oxlint owns linting; oxfmt owns the formatting scopes below and sorts imports.**
 
 | Tree | oxlint config | Formatted by | Scripts |
 |---|---|---|---|
-| the SPA (`webapp/`) | `webapp/.oxlintrc.json` | Biome (`webapp/biome.jsonc`) | `format:webapp`, `lint:webapp`, `check:webapp` |
-| the docs site (`docs/`) | `docs/.oxlintrc.json` | nothing — only `.editorconfig` | linted by `lint:agents`, which passes `docs` as a path |
-| the Bun agent runtime and specs, both precompute trees, `scripts/**`, `.changeset/`, `.github/` and the root config files | `.oxlintrc.json` | Biome (`biome.jsonc`) | `format:agents`, `lint:agents`, `check:agents` |
+| the SPA (`webapp/`) | `webapp/.oxlintrc.json` | oxfmt (`.oxfmtrc.json`) | `format:webapp`, `lint:webapp`, `check:webapp` |
+| the docs site (`docs/`) | `docs/.oxlintrc.json` | oxfmt for JavaScript, TypeScript, JSON/JSONC, and CSS (`.oxfmtrc.json`) | `format:docs`; linted by `lint:agents` |
+| the Bun agent runtime and specs, both precompute trees, and `scripts/**` | `.oxlintrc.json` | oxfmt (`.oxfmtrc.json`) | `format:agents`, `lint:agents`, `check:agents` |
+| selected repository tooling configuration | `.oxlintrc.json` where applicable | oxfmt (`.oxfmtrc.json`) | `format:config` |
 
 `docs:lint` is **not** the oxlint leg — it is the docs package's own `typecheck` plus
 `markdownlint-cli2`, configured by `docs/.markdownlint-cli2.jsonc`, which states both the file scope
@@ -94,6 +95,7 @@ adding a rule there enables it nowhere. `webapp/AGENTS.md` § Linting has the re
 Holds wherever TypeScript is written here, the Bun agent trees and `scripts/**` included.
 `webapp/AGENTS.md` wins over it inside the SPA.
 
+- Separate import groups with blank lines wherever their relative evaluation order must not change; oxfmt sorts within each group.
 - **A leading `_` marks what the language or a tool reads that way** — an intentionally unused
   binding, a server field name (`_id`), a runtime global. It never marks something private, which
   carries no prefix.

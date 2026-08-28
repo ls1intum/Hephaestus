@@ -33,9 +33,9 @@ Nothing staged or modified means nothing to land.
 `.github/workflows/cicd.yml` holds the `dorny/paths-filter` block that decides this; read it rather
 than guessing, and note the two shapes that surprise people:
 
-- **`scripts/**` and the repo-root config files (`package.json`, `pnpm-lock.yaml`, `.oxlintrc.json`,
-  `biome.jsonc`) trigger both the webapp and the app-server legs**, because the gates they configure
-  run on both.
+- **`scripts/**` and the root lint, formatter, TypeScript, and package configuration listed in
+  the workflow trigger both the webapp and app-server legs**, because the gates they configure run
+  on both.
 - **`docs/**` triggers the app-server leg.** There is no such thing as a docs-only PR that skips
   validation: `docs:lint` and `check:diagrams` run there.
 

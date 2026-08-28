@@ -1,4 +1,5 @@
 import { basename, isAbsolute, relative } from "node:path";
+
 import { defineRule } from "@oxlint/plugins";
 
 /**
@@ -39,7 +40,7 @@ export const noNonAsciiFilename = defineRule({
 		type: "problem",
 		docs: {
 			description:
-				"A path this repo owns is spelled in ASCII. A name outside it survives the author's machine and then stops being one string: a filesystem may store it decomposed while the import states it composed, Git prints it escaped, a zip archive re-encodes it, and a tool that matches paths as text quietly stops matching. Biome's `useFilenamingConvention` asked this through `requireAscii`; `unicorn/filename-case`, which replaces it, checks the shape of a name and not its alphabet.",
+				"A path this repo owns is spelled in ASCII. A name outside it survives the author's machine and then stops being one string: a filesystem may store it decomposed while the import states it composed, Git prints it escaped, a zip archive re-encodes it, and a tool that matches paths as text quietly stops matching. `unicorn/filename-case` checks the shape of a name and not its alphabet, so this repository rule enforces the alphabet.",
 		},
 		messages: {
 			nonAscii:

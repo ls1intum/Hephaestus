@@ -52,12 +52,8 @@ jobs:
             webapp:
               - 'webapp/**'
               - 'docs/images/readme/**'
-              # webapp/.oxlintrc.json carries no `options` block and webapp/biome.jsonc declares
-              # `root: false`, so `typeAware`, `reportUnusedDisableDirectives` and the Biome graph
-              # root all come from these two files — they decide the webapp's verdict from outside
-              # webapp/.
               - '.oxlintrc.json'
-              - 'biome.jsonc'
+              - '.oxfmtrc.json'
               # check:components, check:stories and check:story-sort live here, run on the Webapp leg.
               - 'scripts/**'
               - 'package.json'
@@ -88,12 +84,8 @@ jobs:
               # the Bun they run on is read from the agent image.
               - 'docker/agents/**'
               - 'tsconfig.agents.json'
-              # The lint/format gate for every non-webapp TypeScript tree is assembled from all five:
-              # oxlint's rules, Biome's rules, the `:agents` scripts that invoke them, the pinned
-              # binaries, and the root tsconfig — which exists only to give the Bun trees, configured
-              # by tsconfig.agents.json, the project that oxlint's type-aware rules require.
               - '.oxlintrc.json'
-              - 'biome.jsonc'
+              - '.oxfmtrc.json'
               - 'tsconfig.json'
               - 'package.json'
               - 'pnpm-lock.yaml'
@@ -101,11 +93,9 @@ jobs:
               # docs:lint, and parsed by check:diagrams. The `docs` filter below feeds no job, so this
               # entry is the only thing that puts a docs-only PR into `any-code`.
               - 'docs/**'
-              - '.changeset/*.cjs'
+              - '.changeset/**'
               - 'commitlint.config.ts'
               - '.github/scripts/**'
-              # check:biome-pin compares this file's $schema against the pinned version.
-              - 'webapp/biome.jsonc'
               # check:env compares application.yml against the deployment that has to deliver it.
               - 'docker/compose.app.yaml'
               - 'docker/compose.core.yaml'
@@ -119,6 +109,11 @@ jobs:
               - '.opencode/**'
               - '.agents/**'
               - 'opencode.json'
+              - 'renovate.json'
+              - 'openapitools.json'
+              - 'jean.json'
+              - 'project.code-workspace'
+              - '.vscode/settings.json'
             application-server-image:
               - 'server/application/src/main/**'
               - 'server/application/pom.xml'
