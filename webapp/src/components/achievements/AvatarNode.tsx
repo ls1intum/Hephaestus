@@ -1,4 +1,5 @@
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
+
 import { CENTERED_HANDLE_STYLE } from "@/components/achievements/handle-style";
 import {
 	getLeagueColor,

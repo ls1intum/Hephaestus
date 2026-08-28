@@ -2,8 +2,10 @@ import type { Meta, StoryObj } from "@storybook/react";
 import type * as React from "react";
 import { useState } from "react";
 import { fn } from "storybook/test";
+
 import { STORY_NOW } from "@/components/common/story-clock";
 import { DEFAULT_SCHEDULE, formatDateRangeForApi, getDateRangeForPreset } from "@/lib/timeframe";
+
 import { ProfileTimeframePicker } from "./ProfileTimeframePicker";
 
 // Calculate default dates using the shared timeframe utilities

@@ -1,5 +1,6 @@
 import { Link, useMatchRoute } from "@tanstack/react-router";
 import { Radar, Sparkles, Trophy, User, Users } from "lucide-react";
+
 import {
 	SidebarGroup,
 	SidebarGroupLabel,

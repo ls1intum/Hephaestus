@@ -1,4 +1,5 @@
 import { Info, Star } from "lucide-react";
+
 import {
 	Dialog,
 	DialogContent,
@@ -6,6 +7,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+
 import { LeagueIcon } from "./LeagueIcon";
 import { Leagues } from "./utils";
 

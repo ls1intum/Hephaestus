@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
+
 import type { ConfigAuditEntryView } from "@/api/types.gen";
+
 import { ConfigAuditTable } from "./ConfigAuditTable";
 
 const impersonatedUpdate: ConfigAuditEntryView = {

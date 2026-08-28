@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { WorkflowIcon } from "lucide-react";
+
 import type { AgentJob, Practice, ReviewFeedback, ReviewObservation } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
@@ -16,6 +17,8 @@ import {
 	EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
+
+import type { RunsSearch } from "./review-search";
 import { ReviewArtifactLink } from "./ReviewArtifact";
 import { ReviewBreadcrumbs } from "./ReviewBreadcrumbs";
 import { ReviewDetailHeader } from "./ReviewDetailHeader";
@@ -23,7 +26,6 @@ import { ReviewOutputSections, type ReviewSectionState } from "./ReviewOutputSec
 import { ReviewRunActions } from "./ReviewRunActions";
 import { ReviewRunCard } from "./ReviewRunCard";
 import { ReviewRunNotices } from "./ReviewRunNotices";
-import type { RunsSearch } from "./review-search";
 
 export interface ReviewRunDetailPageProps {
 	workspaceSlug: string;

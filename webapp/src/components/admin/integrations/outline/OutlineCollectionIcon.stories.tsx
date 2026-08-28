@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+
 import { OutlineCollectionIcon } from "@/components/admin/integrations/outline/OutlineCollectionIcon";
 
 /**

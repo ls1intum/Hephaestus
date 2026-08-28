@@ -1,4 +1,5 @@
 import { defineRule, type ESTree } from "@oxlint/plugins";
+
 import { memberName } from "../property.ts";
 
 /**

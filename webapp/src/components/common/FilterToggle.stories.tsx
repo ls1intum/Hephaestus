@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, within } from "storybook/test";
+
 import { Stateful } from "@/stories/stateful";
+
 import { FilterToggle } from "./FilterToggle";
 
 const OPTIONS = [

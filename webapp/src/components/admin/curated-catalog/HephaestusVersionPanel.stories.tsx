@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent } from "storybook/test";
+
 import type { CatalogEntryStatus } from "@/api/types.gen";
 import {
 	mockAuthorDeclaredEvidenceValidation,
@@ -8,6 +9,7 @@ import {
 	mockPullRequestPolicy,
 } from "@/mocks/fixtures/practice";
 import { expectNoOverflowingElement } from "@/test/reflow";
+
 import { HephaestusVersionPanel } from "./HephaestusVersionPanel";
 
 const status = (overrides: Partial<CatalogEntryStatus> = {}): CatalogEntryStatus => ({

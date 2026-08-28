@@ -1,6 +1,7 @@
 import { type DefaultError, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
+
 import {
 	getCurrentUserQueryKey,
 	getSlackUserPreferencesOptions,

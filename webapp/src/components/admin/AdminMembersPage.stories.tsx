@@ -1,9 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
+
 import type { TeamInfo } from "@/api/types.gen";
 import type { ExtendedUserTeams } from "@/components/admin/types";
 import { withStandardPage } from "@/stories/decorators";
 import { expectNoPageOverflow, expectTablesScrollInPlace } from "@/test/reflow";
+
 import { AdminMembersPage } from "./AdminMembersPage";
 
 const meta = {

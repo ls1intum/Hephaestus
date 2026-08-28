@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+
 import { GitLabMergeRequestIcon } from "./gitlab-icons";
 import { getPullRequestStateIcon, type PullRequestState } from "./provider-icons";
 import { getProviderSlug, getProviderTerms, type ProviderType } from "./provider-terms";

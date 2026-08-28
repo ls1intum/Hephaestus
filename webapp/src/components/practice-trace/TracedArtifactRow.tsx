@@ -1,9 +1,11 @@
 import { Link } from "@tanstack/react-router";
 import { ChevronRightIcon } from "lucide-react";
+
 import type { TracedArtifact } from "@/api/types.gen";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item";
 import { artifactKindIcon, artifactKindLabel } from "@/lib/artifact-kinds";
+
 import { signalCountsLabel } from "./trace-format";
 
 export interface TracedArtifactRowProps {

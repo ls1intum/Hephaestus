@@ -1,10 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, within } from "storybook/test";
+
 import { withStandardPage } from "@/stories/decorators";
 import { StatefulPatch } from "@/stories/stateful";
+
 import { FeedbackFilters } from "./FeedbackFilters";
-import type { ReviewPeople } from "./ReviewPersonFacet";
 import type { FeedbackSearch } from "./review-search";
+import type { ReviewPeople } from "./ReviewPersonFacet";
 import { reviewArtifact, workspaceMembers } from "./story-mock-data";
 
 const PEOPLE: ReviewPeople = {

@@ -1,11 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, screen, userEvent, waitFor } from "storybook/test";
+
 import { GroupPill } from "@/components/admin/practice-catalog/GroupPill";
 import { DetailDrawerStack } from "@/components/core/detail-drawer/DetailDrawerStack";
 import { DrawerBody, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { withPageBehind } from "@/stories/decorators";
 import { Stateful } from "@/stories/stateful";
 import { expectSettledVisible } from "@/test/overlay";
+
 import { DetailDrawerHeader } from "./DetailDrawerHeader";
 
 const meta = {

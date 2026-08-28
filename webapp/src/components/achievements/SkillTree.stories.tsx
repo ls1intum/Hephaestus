@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { ReactFlowProvider } from "@xyflow/react";
+
 import { SkillTree } from "@/components/achievements/SkillTree";
 import { mockUser, mythicAchievementsUI } from "@/components/achievements/story-mock-data";
 import { generateSkillTreeData } from "@/components/achievements/utils";

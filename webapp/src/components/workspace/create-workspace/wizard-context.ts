@@ -1,5 +1,7 @@
 import { createContext, useContext } from "react";
+
 import type { GitLabGroup, GitLabPreflightResponse } from "@/api/types.gen";
+
 import { generateSlug } from "./slug-utils";
 
 export type WizardStep = 1 | 2 | 3;

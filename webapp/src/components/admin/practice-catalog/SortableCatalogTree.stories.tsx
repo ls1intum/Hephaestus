@@ -1,6 +1,7 @@
 import type { Meta, StoryContext, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
+
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -9,6 +10,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { expectNoOverflowingElement } from "@/test/reflow";
+
 import {
 	type SortableCatalogEntry,
 	type SortableCatalogGroup,

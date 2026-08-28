@@ -1,5 +1,6 @@
 import { RotateCcw } from "lucide-react";
 import { useState } from "react";
+
 import type {
 	CatalogEntryStatus,
 	CuratedPracticeDefinition,
@@ -23,6 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+
 import { canUseHephaestusVersion } from "./curated-entry-state";
 import { HephaestusVersionPanel } from "./HephaestusVersionPanel";
 

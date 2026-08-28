@@ -1,9 +1,11 @@
 import { assert, describe, expect, it } from "vitest";
+
 import {
 	autonomyDistribution,
 	autonomyDistributionSentence,
 	autonomyTotal,
 } from "@/lib/practice-autonomy";
+
 import {
 	countOverrides,
 	groupPracticesByGroup,

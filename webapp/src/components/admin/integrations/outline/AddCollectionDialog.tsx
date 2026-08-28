@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { CheckIcon, LibraryIcon, LockIcon } from "lucide-react";
 import { useId, useRef, useState } from "react";
+
 import { listOutlineCollectionCandidatesOptions } from "@/api/@tanstack/react-query.gen";
 import type { OutlineCollectionCandidate } from "@/api/types.gen";
 import { OutlineCollectionIcon } from "@/components/admin/integrations/outline/OutlineCollectionIcon";

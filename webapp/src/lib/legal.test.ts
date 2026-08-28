@@ -1,4 +1,5 @@
 import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
 	isSafeLegalHref,
 	isSafeLegalImageSrc,

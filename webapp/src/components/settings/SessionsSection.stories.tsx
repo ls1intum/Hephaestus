@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
+
 import { noSessions, sessionsError } from "@/mocks/handlers";
+
 import { SessionsSection } from "./SessionsSection";
 
 /**

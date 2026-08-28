@@ -1,7 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
+
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { expectNoPageOverflow } from "@/test/reflow";
+
 import Header from "./Header";
 
 const meta = {

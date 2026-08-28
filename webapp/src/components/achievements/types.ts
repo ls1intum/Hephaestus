@@ -1,4 +1,5 @@
 import type React from "react";
+
 import type { Achievement } from "@/api/types.gen";
 
 /**

@@ -1,6 +1,8 @@
 import { useState } from "react";
+
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+
 import { type WorkspaceDetailsData, workspaceDetailsSchema } from "./schemas";
 import { generateSlug } from "./slug-utils";
 import { useWizard } from "./wizard-context";

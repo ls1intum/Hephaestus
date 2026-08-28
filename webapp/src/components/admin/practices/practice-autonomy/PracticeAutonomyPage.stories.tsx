@@ -1,9 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, within } from "storybook/test";
+
 import { withWidePage } from "@/stories/decorators";
 import { Stateful } from "@/stories/stateful";
 import { expectSettledVisible } from "@/test/overlay";
 import { expectNoPageOverflow } from "@/test/reflow";
+
 import { PracticeAutonomyPage } from "./PracticeAutonomyPage";
 import { type AutonomyFixture, buildAutonomyFixture, scaleFixture } from "./story-mock-data";
 

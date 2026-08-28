@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { Code, MessageSquare, Sparkles, Trophy } from "lucide-react";
+
 import { FeatureCard } from "./FeatureCard";
 
 const meta = {

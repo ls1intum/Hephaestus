@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+
 import { listWorkspacesOptions } from "@/api/@tanstack/react-query.gen";
 import type { WorkspaceListItem } from "@/api/types.gen";
 import { useAuth } from "@/integrations/auth/AuthContext";

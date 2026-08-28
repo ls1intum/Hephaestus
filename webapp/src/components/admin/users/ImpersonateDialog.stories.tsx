@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent } from "storybook/test";
+
 import type { AdminAccountView } from "@/api/types.gen";
+
 import { ImpersonateDialog } from "./ImpersonateDialog";
 
 const target: AdminAccountView = {

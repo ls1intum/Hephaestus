@@ -1,5 +1,6 @@
 import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip";
 import type { ReactElement } from "react";
+
 import { AchievementProgressDisplay } from "@/components/achievements/AchievementProgressDisplay";
 import { rarityBorderColors, rarityLabels, statusIcons } from "@/components/achievements/styles";
 import type { UIAchievement } from "@/components/achievements/types";

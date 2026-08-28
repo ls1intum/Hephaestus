@@ -11,6 +11,7 @@ import {
 } from "@tanstack/react-router";
 import type React from "react";
 import { toast } from "sonner";
+
 import {
 	getIntegrationCatalogOptions,
 	getUserSettingsOptions,
@@ -20,8 +21,8 @@ import { ImpersonationBanner } from "@/components/auth/ImpersonationBanner";
 import { CookieConsentBanner } from "@/components/consent/CookieConsentBanner";
 import Footer from "@/components/core/Footer";
 import Header from "@/components/core/Header";
-import { StandardPageSurface } from "@/components/core/StandardPageSurface";
 import { AppSidebar, type SidebarContext } from "@/components/core/sidebar/AppSidebar";
+import { StandardPageSurface } from "@/components/core/StandardPageSurface";
 import { Chat } from "@/components/mentor/Chat";
 import { Copilot } from "@/components/mentor/Copilot";
 import { defaultPartRenderers } from "@/components/mentor/renderers";

@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn } from "storybook/test";
+
 import { AdminAchievementsTable } from "./AdminAchievementsTable";
 import type { ExtendedUserTeams } from "./types";
 

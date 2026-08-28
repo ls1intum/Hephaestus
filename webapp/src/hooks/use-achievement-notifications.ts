@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
+
 import type { AchievementStatus, UIAchievement } from "@/components/achievements/types";
 
 /**

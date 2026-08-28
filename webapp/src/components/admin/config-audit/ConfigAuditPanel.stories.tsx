@@ -1,7 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { HttpResponse, http } from "msw";
 import { expect, fn } from "storybook/test";
+
 import type { ConfigAuditEntryView } from "@/api/types.gen";
+
 import { AdminConfigAuditPanel, WorkspaceConfigAuditPanel } from "./ConfigAuditPanel";
 
 const llmConnectionCreated: ConfigAuditEntryView = {

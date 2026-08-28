@@ -10,6 +10,7 @@ import { join, resolve } from "node:path";
  *   --scripts defaults to ../../../server/application/src/main/resources/practices/precompute (the version-controlled home)
  */
 import { parseArgs } from "node:util";
+
 import { parsePracticeResult } from "./lib/practice-contract";
 import type { PracticeResult } from "./lib/types";
 

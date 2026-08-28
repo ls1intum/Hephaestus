@@ -13,10 +13,11 @@ import { statusFacetOptions } from "@/components/practice-vocabulary/status-def"
 import { WITHHOLDING_FAMILY_DEFS } from "@/components/practice-vocabulary/withholding-defs";
 import { fromDateRange, toDateRange } from "@/lib/date-range-search";
 import { nonEmpty } from "@/lib/search-params";
+
 import { AppliedFacetPills, facetPills } from "./AppliedFacetPills";
+import type { FeedbackSearch } from "./review-search";
 import { reviewArtifactScopeLabel } from "./ReviewArtifact";
 import { type ReviewPeople, ReviewPersonFacet } from "./ReviewPersonFacet";
-import type { FeedbackSearch } from "./review-search";
 
 const OUTCOME_OPTIONS = statusFacetOptions(DELIVERY_STATE_DEFS);
 // The one facet that offers a subset: a place nothing is ever written to would be a filter with no

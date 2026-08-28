@@ -1,4 +1,5 @@
 import { useState } from "react";
+
 import type { SlackChannelCandidate } from "@/components/admin/integrations/AdminSlackChannelsSettings";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ import {
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { parseSlackChannelReference } from "@/lib/slack-channel-reference";
+
 import { SlackChannelCombobox } from "./SlackChannelCombobox";
 import { SlackChannelPasteField } from "./SlackChannelPasteField";
 

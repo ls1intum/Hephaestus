@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+
 import { LeaderboardFilter } from "./LeaderboardFilter";
 
 const meta: Meta<typeof LeaderboardFilter> = {

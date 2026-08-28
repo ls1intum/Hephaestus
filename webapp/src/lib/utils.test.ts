@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { cn, sanitizeText } from "./utils";
 
 describe("utils", () => {

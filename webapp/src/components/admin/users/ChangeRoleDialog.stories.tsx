@@ -1,7 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ShieldCheck, ShieldOff } from "lucide-react";
 import { expect, fn, screen, userEvent } from "storybook/test";
+
 import type { AdminAccountView } from "@/api/types.gen";
+
 import { ChangeRoleDialog } from "./ChangeRoleDialog";
 
 const regularUser: AdminAccountView = {

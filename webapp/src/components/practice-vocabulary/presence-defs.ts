@@ -1,5 +1,7 @@
 import { CircleHelpIcon, CircleMinusIcon, CircleSlashIcon, EyeIcon } from "lucide-react";
+
 import type { ReviewObservation } from "@/api/types.gen";
+
 import type { StatusDefs } from "./status-def";
 
 export type Presence = ReviewObservation["presence"];

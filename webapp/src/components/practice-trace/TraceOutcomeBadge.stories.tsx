@@ -1,8 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
+
 import { expectNoPageOverflow } from "@/test/reflow";
-import { TraceOutcomeBadge } from "./TraceOutcomeBadge";
+
 import { OUTCOMES } from "./trace-format";
+import { TraceOutcomeBadge } from "./TraceOutcomeBadge";
 
 const meta = {
 	title: "Practice trace/Outcome badge",

@@ -2,6 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { ExternalLinkIcon, SendIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+
 import {
 	initiateMutation,
 	sendSlackTestMessageMutation,
@@ -52,10 +53,11 @@ import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { problemDetailOf } from "@/lib/problem-detail";
 import { parseSlackChannelReference } from "@/lib/slack-channel-reference";
+
 import { IntegrationCardHeading } from "./IntegrationCardHeading";
+import { slackErrorMessage } from "./slack-channels/slack-error-copy";
 import { SlackChannelCombobox } from "./slack-channels/SlackChannelCombobox";
 import { SlackChannelPasteField } from "./slack-channels/SlackChannelPasteField";
-import { slackErrorMessage } from "./slack-channels/slack-error-copy";
 
 export interface AdminSlackNotificationSettingsProps {
 	workspaceSlug: string;

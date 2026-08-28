@@ -1,4 +1,5 @@
 import { GripVertical, MoreHorizontal } from "lucide-react";
+
 import type { CuratedGroup, CuratedPracticeSummary } from "@/api/types.gen";
 import { automatedReviewLimitationLabel } from "@/components/admin/practice-catalog/evidence-presentation";
 import { GroupPill } from "@/components/admin/practice-catalog/GroupPill";
@@ -27,8 +28,9 @@ import { Item, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/i
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { artifactKindLabel } from "@/lib/artifact-kinds";
-import { CuratedEntryBadges } from "./CuratedEntryBadges";
+
 import { curatedGroupLevel, curatedPracticeLevel } from "./curated-catalog-search";
+import { CuratedEntryBadges } from "./CuratedEntryBadges";
 
 type TreeGroup = CuratedGroup & { displayOrder: number; name: string };
 type TreePractice = CuratedPracticeSummary & {

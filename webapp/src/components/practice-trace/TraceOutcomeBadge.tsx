@@ -1,5 +1,6 @@
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
 import { TRACE_OUTCOME_DEFS } from "@/components/practice-vocabulary/trace-outcome-defs";
+
 import type { TraceOutcome } from "./trace-format";
 
 export interface TraceOutcomeBadgeProps {

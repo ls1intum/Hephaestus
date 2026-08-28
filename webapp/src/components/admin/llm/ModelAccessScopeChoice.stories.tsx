@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen } from "storybook/test";
+
 import { ModelAccessScopeChoice } from "./ModelAccessScopeChoice";
 
 const meta = {

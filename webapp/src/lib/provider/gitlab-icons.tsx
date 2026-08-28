@@ -1,4 +1,4 @@
-import { hasText } from "@/lib/text";
+import type { SVGProps } from "react";
 /**
  * React wrapper components for GitLab SVG icons from `@gitlab/svgs`.
  *
@@ -11,7 +11,7 @@ import { hasText } from "@/lib/text";
  * - conditional `aria-hidden` based on `aria-label` / `aria-labelledby`
  */
 
-import type { SVGProps } from "react";
+import { hasText } from "@/lib/text";
 
 export interface GitLabIconProps extends Omit<SVGProps<SVGSVGElement>, "children"> {
 	/** Icon size in pixels. Defaults to 16. */

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+
 import type { PostHogSurvey } from "@/types/survey";
 
 interface SurveyNotificationState {

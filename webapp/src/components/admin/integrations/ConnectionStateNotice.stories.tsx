@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect } from "storybook/test";
+
 import { ConnectionStateNotice } from "./ConnectionStateNotice";
 
 /**

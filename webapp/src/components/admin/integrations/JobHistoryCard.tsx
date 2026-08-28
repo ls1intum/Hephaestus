@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+
 import { IntegrationCardHeading } from "./IntegrationCardHeading";
 import { SyncJobsTable, type SyncJobsTableProps } from "./SyncJobsTable";
 

@@ -1,5 +1,6 @@
 import { Plus, RotateCcw, Search, Shapes } from "lucide-react";
 import { useState } from "react";
+
 import type {
 	CuratedGroup,
 	CuratedPracticeSummary,
@@ -40,9 +41,10 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { isKnownArtifactKind } from "@/lib/artifact-kinds";
 import { cn } from "@/lib/utils";
+
+import { type CuratedCatalogSearch, curatedPracticeLevel } from "./curated-catalog-search";
 import { CuratedCatalogSummary } from "./CuratedCatalogSummary";
 import { CuratedCatalogTree } from "./CuratedCatalogTree";
-import { type CuratedCatalogSearch, curatedPracticeLevel } from "./curated-catalog-search";
 
 export interface CuratedCatalogProps {
 	groups: readonly CuratedGroup[];

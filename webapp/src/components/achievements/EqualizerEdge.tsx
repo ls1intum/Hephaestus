@@ -1,5 +1,6 @@
 import type { Edge, EdgeProps } from "@xyflow/react";
 import { useState } from "react";
+
 import { useAnimationTime } from "@/hooks/use-animation-time";
 
 export type EqualizerVariant = "traveling" | "static";

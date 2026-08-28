@@ -1,5 +1,7 @@
 import { CheckIcon } from "lucide-react";
+
 import { cn } from "@/lib/utils";
+
 import type { WizardStep } from "./wizard-context";
 
 const STEPS = [

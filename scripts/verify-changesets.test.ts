@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { verifyChangesets } from "./verify-changesets.ts";
 
 const status = (releases: unknown[], summary: string) => ({

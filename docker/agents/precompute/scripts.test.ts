@@ -5,6 +5,7 @@ import { afterEach, beforeAll, describe, expect, it } from "bun:test";
 import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+
 import { isPracticeModule } from "./lib/practice-contract";
 import type { DiffFile, PracticeScript } from "./lib/types";
 

@@ -1,4 +1,5 @@
 import type { Node, NodeProps } from "@xyflow/react";
+
 import { defaultCategoryIcons } from "@/components/achievements/styles";
 
 export type CategoryLabelNodeData = {

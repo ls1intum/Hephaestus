@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+
 import { regressions } from "./check-ci-performance.ts";
 import type { TestSummary } from "./summarize-test-results.ts";
 

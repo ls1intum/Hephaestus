@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { ReactFlowProvider } from "@xyflow/react";
 import { expect } from "storybook/test";
+
 import { AchievementSidebar } from "@/components/achievements/AchievementSidebar";
 import { mockUser, mythicAchievementsUI } from "@/components/achievements/story-mock-data";
 

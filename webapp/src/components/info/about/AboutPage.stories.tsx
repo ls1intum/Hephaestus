@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
+
 import { withStandardPage } from "@/stories/decorators";
+
 import { AboutPage } from "./AboutPage";
 import type { ProjectManager } from "./ProjectManagerCard";
 

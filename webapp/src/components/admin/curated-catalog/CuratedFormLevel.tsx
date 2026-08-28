@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
+
 import { DetailDrawerHeader } from "@/components/core/detail-drawer/DetailDrawerHeader";
 import { DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
+
 import type { CuratedLevelKind } from "./curated-catalog-search";
 
 const TITLES: Record<CuratedLevelKind, { title: string; description: string }> = {

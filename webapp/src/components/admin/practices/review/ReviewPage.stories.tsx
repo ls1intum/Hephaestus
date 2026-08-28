@@ -1,9 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, waitFor, within } from "storybook/test";
+
 import { StatefulPatch } from "@/stories/stateful";
 import { expectNoPageOverflow } from "@/test/reflow";
-import { ReviewPage } from "./ReviewPage";
+
 import type { ReviewSectionId } from "./review-sections";
+import { ReviewPage } from "./ReviewPage";
 
 /**
  * The shell only ever receives its section bodies; it never builds them. Standing in for each one is

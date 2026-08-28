@@ -1,113 +1,108 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Renovate config - dashboard only, manual updates",
-  "extends": [
-    "config:best-practices",
-    ":semanticCommitTypeAll(chore)",
-    ":dependencyDashboardApproval"
-  ],
-  "labels": ["dependencies"],
-  "assigneesFromCodeOwners": true,
+	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
+	"description": "Renovate config - dashboard only, manual updates",
+	"extends": [
+		"config:best-practices",
+		":semanticCommitTypeAll(chore)",
+		":dependencyDashboardApproval"
+	],
+	"labels": ["dependencies"],
+	"assigneesFromCodeOwners": true,
 
-  "timezone": "Europe/Berlin",
-  "schedule": ["before 7am on monday"],
-  "minimumReleaseAge": "3 days",
+	"timezone": "Europe/Berlin",
+	"schedule": ["before 7am on monday"],
+	"minimumReleaseAge": "3 days",
 
-  "platformAutomerge": true,
-  "automergeStrategy": "squash",
-  "semanticCommitScope": "deps",
+	"platformAutomerge": true,
+	"automergeStrategy": "squash",
+	"semanticCommitScope": "deps",
 
-  "dependencyDashboard": true,
-  "dependencyDashboardTitle": "Dependency Dashboard",
+	"dependencyDashboard": true,
+	"dependencyDashboardTitle": "Dependency Dashboard",
 
-  "postUpdateOptions": ["pnpmDedupe"],
+	"postUpdateOptions": ["pnpmDedupe"],
 
-  "lockFileMaintenance": {
-    "enabled": true,
-    "schedule": ["before 7am on monday"],
-    "postUpdateOptions": ["pnpmDedupe"]
-  },
+	"lockFileMaintenance": {
+		"enabled": true,
+		"schedule": ["before 7am on monday"],
+		"postUpdateOptions": ["pnpmDedupe"]
+	},
 
-  "rangeStrategy": "replace",
+	"rangeStrategy": "replace",
 
-  "packageRules": [
-    {
-      "description": "Group Java/Spring",
-      "matchManagers": ["maven"],
-      "groupName": "Java dependencies",
-      "labels": ["dependencies", "java"]
-    },
-    {
-      "description": "Group webapp non-major updates",
-      "matchFileNames": ["webapp/package.json"],
-      "matchUpdateTypes": ["minor", "patch"],
-      "groupName": "Webapp dependencies",
-      "labels": ["dependencies", "webapp"]
-    },
-    {
-      "description": "Group documentation deps",
-      "matchFileNames": ["docs/package.json"],
-      "groupName": "Documentation dependencies",
-      "labels": ["dependencies", "docs"]
-    },
-    {
-      "description": "Major updates",
-      "matchUpdateTypes": ["major"],
-      "minimumReleaseAge": "7 days",
-      "labels": ["dependencies", "breaking"]
-    },
-    {
-      "description": "Core frameworks",
-      "matchPackageNames": [
-        "typescript",
-        "react",
-        "react-dom",
-        "/^@tanstack/",
-        "/^org\\.springframework/"
-      ],
-      "matchUpdateTypes": ["minor"],
-      "groupName": "Core frameworks"
-    },
-    {
-      "description": "GitHub Actions",
-      "matchManagers": ["github-actions"],
-      "groupName": "GitHub Actions",
-      "labels": ["dependencies", "ci"]
-    },
-    {
-      "description": "Docker images",
-      "matchManagers": ["dockerfile", "docker-compose"],
-      "groupName": "Docker images",
-      "labels": ["dependencies", "infrastructure"]
-    }
-  ],
+	"packageRules": [
+		{
+			"description": "Group Java/Spring",
+			"matchManagers": ["maven"],
+			"groupName": "Java dependencies",
+			"labels": ["dependencies", "java"]
+		},
+		{
+			"description": "Group webapp non-major updates",
+			"matchFileNames": ["webapp/package.json"],
+			"matchUpdateTypes": ["minor", "patch"],
+			"groupName": "Webapp dependencies",
+			"labels": ["dependencies", "webapp"]
+		},
+		{
+			"description": "Group documentation deps",
+			"matchFileNames": ["docs/package.json"],
+			"groupName": "Documentation dependencies",
+			"labels": ["dependencies", "docs"]
+		},
+		{
+			"description": "Major updates",
+			"matchUpdateTypes": ["major"],
+			"minimumReleaseAge": "7 days",
+			"labels": ["dependencies", "breaking"]
+		},
+		{
+			"description": "Core frameworks",
+			"matchPackageNames": [
+				"typescript",
+				"react",
+				"react-dom",
+				"/^@tanstack/",
+				"/^org\\.springframework/"
+			],
+			"matchUpdateTypes": ["minor"],
+			"groupName": "Core frameworks"
+		},
+		{
+			"description": "GitHub Actions",
+			"matchManagers": ["github-actions"],
+			"groupName": "GitHub Actions",
+			"labels": ["dependencies", "ci"]
+		},
+		{
+			"description": "Docker images",
+			"matchManagers": ["dockerfile", "docker-compose"],
+			"groupName": "Docker images",
+			"labels": ["dependencies", "infrastructure"]
+		}
+	],
 
-  "customManagers": [
-    {
-      "description": "Track ARG <PKG>_VERSION pins in Dockerfiles via a `# renovate:` magic comment, so Renovate handles bumps for tools installed inside the image (e.g. agent-pi's @earendil-works/pi-coding-agent).",
-      "customType": "regex",
-      "managerFilePatterns": ["/(^|/)Dockerfile$/"],
-      "matchStrings": [
-        "# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>\\S+)(?: versioning=(?<versioning>\\S+))?(?: extractVersion=(?<extractVersion>\\S+))?\\s*\\nARG [A-Z_]+_VERSION=(?<currentValue>\\S+)"
-      ],
-      "versioningTemplate": "{{#if versioning}}{{versioning}}{{else}}semver{{/if}}"
-    }
-  ],
+	"customManagers": [
+		{
+			"description": "Track ARG <PKG>_VERSION pins in Dockerfiles via a `# renovate:` magic comment, so Renovate handles bumps for tools installed inside the image (e.g. agent-pi's @earendil-works/pi-coding-agent).",
+			"customType": "regex",
+			"managerFilePatterns": ["/(^|/)Dockerfile$/"],
+			"matchStrings": [
+				"# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>\\S+)(?: versioning=(?<versioning>\\S+))?(?: extractVersion=(?<extractVersion>\\S+))?\\s*\\nARG [A-Z_]+_VERSION=(?<currentValue>\\S+)"
+			],
+			"versioningTemplate": "{{#if versioning}}{{versioning}}{{else}}semver{{/if}}"
+		}
+	],
 
-  "vulnerabilityAlerts": {
-    "labels": ["security", "dependencies"],
-    "schedule": ["at any time"],
-    "minimumReleaseAge": null,
-    "dependencyDashboardApproval": false,
-    "prPriority": 10,
-    "automerge": true,
-    "groupName": null
-  },
+	"vulnerabilityAlerts": {
+		"labels": ["security", "dependencies"],
+		"schedule": ["at any time"],
+		"minimumReleaseAge": null,
+		"dependencyDashboardApproval": false,
+		"prPriority": 10,
+		"automerge": true,
+		"groupName": null
+	},
 
-  "ignorePaths": [
-    "**/node_modules/**",
-    "**/target/**",
-    "**/dist/**",
-    "**/build/**"
-  ]
+	"ignorePaths": ["**/node_modules/**", "**/target/**", "**/dist/**", "**/build/**"]
 }

@@ -1,8 +1,10 @@
 import { Link } from "@tanstack/react-router";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+
 import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
 import { renderWithRouter } from "@/test/router-harness";
+
 import { PracticeDefinitionForm, type PracticeDefinitionValue } from "./PracticeDefinitionForm";
 
 vi.mock("@/components/shared/CodeEditor", () => ({

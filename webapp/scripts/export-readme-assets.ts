@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
+
 import { type Browser, chromium } from "playwright";
 
 const scriptDirectory = import.meta.dirname;

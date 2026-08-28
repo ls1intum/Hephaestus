@@ -1,5 +1,7 @@
 import { CircleAlert, CircleCheck, CornerDownLeft, Plus } from "lucide-react";
+
 import type { CatalogGroupPracticeAction } from "@/api/types.gen";
+
 import type { StatusDefs } from "./status-def";
 
 export type CatalogGroupAction = CatalogGroupPracticeAction["action"];

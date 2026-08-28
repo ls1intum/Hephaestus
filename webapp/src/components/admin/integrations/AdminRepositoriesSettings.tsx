@@ -1,5 +1,6 @@
 import { FolderGitIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
+
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import {
 	AlertDialog,
@@ -33,6 +34,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { problemDetailOf } from "@/lib/problem-detail";
+
 import { IntegrationCardHeading } from "./IntegrationCardHeading";
 
 interface RepositoryItem {

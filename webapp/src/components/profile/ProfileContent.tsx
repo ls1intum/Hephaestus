@@ -1,5 +1,6 @@
 import { CodeReviewIcon } from "@primer/octicons-react";
 import { ArrowRightIcon } from "lucide-react";
+
 import type { ProfileActivityMonitor, PullRequestBaseInfo } from "@/api/types.gen";
 import { ActivityBadges } from "@/components/leaderboard/ActivityBadges";
 import type { ReviewedPullRequest } from "@/components/leaderboard/ReviewsPopover";
@@ -10,6 +11,7 @@ import { type ActivityMonitorFilters, MAX_ACTIVITY_MONITOR_LIMIT } from "@/lib/a
 import { getProviderTerms, getPullRequestStateIcon, type ProviderType } from "@/lib/provider";
 import { firstNonBlank } from "@/lib/text";
 import type { LeaderboardSchedule } from "@/lib/timeframe";
+
 import { ActivityMonitorConfiguration } from "./ActivityMonitorConfiguration";
 import { ProfileTimeframePicker } from "./ProfileTimeframePicker";
 import { ReviewActivityCard } from "./ReviewActivityCard";

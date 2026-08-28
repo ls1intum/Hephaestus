@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
+
 import { Badge } from "@/components/ui/badge";
+
 import { MetaRow } from "./MetaRow";
 
 const meta = {

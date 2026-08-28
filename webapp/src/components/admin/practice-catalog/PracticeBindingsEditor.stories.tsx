@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent, within } from "storybook/test";
+
 import {
 	mockConversationBinding,
 	mockConversationWorkType,
@@ -13,6 +14,7 @@ import {
 } from "@/mocks/fixtures/practice";
 import { Stateful } from "@/stories/stateful";
 import { expectNoOverflowingElement } from "@/test/reflow";
+
 import { PracticeBindingsEditor, type PracticeOccasionMode } from "./PracticeBindingsEditor";
 import { outcome } from "./story-mock-data";
 

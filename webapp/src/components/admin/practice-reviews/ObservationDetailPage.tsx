@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { MessageSquareTextIcon } from "lucide-react";
+
 import type { GetPracticeReviewObservationResponse, Practice } from "@/api/types.gen";
 import { MissingRecordEmpty } from "@/components/common/MissingRecordEmpty";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
@@ -15,7 +16,9 @@ import {
 	EmptyTitle,
 } from "@/components/ui/empty";
 import { Spinner } from "@/components/ui/spinner";
+
 import { ObservationEvidence } from "./ObservationEvidence";
+import { type ObservationsSearch, reviewScopeSearch } from "./review-search";
 import { ReviewArtifactLink, reviewArtifactTypeSlug } from "./ReviewArtifact";
 import {
 	ClaimCurrentnessAlert,
@@ -32,7 +35,6 @@ import {
 import { ReviewPerson } from "./ReviewPerson";
 import { ReviewPracticeLink } from "./ReviewPracticeLink";
 import { ReviewRow, ReviewRowList, ReviewRowMeta } from "./ReviewRow";
-import { type ObservationsSearch, reviewScopeSearch } from "./review-search";
 
 export interface ObservationDetailPageProps {
 	workspaceSlug: string;

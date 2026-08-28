@@ -27,9 +27,11 @@ vi.mock("uuid", () => ({
 
 import { type UseChatHelpers, useChat } from "@ai-sdk/react";
 import type { ChatInit } from "ai";
+
 import { getThreadQueryKey, listThreadsQueryKey } from "@/api/@tanstack/react-query.gen";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import type { ChatMessage } from "@/lib/types";
+
 import { useMentorChat } from "./use-mentor-chat";
 
 // The instantiation expression pins the message type the hook uses, so the fake below is

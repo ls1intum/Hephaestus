@@ -1,7 +1,9 @@
 import { render, screen, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { describe, expect, it } from "vitest";
+
 import type { LlmUsageByDay, WorkspaceLlmUsageReport } from "@/api/types.gen";
+
 import { LlmUsageByDayTable, LlmUsageByJobTypeTable } from "./LlmUsageBreakdownTables";
 
 const julyFifth: LlmUsageByDay = {

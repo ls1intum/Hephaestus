@@ -1,6 +1,7 @@
 import { screen } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
+
 import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
 import { server } from "@/mocks/server";
 import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";

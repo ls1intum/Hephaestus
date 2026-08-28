@@ -1,9 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { type ComponentProps, useState } from "react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
+
 import type { SyncResourceState } from "@/api/types.gen";
 import { daysBefore, minutesBefore } from "@/components/common/story-clock";
 import { expectSettledVisible } from "@/test/overlay";
+
 import { SCM_CLASS_KEYS, SyncResourcesTable } from "./SyncResourcesTable";
 
 const SYNC_INTERVAL_SECONDS = 3_600;

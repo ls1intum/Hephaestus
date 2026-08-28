@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { firstNonBlank, hasText } from "./text";
 
 describe("hasText", () => {

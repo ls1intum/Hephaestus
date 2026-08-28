@@ -11,6 +11,7 @@ import {
 	LEGAL_PAGE_TITLES,
 	type resolveLegalContent,
 } from "@/lib/legal";
+
 import { LegalPage } from "./LegalPage";
 
 declare global {

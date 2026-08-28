@@ -1,5 +1,6 @@
 import type { Meta, StoryContext, StoryObj } from "@storybook/react";
 import { expect } from "storybook/test";
+
 import { CapMeter } from "./CapMeter";
 
 const sharedBudgetMeter = (canvas: StoryContext["canvas"]) =>

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+
 import { markdown, parseJUnit, parsePerformance, summarize } from "./summarize-test-results.ts";
 
 const REPORT = `<?xml version="1.0"?>

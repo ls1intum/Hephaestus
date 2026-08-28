@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+
 import type { LlmModel } from "@/api/types.gen";
+
 import { AdminLlmModelsSection } from "./AdminLlmModelsSection";
 
 const model: LlmModel = {

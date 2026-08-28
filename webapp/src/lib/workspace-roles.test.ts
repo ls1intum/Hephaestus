@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { hasMinimumWorkspaceRole, type WorkspaceRole } from "./workspace-roles";
 
 describe("hasMinimumWorkspaceRole", () => {

@@ -1,7 +1,9 @@
 import { RefreshCwIcon } from "lucide-react";
+
 import type { SyncJob } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+
 import { JOB_TYPE_LABEL, type SyncTriggerType } from "./sync-format";
 
 export interface SyncNowButtonProps {

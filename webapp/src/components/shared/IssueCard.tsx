@@ -1,4 +1,5 @@
 import { format } from "date-fns";
+
 import type { LabelInfo } from "@/api/types.gen";
 import { FormattedTitle } from "@/components/shared/FormattedTitle";
 import { LabelBadge } from "@/components/shared/LabelBadge";

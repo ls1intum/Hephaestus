@@ -13,6 +13,7 @@ import { CalendarDays, CalendarIcon, CalendarRange, Clock } from "lucide-react";
 // oxlint-disable-next-line no-restricted-imports -- `schedule` below is a dependency of the emitting effect, so its identity decides whether that effect re-runs; see the note there.
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DateRange } from "react-day-picker";
+
 import { useNow } from "@/components/common/use-now";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";

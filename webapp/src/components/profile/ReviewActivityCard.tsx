@@ -1,6 +1,7 @@
 import { CheckIcon, CommentIcon, FileDiffIcon } from "@primer/octicons-react";
 import { formatDistanceToNow } from "date-fns";
 import { AwardIcon } from "lucide-react";
+
 import { FormattedTitle } from "@/components/shared/FormattedTitle";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";

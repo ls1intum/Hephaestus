@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+
 import {
 	LEGAL_PAGE_TITLES,
 	type LegalPageId,
@@ -6,6 +7,7 @@ import {
 	type resolveLegalContent,
 } from "@/lib/legal";
 import { withStandardPage } from "@/stories/decorators";
+
 import { LegalPage } from "./LegalPage";
 
 const TUM_IMPRINT = `Information in accordance with § 5 DDG — German Digital Services Act.

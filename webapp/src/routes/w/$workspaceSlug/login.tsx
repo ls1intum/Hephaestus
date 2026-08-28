@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, redirect } from "@tanstack/react-router";
+
 import { getWorkspaceOptions } from "@/api/@tanstack/react-query.gen";
 import { LoginCard } from "@/components/auth/LoginCard";
 import { useAuth } from "@/integrations/auth/AuthContext";

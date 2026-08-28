@@ -1,4 +1,5 @@
 import { ChevronDown, ChevronRight, CircleDollarSign, Info } from "lucide-react";
+
 import type { AdminWorkspaceLlmUsage, WorkspaceLlmUsageReport } from "@/api/types.gen";
 import { MoneyCell } from "@/components/admin/ai/job-utils";
 import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
@@ -17,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatCapUsd, formatCostUsd } from "@/lib/money";
+
 import { BudgetPaceAlert } from "./BudgetPaceAlert";
 import { CapIsNotMonthScoped } from "./CapIsNotMonthScoped";
 import { CAP_STATE_LABELS, CapMeter, type CapState, capState } from "./CapMeter";

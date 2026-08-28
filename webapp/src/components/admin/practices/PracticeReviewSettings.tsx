@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { AlertCircle } from "lucide-react";
 import { useState } from "react";
+
 import type {
 	AgentBinding,
 	PracticeReviewSettings as PracticeReviewSettingsData,
@@ -20,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Item, ItemActions, ItemContent, ItemTitle } from "@/components/ui/item";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+
 import { reviewModelRunnable } from "./review/review-readiness";
 
 export type PracticeReviewField = NonNullable<UpdatePracticeReviewSettingsRequest["reset"]>[number];

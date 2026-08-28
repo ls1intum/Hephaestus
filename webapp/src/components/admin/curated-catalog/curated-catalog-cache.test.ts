@@ -1,5 +1,7 @@
 import { assert, describe, expect, it } from "vitest";
+
 import type { CatalogEntryStatus, CuratedCatalog } from "@/api/types.gen";
+
 import {
 	orderedPracticeSlugs,
 	placeCuratedPractice,

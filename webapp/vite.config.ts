@@ -1,9 +1,11 @@
 import * as fs from "node:fs";
 import path, { resolve } from "node:path";
+
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import { defineConfig, type ViteDevServer } from "vite";
 import Terminal from "vite-plugin-terminal";
 import { configDefaults } from "vitest/config";
+
 import { appSourcePlugins } from "./vite.shared.ts";
 
 // https://vitejs.dev/config/

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
+
 import { getUserFeatures } from "@/api/sdk.gen";
 import type { FeatureFlags } from "@/api/types.gen";
 import { useAuth } from "@/integrations/auth/AuthContext";

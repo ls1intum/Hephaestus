@@ -1,11 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, within } from "storybook/test";
+
 import type { FacetSource } from "@/components/common/FacetMultiSelect";
 import { withStandardPage } from "@/stories/decorators";
 import { StatefulPatch } from "@/stories/stateful";
+
 import { groupFacetOptions, ObservationFilters, practiceFacetOptions } from "./ObservationFilters";
-import type { ReviewPeople } from "./ReviewPersonFacet";
 import type { ObservationsSearch } from "./review-search";
+import type { ReviewPeople } from "./ReviewPersonFacet";
 import {
 	practiceGroups,
 	reviewArtifact,

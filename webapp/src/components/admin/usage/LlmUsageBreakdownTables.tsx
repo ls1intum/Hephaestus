@@ -12,6 +12,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { formatCostUsd, formatRateUsd } from "@/lib/money";
+
 import { type Fx, FxSpendLine } from "./fx";
 import { formatUsageDay, JOB_TYPE_LABELS } from "./usage-utils";
 

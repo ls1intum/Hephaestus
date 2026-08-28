@@ -1,4 +1,5 @@
 import { ChevronRight, Library } from "lucide-react";
+
 import type { CatalogPracticeSummary } from "@/api/types.gen";
 import { GroupPill } from "@/components/admin/practice-catalog/GroupPill";
 import { DetailStackLink } from "@/components/core/detail-drawer/DetailStackLink";

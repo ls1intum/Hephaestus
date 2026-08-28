@@ -1,7 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { HttpResponse, http } from "msw";
 import { expect, fn } from "storybook/test";
+
 import { withStandardPage } from "@/stories/decorators";
+
 import type { FeatureValues } from "./AdminFeaturesSettings";
 import { AdminSettingsPage } from "./AdminSettingsPage";
 

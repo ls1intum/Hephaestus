@@ -1,5 +1,6 @@
 import { Progress as ProgressRoot } from "@base-ui/react/progress";
 import { ClockIcon } from "@primer/octicons-react";
+
 import { ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 

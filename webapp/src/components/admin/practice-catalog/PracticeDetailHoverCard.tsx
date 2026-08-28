@@ -1,4 +1,5 @@
 import type { ReactElement } from "react";
+
 import type { Practice } from "@/api/types.gen";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { artifactKindLabel } from "@/lib/artifact-kinds";

@@ -16,7 +16,9 @@ import {
 	MessageSquareTextIcon,
 	MessagesSquareIcon,
 } from "lucide-react";
+
 import type { EvidenceCitation } from "@/api/types.gen";
+
 import type { StatusDef } from "./status-def";
 
 /**

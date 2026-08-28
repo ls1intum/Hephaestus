@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
+
 import type { SlackChannelCandidate } from "@/api/types.gen";
+
 import { AddChannelDialog } from "./AddChannelDialog";
 
 const candidates: SlackChannelCandidate[] = [

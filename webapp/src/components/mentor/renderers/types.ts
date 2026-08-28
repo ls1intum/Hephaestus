@@ -1,4 +1,5 @@
 import type React from "react";
+
 import type { ChatMessage, ChatTools } from "@/lib/types";
 export type ToolKey = keyof ChatTools;
 export type ToolType<T extends ToolKey = ToolKey> = `tool-${T}`;

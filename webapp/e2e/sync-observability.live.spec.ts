@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+
 import type { Response } from "@playwright/test";
+
 import { expect, loginAsDevAdmin, test } from "./fixtures";
 
 const LIVE_ENABLED = process.env.LIVE_INTEGRATION_E2E === "true";

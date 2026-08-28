@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { monthOf, usageSearchSchema } from "./usage-search";
 
 function atMonth(iso: string) {

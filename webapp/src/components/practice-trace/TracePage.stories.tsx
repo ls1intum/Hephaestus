@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent, within } from "storybook/test";
+
 import { expectNoPageOverflow } from "@/test/reflow";
+
 import { artifactTrace, untouchedArtifactTrace } from "./story-mock-data";
 import { TracePage } from "./TracePage";
 

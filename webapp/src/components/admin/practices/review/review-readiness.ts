@@ -5,6 +5,7 @@ import {
 	LoaderIcon,
 	TriangleAlertIcon,
 } from "lucide-react";
+
 import type { AgentBinding } from "@/api/types.gen";
 import type { StatusDefs } from "@/components/practice-vocabulary/status-def";
 

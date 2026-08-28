@@ -2,6 +2,7 @@ import type { SyncJob } from "@/api/types.gen";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
+
 import { JOB_TYPE_LABEL, jobProgress, phaseLabel } from "./sync-format";
 
 export interface ActiveJobProgressProps {

@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent, waitFor } from "storybook/test";
+
 import { DetailDrawerStack } from "@/components/core/detail-drawer/DetailDrawerStack";
 import { LevelCancel } from "@/components/core/detail-drawer/LevelCancel";
 import {
@@ -11,9 +12,10 @@ import { withPageBehind } from "@/stories/decorators";
 import { Stateful } from "@/stories/stateful";
 import { settledDrawerPanel } from "@/test/overlay";
 import { expectNoPanelOverflow } from "@/test/reflow";
+
+import { GUARDED_LEVEL_KINDS, practiceFormLevel } from "./practice-search";
 import { PracticeForm } from "./PracticeForm";
 import { PracticeFormLevel } from "./PracticeFormLevel";
-import { GUARDED_LEVEL_KINDS, practiceFormLevel } from "./practice-search";
 import { mockGroups, mockPracticeWithAllTriggers } from "./story-mock-data";
 
 const createSubmit = fn();

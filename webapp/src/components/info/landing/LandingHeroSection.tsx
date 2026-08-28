@@ -8,6 +8,7 @@ import {
 	Lightbulb,
 } from "lucide-react";
 import { motion, stagger, useReducedMotion } from "motion/react";
+
 import { LandingSignInCta } from "@/components/auth/LandingSignInCta";
 import { GithubIcon, GitlabIcon } from "@/components/icons/brand";
 import { MentorIcon } from "@/components/mentor/MentorIcon";

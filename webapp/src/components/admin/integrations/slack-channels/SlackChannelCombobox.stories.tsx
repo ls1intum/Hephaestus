@@ -1,8 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, waitFor } from "storybook/test";
+
 import type { SlackChannelCandidate } from "@/api/types.gen";
 import { Badge } from "@/components/ui/badge";
 import { expectSettledVisible } from "@/test/overlay";
+
 import { SlackChannelCombobox } from "./SlackChannelCombobox";
 
 const candidates: SlackChannelCandidate[] = [

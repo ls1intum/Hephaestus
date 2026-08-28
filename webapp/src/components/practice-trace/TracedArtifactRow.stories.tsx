@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
+
 import { ItemGroup } from "@/components/ui/item";
+
 import { tracedArtifact } from "./story-mock-data";
 import { TracedArtifactRow } from "./TracedArtifactRow";
 

@@ -1,5 +1,6 @@
 import { AlertCircleIcon, InfoIcon, LockIcon, SearchXIcon } from "lucide-react";
 import type * as React from "react";
+
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";

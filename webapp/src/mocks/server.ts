@@ -5,6 +5,7 @@
 // `src/test/setup-msw.ts` starts, resets and closes it around the Vitest run.
 
 import { setupServer } from "msw/node";
+
 import { handlers } from "./handlers";
 
 export const server = setupServer(...handlers);

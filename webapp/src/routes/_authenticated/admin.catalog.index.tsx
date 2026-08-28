@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router";
 import { LibraryBig, Plus } from "lucide-react";
 import { toast } from "sonner";
+
 import {
 	adminGetCuratedCatalogOptions,
 	adminGetCuratedCatalogQueryKey,
@@ -20,7 +21,6 @@ import type {
 	CuratedPractice,
 	CuratedPracticeSummary,
 } from "@/api/types.gen";
-import { CuratedCatalog } from "@/components/admin/curated-catalog/CuratedCatalog";
 import {
 	orderedPracticeSlugs,
 	placeCuratedPractice,
@@ -36,11 +36,12 @@ import {
 	curatedPracticeLevel,
 	GUARDED_CURATED_LEVEL_KINDS,
 } from "@/components/admin/curated-catalog/curated-catalog-search";
+import { CuratedCatalog } from "@/components/admin/curated-catalog/CuratedCatalog";
 import { PracticeTreeSkeleton } from "@/components/admin/practices/PracticeSkeletons";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { parseDetailStack } from "@/components/core/detail-drawer/detail-stack";
 import { DetailDrawerStack } from "@/components/core/detail-drawer/DetailDrawerStack";
 import { DetailStackLink } from "@/components/core/detail-drawer/DetailStackLink";
-import { parseDetailStack } from "@/components/core/detail-drawer/detail-stack";
 import { useDetailStack } from "@/components/core/detail-drawer/use-detail-stack";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
@@ -48,6 +49,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { filedUnder, pathString, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import { instanceAdminHead } from "@/lib/page-title";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
+
 import { CuratedGroupCreateLevel } from "./-CuratedGroupCreateLevel";
 import { CuratedGroupEditLevel } from "./-CuratedGroupEditLevel";
 import { CuratedPracticeCreateLevel } from "./-CuratedPracticeCreateLevel";

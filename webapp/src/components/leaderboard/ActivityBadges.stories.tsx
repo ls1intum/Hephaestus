@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
+
 import { STORY_NOW } from "@/components/common/story-clock";
 import { withProvider } from "@/stories/decorators";
+
 import { ActivityBadges } from "./ActivityBadges";
 import type { ReviewedPullRequest } from "./ReviewsPopover";
 

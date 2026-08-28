@@ -1,7 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
+
 import type { CatalogPracticeSummary } from "@/api/types.gen";
 import { mockAuthorDeclaredEvidenceValidation } from "@/mocks/fixtures/practice";
+
 import { AvailablePracticeList } from "./AvailablePracticeList";
 
 // The `detail` param a row would push. Read back off the href rather than compared as a whole URL,

@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
+
 import type { AutonomyRollup, Practice, PracticeReviewSettings } from "@/api/types.gen";
 import { automatedReviewLimitationLabel } from "@/components/admin/practice-catalog/evidence-presentation";
 import { PracticeDetailHoverCard } from "@/components/admin/practice-catalog/PracticeDetailHoverCard";
@@ -46,6 +47,7 @@ import {
 	WORKSPACE_DEFAULT_SOURCE,
 } from "@/lib/practice-autonomy";
 import { cn } from "@/lib/utils";
+
 import { AutonomyLadder } from "./AutonomyLadder";
 import {
 	type AutonomyGroup,

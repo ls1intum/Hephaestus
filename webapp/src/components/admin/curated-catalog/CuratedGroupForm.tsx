@@ -1,6 +1,7 @@
 import deepEqual from "fast-deep-equal";
 import { RotateCcw } from "lucide-react";
 import { useState } from "react";
+
 import type { CatalogEntryStatus, CuratedGroupRequest } from "@/api/types.gen";
 import { generateSlug, isValidSlug } from "@/components/admin/practice-catalog/constants";
 import { GroupVisualPicker } from "@/components/admin/practice-catalog/GroupVisualPicker";
@@ -23,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
+
 import { canUseHephaestusVersion } from "./curated-entry-state";
 import { HephaestusVersionPanel } from "./HephaestusVersionPanel";
 

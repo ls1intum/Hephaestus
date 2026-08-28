@@ -1,5 +1,6 @@
 import { CheckIcon, CopyIcon } from "@primer/octicons-react";
 import { useEffect, useRef, useState } from "react";
+
 import type { PullRequestBaseInfo, PullRequestInfo } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import { CardTitle } from "@/components/ui/card";

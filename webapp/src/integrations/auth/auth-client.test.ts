@@ -1,4 +1,5 @@
 import { afterEach, assert, describe, expect, it } from "vitest";
+
 import {
 	applyStateChangingHeaders,
 	authClient,
