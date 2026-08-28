@@ -16,7 +16,9 @@ export function LandingProjectOriginsSection() {
 						Technologies at the Technical University of Munich.
 					</p>
 				</div>
-				<InstitutionalAttribution />
+				<div className="justify-self-center md:justify-self-auto">
+					<InstitutionalAttribution />
+				</div>
 			</div>
 		</section>
 	);
