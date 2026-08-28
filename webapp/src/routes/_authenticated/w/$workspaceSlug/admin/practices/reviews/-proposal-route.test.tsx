@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { assert, describe, expect, it, vi } from "vitest";
@@ -101,5 +101,39 @@ describe("feedback proposal route", () => {
 			rejectionReason: "MISSING_CONTEXT",
 			rejectionNote: "The fallback path was not considered.",
 		});
+	});
+
+	it("reloads the winning decision after a concurrent approval conflict", async () => {
+		let deliveryState: "AWAITING_APPROVAL" | "PREPARED" = "AWAITING_APPROVAL";
+		let detailReads = 0;
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/members/me", () =>
+				HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
+			),
+			http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId", () => {
+				detailReads += 1;
+				return HttpResponse.json(proposalWire(deliveryState));
+			}),
+			http.put(
+				"*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId/approval",
+				() => {
+					deliveryState = "PREPARED";
+					return HttpResponse.json(
+						{ status: 409, title: "This review was already decided" },
+						{ status: 409 },
+					);
+				},
+			),
+			...reviewHandlers(),
+		);
+
+		renderRouteAtWithRouter(`/w/acme/admin/practices/reviews/delivery/${FEEDBACK_ID}`);
+		await screen.findByRole("button", { name: "Approve for delivery" });
+		fireEvent.click(screen.getByRole("button", { name: "Approve for delivery" }));
+
+		await waitFor(() =>
+			expect(screen.queryByRole("button", { name: "Approve for delivery" })).toBeNull(),
+		);
+		expect(detailReads).toBeGreaterThan(1);
 	});
 });

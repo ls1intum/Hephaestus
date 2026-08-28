@@ -85,6 +85,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Denied: Story = {
 	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("heading", { name: "Why this was not sent" })).toBeVisible();
 		await openEvaluation(canvas, /In-context feedback · Final delivery/);
 		await expect(await canvas.findByText("In-context feedback · Final delivery")).toBeVisible();
 		await expect(
@@ -100,6 +101,7 @@ export const Denied: Story = {
 export const Allowed: Story = {
 	args: { evaluations: [allowedEvaluation] },
 	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("heading", { name: "Delivery checks" })).toBeVisible();
 		await openEvaluation(canvas, /In-context feedback · Final delivery/);
 		await expect(await canvas.findByText("In-context feedback · Final delivery")).toBeVisible();
 		await expect(canvas.getByText("Allowed")).toBeVisible();
@@ -113,7 +115,7 @@ export const NoEvaluations: Story = {
 	args: { evaluations: [] },
 	play: async ({ canvas }) => {
 		await expect(
-			canvas.queryByRole("heading", { name: "Delivery policy trace" }),
+			canvas.queryByRole("heading", { name: "Why this was not sent" }),
 		).not.toBeInTheDocument();
 	},
 };

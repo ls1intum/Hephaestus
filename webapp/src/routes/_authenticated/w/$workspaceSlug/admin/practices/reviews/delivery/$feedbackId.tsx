@@ -42,18 +42,18 @@ function FeedbackDetailRoute() {
 	const practicesQuery = useQuery({ ...listPracticesOptions({ path: { workspaceSlug } }) });
 	const decision = useMutation({
 		...decideFeedbackProposalMutation(),
-		onSuccess: async (_, variables) => {
+		onSettled: () => {
+			void queryClient.invalidateQueries({ queryKey: detailKey });
+			void queryClient.invalidateQueries({
+				queryKey: listPracticeReviewFeedbackQueryKey({ path: { workspaceSlug } }),
+			});
+		},
+		onSuccess: (_, variables) => {
 			toast.success(
 				variables.body.decision === "APPROVED"
 					? "Review approved. Delivery is being checked."
 					: "Review rejected",
 			);
-			await Promise.all([
-				queryClient.invalidateQueries({ queryKey: detailKey }),
-				queryClient.invalidateQueries({
-					queryKey: listPracticeReviewFeedbackQueryKey({ path: { workspaceSlug } }),
-				}),
-			]);
 		},
 		onError: (error) => {
 			toast.error("Couldn't decide this review", { description: problemDetailOf(error) });

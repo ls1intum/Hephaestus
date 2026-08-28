@@ -32,10 +32,11 @@ export interface DeliveryPolicyTraceProps {
 
 export function DeliveryPolicyTrace({ evaluations }: DeliveryPolicyTraceProps) {
 	if (evaluations.length === 0) return null;
+	const denied = evaluations.some((evaluation) => !evaluation.allowed);
 
 	return (
 		<section className="min-w-0 rounded-lg border bg-card p-4 text-sm">
-			<h4 className="font-medium">Delivery policy trace</h4>
+			<h4 className="font-medium">{denied ? "Why this was not sent" : "Delivery checks"}</h4>
 			<p className="mt-1 text-xs text-muted-foreground">
 				Checks run in order. After a denial, later checks are not reached.
 			</p>
