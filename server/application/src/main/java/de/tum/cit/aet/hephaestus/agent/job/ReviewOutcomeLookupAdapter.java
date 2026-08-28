@@ -14,14 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
 
-/**
- * Reads back the readiness report a run wrote, for whoever has to explain the run.
- *
- * <p>Read <em>defensively</em>, node by node, rather than by deserializing
- * {@code AutomatedReviewReadinessReport}: that record validates hard in its constructor, which is right
- * on the way in but would turn a row written by an older build into a 500 on a page whose only job is to
- * explain what went wrong — a field this parser can't read just degrades to a less specific sentence.
- */
+/** Reads persisted review decisions used to derive practice traces. */
 @Component
 @RequiredArgsConstructor
 class ReviewOutcomeLookupAdapter implements ReviewOutcomeLookup {
@@ -46,7 +39,30 @@ class ReviewOutcomeLookupAdapter implements ReviewOutcomeLookup {
                 && row.getOutput() != null
                 && ReviewRunOutcome.fromJobOutput(row.getOutput()) == ReviewRunOutcome.INSUFFICIENT_EVIDENCE;
         return new ReviewOutcome(
-                state(row.getStatus()), refusedEvidence, row.getCompletedAt(), readiness(row.getReviewReadiness()));
+                state(row.getStatus()),
+                refusedEvidence,
+                row.getCompletedAt(),
+                readiness(row.getReviewReadiness()),
+                coverage(row.getOutput()));
+    }
+
+    private static Map<String, PracticeCoverageOutcome> coverage(@Nullable JsonNode output) {
+        JsonNode outcomes =
+                output == null ? null : output.path("practiceCoverage").path("outcomes");
+        if (outcomes == null || !outcomes.isArray()) return Map.of();
+        Map<String, PracticeCoverageOutcome> bySlug = new HashMap<>();
+        for (JsonNode outcome : outcomes) {
+            String slug = outcome.path("practiceSlug").asString(null);
+            try {
+                if (slug == null || slug.isBlank() || bySlug.containsKey(slug)) return Map.of();
+                bySlug.put(
+                        slug,
+                        PracticeCoverageOutcome.valueOf(outcome.path("outcome").asString()));
+            } catch (IllegalArgumentException ignored) {
+                return Map.of();
+            }
+        }
+        return Map.copyOf(bySlug);
     }
 
     /**

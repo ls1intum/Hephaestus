@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewOutcomeLookup.PracticeCoverageOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOutcomeLookup.PracticeReadinessOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOutcomeLookup.ReviewOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOutcomeLookup.ReviewRunState;
@@ -24,13 +25,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-/**
- * The answers the trace view gives, and the order it asks its questions in.
- *
- * <p>Every assertion here is a claim the product makes to a developer about why they heard nothing, so
- * a wrong one is worse than no feature. The pure deriver exists so these can be stated without a
- * database standing between the fact and the claim.
- */
 class PracticeTraceDeriverTest extends BaseUnitTest {
 
     private static final SignalName READY = ScmSignals.PULL_REQUEST_READY;
@@ -57,10 +51,6 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
             assertThat(entry.reviewId()).isEqualTo(RUN);
         }
 
-        /**
-         * Configuration is read as it stands now while observations are history, so turning a practice off
-         * must not retroactively erase the evidence that it ran.
-         */
         @Test
         void letsPastMeasurementsOutrankATierTurnedOffSince() {
             var entry = only(
@@ -125,11 +115,6 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
             assertThat(entry.explanation()).contains("scm.pull-request.diff was captured only in part");
         }
 
-        /**
-         * The split this outcome exists for, asserted from the other side. The run read the evidence and
-         * the thing the practice judges was not in the work: that is a fact about the work, so the reader
-         * must not be told our instrument failed and sent off to go fixing a capture that was fine.
-         */
         @Test
         void rendersAnAbsentSubjectAsSkippedInThePracticeAuthorsOwnWords() {
             var entry = only(
@@ -157,7 +142,7 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
             var entry = only(
                     practice(PracticeAutonomy.AUTOMATIC, READY),
                     List.of(triggered(READY, RUN)),
-                    Map.of(RUN, new ReviewOutcome(ReviewRunState.COMPLETED, true, AT, Map.of())),
+                    Map.of(RUN, new ReviewOutcome(ReviewRunState.COMPLETED, true, AT, Map.of(), Map.of())),
                     Map.of());
 
             assertThat(entry.outcome()).isEqualTo(PracticeTraceOutcome.NOT_ASSESSABLE);
@@ -165,8 +150,27 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
     }
 
     @Nested
-    @DisplayName("The run finished and never named this practice")
+    @DisplayName("Completed run decisions")
     class NotAdmitted {
+
+        @Test
+        void distinguishesAnEligiblePracticeTheBudgetDidNotReach() {
+            var review = new ReviewOutcome(
+                    ReviewRunState.COMPLETED,
+                    false,
+                    AT,
+                    Map.of("slug", new PracticeReadinessOutcome(true, List.of(), null)),
+                    Map.of("slug", PracticeCoverageOutcome.NOT_REACHED));
+
+            var entry = only(
+                    practice(PracticeAutonomy.AUTOMATIC, READY),
+                    List.of(triggered(READY, RUN)),
+                    Map.of(RUN, review),
+                    Map.of());
+
+            assertThat(entry.outcome()).isEqualTo(PracticeTraceOutcome.NOT_REACHED);
+            assertThat(entry.explanation()).contains("ended before reaching");
+        }
 
         @Test
         void reportsAPracticeTheRunConsideredOthersInsteadOfAsSkipped() {
@@ -180,7 +184,6 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
             assertThat(entry.explanation()).isEqualTo("The review that ran did not include this practice.");
         }
 
-        /** A run that recorded nothing cannot support the stronger claim, and must not make it. */
         @Test
         void saysSoWhenTheRunRecordedNoReadinessAtAll() {
             var entry = only(
@@ -253,12 +256,12 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
             var running = only(
                     practice(PracticeAutonomy.AUTOMATIC, READY),
                     List.of(triggered(READY, RUN)),
-                    Map.of(RUN, new ReviewOutcome(ReviewRunState.IN_PROGRESS, false, null, Map.of())),
+                    Map.of(RUN, new ReviewOutcome(ReviewRunState.IN_PROGRESS, false, null, Map.of(), Map.of())),
                     Map.of());
             var failed = only(
                     practice(PracticeAutonomy.AUTOMATIC, READY),
                     List.of(triggered(READY, RUN)),
-                    Map.of(RUN, new ReviewOutcome(ReviewRunState.FAILED, false, AT, Map.of())),
+                    Map.of(RUN, new ReviewOutcome(ReviewRunState.FAILED, false, AT, Map.of(), Map.of())),
                     Map.of());
 
             assertThat(running.outcome()).isEqualTo(PracticeTraceOutcome.RUNNING);
@@ -357,6 +360,6 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
     }
 
     private static ReviewOutcome completed(Map<String, PracticeReadinessOutcome> readiness) {
-        return new ReviewOutcome(ReviewRunState.COMPLETED, false, AT, readiness);
+        return new ReviewOutcome(ReviewRunState.COMPLETED, false, AT, readiness, Map.of());
     }
 }

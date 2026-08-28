@@ -559,12 +559,9 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      *
      * <p><strong>"Latest run" means the latest run that actually said something about THIS claim</strong> —
      * the subquery correlates on practice, subject, artifact and origin class together. Correlating on the
-     * artifact alone would let any later run supersede a verdict it never re-examined, and a run covers only
-     * the practices it got to: {@code PracticeTraceOutcome} lists seven ways one drops out of a run —
-     * {@code SKIPPED}, {@code NOT_ASSESSABLE}, {@code TURNED_OFF}, {@code NOT_OCCASIONED}, {@code DORMANT},
-     * {@code LAPSED}, {@code FAILED} — none of which writes a row. A partial capture, a refusal, an exhausted
-     * budget or a timeout would then read exactly like a fixed habit, which is the conflation that enum exists
-     * to prevent: telemetry about our instrument is not a measurement of anybody's behaviour.
+     * artifact alone would let any later run supersede a verdict it never re-examined. A run does not
+     * necessarily evaluate every eligible practice, and outcomes without a measurement write no observation
+     * row. A partial capture, refusal, or timeout must not read like a fixed habit.
      *
      * <p><strong>Backfilled observations are included, partitioned by origin class</strong> — a campaign's
      * {@code BAD} observation on a developer's own work is exactly what "what should I work on" is asking for,
