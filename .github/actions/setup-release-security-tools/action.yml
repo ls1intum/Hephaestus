@@ -1,0 +1,34 @@
+name: Setup release security tools
+description: Install checksum-verified Syft and Trivy binaries used by release evidence workflows
+inputs:
+  install-syft:
+    description: Install Syft in addition to Trivy
+    default: "true"
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        INSTALL_SYFT: ${{ inputs.install-syft }}
+        # renovate: datasource=github-releases depName=anchore/syft
+        SYFT_VERSION: 1.51.1
+        # renovate: datasource=github-releases depName=aquasecurity/trivy
+        TRIVY_VERSION: 0.74.0
+      run: |
+        set -euo pipefail
+        if [ "$INSTALL_SYFT" = true ]; then
+          syft_archive="syft_${SYFT_VERSION}_linux_amd64.tar.gz"
+          syft_base="https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}"
+          curl -fsSL --proto =https -o "/tmp/$syft_archive" "$syft_base/$syft_archive"
+          curl -fsSL --proto =https -o /tmp/syft-checksums "$syft_base/syft_${SYFT_VERSION}_checksums.txt"
+          (cd /tmp && grep " $syft_archive$" syft-checksums | sha256sum -c -)
+          tar -xzf "/tmp/$syft_archive" -C /usr/local/bin syft
+          syft version
+        fi
+        trivy_archive="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+        trivy_base="https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}"
+        curl -fsSL --proto =https -o "/tmp/$trivy_archive" "$trivy_base/$trivy_archive"
+        curl -fsSL --proto =https -o /tmp/trivy-checksums "$trivy_base/trivy_${TRIVY_VERSION}_checksums.txt"
+        (cd /tmp && grep " $trivy_archive$" trivy-checksums | sha256sum -c -)
+        tar -xzf "/tmp/$trivy_archive" -C /usr/local/bin trivy
+        trivy --version

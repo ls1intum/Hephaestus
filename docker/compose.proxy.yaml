@@ -2,7 +2,7 @@ services:
   reverse-proxy:
     # Keep at >=3.3: below it the app-server sticky.cookie.path label (workspace replica affinity)
     # fails to parse and Traefik silently drops the whole router. Pin a current 3.x.
-    image: traefik:v3.7.4
+    image: traefik:v3.7.4@sha256:fcdef599e6259359833dd2e1d49f9e964f66825d69bd3dd468f51102ce013d03
     restart: unless-stopped
     networks:
       - shared-network
@@ -60,7 +60,7 @@ services:
         max-file: "3"
 
   maintenance:
-    image: nginx:alpine
+    image: nginx:1.31.4-alpine@sha256:db35bfc6b2951e7f8a72db5db120288c127ffaeeb4a6d4b95a26fead017d5913
     restart: unless-stopped
     configs:
       - source: maintenance-page

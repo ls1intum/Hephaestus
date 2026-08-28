@@ -1,0 +1,92 @@
+name: Rescan supported release images
+on:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: read
+  issues: write
+concurrency:
+  group: rescan-supported-release
+  cancel-in-progress: false
+jobs:
+  rescan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-bun
+      - uses: ./.github/actions/setup-release-security-tools
+        with:
+          install-syft: "false"
+      - name: Download and verify latest supported release evidence
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir release-evidence
+          gh release download --repo "${{ github.repository }}" --dir release-evidence
+          (cd release-evidence && sha256sum -c SHA256SUMS)
+          for file in manifest.json release-images.json tool-versions.json trivy-db.json vulnerability-policy.json; do
+            test -s "release-evidence/$file"
+          done
+          jq -e --slurpfile inventory release-evidence/release-images.json \
+            '.schemaVersion == 1 and
+             ([.subjects[].image] | unique == (($inventory[0].images + [$inventory[0].upstream[].name]) | sort)) and
+             (group_by(.image) | all(.[]; [.[].platform] == ["linux/amd64", "linux/arm64"])) and
+             all(.subjects[]; (.digest | test("^sha256:[a-f0-9]{64}$")) and (.indexDigest | test("^sha256:[a-f0-9]{64}$")))' \
+            release-evidence/manifest.json >/dev/null
+          jq -er '.subjects[] | [.image, .platform, .indexDigest, .digest, .repository] | @tsv' release-evidence/manifest.json |
+          while IFS=$'\t' read -r image platform index_digest digest repository; do
+            suffix=${platform//\//-}
+            bun scripts/check-release-sbom.ts \
+              "release-evidence/$image-$suffix.syft.json" \
+              "release-evidence/$image-$suffix.spdx.json" \
+              "release-evidence/$image-$suffix.cdx.json" \
+              "$digest" "$platform" /tmp/sbom-summary.json
+            cmp "release-evidence/$image-$suffix.sbom-summary.json" /tmp/sbom-summary.json
+            for kind in trivy policy; do
+              test -s "release-evidence/$image-$suffix.$kind.json"
+            done
+            architecture=${platform#*/}
+            docker buildx imagetools inspect "$repository@$index_digest" --raw |
+              jq -e --arg architecture "$architecture" --arg digest "$digest" \
+                'any(.manifests[]; .platform.os == "linux" and .platform.architecture == $architecture and .digest == $digest)' >/dev/null
+          done
+      - name: Rescan immutable subjects
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir reports
+          trivy image --download-db-only
+          db_metadata="${TRIVY_CACHE_DIR:-$HOME/.cache/trivy}/db/metadata.json"
+          jq -e '(.UpdatedAt | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) as $updated |
+            ((now - $updated) >= 0) and ((now - $updated) <= 86400)' \
+            "$db_metadata" >/dev/null
+          cp "$db_metadata" reports/trivy-db.json
+          jq -er '.subjects[] | [.image, .platform, .digest, .repository] | @tsv' release-evidence/manifest.json |
+          while IFS=$'\t' read -r image platform digest repository; do
+            suffix=${platform//\//-}
+            trivy image --scanners vuln --format json --output "reports/$image-$suffix.json" "$repository@$digest"
+            bun scripts/check-release-vulnerabilities.ts "$image" "reports/$image-$suffix.json" security/vulnerability-policy.json "reports/$image-$suffix.policy.json"
+          done
+      - name: Upload diagnostic reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: supported-release-rescan-${{ github.run_id }}
+          path: reports
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Notify vulnerability response tracking
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue comment 1369 --repo "${{ github.repository }}" --body \
+            "The supported-release rescan is **unknown or failing policy**. Treat this as actionable until triaged: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
