@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.connection;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import java.io.ByteArrayOutputStream;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import org.jspecify.annotations.Nullable;
 
@@ -62,22 +62,33 @@ public record EncryptionContext(
         byte[] instanceBytes = (instanceKey == null ? "" : instanceKey).getBytes(StandardCharsets.UTF_8);
         byte[] columnBytes = columnFqn.getBytes(StandardCharsets.UTF_8);
 
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        out.writeBytes(DOMAIN_SEPARATOR);
-        out.write(SCHEMA_VERSION_V2);
-        writeLengthPrefixed(out, workspaceBytes);
-        writeLengthPrefixed(out, kindBytes);
-        writeLengthPrefixed(out, instanceBytes);
-        writeLengthPrefixed(out, columnBytes);
-        return out.toByteArray();
+        int len = DOMAIN_SEPARATOR.length
+                + 1
+                + // schema version
+                2
+                + workspaceBytes.length
+                + 2
+                + kindBytes.length
+                + 2
+                + instanceBytes.length
+                + 2
+                + columnBytes.length;
+
+        ByteBuffer buf = ByteBuffer.allocate(len);
+        buf.put(DOMAIN_SEPARATOR);
+        buf.put(SCHEMA_VERSION_V2);
+        writeLengthPrefixed(buf, workspaceBytes);
+        writeLengthPrefixed(buf, kindBytes);
+        writeLengthPrefixed(buf, instanceBytes);
+        writeLengthPrefixed(buf, columnBytes);
+        return buf.array();
     }
 
-    private static void writeLengthPrefixed(ByteArrayOutputStream out, byte[] bytes) {
+    private static void writeLengthPrefixed(ByteBuffer buf, byte[] bytes) {
         if (bytes.length > 0xFFFF) {
             throw new IllegalArgumentException("AAD field exceeds u16 length limit: " + bytes.length);
         }
-        out.write(bytes.length >>> 8);
-        out.write(bytes.length);
-        out.writeBytes(bytes);
+        buf.putShort((short) bytes.length);
+        buf.put(bytes);
     }
 }

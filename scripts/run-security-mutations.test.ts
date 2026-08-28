@@ -11,6 +11,27 @@ await test("accepts only complete PIT outcomes", () => {
 	assert.equal(result.valid, true);
 	assert.equal(result.total, 4);
 	assert.equal(result.counts.get("KILLED"), 1);
+	assert.deepEqual(result.actionable, [
+		{ className: "?", description: "?", line: "?", method: "?", status: "SURVIVED" },
+		{ className: "?", description: "?", line: "?", method: "?", status: "NO_COVERAGE" },
+	]);
+});
+
+await test("extracts mutations that need review", () => {
+	const result = summarizePitXml(`<mutations><mutation status="SURVIVED">
+		<mutatedClass>example.Guard</mutatedClass><mutatedMethod>allows</mutatedMethod>
+		<lineNumber>42</lineNumber><description>negated conditional</description>
+	</mutation></mutations>`);
+
+	assert.deepEqual(result.actionable, [
+		{
+			className: "example.Guard",
+			description: "negated conditional",
+			line: "42",
+			method: "allows",
+			status: "SURVIVED",
+		},
+	]);
 });
 
 await test("accepts a singleton mutation", () => {

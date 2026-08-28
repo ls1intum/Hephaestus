@@ -5,10 +5,17 @@ on:
   pull_request:
     paths:
       - ".github/workflows/security-mutation.yml"
+      - ".github/actions/setup-pnpm-node/**"
+      - ".node-version"
       - "package.json"
       - "pnpm-lock.yaml"
       - "scripts/run-security-mutations.ts"
+      - "scripts/run-security-mutations.test.ts"
       - "server/application/pom.xml"
+      - "server/generated-clients/**"
+      - "server/.mvn/**"
+      - "server/mvnw"
+      - "server/pom.xml"
       - "server/application/src/main/java/de/tum/cit/aet/hephaestus/core/auth/oauth/AdminBootstrapPolicy.java"
       - "server/application/src/main/java/de/tum/cit/aet/hephaestus/core/auth/oauth/AuthIntentCookie.java"
       - "server/application/src/main/java/de/tum/cit/aet/hephaestus/core/auth/oauth/CookieOAuth2AuthorizationRequestRepository.java"
@@ -70,7 +77,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: security-mutation-report-${{ github.run_id }}
+          name: security-mutation-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: server/application/target/pit-reports
           if-no-files-found: error
           retention-days: 30

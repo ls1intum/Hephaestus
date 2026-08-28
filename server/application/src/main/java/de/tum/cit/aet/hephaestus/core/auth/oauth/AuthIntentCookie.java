@@ -122,9 +122,7 @@ public class AuthIntentCookie {
                     Instant issuedAt = Instant.ofEpochMilli(intent.issuedAt());
                     Instant now = clock.instant();
                     if (issuedAt.isAfter(now) || issuedAt.isBefore(now.minusSeconds(MAX_COOKIE_AGE_SECONDS))) {
-                        // Authoritative server-side freshness gate — the cookie Max-Age is
-                        // client-controlled and cannot be trusted. Negative age = future-dated
-                        // (skew/forgery); over-TTL = replay of an expired intent. Either way: absent.
+                        // Browser Max-Age is not authoritative for server-side freshness.
                         log.warn("auth.oauth: rejecting stale/future auth-intent cookie");
                         return null;
                     }

@@ -39,8 +39,9 @@ export async function discoverJavaSourcePaths(
 			try {
 				await access(resolve(root, path));
 				return path;
-			} catch {
-				return undefined;
+			} catch (error) {
+				if (isNodeError(error) && error.code === "ENOENT") return undefined;
+				throw error;
 			}
 		}),
 	);
@@ -51,6 +52,10 @@ export async function discoverJavaSourcePaths(
 		);
 	}
 	return paths;
+}
+
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+	return error instanceof Error;
 }
 
 function unicodeEscapes(source: string): string {

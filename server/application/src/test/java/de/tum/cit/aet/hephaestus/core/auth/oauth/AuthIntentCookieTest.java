@@ -13,11 +13,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
-/**
- * Pins the AES-GCM-sealed auth-intent cookie's server-side freshness gate: the {@code issuedAt} baked
- * into the sealed plaintext (not the client-controlled {@code Max-Age}) is authoritative, so a stale
- * or future-dated cookie is treated as absent (returns null).
- */
 class AuthIntentCookieTest extends BaseUnitTest {
 
     private static final byte[] KEY = "0123456789abcdef0123456789abcdef".getBytes();
@@ -27,7 +22,6 @@ class AuthIntentCookieTest extends BaseUnitTest {
         return new AuthIntentCookie(KEY, Clock.fixed(when, ZoneOffset.UTC));
     }
 
-    /** Seal {@code intent} (writer clock irrelevant) and return the cookie value. */
     private static Cookie seal(AuthIntentCookie.Intent intent) {
         MockHttpServletResponse res = new MockHttpServletResponse();
         new AuthIntentCookie(KEY).write(res, intent);

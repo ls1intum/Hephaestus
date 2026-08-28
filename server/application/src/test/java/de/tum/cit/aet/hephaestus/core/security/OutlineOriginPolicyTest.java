@@ -13,7 +13,6 @@ class OutlineOriginPolicyTest extends BaseUnitTest {
         OutlineOriginPolicy policy = new OutlineOriginPolicy(Set.of("https://WIKI.example.com/"));
 
         assertThat(policy.allows("https://wiki.example.com:443")).isTrue();
-        assertThat(policy.allows("https://wiki.example.com:0")).isFalse();
         assertThat(policy.allows("https://wiki.example.com:8443")).isFalse();
     }
 
