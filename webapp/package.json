@@ -69,7 +69,7 @@
 	"devDependencies": {
 		"@chromatic-com/storybook": "5.2.1",
 		"@gitlab/svgs": "^3.160.0",
-		"@hey-api/openapi-ts": "0.97.1",
+		"@hey-api/openapi-ts": "0.97.3",
 		"@oxlint/plugins": "1.79.0",
 		"@playwright/test": "1.60.0",
 		"@primer/primitives": "11.9.0",
