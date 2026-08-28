@@ -146,6 +146,35 @@ complete response and is safe to repeat. GET returns the response that currently
 **Action**: repoint any direct API caller at the new endpoint. Existing response history is preserved and
 participates in current-response reads; no operator data migration is required.
 
+#### 🟢 Pull request previews are opt-in, and the preview stack no longer runs agents
+
+**Affected**: anyone operating the Coolify preview application. Upgrading needs no action — the
+steps below are only for turning previews on. Staging and production are untouched.
+
+**Before**: Coolify deployed a preview for every same-repository pull request by itself, onto a stack
+that ran the agent sandbox and mounted the Docker socket. The v0.74.0 note below told you to name the
+preview's agent image in its `.env`.
+
+**After**: a preview starts only when someone with push access adds the `preview` label to a pull
+request — including a layer stacked on another branch — and at most `PREVIEW_MAX_ACTIVE` run at once
+(three unless you set that repository variable). GitHub Actions drives the whole lifecycle
+through a signed webhook; Coolify's own automatic deployment stays off. The stack runs no agent, no
+worker, no webhook ingestion and no integrations, so `AGENT_ENABLED` and
+`HEPHAESTUS_AGENT_IMAGE_REFERENCE` are gone from `docker/preview/.env.example` and the v0.74.0 note
+below no longer applies to previews.
+
+**Do this before enabling previews:**
+
+1. Refresh the preview application's Compose definition from `main`, then confirm the cached
+   definition has no Docker socket and no staging network.
+2. Turn Coolify's automatic deployment and its repository webhook off, and preview deployments on.
+3. Create a repository label named exactly `preview`.
+4. Set the repository variables and the two scoped secrets listed in the
+   [preview runbook](https://github.com/ls1intum/Hephaestus/blob/main/docker/preview/README.md),
+   then delete the old broad `COOLIFY_API_TOKEN`.
+
+Leaving previews disabled needs no action: without the repository variables, nothing deploys.
+
 ### v0.74.0
 
 #### 🔴 An agent image reference naming a channel tag is now refused
@@ -204,7 +233,8 @@ request which does not touch `docker/agents/**`.
 A preview now derives its agent image from its own commit, and CI publishes one at that commit only
 when the pull request changed the agent tree or a workflow. Previously such a preview silently used
 the last release's image. Set `HEPHAESTUS_AGENT_IMAGE_REFERENCE` in the preview's `.env` to the agent
-image you want it to exercise — `docker/preview/.env.example` shows the line.
+image you want it to exercise — `docker/preview/.env.example` shows the line. (Superseded for
+previews in v0.75.0: previews no longer run agents, and that variable is gone from the file.)
 #### 🔴 `NATS_JS_MAX_FILE` is gone, and webhook streams now have a disk bound
 
 **Affected**: every deployment.

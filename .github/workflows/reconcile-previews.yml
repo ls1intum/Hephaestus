@@ -1,112 +1,118 @@
 name: Preview reconcile
 
-# `cleanup-preview.yml` deletes a preview when its pull request closes. That request can fail — most
-# plausibly because Coolify was unreachable at the time — and nothing afterwards notices, so the
-# preview keeps its cloned database and git checkout indefinitely. This re-checks on a schedule.
-#
-# Deleting an already-deleted preview answers 404, so 404 is the expected result rather than a fault.
-
+# Event-driven cleanup can be missed — a run cancelled, a Coolify hiccup, a pull request closed while
+# the lifecycle queue was busy. This sweeps what the events left behind, and joins the same global
+# lifecycle group as deploy and close so admission cannot race reclamation.
 on:
   schedule:
     - cron: "0 4 * * *"
   workflow_dispatch:
-    inputs:
-      days:
-        description: "How far back to look for closed pull requests"
-        type: number
-        default: 45
 
-permissions:
-  contents: read
-  pull-requests: read
+permissions: {}
 
 concurrency:
-  group: preview-reconcile
+  group: preview-reconcile-inventory
   cancel-in-progress: false
 
 jobs:
-  reconcile:
-    name: "Preview / Reconcile orphans"
-    runs-on: ubuntu-latest
+  inventory:
+    name: "Preview / Inventory"
     if: vars.COOLIFY_URL != '' && vars.COOLIFY_APP_UUID != ''
-    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: read
+    timeout-minutes: 5
+    outputs:
+      previews: ${{ steps.candidates.outputs.previews }}
+    steps:
+      - name: Find the preview environments GitHub still records
+        id: candidates
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          candidates="${RUNNER_TEMP}/preview-candidates.txt"
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/deployments?task=deploy%3Apreview&per_page=100" \
+            --jq '.[] | .environment | select(test("^preview/pr-[1-9][0-9]*$")) | sub("^preview/pr-"; "")' \
+            | sort -nu > "${candidates}"
+
+          count=$(grep -c . "${candidates}" || true)
+          # Truncate rather than abort: a backlog past the bound is exactly when this job is needed,
+          # so refusing to run would make the next night's backlog larger still.
+          if [ "${count}" -gt 100 ]; then
+            echo "::warning::Found ${count} preview candidates; reconciling the oldest 100 this run."
+            head -100 "${candidates}" > "${candidates}.capped"
+            mv "${candidates}.capped" "${candidates}"
+          fi
+          previews=$(jq -Rsc 'split("\n") | map(select(length > 0) | tonumber)' "${candidates}")
+          echo "previews=${previews}" >> "${GITHUB_OUTPUT}"
+          echo "Found ${count} preview candidates."
+
+  cleanup:
+    name: "Preview / Reconcile PR ${{ matrix.pr }}"
+    needs: inventory
+    if: needs.inventory.result == 'success' && needs.inventory.outputs.previews != '[]'
+    permissions:
+      contents: read
+      deployments: write
+      pull-requests: read
+    strategy:
+      fail-fast: false
+      # Every job below joins the global preview lifecycle group, so a higher value would only start
+      # runners that immediately queue.
+      max-parallel: 1
+      matrix:
+        pr: ${{ fromJSON(needs.inventory.outputs.previews) }}
+    concurrency:
+      group: hephaestus-preview-lifecycle
+      queue: max
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
     env:
       COOLIFY_URL: ${{ vars.COOLIFY_URL }}
       COOLIFY_APP_UUID: ${{ vars.COOLIFY_APP_UUID }}
-      COOLIFY_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
-      GH_TOKEN: ${{ github.token }}
-      DAYS: ${{ inputs.days || 45 }}
+      PR_NUMBER: ${{ matrix.pr }}
+      ENVIRONMENT: preview/pr-${{ matrix.pr }}
     steps:
-      - name: Reclaim previews whose pull request has closed
-        run: |
-          set -euo pipefail
+      - name: Load the trusted preview adapter
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            .github/actions/setup-bun
+            package.json
+            scripts
 
-          if [ -z "${COOLIFY_TOKEN}" ]; then
-            echo "::notice::COOLIFY_API_TOKEN is not configured; nothing to reconcile against."
-            exit 0
-          fi
+      - name: Set up the repository's Bun version
+        uses: ./.github/actions/setup-bun
 
-          since=$(date -u -d "-${DAYS} days" +%Y-%m-%d)
-          closed=$(gh pr list --repo "${GITHUB_REPOSITORY}" --state closed \
-            --search "closed:>=${since}" --limit 500 --json number --jq '.[].number')
-          # --limit truncates; it is not the window. Passing --search also switches gh to
-          # relevance ordering, so a truncated page would drop arbitrary pull requests.
-          if [ "$(printf '%s\n' "${closed}" | grep -c .)" -ge 500 ]; then
-            echo "::error::More than 500 pull requests closed since ${since}; raise --limit."
-            exit 1
-          fi
+      - name: Recheck pull request state
+        id: pull
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const controller = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview-controller.ts`);
+            await controller.assess({ github, context, core });
 
-          reclaimed=0
-          checked=0
-          failed=0
-          summary="${RUNNER_TEMP}/summary.md"
-          body="${RUNNER_TEMP}/response.json"
-          {
-            echo "| PR | Result |"
-            echo "|---:|---|"
-          } > "${summary}"
+      - name: Request Coolify cleanup through the signed close event
+        id: close
+        if: steps.pull.outputs.stale == 'true'
+        env:
+          COOLIFY_WEBHOOK_SECRET: ${{ secrets.COOLIFY_PREVIEW_WEBHOOK_SECRET }}
+          PR_URL: ${{ steps.pull.outputs.url }}
+          PR_TITLE: ${{ steps.pull.outputs.title }}
+          AUTHOR_ASSOCIATION: ${{ steps.pull.outputs.association }}
+          HEAD_REF: ${{ steps.pull.outputs.head_ref }}
+          HEAD_SHA: ${{ steps.pull.outputs.head_sha }}
+          BASE_REF: ${{ steps.pull.outputs.base_ref }}
+        run: bun scripts/coolify-preview.ts close
 
-          while read -r number; do
-            [ -n "${number:-}" ] || continue
-            checked=$((checked + 1))
-
-            status=$(curl -sS -o "${body}" -w '%{http_code}' -X DELETE \
-              -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
-              -H 'Accept: application/json' \
-              --retry 3 --retry-connrefused --max-time 15 \
-              "${COOLIFY_URL}/api/v1/applications/${COOLIFY_APP_UUID}/previews/${number}") || status=000
-
-            case "${status}" in
-              404)
-                : # already clean
-                ;;
-              2*)
-                reclaimed=$((reclaimed + 1))
-                echo "| #${number} | reclaimed |" >> "${summary}"
-                echo "::warning::Reclaimed an orphaned preview for closed PR #${number}; cleanup on close did not reach Coolify."
-                ;;
-              *)
-                # Stop on the first failure: an unreachable Coolify is one finding, not one per
-                # pull request. The summary below still reports what was reclaimed before it.
-                failed=1
-                echo "| #${number} | HTTP ${status} |" >> "${summary}"
-                echo "::error::Coolify returned HTTP ${status} for PR #${number}: $(head -c 200 "${body}" | tr '\n' ' ')"
-                break
-                ;;
-            esac
-          done <<< "${closed}"
-
-          {
-            echo "## Preview reconcile"
-            echo
-            echo "Checked **${checked}** pull requests closed in the last ${DAYS} days."
-            echo
-            if [ "${reclaimed}" -eq 0 ] && [ "${failed}" -eq 0 ]; then
-              echo "No orphaned previews."
-            else
-              cat "${summary}"
-            fi
-          } >> "${GITHUB_STEP_SUMMARY}"
-
-          echo "checked=${checked} reclaimed=${reclaimed} failed=${failed}"
-          [ "${failed}" -eq 0 ]
+      - name: Retire the GitHub preview deployments
+        if: steps.pull.outputs.stale == 'true' && steps.close.outcome == 'success'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const controller = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview-controller.ts`);
+            await controller.retire({ github, context, core });

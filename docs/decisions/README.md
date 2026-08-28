@@ -73,5 +73,6 @@ do, its home is the Admin Guide (`docs/admin/`) and the runbook links to it.
 | [0032](0032-generated-clients-build-boundary.md) | Generated clients are a Maven build boundary | Accepted |
 | [0033](0033-bun-is-the-javascript-runtime-and-package-manager.md) | Bun is the JavaScript runtime and package manager | Accepted |
 | [0034](0034-signed-release-image-lock.md) | Production consumes one signed release image lock | Accepted |
+| [0035](0035-pull-request-previews-are-label-gated.md) | Pull request previews are label-gated and driven from the default branch | Accepted |
 
 Template: [0000-template.md](0000-template.md).

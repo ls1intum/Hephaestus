@@ -82,25 +82,93 @@ This is more efficient than a custom workflow and doesn't consume CI minutes.
 
 ## 📦 Environments
 
-| Environment       | Protection        | Deploys On     |
-| ----------------- | ----------------- | -------------- |
-| Preview (Coolify) | None              | Every PR       |
-| Staging           | None              | Verified signed release |
-| Production        | Approval required | The same verified signed release |
+| Environment       | Eligibility | Deploys on |
+| ----------------- | ----------- | ---------- |
+| Preview (Coolify) | Same-repository PR with the `preview` label | Every push; never waits for CI |
+| Staging           | `main` | Verified signed release |
+| Production        | Required reviewer | The same verified signed release |
 
 ### GitHub Environment Setup
 
 1. **Settings → Environments → New environment**
-2. Create `staging` (no rules)
-3. Create `production` with **Required reviewers**
+2. Create `Staging` (no rules)
+3. Create `Production` with **Required reviewers**
+
+Preview environments do not need to be created in advance. The preview workflow registers
+`preview/pr-N` as a transient GitHub environment when Coolify accepts the first deployment.
 
 ## 🔄 Preview Deployments
 
-Coolify handles PR previews:
+Previews are opt-in and self-service. Add the **`preview`** label to your pull request — no review,
+no ceremony, and you can label your own PR. Every push redeploys, and **a preview never waits for
+your tests to pass**: it is most useful exactly when they do not.
 
-- Built directly on server (fast!)
-- URL: `pr-{number}.preview.hephaestus.cit.tum.de`
-- Auto-cleanup on PR close
+A preview runs the images CI published for your commit — the same artifacts staging and production
+run. It waits for those images, which CI builds in parallel with the tests, and never for the tests
+themselves. How long that takes is how long CI needs to publish the images your change actually
+rebuilds: a docs-only change re-tags unchanged images and is quick; touching the webapp or the server
+means waiting for that image to build.
+
+That is deliberate: a preview built a second way could start cleanly when the released image would
+not, which is the one thing a preview of a Spring Boot service is well placed to catch.
+
+A sticky comment carries the URL, and GitHub records each accepted update as the transient
+environment `preview/pr-N`, so the pull request's **View deployment** link opens it too.
+
+Remove the `preview` label to tear the stack down and free the slot. Closing, merging, or converting
+the pull request back to draft does the same thing.
+
+Deployments are serialized, never parallel, and each one deploys the pull request's *current* head.
+A burst of pushes therefore produces one deployment of the newest commit rather than one per commit.
+If you push while a deployment is in flight, that run stands down rather than deploying a commit that
+is no longer the head; the new push starts the next deployment and nothing needs re-labelling.
+
+### What is in a preview
+
+Each preview is a clean install: an empty database, no seeded workspace, no synced GitHub data, no
+agent runs, and no inbound webhooks. It is the right place to check UI, routing, migrations that must
+apply to an empty schema, and anything reachable before a workspace exists. It is the wrong place to
+check practice reviews, the leaderboard, or anything that needs synced work — those need staging.
+Sign-in works only if the preview-only GitHub OAuth app is configured, and the accounts in the preview
+application's `HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS` come up as admins.
+
+Each stack is isolated: its own empty PostgreSQL and NATS, preview-only credentials, signed
+commit-addressed CI images, no Docker socket and no staging network.
+
+Stacked pull requests work. A layer based on the layer below gets its own preview of the whole stack
+up to that layer, and each labelled layer takes its own slot. Deployment policy is checked against
+`main`, not against the layer below, so a layer cannot inherit a workflow or `docker/preview/` edit
+from underneath it.
+
+### When the comment says nothing deployed
+
+| Comment says | What to do |
+| --- | --- |
+| does not carry the `preview` label | Add the label |
+| is a draft | Mark it ready for review |
+| comes from a fork | Push the branch to this repository |
+| was opened by a … , not a repository collaborator | Nothing; previews need push access |
+| changes trusted deployment policy | Land that change first — a preview never runs a pull request's own edits to `.github/workflows/**`, `.github/actions/**` or `docker/preview/**` |
+| changes too many files for one comparison | Split the pull request, or land it without a preview |
+
+### When the preview failed
+
+| Comment says | What it means |
+| --- | --- |
+| CI never published images for this commit | An image build failed, or was still running when the deploy gave up. Check the CI run; the next push retries. |
+| Coolify reported a failed preview deployment | The stack did not start. Open the deployment log link in the comment. |
+| Coolify finished, but the preview did not return HTTP 2xx | Containers started but the app never became healthy — usually a migration or a missing setting. |
+| Timed out waiting for Coolify … | The deploy outlasted its budget. The next push retries; if it keeps happening the host is likely saturated. |
+| The preview host is full (n/m) | Drop the label from one of the named pull requests |
+
+Cleanup sends a signed close event and then marks the deployment inactive; the nightly repair
+repeats Coolify cleanup before retiring that record. Failed cleanup stays blocking, and the repair
+starts from the host inventory rather than an arbitrary date window.
+
+Operator configuration, host capacity and secret scopes live in
+[`docker/preview/README.md`](https://github.com/ls1intum/Hephaestus/blob/main/docker/preview/README.md);
+why the label is the authority, and which alternatives were priced and declined, is
+[ADR 0035](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0035-pull-request-previews-are-label-gated.md).
 
 ## ⚙️ Key Workflows
 
@@ -115,6 +183,9 @@ Coolify handles PR previews:
 | `ci-server-clean-reference.yml` | Weekly, manual | Records cold server phases and compares generated JARs |
 | `verify-changesets.yml`| Called by cicd.yml    | Tests changeset/version-sync policy and enforces release-note presence |
 | `ci-compose-validate.yml` | PRs, push to main  | Renders the reference and self-host compose stacks so an interpolation or merge break is a red check, not a stranger's bad first boot |
+| `deploy-preview.yml` | `preview` label added, or a push, reopen or ready-for-review on a labelled PR | Waits for this commit's attested CI images, deploys them, and registers the native GitHub deployment |
+| `cleanup-preview.yml` | Label removed, PR closed or drafted | Removes and verifies resources, then retains a cleanup tombstone |
+| `reconcile-previews.yml` | Nightly, manual | Re-sends teardown for any preview environment whose pull request is closed, drafted or unlabelled |
 | `version-pr.yml`       | Push to main          | Maintains the accumulating Version PR (changesets) |
 | `release.yml`          | On CI/CD Success      | Cuts a release when the Version PR merged: tag + GitHub Release, gates production |
 | `deploy-staging.yml`   | Called by `release.yml` or manual dispatch | Deploys a verified release lock to staging |
