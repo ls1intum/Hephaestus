@@ -39,11 +39,14 @@ hold, each enforced before Coolify is asked to deploy:
 - Agent execution, repository checkout, inbound webhooks and recurring sync stay disabled, which is
   what keeps a stack holding real data from acting on it.
 
-Two things follow from that, and both are deliberate rather than incidental. Only the seed loader
-holds the Docker socket, read-only, because `pg_dump` and `psql` run inside the two database
-containers; every service that runs pull-request code is refused it. And only the application server
-joins staging's network, to reach the broker. The database and the SPA stay on Coolify's per-preview
-network — the one it creates and attaches its proxy to. This file defines no network of its own:
+No container here holds the Docker socket. A `:ro` socket mount restricts the file and not the API —
+a container holding one can still create containers, and from there mount the host — so there is no
+scoped way to hold it and nothing does. The seed loader reads staging over the network instead, as a
+role that can only read.
+
+Only the seed loader and the application server join staging's network, the first to reach its
+database and the second its broker. The preview's own database and the SPA stay on Coolify's
+per-preview network — the one it creates and attaches its proxy to. This file defines no network of its own:
 Coolify runs every preview of this application under one Compose project named after the application
 UUID, so a network defined here would be `<uuid>_backend` for all of them at once, private-looking
 and shared. `staging-shared` is joined by name, which makes it a decision rather than a side effect.
@@ -63,9 +66,8 @@ pull request's own copy of it defines that pull request's stack. Two rules hold 
 works alone: the controller refuses to deploy a head that introduces changes anywhere under
 `docker/preview/` — compared against the default branch, so a stacked layer cannot inherit an edit
 from the layer below — and `ci-compose-validate.yml` renders the file on every pull request and fails if
-the stack gains a way out of its sandbox — a build stage, a published port, an unbounded memory
-limit, a network every preview would share, the Docker socket on anything but the seed loader or
-writable on that, or a flipped integration switch.
+the stack gains a way out of its sandbox — a socket, a build stage, a published port, an unbounded
+memory limit, a network every preview would share, or a flipped integration switch.
 `scripts/check-preview-stack.ts` is the authoritative list; this paragraph is not.
 
 ## Host capacity
@@ -105,10 +107,22 @@ Create one Docker Compose application for `ls1intum/Hephaestus` on branch `main`
 6. Disable **Connect to predefined network**. Coolify attaches its proxy to each generated preview
    network; the services do not need the shared `coolify` network. The one network this stack joins,
    staging's `shared-network`, it names itself.
-7. The deployment host must be the one running staging, because the seed loader reaches staging's
-   Postgres through the host's Docker socket and the application server reaches its broker over
-   `shared-network`. Both are checked at deploy time: a missing seed source fails the preview
-   rather than starting it on an empty database.
+7. Deploy onto the host running staging: the stack reaches staging's database and broker over its
+   `shared-network`, which is local to that host. A seed source that is unreachable fails the
+   preview rather than quietly starting it on an empty database.
+8. Create the seeding role once, on staging's PostgreSQL, and put its password in
+   `PREVIEW_SEED_SOURCE_PASSWORD`. `pg_read_all_data` is the whole grant — the role can read every
+   table `pg_dump` needs and write nothing:
+
+   ```sql
+   CREATE ROLE preview_seed LOGIN PASSWORD '<generated>';
+   ALTER ROLE preview_seed WITH NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION CONNECTION LIMIT 4;
+   GRANT pg_read_all_data TO preview_seed;
+   GRANT CONNECT ON DATABASE hephaestus TO preview_seed;
+   ```
+
+   Rotating it is one `ALTER ROLE … PASSWORD` and one Coolify variable. Between the two, seeding
+   fails and previews stay down rather than coming up on an empty database.
 
 ## GitHub configuration
 

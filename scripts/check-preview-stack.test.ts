@@ -70,24 +70,11 @@ void describe("preview stack sandbox", () => {
 	void test("rejects every documented way out of the sandbox", () => {
 		const escapes: [string, (stack: Stack) => void, RegExp][] = [
 			[
-				"docker socket on a service that runs pull-request code",
+				"docker socket, which a read-only mount does not make safe",
 				(s) => {
-					s.services.appserver.volumes = [{ source: "/var/run/docker.sock", read_only: true }];
+					s.services.postgres.volumes = [{ source: "/var/run/docker.sock", read_only: true }];
 				},
-				/only seed-loader may hold/,
-			],
-			[
-				"a writable socket on the seed loader",
-				(s) => {
-					s.services["seed-loader"] = {
-						environment: {},
-						deploy: { resources: { limits: { memory: "1" } } },
-						security_opt: ["no-new-privileges:true"],
-						cap_drop: ["ALL"],
-						volumes: [{ source: "/var/run/docker.sock" }],
-					};
-				},
-				/mounts the Docker socket writable/,
+				/Docker socket/,
 			],
 			[
 				"build stage",

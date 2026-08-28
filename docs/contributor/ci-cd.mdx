@@ -134,8 +134,8 @@ inbound webhooks stay off. Sign-in works only if the preview-only GitHub OAuth a
 the accounts in the preview application's `HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS` come up as admins.
 
 Each stack keeps its own PostgreSQL, preview-only credentials, and signed commit-addressed CI images.
-Only the seed loader touches the Docker socket, read-only, and only the application server joins
-staging's network.
+No container holds the Docker socket: the seed loader reads staging over the network as a role that
+can only read.
 
 Stacked pull requests work. A layer based on the layer below gets its own preview of the whole stack
 up to that layer, and each labelled layer takes its own slot. Deployment policy is checked against

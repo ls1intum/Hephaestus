@@ -58,26 +58,31 @@ services:
           memory: 512M
           pids: 256
 
-  # Clones the running staging database into this preview so it starts with real data. Only ever
-  # reads through pg_dump: it never mounts staging's data volume, and never starts a second Postgres
-  # against it. Every review entry point is paused, and the instance identity dropped, before the
-  # application server is allowed to boot. Runs once — a redeploy finds the marker and exits.
+  # Clones the running staging database into this preview so it starts with real data. Reads over
+  # the network with a role that can only read: staging's data volume is never mounted, and no
+  # container here holds the Docker daemon. Every review entry point is paused, and the instance
+  # identity dropped, before the application server is allowed to boot. Runs once — a redeploy finds
+  # the marker table and exits.
   #
-  # Every postgres binary runs inside the two database containers, so this image needs the Docker
-  # CLI and nothing else.
+  # This is the image staging itself runs, so pg_dump always matches the server it reads.
   seed-loader:
-    image: docker:cli@sha256:000bb62ff495f986c9f5578eb67cc2cb98b91138eda81d7762d5371eb8a497fe
+    image: ghcr.io/ls1intum/hephaestus/postgres:${SOURCE_COMMIT:?Coolify supplies the deployed commit}
     restart: "no"
     depends_on:
       postgres:
         condition: service_healthy
+    # Reaches staging's Postgres by name; its own database it reaches on Coolify's preview network.
+    networks:
+      - staging-shared
     environment:
-      SERVICE_NAME_POSTGRES: ${SERVICE_NAME_POSTGRES:-}
+      SERVICE_NAME_POSTGRES: ${SERVICE_NAME_POSTGRES:-postgres}
       SERVICE_FQDN_APPSERVER: ${SERVICE_FQDN_APPSERVER:-}
       SERVICE_FQDN_WEBAPP: ${SERVICE_FQDN_WEBAPP:-}
-      PREVIEW_SEED_SOURCE_CONTAINER: ${PREVIEW_SEED_SOURCE_CONTAINER:-app-postgres-1}
-      PREVIEW_SEED_SOURCE_USERNAME: ${PREVIEW_SEED_SOURCE_USERNAME:-root}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PREVIEW_SEED_SOURCE_HOST: ${PREVIEW_SEED_SOURCE_HOST:-app-postgres-1}
+      PREVIEW_SEED_SOURCE_USERNAME: ${PREVIEW_SEED_SOURCE_USERNAME:-preview_seed}
       PREVIEW_SEED_SOURCE_DATABASE: ${PREVIEW_SEED_SOURCE_DATABASE:-hephaestus}
+      PREVIEW_SEED_SOURCE_PASSWORD: ${PREVIEW_SEED_SOURCE_PASSWORD}
     command:
       - sh
       - -c
@@ -90,54 +95,40 @@ services:
           exit 0
         fi
 
-        SOURCE_CTN="$$PREVIEW_SEED_SOURCE_CONTAINER"
-        PREVIEW_PG_SERVICE="$${SERVICE_NAME_POSTGRES:-}"
-        COMPOSE_PROJECT=$$(docker inspect "$$HOSTNAME" \
-          --format '{{ index .Config.Labels "com.docker.compose.project" }}')
-        PREVIEW_PG=$$(docker ps \
-          --filter "label=com.docker.compose.project=$$COMPOSE_PROJECT" \
-          --filter "label=com.docker.compose.service=$$PREVIEW_PG_SERVICE" \
-          --format "{{.Names}}")
-        PREVIEW_PG_COUNT=$$(printf '%s\n' "$$PREVIEW_PG" | awk 'NF { count++ } END { print count + 0 }')
-        if [ -z "$$PREVIEW_PG_SERVICE" ] || [ "$$PREVIEW_PG_COUNT" -ne 1 ]; then
-          echo "Could not uniquely resolve this preview's Postgres container from its Compose labels"
-          exit 1
-        fi
-        if [ "$$SOURCE_CTN" = "$$PREVIEW_PG" ]; then
+        SOURCE="$$PREVIEW_SEED_SOURCE_HOST"
+        TARGET="$$SERVICE_NAME_POSTGRES"
+        if [ "$$SOURCE" = "$$TARGET" ]; then
           echo "Refusing to use the preview database as its own seed source"
           exit 1
         fi
-        if ! docker ps --format "{{.Names}}" | grep -Fxq "$$SOURCE_CTN"; then
-          echo "Staging seed source '$$SOURCE_CTN' is not running"
-          exit 1
-        fi
-        if docker exec "$$PREVIEW_PG" test -f /var/lib/postgresql/data/.hephaestus-preview-seeded; then
+
+        # psql exits 0 on a missing relation, so read the answer rather than the status.
+        MARKER=$$(PGPASSWORD="$$POSTGRES_PASSWORD" psql -h "$$TARGET" -U hephaestus -d hephaestus \
+          -tAX -c "SELECT coalesce(to_regclass('public.hephaestus_preview_seeded')::text, '')")
+        if [ -n "$$MARKER" ]; then
           echo "Skipping seed-loader: this preview has already been seeded"
           exit 0
         fi
 
-        echo "Dumping staging data from $$SOURCE_CTN"
-        docker exec "$$SOURCE_CTN" pg_dump \
-          -U "$$PREVIEW_SEED_SOURCE_USERNAME" \
-          -d "$$PREVIEW_SEED_SOURCE_DATABASE" \
+        echo "Dumping staging data from $$SOURCE"
+        PGPASSWORD="$$PREVIEW_SEED_SOURCE_PASSWORD" pg_dump \
+          -h "$$SOURCE" -U "$$PREVIEW_SEED_SOURCE_USERNAME" -d "$$PREVIEW_SEED_SOURCE_DATABASE" \
           --format=custom --no-owner --no-privileges > /tmp/seed.dump
         test -s /tmp/seed.dump
 
+        export PGPASSWORD="$$POSTGRES_PASSWORD"
+
         echo "Resetting the private preview database"
-        docker exec "$$PREVIEW_PG" psql \
-          -v ON_ERROR_STOP=1 -U hephaestus -d postgres \
+        psql -h "$$TARGET" -U hephaestus -d postgres -v ON_ERROR_STOP=1 \
           -c 'DROP DATABASE IF EXISTS hephaestus WITH (FORCE);' \
           -c 'CREATE DATABASE hephaestus OWNER hephaestus;'
 
-        echo "Restoring staging data into $$PREVIEW_PG"
-        docker exec -i "$$PREVIEW_PG" pg_restore \
-          -U hephaestus -d hephaestus \
+        echo "Restoring staging data into the preview"
+        pg_restore -h "$$TARGET" -U hephaestus -d hephaestus \
           --exit-on-error --no-owner --no-privileges < /tmp/seed.dump
 
-        # Inline rather than a mounted .sql file: Coolify materialises a relative bind mount as an
-        # empty managed directory, which `psql <` reads as zero bytes and exits 0 on.
         echo "Applying the preview policy"
-        docker exec -i "$$PREVIEW_PG" psql -v ON_ERROR_STOP=1 -U hephaestus -d hephaestus <<'SQL'
+        psql -h "$$TARGET" -U hephaestus -d hephaestus -v ON_ERROR_STOP=1 <<'SQL'
         -- 1. Silence: a clone must not act.
         UPDATE workspace
            SET practice_review_auto_trigger_enabled = FALSE,
@@ -183,10 +174,10 @@ services:
         DELETE FROM login_provider;
         SQL
 
-        # The marker promises the policy is in force, so verify against the database rather than
-        # against psql's exit code — see the bind-mount note above for why those differ.
+        # The marker promises the policy is in force, so verify it against the database rather than
+        # trusting psql's exit status.
         echo "Verifying the preview policy took effect"
-        LIVE=$$(docker exec "$$PREVIEW_PG" psql -tAX -v ON_ERROR_STOP=1 -U hephaestus -d hephaestus -c "
+        LIVE=$$(psql -h "$$TARGET" -U hephaestus -d hephaestus -tAX -v ON_ERROR_STOP=1 -c "
           SELECT (SELECT count(*) FROM workspace
                    WHERE practice_review_auto_trigger_enabled OR practice_review_manual_trigger_enabled)
                + (SELECT count(*) FROM workspace_agent_binding WHERE enabled AND purpose = 'PRACTICE_REVIEW')
@@ -203,10 +194,9 @@ services:
           exit 1
         fi
 
-        docker exec "$$PREVIEW_PG" touch /var/lib/postgresql/data/.hephaestus-preview-seeded
+        psql -h "$$TARGET" -U hephaestus -d hephaestus -v ON_ERROR_STOP=1 \
+          -c 'CREATE TABLE hephaestus_preview_seeded (seeded_at timestamptz NOT NULL DEFAULT now());'
         echo "Seed loaded; reviews are paused and the preview owns its login apps and signing key"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
     security_opt:
       - no-new-privileges:true
     cap_drop:

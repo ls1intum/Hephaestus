@@ -125,9 +125,6 @@ const ALLOWED_CAPABILITIES: Record<string, readonly string[]> = {
 
 const REQUIRED_NON_EMPTY = ["HEPHAESTUS_TRUSTED_PROXIES", "WEBHOOK_SECRET"];
 
-/** The one service allowed to hold the Docker socket, and only read-only. */
-const SOCKET_HOLDER = "seed-loader";
-
 /**
  * Switches that keep a preview from reaching anything outside itself. A rename or a typo would not
  * fail at boot — Spring would fall back to its own default, several of which are on — it would quietly
@@ -165,15 +162,10 @@ export function findViolations(stack: unknown): string[] {
 		const mounts = Array.isArray(service.volumes) ? service.volumes : [];
 		for (const mount of mounts) {
 			const source = isRecord(mount) && typeof mount.source === "string" ? mount.source : "";
-			if (!source.includes("docker.sock")) continue;
-			// The seed loader drives pg_dump and psql inside the two database containers, which is the
-			// whole reason it holds the socket. Read-only keeps it to that: it can inspect and exec,
-			// not rebuild the daemon's state. Nothing that runs pull-request code may hold it at all.
-			if (name !== SOCKET_HOLDER) {
-				violations.push(`${name} mounts the Docker socket, which only ${SOCKET_HOLDER} may hold`);
-			} else if (isRecord(mount) && mount.read_only !== true) {
-				violations.push(`${SOCKET_HOLDER} mounts the Docker socket writable`);
-			}
+			// A `:ro` socket mount restricts the file, not the API: a container holding it can still
+			// create containers, and from there mount the host. There is no scoped way to hold this, so
+			// no service in this stack holds it — the seed loader reads staging over the network.
+			if (source.includes("docker.sock")) violations.push(`${name} mounts the Docker socket`);
 		}
 		// A preview runs the artifact CI published, not one built here: a build stage would make it a
 		// lookalike of the shipped image rather than the shipped image.
