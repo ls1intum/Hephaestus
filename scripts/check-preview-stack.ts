@@ -235,13 +235,17 @@ export function findViolations(stack: unknown): string[] {
 }
 
 export function renderStack(): unknown {
+	// The preview stack ships no env file — Coolify supplies every value per pull request — so an
+	// inherited COMPOSE_ENV_FILES only ever points Compose at a file this project directory does not
+	// have. Drop it so the render means the same thing in CI and on a laptop.
+	const { COMPOSE_ENV_FILES: _COMPOSE_ENV_FILES, ...ambient } = process.env;
 	const result = spawnSync(
 		"docker",
 		// `--project-directory` is what Coolify passes, and it is what relative build contexts resolve
 		// against. Rendering without it resolves them under docker/preview/ and checks a stack that
 		// would never be deployed.
 		["compose", "-f", COMPOSE_FILE, "--project-directory", ".", "config", "--format", "json"],
-		{ encoding: "utf8", env: { ...process.env, ...RENDER_ENV } },
+		{ encoding: "utf8", env: { ...ambient, ...RENDER_ENV } },
 	);
 	if (result.status !== 0) {
 		const unavailable =
