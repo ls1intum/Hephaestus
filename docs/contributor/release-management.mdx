@@ -27,7 +27,7 @@ sequenceDiagram
     participant VP as Version PR
     participant R as Release
 
-    PR->>PR: pnpm changeset (bump + operator-facing description)
+    PR->>PR: bun changeset (bump + operator-facing description)
     PR->>M: Merge (squash) — verify-changesets enforces the changeset
     M->>VP: changesets action folds pending changesets into the accumulating Version PR
     Note over VP: CHANGELOG.md + version bump preview
@@ -35,10 +35,10 @@ sequenceDiagram
     M->>R: Tag vX.Y.Z, GitHub Release with curated notes,<br/>docker images X.Y.Z / X.Y / latest
 ```
 
-1. **Every user-facing PR carries a changeset.** `pnpm changeset` asks for the bump type and an
+1. **Every user-facing PR carries a changeset.** `bun changeset` asks for the bump type and an
    operator-facing description; the file lands in `.changeset/` and merges with the PR. The
    `verify-changesets` check fails PRs that change shipped code — anything under `server/`, `webapp/`,
-   or `docker/` except tests and in-tree docs — without one. `pnpm changeset --empty` (non-interactive)
+   or `docker/` except tests and in-tree docs — without one. `bun changeset --empty` (non-interactive)
    is the explicit opt-out for changes with no user-facing effect; write why in the file body. Release
    changesets need an operator-facing summary for the root package.
 2. **The Version PR accumulates.** On every push to `main`, the release workflow maintains a PR
@@ -76,7 +76,7 @@ A changeset summary becomes the `CHANGELOG.md` entry **verbatim** — write it i
   - `major` — operator must act first (required new env var, removed/renamed config, destructive/manual
     migration, dropped API); state the action and update [`MIGRATION.md`](https://github.com/ls1intum/Hephaestus/blob/main/MIGRATION.md).
 
-No TTY (agents, CI)? `pnpm changeset` is interactive — write the file by hand instead: create
+No TTY (agents, CI)? `bun changeset` is interactive — write the file by hand instead: create
 `.changeset/<slug>.md` with frontmatter `"hephaestus": <bump>` and the summary as the body (see
 `.changeset/README.md`). Never hand-edit `CHANGELOG.md`.
 

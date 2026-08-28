@@ -86,7 +86,7 @@ jobs:
           set -euo pipefail
           # scripts/sync-release-version.ts keeps these equal to the release on
           # every Version PR; a mismatch means someone edited one by hand.
-          pkg=$(node -p "require('./package.json').version")
+          pkg=$(jq -r '.version' package.json)
           env_tag=$(grep -m1 '^IMAGE_TAG=' docker/self-host/.env.example | cut -d= -f2)
           [ "$pkg" = "$env_tag" ] || {
             echo "::error::IMAGE_TAG=$env_tag in .env.example != package.json $pkg (run scripts/sync-release-version.ts)"; exit 1; }

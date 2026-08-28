@@ -210,7 +210,7 @@ EOF
 
 start_webapp() {
 	if [ "${HEPHAESTUS_PUBLIC_TEST_SKIP_WEBAPP_BUILD:-false}" != "true" ]; then
-		(cd "$ROOT" && pnpm run build:webapp)
+		(cd "$ROOT" && bun run build:webapp)
 	fi
 	write_webapp_env
 	write_nginx_conf

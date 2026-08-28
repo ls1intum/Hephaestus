@@ -571,13 +571,8 @@ class DockerInteractiveSandboxLiveTest {
     }
 
     /**
-     * Builds an {@link InteractiveSandboxSpec} that uses the REAL {@link PiRuntimeFactory}
-     * production command — identical to what {@code MentorPiAdapter} produces in the live server.
-     * {@code MENTOR_RUNNER_PROTOCOL_ONLY=1} stubs the Pi SDK so no LLM or API key is needed.
-     *
-     * <p>This exercises the full {@code sh -c "mkdir … && ln … && cp … && LD_PRELOAD=… node …"}
-     * chain, catching bootstrap failures (missing dirs, bad LD_PRELOAD symlink, failing {@code cp})
-     * that the toy-command tests in other nested classes never reach.
+     * Exercises the production {@link PiRuntimeFactory} bootstrap with protocol-only SDK behavior,
+     * without requiring an LLM or API key.
      */
     private InteractiveSandboxSpec buildMentorSpec(String userId, String workspaceId) {
         PiRuntimeFactory factory = new PiRuntimeFactory(MAPPER);

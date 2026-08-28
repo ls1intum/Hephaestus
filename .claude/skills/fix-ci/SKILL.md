@@ -7,7 +7,7 @@ disable-model-invocation: true
 allowed-tools:
   - Bash(gh *)
   - Bash(git *)
-  - Bash(pnpm *)
+  - Bash(bun *)
   - Bash(./mvnw *)
   - Read
   - Grep
@@ -62,8 +62,8 @@ Each leg's annotation names its own command; this table is only what the annotat
 
 | Failure | What it actually means |
 |---|---|
-| `routeTree.gen.ts is stale` | Only a Vite build writes it. `cd webapp && pnpm run build`, then commit the file. |
-| `README images are stale` | The storybook job runs `export:readme-assets` *after* `test:storybook`, so the job goes red having printed a clean pass line. Run `pnpm --filter webapp run export:readme-assets` and commit `docs/images/readme`. |
+| `routeTree.gen.ts is stale` | Only a Vite build writes it. `cd webapp && bun run build`, then commit the file. |
+| `README images are stale` | The storybook job runs `export:readme-assets` *after* `test:storybook`, so the job goes red having printed a clean pass line. Run `bun run --filter webapp export:readme-assets` and commit `docs/images/readme`. |
 | Migrations gate | A changelog that reached `main` was edited, renamed or deleted, or a `master.xml` `<include>` was not appended at the end. Fix forward with a new changeset; never edit the released file. |
 | `verify-changesets` | The PR touches shipped code with no `.changeset/*.md`. `/land-pr` step 9 has the rules. |
 | App Server leg red on a docs-only PR | Expected, not a misconfiguration: `docs/**` is inside the `application-server` paths filter, because `docs:lint` and `check:diagrams` run on that leg. |
@@ -71,8 +71,8 @@ Each leg's annotation names its own command; this table is only what the annotat
 ## 4. Reproduce locally before pushing
 
 ```bash
-pnpm run format
-pnpm run check
+bun run format
+bun run check
 ```
 
 `check` runs every leg CI runs except those needing Docker or a live credential — `docs:lint`

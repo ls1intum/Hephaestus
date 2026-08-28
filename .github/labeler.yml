@@ -31,9 +31,8 @@ dependencies:
   - changed-files:
     - any-glob-to-any-file:
       - "**/package.json"
-      - "**/pnpm-lock.yaml"
-      - "pnpm-workspace.yaml"
-      - ".npmrc"
+      - "**/bun.lock"
+      - "bunfig.toml"
       - "**/pom.xml"
       - "renovate.json"
 

@@ -610,8 +610,7 @@
 			}
 		},
 		{
-			// SPA source only. `e2e/**` is Playwright on Node, and the config files at the package root are
-			// build tooling — both may reach for a bare global that has no business in a bundled module.
+			// SPA source only. E2E and build tooling may use globals that do not belong in a bundled module.
 			"files": ["src/**"],
 			"rules": {
 				// `AGENTS.md` § Data fetching: server data is the generated client plus TanStack Query, which

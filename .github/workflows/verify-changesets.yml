@@ -17,14 +17,14 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Setup pnpm + Node.js
-        uses: ./.github/actions/setup-pnpm-node
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
+        run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Test changeset and version-sync policies
-        run: pnpm run check:changesets
+        run: bun run check:changesets
 
       - name: Check release-note presence
         if: ${{ !github.event.pull_request.draft && github.event.pull_request.user.type != 'Bot' }}
@@ -53,8 +53,8 @@ jobs:
           fi
 
           if [ "${#changesets_changed[@]}" -gt 0 ]; then
-            pnpm changeset status --since "$BASE_SHA" --output /tmp/changeset-status.json
-            node scripts/verify-changesets.ts /tmp/changeset-status.json "${changesets_changed[@]}"
+            bun changeset status --since "$BASE_SHA" --output /tmp/changeset-status.json
+            bun scripts/verify-changesets.ts /tmp/changeset-status.json "${changesets_changed[@]}"
           fi
 
           if git diff --name-only "$BASE_SHA"...HEAD -- server/application/src/main/resources/db/changelog/ | grep -q .; then

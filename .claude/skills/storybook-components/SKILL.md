@@ -29,7 +29,7 @@ Load the one file that answers your question.
 
 ## Already enforced — do not re-litigate, and do not restate in prose
 
-These fail `pnpm run check`. Treat a violation as a build error, not a style opinion, and do not
+These fail `bun run check`. Treat a violation as a build error, not a style opinion, and do not
 write a guideline that repeats one.
 
 The house rules are registered in `webapp/tools/oxlint/index.ts` — read it rather than trusting a

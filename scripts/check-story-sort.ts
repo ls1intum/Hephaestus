@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Storybook's sidebar is ordered by `storySort.order` in `.storybook/preview.tsx`. That list names
  * top-level title segments, and a segment it does not name sorts alphabetically *after* every one it

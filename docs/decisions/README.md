@@ -71,5 +71,6 @@ do, its home is the Admin Guide (`docs/admin/`) and the runbook links to it.
 | [0030](0030-agent-runtime-is-typescript-on-bun.md) | The agent runtime is TypeScript on Bun, with no Node in the sandbox | Accepted |
 | [0031](0031-agent-image-follows-the-deployments-own-tag.md) | The agent image reference follows the deployment's own image tag | Accepted |
 | [0032](0032-generated-clients-build-boundary.md) | Generated clients are a Maven build boundary | Accepted |
+| [0033](0033-bun-is-the-javascript-runtime-and-package-manager.md) | Bun is the JavaScript runtime and package manager | Accepted |
 
 Template: [0000-template.md](0000-template.md).

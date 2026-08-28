@@ -83,9 +83,6 @@ pinned to the version the image installs, the root `.oxlintrc.json` for lint, an
   mimalloc and the tuning no longer reaches the allocator that matters. It was applied as a
   command-line prefix rather than as container environment, so this is a deliberate removal, not
   something the sandbox environment blocklist forced.
-- **CI's Bun version is coupled to the Dockerfile's text.** `ci-quality-gates.yml` extracts
-  `ARG BUN_VERSION=` with a regex so the gates run the Bun the sandbox ships. It fails closed when
-  the line is absent, but a reformatted `ARG` line is a CI break with no local signal.
 - **`rootDirs` and `allowImportingTsExtensions` are load-bearing**, not conveniences: the runner
   imports siblings as `./x.ts` because that is what Bun resolves, and the precompute trees are two
   directories that a runtime symlink merges into one. Removing either breaks the type-check against

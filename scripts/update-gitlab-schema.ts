@@ -54,7 +54,7 @@ function parseArgs(): { url: string; token?: string } {
 	if (args.includes("--help") || args.includes("-h")) {
 		console.log(`Update GitLab GraphQL schema via introspection
 
-Usage: pnpm run gitlab:update-schema [-- --url <gitlab-url>] [-- --token <pat>]
+Usage: bun run gitlab:update-schema [-- --url <gitlab-url>] [-- --token <pat>]
 
 Default: ${DEFAULT_GITLAB_URL} (public introspection)
 

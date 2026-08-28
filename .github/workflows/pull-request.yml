@@ -21,22 +21,20 @@ jobs:
       - name: "Checkout repository"
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Setup pnpm + Node.js
-        uses: ./.github/actions/setup-pnpm-node
+      - name: Setup Bun
+        uses: ./.github/actions/setup-bun
 
       - name: "Install dependencies"
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: "Validate PR title with commitlint"
         id: commitlint
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          # Use commitlint to validate PR title (single source of truth)
-          echo "$PR_TITLE" | pnpm exec commitlint 2>&1 | tee /tmp/commitlint-output.txt
+          echo "$PR_TITLE" | bun run commitlint 2>&1 | tee /tmp/commitlint-output.txt
           exit_code=${PIPESTATUS[1]}
 
-          # Capture output for the comment
           {
             echo 'error_message<<EOF'
             cat /tmp/commitlint-output.txt
@@ -94,7 +92,6 @@ jobs:
         with:
           configuration-path: .github/labeler.yml
 
-      # v8 is the first release to run on Node 24, which is what executes the TypeScript below.
       - name: "Apply size and semantic labels"
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:

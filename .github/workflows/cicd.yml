@@ -57,10 +57,8 @@ jobs:
               # check:components, check:stories and check:story-sort live here, run on the Webapp leg.
               - 'scripts/**'
               - 'package.json'
-              - 'pnpm-lock.yaml'
-              - 'pnpm-workspace.yaml'
-              - '.npmrc'
-              - '.node-version'
+              - 'bun.lock'
+              - 'bunfig.toml'
             webapp-image:
               - 'webapp/public/**'
               - 'webapp/docker/**'
@@ -72,23 +70,21 @@ jobs:
               - 'webapp/vite.shared.ts'
               - 'docs/package.json'
               - 'package.json'
-              - 'pnpm-lock.yaml'
-              - 'pnpm-workspace.yaml'
-              - '.npmrc'
+              - 'bun.lock'
+              - 'bunfig.toml'
             application-server:
               - 'server/**'
               # check:env, check:contracts, check:diagrams and db-utils.sh all live here and run on
               # the App Server or Database leg.
               - 'scripts/**'
-              # test:agents and typecheck:agents cover the precompute tree and are configured here;
-              # the Bun they run on is read from the agent image.
+              # test:agents and typecheck:agents cover the precompute tree.
               - 'docker/agents/**'
               - 'tsconfig.agents.json'
               - '.oxlintrc.json'
               - '.oxfmtrc.json'
               - 'tsconfig.json'
               - 'package.json'
-              - 'pnpm-lock.yaml'
+              - 'bun.lock'
               # Linted by the same leg (docs/.oxlintrc.json decides that verdict), markdown-linted by
               # docs:lint, and parsed by check:diagrams. The `docs` filter below feeds no job, so this
               # entry is the only thing that puts a docs-only PR into `any-code`.
@@ -135,14 +131,12 @@ jobs:
               - 'server/compose.yaml'
               - 'docker/postgres/**'
               - 'package.json'
-              - 'pnpm-lock.yaml'
-              - 'pnpm-workspace.yaml'
-              - '.npmrc'
-              - '.node-version'
+              - 'bun.lock'
+              - 'bunfig.toml'
               - '.github/workflows/cicd.yml'
               - '.github/workflows/ci-tests.yml'
               - '.github/actions/setup-caches/**'
-              - '.github/actions/setup-pnpm-node/**'
+              - '.github/actions/setup-bun/**'
             agent-images:
               - 'docker/agents/**'
             release-pin-fetcher:
@@ -465,17 +459,17 @@ jobs:
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "| Issue | Fix Command |" >> $GITHUB_STEP_SUMMARY
               echo "|-------|-------------|" >> $GITHUB_STEP_SUMMARY
-              echo "| Formatting errors | \`pnpm run format\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| TypeScript errors | \`pnpm run typecheck\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Lint errors (webapp) | \`pnpm run check:webapp:fix\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Lint errors (outside webapp) | \`pnpm run check:agents:fix\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Java formatting | \`pnpm run format:java\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Java lint (PMD) | \`pnpm run lint:java:report\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Storybook sidebar order | \`pnpm run check:story-sort\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Mermaid diagram parse errors | \`pnpm run check:diagrams\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Stale \`routeTree.gen.ts\` | \`cd webapp && pnpm run build\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| OpenAPI out of sync | \`pnpm run generate:api\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Database schema drift | \`pnpm run db:draft-changelog\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Formatting errors | \`bun run format\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| TypeScript errors | \`bun run typecheck\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Lint errors (webapp) | \`bun run check:webapp:fix\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Lint errors (outside webapp) | \`bun run check:agents:fix\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Java formatting | \`bun run format:java\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Java lint (PMD) | \`bun run lint:java:report\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Storybook sidebar order | \`bun run check:story-sort\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Mermaid diagram parse errors | \`bun run check:diagrams\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Stale \`routeTree.gen.ts\` | \`cd webapp && bun run build\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| OpenAPI out of sync | \`bun run generate:api\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Database schema drift | \`bun run db:draft-changelog\` |" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "</details>" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
@@ -486,8 +480,8 @@ jobs:
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "| Test Suite | Run Locally |" >> $GITHUB_STEP_SUMMARY
               echo "|------------|-------------|" >> $GITHUB_STEP_SUMMARY
-              echo "| Webapp unit | \`pnpm run test:webapp\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Webapp Storybook | \`pnpm --filter webapp run test:storybook\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Webapp unit | \`bun run test:webapp\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Webapp Storybook | \`bun run --filter webapp test:storybook\` |" >> $GITHUB_STEP_SUMMARY
               echo "| Application server | \`cd server && ./mvnw test\` |" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "**Tip:** Check the **Test Results** tab above for specific failures." >> $GITHUB_STEP_SUMMARY
@@ -499,7 +493,7 @@ jobs:
             if [[ "${{ needs.Changesets.result }}" == "failure" ]]; then
               echo "<details><summary><b>❌ Changesets Failed</b></summary>" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
-              echo "Run \`pnpm run check:changesets\` for policy-test failures; otherwise correct the changeset reported by the job." >> $GITHUB_STEP_SUMMARY
+              echo "Run \`bun run check:changesets\` for policy-test failures; otherwise correct the changeset reported by the job." >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "</details>" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
@@ -530,7 +524,7 @@ jobs:
 
             echo "---" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Quick fix:** Run \`pnpm run format && pnpm run check\` before pushing." >> $GITHUB_STEP_SUMMARY
+            echo "**Quick fix:** Run \`bun run format && bun run check\` before pushing." >> $GITHUB_STEP_SUMMARY
           fi
 
           if [[ "${{ steps.evaluate.outputs.status }}" == "success" ]]; then

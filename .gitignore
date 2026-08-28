@@ -153,8 +153,6 @@ pip-delete-this-directory.txt
 # pipenv
 #Pipfile.lock
 pip-log.txt
-# pnpm's content-addressable store when store-dir resolves inside the repo
-.pnpm-store/
 # poetry
 #poetry.lock
 postgres-data-temp-*/

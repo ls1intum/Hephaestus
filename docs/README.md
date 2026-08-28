@@ -15,7 +15,7 @@ Those three directories are the whole site: each is one `@docusaurus/plugin-cont
 
 ## Diagrams
 
-Mermaid, validated by `pnpm run check:diagrams` — which fails a diagram with no `accTitle` and
+Mermaid, validated by `bun run check:diagrams` — which fails a diagram with no `accTitle` and
 `accDescr`, because the picture is the only copy of that information for a sighted reader.
 
 Three shapes, so a reader recognises what they are looking at before reading it:
@@ -39,22 +39,21 @@ into them by absolute GitHub URL rather than a relative path.
 
 ```bash
 # From repo root (recommended)
-pnpm run docs:dev       # Start dev server at http://localhost:3000/Hephaestus/
+bun run docs:dev       # Start dev server at http://localhost:3000/Hephaestus/
 
 # Or from docs directory
-cd docs && pnpm start
+cd docs && bun run start
 ```
 
 ## Prerequisites
 
-- Node.js as pinned in `.node-version`
-- pnpm as pinned by the root `packageManager` field
+- Bun as pinned by the root `packageManager` field
 
 Install dependencies from the repo root — the docs site is a workspace package, so a root
-`pnpm install` covers it:
+`bun install` covers it:
 
 ```bash
-pnpm install
+bun install
 ```
 
 ## Available Scripts
@@ -62,19 +61,19 @@ pnpm install
 Run from repo root:
 
 ```bash
-pnpm run docs:dev     # Start development server
-pnpm run docs:build   # Build for production
-pnpm run docs:serve   # Preview production build
-pnpm run docs:lint    # TypeScript + Markdown linting
+bun run docs:dev     # Start development server
+bun run docs:build   # Build for production
+bun run docs:serve   # Preview production build
+bun run docs:lint    # TypeScript + Markdown linting
 ```
 
 ## Quality Gates
 
 CI runs these checks automatically:
 
-1. **TypeScript check** – `pnpm run typecheck`
-2. **Markdown lint** – `pnpm run lint:md`
-3. **Build with strict validation** – `pnpm run build`
+1. **TypeScript check** – `bun run typecheck`
+2. **Markdown lint** – `bun run lint:md`
+3. **Build with strict validation** – `bun run build`
 
 The build fails on:
 

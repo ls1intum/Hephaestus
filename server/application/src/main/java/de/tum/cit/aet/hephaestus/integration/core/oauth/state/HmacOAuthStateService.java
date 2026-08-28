@@ -72,7 +72,7 @@ public class HmacOAuthStateService implements OAuthStateService {
      * <p>If {@code hephaestus.integration.oauth-state.secret} is unset, falls back to the shared
      * {@code hephaestus.webhook.secret} (pre-existing infrastructure secret). When neither is
      * configured, production ({@code prod} profile) fails fast; outside production an ephemeral
-     * random secret is generated with a WARN so local dev ({@code pnpm dev:server}) boots without
+     * random secret is generated with a WARN so local development boots without
      * webhook/OAuth config — mirroring the {@code WorkerSigningKey} dev-vs-prod contract.
      *
      * <p>{@code @Autowired} is required to disambiguate from the private core constructor (used by

@@ -67,8 +67,8 @@ We use automated semantic pull request validation to ensure consistent and meani
 (`verify-changesets`); commit types and scopes never affect versioning.
 
 ```bash
-pnpm changeset          # user-facing change: pick the bump, describe it
-pnpm changeset --empty  # no user-facing effect — then write why in the file body
+bun changeset          # user-facing change: pick the bump, describe it
+bun changeset --empty  # no user-facing effect — then write why in the file body
 ```
 
 > ⚠️ **Pre-1.0:** never pick a `major` bump — on `0.x` it cuts 1.0.0 (CI rejects it). Use `minor` for

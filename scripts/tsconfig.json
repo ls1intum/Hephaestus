@@ -3,8 +3,6 @@
 		"target": "ES2023",
 		"module": "ESNext",
 		"moduleResolution": "Bundler",
-		// Node runs these files as they are, and it resolves an import specifier literally, so a sibling
-		// module is imported by the name it has on disk. Nothing is ever emitted.
 		"allowImportingTsExtensions": true,
 		"lib": ["ES2023"],
 		"strict": true,

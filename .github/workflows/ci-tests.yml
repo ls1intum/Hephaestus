@@ -8,7 +8,6 @@ on:
         required: false
         type: string
         default: "false"
-      # Path-based change detection for selective test execution
       webapp_changed:
         description: "Whether webapp files changed"
         required: false
@@ -64,7 +63,6 @@ jobs:
               echo "run=${{ inputs.application_server_changed }}" >> $GITHUB_OUTPUT
               ;;
             *)
-              # Unknown test type - fail explicitly to catch missing case statements
               echo "::error::Unknown test type '${{ matrix.test-type }}' in ci-tests.yml matrix."
               echo "::error::Please add a case for this test type in the 'Determine if test should run' step."
               echo "run=false" >> $GITHUB_OUTPUT
@@ -84,9 +82,9 @@ jobs:
           fetch-depth: ${{ matrix.test-type == 'webapp-storybook' && '0' || '1' }}
           persist-credentials: false
 
-      - name: Setup pnpm + Node.js
+      - name: Setup Bun
         if: steps.should_run.outputs.run == 'true'
-        uses: ./.github/actions/setup-pnpm-node
+        uses: ./.github/actions/setup-bun
 
       - name: Setup caches
         if: steps.should_run.outputs.run == 'true'
@@ -99,31 +97,30 @@ jobs:
         if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'application-server-verification'
         run: |
           rm -rf server/application/target/surefire-reports/*
-          pnpm run test:server:verification
+          bun run test:server:verification
 
       - name: Run server integration tests
         if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'application-server-integration'
         run: |
           rm -rf server/application/target/surefire-reports/*
-          pnpm run test:server:integration
+          bun run test:server:integration
 
       - name: Run tests
         id: tests
         continue-on-error: ${{ matrix.test-type == 'webapp-storybook' }}
         if: steps.should_run.outputs.run == 'true' && startsWith(matrix.test-type, 'webapp-')
         run: |
-          pnpm install --frozen-lockfile
+          bun install --frozen-lockfile
           cd webapp
 
           case "${{ matrix.test-type }}" in
             "webapp-storybook")
-              # Install Playwright browsers (cached in ~/.cache/ms-playwright by setup-caches)
-              pnpm exec playwright install chromium --with-deps
+              bun run playwright install chromium --with-deps
               # Bound browser-runner deadlocks without coupling CI to the current suite duration.
-              timeout --kill-after=30s 15m pnpm run test:storybook
-              pnpm run export:readme-assets
+              timeout --kill-after=30s 15m bun run test:storybook
+              bun run export:readme-assets
               if [[ -n "$(git status --porcelain --untracked-files=all -- ../docs/images/readme)" ]]; then
-                echo "::error::README images are stale. Run 'pnpm --filter webapp run export:readme-assets' and commit the result."
+                echo "::error::README images are stale. Run 'bun run --filter webapp export:readme-assets' and commit the result."
                 git status --short --untracked-files=all -- ../docs/images/readme
                 exit 1
               fi
@@ -136,7 +133,7 @@ jobs:
               }
               trap cleanup EXIT
 
-              pnpm exec playwright install chromium --with-deps
+              bun run playwright install chromium --with-deps
               (
                 cd ../server
                 ./mvnw install -pl generated-clients -am -DskipTests --batch-mode
@@ -154,7 +151,7 @@ jobs:
               docker compose -f ../server/compose.yaml exec -T postgres \
                 psql -v ON_ERROR_STOP=1 -U root -d hephaestus < e2e/seed.sql
 
-              timeout --kill-after=30s 10m pnpm run test:e2e
+              timeout --kill-after=30s 10m bun run test:e2e
               ;;
           esac
 
@@ -164,9 +161,9 @@ jobs:
         run: |
           mkdir -p ci-metrics
           if [[ "${{ matrix.test-type }}" == application-server-* ]]; then
-            pnpm run summarize:test-results "${{ matrix.display-name }}" server/application/target/surefire-reports "ci-metrics/${{ matrix.test-type }}.json"
+            bun run summarize:test-results "${{ matrix.display-name }}" server/application/target/surefire-reports "ci-metrics/${{ matrix.test-type }}.json"
           else
-            pnpm run summarize:test-results "${{ matrix.display-name }}" webapp/test-results "ci-metrics/${{ matrix.test-type }}.json"
+            bun run summarize:test-results "${{ matrix.display-name }}" webapp/test-results "ci-metrics/${{ matrix.test-type }}.json"
           fi
 
       - name: Upload test metrics
@@ -178,10 +175,9 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-      # Chromatic visual testing
-      - name: Build Storybook
+      - name: Build Storybook for public preview
         if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'webapp-storybook'
-        run: pnpm --dir webapp run build-storybook
+        run: bun run --filter webapp build-storybook
 
       - name: "Chromatic Visual Testing"
         if: >-
@@ -213,7 +209,7 @@ jobs:
         env:
           PREVIEW_URL: ls1intum-hephaestus-storybook-pr-${{ github.event.number }}.surge.sh
           SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}
-        run: pnpm dlx surge ./webapp/storybook-static "$PREVIEW_URL" --token "$SURGE_TOKEN"
+        run: bun --bun surge ./webapp/storybook-static "$PREVIEW_URL" --token "$SURGE_TOKEN"
 
       - name: Add Storybook preview to the pull request
         if: steps.storybook_preview.outcome == 'success'
@@ -250,7 +246,6 @@ jobs:
               context: 'Preview / Storybook'
             });
 
-      # Test result aggregation
       - name: Upload application-server test results
         if: steps.should_run.outputs.run == 'true' && always() && startsWith(matrix.test-type, 'application-server-')
         uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
@@ -300,14 +295,12 @@ jobs:
             exit 1
           fi
 
-      # Test Summary for Job Summary
       - name: Generate test summary
         if: steps.should_run.outputs.run == 'true' && always()
         run: |
           echo "### 🧪 ${{ matrix.test-type }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          # Find and summarize JUnit XML results
           case "${{ matrix.test-type }}" in
             application-server-*)
               if [ -d "server/application/target/surefire-reports" ]; then

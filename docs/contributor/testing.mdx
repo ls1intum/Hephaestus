@@ -102,7 +102,7 @@ The `hephaestus.tenancy.enforcement: throw` setting in `application-test.yml` fa
 Reusable webhook JSON lives in `server/application/src/test/resources/github`, named after the event it records. Load one with a `ClassPathResource`, or extract new samples with:
 
 ```bash
-pnpm run nats:extract-examples
+bun run nats:extract-examples
 ```
 
 Available examples include `label.created`, `repository.created`, `create`, `push`, and more – consult the folder before recording new payloads.
