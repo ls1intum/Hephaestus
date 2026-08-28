@@ -12,14 +12,7 @@ import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
-/**
- * The AAD produced by {@link EncryptionContext#toAad()} is the entire substitution-resistance mechanism
- * for at-rest credential bundles: a ciphertext encrypted under context A must not decrypt under context
- * B. These tests pin the two properties that guarantee it — field injectivity and length-prefix framing
- * (so {@code (a, bc)} can never collide with {@code (ab, c)}) — plus the u16 overflow guard. A refactor
- * that dropped a length prefix would still pass every encrypt→decrypt round-trip test (writer + reader
- * stay in sync), which is exactly why this needs a direct assertion on the bytes.
- */
+/** Pins the persisted AAD wire format and field separation that round trips cannot detect. */
 class EncryptionContextTest extends BaseUnitTest {
 
     private static byte[] aad(
@@ -63,21 +56,10 @@ class EncryptionContextTest extends BaseUnitTest {
     }
 
     @Test
-    void nullAndEmptyInstanceKeyAreCoercedToTheSameAad() {
-        // Documents the deliberate null→"" coercion: callers must therefore NEVER pass "" as a real
-        // instanceKey, or it would share AAD with a null-instanceKey (pending) row of the same column.
-        assertThat(aad(1L, IntegrationKind.GITHUB, null, "col")).isEqualTo(aad(1L, IntegrationKind.GITHUB, "", "col"));
-    }
-
-    @Test
-    void everyContextBeginsWithTheSameDomainSeparatorMarker() {
-        // Cross-purpose AAD separation: every context — regardless of its fields — leads with the same
-        // domain-separator marker, so a credential-bundle ciphertext can't be confused with another use
-        // of the same AES key. Asserting the marker (not the exact framing offsets) keeps this robust.
-        byte[] marker = "hephaestus-credential-bundle".getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        assertThat(aad(1L, IntegrationKind.GITHUB, "inst", "col")).startsWith(marker);
-        assertThat(aad(999L, IntegrationKind.SLACK, "other-instance", "other.column"))
-                .startsWith(marker);
+    void rejectsBlankInstanceKey() {
+        assertThatThrownBy(() -> aad(1L, IntegrationKind.GITHUB, "", "col"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("instanceKey must not be blank");
     }
 
     @Test

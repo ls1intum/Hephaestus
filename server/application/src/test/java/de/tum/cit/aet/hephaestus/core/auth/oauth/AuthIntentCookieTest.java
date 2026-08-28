@@ -114,7 +114,6 @@ class AuthIntentCookieTest extends BaseUnitTest {
 
     @Test
     void legacyCookieWithoutIssuedAt_isTreatedAsStale() {
-        // issuedAt == 0 mimics a cookie minted before the field existed → ~56 years old → rejected.
         Cookie cookie = seal(intentAt(0L));
         assertThat(readBack(at(T0), cookie)).isNull();
     }

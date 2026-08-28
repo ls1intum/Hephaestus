@@ -7,7 +7,6 @@ public final class PrivateAddressGuard {
 
     private PrivateAddressGuard() {}
 
-    /** Returns whether {@code addr} is private, local, or in an SSRF-relevant special-purpose range. */
     public static boolean isNonPublic(InetAddress addr) {
         return (addr.isLoopbackAddress()
                 || addr.isLinkLocalAddress()
@@ -24,13 +23,7 @@ public final class PrivateAddressGuard {
         return bytes.length == 16 && (bytes[0] & 0xFE) == 0xFC;
     }
 
-    /**
-     * IANA special-purpose ranges that {@link InetAddress}'s {@code isXxx()} predicates do NOT flag but
-     * which routinely front internal services. {@code isSiteLocalAddress()} is RFC-1918-only, so CGNAT
-     * (RFC 6598, standard pod networking in EKS/GKE), benchmarking, TEST-NET, Class-E and especially the
-     * NAT64 well-known prefix (RFC 6052 — its low 32 bits can encode IPv4 loopback) all slip past the
-     * predicates above. Operates on the already-resolved address bytes (allocation-free, IPv4/IPv6-uniform).
-     */
+    /** Additional IANA special-purpose ranges not covered by {@link InetAddress} predicates. */
     private static boolean isReservedRange(InetAddress addr) {
         byte[] b = addr.getAddress();
         if (b.length == 4) {
@@ -45,7 +38,7 @@ public final class PrivateAddressGuard {
             return b0 >= 240; // 240.0.0.0/4 reserved (Class E) + 255.255.255.255 broadcast
         }
         if (b.length == 16) {
-            // 64:ff9b::/32 NAT64 well-known prefixes (RFC 6052 /96 + RFC 8215 /48) — embed IPv4, incl. loopback.
+            // 64:ff9b::/32 includes standardized NAT64 prefixes.
             if ((b[0] & 0xFF) == 0x00 && (b[1] & 0xFF) == 0x64 && (b[2] & 0xFF) == 0xff && (b[3] & 0xFF) == 0x9b) {
                 return true;
             }

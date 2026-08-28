@@ -31,6 +31,7 @@ type MutationDetail = {
 	description: string;
 	line: string;
 	method: string;
+	mutator: string;
 	status: string;
 };
 
@@ -63,6 +64,7 @@ export function summarizePitXml(xml: string): Summary {
 				description: textField(mutation.description),
 				line: textField(mutation.lineNumber),
 				method: textField(mutation.mutatedMethod),
+				mutator: shortMutator(textField(mutation.mutator)),
 				status,
 			});
 		}
@@ -84,6 +86,10 @@ function invalidSummary(error: string): Summary {
 
 function textField(value: unknown): string {
 	return typeof value === "string" || typeof value === "number" ? String(value) : "?";
+}
+
+function shortMutator(mutator: string): string {
+	return mutator.slice(mutator.lastIndexOf(".") + 1);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -125,7 +131,7 @@ function markdown(
 		),
 		"",
 		passed
-			? "PIT completed without technical analysis errors. Review surviving and uncovered mutations in the HTML report."
+			? "PIT completed without technical analysis errors. Review the rows below; use the HTML report for source detail."
 			: `The run is invalid: ${summary.error ?? "Maven or PIT failed"}. Do not interpret its mutation score.`,
 		"",
 	];
@@ -133,11 +139,11 @@ function markdown(
 		lines.push(
 			"## Mutations to review",
 			"",
-			"| Status | Location | Mutation |",
-			"| --- | --- | --- |",
+			"| Status | Location | Mutator | Mutation |",
+			"| --- | --- | --- | --- |",
 			...summary.actionable.map(
 				(item) =>
-					`| ${item.status} | ${markdownCell(item.className)}.${markdownCell(item.method)}:${markdownCell(item.line)} | ${markdownCell(item.description)} |`,
+					`| ${item.status} | ${markdownCell(item.className)}.${markdownCell(item.method)}:${markdownCell(item.line)} | ${markdownCell(item.mutator)} | ${markdownCell(item.description)} |`,
 			),
 			"",
 		);

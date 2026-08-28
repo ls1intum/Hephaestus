@@ -777,7 +777,6 @@
                 <failsafe.includedGroups />
             </properties>
         </profile>
-        <!-- Advisory security mutation suite; run pnpm run test:server:mutation. -->
         <profile>
             <id>pitest</id>
             <build>
@@ -796,15 +795,14 @@
                         <configuration>
                             <!-- Surefire's JaCoCo argLine is invalid in PIT minion JVMs. -->
                             <parseSurefireConfig>false</parseSurefireConfig>
-                            <!-- Bound resource use and avoid concurrent minion instability. -->
+                            <!-- Keep peak PIT resource use within the advisory runner budget. -->
                             <threads>1</threads>
                             <failWhenNoMutations>true</failWhenNoMutations>
-                            <!-- Allow for minion JVM startup on the application classpath. -->
+                            <!-- Account for cold minion startup on the application classpath. -->
                             <timeoutConstant>30000</timeoutConstant>
                             <jvmArgs>
                                 <value>-Xmx1g</value>
                                 <value>-XX:+EnableDynamicAgentLoading</value>
-                                <value>-Dnet.bytebuddy.experimental=true</value>
                             </jvmArgs>
                             <targetClasses>
                                 <param>de.tum.cit.aet.hephaestus.core.security.ServerUrlValidator</param>

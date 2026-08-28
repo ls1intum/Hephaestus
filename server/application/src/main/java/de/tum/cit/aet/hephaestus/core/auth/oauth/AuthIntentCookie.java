@@ -122,7 +122,6 @@ public class AuthIntentCookie {
                     Instant issuedAt = Instant.ofEpochMilli(intent.issuedAt());
                     Instant now = clock.instant();
                     if (issuedAt.isAfter(now) || issuedAt.isBefore(now.minusSeconds(MAX_COOKIE_AGE_SECONDS))) {
-                        // Browser Max-Age is not authoritative for server-side freshness.
                         log.warn("auth.oauth: rejecting stale/future auth-intent cookie");
                         return null;
                     }
