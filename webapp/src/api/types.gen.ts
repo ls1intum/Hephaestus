@@ -5594,6 +5594,16 @@ export type ConnectionAuditEntry = {
     toState?: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'UNINSTALLED';
 };
 
+export type ConfigurationFact = {
+    documentationUrl: string;
+    explanation: string;
+    id: string;
+    requirement: 'REQUIRED' | 'RECOMMENDED' | 'OPTIONAL';
+    roles: Array<'SERVER' | 'WORKER' | 'WEBHOOK'>;
+    status: 'SATISFIED' | 'ACTION_REQUIRED' | 'NOT_CONFIGURED' | 'NOT_APPLICABLE';
+    subject: string;
+};
+
 /**
  * Mentor chat thread summary (no messages).
  */
@@ -6083,6 +6093,22 @@ export type AdminListConfigAuditEventsResponses = {
 };
 
 export type AdminListConfigAuditEventsResponse = AdminListConfigAuditEventsResponses[keyof AdminListConfigAuditEventsResponses];
+
+export type AdminGetConfigurationReadinessData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/admin/configuration-readiness';
+};
+
+export type AdminGetConfigurationReadinessResponses = {
+    /**
+     * OK
+     */
+    200: Array<ConfigurationFact>;
+};
+
+export type AdminGetConfigurationReadinessResponse = AdminGetConfigurationReadinessResponses[keyof AdminGetConfigurationReadinessResponses];
 
 export type AdminListLlmConnectionsData = {
     body?: never;

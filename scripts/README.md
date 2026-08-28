@@ -83,6 +83,8 @@ bun run nats:extract-examples -- --event push --event pull_request:opened
 The retained shell files run where shell is already part of the runtime:
 
 - `.husky/_/husky.sh` is Husky's generated, minimal Git-hook bootstrap.
+- `docker/self-host/setup.sh` bootstraps an operator installation before Bun is available; its test
+  orchestration is typed TypeScript under `scripts/`.
 - `webapp/docker/entrypoint.sh` prepares assets in the final nginx image, which does not contain Bun.
 
 No substantive shell script is permitted under `scripts/`.

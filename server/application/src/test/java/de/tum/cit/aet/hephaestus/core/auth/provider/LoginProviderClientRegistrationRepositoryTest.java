@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.core.auth.provider;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.security.OutlineOriginPolicy;
@@ -91,23 +92,42 @@ class LoginProviderClientRegistrationRepositoryTest extends BaseUnitTest {
         LoginProviderClientRegistrationRepository repository =
                 new LoginProviderClientRegistrationRepository(repo, "", OUTLINE_ORIGINS);
 
-        // Link-only in the SPA, but discoverable so the authenticated settings page can offer account linking.
         List<ClientRegistration> picker = repository.listRegistrations();
         assertThat(picker).extracting(ClientRegistration::getRegistrationId).containsExactly("github", "slack");
 
-        // But it IS reachable by registrationId for the account-linking flow, wired to Slack's OIDC endpoints.
         ClientRegistration slack = repository.findByRegistrationId("slack");
         assertNotNull(slack);
         assertThat(slack.getProviderDetails().getAuthorizationUri())
                 .isEqualTo("https://slack.com/openid/connect/authorize");
-        assertNotNull(slack);
         assertThat(slack.getProviderDetails().getTokenUri()).isEqualTo("https://slack.com/api/openid.connect.token");
         assertThat(slack.getProviderDetails().getUserInfoEndpoint().getUri())
                 .isEqualTo("https://slack.com/api/openid.connect.userInfo");
-        assertNotNull(slack);
         assertThat(slack.getProviderDetails().getJwkSetUri()).isEqualTo("https://slack.com/openid/connect/keys");
         assertThat(slack.getProviderDetails().getUserInfoEndpoint().getUserNameAttributeName())
                 .isEqualTo("sub");
+    }
+
+    @Test
+    void primaryProviderSatisfiesSignInReadiness() {
+        LoginProviderRepository repo = mock(LoginProviderRepository.class);
+        when(repo.existsByEnabledTrueAndTypeIn(
+                        Set.of(LoginProvider.ProviderType.GITHUB, LoginProvider.ProviderType.GITLAB)))
+                .thenReturn(true);
+
+        assertThat(new LoginProviderClientRegistrationRepository(repo, "", OUTLINE_ORIGINS)
+                        .hasEnabledPrimarySignInProvider())
+                .isTrue();
+    }
+
+    @Test
+    void signInReadinessQueriesOnlyPrimaryProviderTypes() {
+        LoginProviderRepository repo = mock(LoginProviderRepository.class);
+        assertThat(new LoginProviderClientRegistrationRepository(repo, "", OUTLINE_ORIGINS)
+                        .hasEnabledPrimarySignInProvider())
+                .isFalse();
+        verify(repo)
+                .existsByEnabledTrueAndTypeIn(
+                        Set.of(LoginProvider.ProviderType.GITHUB, LoginProvider.ProviderType.GITLAB));
     }
 
     @Test
@@ -120,18 +140,13 @@ class LoginProviderClientRegistrationRepositoryTest extends BaseUnitTest {
         ClientRegistration outline = new LoginProviderClientRegistrationRepository(repo, "", OUTLINE_ORIGINS)
                 .findByRegistrationId("outline");
 
-        // Plain OAuth2 (NOT OIDC): endpoints hang off the per-instance base URL; the userinfo URI points
-        // at POST /api/auth.info, which OutlineAuthInfoUserService (not the framework default) calls.
         assertNotNull(outline);
         assertThat(outline.getProviderDetails().getAuthorizationUri())
                 .isEqualTo("https://wiki.example.com/oauth/authorize");
-        assertNotNull(outline);
         assertThat(outline.getProviderDetails().getTokenUri()).isEqualTo("https://wiki.example.com/oauth/token");
         assertThat(outline.getProviderDetails().getUserInfoEndpoint().getUri())
                 .isEqualTo("https://wiki.example.com/api/auth.info");
-        assertNotNull(outline);
-        assertThat(outline.getProviderDetails().getJwkSetUri()).isNull(); // no OIDC path
-        // nOAuth defence: the principal keys on the immutable Outline user UUID, never name/email.
+        assertThat(outline.getProviderDetails().getJwkSetUri()).isNull();
         assertThat(outline.getProviderDetails().getUserInfoEndpoint().getUserNameAttributeName())
                 .isEqualTo("id");
     }
@@ -174,8 +189,6 @@ class LoginProviderClientRegistrationRepositoryTest extends BaseUnitTest {
                 .thenReturn(Optional.of(
                         provider("github", LoginProvider.ProviderType.GITHUB, "https://github.com", "read:user")));
 
-        // Behind a proxy that strips /api, the redirect_uri the IdP gets must re-add it so the callback
-        // lands on the proxied API path, not the SPA. {baseUrl} is expanded by Spring at request time.
         ClientRegistration prefixed = new LoginProviderClientRegistrationRepository(repo, "/api", OUTLINE_ORIGINS)
                 .findByRegistrationId("github");
         assertNotNull(prefixed);
