@@ -47,6 +47,9 @@ public interface WorkspaceMembershipRepository extends JpaRepository<WorkspaceMe
     Optional<WorkspaceMembership> findByWorkspace_IdAndUser_Id(
             @Param("workspaceId") Long workspaceId, @Param("userId") Long userId);
 
+    Optional<WorkspaceMembership> findFirstByWorkspace_IdAndUser_LoginIgnoreCaseOrderByUser_Id(
+            Long workspaceId, String login);
+
     List<WorkspaceMembership> findAllByWorkspace_IdAndUser_IdIn(Long workspaceId, Collection<Long> userIds);
 
     @Query("""

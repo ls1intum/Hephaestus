@@ -18,7 +18,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryInfoDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserInfoDTO;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.profile.dto.ProfileActivityMonitorDTO;
 import de.tum.cit.aet.hephaestus.profile.dto.ProfileActivityStatsDTO;
 import de.tum.cit.aet.hephaestus.profile.dto.ProfileDTO;
@@ -59,7 +58,6 @@ public class UserProfileService {
     private static final int DEFAULT_ACTIVITY_MONITOR_LIMIT = 5;
     private static final int MAX_ACTIVITY_MONITOR_LIMIT = 100;
 
-    private final UserRepository userRepository;
     private final ProfileRepositoryQueryRepository profileRepositoryQueryRepository;
     private final ProfilePullRequestQueryRepository profilePullRequestQueryRepository;
     private final PullRequestReviewRepository pullRequestReviewRepository;
@@ -93,7 +91,7 @@ public class UserProfileService {
                 timeRange.after(),
                 timeRange.before());
 
-        Optional<User> optionalUser = userRepository.findByLogin(login);
+        Optional<User> optionalUser = workspaceMembershipService.findMemberByLogin(workspaceId, login);
         if (optionalUser.isEmpty()) {
             return Optional.empty();
         }
@@ -123,16 +121,12 @@ public class UserProfileService {
     @Transactional(readOnly = true)
     public Optional<ProfileActivityMonitorDTO> getActivityMonitor(
             String login,
-            @Nullable Long workspaceId,
+            Long workspaceId,
             @Nullable Instant after,
             @Nullable Instant before,
             @Nullable Set<Long> repositoryIds,
             @Nullable Integer limit) {
-        if (workspaceId == null) {
-            return Optional.empty();
-        }
-
-        Optional<User> optionalUser = userRepository.findByLogin(login);
+        Optional<User> optionalUser = workspaceMembershipService.findMemberByLogin(workspaceId, login);
         if (optionalUser.isEmpty()) {
             return Optional.empty();
         }

@@ -128,6 +128,13 @@ public class WorkspaceMembershipService {
         return member.getLeaguePoints();
     }
 
+    @Transactional(readOnly = true)
+    public Optional<User> findMemberByLogin(Long workspaceId, String login) {
+        return workspaceMembershipRepository
+                .findFirstByWorkspace_IdAndUser_LoginIgnoreCaseOrderByUser_Id(workspaceId, login)
+                .map(WorkspaceMembership::getUser);
+    }
+
     @Transactional
     public void updateLeaguePoints(Long workspaceId, User user, int newPoints) {
         if (user == null || user.getId() == null) {
