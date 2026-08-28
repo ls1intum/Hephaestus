@@ -1,0 +1,78 @@
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+
+import { run } from "./lib/process.ts";
+
+const root = process.cwd();
+
+export function updateEnv(text: string): string {
+	if (!/^GITLAB_PAT=.+$/m.test(text) || !/^GITLAB_GROUP_PATH=.+$/m.test(text)) return text;
+	const set = (input: string, key: string, value: string): string => {
+		const assignment = `${key}=${value}`;
+		if (new RegExp(`^${key}=`, "m").test(input))
+			return input.replace(new RegExp(`^${key}=.*$`, "m"), assignment);
+		return `${input}${input.endsWith("\n") || input.length === 0 ? "" : "\n"}${assignment}\n`;
+	};
+	return set(
+		set(set(text, "GITLAB_WORKSPACE_INIT_DEFAULT", "true"), "GITLAB_ENABLED", "true"),
+		"GITLAB_SERVER_URL",
+		/^GITLAB_SERVER_URL=/m.test(text)
+			? (/^GITLAB_SERVER_URL=(.*)$/m.exec(text)?.[1] ?? "https://gitlab.lrz.de")
+			: "https://gitlab.lrz.de",
+	);
+}
+
+async function copyFirst(
+	rootPath: string,
+	destination: string,
+	candidates: string[],
+): Promise<void> {
+	for (const [index, candidate] of candidates.entries()) {
+		const source = Bun.file(join(rootPath, candidate));
+		if (!(await source.exists())) continue;
+		await mkdir(dirname(join(root, destination)), { recursive: true });
+		await copyFile(join(rootPath, candidate), join(root, destination));
+		console.log(
+			`  ${index ? "WARN: legacy layout — copied" : "copied"} ${destination}${index ? ` (from ${candidate})` : ""}`,
+		);
+		return;
+	}
+	console.log(`  skipped ${destination} (no candidate found in root: ${candidates.join(" ")})`);
+}
+
+async function main(): Promise<void> {
+	console.log("Setting up Jean worktree...");
+	const jeanRoot = Bun.env.JEAN_ROOT_PATH;
+	if (!jeanRoot) console.log("  JEAN_ROOT_PATH is not set — skipping config file copy.");
+	else {
+		console.log("Copying local config files...");
+		for (const [destination, candidates] of [
+			[
+				"server/application/src/main/resources/application-local.yml",
+				["server/application/src/main/resources/application-local.yml"],
+			],
+			[
+				"server/application/src/test/resources/application-live-local.yml",
+				["server/application/src/test/resources/application-live-local.yml"],
+			],
+			["server/.env", ["server/.env"]],
+			["docker/.env", ["docker/.env"]],
+			[".claude/settings.local.json", [".claude/settings.local.json"]],
+		] satisfies Array<[string, string[]]>)
+			await copyFirst(jeanRoot, destination, candidates);
+	}
+	const envPath = join(root, "server/.env");
+	if (await Bun.file(envPath).exists()) {
+		const before = await readFile(envPath, "utf8");
+		const after = updateEnv(before);
+		if (after !== before) {
+			await writeFile(envPath, after, { mode: 0o600 });
+			console.log("  enabled GitLab default workspace bootstrap from local server/.env");
+		}
+	}
+	console.log("Installing dependencies...");
+	await run("bun", ["install", "--frozen-lockfile"], { cwd: root });
+	console.log("✅ Jean worktree setup complete.");
+}
+
+if (import.meta.main) await main();

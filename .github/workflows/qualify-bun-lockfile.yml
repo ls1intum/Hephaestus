@@ -9,7 +9,7 @@ on:
       - "docs/package.json"
       - "webapp/package.json"
       - "scripts/check-package-manager.ts"
-      - "scripts/qualify-bun-lockfile.sh"
+      - "scripts/qualify-bun-lockfile.ts"
       - ".github/actions/setup-bun/action.yml"
       - ".github/workflows/qualify-bun-lockfile.yml"
       - "docker/agents/pi/Dockerfile"
@@ -31,4 +31,4 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup-bun
-      - run: scripts/qualify-bun-lockfile.sh 25
+      - run: bun run qualify:bun-lockfile -- 25
