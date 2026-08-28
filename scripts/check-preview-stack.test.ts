@@ -23,7 +23,7 @@ interface Service {
 
 interface Stack {
 	services: { appserver: Service; postgres: Service; webapp?: Service };
-	networks: { backend: { internal?: boolean } };
+	networks: Record<string, { internal?: boolean }>;
 }
 
 const sandboxed: Stack = {
@@ -47,7 +47,7 @@ const sandboxed: Stack = {
 			cap_add: ["CHOWN", "DAC_OVERRIDE", "FOWNER", "SETGID", "SETUID"],
 		},
 	},
-	networks: { backend: { internal: true } },
+	networks: {},
 };
 
 /** Clones the good stack, then lets a test break exactly one thing. */
@@ -107,11 +107,11 @@ void describe("preview stack sandbox", () => {
 				/no memory limit/,
 			],
 			[
-				"routable backend",
+				"a network every preview would share",
 				(s) => {
-					s.networks.backend.internal = false;
+					s.networks.backend = { internal: true };
 				},
-				/no longer internal/,
+				/every preview would share/,
 			],
 		];
 
@@ -194,7 +194,6 @@ void describe("preview stack sandbox", () => {
 		assert.deepEqual(findViolations({}), [
 			"the rendered stack declares no services",
 			"the rendered stack has no appserver service, so no switch was checked",
-			"the backend network is gone",
 		]);
 	});
 });

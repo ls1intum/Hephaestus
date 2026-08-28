@@ -226,10 +226,15 @@ export function findViolations(stack: unknown): string[] {
 	if (!services.some(([name]) => name === "appserver")) {
 		violations.push("the rendered stack has no appserver service, so no switch was checked");
 	}
-	const backend = records(stack.networks).find(([name]) => name === "backend");
-	if (!backend) violations.push("the backend network is gone");
-	else if (backend[1].internal !== true)
-		violations.push("the backend network is no longer internal");
+	// Coolify runs every preview of this application under one Compose project, named after the
+	// application UUID with no pull request in it. A network named here is therefore `<uuid>_<name>`
+	// for all of them at once, and one preview reaches another's database over it. Coolify's own
+	// per-preview network, which its proxy joins, is what keeps them apart. `default` is Compose's
+	// own and carries the project name too, but nothing joins it once no service names a network.
+	for (const [name] of records(stack.networks)) {
+		if (name === "default") continue;
+		violations.push(`the stack declares the ${name} network, which every preview would share`);
+	}
 
 	return violations;
 }

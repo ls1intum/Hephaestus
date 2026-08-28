@@ -32,8 +32,10 @@ hold, each enforced before Coolify is asked to deploy:
   network membership, or host control socket.
 
 The application server runs without Linux capabilities and with `no-new-privileges`. PostgreSQL and
-NATS data live in PR-specific volumes. Coolify's proxy reaches the webapp and API on the frontend
-network; the database and NATS broker also use an internal backend network.
+NATS data live in PR-specific volumes. The stack declares no networks of its own: Coolify runs every
+preview of this application under one Compose project named after the application UUID, so a network
+named here would be shared by all of them at once. Each preview gets Coolify's own per-preview
+network instead, which its proxy joins to reach the webapp and API.
 
 Deployment authority is deliberately the same as push authority;
 [ADR 0035](../../docs/decisions/0035-pull-request-previews-are-label-gated.md) records why, and what
@@ -48,7 +50,8 @@ works alone: the controller refuses to deploy a head that introduces changes any
 `docker/preview/` — compared against the default branch, so a stacked layer cannot inherit an edit
 from the layer below — and `ci-compose-validate.yml` renders the file on every pull request and fails if
 the stack gains a way out of its sandbox — a socket, a build stage, a published port, an external
-network, an unbounded memory limit, a non-internal backend, or a flipped integration switch.
+network, an unbounded memory limit, a network every preview would share, or a flipped integration
+switch.
 `scripts/check-preview-stack.ts` is the authoritative list; this paragraph is not.
 
 ## Host capacity

@@ -13,6 +13,11 @@
 # would arrive with sync, notifications and the agent digest requirement switched on, and with the
 # Docker socket mounted — ADR 0035 option 6 has the rendered evidence. scripts/check-preview-stack.ts
 # fails when the reference gains a variable this file neither sets nor records as omitted.
+#
+# This file declares no networks. Coolify runs every preview of this application under one Compose
+# project — the project name is the application UUID, with no pull request in it — so a network named
+# here would be `<uuid>_backend`, shared by every preview at once. Coolify instead gives each preview
+# its own network and attaches its proxy to that, which is what keeps the stacks apart.
 
 services:
   postgres:
@@ -24,8 +29,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres-data:/var/lib/postgresql/data
-    networks:
-      - backend
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -61,8 +64,6 @@ services:
     command: ["--jetstream", "--store_dir=/data", "--http_port=8222"]
     volumes:
       - nats-data:/data
-    networks:
-      - backend
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -110,11 +111,14 @@ services:
       HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES}
       APPLICATION_HOST_URL: https://${SERVICE_FQDN_WEBAPP}
       HEPHAESTUS_AUTH_API_BASE_PATH: ""
-      DATABASE_URL: postgresql://postgres:5432/hephaestus?sslmode=disable
+      # Coolify renames each service to `<service>-pr-<id>` and publishes the renamed hosts as
+      # SERVICE_NAME_*, so the bare service name resolves to nothing inside a preview. The defaults
+      # keep this file runnable on its own.
+      DATABASE_URL: postgresql://${SERVICE_NAME_POSTGRES:-postgres}:5432/hephaestus?sslmode=disable
       DATABASE_USERNAME: hephaestus
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
-      NATS_SERVER: nats://nats:4222
-      HEPHAESTUS_SYNC_NATS_SERVER: nats://nats:4222
+      NATS_SERVER: nats://${SERVICE_NAME_NATS:-nats}:4222
+      HEPHAESTUS_SYNC_NATS_SERVER: nats://${SERVICE_NAME_NATS:-nats}:4222
       NATS_ENABLED: "true"
       NATS_DURABLE_CONSUMER_NAME: preview-consumer
       HEPHAESTUS_INTEGRATION_CONSUMER_INACTIVE_THRESHOLD: 24h
@@ -140,9 +144,6 @@ services:
       SENTRY_DSN: ""
       WEBHOOK_SECRET: ${WEBHOOK_SECRET}
       WEBHOOK_EXTERNAL_URL: ""
-    networks:
-      - frontend
-      - backend
     depends_on:
       postgres:
         condition: service_healthy
@@ -189,8 +190,6 @@ services:
       SENTRY_ENVIRONMENT: preview
       SENTRY_DSN: ""
       POSTHOG_ENABLED: "false"
-    networks:
-      - frontend
     depends_on:
       appserver:
         condition: service_healthy
@@ -215,11 +214,6 @@ services:
           cpus: "0.25"
           memory: 256M
           pids: 128
-
-networks:
-  frontend:
-  backend:
-    internal: true
 
 volumes:
   postgres-data:

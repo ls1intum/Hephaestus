@@ -108,8 +108,8 @@ The gates that remain are the ones that describe *what may run*, not *who asked*
   this rule is load-bearing.
   `ci-compose-validate.yml` holds the other half: on every pull request it renders that file and fails
   if the stack gains a way out of its sandbox — a socket, a build stage, a published port, an external
-  network, an unbounded memory limit, a non-internal backend, or a renamed or flipped integration
-  switch. `scripts/check-preview-stack.ts` is the authoritative list, and its own tests prove each
+  network, an unbounded memory limit, a network every preview would share, or a renamed or flipped
+  integration switch. `scripts/check-preview-stack.ts` is the authoritative list, and its own tests prove each
   assertion fails when that escape is present.
 - Every service runs the image CI published for the exact head commit, and each digest must carry a
   build attestation signed by this repository's `reusable-docker-build.yml`, verified before Coolify
