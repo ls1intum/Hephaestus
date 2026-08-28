@@ -1,7 +1,6 @@
 {
 	"$schema": "./node_modules/oxlint/configuration_schema.json",
 
-	// oxlint lints this package; Biome formats it and sorts imports (`biome.jsonc`).
 	"plugins": ["typescript", "unicorn", "oxc", "import", "react", "jsx-a11y", "vitest", "promise"],
 	"jsPlugins": ["./tools/oxlint/index.ts"],
 
@@ -395,7 +394,10 @@
 		// computed — which is every assertion inside a loop, the shape that needs a label most.
 		"vitest/valid-expect": ["error", { "maxArgs": 2 }],
 		// CSS side effects and module augmentation.
-		"import/no-unassigned-import": ["error", { "allow": ["**/*.css", "@tanstack/react-router", "react"] }],
+		"import/no-unassigned-import": [
+			"error",
+			{ "allow": ["**/*.css", "@tanstack/react-router", "react"] }
+		],
 		// A Testing Library query IS the assertion: `getBy*` throws when it finds nothing. Supplying
 		// this option replaces oxlint's defaults rather than extending them, so the first four restate
 		// its list — drop one and a plain `expect()` stops counting.
@@ -436,7 +438,12 @@
 			"error",
 			{
 				"paths": [
-					{ "name": "react", "importNames": ["useMemo", "useCallback", "memo", "forwardRef"], "allowTypeImports": true, "message": "React Compiler memoises at build time; `ref` is a plain prop in React 19." },
+					{
+						"name": "react",
+						"importNames": ["useMemo", "useCallback", "memo", "forwardRef"],
+						"allowTypeImports": true,
+						"message": "React Compiler memoises at build time; `ref` is a plain prop in React 19."
+					},
 					{ "name": "clsx", "message": "Compose classes with `cn()` from `@/lib/utils`." },
 					{ "name": "tailwind-merge", "message": "Compose classes with `cn()` from `@/lib/utils`." }
 				]
@@ -482,9 +489,17 @@
 					"error",
 					{
 						"paths": [
-							{ "name": "react", "importNames": ["useMemo", "useCallback", "memo", "forwardRef"], "allowTypeImports": true, "message": "React Compiler memoises at build time; `ref` is a plain prop in React 19." },
+							{
+								"name": "react",
+								"importNames": ["useMemo", "useCallback", "memo", "forwardRef"],
+								"allowTypeImports": true,
+								"message": "React Compiler memoises at build time; `ref` is a plain prop in React 19."
+							},
 							{ "name": "clsx", "message": "Compose classes with `cn()` from `@/lib/utils`." },
-							{ "name": "tailwind-merge", "message": "Compose classes with `cn()` from `@/lib/utils`." }
+							{
+								"name": "tailwind-merge",
+								"message": "Compose classes with `cn()` from `@/lib/utils`."
+							}
 						],
 						"patterns": [
 							{
@@ -509,7 +524,12 @@
 					"error",
 					{
 						"paths": [
-							{ "name": "react", "importNames": ["useMemo", "useCallback", "memo", "forwardRef"], "allowTypeImports": true, "message": "React Compiler memoises at build time; `ref` is a plain prop in React 19." }
+							{
+								"name": "react",
+								"importNames": ["useMemo", "useCallback", "memo", "forwardRef"],
+								"allowTypeImports": true,
+								"message": "React Compiler memoises at build time; `ref` is a plain prop in React 19."
+							}
 						],
 						"patterns": [
 							{
@@ -532,9 +552,17 @@
 					"error",
 					{
 						"paths": [
-							{ "name": "react", "importNames": ["useMemo", "useCallback", "memo", "forwardRef"], "allowTypeImports": true, "message": "React Compiler memoises at build time; `ref` is a plain prop in React 19." },
+							{
+								"name": "react",
+								"importNames": ["useMemo", "useCallback", "memo", "forwardRef"],
+								"allowTypeImports": true,
+								"message": "React Compiler memoises at build time; `ref` is a plain prop in React 19."
+							},
 							{ "name": "clsx", "message": "Compose classes with `cn()` from `@/lib/utils`." },
-							{ "name": "tailwind-merge", "message": "Compose classes with `cn()` from `@/lib/utils`." }
+							{
+								"name": "tailwind-merge",
+								"message": "Compose classes with `cn()` from `@/lib/utils`."
+							}
 						],
 						"patterns": [
 							{
@@ -559,9 +587,17 @@
 					"error",
 					{
 						"paths": [
-							{ "name": "react", "importNames": ["useMemo", "useCallback", "memo", "forwardRef"], "allowTypeImports": true, "message": "React Compiler memoises at build time; `ref` is a plain prop in React 19." },
+							{
+								"name": "react",
+								"importNames": ["useMemo", "useCallback", "memo", "forwardRef"],
+								"allowTypeImports": true,
+								"message": "React Compiler memoises at build time; `ref` is a plain prop in React 19."
+							},
 							{ "name": "clsx", "message": "Compose classes with `cn()` from `@/lib/utils`." },
-							{ "name": "tailwind-merge", "message": "Compose classes with `cn()` from `@/lib/utils`." }
+							{
+								"name": "tailwind-merge",
+								"message": "Compose classes with `cn()` from `@/lib/utils`."
+							}
 						],
 						"patterns": [
 							{

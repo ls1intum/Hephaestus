@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { test } from "node:test";
+
 import {
 	analyse,
 	CODEX_SKILLS,
@@ -343,7 +344,7 @@ await test("a code span split by the line wrap does not swallow the import after
 await test("prose that merely contains an @ is not a file reference", () => {
 	for (const markdown of [
 		"Uses @base-ui/react and @Audited on the mutation.",
-		"Pin @biomejs/biome@2.4.15 exactly.",
+		"Pin formatter@0.1.0 exactly.",
 		"Upgraded to @v0.74.0 last week.",
 		"Ping @felix.dietrich about it.",
 		"Types from @/api/types.gen are already checked.",

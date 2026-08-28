@@ -59,8 +59,9 @@ Before any release, code must pass:
 | Java lint       | PMD         | Static analysis      |
 | Java nullness policy | NullAway policy scanner | Rejects suppressed analysis and empty source discovery |
 | Changeset policy | Node test runner + Changesets | Tests release-note and version synchronization rules |
-| Webapp TypeScript | oxlint + Biome (`webapp/biome.jsonc`) + tsc | Lint + format + typecheck |
-| Everything else TypeScript | oxlint (`.oxlintrc.json`) + Biome (`biome.jsonc`) + tsc | oxlint reaches the Bun runtime, its specs, both precompute trees, `scripts/**`, `docs/` and the repo-root config files; Biome formats all of those except `docs/`, which has its own config (`docs/.oxlintrc.json`) and no formatter |
+| Webapp TypeScript | oxlint + oxfmt (`.oxfmtrc.json`) + tsc | Lint + format + typecheck |
+| Agent and repository-tooling files | oxlint + oxfmt + tsc | Lint, format, and typecheck where applicable |
+| Docs code and configuration | oxfmt | Format JavaScript, TypeScript, JSON/JSONC, and CSS |
 | Agent runtime   | Bun         | Runner and precompute specs, on the Bun the sandbox ships — CI reads `ARG BUN_VERSION` out of `docker/agents/pi/Dockerfile` rather than hard-coding it, and fails closed if that line is missing |
 
 ## 🔒 Security
@@ -165,10 +166,9 @@ CI only runs jobs for components that actually changed:
 
 | Component            | Triggers On                                                   |
 | -------------------- | ------------------------------------------------------------- |
-| Webapp               | `webapp/**`, `docs/images/readme/**`, `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `.npmrc`, `.node-version` |
-| Application Server   | `server/**`, `scripts/**` (includes webhook receiver — ADR 0008), `docker/agents/**`, `tsconfig.agents.json`, `biome.jsonc`, `package.json`, `pnpm-lock.yaml` |
+| Webapp               | `webapp/**`, `docs/images/readme/**`, `.oxlintrc.json`, `.oxfmtrc.json`, root package and Node configuration |
+| Application Server   | `server/**`, `scripts/**`, `docker/agents/**`, `docs/**`, root lint, format, TypeScript, and package configuration |
 | Agent images         | `docker/agents/**`                                            |
-| Docs                 | `docs/**`                                                     |
 | CI Config            | `.github/workflows/**`, `.github/actions/**` → runs all jobs  |
 
 The whole of `scripts/` counts as application-server change, not just the database helper: the
@@ -176,11 +176,6 @@ contract validator and the changelog-immutability guard live there, and a PR edi
 would otherwise skip the workflow that runs it. `docker/agents/**` appears twice for the same reason
 — it builds the agent images, and `test:agents` and `typecheck:agents` cover the precompute tree
 inside it, so a PR editing only a precompute script must still run those gates.
-
-`.oxlintrc.json`, `biome.jsonc`, `tsconfig.json`, `package.json` and `pnpm-lock.yaml` are listed
-because they decide the verdict of the App Server leg's lint and format step: the two rule sets, the
-project the type-aware rules resolve against, the `:agents` scripts that invoke them, and the binary
-versions. A gate whose own configuration can change without re-running it is not a gate.
 
 ### Docker Layer Caching
 
@@ -261,7 +256,7 @@ workflow remains authoritative for its hosted jobs.
 
 ```bash
 # Webapp
-pnpm run check:webapp          # Biome format check, then oxlint
+pnpm run check:webapp          # oxfmt format check, then oxlint
 pnpm run check:webapp:fix      # Same, applying every safe fix
 pnpm run typecheck:webapp      # A separate leg — check:webapp does not run it
 pnpm run test:webapp           # Unit tests
@@ -272,14 +267,14 @@ cd server && ./mvnw test       # Unit tests, including required reactor dependen
 
 # Agent runtime (Bun) — the Pi runner and the practice precompute scripts
 pnpm run test:agents           # Runner + precompute specs
-pnpm run check:agents          # Biome format, then oxlint, then both typechecks
+pnpm run check:agents          # oxfmt check, then oxlint, then both typechecks
 pnpm run check:agents:fix      # Same, applying every safe fix
 pnpm run typecheck:agents      # Agent + precompute TypeScript
 ```
 
-`check:agents` covers every TypeScript tree outside the webapp — the runtime, its specs, both
-precompute trees and `scripts/**`. Its rules and path roots live in `biome.jsonc`; CI runs the same
-thing as `pnpm run ci:agents`, which reports findings as inline annotations on the diff.
+`check:agents` formats the agent and tooling TypeScript trees, docs code, and selected repository
+configuration; it also lints and type-checks the non-webapp TypeScript trees. CI invokes the same
+commands.
 
 ### Common Issues
 
