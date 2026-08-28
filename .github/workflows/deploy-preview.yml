@@ -16,7 +16,6 @@ jobs:
       vars.COOLIFY_URL != '' &&
       vars.COOLIFY_APP_UUID != '' &&
       vars.COOLIFY_PREVIEW_URL_TEMPLATE != '' &&
-      vars.PREVIEW_HOST != '' &&
       (github.event.label.name == 'preview' ||
        contains(github.event.pull_request.labels.*.name, 'preview'))
     runs-on: ubuntu-latest

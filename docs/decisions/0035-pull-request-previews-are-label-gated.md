@@ -138,8 +138,8 @@ control.
 **Coolify is driven, not trusted.** The controller sends an HMAC-signed synthetic GitHub
 `pull_request` webhook naming the full commit SHA, because the public `/api/v1/deploy` endpoint
 queues a mutable `HEAD`. The API token it holds is read-only; every mutation goes through the signed
-webhook. Teardown is verified on the host over an SSH channel restricted by a forced command to a
-root-owned binary whose command vocabulary is closed and enumerated in the runbook.
+webhook. Teardown is a signed close event; Coolify queues it and answers immediately, so what the
+workflow records is that the request was accepted.
 
 **Admission is bounded and the lifecycle is serialized.** `PREVIEW_MAX_ACTIVE` caps concurrent previews. The
 bound exists because the host is shared with staging and a preview stack's memory ceiling is a
@@ -162,13 +162,9 @@ the author why, so the refusal is immediate and names the pull requests holding 
 - **A stack can hold several slots at once**, one per labelled layer, because each layer is a
   separate pull request. The admission message names the occupants, so the author can see it and drop
   a label.
-- The host cleanup binary is compiled from `scripts/preview-host-cleanup.ts` and installed by hand,
-  so the two can drift. The binary carries the hash it was built from and the nightly reconcile
-  compares it, in a job kept separate from reclamation so a stale binary is reported without blocking
-  cleanup. Detection is nightly, not at deploy time: a rebuild that is never installed is caught a day
-  late.
-- Teardown failures are loud and retried nightly; nothing opens an issue. Every teardown step is
-  idempotent, so a retry over already-removed
+- Teardown is a request, not a proof: Coolify queues it and answers immediately, so a preview that
+  Coolify fails to remove leaks silently until someone looks at the host. Failures to *send* it are
+  loud and retried nightly. Every teardown step is idempotent, so a retry over already-removed
   resources succeeds rather than compounding the failure. Reclamation is decided per pull request
   from that pull request's own state, never from a resource's absence from a listing, so a failed
   inventory query cannot make live previews look orphaned.
@@ -179,5 +175,7 @@ the author why, so the refusal is immediate and names the pull requests holding 
 
 - **Previews move off the staging VM.** Then `PREVIEW_MAX_ACTIVE` can rise and the single global
   concurrency group can be split per pull request.
-- **Coolify gains verified preview teardown.** Then the SSH channel, its key, the host binary and the
-  reconcile workflow can all be deleted.
+- **A preview stack is observed outliving its pull request.** Teardown is currently a request to
+  Coolify, not a proof; the nightly reconcile re-sends it but checks nothing on the host. Verifying it
+  would mean a standing credential on the deployment host, which is not worth paying for a failure
+  that has not been seen.

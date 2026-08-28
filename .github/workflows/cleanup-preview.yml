@@ -1,8 +1,7 @@
 name: Preview cleanup
 
 # Since 2025-12-08 `pull_request_target` always takes the workflow file and the checked-out commit from
-# the default branch, so no fork code runs beside the secrets here. A Coolify 2xx is not
-# proof of teardown, so this ends with a forced SSH command that proves the resources are gone.
+# the default branch, so no fork code runs beside the secrets here.
 on:
   pull_request_target:
     types: [closed, unlabeled, converted_to_draft]
@@ -19,7 +18,6 @@ jobs:
     if: >-
       vars.COOLIFY_URL != '' &&
       vars.COOLIFY_APP_UUID != '' &&
-      vars.PREVIEW_HOST != '' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       (github.event.label.name == 'preview' ||
        (github.event.action != 'unlabeled' &&
@@ -63,22 +61,9 @@ jobs:
           COOLIFY_WEBHOOK_SECRET: ${{ secrets.COOLIFY_PREVIEW_WEBHOOK_SECRET }}
         run: bun scripts/coolify-preview.ts close
 
-      - name: Remove and verify matching host resources
-        id: host_cleanup
-        if: always()
-        env:
-          PREVIEW_HOST: ${{ vars.PREVIEW_HOST }}
-          PREVIEW_HOST_KEY: ${{ vars.PREVIEW_HOST_KEY }}
-          PREVIEW_SSH_USER: ${{ vars.PREVIEW_SSH_USER }}
-          PREVIEW_SSH_PRIVATE_KEY: ${{ secrets.PREVIEW_SSH_PRIVATE_KEY }}
-        run: bun scripts/preview-ssh.ts cleanup "${PR_NUMBER}"
-
       - name: Keep a verified cleanup tombstone
         id: tombstone
-        # Proven-absent host resources are what frees the slot. A Coolify hiccup must not leave the
-        # environment counting against admission forever; the tombstone says the nightly run still
-        # owes Coolify a second pass.
-        if: always() && steps.host_cleanup.outcome == 'success'
+        if: steps.close.outcome == 'success'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
@@ -96,15 +81,12 @@ jobs:
           message: |
             ## 🧹 App Preview
 
-            ~~Preview removed~~ — the slot on the preview host is free again.
+            ~~Preview removed~~ — its slot is free again.
 
             <sub>Add the `preview` label, or mark the pull request ready for review, to deploy it again.</sub>
 
-      - name: Fail if cleanup could not be verified
-        if: >-
-          always() &&
-          (steps.close.outcome != 'success' ||
-           steps.host_cleanup.outcome != 'success')
+      - name: Fail if Coolify did not accept the close event
+        if: always() && steps.close.outcome != 'success'
         run: |
-          echo "::error::Preview cleanup was not fully verified; the nightly reconciler will retry."
+          echo "::error::Coolify did not accept the close event; the nightly reconcile will retry."
           exit 1

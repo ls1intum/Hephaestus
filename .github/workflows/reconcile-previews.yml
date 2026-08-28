@@ -1,7 +1,8 @@
 name: Preview reconcile
 
-# Cleanup joins the same global lifecycle queue as deploy and close, so admission cannot race
-# reclamation.
+# Event-driven cleanup can be missed — a run cancelled, a Coolify hiccup, a pull request closed while
+# the lifecycle queue was busy. This sweeps what the events left behind, and joins the same global
+# lifecycle group as deploy and close so admission cannot race reclamation.
 on:
   schedule:
     - cron: "0 4 * * *"
@@ -14,50 +15,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  binary:
-    name: "Preview / Verify host cleanup binary"
-    if: vars.PREVIEW_HOST != ''
-    runs-on: ubuntu-latest
-    # Reads no GitHub state; it only asks the host what it is running.
-    permissions:
-      contents: read
-    timeout-minutes: 3
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-          sparse-checkout: |
-            .github/actions/setup-bun
-            package.json
-            scripts
-
-      - name: Set up the repository's Bun version
-        uses: ./.github/actions/setup-bun
-
-      # The host runs a compiled copy of scripts/preview-host-cleanup.ts, installed out of band; if
-      # the two drift, cleanup enforces rules this repository no longer states. Kept out of the
-      # reconcile job below so a stale binary is reported without blocking reclamation.
-      - name: Compare the installed binary against this commit
-        env:
-          PREVIEW_HOST: ${{ vars.PREVIEW_HOST }}
-          PREVIEW_HOST_KEY: ${{ vars.PREVIEW_HOST_KEY }}
-          PREVIEW_SSH_USER: ${{ vars.PREVIEW_SSH_USER }}
-          PREVIEW_SSH_PRIVATE_KEY: ${{ secrets.PREVIEW_SSH_PRIVATE_KEY }}
-          PREVIEW_HOST_ARCH: ${{ vars.PREVIEW_HOST_ARCH }}
-        run: |
-          set -euo pipefail
-          expected=$(shasum -a 256 scripts/preview-host-cleanup.ts | cut -c1-16)
-          installed=$(bun scripts/preview-ssh.ts version | tr -d '[:space:]')
-          [ "${installed}" = "${PREVIEW_HOST_ARCH:-x64}-${expected}" ] || {
-            echo "::error::${PREVIEW_HOST} runs preview cleanup ${installed}; this commit expects ${PREVIEW_HOST_ARCH:-x64}-${expected}. Rebuild and reinstall it — see docker/preview/README.md."
-            exit 1
-          }
-          echo "Host cleanup binary matches this commit (${installed})."
-
   inventory:
     name: "Preview / Inventory"
-    if: vars.PREVIEW_HOST != '' && vars.COOLIFY_URL != '' && vars.COOLIFY_APP_UUID != ''
+    if: vars.COOLIFY_URL != '' && vars.COOLIFY_APP_UUID != ''
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -66,37 +26,17 @@ jobs:
     outputs:
       previews: ${{ steps.candidates.outputs.previews }}
     steps:
-      - name: Load the trusted preview adapters
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.sha }}
-          persist-credentials: false
-          sparse-checkout: |
-            .github/actions/setup-bun
-            package.json
-            scripts
-
-      - name: Set up the repository's Bun version
-        uses: ./.github/actions/setup-bun
-
-      - name: Find host resources and GitHub preview environments
+      - name: Find the preview environments GitHub still records
         id: candidates
         env:
           GH_TOKEN: ${{ github.token }}
-          PREVIEW_HOST: ${{ vars.PREVIEW_HOST }}
-          PREVIEW_HOST_KEY: ${{ vars.PREVIEW_HOST_KEY }}
-          PREVIEW_SSH_USER: ${{ vars.PREVIEW_SSH_USER }}
-          PREVIEW_SSH_PRIVATE_KEY: ${{ secrets.PREVIEW_SSH_PRIVATE_KEY }}
         run: |
           set -euo pipefail
           candidates="${RUNNER_TEMP}/preview-candidates.txt"
-          bun scripts/preview-ssh.ts list > "${candidates}"
-
           gh api --paginate "repos/${GITHUB_REPOSITORY}/deployments?task=deploy%3Apreview&per_page=100" \
             --jq '.[] | .environment | select(test("^preview/pr-[1-9][0-9]*$")) | sub("^preview/pr-"; "")' \
-            >> "${candidates}"
+            | sort -nu > "${candidates}"
 
-          sort -nu -o "${candidates}" "${candidates}"
           count=$(grep -c . "${candidates}" || true)
           # Truncate rather than abort: a backlog past the bound is exactly when this job is needed,
           # so refusing to run would make the next night's backlog larger still.
@@ -109,26 +49,18 @@ jobs:
           echo "previews=${previews}" >> "${GITHUB_OUTPUT}"
           echo "Found ${count} preview candidates."
 
-      - name: Reclaim superseded preview images
-        env:
-          PREVIEW_HOST: ${{ vars.PREVIEW_HOST }}
-          PREVIEW_HOST_KEY: ${{ vars.PREVIEW_HOST_KEY }}
-          PREVIEW_SSH_USER: ${{ vars.PREVIEW_SSH_USER }}
-          PREVIEW_SSH_PRIVATE_KEY: ${{ secrets.PREVIEW_SSH_PRIVATE_KEY }}
-        run: bun scripts/preview-ssh.ts prune
-
   cleanup:
     name: "Preview / Reconcile PR ${{ matrix.pr }}"
+    needs: inventory
+    if: needs.inventory.result == 'success' && needs.inventory.outputs.previews != '[]'
     permissions:
       contents: read
       deployments: write
       pull-requests: read
-    needs: inventory
-    if: needs.inventory.result == 'success' && needs.inventory.outputs.previews != '[]'
     strategy:
       fail-fast: false
-      # Every job below joins the global preview lifecycle group, so a higher value would only
-      # start runners that immediately queue.
+      # Every job below joins the global preview lifecycle group, so a higher value would only start
+      # runners that immediately queue.
       max-parallel: 1
       matrix:
         pr: ${{ fromJSON(needs.inventory.outputs.previews) }}
@@ -167,7 +99,6 @@ jobs:
       - name: Request Coolify cleanup through the signed close event
         id: close
         if: steps.pull.outputs.stale == 'true'
-        continue-on-error: true
         env:
           COOLIFY_WEBHOOK_SECRET: ${{ secrets.COOLIFY_PREVIEW_WEBHOOK_SECRET }}
           PR_URL: ${{ steps.pull.outputs.url }}
@@ -178,46 +109,10 @@ jobs:
           BASE_REF: ${{ steps.pull.outputs.base_ref }}
         run: bun scripts/coolify-preview.ts close
 
-      - name: Remove and verify matching host resources
-        id: host_cleanup
-        if: always() && steps.pull.outputs.stale == 'true'
-        env:
-          PREVIEW_HOST: ${{ vars.PREVIEW_HOST }}
-          PREVIEW_HOST_KEY: ${{ vars.PREVIEW_HOST_KEY }}
-          PREVIEW_SSH_USER: ${{ vars.PREVIEW_SSH_USER }}
-          PREVIEW_SSH_PRIVATE_KEY: ${{ secrets.PREVIEW_SSH_PRIVATE_KEY }}
-        run: bun scripts/preview-ssh.ts cleanup "${PR_NUMBER}"
-
-      - name: Retire GitHub preview deployments
-        if: >-
-          always() &&
-          steps.pull.outputs.stale == 'true' &&
-          steps.close.outcome == 'success' &&
-          steps.host_cleanup.outcome == 'success'
+      - name: Retire the GitHub preview deployments
+        if: steps.pull.outputs.stale == 'true' && steps.close.outcome == 'success'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const controller = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview-controller.ts`);
             await controller.retire({ github, context, core });
-
-      - name: Free the slot when only Coolify is still outstanding
-        if: >-
-          always() &&
-          steps.pull.outputs.stale == 'true' &&
-          steps.host_cleanup.outcome == 'success' &&
-          steps.close.outcome != 'success'
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script: |
-            const controller = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview-controller.ts`);
-            await controller.inactivate({ github, context, core });
-
-      - name: Fail if reconciliation could not verify cleanup
-        if: >-
-          always() &&
-          steps.pull.outputs.stale == 'true' &&
-          (steps.close.outcome != 'success' ||
-           steps.host_cleanup.outcome != 'success')
-        run: |
-          echo "::error::Preview reconciliation could not verify complete cleanup."
-          exit 1

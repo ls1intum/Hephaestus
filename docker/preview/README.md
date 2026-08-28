@@ -101,17 +101,13 @@ Set these repository variables:
 | `COOLIFY_APP_UUID` | Preview application UUID |
 | `COOLIFY_PREVIEW_URL_TEMPLATE` | Public web URL containing `{pr}` |
 | `PREVIEW_MAX_ACTIVE` | Concurrent preview limit (optional; defaults to 3) |
-| `PREVIEW_HOST` | SSH hostname used only for cleanup verification |
-| `PREVIEW_HOST_KEY` | Exactly one line, `<host> ssh-ed25519 <key>`, from `ssh-keyscan -t ed25519 <host>`. The host field must equal `PREVIEW_HOST`; other key types are rejected |
-| `PREVIEW_SSH_USER` | Forced-command cleanup account |
 
-Set three repository secrets:
+Set two repository secrets:
 
 | Secret | Scope |
 |---|---|
 | `COOLIFY_PREVIEW_WEBHOOK_SECRET` | Must equal this application's Coolify **Manual Webhook Secret (GitHub)** |
 | `COOLIFY_PREVIEW_READ_TOKEN` | Coolify API token with the `read` ability |
-| `PREVIEW_SSH_PRIVATE_KEY` | Key restricted by `authorized_keys` to the host cleanup command |
 
 The controller needs no Coolify mutation token: the HMAC-authenticated webhook queues deployments and
 requests preview cleanup, and the read token only follows deployment status.
@@ -125,65 +121,21 @@ Each rotation fails closed, so a half-finished one blocks previews rather than w
   Coolify's signature check; the nightly reconcile retries teardown once both agree.
 - **`COOLIFY_PREVIEW_READ_TOKEN`** — issue the new `read` token first, update the secret, then revoke
   the old one. A deploy in flight reports "cannot read deployment status" and the next push retries.
-- **`PREVIEW_SSH_PRIVATE_KEY`** — add the new public key to `authorized_keys` with the same forced
-  command, update the secret, then remove the old entry. Teardown verification fails closed while the
-  key is wrong, which holds the preview's admission slot until it is fixed.
 
 Leaving these unset disables previews. Every preview workflow is guarded on them, so nothing runs and
 nothing fails.
 
-## Host cleanup contract
+## Teardown
 
-Coolify acknowledges preview deletion before remote Docker cleanup is proven — its webhook handler
-queues the teardown and answers in the same breath — so the workflow verifies the host itself. It
-waits for Coolify's own teardown to finish, forces removal of whatever remains, and then checks that
-nothing matching is left. A Coolify 2xx, or a missing preview record, is not proof.
+Closing a pull request, merging it, dropping the `preview` label or converting the pull request to a
+draft sends Coolify a signed close event, and the GitHub deployment is then marked inactive so the
+slot is free. Coolify queues that teardown and answers immediately, so the workflow reports that the
+request was accepted, not that the containers are gone.
 
-Build the cleanup binary with the source hash baked in, so the nightly
-*Preview / Verify host cleanup binary* job can tell whether the installed copy still matches this
-repository:
+Nothing here checks the host. That is a deliberate scope choice, not an oversight: no leaked preview
+stack has been observed, and verifying it would mean a standing SSH credential and a root-owned
+binary installed out of band. If leaks do turn up, the nightly `Preview reconcile` workflow is where
+that check belongs — it already walks every retained preview and re-sends the close event.
 
-```bash
-bun build --compile --target=bun-linux-x64 scripts/preview-host-cleanup.ts \
-  --define CLEANUP_BUILD_ID="'$(shasum -a 256 scripts/preview-host-cleanup.ts | cut -c1-16)'" \
-  --outfile hephaestus-preview-cleanup
-```
-
-Use `--target=bun-linux-arm64` on an ARM host and set the `PREVIEW_HOST_ARCH` repository variable to
-`arm64`; the binary reports its own architecture, so a mismatch is named rather than left as a silent
-failure to run.
-
-Install it as `/usr/local/sbin/hephaestus-preview-cleanup`, root-owned, behind a forced SSH command.
-It accepts `list`, `version`, `prune`, and `cleanup <pr>`. Use an Ed25519 key whose `authorized_keys` entry
-starts with `restrict,command="/usr/local/sbin/hephaestus-preview-cleanup"`. Rebuild and reinstall it
-whenever `scripts/preview-host-cleanup.ts` changes; the nightly job turns red the next morning if you
-forget. Previews keep working meanwhile — cleanup still runs, it just runs an older rule set — so that
-job going red is a next-morning task, not a page.
-
-Write `/etc/hephaestus-preview-cleanup.conf`, root-owned and neither group- nor world-writable — the
-binary refuses to run otherwise, and rejects any key it does not recognise:
-
-```ini
-COOLIFY_APP_UUID=<same value as the COOLIFY_APP_UUID repository variable>
-COOLIFY_APPLICATION_ID=<the numeric id in the application's Coolify URL>
-# Optional. How many five-second rounds to let Coolify finish its own teardown before forcing
-# removal. Defaults to 12; 0 forces immediately, 60 is the maximum.
-COOLIFY_CLEANUP_GRACE_ATTEMPTS=12
-```
-
-Both identifiers name the same application and both are required: the UUID scopes preview volume and
-network names, and the numeric id is the `coolify.applicationId` container label. Cleanup
-removes only resources carrying that label and the deterministic PR suffix, then verifies that no
-matching container, volume, or network remains.
-
-The nightly reconcile runs `prune`, which reclaims dangling image layers. It deliberately does not
-remove unreferenced *tagged* images: preview and staging pull the same repositories on one daemon, and
-an image staging keeps only as a rollback target has no container referencing it either. Superseded
-preview tags therefore accumulate — they share most layers, so growth is slow, but watch disk on the
-host and remove old tags by hand when it matters. A failed check leaves the workflow red so the scheduled
-reconcile run retries.
-
-After host verification, GitHub keeps one inactive cleanup tombstone so the nightly second pass can
-repeat Coolify cleanup before retiring the record; admission ignores only tombstones carrying that
-verified state. The nightly reconcile handles at most 100 candidates per run and warns when it
-truncates — that warning means several nights of backlog, not a single failure.
+Watch the host's disk and container list for the first few weeks. Preview images are pulled per
+commit and are never removed by this system.

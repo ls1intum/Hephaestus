@@ -161,12 +161,11 @@ from underneath it.
 | Timed out waiting for Coolify … | The deploy outlasted its budget. The next push retries; if it keeps happening the host is likely saturated. |
 | The preview host is full (n/m) | Drop the label from one of the named pull requests |
 
-Cleanup sends a signed close event and then verifies on the host that the resources are gone before
-marking the deployment as a verified cleanup tombstone; the nightly repair
+Cleanup sends a signed close event and then marks the deployment inactive; the nightly repair
 repeats Coolify cleanup before retiring that record. Failed cleanup stays blocking, and the repair
 starts from the host inventory rather than an arbitrary date window.
 
-Operator configuration, host capacity, secret scopes, and host cleanup live in
+Operator configuration, host capacity and secret scopes live in
 [`docker/preview/README.md`](https://github.com/ls1intum/Hephaestus/blob/main/docker/preview/README.md);
 why the label is the authority, and which alternatives were priced and declined, is
 [ADR 0035](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0035-pull-request-previews-are-label-gated.md).
@@ -186,7 +185,7 @@ why the label is the authority, and which alternatives were priced and declined,
 | `ci-compose-validate.yml` | PRs, push to main  | Renders the reference and self-host compose stacks so an interpolation or merge break is a red check, not a stranger's bad first boot |
 | `deploy-preview.yml` | `preview` label added, or a push, reopen or ready-for-review on a labelled PR | Waits for this commit's attested CI images, deploys them, and registers the native GitHub deployment |
 | `cleanup-preview.yml` | Label removed, PR closed or drafted | Removes and verifies resources, then retains a cleanup tombstone |
-| `reconcile-previews.yml` | Nightly, manual | Reconciles host resources and GitHub preview environments against PR state, and reports a drifted host cleanup binary |
+| `reconcile-previews.yml` | Nightly, manual | Re-sends teardown for any preview environment whose pull request is closed, drafted or unlabelled |
 | `version-pr.yml`       | Push to main          | Maintains the accumulating Version PR (changesets) |
 | `release.yml`          | On CI/CD Success      | Cuts a release when the Version PR merged: tag + GitHub Release, gates production |
 | `deploy-staging.yml`   | Called by `release.yml` or manual dispatch | Deploys a verified release lock to staging |

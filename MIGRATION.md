@@ -169,10 +169,9 @@ below no longer applies to previews.
    definition has no Docker socket and no staging network.
 2. Turn Coolify's automatic deployment and its repository webhook off, and preview deployments on.
 3. Create a repository label named exactly `preview`.
-4. Set the repository variables and the three scoped secrets listed in the
+4. Set the repository variables and the two scoped secrets listed in the
    [preview runbook](https://github.com/ls1intum/Hephaestus/blob/main/docker/preview/README.md),
    then delete the old broad `COOLIFY_API_TOKEN`.
-5. Install the host cleanup binary behind a forced SSH command, as that runbook describes.
 
 Leaving previews disabled needs no action: without the repository variables, nothing deploys.
 

@@ -79,8 +79,7 @@ const TRUSTED_ASSOCIATIONS = new Set(["COLLABORATOR", "MEMBER", "OWNER"]);
 const COMPARE_FILE_LIMIT = 300;
 const DEFAULT_MAX_ACTIVE = 3;
 const LIVE_STATES = new Set(["in_progress", "pending", "queued", "success"]);
-const CLEANUP_VERIFIED_DESCRIPTION =
-	"Preview host cleanup verified; awaiting Coolify reconciliation.";
+const CLEANUP_VERIFIED_DESCRIPTION = "Preview teardown requested; awaiting Coolify reconciliation.";
 
 const hasPreviewLabel = (pull: PullRequest): boolean =>
 	pull.labels.some((label) => label.name === PREVIEW_LABEL);

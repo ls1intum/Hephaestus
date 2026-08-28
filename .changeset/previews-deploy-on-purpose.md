@@ -6,4 +6,4 @@ Pull request previews are now self-service. Add the `preview` label to a pull re
 
 Preview stacks use their own database, message broker, credentials, and Docker networks, and reach neither the staging Docker socket, its data, nor any integration credential. Previews never run for forks, nor for changes to the deployment workflows themselves. Stacked pull requests each get their own preview.
 
-**Operators:** follow the preview runbook before enabling the Coolify application. It requires a `preview` repository label, a preview-only Coolify application, two scoped Coolify secrets, a forced-command SSH cleanup key, and the repository variables listed there — including the optional `PREVIEW_MAX_ACTIVE` limit. Keep Coolify's automatic repository webhook disabled.
+**Operators:** follow the preview runbook before enabling the Coolify application. It requires a `preview` repository label, a preview-only Coolify application, two scoped Coolify secrets, and the repository variables listed there — including the optional `PREVIEW_MAX_ACTIVE` limit. Keep Coolify's automatic repository webhook disabled.
