@@ -311,6 +311,10 @@ jobs:
       application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       e2e_changed: ${{ (needs.detect-changes.outputs.e2e == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
+  Changesets:
+    if: github.event_name == 'pull_request'
+    uses: ./.github/workflows/verify-changesets.yml
+
   Docker:
     uses: ./.github/workflows/ci-docker-build.yml
     # Image builds consume the detected source tree, not Quality outputs. Running both branches at
@@ -341,7 +345,7 @@ jobs:
     permissions:
       actions: read
       statuses: write
-    needs: [detect-changes, Quality, Security, Test, Docker]
+    needs: [detect-changes, Quality, Security, Test, Changesets, Docker]
     if: always()
     steps:
       - name: Generate workflow timeline
@@ -395,6 +399,7 @@ jobs:
           echo "Quality:        ${{ needs.Quality.result }}"
           echo "Security:       ${{ needs.Security.result }}"
           echo "Test:           ${{ needs.Test.result }}"
+          echo "Changesets:     ${{ needs.Changesets.result }}"
           echo "Docker:         ${{ needs.Docker.result }}"
 
           if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
@@ -441,6 +446,7 @@ jobs:
 
           echo "| Quality | $(result_to_emoji '${{ needs.Quality.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Test | $(result_to_emoji '${{ needs.Test.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Changesets | $(result_to_emoji '${{ needs.Changesets.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Security | $(result_to_emoji '${{ needs.Security.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Docker | $(result_to_emoji '${{ needs.Docker.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -490,6 +496,15 @@ jobs:
               echo "| Application server | \`cd server && ./mvnw test\` |" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "**Tip:** Check the **Test Results** tab above for specific failures." >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "</details>" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            if [[ "${{ needs.Changesets.result }}" == "failure" ]]; then
+              echo "<details><summary><b>❌ Changesets Failed</b></summary>" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "Run \`pnpm run check:changesets\` for policy-test failures; otherwise correct the changeset reported by the job." >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "</details>" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
