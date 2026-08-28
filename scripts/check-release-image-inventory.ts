@@ -52,6 +52,8 @@ if (import.meta.main) {
 	if (
 		typeof inventory !== "object" ||
 		inventory === null ||
+		!("images" in inventory) ||
+		!Array.isArray(inventory.images) ||
 		!("upstream" in inventory) ||
 		!Array.isArray(inventory.upstream)
 	)
@@ -63,19 +65,28 @@ if (import.meta.main) {
 	]
 		.map((path) => readFileSync(path, "utf8"))
 		.join("\n");
+	const knownImages = new Set(
+		inventory.images.filter((image): image is string => typeof image === "string"),
+	);
 	for (const image of inventory.upstream) {
 		if (!isUpstreamImage(image)) throw new Error("malformed upstream image inventory");
-		if (!compose.includes(`@${image.digest}`))
-			throw new Error(`upstream image ${image.name} is not digest-pinned in the deployment`);
+		knownImages.add(image.name);
 	}
-	const upstreamDigests = new Set(
-		inventory.upstream.filter(isUpstreamImage).map((image) => image.digest),
-	);
+	const deployedImages = new Set<string>();
 	for (const match of compose.matchAll(/^\s*image:\s*["']?([^\s"']+)/gm)) {
 		const reference = match[1] ?? "";
-		if (reference.startsWith("ghcr.io/ls1intum/hephaestus/")) continue;
-		const digest = reference.match(/@(sha256:[a-f0-9]{64})$/)?.[1];
-		if (!digest || !upstreamDigests.has(digest))
-			throw new Error(`deployed upstream image is unpinned or missing from evidence: ${reference}`);
+		const variable = reference.match(/^\$\{HEPHAESTUS_IMAGE_([A-Z0-9_]+):\?/)?.[1];
+		const name = variable?.toLowerCase().replaceAll("_", "-");
+		if (!name || !knownImages.has(name))
+			throw new Error(`deployed image does not consume the verified release lock: ${reference}`);
+		deployedImages.add(name);
 	}
+	// Include agent-pi, which the application launches outside Compose.
+	deployedImages.add("agent-pi");
+	const extra = [...knownImages].filter((image) => !deployedImages.has(image));
+	const absent = [...deployedImages].filter((image) => !knownImages.has(image));
+	if (extra.length > 0 || absent.length > 0)
+		throw new Error(
+			`release inventory and production topology differ (extra: ${extra.join(", ") || "none"}; missing: ${absent.join(", ") || "none"})`,
+		);
 }

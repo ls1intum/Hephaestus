@@ -1,6 +1,6 @@
 # ADR 0031: The agent image reference follows the deployment's own image tag
 
-**Status:** Accepted
+**Status:** Superseded by [ADR 0034](0034-signed-release-image-lock.md)
 **Date:** 2026-08-22
 **Authors:** Felix T.J. Dietrich
 **Builds on:** [ADR 0030](0030-agent-runtime-is-typescript-on-bun.md) (the runtime contract the image implements), [ADR 0007](0007-sandbox-spi-shape.md) (the sandbox the image is run through)
@@ -248,4 +248,4 @@ container and without running one.
 - `ci-docker-build.yml` (`agent-pi-build`'s head-SHA tag, which is what a preview derives against)
 - `docker/compose.app.yaml` (`release-pin-fetcher`, and the `HEPHAESTUS_AGENT_IMAGE_REFERENCE`
   passthrough it shares with `docker/compose.core.yaml` and `docker/preview/compose.app.yaml`),
-  [Agent image resolution and pinning](../admin/agent-image-digests.md)
+  [Release image lock](../admin/release-image-lock.md)

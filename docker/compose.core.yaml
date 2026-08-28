@@ -7,7 +7,7 @@ services:
   # (push events aren't manually redeliverable on GitHub/GitLab). See ADR 0008.
   # ─────────────────────────────────────────────────────────────────────────────
   webhook-server:
-    image: "ghcr.io/ls1intum/hephaestus/application-server:${IMAGE_TAG}"
+    image: "${HEPHAESTUS_IMAGE_APPLICATION_SERVER:?verified release lock required}"
     # Bounds heap sizing to this container so co-located JVMs don't oversubscribe host RAM.
     # Must fit the Spring classpath-scan startup spike (well above the small steady footprint),
     # or the JVM OOMs during boot.
@@ -131,7 +131,7 @@ services:
         max-file: "3"
 
   nats-server:
-    image: nats:2.14.6-alpine@sha256:ad7a43eb7e3337c3c38ce5d784d1461791f95f730f252d2b25eee699752a0ca3
+    image: ${HEPHAESTUS_IMAGE_NATS:?verified release lock required}
     restart: unless-stopped
     ports:
       # Loopback-only by default. Set NATS_BIND_HOST=0.0.0.0 (or a specific interface) to let other

@@ -58,7 +58,7 @@ public class AgentImageReferenceGuard {
 
     private static final Pattern DIGEST_PINNED = Pattern.compile("^[^@]+@sha256:[a-f0-9]{64}$");
 
-    private static final String DOCS = "See docs/admin/agent-image-digests.md.";
+    private static final String DOCS = "See docs/admin/release-image-lock.md.";
 
     private static final String FIX =
             "Pin the digest, or leave the reference unset so it follows this deployment's image tag. " + DOCS;

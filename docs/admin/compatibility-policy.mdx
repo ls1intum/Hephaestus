@@ -20,7 +20,7 @@ Semantic versioning applies to the surfaces an operator or API consumer depends 
 | **Database migration chain** | Each startup applies any not-yet-applied Liquibase changesets in changelog order, so a newer release builds on the previous release's schema. Migrations run automatically when the application server starts. |
 | **Runtime prerequisites** | The minimum PostgreSQL major version, the required outbound network destinations, and any required external services. Adding one is a breaking change. |
 | **Configuration keys** | Environment variables and `hephaestus.*` properties documented in the [Install](./install.mdx) guide (base install) and [Integrations & Reference Deployment](./production-setup.mdx) (per-integration bundles). Renames and removals are breaking changes. |
-| **Docker Compose interface** | Service names, image names, the `IMAGE_TAG` convention, and required environment variables of the published compose files — the self-hosted stack (`docker/self-host/compose.yaml`, see the [Install guide](./install.mdx)) and the reference deployment (`docker/compose.app.yaml`, `docker/compose.core.yaml`, `docker/compose.proxy.yaml`). |
+| **Docker Compose interface** | Service names, image names, the signed release-lock contract, and required environment variables of the published compose files — the self-hosted stack (`docker/self-host/compose.yaml`, see the [Install guide](./install.mdx)) and the reference deployment (`docker/compose.app.yaml`, `docker/compose.core.yaml`, `docker/compose.proxy.yaml`). |
 | **REST API** | The endpoints described by the published [OpenAPI specification](https://github.com/ls1intum/Hephaestus/blob/main/server/openapi.yaml). |
 
 Everything else — Java and TypeScript internals, the database schema itself (as opposed to the migration
@@ -70,15 +70,14 @@ provides no dedicated self-hosted support and expects operators to upgrade regul
 
 ## Docker image tags
 
-All images (`webapp`, `application-server`, `agent-pi`, `release-pin-fetcher`, `postgres`) under
+All images (`webapp`, `application-server`, `agent-pi`, `postgres`) under
 `ghcr.io/ls1intum/hephaestus/` are published with:
 
 | Tag | Meaning | Stability |
 | --- | --- | --- |
-| `X.Y.Z` | Exact release | Immutable — pin this in production |
+| `X.Y.Z` | Exact release | Human-readable label; production consumes the signed digest lock |
 | `X.Y` | Latest patch of a minor release | Moves on every patch release |
 | `latest` | Latest release | Moves on every release |
 | `main`, `<sha>` | Unreleased development builds | **Unsupported** — never deploy these |
 
-For the digest-pinned agent image shipped with every release, see
-[Agent image digests](./agent-image-digests.md).
+For digest-pinned release images, see [Release image lock](./release-image-lock.md).

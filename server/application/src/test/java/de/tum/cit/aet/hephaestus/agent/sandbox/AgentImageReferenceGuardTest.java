@@ -55,7 +55,7 @@ class AgentImageReferenceGuardTest extends BaseUnitTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining(reference)
                 .hasMessageContaining("different commit")
-                .hasMessageContaining("docs/admin/agent-image-digests.md");
+                .hasMessageContaining("docs/admin/release-image-lock.md");
     }
 
     /**
@@ -77,7 +77,7 @@ class AgentImageReferenceGuardTest extends BaseUnitTest {
                 .hasMessageContaining(reference)
                 .hasMessageContaining("version series")
                 .hasMessageContaining("different commit")
-                .hasMessageContaining("docs/admin/agent-image-digests.md");
+                .hasMessageContaining("docs/admin/release-image-lock.md");
     }
 
     /** Docker resolves an untagged reference to the release channel, so this is the same defect. */
@@ -102,7 +102,7 @@ class AgentImageReferenceGuardTest extends BaseUnitTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining(reference)
                 .hasMessageContaining("APP_VERSION")
-                .hasMessageContaining("docs/admin/agent-image-digests.md");
+                .hasMessageContaining("docs/admin/release-image-lock.md");
     }
 
     @ParameterizedTest

@@ -1,5 +1,5 @@
 {
-	"images": ["webapp", "application-server", "agent-pi", "release-pin-fetcher", "postgres"],
+	"images": ["webapp", "application-server", "agent-pi", "postgres"],
 	"upstream": [
 		{
 			"name": "alpine",

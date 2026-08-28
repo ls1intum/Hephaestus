@@ -9,11 +9,6 @@ const version = asString(
 
 const edits = [
 	{
-		file: "docker/self-host/.env.example",
-		re: /^IMAGE_TAG=.*$/m,
-		line: `IMAGE_TAG=${version}`,
-	},
-	{
 		file: "docs/admin/install.mdx",
 		re: /^VERSION=\S+(\s+# the release you are installing.*)$/m,
 		line: `VERSION=${version}$1`,

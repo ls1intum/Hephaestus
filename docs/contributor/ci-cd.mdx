@@ -2,19 +2,19 @@
 id: ci-cd
 sidebar_position: 4
 title: CI/CD Architecture
-description: High-performance trunk-based CI/CD with automatic staging and gated production.
+description: High-performance trunk-based CI/CD with release-gated staging and production.
 ---
 
 # CI/CD Architecture
 
-Hephaestus uses trunk-based continuous deployment powered by GitHub Actions. Every merge to `main` triggers automatic staging deployment, with production requiring manual approval.
+Hephaestus uses trunk-based delivery powered by GitHub Actions. Every merge to `main` is verified; signed releases deploy automatically to staging, with production requiring manual approval.
 
 ## 🏗️ Architecture Overview
 
 ```mermaid
 flowchart TD
     accTitle: Pull request delivery pipeline
-    accDescr: An approved pull request merges to main, runs continuous integration and deployment, builds images, and deploys the application.
+    accDescr: An approved change passes CI, enters a Version PR, and becomes a signed release that deploys to staging before production approval.
     PR[Pull Request] --> Review{Code Review}
     Review -->|Approved| Merge[Merge to main]
     Merge --> CI[CI/CD Pipeline]
@@ -29,16 +29,12 @@ flowchart TD
     T --> Pass
     D --> Pass
 
-    Pass -->|Yes| Staging[Deploy Staging]
     Pass -->|Yes| VP[changesets action updates Version PR]
-    VP -->|Maintainer merges Version PR| Tag[Create Tag vX.Y.Z + GitHub Release]
-
-    Tag --> Verify{Verify OK?}
-    Verify -->|Approve| Prod[Deploy Production]
+    VP -->|Maintainer merges Version PR| Release[Build evidence and signed lock]
+    Release --> Verify{Verify release}
+    Verify -->|Pass| Staging[Deploy complete topology to staging]
+    Staging -->|Approve| Prod[Deploy complete topology to production]
 ```
-
-Staging tracks `main` HEAD and production tracks the last released tag, so the two are deliberately
-not the same commit.
 
 ## 🚀 Release Flow
 
@@ -89,12 +85,8 @@ This is more efficient than a custom workflow and doesn't consume CI minutes.
 | Environment       | Protection        | Deploys On     |
 | ----------------- | ----------------- | -------------- |
 | Preview (Coolify) | None              | Every PR       |
-| Staging           | None              | Every green commit on `main` (app services only) |
-| Production        | Approval required | Tag + approval |
-
-Staging deploys the app services only. NATS/webhook (`core`) and the proxy are stateful and
-disruptive to recreate, so they are never auto-deployed; when their compose changes, CD flags it and
-an operator runs the staging deploy manually with the core/proxy switches on.
+| Staging           | None              | Verified signed release |
+| Production        | Approval required | The same verified signed release |
 
 ### GitHub Environment Setup
 
@@ -125,8 +117,7 @@ Coolify handles PR previews:
 | `ci-compose-validate.yml` | PRs, push to main  | Renders the reference and self-host compose stacks so an interpolation or merge break is a red check, not a stranger's bad first boot |
 | `version-pr.yml`       | Push to main          | Maintains the accumulating Version PR (changesets) |
 | `release.yml`          | On CI/CD Success      | Cuts a release when the Version PR merged: tag + GitHub Release, gates production |
-| `cd-staging.yml`       | On CI/CD Success on `main` | Deploys that commit's immutable image to staging |
-| `deploy-staging.yml`   | Called by cd-staging.yml and manual dispatch | Deploys to staging |
+| `deploy-staging.yml`   | Called by `release.yml` or manual dispatch | Deploys a verified release lock to staging |
 | `deploy-prod.yml`      | workflow_dispatch     | Deploys to production (manual trigger)             |
 
 ### Workflow Architecture

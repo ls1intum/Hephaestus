@@ -247,7 +247,7 @@ services:
       # request touched docker/agents/** or a workflow; otherwise set HEPHAESTUS_AGENT_IMAGE_REFERENCE
       # to the agent image the preview should exercise (docker/preview/.env.example). ADR 0031.
       APP_VERSION: ${IMAGE_TAG:-${SOURCE_COMMIT:-}}
-      # Previews run non-release images with no release-pin, so don't require a digest-pinned agent image.
+      # Previews use build tags, so they cannot require a release digest.
       HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: ${HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST:-false}
       # The override the comment above points at. Valueless, as in docker/compose.app.yaml.
       HEPHAESTUS_AGENT_IMAGE_REFERENCE:

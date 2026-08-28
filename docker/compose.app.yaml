@@ -34,7 +34,7 @@ x-scm-access-env: &scm-access-env
 
 services:
   webapp:
-    image: "ghcr.io/ls1intum/hephaestus/webapp:${IMAGE_TAG}"
+    image: "${HEPHAESTUS_IMAGE_WEBAPP:?verified release lock required}"
     environment:
       APPLICATION_VERSION: ${IMAGE_TAG}
       APPLICATION_CLIENT_URL: https://${APP_HOSTNAME}
@@ -91,7 +91,7 @@ services:
   # until the ownership matches — and that surfaces when an agent job first writes there, not at
   # startup. -h so a symlink inside a checkout is retargeted rather than followed out of the volume.
   volume-init:
-    image: alpine:3@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+    image: ${HEPHAESTUS_IMAGE_ALPINE:?verified release lock required}
     command:
       - sh
       - -c
@@ -106,55 +106,9 @@ services:
         max-size: "50m"
         max-file: "5"
 
-  # See docs/admin/agent-image-digests.md.
-  release-pin-fetcher:
-    image: "ghcr.io/ls1intum/hephaestus/release-pin-fetcher:${IMAGE_TAG}"
-    entrypoint: ["/bin/sh", "-c"]
-    # $$ escapes prevent Compose from substituting shell vars; pass through to /bin/sh.
-    command:
-      - |
-        set -eu
-        : "$${IMAGE_TAG:?IMAGE_TAG required}"
-        if [ "$${HEPHAESTUS_RELEASE_PIN_SKIP:-false}" = "true" ]; then
-          rm -f /pin/release-pin.yaml
-          exit 0
-        fi
-        BASE="https://github.com/ls1intum/Hephaestus/releases/download/v$$IMAGE_TAG"
-        ASSET="release-v$$IMAGE_TAG.yaml"
-        TMP=$$(mktemp -d)
-        trap 'rm -rf "$$TMP"' EXIT
-        curl -fsSL --retry 3 --retry-connrefused --connect-timeout 10 --max-time 60 \
-          "$$BASE/$$ASSET"                 -o "$$TMP/pin.yaml"
-        curl -fsSL --retry 3 --retry-connrefused --connect-timeout 10 --max-time 60 \
-          "$$BASE/$$ASSET.sigstore.json"   -o "$$TMP/pin.sigstore.json"
-        cosign verify-blob \
-          --bundle "$$TMP/pin.sigstore.json" \
-          --certificate-identity 'https://github.com/ls1intum/Hephaestus/.github/workflows/release.yml@refs/heads/main' \
-          --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
-          "$$TMP/pin.yaml"
-        grep -Eq '^[[:space:]]+reference:[[:space:]]+[a-z0-9][a-z0-9._/:-]+@sha256:[a-f0-9]{64}$$' "$$TMP/pin.yaml" \
-          || { echo "pin asset is missing a digest-pinned reference" >&2; exit 1; }
-        install -m 0644 "$$TMP/pin.yaml" /pin/release-pin.yaml.new
-        mv /pin/release-pin.yaml.new /pin/release-pin.yaml
-    environment:
-      IMAGE_TAG: ${IMAGE_TAG}
-      HEPHAESTUS_RELEASE_PIN_SKIP: ${HEPHAESTUS_RELEASE_PIN_SKIP:-false}
-    volumes:
-      - release-pin:/pin
-    restart: "no"
-    networks:
-      - shared-network
-    # Same cap as the long-running services in this file. This one writes a few lines per deploy, but
-    # `restart: "no"` means its container — and its log — outlives the run and is only replaced on the
-    # next deploy; a failing cosign verify retries and is the case worth bounding.
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "50m"
-        max-file: "5"
 
   application-server:
-    image: "ghcr.io/ls1intum/hephaestus/application-server:${IMAGE_TAG}"
+    image: "${HEPHAESTUS_IMAGE_APPLICATION_SERVER:?verified release lock required}"
     # Bounds heap sizing to this container; without it the JVM targets host RAM and co-located
     # services oversubscribe and swap. Hosts the NATS sync consumers, so it takes the largest limit.
     mem_limit: ${APPLICATION_SERVER_MEM_LIMIT:-5g}
@@ -261,19 +215,8 @@ services:
       GITLAB_DEFAULT_SERVER_URL: ${GITLAB_DEFAULT_SERVER_URL:-${GITLAB_OAUTH_BASE_URL:-https://gitlab.com}}
       # Agent sandbox (practice review + Pi mentor chat). Activated by the worker role
       # (hephaestus.runtime.worker.enabled), then gated per-workspace via WorkspaceFeatures.
-      # AgentImagePinGuard requires a digest-pinned agent image in prod, and the release-pin-fetcher
-      # supplies that digest for release tags. A non-release deploy has no signed pin, so the server
-      # falls back to agent-pi:${IMAGE_TAG} — the agent image CI built from the very commit this
-      # server image came from. That is a matched pair, but a tag rather than a digest, so a deploy
-      # tracking main sets this false. Keep true for release deploys, where the pin is authoritative
-      # and stronger. Never point this at a release channel instead — see ADR 0031.
       HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: ${HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST:-true}
-      # The operator's override, and the only lever when neither the signed pin nor the derivation
-      # names the right image. Valueless on purpose: Compose then sets it only when the deployment
-      # actually supplies one, from the stack `.env` or the host. `${VAR:-}` would set it to the
-      # empty string instead, and Spring reads present-but-empty as a value rather than as absent —
-      # the reference would bind to "" and every deployment that does not override would fail to boot.
-      HEPHAESTUS_AGENT_IMAGE_REFERENCE:
+      HEPHAESTUS_AGENT_IMAGE_REFERENCE: ${HEPHAESTUS_IMAGE_AGENT_PI:?verified release lock required}
       SANDBOX_DOCKER_HOST: ${SANDBOX_DOCKER_HOST:-unix:///var/run/docker.sock}
       SANDBOX_CONTAINER_RUNTIME: ${SANDBOX_CONTAINER_RUNTIME:-}
       SANDBOX_MAX_CONCURRENT: ${SANDBOX_MAX_CONCURRENT:-5}
@@ -309,8 +252,6 @@ services:
     depends_on:
       postgres:
         condition: service_started
-      release-pin-fetcher:
-        condition: service_completed_successfully
       volume-init:
         condition: service_completed_successfully
     restart: unless-stopped
@@ -321,7 +262,6 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - git-repos:/data/git-repos
-      - release-pin:/pin:ro
     networks:
       - shared-network
     labels:
@@ -377,7 +317,7 @@ services:
 
   # Worker runtime — same image, worker profile, internal-only HTTP proxy, dials the hub over WSS.
   application-worker:
-    image: "ghcr.io/ls1intum/hephaestus/application-server:${IMAGE_TAG}"
+    image: "${HEPHAESTUS_IMAGE_APPLICATION_SERVER:?verified release lock required}"
     # Bounds heap sizing to this container (see application-server).
     mem_limit: ${APPLICATION_WORKER_MEM_LIMIT:-3g}
     environment:
@@ -389,7 +329,7 @@ services:
       HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES:-}
       HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: ${HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST:-true}
       # Valueless, as on application-server above; this is the pod that actually opens sandboxes.
-      HEPHAESTUS_AGENT_IMAGE_REFERENCE:
+      HEPHAESTUS_AGENT_IMAGE_REFERENCE: ${HEPHAESTUS_IMAGE_AGENT_PI:?verified release lock required}
       HEPHAESTUS_HUB_URL: ws://application-server:8080/api/workers/connect
       HEPHAESTUS_WORKER_REGISTRATION_TOKEN: ${HEPHAESTUS_WORKER_REGISTRATION_TOKEN:-}
       # Agent job queue (practice review). The queue runs on PostgreSQL — this pod needs no NATS at
@@ -446,8 +386,6 @@ services:
     depends_on:
       application-server:
         condition: service_started
-      release-pin-fetcher:
-        condition: service_completed_successfully
       volume-init:
         condition: service_completed_successfully
     restart: unless-stopped
@@ -458,7 +396,6 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - git-repos:/data/git-repos
-      - release-pin:/pin:ro
     networks:
       - shared-network
     # 5m drain budget + 1m headroom; matches spring.lifecycle.timeout-per-shutdown-phase.
@@ -478,7 +415,7 @@ services:
         max-file: "5"
 
   postgres:
-    image: "ghcr.io/ls1intum/hephaestus/postgres:${IMAGE_TAG}"
+    image: "${HEPHAESTUS_IMAGE_POSTGRES:?verified release lock required}"
     environment:
       - POSTGRES_DB=hephaestus
       - POSTGRES_PASSWORD=root
@@ -516,4 +453,3 @@ networks:
 volumes:
   postgresql-data:
   git-repos:
-  release-pin:

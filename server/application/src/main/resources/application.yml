@@ -497,14 +497,6 @@ hephaestus:
     # The queue IS the agent_job table — a QUEUED insert is the enqueue, and AgentJobExecutor polls
     # for QUEUED rows on a fixed interval. Disabled by default.
     agent:
-        # Half of one runtime contract shipped as two artifacts: this server stages TypeScript
-        # runners into a workspace and execs `bun` inside this image, so the image has to be a build
-        # that can run them. The tag therefore follows spring.application.version — the IMAGE_TAG the
-        # deploy already chose for the server image — because CI builds agent-pi under that same tag
-        # on every non-pull-request commit. A release replaces this with a cosign-verified digest
-        # through spring.config.import; an operator replaces both with HEPHAESTUS_AGENT_IMAGE_REFERENCE.
-        # Never name a release channel here: `latest` is whatever released most recently, which is a
-        # pairing no release ever produced. ADR 0031.
         image:
             reference: ghcr.io/ls1intum/hephaestus/agent-pi:${spring.application.version}
         enabled: ${AGENT_ENABLED:false}

@@ -1,9 +1,4 @@
 spring:
-    # Pin written by release-pin-fetcher (docker/compose.app.yaml).
-    # AgentImagePinGuard fails closed in prod if missing.
-    config:
-        import: optional:file:/pin/release-pin.yaml
-
     datasource:
         url: jdbc:${DATABASE_URL}
         username: ${DATABASE_USERNAME}
@@ -161,7 +156,6 @@ hephaestus:
     # Sandbox, the agent job queue (PostgreSQL-backed), git checkout, and LLM proxy are
     # configured via env vars in compose.app.yaml. Defaults come from base application.yml.
 
-    # See docs/admin/agent-image-digests.md.
     agent:
         image:
             require-digest: true

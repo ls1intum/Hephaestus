@@ -87,40 +87,10 @@ is never treated as no findings.
 
 ### Operator verification
 
-Install `gh`, `jq`, `cosign`, and GNU `sha256sum`, then use a clean directory and replace `vX.Y.Z`
-below. Verification uses the digests in the release manifest, never mutable tags:
-
-```bash
-gh release download vX.Y.Z --repo ls1intum/Hephaestus
-sha256sum -c SHA256SUMS
-
-jq -r '.subjects[] | [.image, .platform, .digest] | @tsv' manifest.json |
-while IFS=$'\t' read -r image platform digest; do
-  ref="ghcr.io/ls1intum/hephaestus/$image@$digest"
-  suffix=${platform//\//-}
-  cosign verify-attestation --type spdxjson \
-    --certificate-identity 'https://github.com/ls1intum/Hephaestus/.github/workflows/release.yml@refs/heads/main' \
-    --certificate-oidc-issuer https://token.actions.githubusercontent.com "$ref" \
-    > verified-attestations.json
-  jq -e --slurpfile sbom "$image-$suffix.spdx.json" \
-    'any(.[]; (.payload | @base64d | fromjson | .predicate) == $sbom[0])' \
-    verified-attestations.json >/dev/null
-done
-
-jq -r '[.subjects[] | [.image, .indexDigest]] | unique[] | @tsv' manifest.json |
-while IFS=$'\t' read -r image digest; do
-  ref="ghcr.io/ls1intum/hephaestus/$image@$digest"
-  cosign verify "$ref" \
-    --certificate-identity 'https://github.com/ls1intum/Hephaestus/.github/workflows/reusable-docker-build.yml@refs/heads/main' \
-    --certificate-oidc-issuer https://token.actions.githubusercontent.com
-  gh attestation verify "oci://$ref" --owner ls1intum \
-    --signer-workflow ls1intum/Hephaestus/.github/workflows/reusable-docker-build.yml
-done
-```
-
-The downloaded `*.spdx.json` and `*.cdx.json` files are the machine-readable package and license
-inventories. `*.trivy.json` is a point-in-time scan, not a promise that vulnerability knowledge remains
-unchanged.
+The [release image lock](../admin/release-image-lock.md) is the canonical verification procedure. It
+verifies the lock signer and release identity before Compose consumes any digest. The remaining
+release assets provide the per-platform SBOM, vulnerability, license, and index-membership evidence;
+`SHA256SUMS` covers that evidence set.
 
 ## Writing changesets
 
@@ -173,9 +143,8 @@ merge → merge the Version PR.
 
 Version numbers in source manifests stay at their placeholders (`webapp/package.json` and `server/pom.xml`
 are `0.0.0-development`) — the **release version**
-lives in the root `package.json` and is bumped only by the Version PR. At deploy time,
-`APP_VERSION` is set from the image tag via Docker Compose; the application server exposes it as
-`spring.application.version`.
+lives in the root `package.json` and is bumped only by the Version PR. At deploy time, the verified release lock supplies `APP_VERSION`; the application server exposes it
+as `spring.application.version`.
 
 Check the current release: `git describe --tags --abbrev=0` or
 [GitHub Releases](https://github.com/ls1intum/Hephaestus/releases).

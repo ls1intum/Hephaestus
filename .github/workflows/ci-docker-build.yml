@@ -25,11 +25,6 @@ on:
         required: false
         type: string
         default: "true"
-      release_pin_fetcher_changed:
-        description: "Whether release-pin-fetcher image inputs changed"
-        required: false
-        type: string
-        default: "true"
       postgres_image_changed:
         description: "Whether the PostgreSQL image inputs changed"
         required: false
@@ -133,32 +128,6 @@ jobs:
         org.opencontainers.image.licenses=MIT
         hephaestus.component=agent-pi
 
-  release-pin-fetcher-build:
-    name: "Release Pin Fetcher"
-    if: >-
-      inputs.should_skip != 'true' &&
-      (inputs.release_pin_fetcher_changed == 'true' || github.event_name != 'pull_request')
-    uses: ./.github/workflows/reusable-docker-build.yml
-    with:
-      image-name: "ls1intum/hephaestus/release-pin-fetcher"
-      docker-file: "./docker/release-pin-fetcher/Dockerfile"
-      docker-context: "./docker/release-pin-fetcher"
-      registry: "ghcr.io"
-      # amd64-only on PRs (main/release build both arches). See reusable-docker-build.yml.
-      single-arch: ${{ github.event_name == 'pull_request' }}
-      tags: |
-        ${{ github.ref_name }}
-        ${{ github.sha }}
-        ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
-        ci-${{ github.run_number }}
-        ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || '' }}
-      labels: |
-        org.opencontainers.image.title=Hephaestus Release Pin Fetcher
-        org.opencontainers.image.description=Init container that downloads + cosign-verifies the signed release pin asset
-        org.opencontainers.image.vendor=AET TUM
-        org.opencontainers.image.licenses=MIT
-        hephaestus.component=release-pin-fetcher
-
   postgres-build:
     name: "Postgres (pg_partman)"
     if: >-
@@ -192,7 +161,7 @@ jobs:
     if: >-
       inputs.should_skip != 'true' && github.event_name == 'pull_request' &&
       (inputs.webapp_changed != 'true' || inputs.application_server_changed != 'true' ||
-       inputs.agent_images_changed != 'true' || inputs.release_pin_fetcher_changed != 'true' ||
+       inputs.agent_images_changed != 'true' ||
        inputs.postgres_image_changed != 'true')
     runs-on: ubuntu-latest
     outputs:
@@ -216,7 +185,6 @@ jobs:
           WEBAPP_CHANGED: ${{ inputs.webapp_changed }}
           APPLICATION_SERVER_CHANGED: ${{ inputs.application_server_changed }}
           AGENT_IMAGES_CHANGED: ${{ inputs.agent_images_changed }}
-          RELEASE_PIN_FETCHER_CHANGED: ${{ inputs.release_pin_fetcher_changed }}
           POSTGRES_IMAGE_CHANGED: ${{ inputs.postgres_image_changed }}
           PR_NUMBER: ${{ github.event.number }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -260,5 +228,4 @@ jobs:
             echo "application-server-published=true" >> "$GITHUB_OUTPUT"
           fi
           [ "$AGENT_IMAGES_CHANGED" = "true" ] || tag_image agent-pi
-          [ "$RELEASE_PIN_FETCHER_CHANGED" = "true" ] || tag_image release-pin-fetcher
           [ "$POSTGRES_IMAGE_CHANGED" = "true" ] || tag_image postgres
