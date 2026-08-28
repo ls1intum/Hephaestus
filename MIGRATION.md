@@ -194,7 +194,7 @@ HEPHAESTUS_AGENT_IMAGE_REFERENCE=ghcr.io/ls1intum/hephaestus/agent-pi@sha256:<di
 
 A deployment tracking `main` keeps `HEPHAESTUS_RELEASE_PIN_SKIP=true` and
 `HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST=false`; the derived reference is a matched tag, not a digest.
-See [Agent image digests](https://ls1intum.github.io/Hephaestus/admin/agent-image-digests).
+See [Release image lock](https://ls1intum.github.io/Hephaestus/admin/release-image-lock).
 
 #### 🟡 Preview deployments name their own agent image
 
@@ -771,7 +771,7 @@ action:
 **Migration**:
 
 1. Deploy host must reach `github.com`, `fulcio.sigstore.dev`, `rekor.sigstore.dev`, and `tuf-repo-cdn.sigstore.dev` over HTTPS.
-2. Remove `docker/agent-image-pin.local.env`. Use `application-local.yml` or a shell env var instead — see [Agent image digests](https://github.com/ls1intum/Hephaestus/blob/main/docs/admin/agent-image-digests.md).
+2. Remove `docker/agent-image-pin.local.env`. Use `application-local.yml` or a shell env var instead — see [Release image lock](https://github.com/ls1intum/Hephaestus/blob/main/docs/admin/release-image-lock.md).
 3. Confirm `HEPHAESTUS_AGENT_IMAGE_REFERENCE` is not pre-set in your deploy substrate; an unintended value shadows the verified pin.
 4. Rolling back to a pre-v0.69.0 release: set `HEPHAESTUS_RELEASE_PIN_SKIP=true` plus an explicit `HEPHAESTUS_AGENT_IMAGE_REFERENCE=...@sha256:<digest>` env override on the init service.
 
@@ -794,7 +794,7 @@ HEPHAESTUS_MENTOR_AGENT_PULL_POLICY=IF_NOT_PRESENT
 **Migration**:
 
 1. Drop the four old env vars from your prod configuration.
-2. See [Agent image digests](https://github.com/ls1intum/Hephaestus/blob/main/docs/admin/agent-image-digests.md) for verification + rollback.
+2. See [Release image lock](https://github.com/ls1intum/Hephaestus/blob/main/docs/admin/release-image-lock.md) for verification + rollback.
 
 ---
 

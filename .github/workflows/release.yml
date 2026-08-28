@@ -142,7 +142,7 @@ jobs:
       packages: write
       id-token: write
       attestations: write
-      contents: write # gh release upload (release pin asset)
+      contents: write # gh release upload (release image lock)
     outputs:
       agent-pi-digest: ${{ steps.retag.outputs.agent-pi-digest }}
       application-server-digest: ${{ steps.retag.outputs.application-server-digest }}
@@ -334,44 +334,38 @@ jobs:
               --signer-workflow '${{ github.repository }}/.github/workflows/reusable-docker-build.yml' >/dev/null
           done < release-images.tsv
 
-      - name: Write release pin asset
+      - name: Write release image lock
         id: pin
         env:
           VERSION: ${{ needs.release.outputs.version }}
-          AGENT_DIGEST: ${{ steps.retag.outputs.agent-pi-digest }}
         run: |
           set -euo pipefail
-          ASSET="release-v${VERSION}.yaml"
-          cat > "$ASSET" <<EOF
-          hephaestus:
-            agent:
-              image:
-                reference: ghcr.io/ls1intum/hephaestus/agent-pi@${AGENT_DIGEST}
-          EOF
+          ASSET="release-v${VERSION}.json"
+          jq '{schemaVersion, release, commit,
+            images: [.subjects[]]
+              | group_by(.image)
+              | map({image: .[0].image, repository: .[0].repository, provenance: .[0].provenance,
+                  indexDigest: .[0].indexDigest,
+                  platforms: (map({key: .platform, value: .digest}) | from_entries)})}' \
+            evidence/manifest.json > "$ASSET"
+          bun scripts/release-image-lock.ts "$ASSET" evidence/manifest.json \
+            "v${VERSION}" /tmp/release-lock.env
           echo "asset-path=$ASSET" >> "$GITHUB_OUTPUT"
-          cat "$ASSET"
+          jq . "$ASSET"
 
       - name: Generate subject checksums
         id: subjects
         env:
           ASSET: ${{ steps.pin.outputs.asset-path }}
-          APP_DIGEST: ${{ steps.retag.outputs.application-server-digest }}
-          AGENT_DIGEST: ${{ steps.retag.outputs.agent-pi-digest }}
         run: |
-          # shasum-format: '<hex>  <name>'. Names must be plain identifiers
-          # (no URL chars) — actions/attest forwards them verbatim into the
-          # in-toto subject.name field.
           set -euo pipefail
-          {
-            printf '%s  %s\n' "${APP_DIGEST#sha256:}"   "application-server"
-            printf '%s  %s\n' "${AGENT_DIGEST#sha256:}" "agent-pi"
-            printf '%s  %s\n' "$(sha256sum "$ASSET" | awk '{print $1}')" "$ASSET"
-          } > subjects.sha256
+          while IFS=$'\t' read -r image digest; do
+            printf '%s  %s\n' "${digest#sha256:}" "$image"
+          done < release-images.tsv > subjects.sha256
+          sha256sum "$ASSET" >> subjects.sha256
           cat subjects.sha256
 
-      - name: Attest release pin
-        # Version belongs inside the purl, not as a top-level field.
-        # https://github.com/in-toto/attestation/blob/main/spec/predicates/release.md
+      - name: Attest release image lock
         uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
         with:
           subject-checksums: subjects.sha256
@@ -379,7 +373,7 @@ jobs:
           predicate: |
             { "purl": "pkg:github/ls1intum/hephaestus@${{ needs.release.outputs.tag_name }}" }
 
-      - name: Sign release pin asset
+      - name: Sign release image lock
         env:
           ASSET: ${{ steps.pin.outputs.asset-path }}
         run: |
@@ -387,7 +381,6 @@ jobs:
           cosign sign-blob --yes --bundle "${ASSET}.sigstore.json" "$ASSET"
 
       - name: Verify signature with the deploy-side identity (fail fast)
-        # Keep this identity aligned with docker/compose.app.yaml.
         env:
           ASSET: ${{ steps.pin.outputs.asset-path }}
         run: |
@@ -398,7 +391,7 @@ jobs:
             --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
             "$ASSET"
 
-      - name: Upload release pin asset to GitHub Release
+      - name: Upload release image lock to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG_NAME: ${{ needs.release.outputs.tag_name }}
@@ -407,7 +400,6 @@ jobs:
           set -euo pipefail
           gh release upload "$TAG_NAME" \
             "$ASSET" "${ASSET}.sigstore.json" evidence/* \
-            --clobber \
             --repo "${{ github.repository }}"
 
   publish-release:
@@ -450,6 +442,14 @@ jobs:
           for file in manifest.json release-images.json tool-versions.json trivy-db.json vulnerability-policy.json; do
             test -s "evidence/$file"
           done
+          lock="release-${TAG_NAME}.json"
+          cosign verify-blob \
+            --bundle "evidence/$lock.sigstore.json" \
+            --certificate-identity 'https://github.com/ls1intum/Hephaestus/.github/workflows/release.yml@refs/heads/main' \
+            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+            "evidence/$lock"
+          bun scripts/release-image-lock.ts "evidence/$lock" evidence/manifest.json \
+            "$TAG_NAME" /tmp/release-lock.env
           jq -e --slurpfile inventory evidence/release-images.json \
             '.schemaVersion == 1 and
              ([.subjects[].image] | unique == (($inventory[0].images + [$inventory[0].upstream[].name]) | sort)) and
@@ -494,7 +494,7 @@ jobs:
             gh attestation verify "oci://$ref" --owner "${{ github.repository_owner }}" \
               --signer-workflow '${{ github.repository }}/.github/workflows/reusable-docker-build.yml' >/dev/null
           done
-          asset="evidence/release-${TAG_NAME}.yaml"
+          asset="evidence/release-${TAG_NAME}.json"
           cosign verify-blob --bundle "${asset}.sigstore.json" \
             --certificate-identity 'https://github.com/ls1intum/Hephaestus/.github/workflows/release.yml@refs/heads/main' \
             --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' "$asset" >/dev/null
@@ -524,21 +524,21 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG_NAME: ${{ needs.release.outputs.tag_name }}
-        run: gh release edit "$TAG_NAME" --repo "${{ github.repository }}" --draft=false
+        run: |
+          set -euo pipefail
+          gh release edit "$TAG_NAME" --repo "${{ github.repository }}" --draft=false
+          [ "$(gh release view "$TAG_NAME" --repo "${{ github.repository }}" --json isImmutable --jq .isImmutable)" = true ] || {
+            echo "::error::Repository immutable releases must be enabled before publishing"; exit 1; }
 
   deploy-staging:
     needs: [release, tag-images, publish-release]
     if: needs.release.outputs.released == 'true'
     uses: ./.github/workflows/deploy-staging.yml
-    # Required by the called deployment workflow.
     permissions:
       contents: read
       packages: read
     with:
-      image-tag: ${{ needs.release.outputs.version }}
-      deploy-app: true
-      deploy-core: false
-      deploy-proxy: false
+      image-tag: ${{ needs.release.outputs.tag_name }}
     secrets: inherit
 
   deploy-production:
@@ -557,10 +557,7 @@ jobs:
               workflow_id: 'deploy-prod.yml',
               ref: 'main',
               inputs: {
-                'image-tag': '${{ needs.release.outputs.version }}',
-                'deploy-app': 'true',
-                'deploy-core': 'false',
-                'deploy-proxy': 'false'
+                'image-tag': '${{ needs.release.outputs.tag_name }}'
               }
             });
             console.log('✅ Production deployment triggered for ${{ needs.release.outputs.tag_name }}');

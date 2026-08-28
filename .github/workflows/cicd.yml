@@ -25,7 +25,6 @@ jobs:
       application-server-image: ${{ steps.filter.outputs.application-server-image }}
       e2e: ${{ steps.filter.outputs.e2e }}
       agent-images: ${{ steps.filter.outputs.agent-images }}
-      release-pin-fetcher: ${{ steps.filter.outputs.release-pin-fetcher }}
       postgres-image: ${{ steps.filter.outputs.postgres-image }}
       docs: ${{ steps.filter.outputs.docs }}
       ci-config: ${{ steps.filter.outputs.ci-config }}
@@ -138,8 +137,6 @@ jobs:
               - '.github/actions/setup-bun/**'
             agent-images:
               - 'docker/agents/**'
-            release-pin-fetcher:
-              - 'docker/release-pin-fetcher/**'
             postgres-image:
               - 'docker/postgres/**'
             docs:
@@ -324,7 +321,6 @@ jobs:
       webapp_changed: ${{ (needs.detect-changes.outputs.webapp-image == 'true' || needs.detect-changes.outputs.docker-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       application_server_changed: ${{ (needs.detect-changes.outputs.application-server-image == 'true' || needs.detect-changes.outputs.docker-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       agent_images_changed: ${{ (needs.detect-changes.outputs.agent-images == 'true' || needs.detect-changes.outputs.docker-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
-      release_pin_fetcher_changed: ${{ (needs.detect-changes.outputs.release-pin-fetcher == 'true' || needs.detect-changes.outputs.docker-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       postgres_image_changed: ${{ (needs.detect-changes.outputs.postgres-image == 'true' || needs.detect-changes.outputs.docker-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
   all-ci-passed:

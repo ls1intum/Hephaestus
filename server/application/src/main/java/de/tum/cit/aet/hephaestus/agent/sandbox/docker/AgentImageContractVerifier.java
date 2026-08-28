@@ -76,7 +76,7 @@ public class AgentImageContractVerifier {
         if (declared == null) {
             log.error(
                     "Agent image {} declares no {} label, so it predates the runtime contract this server stages "
-                            + "for (v{}). It cannot be a build matching this server. See docs/admin/agent-image-digests.md.",
+                            + "for (v{}). It cannot be a build matching this server. See docs/admin/release-image-lock.md.",
                     image,
                     SandboxLayout.RUNTIME_CONTRACT_LABEL,
                     expected);
@@ -85,7 +85,7 @@ public class AgentImageContractVerifier {
         if (!declared.equals(Integer.toString(expected))) {
             log.error(
                     "Agent image {} implements runtime contract v{} but this server stages for v{} (image bun={}, pi={}). "
-                            + "Practice reviews and mentor sessions in this image will fail. See docs/admin/agent-image-digests.md.",
+                            + "Practice reviews and mentor sessions in this image will fail. See docs/admin/release-image-lock.md.",
                     image,
                     declared,
                     expected,

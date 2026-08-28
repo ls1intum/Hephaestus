@@ -1,0 +1,153 @@
+name: Deploy locked Docker Compose
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        required: true
+      release:
+        type: string
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Verify release lock
+        id: lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE: ${{ inputs.release }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || {
+            echo "::error::Deploy an immutable vX.Y.Z release, not '$RELEASE'"; exit 1; }
+          asset="release-${RELEASE}.json"
+          mkdir "$RUNNER_TEMP/verified-release"
+          gh release download "$RELEASE" --repo "${{ github.repository }}" \
+            --dir "$RUNNER_TEMP/verified-release" --pattern "$asset" \
+            --pattern "$asset.sigstore.json" --pattern manifest.json
+          cosign verify-blob \
+            --bundle "$RUNNER_TEMP/verified-release/$asset.sigstore.json" \
+            --certificate-identity \
+              'https://github.com/ls1intum/Hephaestus/.github/workflows/release.yml@refs/heads/main' \
+            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+            "$RUNNER_TEMP/verified-release/$asset"
+          commit=$(jq -er '.commit | select(test("^[a-f0-9]{40}$"))' \
+            "$RUNNER_TEMP/verified-release/$asset")
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+
+      # Check out the signed lock's source commit before running repository code with secrets.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.lock.outputs.commit }}
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-bun
+
+      - name: Validate and render release topology
+        env:
+          RELEASE: ${{ inputs.release }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          VARS_CONTEXT: ${{ toJson(vars) }}
+          SECRET_GH_APP_PRIVATE_KEY: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          SECRET_GH_AUTH_TOKEN: ${{ secrets.GH_AUTH_TOKEN }}
+          SECRET_GH_OAUTH_CLIENT_SECRET: ${{ secrets.GH_OAUTH_CLIENT_SECRET }}
+          SECRET_GITLAB_OAUTH_CLIENT_SECRET: ${{ secrets.GITLAB_OAUTH_CLIENT_SECRET }}
+          SECRET_HEPHAESTUS_AUTH_BOOTSTRAP_TOKEN: ${{ secrets.HEPHAESTUS_AUTH_BOOTSTRAP_TOKEN }}
+          SECRET_HEPHAESTUS_AUTH_STATE_COOKIE_KEY: ${{ secrets.HEPHAESTUS_AUTH_STATE_COOKIE_KEY }}
+          SECRET_HEPHAESTUS_INTEGRATION_SLACK_CLIENT_SECRET: ${{ secrets.HEPHAESTUS_INTEGRATION_SLACK_CLIENT_SECRET }}
+          SECRET_HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET: ${{ secrets.HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET }}
+          SECRET_HEPHAESTUS_SECURITY_ENCRYPTION_KEY: ${{ secrets.HEPHAESTUS_SECURITY_ENCRYPTION_KEY }}
+          SECRET_HEPHAESTUS_WORKER_REGISTRATION_TOKEN: ${{ secrets.HEPHAESTUS_WORKER_REGISTRATION_TOKEN }}
+          SECRET_OUTLINE_OAUTH_CLIENT_SECRET: ${{ secrets.OUTLINE_OAUTH_CLIENT_SECRET }}
+          SECRET_POSTHOG_PERSONAL_API_KEY: ${{ secrets.POSTHOG_PERSONAL_API_KEY }}
+          SECRET_POSTHOG_PROJECT_API_KEY: ${{ secrets.POSTHOG_PROJECT_API_KEY }}
+          SECRET_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SECRET_WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+        run: |
+          set -euo pipefail
+          asset="release-${RELEASE}.json"
+          bun scripts/release-image-lock.ts "$RUNNER_TEMP/verified-release/$asset" \
+            "$RUNNER_TEMP/verified-release/manifest.json" "$RELEASE" release-lock.env
+
+          render() {
+            local name=$1 compose=$2
+            mkdir -p "deployment/$name"
+            local allowed
+            allowed=$(docker compose -f "$compose" config --variables --format json | jq 'keys')
+            {
+              printf 'ENVIRONMENT=%s\n' "$ENVIRONMENT"
+              cat release-lock.env
+              jq -n 'env | with_entries(select(.key | startswith("SECRET_")))' |
+                jq -r --argjson allowed "$allowed" '
+                  to_entries[] | (.key | ltrimstr("SECRET_")) as $key |
+                  select($allowed | index($key)) | "\($key)=\(.value | @json)"'
+              jq -r --argjson allowed "$allowed" '
+                to_entries[] | select(.key as $key | $allowed | index($key)) |
+                "\(.key)=\(.value | @json)"' <<<"$VARS_CONTEXT"
+            } > "deployment/$name/deployment.env"
+            chmod 600 "deployment/$name/deployment.env"
+            local rendered="$RUNNER_TEMP/$name-rendered.json"
+            docker compose --env-file "deployment/$name/deployment.env" -f "$compose" \
+              config --format json > "$rendered"
+            jq -e --slurpfile lock "$RUNNER_TEMP/verified-release/$asset" '
+              [$lock[0].images[] | (.repository + "@" + .indexDigest)] as $allowed |
+              [.services[].image] | all(.[]; IN($allowed[]))' \
+              "$rendered" >/dev/null
+            cp "$compose" "deployment/$name/compose.yaml"
+          }
+
+          render proxy docker/compose.proxy.yaml
+          render core docker/compose.core.yaml
+          render app docker/compose.app.yaml
+
+      - name: Copy verified deployment inputs
+        uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1.0.0
+        with:
+          host: ${{ vars.VM_HOST }}
+          username: ${{ vars.VM_USERNAME }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          proxy_host: ${{ vars.DEPLOYMENT_GATEWAY_HOST }}
+          proxy_username: ${{ vars.DEPLOYMENT_GATEWAY_USER }}
+          proxy_key: ${{ secrets.DEPLOYMENT_GATEWAY_SSH_KEY }}
+          proxy_port: ${{ vars.DEPLOYMENT_GATEWAY_PORT }}
+          source: deployment
+          target: /opt/hephaestus
+          strip_components: 1
+
+      - name: Deploy verified topology
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
+        with:
+          host: ${{ vars.VM_HOST }}
+          username: ${{ vars.VM_USERNAME }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          proxy_host: ${{ vars.DEPLOYMENT_GATEWAY_HOST }}
+          proxy_username: ${{ vars.DEPLOYMENT_GATEWAY_USER }}
+          proxy_key: ${{ secrets.DEPLOYMENT_GATEWAY_SSH_KEY }}
+          proxy_port: ${{ vars.DEPLOYMENT_GATEWAY_PORT }}
+          command_timeout: 30m
+          script: |
+            set -euo pipefail
+            for stack in proxy core app; do
+              cd "/opt/hephaestus/$stack"
+              chmod 600 deployment.env
+              docker compose --env-file deployment.env -f compose.yaml config >/dev/null
+              docker compose --env-file deployment.env -f compose.yaml pull
+              if [ "$stack" = core ]; then
+                docker compose --env-file deployment.env -f compose.yaml up -d \
+                  --force-recreate nats-server
+              fi
+              docker compose --env-file deployment.env -f compose.yaml up -d --remove-orphans \
+                --wait --wait-timeout 600
+            done

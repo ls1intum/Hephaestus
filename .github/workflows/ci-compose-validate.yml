@@ -23,6 +23,8 @@ jobs:
   validate:
     name: "Render compose stacks"
     runs-on: ubuntu-latest
+    env:
+      COMPOSE_ENV_FILES: .env,release-lock.env
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -42,6 +44,13 @@ jobs:
             -e 's|^HEPHAESTUS_AUTH_STATE_COOKIE_KEY=$|HEPHAESTUS_AUTH_STATE_COOKIE_KEY=Y2ktbm90LWEtcmVhbC1zdGF0ZS1jb29raWUta2V5|' \
             -e 's|^WEBHOOK_SECRET=$|WEBHOOK_SECRET=ci000000000000000000000000000000000|' \
             .env
+          while IFS= read -r image; do
+            name="HEPHAESTUS_IMAGE_${image^^}"
+            name=${name//-/_}
+            printf '%s=%s@sha256:%s\n' "$name" "example.invalid/${image}" "$(printf '0%.0s' {1..64})" >> release-lock.env
+          done < <(jq -r '.images[], .upstream[].name' ../../security/release-images.json)
+          printf 'IMAGE_TAG=0.0.0\nHEPHAESTUS_RELEASE=v0.0.0\nHEPHAESTUS_RELEASE_COMMIT=%s\n' \
+            "$(printf '0%.0s' {1..40})" >> release-lock.env
           docker compose config > /dev/null
           echo "Rendered services:"
           docker compose config --services | sort
@@ -81,16 +90,6 @@ jobs:
           [ "$published" = "80 443 " ] || {
             echo "::error::reverse-proxy publishes '$published', expected '80 443 ' — !override was ignored"; exit 1; }
 
-      - name: Assert the pinned release version has not drifted
-        run: |
-          set -euo pipefail
-          # scripts/sync-release-version.ts keeps these equal to the release on
-          # every Version PR; a mismatch means someone edited one by hand.
-          pkg=$(jq -r '.version' package.json)
-          env_tag=$(grep -m1 '^IMAGE_TAG=' docker/self-host/.env.example | cut -d= -f2)
-          [ "$pkg" = "$env_tag" ] || {
-            echo "::error::IMAGE_TAG=$env_tag in .env.example != package.json $pkg (run scripts/sync-release-version.ts)"; exit 1; }
-
       - name: Render the reference deployment
         working-directory: docker
         run: |
@@ -99,4 +98,4 @@ jobs:
           # still render, not that they are correct for production.
           docker compose \
             -f compose.proxy.yaml -f compose.core.yaml -f compose.app.yaml \
-            --env-file self-host/.env config --quiet
+            --env-file self-host/.env --env-file self-host/release-lock.env config --quiet

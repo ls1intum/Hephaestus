@@ -65,5 +65,4 @@ timestamp.
   after a restore from an old backup: `docker compose down`,
   `docker volume rm hephaestus_nats-data`, `docker compose up -d` — events in the gap are
   re-fetched by the scheduled sync.
-- **Restore into an older app version:** don't. Restore with the same `IMAGE_TAG` the
-  backup was taken from, then upgrade.
+- **Restore into an older app version:** don't. Restore with the same signed release lock the backup was taken from, then upgrade.

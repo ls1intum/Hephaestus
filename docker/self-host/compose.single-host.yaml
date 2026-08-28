@@ -102,12 +102,6 @@ services:
       # querying a pre-migration schema on a cold start.
       application-server:
         condition: service_healthy
-      release-pin-fetcher:
-        condition: service_completed_successfully
-    volumes:
-      # AgentImagePinGuard loads in every prod container and fails the boot
-      # unless the digest pin is readable.
-      - release-pin:/pin:ro
 
   postgres:
     environment:
