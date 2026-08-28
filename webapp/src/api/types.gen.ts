@@ -3101,7 +3101,7 @@ export type PracticeTraceEntry = {
      * That occurrence's id in this trace's signals list. The name alone cannot identify it — the same signal recurs on every revision — so this is what a link should follow.
      */
     occasionedById?: string;
-    outcome: 'REVIEWED' | 'RUNNING' | 'PENDING' | 'SKIPPED' | 'NOT_ASSESSABLE' | 'TURNED_OFF' | 'NOT_OCCASIONED' | 'DORMANT' | 'LAPSED' | 'FAILED';
+    outcome: 'REVIEWED' | 'RUNNING' | 'PENDING' | 'SKIPPED' | 'NOT_REACHED' | 'NOT_ASSESSABLE' | 'TURNED_OFF' | 'NOT_OCCASIONED' | 'DORMANT' | 'LAPSED' | 'FAILED';
     practiceName: string;
     practiceSlug: string;
     /**

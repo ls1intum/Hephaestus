@@ -18,6 +18,7 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
     private static final List<String> SIDECARS = List.of(
             "pi-error-text.ts",
             "pi-observation-normalize.ts",
+            "pi-practice-coverage.ts",
             "pi-runner-usage.ts",
             "pi-runner-timings.ts",
             "pi-runner-composition.ts",

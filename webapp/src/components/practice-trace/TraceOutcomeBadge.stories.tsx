@@ -19,17 +19,13 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
-/**
- * The words on every badge, in the order the outcome union declares them.
- *
- * Written out rather than read back off `TRACE_OUTCOME_DEFS`: an outcome the server adds, or a label
- * changed to something a reader cannot act on, has to show up here as a diff somebody approved.
- */
+// Kept explicit so vocabulary and label changes remain reviewable.
 const EVERY_LABEL = [
 	"Reviewed",
 	"Running",
 	"Waiting",
 	"Skipped",
+	"Not reached",
 	"Couldn't assess",
 	"Turned off",
 	"Not triggered",

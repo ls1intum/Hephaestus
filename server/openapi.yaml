@@ -12408,6 +12408,7 @@ components:
           - RUNNING
           - PENDING
           - SKIPPED
+          - NOT_REACHED
           - NOT_ASSESSABLE
           - TURNED_OFF
           - NOT_OCCASIONED
