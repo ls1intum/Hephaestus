@@ -2,7 +2,7 @@
 
 This document defines how an evaluation reconstructs a practice review. Exact columns and domain values
 belong to the Java model and
-[Liquibase changelogs](https://github.com/ls1intum/Hephaestus/tree/main/server/src/main/resources/db/changelog),
+[Liquibase changelogs](https://github.com/ls1intum/Hephaestus/tree/main/server/application/src/main/resources/db/changelog),
 not here. The [generated database schema](./database-schema.mdx) provides the structural view.
 
 ## Per-review provenance
@@ -40,9 +40,9 @@ reproducible.
 ## Delivery evidence
 
 Every composed piece of feedback that reaches the delivery layer has a `feedback` row. The Java
-[`FeedbackDeliveryState`](https://github.com/ls1intum/Hephaestus/blob/main/server/src/main/java/de/tum/cit/aet/hephaestus/practices/feedback/FeedbackDeliveryState.java)
+[`FeedbackDeliveryState`](https://github.com/ls1intum/Hephaestus/blob/main/server/application/src/main/java/de/tum/cit/aet/hephaestus/practices/feedback/FeedbackDeliveryState.java)
 and
-[`FeedbackSuppressionReason`](https://github.com/ls1intum/Hephaestus/blob/main/server/src/main/java/de/tum/cit/aet/hephaestus/practices/feedback/FeedbackSuppressionReason.java)
+[`FeedbackSuppressionReason`](https://github.com/ls1intum/Hephaestus/blob/main/server/application/src/main/java/de/tum/cit/aet/hephaestus/practices/feedback/FeedbackSuppressionReason.java)
 types own the domain values; Liquibase owns the persisted constraints.
 
 `DELIVERED` and `SUPERSEDED` prove that a placement was recorded. They do not prove that a person read
@@ -59,9 +59,10 @@ silently dropping it.
   suppression reason. A link to delivered or superseded feedback proves placement. Links only to
   prepared, suppressed, or failed feedback do not. No link means no feedback was composed from that
   observation.
-- **Reaction to delivered evidence:** join `reaction.feedback_id` to feedback, then through
-  `feedback_observation` to its observations. Reactions are accepted only for delivered feedback; a later
-  review may supersede that feedback.
+- **Response to delivered evidence:** join `reaction.feedback_id` to feedback, then through
+  `feedback_observation` to its observations. The latest append-only row carries perceived usefulness,
+  resolution, or both. Responses are accepted only for delivered feedback; a later review may supersede
+  that feedback.
 - **Feedback to posted location:** join `feedback_placement` and inspect `posted_comment_ref` or
   `chat_message_id`.
 

@@ -16,7 +16,10 @@ import {
 } from "graphql";
 import { isRecord, parseJson } from "./lib/json.ts";
 
-const SCHEMA_DIR = resolve(import.meta.dirname, "../server/src/main/resources/graphql/gitlab");
+const SCHEMA_DIR = resolve(
+	import.meta.dirname,
+	"../server/generated-clients/src/main/resources/graphql/gitlab",
+);
 const SCHEMA_FILE = join(SCHEMA_DIR, "schema.gitlab.graphql");
 const DEFAULT_GITLAB_URL = "https://gitlab.lrz.de";
 
@@ -214,7 +217,9 @@ async function main(): Promise<void> {
 		console.log(`Downloaded ${Math.round(stats.size / 1_048_576)}MB`);
 		renameSync(tempFile, SCHEMA_FILE);
 		console.log(`Schema updated successfully: ${SCHEMA_FILE}`);
-		console.log("\nTo regenerate types: cd server && ./mvnw compile -DskipTests");
+		console.log(
+			"\nTo regenerate types: cd server && ./mvnw -pl generated-clients -am compile -DskipTests",
+		);
 	} catch (error) {
 		try {
 			unlinkSync(tempFile);

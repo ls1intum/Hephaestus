@@ -14,8 +14,8 @@ const describeWhatAndWhy: CatalogPracticeSummary = {
 	slug: "describe-what-and-why",
 	name: "Describe what changed and why",
 	artifactKind: "scm.pull_request",
-	areaSlug: "review-ready-work",
-	areaName: "Review-ready work",
+	groupSlug: "review-ready-work",
+	groupName: "Review-ready work",
 	availability: "AVAILABLE",
 	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 };
@@ -24,8 +24,8 @@ const reviewScope: CatalogPracticeSummary = {
 	slug: "review-scope",
 	name: "Keep pull requests focused",
 	artifactKind: "scm.pull_request",
-	areaSlug: "review-ready-work",
-	areaName: "Review-ready work",
+	groupSlug: "review-ready-work",
+	groupName: "Review-ready work",
 	availability: "ADOPTED",
 	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 };
@@ -49,8 +49,8 @@ const meta = {
 	title: "Workspace admin/Practice adoption/Available practices",
 	component: AvailablePracticeList,
 	parameters: { layout: "padded" },
-	args: { practices, existingAreaSlugs: new Set(["review-ready-work"]) },
-	argTypes: { existingAreaSlugs: { control: false } },
+	args: { practices, existingGroupSlugs: new Set(["review-ready-work"]) },
+	argTypes: { existingGroupSlugs: { control: false } },
 	tags: ["autodocs"],
 } satisfies Meta<typeof AvailablePracticeList>;
 
@@ -66,13 +66,13 @@ export const Default: Story = {
 			detailParamOf(canvas.getByRole("link", { name: /Describe what changed and why/ })),
 		).toBe('["catalog-practice:describe-what-and-why"]');
 		await expect(detailParamOf(canvas.getByRole("link", { name: /Review 1 practice/ }))).toBe(
-			'["catalog-area:review-ready-work"]',
+			'["catalog-group:review-ready-work"]',
 		);
 	},
 };
 
-export const DeletedAreaStillHasSomethingToAdd: Story = {
-	args: { existingAreaSlugs: new Set() },
+export const DeletedGroupStillHasSomethingToAdd: Story = {
+	args: { existingGroupSlugs: new Set() },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("link", { name: /Review group · 1 practice/ })).toBeVisible();
 		await expect(
@@ -81,8 +81,8 @@ export const DeletedAreaStillHasSomethingToAdd: Story = {
 	},
 };
 
-export const DeletedAreaCanOnlyBeRestored: Story = {
-	args: { practices: [reviewScope], existingAreaSlugs: new Set() },
+export const DeletedGroupCanOnlyBeRestored: Story = {
+	args: { practices: [reviewScope], existingGroupSlugs: new Set() },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("link", { name: /Restore group · 1 practice/ })).toBeVisible();
 	},
@@ -108,7 +108,7 @@ export const LongContent: Story = {
 			{
 				...describeWhatAndWhy,
 				name: "Explain architectural trade-offs, operational constraints, and the evidence behind the chosen implementation",
-				areaName: "Decisions, documentation, and long-lived operational knowledge",
+				groupName: "Decisions, documentation, and long-lived operational knowledge",
 			},
 		],
 	},

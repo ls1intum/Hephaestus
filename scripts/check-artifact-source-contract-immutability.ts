@@ -14,7 +14,7 @@ const repoRoot = execFileSync("git", ["rev-parse", "--show-toplevel"], {
 	encoding: "utf8",
 	env,
 }).trim();
-const root = "server/src/main/resources/contracts/artifact-source";
+const root = "server/application/src/main/resources/contracts/artifact-source";
 const baseRef =
 	process.env.CONTRACT_BASE_REF ??
 	(process.env.GITHUB_BASE_REF ? `origin/${process.env.GITHUB_BASE_REF}` : "origin/main");

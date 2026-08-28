@@ -12,11 +12,11 @@ const TITLES: Record<CuratedLevelKind, { title: string; description: string }> =
 		title: "Edit practice",
 		description: "Saving updates the instance catalog. Existing workspace copies will not change.",
 	},
-	"area-new": {
+	"group-new": {
 		title: "Create group",
 		description: "Groups keep related practices together in the instance catalog.",
 	},
-	"area-edit": {
+	"group-edit": {
 		title: "Edit group",
 		description: "Saving updates the instance catalog. Existing workspace copies will not change.",
 	},

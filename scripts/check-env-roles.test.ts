@@ -238,7 +238,10 @@ await test("the shipped topology delivers every role-scoped variable to a contai
 	// With the profile overlays, exactly as the CLI runs it. Omitting them makes this pass on a
 	// topology the real gate fails, which is the whole defect class the gate is here for.
 	const { failures } = analyse(
-		await readFile(join(REPO_ROOT, "server/src/main/resources/application.yml"), "utf8"),
+		await readFile(
+			join(REPO_ROOT, "server/application/src/main/resources/application.yml"),
+			"utf8",
+		),
 		shipped,
 		await readProfileRoles(REPO_ROOT),
 	);

@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import {
 	autonomyRollupQueryKey,
 	getPracticeReviewSettingsQueryKey,
-	listAreasQueryKey,
+	listGroupsQueryKey,
 	listPracticesQueryKey,
 	updatePracticeReviewSettingsMutation,
 } from "@/api/@tanstack/react-query.gen";
@@ -96,7 +96,7 @@ export function usePracticeReviewSettingsMutation(
 				queryKey: listPracticesQueryKey({ path: { workspaceSlug } }),
 			});
 			void queryClient.invalidateQueries({
-				queryKey: listAreasQueryKey({ path: { workspaceSlug } }),
+				queryKey: listGroupsQueryKey({ path: { workspaceSlug } }),
 			});
 		},
 	});

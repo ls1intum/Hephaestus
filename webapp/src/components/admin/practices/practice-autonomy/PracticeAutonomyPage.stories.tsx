@@ -14,7 +14,7 @@ const from = ({ settings, rollup, practices }: AutonomyFixture) => ({
 });
 
 const small = buildAutonomyFixture({
-	areas: [
+	groups: [
 		{
 			slug: "pull-request-hygiene",
 			name: "Pull request hygiene",
@@ -43,7 +43,7 @@ const small = buildAutonomyFixture({
 
 const chosenByTheWorkspace = buildAutonomyFixture({
 	workspaceDefault: "HUMAN_APPROVAL",
-	areas: [
+	groups: [
 		{
 			slug: "pull-request-hygiene",
 			name: "Pull request hygiene",
@@ -53,7 +53,7 @@ const chosenByTheWorkspace = buildAutonomyFixture({
 });
 
 const oneDescribedAndOneBare = buildAutonomyFixture({
-	areas: [
+	groups: [
 		{
 			slug: "documentation",
 			name: "Documentation",
@@ -71,7 +71,7 @@ const oneDescribedAndOneBare = buildAutonomyFixture({
 });
 
 const oneDescribedPractice = buildAutonomyFixture({
-	areas: [
+	groups: [
 		{
 			slug: "documentation",
 			name: "Documentation",
@@ -87,11 +87,11 @@ const oneDescribedPractice = buildAutonomyFixture({
 });
 
 const nothingSetByHand = buildAutonomyFixture({
-	areas: [{ slug: "testing", name: "Testing", practices: [{ name: "Covers the new branch" }] }],
+	groups: [{ slug: "testing", name: "Testing", practices: [{ name: "Covers the new branch" }] }],
 });
 
 const oneUnreviewablePractice = buildAutonomyFixture({
-	areas: [
+	groups: [
 		{
 			slug: "observability",
 			name: "Observability",
@@ -105,7 +105,7 @@ const atScale = scaleFixture();
 
 const idle = {
 	workspace: false,
-	areaSlugs: new Set<string>(),
+	groupSlugs: new Set<string>(),
 	practiceSlugs: new Set<string>(),
 	bulk: null,
 };
@@ -128,8 +128,8 @@ const meta = {
 		onOverridesOnlyChange: fn(),
 		onSetWorkspaceDefault: fn(),
 		onClearWorkspaceDefault: fn(),
-		onSetAreaAutonomy: fn(),
-		onClearAreaAutonomy: fn(),
+		onSetGroupAutonomy: fn(),
+		onClearGroupAutonomy: fn(),
 		onSetPracticeAutonomy: fn(),
 		onClearPracticeAutonomy: fn(),
 		onBulkSetAutonomy: fn(),
@@ -195,18 +195,17 @@ export const WorkspaceDefaultSet: Story = {
 	},
 };
 
-export const AreaOverride: Story = {
+export const GroupOverride: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		const testing = canvas.getByRole("radiogroup", {
 			name: "How far reviews go in Testing",
 		});
 		await expect(within(testing).getByRole("radio", { name: "Off" })).toBeChecked();
 		await userEvent.click(within(testing).getByRole("radio", { name: "Send automatically" }));
-		await expect(args.onSetAreaAutonomy).toHaveBeenCalledWith("testing", "AUTOMATIC");
+		await expect(args.onSetGroupAutonomy).toHaveBeenCalledWith("testing", "AUTOMATIC");
 
-		// The bucket for practices in no area holds no autonomy of its own — it is not a row anywhere.
 		const unassigned = canvas.getByText("Unassigned").closest('[data-slot="accordion-item"]');
-		if (!(unassigned instanceof HTMLElement)) throw new Error("No-area group not rendered");
+		if (!(unassigned instanceof HTMLElement)) throw new Error("No-group group not rendered");
 		await expect(within(unassigned).getByText("Follows the workspace default")).toBeVisible();
 		await expect(
 			within(unassigned).queryByRole("radiogroup", { name: /How far reviews go in/ }),
@@ -301,7 +300,6 @@ export const PracticeDetailOnKeyboardFocus: Story = {
 	},
 };
 
-/** An area whose own autonomy was set survives the filter even though none of its practices were. */
 export const OverridesOnly: Story = {
 	args: { overridesOnly: true },
 	play: async ({ canvas }) => {
@@ -397,21 +395,14 @@ export const BulkInFlight: Story = {
 	},
 };
 
-/**
- * The summary comes from the server's rollup, not from counting the rendered rows, so it stays
- * correct when a shut area renders none of its practices — which is what the radiogroup count below
- * pins.
- */
 export const AtScale: Story = {
 	args: from(atScale),
 	play: async ({ canvas }) => {
 		await expect(
 			canvas.getByText(
-				/^100 practices: 6 off, 89 review before sending and 5 send automatically\. \d+ practices and \d+ areas set by hand\.$/,
+				/^100 practices: 6 off, 89 review before sending and 5 send automatically\. \d+ practices and \d+ groups set by hand\.$/,
 			),
 		).toBeVisible();
-		// One ladder for the workspace and one per area, and nothing else on the screen is a
-		// radiogroup: every area is shut, so no practice ladder is rendered.
 		await expect(canvas.getAllByRole("radiogroup")).toHaveLength(26);
 		await expect(canvas.queryByRole("checkbox", { name: /^Select / })).not.toBeInTheDocument();
 		await expectNoPageOverflow();
@@ -420,7 +411,7 @@ export const AtScale: Story = {
 
 /**
  * A geometry assertion, because a ladder laid out after a content-width header takes its left edge
- * from the length of the area's name — and nothing about the DOM, the roles or the text changes when
+ * from the length of the group's name — and nothing about the DOM, the roles or the text changes when
  * that happens, so no other kind of assertion catches it.
  */
 export const DecisionsShareOneColumn: Story = {

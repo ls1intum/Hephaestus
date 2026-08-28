@@ -89,7 +89,7 @@ export const Delivered: Story = {
 	play: async ({ canvas }) => {
 		await expect(await canvas.findAllByText("Delivered")).toHaveLength(1);
 		canvas.getByText(/As an inline note on the work/);
-		canvas.getByText("server/src/main/resources/application.yml:118–120");
+		canvas.getByText("server/application/src/main/resources/application.yml:118–120");
 	},
 };
 

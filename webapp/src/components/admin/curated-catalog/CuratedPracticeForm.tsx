@@ -36,7 +36,7 @@ export interface CuratedPracticeFormInitialValue extends CuratedPracticeFormValu
 }
 
 interface CuratedPracticeFormBaseProps {
-	areas: readonly { slug: string; name: string }[];
+	groups: readonly { slug: string; name: string }[];
 	isPending: boolean;
 	conflict?: boolean;
 	onContinueWithDraft?: () => void;
@@ -68,7 +68,7 @@ export type CuratedPracticeFormProps =
 export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 	const {
 		mode,
-		areas,
+		groups,
 		isPending,
 		conflict,
 		onContinueWithDraft,
@@ -94,7 +94,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 					kind="practice"
 					shipped={initialData.shipped}
 					definitionOptions={definitionOptions}
-					areaNames={Object.fromEntries(areas.map((area) => [area.slug, area.name]))}
+					groupNames={Object.fromEntries(groups.map((group) => [group.slug, group.name]))}
 					isResetPending={isResetPending}
 					isKeepPending={isKeepPending}
 					disabled={conflict ?? false}
@@ -157,7 +157,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 				<PracticeDefinitionForm
 					mode="create"
 					beforeFields={banners}
-					areas={areas}
+					groups={groups}
 					isPending={isPending}
 					definitionOptions={definitionOptions}
 					disabled={formDisabled}
@@ -169,7 +169,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 					mode="edit"
 					beforeFields={banners}
 					initialData={initialData}
-					areas={areas}
+					groups={groups}
 					isPending={isPending}
 					definitionOptions={definitionOptions}
 					disabled={formDisabled}

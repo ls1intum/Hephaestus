@@ -11,7 +11,10 @@
 import { renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-const SCHEMA_DIR = resolve(import.meta.dirname, "../server/src/main/resources/graphql/github");
+const SCHEMA_DIR = resolve(
+	import.meta.dirname,
+	"../server/generated-clients/src/main/resources/graphql/github",
+);
 const SCHEMA_FILE = join(SCHEMA_DIR, "schema.github.graphql");
 const SCHEMA_URL = "https://docs.github.com/public/fpt/schema.docs.graphql";
 
@@ -122,7 +125,9 @@ async function main(): Promise<void> {
 		renameSync(tempFile, SCHEMA_FILE);
 
 		console.log(`Schema updated successfully: ${SCHEMA_FILE}`);
-		console.log("\nTo regenerate types: cd server && ./mvnw compile -DskipTests");
+		console.log(
+			"\nTo regenerate types: cd server && ./mvnw -pl generated-clients -am compile -DskipTests",
+		);
 	} catch (error) {
 		try {
 			unlinkSync(tempFile);

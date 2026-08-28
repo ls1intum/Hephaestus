@@ -38,7 +38,10 @@ import {
 } from "./lib/json.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
-const contractsRoot = path.join(root, "server/src/main/resources/contracts/artifact-source");
+const contractsRoot = path.join(
+	root,
+	"server/application/src/main/resources/contracts/artifact-source",
+);
 const contractVersions = (await readdir(contractsRoot, { withFileTypes: true }))
 	.filter((entry) => entry.isDirectory())
 	.map((entry) => entry.name)
@@ -121,7 +124,7 @@ for (const version of contractVersions) {
 
 const defaultCatalogSchemaPath = path.join(
 	root,
-	"server/src/main/resources/practices/default-catalog.schema.json",
+	"server/application/src/main/resources/practices/default-catalog.schema.json",
 );
 const defaultCatalogSchema = await readSchema(
 	defaultCatalogSchemaPath,
@@ -530,7 +533,11 @@ const validateContractVersion = async (version: string): Promise<void> => {
 for (const version of contractVersions) await validateContractVersion(version);
 
 const PRACTICE_CATALOG = "practices/default-catalog.json";
-const practiceCatalogPath = path.join(root, "server/src/main/resources", PRACTICE_CATALOG);
+const practiceCatalogPath = path.join(
+	root,
+	"server/application/src/main/resources",
+	PRACTICE_CATALOG,
+);
 const parsedPracticeCatalog = await readJsonFile(practiceCatalogPath);
 validate(
 	asString(defaultCatalogSchema.$id, "default-catalog.schema.json $id"),
@@ -545,11 +552,11 @@ interface BundledPractice {
 }
 
 const bundledPractices = (value: unknown, label: string): BundledPractice[] =>
-	asArray(asRecord(value, label).areas, `${label} areas`).flatMap((area, areaIndex) => {
-		const areaLabel = `${label} areas[${areaIndex}]`;
-		return asArray(asRecord(area, areaLabel).practices, `${areaLabel} practices`).map(
+	asArray(asRecord(value, label).groups, `${label} groups`).flatMap((group, groupIndex) => {
+		const groupLabel = `${label} groups[${groupIndex}]`;
+		return asArray(asRecord(group, groupLabel).practices, `${groupLabel} practices`).map(
 			(practice, index) => {
-				const entry = `${areaLabel} practices[${index}]`;
+				const entry = `${groupLabel} practices[${index}]`;
 				const record = asRecord(practice, entry);
 				const script = record.precomputeScript;
 				return {
@@ -567,7 +574,7 @@ const practices = bundledPractices(parsedPracticeCatalog, PRACTICE_CATALOG);
 
 const precomputeResourcePrefix = "practices/precompute/";
 const precomputeScripts = new Set(
-	(await readdir(path.join(root, "server/src/main/resources/practices/precompute")))
+	(await readdir(path.join(root, "server/application/src/main/resources/practices/precompute")))
 		.filter((file) => file.endsWith(".ts"))
 		.map((file) => precomputeResourcePrefix + file),
 );

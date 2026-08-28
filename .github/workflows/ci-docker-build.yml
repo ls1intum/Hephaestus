@@ -82,7 +82,7 @@ jobs:
       # Paketo Cloud Native Buildpacks via spring-boot:build-image, with Application CDS.
       # See docs/admin/buildpacks-cds-decision.md and pom.xml's <image> block.
       use-buildpacks: true
-      maven-module: "server"
+      maven-module: "server/application"
       registry: "ghcr.io"
       # amd64-only on PRs (main/release build both arches). See reusable-docker-build.yml.
       single-arch: ${{ github.event_name == 'pull_request' }}

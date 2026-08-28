@@ -11,7 +11,7 @@ export interface CuratedEntryCopy {
 
 export function curatedEntryCopy(
 	status: CatalogEntryStatus,
-	kind: "practice" | "area",
+	kind: "practice" | "group",
 ): CuratedEntryCopy {
 	switch (status.state) {
 		case "YOURS":
@@ -31,12 +31,12 @@ export function curatedEntryCopy(
 					: `This customized ${kind} is excluded from new workspaces.`,
 			};
 		case "UPDATE_WAITING":
-			if (kind === "area") {
+			if (kind === "group") {
 				return {
 					label: "Hephaestus update available",
 					tone: "info",
 					detail:
-						"Applying this update would change the area's name, description, icon, or color. Your saved version stays in place until you decide.",
+						"Applying this update would change the group's name, description, icon, or color. Your saved version stays in place until you decide.",
 				};
 			}
 			return {

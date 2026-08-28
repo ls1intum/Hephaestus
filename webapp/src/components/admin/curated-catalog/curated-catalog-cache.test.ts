@@ -3,7 +3,7 @@ import type { CatalogEntryStatus, CuratedCatalog } from "@/api/types.gen";
 import {
 	orderedPracticeSlugs,
 	placeCuratedPractice,
-	reorderCuratedAreas,
+	reorderCuratedGroups,
 	reorderCuratedPractices,
 } from "./curated-catalog-cache";
 
@@ -32,7 +32,7 @@ const catalog = {
 		notOffered: 0,
 		noLongerShipped: 0,
 	},
-	areas: [
+	groups: [
 		{ slug: "a", position: 0, definition: { name: "A" }, status },
 		{ slug: "b", position: 1, definition: { name: "B" }, status: { ...status, offered: false } },
 	],
@@ -42,7 +42,7 @@ const catalog = {
 			name: "One",
 			artifactKind: "scm.issue",
 			automatedReview,
-			areaSlug: "a",
+			groupSlug: "a",
 			position: 0,
 			effectivelyOffered: true,
 			status,
@@ -52,7 +52,7 @@ const catalog = {
 			name: "Two",
 			artifactKind: "scm.issue",
 			automatedReview,
-			areaSlug: "a",
+			groupSlug: "a",
 			position: 1,
 			effectivelyOffered: true,
 			status,
@@ -62,7 +62,7 @@ const catalog = {
 			name: "Three",
 			artifactKind: "scm.issue",
 			automatedReview,
-			areaSlug: "b",
+			groupSlug: "b",
 			position: 0,
 			effectivelyOffered: false,
 			status,
@@ -71,14 +71,14 @@ const catalog = {
 } satisfies CuratedCatalog;
 
 describe("curated catalog cache", () => {
-	it("reorders areas without changing their definitions", () => {
-		const updated = reorderCuratedAreas(catalog, ["b", "a"]);
-		expect(updated.areas.map(({ slug, position }) => ({ slug, position }))).toStrictEqual([
+	it("reorders groups without changing their definitions", () => {
+		const updated = reorderCuratedGroups(catalog, ["b", "a"]);
+		expect(updated.groups.map(({ slug, position }) => ({ slug, position }))).toStrictEqual([
 			{ slug: "a", position: 1 },
 			{ slug: "b", position: 0 },
 		]);
-		const [reordered] = updated.areas;
-		const [original] = catalog.areas;
+		const [reordered] = updated.groups;
+		const [original] = catalog.groups;
 		assert(reordered);
 		assert(original);
 		expect(reordered.definition).toBe(original.definition);
@@ -91,7 +91,7 @@ describe("curated catalog cache", () => {
 		expect(updated.practices.find(({ slug }) => slug === "two")?.effectivelyOffered).toBe(false);
 	});
 
-	it("reorders within one area", () => {
+	it("reorders within one group", () => {
 		const updated = reorderCuratedPractices(catalog, "a", ["two", "one"]);
 		expect(orderedPracticeSlugs(updated, "a")).toStrictEqual(["two", "one"]);
 	});

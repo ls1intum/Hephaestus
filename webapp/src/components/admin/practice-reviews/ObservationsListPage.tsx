@@ -21,7 +21,7 @@ export interface ObservationsListPageProps {
 	isLoading: boolean;
 	error: unknown;
 	onRetry?: () => void;
-	areas: FacetSource;
+	groups: FacetSource;
 	practices: FacetSource;
 	/**
 	 * The practice records themselves, which the rows' practice links show as a hover card. Distinct
@@ -40,7 +40,7 @@ export function ObservationsListPage({
 	isLoading,
 	error,
 	onRetry,
-	areas,
+	groups,
 	practices,
 	practiceRecords,
 	people,
@@ -60,7 +60,7 @@ export function ObservationsListPage({
 				search={search}
 				onPatch={patchFilter}
 				onReset={reset}
-				areas={areas}
+				groups={groups}
 				practices={practices}
 				people={people}
 				total={observations?.page?.totalElements}

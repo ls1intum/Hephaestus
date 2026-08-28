@@ -1,5 +1,5 @@
 name: "Setup CI caches"
-description: "Caches Maven repo + generated sources, Playwright browsers, and Storybook builds. Node/pnpm setup happens in the calling workflow via pnpm/action-setup + actions/setup-node (cache: pnpm)."
+description: "Caches Maven dependencies, generated-client build outputs, and Playwright browsers. Node/pnpm setup happens in the calling workflow."
 inputs:
   cache-type:
     description: "Type of cache to setup"
@@ -13,27 +13,44 @@ runs:
   using: "composite"
   steps:
     - name: Set up JDK 21
+      id: java
       if: startsWith(inputs.cache-type, 'application-server-') || contains(fromJSON('["webapp-e2e", "server-contracts"]'), inputs.cache-type)
       uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
       with:
         distribution: "temurin"
         java-version: "21"
 
-    - name: Cache Maven repo
-      # server/target/generated-sources is deliberately NOT cached. actions/cache's
-      # restore-keys fallback can restore a stale generated-sources tree from a prior
-      # build (e.g., from before a Java package rename); the `quick` profile in pom.xml
-      # then activates on the present directory and skips codegen, causing compile
-      # failures because the cached classes don't match the current sources. Codegen
-      # runs in ~5s — much cheaper than that failure mode.
-      if: startsWith(inputs.cache-type, 'application-server-') || contains(fromJSON('["webapp-e2e", "server-contracts"]'), inputs.cache-type)
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+    - name: Restore Maven dependencies
+      if: github.event_name == 'pull_request' && (startsWith(inputs.cache-type, 'application-server-') || contains(fromJSON('["webapp-e2e", "server-contracts"]'), inputs.cache-type))
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        path: |
-          ~/.m2/repository
-        key: ${{ inputs.os }}-maven-${{ hashFiles('server/pom.xml') || 'no-pom' }}
+        path: ~/.m2/repository
+        key: ${{ inputs.os }}-maven-${{ hashFiles('server/**/pom.xml', 'server/.mvn/extensions.xml', 'server/.mvn/wrapper/maven-wrapper.properties') || 'no-pom' }}
         restore-keys: |
           ${{ inputs.os }}-maven-
+
+    - name: Cache Maven dependencies
+      if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && contains(fromJSON('["push", "schedule", "workflow_dispatch"]'), github.event_name) && (startsWith(inputs.cache-type, 'application-server-') || contains(fromJSON('["webapp-e2e", "server-contracts"]'), inputs.cache-type))
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.m2/repository
+        key: ${{ inputs.os }}-maven-${{ hashFiles('server/**/pom.xml', 'server/.mvn/extensions.xml', 'server/.mvn/wrapper/maven-wrapper.properties') || 'no-pom' }}
+        restore-keys: |
+          ${{ inputs.os }}-maven-
+
+    - name: Restore generated clients
+      if: github.event_name == 'pull_request' && (startsWith(inputs.cache-type, 'application-server-') || contains(fromJSON('["webapp-e2e", "server-contracts"]'), inputs.cache-type))
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.m2/build-cache
+        key: ${{ inputs.os }}-${{ steps.java.outputs.distribution }}-${{ steps.java.outputs.version }}-generated-clients-${{ hashFiles('server/pom.xml', 'server/generated-clients/pom.xml', 'server/.mvn/**', 'server/generated-clients/src/**') }}
+
+    - name: Cache generated clients
+      if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && contains(fromJSON('["push", "schedule", "workflow_dispatch"]'), github.event_name) && (startsWith(inputs.cache-type, 'application-server-') || contains(fromJSON('["webapp-e2e", "server-contracts"]'), inputs.cache-type))
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.m2/build-cache
+        key: ${{ inputs.os }}-${{ steps.java.outputs.distribution }}-${{ steps.java.outputs.version }}-generated-clients-${{ hashFiles('server/pom.xml', 'server/generated-clients/pom.xml', 'server/.mvn/**', 'server/generated-clients/src/**') }}
 
     - name: Cache Playwright browsers
       if: inputs.cache-type == 'webapp-storybook'
@@ -43,12 +60,3 @@ runs:
         key: ${{ inputs.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
         restore-keys: |
           ${{ inputs.os }}-playwright-
-
-    - name: Cache Storybook
-      if: contains(fromJSON('["webapp-visual", "webapp-storybook"]'), inputs.cache-type)
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-      with:
-        path: webapp/.storybook/.cache
-        key: ${{ inputs.os }}-storybook-v2-${{ hashFiles('webapp/**/*.stories.tsx', 'webapp/.storybook/**', 'pnpm-lock.yaml') }}
-        restore-keys: |
-          ${{ inputs.os }}-storybook-v2-

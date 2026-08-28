@@ -12,13 +12,14 @@ Hephaestus is maintained by the Applied Education Technologies (AET) team at TUM
 ```text
 Hephaestus/
 ├── webapp/                    # React + Vite front-end (public UI)
-├── server/                    # Spring Boot server (GitHub + mentor APIs, webhook receiver,
-│                              #   Pi mentor agent, sync NATS consumer — three runtime roles)
+├── server/                    # Maven reactor
+│   ├── application/           # Spring Boot application — server, worker, and webhook roles
+│   └── generated-clients/     # Generated GitHub, GitLab, and Outline transports
 ├── docs/                      # Docusaurus site (this documentation)
 └── scripts/                   # Tooling (ERD generation, migrations, utilities)
 ```
 
-The webhook receiver moved into `server/src/main/java/.../integration/core/webhook/` and is
+The webhook receiver moved into `server/application/src/main/java/.../integration/core/webhook/` and is
 deployed as a separate `webhook-server` container (same image as `application-server`,
 activated with `SPRING_PROFILES_ACTIVE=prod,webhook`) so an app-server restart does not drop
 incoming webhooks. See ADR 0008.

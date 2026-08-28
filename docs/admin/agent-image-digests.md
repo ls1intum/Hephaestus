@@ -74,7 +74,7 @@ A checkout has no `APP_VERSION`, so the reference derives to `agent-pi:0.0.0-dev
 
 ```bash
 echo 'hephaestus.agent.image.reference: ghcr.io/ls1intum/hephaestus/agent-pi:dev' \
-  > server/src/main/resources/application-local.yml
+  > server/application/src/main/resources/application-local.yml
 ```
 
 Or via env var: `export HEPHAESTUS_AGENT_IMAGE_REFERENCE=ghcr.io/ls1intum/hephaestus/agent-pi:dev`.

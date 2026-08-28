@@ -1,0 +1,46 @@
+package de.tum.cit.aet.hephaestus.practices.feedback.inapp.dto;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
+
+/**
+ * One card on a developer's own practice pages: a process-level message about a habit in their work, what
+ * it is evidenced by, and one thing to try next.
+ *
+ * <p>Only ever returned to the person it is about. The endpoint takes no user parameter, and the
+ * operator surfaces are closed to the body.
+ *
+ * <p>{@code criteria} is deliberately absent, as it is on the reflective read model: the criteria text
+ * is instruction for the detector, and a developer reading it would be reading the rubric they were
+ * measured with rather than the practice they are learning. Only the developer framing travels —
+ * {@code whyItMatters} and {@code whatGoodLooksLike}.
+ *
+ * <p>No counts either. "Three of your last five" is evidence for a claim about a strategy and belongs
+ * inside the message the composer wrote; a number on the card would be a score, which this surface is
+ * not. {@link #occurrenceCount} is the length of {@link #evidence} and exists so a card can say
+ * "3 pieces of work" beside the list, not as a metric to track over time.
+ */
+@Schema(description = "A process-level message on the developer's own practice pages")
+public record InAppFeedbackDTO(
+    @NonNull UUID id,
+    @NonNull @Schema(description = "Short headline naming the habit, never the person") String headline,
+    @NonNull @Schema(description = "The message, as Markdown; ends with the habit to try next") String body,
+    @NonNull @Schema(description = "Practice this habit belongs to") String practiceSlug,
+    @NonNull String practiceName,
+    @Schema(description = "Group the practice sits in; null when the practice has none") @Nullable String groupSlug,
+    @Schema(description = "Group display name; null when the practice has none") @Nullable String groupName,
+    @Schema(description = "Why this practice matters, in the developer's framing") @Nullable String whyItMatters,
+    @Schema(description = "What good looks like, in the developer's framing") @Nullable String whatGoodLooksLike,
+    @NonNull
+    @Schema(description = "The pieces of work the habit was observed on, newest first")
+    List<InAppEvidenceDTO> evidence,
+    @NonNull
+    @Schema(description = "How many pieces of work carry it — the length of the evidence list")
+    Integer occurrenceCount,
+    @NonNull @Schema(description = "When the message was composed") Instant preparedAt,
+    @Schema(description = "When this developer first opened it; null until they have") @Nullable Instant readAt
+) {}

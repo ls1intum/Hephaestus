@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 const REPO_ROOT = resolve(import.meta.dirname, "..");
-const JAVA_SOURCE = /^server\/src\/(?:main|test)\/java\/.*\.java$/;
+const JAVA_SOURCE = /^server\/application\/src\/(?:main|test)\/java\/.*\.java$/;
 
 export interface JavaSource {
 	readonly path: string;

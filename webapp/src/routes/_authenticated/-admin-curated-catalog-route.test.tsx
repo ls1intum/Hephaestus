@@ -27,7 +27,7 @@ const status = (overrides: Record<string, unknown> = {}) => ({
 	...overrides,
 });
 
-const areaDefinition = {
+const groupDefinition = {
 	name: "Packaging work",
 	description: "Make a change cheap to review",
 	icon: "Package",
@@ -57,14 +57,14 @@ function mockCatalog(overrides: Record<string, unknown> = {}) {
 			notOffered: 0,
 			noLongerShipped: 0,
 		},
-		areas: [{ slug: "packaging", position: 0, definition: areaDefinition, status: status() }],
+		groups: [{ slug: "packaging", position: 0, definition: groupDefinition, status: status() }],
 		practices: [
 			{
 				slug: "describe-what-and-why",
 				name: practiceDefinition.name,
 				artifactKind: "scm.pull_request",
 				automatedReview: mockPullRequestPolicy.automatedReview,
-				areaSlug: "packaging",
+				groupSlug: "packaging",
 				position: 0,
 				effectivelyOffered: true,
 				status: status({ state: "UPDATE_WAITING", changeKind: "DETECTION" }),
@@ -103,7 +103,7 @@ describe("instance catalog routes", () => {
 		await screen.findByRole("heading", { name: "Create practice" }, ROUTE_RENDER_WAIT);
 	});
 
-	it("opens the area editor from the catalog", async () => {
+	it("opens the group editor from the catalog", async () => {
 		mockCatalog();
 		renderRouteAt("/admin/catalog");
 
@@ -112,23 +112,23 @@ describe("instance catalog routes", () => {
 		await screen.findByRole("heading", { name: "Create group" }, ROUTE_RENDER_WAIT);
 	});
 
-	it("reorders areas with the catalog tag", async () => {
-		const secondArea = {
+	it("reorders groups with the catalog tag", async () => {
+		const secondGroup = {
 			slug: "delivery",
 			position: 1,
-			definition: { ...areaDefinition, name: "Delivery" },
+			definition: { ...groupDefinition, name: "Delivery" },
 			status: status(),
 		};
 		mockCatalog({
-			areas: [
-				{ slug: "packaging", position: 0, definition: areaDefinition, status: status() },
-				secondArea,
+			groups: [
+				{ slug: "packaging", position: 0, definition: groupDefinition, status: status() },
+				secondGroup,
 			],
 		});
 		let ifMatch: string | null = null;
 		let body: unknown;
 		server.use(
-			http.patch("*/admin/practice-catalog/areas/reorder", async ({ request }) => {
+			http.patch("*/admin/practice-catalog/groups/reorder", async ({ request }) => {
 				ifMatch = request.headers.get("if-match");
 				body = await request.json();
 				return HttpResponse.json({
@@ -143,9 +143,9 @@ describe("instance catalog routes", () => {
 						notOffered: 0,
 						noLongerShipped: 0,
 					},
-					areas: [
-						secondArea,
-						{ slug: "packaging", position: 1, definition: areaDefinition, status: status() },
+					groups: [
+						secondGroup,
+						{ slug: "packaging", position: 1, definition: groupDefinition, status: status() },
 					],
 					practices: [],
 				});
@@ -187,20 +187,20 @@ describe("instance catalog routes", () => {
 	});
 
 	it("restores the order and focus after a reorder conflict", async () => {
-		const secondArea = {
+		const secondGroup = {
 			slug: "delivery",
 			position: 1,
-			definition: { ...areaDefinition, name: "Delivery" },
+			definition: { ...groupDefinition, name: "Delivery" },
 			status: status(),
 		};
 		mockCatalog({
-			areas: [
-				{ slug: "packaging", position: 0, definition: areaDefinition, status: status() },
-				secondArea,
+			groups: [
+				{ slug: "packaging", position: 0, definition: groupDefinition, status: status() },
+				secondGroup,
 			],
 		});
 		server.use(
-			http.patch("*/admin/practice-catalog/areas/reorder", async () => {
+			http.patch("*/admin/practice-catalog/groups/reorder", async () => {
 				await delay(100);
 				return HttpResponse.json({ status: 412, title: "Stale" }, { status: 412 });
 			}),
@@ -234,36 +234,36 @@ describe("instance catalog routes", () => {
 		await waitFor(() => expect(document.activeElement).toBe(trigger));
 	});
 
-	it("loads the new area when a moved practice editor is reopened", async () => {
-		const deliveryArea = {
+	it("loads the new group when a moved practice editor is reopened", async () => {
+		const deliveryGroup = {
 			slug: "delivery",
 			position: 1,
-			definition: { ...areaDefinition, name: "Delivery" },
+			definition: { ...groupDefinition, name: "Delivery" },
 			status: status(),
 		};
 		const catalog = mockCatalog({
-			areas: [
-				{ slug: "packaging", position: 0, definition: areaDefinition, status: status() },
-				deliveryArea,
+			groups: [
+				{ slug: "packaging", position: 0, definition: groupDefinition, status: status() },
+				deliveryGroup,
 			],
 		});
-		let latestArea = "packaging";
+		let latestGroup = "packaging";
 		server.use(
 			http.get("*/admin/practice-catalog/practices/:slug", () =>
 				HttpResponse.json({
 					slug: "describe-what-and-why",
-					definition: { ...practiceDefinition, areaSlug: latestArea },
+					definition: { ...practiceDefinition, groupSlug: latestGroup },
 					status: status(),
 				}),
 			),
 			http.patch("*/admin/practice-catalog/practices/:slug/placement", () => {
-				latestArea = "delivery";
+				latestGroup = "delivery";
 				return HttpResponse.json({
 					...catalog,
 					etag: "structure-2",
 					practices: catalog.practices.map((practice) => ({
 						...practice,
-						areaSlug: "delivery",
+						groupSlug: "delivery",
 					})),
 				});
 			}),
@@ -279,7 +279,7 @@ describe("instance catalog routes", () => {
 			),
 		);
 		fireEvent.click(await screen.findByRole("menuitemradio", { name: "Delivery" }));
-		await waitFor(() => expect(latestArea).toBe("delivery"));
+		await waitFor(() => expect(latestGroup).toBe("delivery"));
 
 		fireEvent.click(await screen.findByRole("link", { name: practiceDefinition.name }));
 		expect(
@@ -288,17 +288,17 @@ describe("instance catalog routes", () => {
 		).toContain("Delivery");
 	});
 
-	it("explains which practices area exclusion affects", async () => {
+	it("explains which practices group exclusion affects", async () => {
 		const catalog = mockCatalog();
 		let ifMatch: string | null = null;
 		server.use(
-			http.patch("*/admin/practice-catalog/areas/:slug/status", ({ request }) => {
+			http.patch("*/admin/practice-catalog/groups/:slug/status", ({ request }) => {
 				ifMatch = request.headers.get("if-match");
 				return HttpResponse.json({
 					...catalog,
 					etag: "structure-2",
-					areas: catalog.areas.map((area) => ({
-						...area,
+					groups: catalog.groups.map((group) => ({
+						...group,
 						status: status({ offered: false }),
 					})),
 				});
@@ -321,27 +321,27 @@ describe("instance catalog routes", () => {
 		await waitFor(() => expect(ifMatch).toBe('"structure-1"'));
 	});
 
-	it("prevents a second catalog write while an area update is pending", async () => {
+	it("prevents a second catalog write while a group update is pending", async () => {
 		const catalog = mockCatalog({
 			customOrder: true,
-			areas: [
-				{ slug: "packaging", position: 0, definition: areaDefinition, status: status() },
+			groups: [
+				{ slug: "packaging", position: 0, definition: groupDefinition, status: status() },
 				{
 					slug: "delivery",
 					position: 1,
-					definition: { ...areaDefinition, name: "Delivery" },
+					definition: { ...groupDefinition, name: "Delivery" },
 					status: status(),
 				},
 			],
 		});
 		server.use(
-			http.patch("*/admin/practice-catalog/areas/:slug/status", async () => {
+			http.patch("*/admin/practice-catalog/groups/:slug/status", async () => {
 				await delay(500);
 				return HttpResponse.json({
 					...catalog,
 					etag: "structure-2",
-					areas: catalog.areas.map((area) => ({
-						...area,
+					groups: catalog.groups.map((group) => ({
+						...group,
 						status: status({ offered: false }),
 					})),
 				});

@@ -33,7 +33,7 @@ const SEVERITY_OPTIONS = statusFacetOptions(SEVERITY_DEFS);
 export function clearedObservationFilters(): Partial<ObservationsSearch> {
 	return {
 		page: 0,
-		areaSlug: undefined,
+		groupSlug: undefined,
 		practiceSlug: undefined,
 		presence: undefined,
 		assessment: undefined,
@@ -49,7 +49,7 @@ export function clearedObservationFilters(): Partial<ObservationsSearch> {
 
 export function hasObservationFilter(search: ObservationsSearch): boolean {
 	return (
-		(search.areaSlug?.length ?? 0) > 0 ||
+		(search.groupSlug?.length ?? 0) > 0 ||
 		(search.practiceSlug?.length ?? 0) > 0 ||
 		(search.presence?.length ?? 0) > 0 ||
 		(search.assessment?.length ?? 0) > 0 ||
@@ -62,26 +62,20 @@ export function hasObservationFilter(search: ObservationsSearch): boolean {
 	);
 }
 
-/**
- * Typed by what the derivation reads rather than by the whole record: an area's autonomy and dashboard
- * visibility are nothing to a facet, and asking for them would make a caller hand over fields it has
- * no reason to hold.
- */
-type NamedArea = { slug: string; name: string };
+type NamedGroup = { slug: string; name: string };
 
-export function areaFacetOptions(areas: readonly NamedArea[] | undefined): FacetOption[] {
-	return (areas ?? []).map((area) => ({ value: area.slug, label: area.name }));
+export function groupFacetOptions(groups: readonly NamedGroup[] | undefined): FacetOption[] {
+	return (groups ?? []).map((group) => ({ value: group.slug, label: group.name }));
 }
 
-/** The area name rides along as each practice's description, which is how the facet groups them. */
 export function practiceFacetOptions(
-	practices: readonly { slug: string; name: string; areaSlug?: string }[] | undefined,
-	areas: readonly NamedArea[] | undefined,
+	practices: readonly { slug: string; name: string; groupSlug?: string }[] | undefined,
+	groups: readonly NamedGroup[] | undefined,
 ): FacetOption[] {
 	return (practices ?? []).map((practice) => ({
 		value: practice.slug,
 		label: practice.name,
-		description: (areas ?? []).find((area) => area.slug === practice.areaSlug)?.name,
+		description: (groups ?? []).find((group) => group.slug === practice.groupSlug)?.name,
 	}));
 }
 
@@ -90,7 +84,7 @@ export interface ObservationFiltersProps {
 	/** Reports one changed facet. The caller sends the reader back to page one. */
 	onPatch: (patch: Partial<ObservationsSearch>) => void;
 	onReset: () => void;
-	areas: FacetSource;
+	groups: FacetSource;
 	practices: FacetSource;
 	people: ReviewPeople;
 	total: number | undefined;
@@ -110,7 +104,7 @@ export function ObservationFilters({
 	search,
 	onPatch,
 	onReset,
-	areas,
+	groups,
 	practices,
 	people,
 	total,
@@ -134,12 +128,12 @@ export function ObservationFilters({
 		>
 			<div className="flex flex-wrap gap-2">
 				<FacetMultiSelect
-					title="Area"
-					options={areas.options}
-					selected={search.areaSlug ?? []}
-					onChange={(values) => onPatch({ areaSlug: nonEmpty(values) })}
-					disabled={areas.isLoading}
-					emptyLabel={areas.isError ? "Could not load groups" : "No groups available"}
+					title="Group"
+					options={groups.options}
+					selected={search.groupSlug ?? []}
+					onChange={(values) => onPatch({ groupSlug: nonEmpty(values) })}
+					disabled={groups.isLoading}
+					emptyLabel={groups.isError ? "Could not load groups" : "No groups available"}
 				/>
 				<FacetMultiSelect
 					title="Practice"
@@ -184,8 +178,8 @@ export function ObservationFilters({
 			</div>
 			<AppliedFacetPills
 				pills={[
-					...facetPills("Area", areas.options, search.areaSlug, (values) =>
-						onPatch({ areaSlug: nonEmpty(values) }),
+					...facetPills("Group", groups.options, search.groupSlug, (values) =>
+						onPatch({ groupSlug: nonEmpty(values) }),
 					),
 					...facetPills("Practice", practices.options, search.practiceSlug, (values) =>
 						onPatch({ practiceSlug: nonEmpty(values) }),

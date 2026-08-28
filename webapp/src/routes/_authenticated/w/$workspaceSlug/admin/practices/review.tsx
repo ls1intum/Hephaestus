@@ -163,7 +163,7 @@ function HowMuchSection({
 			practices={practicesQuery.data}
 			pending={{
 				workspace: updateSettings.isPending,
-				areaSlugs: autonomyMutations.pendingAreaSlugs,
+				groupSlugs: autonomyMutations.pendingGroupSlugs,
 				practiceSlugs: autonomyMutations.pendingPracticeSlugs,
 				bulk: autonomyMutations.bulk,
 			}}
@@ -178,14 +178,14 @@ function HowMuchSection({
 					body: { reset: ["DEFAULT_AUTONOMY"] },
 				})
 			}
-			onSetAreaAutonomy={(areaSlug, autonomy) =>
-				autonomyMutations.setAreaAutonomy.mutate({
-					path: { workspaceSlug, areaSlug },
+			onSetGroupAutonomy={(groupSlug, autonomy) =>
+				autonomyMutations.setGroupAutonomy.mutate({
+					path: { workspaceSlug, groupSlug },
 					body: { autonomy },
 				})
 			}
-			onClearAreaAutonomy={(areaSlug) =>
-				autonomyMutations.setAreaAutonomy.mutate({ path: { workspaceSlug, areaSlug }, body: {} })
+			onClearGroupAutonomy={(groupSlug) =>
+				autonomyMutations.setGroupAutonomy.mutate({ path: { workspaceSlug, groupSlug }, body: {} })
 			}
 			onSetPracticeAutonomy={(practiceSlug, autonomy) =>
 				autonomyMutations.setPracticeAutonomy.mutate({

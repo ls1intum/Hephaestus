@@ -215,7 +215,7 @@ export const LargeSize: Story = {
 	parameters: {
 		docs: {
 			description: {
-				story: "Large size variant for prominent display areas.",
+				story: "Large size variant for prominent display groups.",
 			},
 		},
 	},

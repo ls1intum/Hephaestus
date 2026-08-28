@@ -6,6 +6,6 @@ Workspace administrators now choose which practices their workspace reviews, ins
 
 Adding never starts sending feedback on its own. A practice Hephaestus can review starts at **Review before sending**, and a practice it cannot review stays **Off** until you connect what it reads.
 
-You can also add a whole area at once. Hephaestus shows every practice it would add, reuse, or skip first, and applies the result in one step or not at all. Adding is refused if the library or your workspace changed while you were reading the preview, so you always act on what you saw.
+You can also add a whole group at once. Hephaestus shows every practice it would add, reuse, or skip first, and applies the result in one step or not at all. Adding is refused if the library or your workspace changed while you were reading the preview, so you always act on what you saw.
 
 Workspaces you already have keep everything in them, and a workspace that has never recorded a catalog installation still receives one at the next start, so nothing goes missing.

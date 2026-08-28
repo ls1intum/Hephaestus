@@ -28,6 +28,57 @@ security:
 tags:
 - description: User achievement progress and unlocks
   name: Achievements
+- description: Per-workspace LLM spend rollup and budget status
+  name: LLM Usage
+- description: Practice group trends and review runs for the current developer
+  name: Practice Group Detail
+- description: Workspace-scoped mentor chat threads
+  name: Mentor Threads
+- description: The current developer's standing in each practice
+  name: Practice Standings
+- description: Recipient responses to delivered practice feedback
+  name: Feedback Response
+- description: "User account management (settings, deletion)"
+  name: Account
+- description: Instance-admin account management
+  name: Admin
+- description: Current user's Slack privacy preferences
+  name: Slack User Preferences
+- description: Per-workspace Outline collection mirroring control plane
+  name: Outline collections
+- description: The starting catalog copied into new workspaces
+  name: Admin Practice Catalog
+- description: User profile and activity data
+  name: Profile
+- description: Instance-wide operator settings
+  name: Instance Settings
+- description: Current instance definitions visible to workspace administrators
+  name: Practice Catalog
+- description: Session lifecycle
+  name: Auth
+- description: Workspace-scoped practice-review policy
+  name: Practice Review Settings
+- description: Workspace integration connection management
+  name: Connections
+- description: Up/down votes on mentor assistant messages
+  name: Mentor Votes
+- description: "Workspace-admin access to review runs, observations, and feedback\
+    \ delivery history"
+  name: Practice reviews
+- description: GDPR Art. 20 self-service data export
+  name: Account
+- description: Workspace-scoped history of admin configuration changes
+  name: Config Audit
+- description: |-
+    Vendor OAuth redirect ingress at <code>/oauth/callback/{kind</code>}. Unauthenticated —
+     identity comes from the HMAC-signed <code>state</code> param. Browsers get 302 redirects
+     on both success and failure; only <code>Accept: application/json</code> requests get
+     4xx JSON.
+  name: o-auth-callback-controller
+- description: Recurring reviews of recent work
+  name: Practice Review Sweep
+- description: Identity provider discovery (public)
+  name: Auth discovery
 - description: Global contributor information
   name: Contributors
 - description: User preferences
@@ -36,12 +87,6 @@ tags:
   name: Admin
 - description: Per-workspace Slack channel consent + activation
   name: Slack channel activation
-- description: Per-workspace LLM spend rollup and budget status
-  name: LLM Usage
-- description: Manage practice areas
-  name: Practice Areas
-- description: Workspace-scoped mentor chat threads
-  name: Mentor Threads
 - description: |-
     Workspace registry endpoints under /workspaces that operate outside of a specific workspace slug;
      slugged routes live in {@link WorkspaceController WorkspaceController} via <code>@WorkspaceScopedController</code>.
@@ -56,81 +101,42 @@ tags:
   name: Agents
 - description: Workspace-scoped agent job monitoring
   name: Agent Jobs
+- description: The current developer's standing in each practice group
+  name: Practice Group Standings
 - description: Asking for a review of a piece of work by hand
   name: Practice review requests
-- description: "User account management (settings, deletion)"
-  name: Account
 - description: Read-only access to practice evaluation observations
   name: Practice Observations
-- description: Instance-admin account management
-  name: Admin
-- description: Current user's Slack privacy preferences
-  name: Slack User Preferences
 - description: Adopt instance catalog practices into a workspace
   name: Practice Catalog Adoption
-- description: Per-workspace Outline collection mirroring control plane
-  name: Outline collections
 - description: Team management within workspace
   name: Teams
-- description: The starting catalog copied into new workspaces
-  name: Admin Practice Catalog
 - description: The developer's own prepared practice feedback
   name: In-App Feedback
 - description: "Workspace-scoped \"bring your own\" AI provider connections, models\
     \ and settings"
   name: Workspace LLM
-- description: User profile and activity data
-  name: Profile
-- description: Instance-wide operator settings
-  name: Instance Settings
 - description: Contributor rankings and league statistics
   name: Leaderboard
 - description: Why each practice did or did not run on one piece of work; readable
     by any workspace member
   name: Practice review trace
-- description: Current instance definitions visible to workspace administrators
-  name: Practice Catalog
-- description: Session lifecycle
-  name: Auth
-- description: Workspace-scoped practice-review policy
-  name: Practice Review Settings
 - description: Active sessions
   name: Account
 - description: |-
     GitLab-specific REST endpoints used during the workspace creation wizard. Gated on the
      <code>GITLAB_WORKSPACE_CREATION</code> feature flag.
   name: git-lab-preflight-controller
-- description: Workspace integration connection management
-  name: Connections
 - description: Instance-admin LLM connection and settings management
   name: Admin LLM
-- description: Up/down votes on mentor assistant messages
-  name: Mentor Votes
-- description: "Workspace-admin access to review runs, observations, and feedback\
-    \ delivery history"
-  name: Practice reviews
+- description: Manage practice groups
+  name: Practice Groups
 - description: Public JWK set for verifying Hephaestus session JWTs
   name: Auth discovery
-- description: GDPR Art. 20 self-service data export
-  name: Account
-- description: Workspace-scoped history of admin configuration changes
-  name: Config Audit
-- description: |-
-    Vendor OAuth redirect ingress at <code>/oauth/callback/{kind</code>}. Unauthenticated —
-     identity comes from the HMAC-signed <code>state</code> param. Browsers get 302 redirects
-     on both success and failure; only <code>Accept: application/json</code> requests get
-     4xx JSON.
-  name: o-auth-callback-controller
 - description: Manage practice definitions
   name: Practice Catalog
 - description: Workspace-scoped team settings management
   name: Team Settings
-- description: Recurring reviews of recent work
-  name: Practice Review Sweep
-- description: Developer reactions to delivered feedback
-  name: Feedback Reaction
-- description: Identity provider discovery (public)
-  name: Auth discovery
 - description: Integration sync observability and manual controls
   name: Sync
 - description: "Current user identity, linked accounts, deletion"
@@ -372,9 +378,9 @@ paths:
             - PRACTICE_ACTIVE
             - PRACTICE_USAGE
             - PRACTICE_DEFINITION
-            - PRACTICE_AREA
+            - PRACTICE_GROUP
             - CURATED_PRACTICE
-            - CURATED_PRACTICE_AREA
+            - CURATED_PRACTICE_GROUP
             - WORKSPACE_INSTANCE_LLM_BUDGET
             - WORKSPACE_OWN_PROVIDER_LLM_BUDGET
             - WORKSPACE_LLM_BUDGET
@@ -874,7 +880,7 @@ paths:
       - Admin
   /admin/practice-catalog:
     get:
-      description: "Practice summaries, complete areas, ordering, and catalog state.\
+      description: "Practice summaries, complete groups, ordering, and catalog state.\
         \ Fetch a practice for its full definition."
       operationId: adminGetCuratedCatalog
       responses:
@@ -887,34 +893,49 @@ paths:
       summary: Read the instance catalog
       tags:
       - Admin Practice Catalog
-  /admin/practice-catalog/areas:
+  /admin/practice-catalog/definition-options:
+    get:
+      description: "Returns available review events, recommended requirements, and\
+        \ allowed evidence sources by work type"
+      operationId: adminGetPracticeDefinitionOptions
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeDefinitionOptions"
+          description: OK
+      summary: Read practice definition options
+      tags:
+      - Admin Practice Catalog
+  /admin/practice-catalog/groups:
     post:
-      operationId: adminCreateCuratedArea
+      operationId: adminCreateCuratedGroup
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateCuratedAreaRequest"
+              $ref: "#/components/schemas/CreateCuratedGroupRequest"
         required: true
       responses:
         "201":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CuratedArea"
-          description: Area added
+                $ref: "#/components/schemas/CuratedGroup"
+          description: Group added
         "409":
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: Slug already exists
-      summary: Add an area to the catalog
+      summary: Add a group to the catalog
       tags:
       - Admin Practice Catalog
-  /admin/practice-catalog/areas/reorder:
+  /admin/practice-catalog/groups/reorder:
     patch:
-      operationId: adminReorderCuratedAreas
+      operationId: adminReorderCuratedGroups
       parameters:
       - in: header
         name: If-Match
@@ -925,7 +946,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ReorderPracticeAreasRequest"
+              $ref: "#/components/schemas/ReorderPracticeGroupsRequest"
         required: true
       responses:
         "200":
@@ -934,12 +955,12 @@ paths:
               schema:
                 $ref: "#/components/schemas/CuratedCatalog"
           description: OK
-      summary: Reorder catalog areas
+      summary: Reorder catalog groups
       tags:
       - Admin Practice Catalog
-  /admin/practice-catalog/areas/{slug}:
+  /admin/practice-catalog/groups/{slug}:
     get:
-      operationId: adminGetCuratedArea
+      operationId: adminGetCuratedGroup
       parameters:
       - in: path
         name: slug
@@ -951,13 +972,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CuratedArea"
-          description: The area
-      summary: Read a catalog area
+                $ref: "#/components/schemas/CuratedGroup"
+          description: The group
+      summary: Read a catalog group
       tags:
       - Admin Practice Catalog
     put:
-      operationId: adminUpdateCuratedArea
+      operationId: adminUpdateCuratedGroup
       parameters:
       - in: path
         name: slug
@@ -973,15 +994,15 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CuratedAreaRequest"
+              $ref: "#/components/schemas/CuratedGroupRequest"
         required: true
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CuratedArea"
-          description: The area
+                $ref: "#/components/schemas/CuratedGroup"
+          description: The group
         "412":
           content:
             application/json:
@@ -994,12 +1015,12 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: If-Match is required
-      summary: Replace an area definition
+      summary: Replace a group definition
       tags:
       - Admin Practice Catalog
-  /admin/practice-catalog/areas/{slug}/override:
+  /admin/practice-catalog/groups/{slug}/override:
     delete:
-      operationId: adminDeleteCuratedAreaOverride
+      operationId: adminDeleteCuratedGroupOverride
       parameters:
       - in: path
         name: slug
@@ -1016,8 +1037,8 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CuratedArea"
-          description: The area
+                $ref: "#/components/schemas/CuratedGroup"
+          description: The group
         "409":
           content:
             application/json:
@@ -1036,12 +1057,12 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: If-Match is required
-      summary: Use the Hephaestus definition of an area
+      summary: Use the Hephaestus definition of a group
       tags:
       - Admin Practice Catalog
-  /admin/practice-catalog/areas/{slug}/override/acknowledgement:
+  /admin/practice-catalog/groups/{slug}/override/acknowledgement:
     put:
-      operationId: adminKeepCuratedArea
+      operationId: adminKeepCuratedGroup
       parameters:
       - in: path
         name: slug
@@ -1058,8 +1079,8 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CuratedArea"
-          description: The area
+                $ref: "#/components/schemas/CuratedGroup"
+          description: The group
         "412":
           content:
             application/json:
@@ -1072,14 +1093,14 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: If-Match is required
-      summary: Keep the saved area customization
+      summary: Keep the saved group customization
       tags:
       - Admin Practice Catalog
-  /admin/practice-catalog/areas/{slug}/status:
+  /admin/practice-catalog/groups/{slug}/status:
     patch:
-      description: Excluding an area also excludes its practices from new workspaces;
+      description: Excluding a group also excludes its practices from new workspaces;
         existing workspaces do not change.
-      operationId: adminUpdateCuratedAreaStatus
+      operationId: adminUpdateCuratedGroupStatus
       parameters:
       - in: path
         name: slug
@@ -1116,22 +1137,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: If-Match is required
-      summary: "Exclude an area from new workspaces, or include it again"
-      tags:
-      - Admin Practice Catalog
-  /admin/practice-catalog/definition-options:
-    get:
-      description: "Returns available review events, recommended requirements, and\
-        \ allowed evidence sources by work type"
-      operationId: adminGetPracticeDefinitionOptions
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PracticeDefinitionOptions"
-          description: OK
-      summary: Read practice definition options
+      summary: "Exclude a group from new workspaces, or include it again"
       tags:
       - Admin Practice Catalog
   /admin/practice-catalog/order:
@@ -1200,7 +1206,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/CuratedCatalog"
           description: OK
-      summary: Reorder practices within one catalog area
+      summary: Reorder practices within one catalog group
       tags:
       - Admin Practice Catalog
   /admin/practice-catalog/practices/{slug}:
@@ -1372,7 +1378,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/CuratedCatalog"
           description: OK
-      summary: Move a practice to another catalog area
+      summary: Move a practice to another catalog group
       tags:
       - Admin Practice Catalog
   /admin/practice-catalog/practices/{slug}/status:
@@ -2342,9 +2348,9 @@ paths:
             - PRACTICE_ACTIVE
             - PRACTICE_USAGE
             - PRACTICE_DEFINITION
-            - PRACTICE_AREA
+            - PRACTICE_GROUP
             - CURATED_PRACTICE
-            - CURATED_PRACTICE_AREA
+            - CURATED_PRACTICE_GROUP
             - WORKSPACE_INSTANCE_LLM_BUDGET
             - WORKSPACE_OWN_PROVIDER_LLM_BUDGET
             - WORKSPACE_LLM_BUDGET
@@ -4009,234 +4015,6 @@ paths:
         resume)
       tags:
       - Outline collections
-  /workspaces/{workspaceSlug}/practice-areas:
-    get:
-      description: Returns the workspace's practice areas
-      operationId: listAreas
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - description: Return only areas shown in practice dashboards
-        in: query
-        name: visibleInPracticeDashboardsOnly
-        required: false
-        schema:
-          type: boolean
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/PracticeArea"
-          description: Areas returned
-      security: []
-      summary: List practice areas
-      tags:
-      - Practice Areas
-    post:
-      operationId: createArea
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreatePracticeAreaRequest"
-        required: true
-      responses:
-        "201":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PracticeArea"
-          description: Area created
-        "409":
-          description: Area slug already exists in this workspace
-      summary: Create a new practice area
-      tags:
-      - Practice Areas
-  /workspaces/{workspaceSlug}/practice-areas/reorder:
-    patch:
-      description: Sets each area's display order to its index in the provided slug
-        list (one atomic write)
-      operationId: reorderAreas
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ReorderPracticeAreasRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/PracticeArea"
-          description: Areas reordered; the full ordered list is returned
-        "400":
-          description: orderedSlugs is empty or contains duplicates
-        "404":
-          description: A slug is unknown
-      summary: Reorder practice areas
-      tags:
-      - Practice Areas
-  /workspaces/{workspaceSlug}/practice-areas/{areaSlug}:
-    delete:
-      description: Deletes the area. By default its practices move to Unassigned;
-        deletePractices=true deletes them too.
-      operationId: deleteArea
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: areaSlug
-        required: true
-        schema:
-          type: string
-      - in: query
-        name: deletePractices
-        required: false
-        schema:
-          type: boolean
-          default: false
-      responses:
-        "204":
-          description: Area deleted
-        "404":
-          description: Area not found
-      summary: Delete a practice area
-      tags:
-      - Practice Areas
-    get:
-      operationId: getArea
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: areaSlug
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PracticeArea"
-          description: Area returned
-        "404":
-          description: Area not found
-      security: []
-      summary: Get a practice area
-      tags:
-      - Practice Areas
-    patch:
-      operationId: updateArea
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: areaSlug
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdatePracticeAreaRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PracticeArea"
-          description: Area updated
-        "404":
-          description: Area not found
-      summary: Update a practice area
-      tags:
-      - Practice Areas
-  /workspaces/{workspaceSlug}/practice-areas/{areaSlug}/autonomy:
-    patch:
-      description: "Applies to every practice in the area that holds no autonomy of\
-        \ its own; practices that set their own are left alone. OFF stops their reviews\
-        \ entirely. HUMAN_APPROVAL runs them and records every observation, and holds\
-        \ feedback for an authorized reviewer. AUTOMATIC sends feedback without asking.\
-        \ Send a null autonomy to clear the area's own setting so it follows the workspace\
-        \ default."
-      operationId: setAreaAutonomy
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: areaSlug
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdatePracticeAutonomyRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PracticeArea"
-          description: Autonomy updated; the response carries the autonomy now in
-            force and where it came from
-        "404":
-          description: Area not found
-      summary: Set how much autonomy the system has over one area
-      tags:
-      - Practice Areas
   /workspaces/{workspaceSlug}/practice-catalog/adoption:
     get:
       operationId: listAdoptablePractices
@@ -4266,9 +4044,9 @@ paths:
       summary: List practices available for adoption
       tags:
       - Practice Catalog Adoption
-  /workspaces/{workspaceSlug}/practice-catalog/adoption/areas/{slug}:
+  /workspaces/{workspaceSlug}/practice-catalog/adoption/groups/{slug}:
     get:
-      operationId: previewAreaAdoption
+      operationId: previewGroupAdoption
       parameters:
       - description: Workspace slug
         in: path
@@ -4287,13 +4065,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CatalogAreaAdoptionPreview"
+                $ref: "#/components/schemas/CatalogGroupAdoptionPreview"
           description: OK
-      summary: Preview adoption of a catalog area and its practices
+      summary: Preview adoption of a catalog group and its practices
       tags:
       - Practice Catalog Adoption
     post:
-      operationId: adoptArea
+      operationId: adoptGroup
       parameters:
       - description: Workspace slug
         in: path
@@ -4317,9 +4095,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CatalogAreaAdoptionResult"
+                $ref: "#/components/schemas/CatalogGroupAdoptionResult"
           description: OK
-      summary: Adopt all available practices in a catalog area
+      summary: Adopt all available practices in a catalog group
       tags:
       - Practice Catalog Adoption
   /workspaces/{workspaceSlug}/practice-catalog/adoption/{slug}:
@@ -4446,12 +4224,373 @@ paths:
       summary: Read the instance's definition of a practice
       tags:
       - Practice Catalog
+  /workspaces/{workspaceSlug}/practice-groups:
+    get:
+      description: Returns the workspace's practice groups
+      operationId: listGroups
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: Return only groups shown in practice dashboards
+        in: query
+        name: visibleInPracticeDashboardsOnly
+        required: false
+        schema:
+          type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PracticeGroup"
+          description: Groups returned
+      summary: List practice groups
+      tags:
+      - Practice Groups
+    post:
+      operationId: createGroup
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePracticeGroupRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeGroup"
+          description: Group created
+        "409":
+          description: Group slug already exists in this workspace
+      summary: Create a new practice group
+      tags:
+      - Practice Groups
+  /workspaces/{workspaceSlug}/practice-groups/reorder:
+    patch:
+      description: Sets each group's display order to its index in the provided slug
+        list (one atomic write)
+      operationId: reorderGroups
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderPracticeGroupsRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PracticeGroup"
+          description: Groups reordered; the full ordered list is returned
+        "400":
+          description: orderedSlugs is empty or contains duplicates
+        "404":
+          description: A slug is unknown
+      summary: Reorder practice groups
+      tags:
+      - Practice Groups
+  /workspaces/{workspaceSlug}/practice-groups/standings:
+    get:
+      description: "Returns every active practice group's standing, direction, guidance,\
+        \ and supporting observations."
+      operationId: listPracticeGroupStandings
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PracticeGroupStanding"
+          description: Practice group standings returned
+      summary: List the current developer's practice group standings
+      tags:
+      - Practice Group Standings
+  /workspaces/{workspaceSlug}/practice-groups/{groupSlug}:
+    delete:
+      description: Deletes the group. By default its practices move to Unassigned;
+        deletePractices=true deletes them too.
+      operationId: deleteGroup
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: groupSlug
+        required: true
+        schema:
+          type: string
+      - in: query
+        name: deletePractices
+        required: false
+        schema:
+          type: boolean
+          default: false
+      responses:
+        "204":
+          description: Group deleted
+        "404":
+          description: Group not found
+      summary: Delete a practice group
+      tags:
+      - Practice Groups
+    get:
+      operationId: getGroup
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: groupSlug
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeGroup"
+          description: Group returned
+        "404":
+          description: Group not found
+      summary: Get a practice group
+      tags:
+      - Practice Groups
+    patch:
+      operationId: updateGroup
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: groupSlug
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePracticeGroupRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeGroup"
+          description: Group updated
+        "404":
+          description: Group not found
+      summary: Update a practice group
+      tags:
+      - Practice Groups
+  /workspaces/{workspaceSlug}/practice-groups/{groupSlug}/autonomy:
+    patch:
+      description: "Applies to every practice in the group that holds no autonomy\
+        \ of its own; practices that set their own are left alone. OFF stops their\
+        \ reviews entirely. HUMAN_APPROVAL runs them and records every observation,\
+        \ and holds feedback for an authorized reviewer. AUTOMATIC sends feedback\
+        \ without asking. Send a null autonomy to clear the group's own setting so\
+        \ it follows the workspace default."
+      operationId: setGroupAutonomy
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: groupSlug
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePracticeAutonomyRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeGroup"
+          description: Autonomy updated; the response carries the autonomy now in
+            force and where it came from
+        "404":
+          description: Group not found
+      summary: Set how much autonomy the system has over one group
+      tags:
+      - Practice Groups
+  /workspaces/{workspaceSlug}/practice-groups/{groupSlug}/review-runs:
+    get:
+      description: "Returns complete review runs newest first, including visible undecided\
+        \ observations."
+      operationId: listPracticeGroupReviewRuns
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: groupSlug
+        required: true
+        schema:
+          type: string
+      - in: query
+        name: practiceSlug
+        required: false
+        schema:
+          type: string
+      - description: "Only reviews of these artifact kinds, e.g. scm.pull_request\
+          \ (repeatable)"
+        in: query
+        name: artifactKinds
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      - in: query
+        name: severities
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - CRITICAL
+            - MAJOR
+            - MINOR
+            - INFO
+      - description: "Zero-based page, at most 100"
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          maximum: 100
+          minimum: 0
+      - description: Page size from 1 to 50
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          maximum: 50
+          minimum: 1
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeGroupReviewRunsPage"
+          description: Paginated review runs returned
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Invalid filter or pagination
+        "404":
+          description: Practice group not found
+      summary: List complete review runs for a practice group
+      tags:
+      - Practice Group Detail
+  /workspaces/{workspaceSlug}/practice-groups/{groupSlug}/trend:
+    get:
+      description: Returns the group direction and every eligible practice direction
+        with inspectable support.
+      operationId: getPracticeGroupTrend
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: groupSlug
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeGroupTrend"
+          description: Practice-group trend returned
+        "404":
+          description: Practice group not found
+      summary: Get the evidence-supported trend for a practice group
+      tags:
+      - Practice Group Detail
   /workspaces/{workspaceSlug}/practices:
     get:
       description: "Returns this workspace's practices, each with the autonomy in\
         \ force for it, whether that autonomy was set on the practice or inherited\
-        \ from its area or the workspace, and which level decided it. Optionally narrowed\
-        \ to one autonomy."
+        \ from its group or the workspace, and which level decided it. Optionally\
+        \ narrowed to one autonomy."
       operationId: listPractices
       parameters:
       - description: Workspace slug
@@ -4512,7 +4651,7 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
-          description: Practice area not found
+          description: Practice group not found
         "409":
           content:
             application/problem+json:
@@ -4525,7 +4664,7 @@ paths:
   /workspaces/{workspaceSlug}/practices/autonomy:
     get:
       description: "How many practices sit at each autonomy, for the whole workspace\
-        \ and for each area, plus the workspace default and where feedback may go.\
+        \ and for each group, plus the workspace default and where feedback may go.\
         \ The summary a hundred-practice catalogue is read through — answered here\
         \ so a client never has to fetch every practice to count them."
       operationId: autonomyRollup
@@ -4544,7 +4683,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/AutonomyRollup"
           description: Rollup returned
-      summary: "Summarise how much autonomy this workspace grants, by area"
+      summary: "Summarise how much autonomy this workspace grants, by group"
       tags:
       - Practice Catalog
   /workspaces/{workspaceSlug}/practices/backfill-runs:
@@ -4707,29 +4846,6 @@ paths:
       summary: Read practice definition options
       tags:
       - Practice Catalog
-  /workspaces/{workspaceSlug}/practices/feedback/engagement:
-    get:
-      description: Returns the current user's reaction action counts across all feedback
-        they received in this workspace.
-      operationId: getEngagement
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ReactionEngagement"
-          description: Engagement statistics returned
-      summary: Get engagement statistics
-      tags:
-      - Feedback Reaction
   /workspaces/{workspaceSlug}/practices/feedback/in-app:
     get:
       description: "Process-level messages prepared for the authenticated developer:\
@@ -4756,15 +4872,57 @@ paths:
                 items:
                   $ref: "#/components/schemas/InAppFeedback"
           description: "In-app messages returned, newest first"
-      security: []
       summary: The current developer's in-app feedback
       tags:
       - In-App Feedback
-  /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/reactions:
+  /workspaces/{workspaceSlug}/practices/feedback/resolution-counts:
     get:
-      description: "Returns the current user's most recent reaction to the specified\
-        \ feedback unit, or 204 if none exists."
-      operationId: getLatestReaction
+      operationId: getFeedbackResolutionCounts
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackResolutionCounts"
+          description: OK
+      summary: Get feedback resolution counts
+      tags:
+      - Feedback Response
+  /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/response:
+    delete:
+      operationId: deleteFeedbackResponse
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: feedbackId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: Response deleted or no response was recorded
+        "404":
+          description: Delivered feedback not found for the current recipient
+      summary: Delete the response to delivered feedback
+      tags:
+      - Feedback Response
+    get:
+      operationId: getFeedbackResponse
       parameters:
       - description: Workspace slug
         in: path
@@ -4784,20 +4942,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Reaction"
-          description: Latest reaction returned
+                $ref: "#/components/schemas/FeedbackResponse"
+          description: Current response returned
         "204":
-          description: No reaction exists for this feedback unit
+          description: No response is currently recorded
         "404":
-          description: Feedback not found in this workspace
-      summary: Get the latest reaction to a feedback unit
+          description: Delivered feedback not found for the current recipient
+      summary: Get the current feedback response
       tags:
-      - Feedback Reaction
-    post:
-      description: "Records the recipient's reaction (ADDRESSED, DISPUTED, NOT_APPLICABLE)\
-        \ to a delivered feedback unit. Append-only: submitting again creates a new\
-        \ record, preserving temporal history."
-      operationId: submitReaction
+      - Feedback Response
+    put:
+      description: Sets the complete current response. Repeating the same request
+        has no effect.
+      operationId: replaceFeedbackResponse
       parameters:
       - description: Workspace slug
         in: path
@@ -4816,50 +4973,22 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateReaction"
+              $ref: "#/components/schemas/FeedbackResponseRequest"
         required: true
-      responses:
-        "201":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Reaction"
-          description: Reaction recorded
-        "400":
-          description: "Invalid request (e.g., DISPUTED without explanation)"
-        "403":
-          description: Current user is not the feedback's recipient
-        "404":
-          description: Feedback not found in this workspace
-      summary: Submit a reaction to a feedback unit
-      tags:
-      - Feedback Reaction
-  /workspaces/{workspaceSlug}/practices/learner:
-    get:
-      description: "Returns the learner-facing name, area, rationale, and example\
-        \ for every practice the workspace reviews (any autonomy above OFF)"
-      operationId: listLearnerPractices
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       responses:
         "200":
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/LearnerPractice"
-          description: Learner practices returned
-      security: []
-      summary: "List reviewed practices, learner-facing"
+                $ref: "#/components/schemas/FeedbackResponse"
+          description: Response replaced
+        "400":
+          description: Invalid response
+        "404":
+          description: Delivered feedback not found for the current recipient
+      summary: Replace the response to delivered feedback
       tags:
-      - Practice Catalog
+      - Feedback Response
   /workspaces/{workspaceSlug}/practices/observations:
     get:
       description: Paginated observations for the authenticated developer with optional
@@ -4879,6 +5008,12 @@ paths:
         required: false
         schema:
           type: string
+      - description: Filter by the practice group the observed practice belongs to
+        in: query
+        name: groupSlug
+        required: false
+        schema:
+          type: string
       - description: Filter by presence
         in: query
         name: presence
@@ -4890,20 +5025,73 @@ paths:
           - ABSENT
           - NOT_APPLICABLE
           - INCONCLUSIVE
-      - in: query
+      - description: "Only observations on these kinds of reviewed work, e.g. scm.pull_request\
+          \ (repeatable)"
+        in: query
+        name: artifactKinds
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Only observations with these severities (repeatable); omit for
+          all
+        in: query
+        name: severities
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - CRITICAL
+            - MAJOR
+            - MINOR
+            - INFO
+      - description: Drop NOT_APPLICABLE rows — only observations where the practice
+          actually applied
+        in: query
+        name: displayableOnly
+        required: false
+        schema:
+          type: boolean
+      - description: "Feed ordering: DATE (default) or SEVERITY (most severe first,\
+          \ ties newest-first)"
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: string
+          enum:
+          - DATE
+          - SEVERITY
+      - description: "Ordering direction: for DATE newest/oldest first, for SEVERITY\
+          \ most/least severe first"
+        in: query
+        name: direction
+        required: false
+        schema:
+          type: string
+          enum:
+          - ASC
+          - DESC
+      - description: Zero-based page
+        in: query
         name: page
         required: false
         schema:
           type: integer
           format: int32
-          default: 0
-      - in: query
+          minimum: 0
+      - description: Page size from 1 to 100
+        in: query
         name: size
         required: false
         schema:
           type: integer
           format: int32
-          default: 20
+          maximum: 100
+          minimum: 1
       responses:
         "200":
           content:
@@ -4911,7 +5099,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/PageObservationList"
           description: Paginated observations returned
-      security: []
       summary: List observations for current user
       tags:
       - Practice Observations
@@ -4942,37 +5129,7 @@ paths:
                 items:
                   $ref: "#/components/schemas/ObservationList"
           description: PR observations returned
-      security: []
       summary: List observations for a pull request
-      tags:
-      - Practice Observations
-  /workspaces/{workspaceSlug}/practices/observations/reflection:
-    get:
-      description: "Per-practice cards a developer can READ — why the practice matters,\
-        \ what good looks like, where they stand, the specific feedback to act on,\
-        \ and what they already do well. The third feedback channel alongside in-context\
-        \ SCM notes and the conversational mentor; the same observations reorganised\
-        \ by practice for self-paced reflection, not a scoreboard of counts."
-      operationId: getReflection
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ReflectionPractice"
-          description: Per-practice reflection cards returned
-      security: []
-      summary: Reflective dashboard feedback for the current developer
       tags:
       - Practice Observations
   /workspaces/{workspaceSlug}/practices/observations/summary:
@@ -4996,7 +5153,6 @@ paths:
                 items:
                   $ref: "#/components/schemas/DeveloperPracticeSummary"
           description: Practice summaries returned
-      security: []
       summary: Per-practice summary for current user
       tags:
       - Practice Observations
@@ -5026,7 +5182,6 @@ paths:
           description: Observation detail returned
         "404":
           description: Observation not found or not owned by current user
-      security: []
       summary: Get observation detail
       tags:
       - Practice Observations
@@ -5063,9 +5218,9 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
-          description: "orderedSlugs is empty, has duplicates, or is not the area's\
+          description: "orderedSlugs is empty, has duplicates, or is not the group's\
             \ complete set"
-      summary: Reorder the practices within an area
+      summary: Reorder the practices within a group
       tags:
       - Practice Catalog
   /workspaces/{workspaceSlug}/practices/review-requests:
@@ -5197,6 +5352,31 @@ paths:
       summary: Preview the effective counts for proposed practice-review coverage
       tags:
       - Practice Review Settings
+  /workspaces/{workspaceSlug}/practices/reviewed:
+    get:
+      description: "Returns the developer-facing name, group, rationale, and example\
+        \ for every practice the workspace reviews (any autonomy above OFF)"
+      operationId: listReviewedPractices
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReviewedPractice"
+          description: Developer practices returned
+      summary: "List reviewed practices, developer-facing"
+      tags:
+      - Practice Catalog
   /workspaces/{workspaceSlug}/practices/reviews:
     get:
       description: Results are ordered newest first.
@@ -5578,7 +5758,7 @@ paths:
           items:
             type: string
       - in: query
-        name: areaSlug
+        name: groupSlug
         required: false
         schema:
           type: array
@@ -5720,6 +5900,31 @@ paths:
       summary: Get an observation with its evidence and linked feedback
       tags:
       - Practice reviews
+  /workspaces/{workspaceSlug}/practices/standings:
+    get:
+      description: "Returns each practice's standing, direction, supporting observations,\
+        \ and developer guidance."
+      operationId: listPracticeStandings
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PracticeStanding"
+          description: Practice standings returned
+      summary: List the current developer's practice standings
+      tags:
+      - Practice Standings
   /workspaces/{workspaceSlug}/practices/sweep-schedules:
     get:
       operationId: listSweepSchedules
@@ -6044,48 +6249,8 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
-          description: Practice or practice area not found
+          description: Practice or practice group not found
       summary: Update a practice
-      tags:
-      - Practice Catalog
-  /workspaces/{workspaceSlug}/practices/{practiceSlug}/area:
-    put:
-      description: "Moves the practice to the requested area, or to Unassigned when\
-        \ areaSlug is null"
-      operationId: bindArea
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: practiceSlug
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/BindPracticeAreaRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Practice"
-          description: Practice moved
-        "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: Practice or area not found
-      summary: Move a practice
       tags:
       - Practice Catalog
   /workspaces/{workspaceSlug}/practices/{practiceSlug}/autonomy:
@@ -6094,7 +6259,7 @@ paths:
         \ every observation and holds feedback for an authorized reviewer. AUTOMATIC\
         \ sends feedback without asking, as far as this workspace's reach allows.\
         \ Send a null autonomy to clear the practice's own setting so it follows its\
-        \ area, and through the area the workspace default."
+        \ group, and through the group the workspace default."
       operationId: setAutonomy
       parameters:
       - description: Workspace slug
@@ -6139,10 +6304,50 @@ paths:
       summary: Set how much autonomy the system has over one practice
       tags:
       - Practice Catalog
+  /workspaces/{workspaceSlug}/practices/{practiceSlug}/group:
+    put:
+      description: "Moves the practice to the requested group, or to Unassigned when\
+        \ groupSlug is null"
+      operationId: bindGroup
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: practiceSlug
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BindPracticeGroupRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Practice"
+          description: Practice moved
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Practice or group not found
+      summary: Move a practice
+      tags:
+      - Practice Catalog
   /workspaces/{workspaceSlug}/practices/{practiceSlug}/placement:
     put:
       description: Moves the practice and sets its exact position in one atomic write;
-        omit areaSlug for Unassigned
+        omit groupSlug for Unassigned
       operationId: placePractice
       parameters:
       - description: Workspace slug
@@ -6183,7 +6388,7 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
-          description: Practice or area not found
+          description: Practice or group not found
       summary: Place a practice in the catalog
       tags:
       - Practice Catalog
@@ -7555,9 +7760,9 @@ components:
         timeoutSeconds:
           type: integer
           format: int32
-          description: Per-run timeout in seconds (30–3600; one hour is the longest
+          description: Per-run timeout in seconds (30–10800; three hours is the longest
             a single run may take)
-          maximum: 3600
+          maximum: 10800
           minimum: 30
         workspaceModelId:
           type: integer
@@ -7704,33 +7909,6 @@ components:
       - reviewOutcome
       - status
       - target
-    AreaAutonomyRollup:
-      type: object
-      description: One area's practice counts per effective autonomy state
-      properties:
-        areaName:
-          type: string
-          description: Area name; null for the no-area group
-        areaSlug:
-          type: string
-          description: Area slug; null groups the practices that belong to no area
-        autonomy:
-          $ref: "#/components/schemas/AutonomyAssignment"
-          description: "The autonomy in force for this area, and where it came from"
-        counts:
-          type: object
-          additionalProperties:
-            type: integer
-            format: int32
-          description: Practice count per effective autonomy in this area
-        overriddenCount:
-          type: integer
-          format: int32
-          description: Number of practices with an explicit autonomy override
-      required:
-      - autonomy
-      - counts
-      - overriddenCount
     ArtifactTrace:
       type: object
       description: "Every practice's answer for one artifact, and the occurrences\
@@ -7859,7 +8037,7 @@ components:
           description: Which level decided the effective autonomy
           enum:
           - PRACTICE
-          - AREA
+          - GROUP
           - WORKSPACE
       required:
       - effective
@@ -7868,26 +8046,26 @@ components:
     AutonomyRollup:
       type: object
       description: "Practice counts per autonomy state, for the workspace and each\
-        \ area"
+        \ group"
       properties:
-        areas:
-          type: array
-          description: "The same counts per area, in catalogue order"
-          items:
-            $ref: "#/components/schemas/AreaAutonomyRollup"
         counts:
           type: object
           additionalProperties:
             type: integer
             format: int32
           description: Practice count per effective autonomy across the workspace
+        groups:
+          type: array
+          description: "The same counts per group, in catalogue order"
+          items:
+            $ref: "#/components/schemas/GroupAutonomyRollup"
         workspaceDefault:
           $ref: "#/components/schemas/AutonomyAssignment"
-          description: The workspace-level decision every area and practice falls
+          description: The workspace-level decision every group and practice falls
             back to
       required:
-      - areas
       - counts
+      - groups
       - workspaceDefault
     AvailableLlmModel:
       type: object
@@ -7965,90 +8143,31 @@ components:
       description: Binary progress indicating unlocked state
       required:
       - unlocked
-    BindPracticeAreaRequest:
+    BindPracticeGroupRequest:
       type: object
-      description: Request to move a practice to an area or Unassigned
+      description: Request to move a practice to a group or Unassigned
       properties:
-        areaSlug:
+        groupSlug:
           type:
           - string
           - "null"
-          description: Destination area slug; omit or set to null for Unassigned
+          description: Destination group slug; omit or set to null for Unassigned
           example: review-ready-work
-    CatalogAdoptionArea:
+    CatalogAdoptionGroup:
       type: object
       properties:
         definition:
-          $ref: "#/components/schemas/CuratedAreaRequest"
+          $ref: "#/components/schemas/CuratedGroupRequest"
         disposition:
           type: string
           enum:
           - UNASSIGNED
-          - REUSE_EXISTING_AREA
-          - CREATE_CATALOG_AREA
+          - REUSE_EXISTING_GROUP
+          - CREATE_CATALOG_GROUP
         slug:
           type: string
       required:
       - disposition
-    CatalogAreaAdoptionPreview:
-      type: object
-      properties:
-        actions:
-          type: array
-          items:
-            $ref: "#/components/schemas/CatalogAreaPracticeAction"
-        definition:
-          $ref: "#/components/schemas/CuratedAreaRequest"
-        disposition:
-          type: string
-          enum:
-          - UNASSIGNED
-          - REUSE_EXISTING_AREA
-          - CREATE_CATALOG_AREA
-        etag:
-          type: string
-        practices:
-          type: array
-          items:
-            $ref: "#/components/schemas/CatalogPracticePreview"
-        slug:
-          type: string
-      required:
-      - actions
-      - definition
-      - disposition
-      - etag
-      - practices
-      - slug
-    CatalogAreaAdoptionResult:
-      type: object
-      properties:
-        added:
-          type: array
-          items:
-            $ref: "#/components/schemas/Practice"
-        moved:
-          type: array
-          items:
-            $ref: "#/components/schemas/Practice"
-      required:
-      - added
-      - moved
-    CatalogAreaPracticeAction:
-      type: object
-      properties:
-        action:
-          type: string
-          enum:
-          - ADD
-          - MOVE_TO_AREA
-          - KEEP
-          - BLOCKED
-        slug:
-          type: string
-      required:
-      - action
-      - slug
     CatalogEntryStatus:
       type: object
       properties:
@@ -8077,6 +8196,65 @@ components:
       - etag
       - offered
       - state
+    CatalogGroupAdoptionPreview:
+      type: object
+      properties:
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogGroupPracticeAction"
+        definition:
+          $ref: "#/components/schemas/CuratedGroupRequest"
+        disposition:
+          type: string
+          enum:
+          - UNASSIGNED
+          - REUSE_EXISTING_GROUP
+          - CREATE_CATALOG_GROUP
+        etag:
+          type: string
+        practices:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogPracticePreview"
+        slug:
+          type: string
+      required:
+      - actions
+      - definition
+      - disposition
+      - etag
+      - practices
+      - slug
+    CatalogGroupAdoptionResult:
+      type: object
+      properties:
+        added:
+          type: array
+          items:
+            $ref: "#/components/schemas/Practice"
+        moved:
+          type: array
+          items:
+            $ref: "#/components/schemas/Practice"
+      required:
+      - added
+      - moved
+    CatalogGroupPracticeAction:
+      type: object
+      properties:
+        action:
+          type: string
+          enum:
+          - ADD
+          - MOVE_TO_GROUP
+          - KEEP
+          - BLOCKED
+        slug:
+          type: string
+      required:
+      - action
+      - slug
     CatalogOrigin:
       type: object
       description: The catalog entry a workspace copy came from and whether it differs
@@ -8101,8 +8279,6 @@ components:
     CatalogPracticePreview:
       type: object
       properties:
-        area:
-          $ref: "#/components/schemas/CatalogAdoptionArea"
         availability:
           type: string
           enum:
@@ -8113,6 +8289,8 @@ components:
           $ref: "#/components/schemas/CuratedPracticeDefinition"
         etag:
           type: string
+        group:
+          $ref: "#/components/schemas/CatalogAdoptionGroup"
         initialAutonomy:
           type: string
           enum:
@@ -8124,20 +8302,16 @@ components:
         sourceReviewRuleFingerprint:
           type: string
       required:
-      - area
       - availability
       - definition
       - etag
+      - group
       - initialAutonomy
       - slug
       - sourceReviewRuleFingerprint
     CatalogPracticeSummary:
       type: object
       properties:
-        areaName:
-          type: string
-        areaSlug:
-          type: string
         artifactKind:
           type: string
         automatedReviewValidation:
@@ -8148,6 +8322,10 @@ components:
           - AVAILABLE
           - ADOPTED
           - SLUG_CONFLICT
+        groupName:
+          type: string
+        groupSlug:
+          type: string
         name:
           type: string
         slug:
@@ -8305,9 +8483,9 @@ components:
           - PRACTICE_ACTIVE
           - PRACTICE_USAGE
           - PRACTICE_DEFINITION
-          - PRACTICE_AREA
+          - PRACTICE_GROUP
           - CURATED_PRACTICE
-          - CURATED_PRACTICE_AREA
+          - CURATED_PRACTICE_GROUP
           - WORKSPACE_INSTANCE_LLM_BUDGET
           - WORKSPACE_OWN_PROVIDER_LLM_BUDGET
           - WORKSPACE_LLM_BUDGET
@@ -8607,12 +8785,12 @@ components:
       - id
       - login
       - name
-    CreateCuratedAreaRequest:
+    CreateCuratedGroupRequest:
       type: object
-      description: Request to add an area to the instance catalog
+      description: Request to add a group to the instance catalog
       properties:
         definition:
-          $ref: "#/components/schemas/CuratedAreaRequest"
+          $ref: "#/components/schemas/CuratedGroupRequest"
         slug:
           type: string
           example: reviewing-work
@@ -8745,20 +8923,20 @@ components:
       - clientSecret
       - registrationId
       - type
-    CreatePracticeAreaRequest:
+    CreatePracticeGroupRequest:
       type: object
-      description: Request to create a new practice area
+      description: Request to create a new practice group
       properties:
         color:
           type: string
-          description: Optional palette colour key for the area's chip
+          description: Optional palette colour key for the group's chip
           example: rose
           maxLength: 32
           minLength: 0
           pattern: "^[a-z]+$"
         description:
           type: string
-          description: What this area develops
+          description: What this group develops
           maxLength: 5000
           minLength: 0
         displayOrder:
@@ -8768,7 +8946,7 @@ components:
           example: 1
         icon:
           type: string
-          description: Optional lucide icon name giving the area a glanceable identity
+          description: Optional lucide icon name giving the group a glanceable identity
           example: ShieldAlert
           maxLength: 64
           minLength: 0
@@ -8793,12 +8971,6 @@ components:
       type: object
       description: Request to create a new practice definition
       properties:
-        areaSlug:
-          type:
-          - string
-          - "null"
-          description: Practice area to add the practice to. Omit or set to null for
-            Unassigned.
         automatedReviewPolicy:
           $ref: "#/components/schemas/PracticeAutomatedReviewPolicy"
           description: Versioned review settings; omit to use the recommended ones
@@ -8816,6 +8988,12 @@ components:
           description: Practice review criteria
           maxLength: 50000
           minLength: 0
+        groupSlug:
+          type:
+          - string
+          - "null"
+          description: Practice group to add the practice to. Omit or set to null
+            for Unassigned.
         name:
           type: string
           description: Human-readable name
@@ -8850,24 +9028,6 @@ components:
       - criteria
       - name
       - slug
-    CreateReaction:
-      type: object
-      description: Submit a reaction to a delivered feedback unit
-      properties:
-        action:
-          type: string
-          description: The reaction action to record
-          enum:
-          - ADDRESSED
-          - DISPUTED
-          - NOT_APPLICABLE
-        explanation:
-          type: string
-          description: Explanation for the reaction. Required when action is DISPUTED.
-          maxLength: 2000
-          minLength: 0
-      required:
-      - action
     CreateReviewBackfillRunRequest:
       type: object
       description: |-
@@ -9118,60 +9278,19 @@ components:
       - displayName
       - kind
       - workspaceSlug
-    CuratedArea:
-      type: object
-      properties:
-        definition:
-          $ref: "#/components/schemas/CuratedAreaRequest"
-        position:
-          type: integer
-          format: int32
-        shipped:
-          $ref: "#/components/schemas/CuratedAreaRequest"
-        slug:
-          type: string
-        status:
-          $ref: "#/components/schemas/CatalogEntryStatus"
-      required:
-      - definition
-      - position
-      - slug
-      - status
-    CuratedAreaRequest:
-      type: object
-      description: A complete curated practice area definition
-      properties:
-        color:
-          type: string
-          maxLength: 32
-          minLength: 0
-        description:
-          type: string
-          maxLength: 2000
-          minLength: 0
-        icon:
-          type: string
-          maxLength: 64
-          minLength: 0
-        name:
-          type: string
-          maxLength: 128
-          minLength: 3
-      required:
-      - name
     CuratedCatalog:
       type: object
       properties:
-        areas:
-          type: array
-          items:
-            $ref: "#/components/schemas/CuratedArea"
         customOrder:
           type: boolean
         etag:
           type: string
           description: Strong entity tag to send in If-Match when reordering this
             catalog
+        groups:
+          type: array
+          items:
+            $ref: "#/components/schemas/CuratedGroup"
         practices:
           type: array
           items:
@@ -9179,9 +9298,9 @@ components:
         summary:
           $ref: "#/components/schemas/CuratedCatalogSummary"
       required:
-      - areas
       - customOrder
       - etag
+      - groups
       - practices
       - summary
     CuratedCatalogSummary:
@@ -9220,6 +9339,47 @@ components:
       - updatesChangingPresentation
       - updatesChangingWordingOnly
       - yours
+    CuratedGroup:
+      type: object
+      properties:
+        definition:
+          $ref: "#/components/schemas/CuratedGroupRequest"
+        position:
+          type: integer
+          format: int32
+        shipped:
+          $ref: "#/components/schemas/CuratedGroupRequest"
+        slug:
+          type: string
+        status:
+          $ref: "#/components/schemas/CatalogEntryStatus"
+      required:
+      - definition
+      - position
+      - slug
+      - status
+    CuratedGroupRequest:
+      type: object
+      description: A complete curated practice group definition
+      properties:
+        color:
+          type: string
+          maxLength: 32
+          minLength: 0
+        description:
+          type: string
+          maxLength: 2000
+          minLength: 0
+        icon:
+          type: string
+          maxLength: 64
+          minLength: 0
+        name:
+          type: string
+          maxLength: 128
+          minLength: 3
+      required:
+      - name
     CuratedPractice:
       type: object
       properties:
@@ -9243,8 +9403,6 @@ components:
       type: object
       description: A resolved curated practice definition
       properties:
-        areaSlug:
-          type: string
         artifactKind:
           type: string
         automatedReviewPolicy:
@@ -9256,6 +9414,8 @@ components:
           items:
             $ref: "#/components/schemas/PracticeBinding"
         criteria:
+          type: string
+        groupSlug:
           type: string
         name:
           type: string
@@ -9276,10 +9436,6 @@ components:
       type: object
       description: A complete curated practice definition
       properties:
-        areaSlug:
-          type: string
-          maxLength: 64
-          minLength: 0
         automatedReviewPolicy:
           $ref: "#/components/schemas/PracticeAutomatedReviewPolicy"
           description: Evidence requirements; omit to use the recommended requirements
@@ -9295,6 +9451,10 @@ components:
         criteria:
           type: string
           maxLength: 50000
+          minLength: 0
+        groupSlug:
+          type: string
+          maxLength: 64
           minLength: 0
         name:
           type: string
@@ -9319,14 +9479,14 @@ components:
     CuratedPracticeSummary:
       type: object
       properties:
-        areaSlug:
-          type: string
         artifactKind:
           type: string
         automatedReview:
           $ref: "#/components/schemas/PracticeAutomatedReview"
         effectivelyOffered:
           type: boolean
+        groupSlug:
+          type: string
         name:
           type: string
         position:
@@ -9688,6 +9848,81 @@ components:
           - DUPLICATE
           - INAPPROPRIATE_PLACEMENT
           - OTHER
+    FeedbackResolutionCounts:
+      type: object
+      description: Feedback resolution counts for the current developer
+      properties:
+        addressed:
+          type: integer
+          format: int64
+        disputed:
+          type: integer
+          format: int64
+        notApplicable:
+          type: integer
+          format: int64
+    FeedbackResponse:
+      type: object
+      description: The recipient's current assessment and resolution of delivered
+        feedback
+      properties:
+        comment:
+          type: string
+        feedbackId:
+          type: string
+          format: uuid
+        resolution:
+          type: string
+          enum:
+          - ADDRESSED
+          - DISPUTED
+          - NOT_APPLICABLE
+        respondedAt:
+          type: string
+          format: date-time
+        usefulness:
+          type: string
+          enum:
+          - HELPFUL
+          - UNHELPFUL
+      required:
+      - feedbackId
+    FeedbackResponseRequest:
+      type: object
+      description: The complete response to delivered feedback
+      properties:
+        comment:
+          type: string
+          description: Optional explanation; required when resolution is DISPUTED.
+          maxLength: 2000
+          minLength: 0
+        resolution:
+          type: string
+          description: What the recipient decided to do with the feedback
+          enum:
+          - ADDRESSED
+          - DISPUTED
+          - NOT_APPLICABLE
+        usefulness:
+          type: string
+          description: How useful the feedback was
+          enum:
+          - HELPFUL
+          - UNHELPFUL
+    FeedbackSourceCount:
+      type: object
+      description: Distinct work artifacts of one kind that contributed feedback
+      properties:
+        count:
+          type: integer
+          format: int64
+          description: Distinct artifacts of this kind in the selected time period
+        workKind:
+          type: string
+          description: The kind of work the feedback came from
+      required:
+      - count
+      - workKind
     FxRateInfo:
       type: object
       description: "Display-only currency conversion for the USD amounts in this response.\
@@ -9810,6 +10045,33 @@ components:
           type: string
           description: Default GitLab server URL
           example: https://gitlab.lrz.de
+    GroupAutonomyRollup:
+      type: object
+      description: One group's practice counts per effective autonomy state
+      properties:
+        autonomy:
+          $ref: "#/components/schemas/AutonomyAssignment"
+          description: "The autonomy in force for this group, and where it came from"
+        counts:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int32
+          description: Practice count per effective autonomy in this group
+        groupName:
+          type: string
+          description: Group name; null for the no-group group
+        groupSlug:
+          type: string
+          description: Group slug; null groups the practices that belong to no group
+        overriddenCount:
+          type: integer
+          format: int32
+          description: Number of practices with an explicit autonomy override
+      required:
+      - autonomy
+      - counts
+      - overriddenCount
     IdentityProviderView:
       type: object
       description: |-
@@ -9888,12 +10150,6 @@ components:
       type: object
       description: A process-level message on the developer's own practice pages
       properties:
-        areaName:
-          type: string
-          description: Area display name; null when the practice has none
-        areaSlug:
-          type: string
-          description: Area the practice sits in; null when the practice has none
         body:
           type: string
           description: "The message, as Markdown; ends with the habit to try next"
@@ -9902,6 +10158,12 @@ components:
           description: "The pieces of work the habit was observed on, newest first"
           items:
             $ref: "#/components/schemas/InAppEvidence"
+        groupName:
+          type: string
+          description: Group display name; null when the practice has none
+        groupSlug:
+          type: string
+          description: Group the practice sits in; null when the practice has none
         headline:
           type: string
           description: "Short headline naming the habit, never the person"
@@ -9928,10 +10190,10 @@ components:
           description: When this developer first opened it; null until they have
         whatGoodLooksLike:
           type: string
-          description: "What good looks like, in the learner's framing"
+          description: "What good looks like, in the developer's framing"
         whyItMatters:
           type: string
-          description: "Why this practice matters, in the learner's framing"
+          description: "Why this practice matters, in the developer's framing"
       required:
       - body
       - evidence
@@ -10197,28 +10459,6 @@ components:
       required:
       - leaguePointsChange
       - login
-    LearnerPractice:
-      type: object
-      description: Learner-facing view of a practice — criteria absent by construction
-      properties:
-        areaSlug:
-          type: string
-          description: "Slug of the practice area this belongs to, if any"
-        name:
-          type: string
-          description: Human-readable name
-        slug:
-          type: string
-          description: URL-safe identifier
-        whatGoodLooksLike:
-          type: string
-          description: A concrete picture of doing this well
-        whyItMatters:
-          type: string
-          description: "Why this practice matters, in plain language"
-      required:
-      - name
-      - slug
     LinearAchievementProgress:
       allOf:
       - $ref: "#/components/schemas/AchievementProgress"
@@ -10583,6 +10823,10 @@ components:
         artifactKind:
           type: string
           description: Artifact type (e.g. PULL_REQUEST)
+        artifactUrl:
+          type: string
+          description: Link to the reviewed artifact on its platform (null when it
+            cannot be resolved)
         assessment:
           type: string
           description: "Assessment: GOOD or BAD; null when the presence carries no\
@@ -10749,6 +10993,30 @@ components:
       - practiceSlug
       - presence
       - summary
+    OutcomeVector:
+      type: object
+      properties:
+        commissionProblems:
+          type: integer
+          format: int32
+        demonstratedStrengths:
+          type: integer
+          format: int32
+        notApplicable:
+          type: integer
+          format: int32
+        omissionGaps:
+          type: integer
+          format: int32
+        safeAvoidances:
+          type: integer
+          format: int32
+      required:
+      - commissionProblems
+      - demonstratedStrengths
+      - notApplicable
+      - omissionGaps
+      - safeAvoidances
     OutlineCollection:
       type: object
       description: A mirrored Outline collection with its sync state and live document
@@ -11111,9 +11379,9 @@ components:
       type: object
       description: A practice's position in the catalog
       properties:
-        areaSlug:
+        groupSlug:
           type: string
-          description: Destination area slug; omit to place the practice in Unassigned
+          description: Destination group slug; omit to place the practice in Unassigned
           example: review-ready-work
         position:
           type: integer
@@ -11127,9 +11395,6 @@ components:
       type: object
       description: Practice definition for evaluating developer contributions
       properties:
-        areaSlug:
-          type: string
-          description: "Slug of the practice area this practice is bound to, if any"
         artifactKind:
           type: string
           description: "Kind of work this practice reviews, read off its bindings"
@@ -11141,7 +11406,7 @@ components:
         autonomy:
           $ref: "#/components/schemas/AutonomyAssignment"
           description: "How much autonomy the system has over this practice, whether\
-            \ that was set here or inherited from its area or workspace, and which\
+            \ that was set here or inherited from its group or workspace, and which\
             \ level decided it"
         bindings:
           type: array
@@ -11161,7 +11426,10 @@ components:
         displayOrder:
           type: integer
           format: int32
-          description: Position within its area (lowest first); ties broken by name
+          description: Position within its group (lowest first); ties broken by name
+        groupSlug:
+          type: string
+          description: "Slug of the practice group this practice is bound to, if any"
         id:
           type: integer
           format: int64
@@ -11182,10 +11450,10 @@ components:
           description: Timestamp when the practice was last updated
         whatGoodLooksLike:
           type: string
-          description: Developer-facing exemplar (learner layer)
+          description: Developer-facing exemplar (developer layer)
         whyItMatters:
           type: string
-          description: Developer-facing rationale (learner layer)
+          description: Developer-facing rationale (developer layer)
       required:
       - artifactKind
       - automatedReviewPolicy
@@ -11199,59 +11467,6 @@ components:
       - name
       - slug
       - updatedAt
-    PracticeArea:
-      type: object
-      description: A practice area grouping related practices into a learning objective
-      properties:
-        autonomy:
-          $ref: "#/components/schemas/AutonomyAssignment"
-          description: "How much autonomy the system has over every practice in this\
-            \ area that holds no autonomy of its own, whether that was set here or\
-            \ inherited from the workspace, and which level decided it"
-        catalogOrigin:
-          $ref: "#/components/schemas/CatalogOrigin"
-        color:
-          type: string
-          description: Optional palette colour key for the area's chip
-        createdAt:
-          type: string
-          format: date-time
-          description: Timestamp when the area was created
-        description:
-          type: string
-          description: What this area develops
-        displayOrder:
-          type: integer
-          format: int32
-          description: Sort order within the workspace
-        icon:
-          type: string
-          description: Optional lucide icon name for the area's chip
-        id:
-          type: integer
-          format: int64
-          description: Area ID
-        name:
-          type: string
-          description: Human-readable name
-        slug:
-          type: string
-          description: URL-safe identifier unique within the workspace
-        updatedAt:
-          type: string
-          format: date-time
-          description: Timestamp when the area was last updated
-        visibleInPracticeDashboards:
-          type: boolean
-          description: Whether this area is shown in practice dashboards
-      required:
-      - autonomy
-      - createdAt
-      - displayOrder
-      - id
-      - name
-      - slug
-      - visibleInPracticeDashboards
     PracticeAutomatedReview:
       type: object
       description: Author-declared automated review and evidence sufficiency for one
@@ -11520,6 +11735,268 @@ components:
           - AUTOMATIC
         slug:
           type: string
+    PracticeGroup:
+      type: object
+      description: A practice group grouping related practices into a learning objective
+      properties:
+        autonomy:
+          $ref: "#/components/schemas/AutonomyAssignment"
+          description: "How much autonomy the system has over every practice in this\
+            \ group that holds no autonomy of its own, whether that was set here or\
+            \ inherited from the workspace, and which level decided it"
+        catalogOrigin:
+          $ref: "#/components/schemas/CatalogOrigin"
+        color:
+          type: string
+          description: Optional palette colour key for the group's chip
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the group was created
+        description:
+          type: string
+          description: What this group develops
+        displayOrder:
+          type: integer
+          format: int32
+          description: Sort order within the workspace
+        icon:
+          type: string
+          description: Optional lucide icon name for the group's chip
+        id:
+          type: integer
+          format: int64
+          description: Group ID
+        name:
+          type: string
+          description: Human-readable name
+        slug:
+          type: string
+          description: URL-safe identifier unique within the workspace
+        updatedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the group was last updated
+        visibleInPracticeDashboards:
+          type: boolean
+          description: Whether this group is shown in practice dashboards
+      required:
+      - autonomy
+      - createdAt
+      - displayOrder
+      - id
+      - name
+      - slug
+      - visibleInPracticeDashboards
+    PracticeGroupReviewObservation:
+      type: object
+      description: "One concrete, evidence-backed observation from a review run"
+      properties:
+        assessment:
+          type: string
+          description: Good or bad for the developer; null when the review could not
+            decide (INCONCLUSIVE)
+          enum:
+          - GOOD
+          - BAD
+        feedbackId:
+          type: string
+          format: uuid
+        feedbackResolution:
+          type: string
+          enum:
+          - ADDRESSED
+          - DISPUTED
+          - NOT_APPLICABLE
+        feedbackResponseComment:
+          type: string
+        feedbackUsefulness:
+          type: string
+          enum:
+          - HELPFUL
+          - UNHELPFUL
+        observationId:
+          type: string
+          format: uuid
+        practiceName:
+          type: string
+        practiceSlug:
+          type: string
+        presence:
+          type: string
+          enum:
+          - PRESENT
+          - ABSENT
+          - NOT_APPLICABLE
+          - INCONCLUSIVE
+        recurrenceKey:
+          type: string
+        severity:
+          type: string
+          enum:
+          - CRITICAL
+          - MAJOR
+          - MINOR
+          - INFO
+        title:
+          type: string
+      required:
+      - observationId
+      - practiceName
+      - practiceSlug
+      - presence
+      - title
+    PracticeGroupReviewRun:
+      type: object
+      description: A complete review run in a developer's practice-group history
+      properties:
+        observations:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeGroupReviewObservation"
+        reviewId:
+          type: string
+          format: uuid
+        reviewedAt:
+          type: string
+          format: date-time
+        reviewedWork:
+          $ref: "#/components/schemas/PracticeGroupReviewedWork"
+      required:
+      - observations
+      - reviewId
+      - reviewedAt
+      - reviewedWork
+    PracticeGroupReviewRunsPage:
+      type: object
+      description: A page of visible review runs
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeGroupReviewRun"
+        hasNext:
+          type: boolean
+        page:
+          type: integer
+          format: int32
+        size:
+          type: integer
+          format: int32
+      required:
+      - content
+    PracticeGroupReviewedWork:
+      type: object
+      description: The work assessed in a developer-facing review run
+      properties:
+        channelName:
+          type: string
+        id:
+          type: integer
+          format: int64
+        number:
+          type: integer
+          format: int32
+        provider:
+          type: string
+          enum:
+          - GITHUB
+          - GITLAB
+          - SLACK
+          - OUTLINE
+        repositoryName:
+          type: string
+        title:
+          type: string
+        type:
+          type: string
+        url:
+          type: string
+      required:
+      - id
+      - type
+    PracticeGroupStanding:
+      type: object
+      description: A developer's derived qualitative standing for one Group including
+        1<=n<many practices
+      properties:
+        direction:
+          type: string
+          description: "Evidence-weighted, opportunity-indexed direction across the\
+            \ group's practices"
+          enum:
+          - IMPROVING
+          - DECLINING
+          - UNCERTAIN
+          - INSUFFICIENT_EVIDENCE
+        feedbackSince:
+          type: string
+          format: date-time
+          description: "Oldest contributing observation, for provenance only (null\
+            \ without a verdict)"
+        feedbackSpanDays:
+          type: integer
+          format: int32
+          description: "Calendar span covered by the feedback, for provenance only;\
+            \ never a trend-analysis unit"
+        groupName:
+          type: string
+          description: Group name
+        groupSlug:
+          type: string
+          description: Group slug
+        guidance:
+          type: string
+          description: "Developer guidance aggregated from the group's feedback (null\
+            \ unless the standing is a verdict). The deterministic summary combines\
+            \ standing, next focus, and developer-facing catalog guidance."
+        guidanceSource:
+          type: string
+          description: How the guidance text was produced (null when there is no guidance)
+          enum:
+          - RULE_BASED
+        observations:
+          type: array
+          description: Supporting observations the standing derives from (problems
+            first); empty without a verdict
+          items:
+            $ref: "#/components/schemas/PracticeStandingObservation"
+        sources:
+          type: array
+          description: "Distinct pieces of reviewed work the observations come from,\
+            \ per kind (provenance, not a score); empty without a verdict"
+          items:
+            $ref: "#/components/schemas/FeedbackSourceCount"
+        standing:
+          type: string
+          description: Derived qualitative standing across the group's practices
+          enum:
+          - DEVELOPING
+          - STRENGTH
+          - MIXED
+          - NOT_OBSERVED
+          - NO_OPPORTUNITY
+        trendSupport:
+          $ref: "#/components/schemas/TrendSupport"
+          description: Evidence support and provenance for the direction
+      required:
+      - groupName
+      - groupSlug
+      - observations
+      - sources
+      - standing
+    PracticeGroupTrend:
+      type: object
+      properties:
+        group:
+          $ref: "#/components/schemas/PracticeTrend"
+        practices:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeTrend"
+      required:
+      - group
+      - practices
     PracticeManualReviewSignal:
       type: object
       description: The signal a person raises by asking for a review of this work
@@ -11604,8 +12081,8 @@ components:
         defaultAutonomy:
           type: string
           description: "Effective: how much autonomy the system has over practices\
-            \ and areas that hold no autonomy of their own — the bottom of the practice\
-            \ → area → workspace chain"
+            \ and groups that hold no autonomy of their own — the bottom of the practice\
+            \ → group → workspace chain"
           enum:
           - "OFF"
           - HUMAN_APPROVAL
@@ -11666,6 +12143,126 @@ components:
       - displayName
       - recommended
       - signal
+    PracticeStanding:
+      type: object
+      description: A developer's readable feedback for one practice
+      properties:
+        direction:
+          type: string
+          description: Opportunity-indexed direction of this practice's recent evidence
+          enum:
+          - IMPROVING
+          - DECLINING
+          - UNCERTAIN
+          - INSUFFICIENT_EVIDENCE
+        groupName:
+          type: string
+          description: "Group name this practice belongs to, if any"
+        groupSlug:
+          type: string
+          description: "Group slug this practice belongs to, if any"
+        name:
+          type: string
+          description: Practice name
+        slug:
+          type: string
+          description: Practice slug
+        standing:
+          type: string
+          description: "Where the developer stands on this practice, or why no standing\
+            \ could be formed"
+          enum:
+          - DEVELOPING
+          - STRENGTH
+          - MIXED
+          - NOT_OBSERVED
+          - NO_OPPORTUNITY
+        strengths:
+          type: array
+          description: What the developer already does well here
+          items:
+            $ref: "#/components/schemas/PracticeStandingObservation"
+        toWorkOn:
+          type: array
+          description: Specific feedback to act on (highest-impact first)
+          items:
+            $ref: "#/components/schemas/PracticeStandingObservation"
+        trendSupport:
+          $ref: "#/components/schemas/TrendSupport"
+          description: Evidence support and provenance for the direction
+        whatGoodLooksLike:
+          type: string
+          description: A concrete picture of doing this well
+        whyItMatters:
+          type: string
+          description: "Why this practice matters, in plain language"
+      required:
+      - name
+      - slug
+      - standing
+      - strengths
+      - toWorkOn
+    PracticeStandingObservation:
+      type: object
+      description: A single piece of practice feedback to read and act on
+      properties:
+        deliveredFeedback:
+          type: string
+          description: What to do — the delivered feedback for this observation (null
+            if nothing was delivered)
+        locator:
+          type: string
+          description: "Where in the work, e.g. \"FrameRecorder.swift:212\", when\
+            \ known"
+        observationId:
+          type: string
+          format: uuid
+          description: Observation id — handle to open the full detail
+        origin:
+          type: string
+          description: "Why this observation was recorded. BACKFILL means it came\
+            \ from a review of past work rather than from something that just happened,\
+            \ and nothing was posted anywhere at the time."
+          enum:
+          - LIVE
+          - MANUAL
+          - BACKFILL
+        outcome:
+          type: string
+          description: "What this observation says about the developer: a behaviour\
+            \ demonstrated, a trap avoided, something harmful done, or something needed\
+            \ left out. The lists only separate positive from negative, so this is\
+            \ what tells the two kinds of each apart."
+          enum:
+          - DEMONSTRATED_STRENGTH
+          - SAFE_AVOIDANCE
+          - COMMISSION_PROBLEM
+          - OMISSION_GAP
+        reviewedWorkId:
+          type: integer
+          format: int64
+          description: Identifier of the reviewed work
+        severity:
+          type: string
+          description: Impact level (null unless assessed BAD)
+          enum:
+          - CRITICAL
+          - MAJOR
+          - MINOR
+          - INFO
+        title:
+          type: string
+          description: The headline of the feedback
+        workKind:
+          type: string
+          description: The kind of reviewed work this is about
+      required:
+      - observationId
+      - origin
+      - outcome
+      - reviewedWorkId
+      - title
+      - workKind
     PracticeSubject:
       type: object
       description: What must be in a piece of work for this practice to have anything
@@ -11810,6 +12407,39 @@ components:
       - practiceSlug
       - watches
       - withheldReasons
+    PracticeTrend:
+      type: object
+      properties:
+        currentOutcomes:
+          $ref: "#/components/schemas/OutcomeVector"
+        direction:
+          type: string
+          enum:
+          - IMPROVING
+          - DECLINING
+          - UNCERTAIN
+          - INSUFFICIENT_EVIDENCE
+        opportunities:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrendOpportunity"
+        previousOutcomes:
+          $ref: "#/components/schemas/OutcomeVector"
+        scope:
+          type: string
+          enum:
+          - GROUP
+          - PRACTICE
+        slug:
+          type: string
+        support:
+          $ref: "#/components/schemas/TrendSupport"
+      required:
+      - direction
+      - opportunities
+      - scope
+      - slug
+      - support
     PracticeWorkTypeDefinitionOptions:
       type: object
       description: "Review timing, evidence choices, and recommended settings for\
@@ -12297,155 +12927,6 @@ components:
             null if the vendor never told us to back off
       required:
       - observedAt
-    Reaction:
-      type: object
-      description: Developer reaction to a delivered unit of feedback
-      properties:
-        action:
-          type: string
-          description: The reaction action taken
-          enum:
-          - ADDRESSED
-          - DISPUTED
-          - NOT_APPLICABLE
-        createdAt:
-          type: string
-          format: date-time
-          description: When the reaction was submitted
-        explanation:
-          type: string
-          description: Optional explanation for the reaction
-        feedbackId:
-          type: string
-          format: uuid
-          description: ID of the feedback unit this reaction is about
-        id:
-          type: string
-          format: uuid
-          description: Unique reaction ID
-      required:
-      - action
-      - createdAt
-      - feedbackId
-      - id
-    ReactionEngagement:
-      type: object
-      description: "Reaction engagement for a developer, split into the response (uptake)\
-        \ and validity axes"
-      properties:
-        addressed:
-          type: integer
-          format: int64
-          description: "RESPONSE: observations the developer acted on (the recipience\
-            \ act, not the outcome)"
-        disputed:
-          type: integer
-          format: int64
-          description: "RESPONSE: observations the developer rejected with a reasoned\
-            \ explanation"
-        notApplicable:
-          type: integer
-          format: int64
-          description: "VALIDITY: observations marked out-of-scope — a detector-scope\
-            \ signal, NOT an uptake count"
-      required:
-      - addressed
-      - disputed
-      - notApplicable
-    ReflectionItem:
-      type: object
-      description: A single piece of practice feedback to read and act on
-      properties:
-        artifactId:
-          type: integer
-          format: int64
-          description: Id of the PR / issue this is about
-        artifactKind:
-          type: string
-          description: The kind of work this is about (PR / issue)
-        deliveredFeedback:
-          type: string
-          description: What to do — the delivered feedback for this observation (null
-            if nothing was delivered)
-        locator:
-          type: string
-          description: "Where in the work, e.g. \"FrameRecorder.swift:212\", when\
-            \ known"
-        observationId:
-          type: string
-          format: uuid
-          description: Observation id — handle to open the full detail
-        origin:
-          type: string
-          description: "What occasioned the measurement. BACKFILL means it came from\
-            \ a review of past work rather than from something that just happened,\
-            \ and nothing was posted anywhere at the time."
-          enum:
-          - LIVE
-          - MANUAL
-          - BACKFILL
-        severity:
-          type: string
-          description: Impact level (null unless assessed BAD)
-          enum:
-          - CRITICAL
-          - MAJOR
-          - MINOR
-          - INFO
-        title:
-          type: string
-          description: The headline of the feedback
-      required:
-      - artifactId
-      - artifactKind
-      - observationId
-      - origin
-      - title
-    ReflectionPractice:
-      type: object
-      description: A developer's readable feedback for one practice
-      properties:
-        areaName:
-          type: string
-          description: "Area name this practice belongs to, if any"
-        areaSlug:
-          type: string
-          description: "Area slug this practice belongs to, if any"
-        name:
-          type: string
-          description: Practice name
-        slug:
-          type: string
-          description: Practice slug
-        standing:
-          type: string
-          description: Where the developer stands on this practice
-          enum:
-          - DEVELOPING
-          - STRENGTH
-          - MIXED
-        strengths:
-          type: array
-          description: What the developer already does well here
-          items:
-            $ref: "#/components/schemas/ReflectionItem"
-        toWorkOn:
-          type: array
-          description: Specific feedback to act on (highest-impact first)
-          items:
-            $ref: "#/components/schemas/ReflectionItem"
-        whatGoodLooksLike:
-          type: string
-          description: A concrete picture of doing this well
-        whyItMatters:
-          type: string
-          description: "Why this practice matters, in plain language"
-      required:
-      - name
-      - slug
-      - standing
-      - strengths
-      - toWorkOn
     RegisterOutlineCollectionRequest:
       type: object
       description: Register an Outline collection for mirroring (lands ENABLED + PENDING)
@@ -12487,13 +12968,13 @@ components:
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       required:
       - newSlug
-    ReorderPracticeAreasRequest:
+    ReorderPracticeGroupsRequest:
       type: object
-      description: Reorder practice areas to match the supplied list
+      description: Reorder practice groups to match the supplied list
       properties:
         orderedSlugs:
           type: array
-          description: Area slugs in the desired display order
+          description: Group slugs in the desired display order
           example:
           - review-ready-work
           - acting-on-review-feedback
@@ -12504,19 +12985,19 @@ components:
       - orderedSlugs
     ReorderPracticesRequest:
       type: object
-      description: Reorder one area's practices to match the supplied list
+      description: Reorder one group's practices to match the supplied list
       properties:
-        areaSlug:
+        groupSlug:
           type:
           - string
           - "null"
-          description: Slug of the area whose practices are being reordered; null
+          description: Slug of the group whose practices are being reordered; null
             reorders the unassigned bucket
           example: review-ready-work
         orderedSlugs:
           type: array
           description: Practice slugs in the desired display order — the complete
-            set for the area
+            set for the group
           example:
           - describe-what-and-why
           - ready-and-traceable-handoff
@@ -12803,9 +13284,6 @@ components:
       type: object
       description: An observation that contributed to a piece of feedback
       properties:
-        area:
-          $ref: "#/components/schemas/ReviewPracticeArea"
-          description: Practice area; null when the practice is Unassigned
         assessment:
           type: string
           description: "Assessment: GOOD or BAD (null when NOT_APPLICABLE)"
@@ -12820,6 +13298,9 @@ components:
           - CURRENT
           - STALE
           - UNVERIFIABLE
+        group:
+          $ref: "#/components/schemas/ReviewPracticeGroup"
+          description: Practice group; null when the practice is Unassigned
         observationId:
           type: string
           format: uuid
@@ -13140,9 +13621,6 @@ components:
         agentJobId:
           type: string
           format: uuid
-        area:
-          $ref: "#/components/schemas/ReviewPracticeArea"
-          description: Practice area; null when the practice is Unassigned
         artifact:
           $ref: "#/components/schemas/ReviewArtifact"
         assessment:
@@ -13162,6 +13640,9 @@ components:
         feedbackDisposition:
           $ref: "#/components/schemas/ReviewFeedbackDisposition"
           description: Counts of linked feedback by delivery state
+        group:
+          $ref: "#/components/schemas/ReviewPracticeGroup"
+          description: Practice group; null when the practice is Unassigned
         id:
           type: string
           format: uuid
@@ -13249,9 +13730,6 @@ components:
         agentJobId:
           type: string
           format: uuid
-        area:
-          $ref: "#/components/schemas/ReviewPracticeArea"
-          description: Practice area; null when the practice is Unassigned
         artifact:
           $ref: "#/components/schemas/ReviewArtifact"
         assessment:
@@ -13277,6 +13755,9 @@ components:
           description: "Linked feedback, newest first"
           items:
             $ref: "#/components/schemas/ReviewBoundFeedback"
+        group:
+          $ref: "#/components/schemas/ReviewPracticeGroup"
+          description: Practice group; null when the practice is Unassigned
         id:
           type: string
           format: uuid
@@ -13374,7 +13855,7 @@ components:
       required:
       - id
       - placementType
-    ReviewPracticeArea:
+    ReviewPracticeGroup:
       type: object
       properties:
         color:
@@ -13608,6 +14089,28 @@ components:
       - id
       - lookbackDays
       - nextRunAt
+    ReviewedPractice:
+      type: object
+      description: Developer-facing view of a practice — criteria absent by construction
+      properties:
+        groupSlug:
+          type: string
+          description: "Slug of the practice group this belongs to, if any"
+        name:
+          type: string
+          description: Human-readable name
+        slug:
+          type: string
+          description: URL-safe identifier
+        whatGoodLooksLike:
+          type: string
+          description: A concrete picture of doing this well
+        whyItMatters:
+          type: string
+          description: "Why this practice matters, in plain language"
+      required:
+      - name
+      - slug
     RevokeSessionsResult:
       type: object
       properties:
@@ -14208,6 +14711,78 @@ components:
       - revision
       - signal
       - state
+    TrendOpportunity:
+      type: object
+      properties:
+        bundle:
+          type: string
+          enum:
+          - PREVIOUS
+          - CURRENT
+          - OLDER
+        index:
+          type: integer
+          format: int32
+        occurredAt:
+          type: string
+          format: date-time
+        outcomes:
+          $ref: "#/components/schemas/OutcomeVector"
+        reviewedWorkId:
+          type: integer
+          format: int64
+        workKind:
+          type: string
+      required:
+      - bundle
+      - index
+      - occurredAt
+      - outcomes
+      - reviewedWorkId
+      - workKind
+    TrendSupport:
+      type: object
+      properties:
+        bundleSize:
+          type: integer
+          format: int32
+        calendarSpanDays:
+          type: integer
+          format: int32
+        comparablePractices:
+          type: integer
+          format: int32
+        credibilityThreshold:
+          type: number
+          format: double
+        currentOpportunities:
+          type: integer
+          format: int32
+        eligiblePractices:
+          type: integer
+          format: int32
+        firstOpportunityAt:
+          type: string
+          format: date-time
+        lastOpportunityAt:
+          type: string
+          format: date-time
+        opportunitiesUntilComparable:
+          type: integer
+          format: int32
+        previousOpportunities:
+          type: integer
+          format: int32
+        ropeHalfWidth:
+          type: number
+          format: double
+      required:
+      - bundleSize
+      - credibilityThreshold
+      - currentOpportunities
+      - opportunitiesUntilComparable
+      - previousOpportunities
+      - ropeHalfWidth
     TriggerSyncJobRequest:
       type: object
       description: Manual sync trigger request body
@@ -14440,20 +15015,32 @@ components:
           - PAUSED
       required:
       - state
-    UpdatePracticeAreaRequest:
+    UpdatePracticeAutonomyRequest:
       type: object
-      description: Request to update an existing practice area (PATCH — only non-null
+      description: "Set how much autonomy the system has here, or clear it back to\
+        \ inherit"
+      properties:
+        autonomy:
+          type: string
+          description: Local autonomy override. Null inherits from the group or workspace.
+          enum:
+          - "OFF"
+          - HUMAN_APPROVAL
+          - AUTOMATIC
+    UpdatePracticeGroupRequest:
+      type: object
+      description: Request to update an existing practice group (PATCH — only non-null
         fields applied)
       properties:
         color:
           type: string
-          description: Optional palette colour key for the area's chip
+          description: Optional palette colour key for the group's chip
           maxLength: 32
           minLength: 0
           pattern: "^[a-z]+$"
         description:
           type: string
-          description: What this area develops
+          description: What this group develops
           maxLength: 5000
           minLength: 0
         displayOrder:
@@ -14462,7 +15049,7 @@ components:
           description: Sort order within the workspace
         icon:
           type: string
-          description: Optional lucide icon name giving the area a glanceable identity
+          description: Optional lucide icon name giving the group a glanceable identity
           maxLength: 64
           minLength: 0
           pattern: "^[A-Za-z0-9]+$"
@@ -14474,27 +15061,11 @@ components:
           pattern: .*\S.*
         visibleInPracticeDashboards:
           type: boolean
-          description: Whether this area is shown in practice dashboards
-    UpdatePracticeAutonomyRequest:
-      type: object
-      description: "Set how much autonomy the system has here, or clear it back to\
-        \ inherit"
-      properties:
-        autonomy:
-          type: string
-          description: Local autonomy override. Null inherits from the area or workspace.
-          enum:
-          - "OFF"
-          - HUMAN_APPROVAL
-          - AUTOMATIC
+          description: Whether this group is shown in practice dashboards
     UpdatePracticeRequest:
       type: object
       description: Request to update a practice; omitted fields remain unchanged
       properties:
-        area:
-          $ref: "#/components/schemas/BindPracticeAreaRequest"
-          description: Catalog placement to apply with the definition update; omit
-            to leave unchanged
         automatedReviewPolicy:
           $ref: "#/components/schemas/PracticeAutomatedReviewPolicy"
           description: "Replacement review settings; omit to preserve them, or to\
@@ -14523,6 +15094,10 @@ components:
           maxLength: 50000
           minLength: 0
           pattern: .*\S.*
+        group:
+          $ref: "#/components/schemas/BindPracticeGroupRequest"
+          description: Catalog placement to apply with the definition update; omit
+            to leave unchanged
         name:
           type: string
           description: Human-readable name
@@ -14561,10 +15136,10 @@ components:
           minimum: 0
         defaultAutonomy:
           type: string
-          description: How much autonomy the system has over practices and areas that
-            hold no autonomy of their own. The one decision that moves a whole workspace
-            at once. Null leaves it unchanged; name DEFAULT_AUTONOMY in 'reset' to
-            clear it.
+          description: How much autonomy the system has over practices and groups
+            that hold no autonomy of their own. The one decision that moves a whole
+            workspace at once. Null leaves it unchanged; name DEFAULT_AUTONOMY in
+            'reset' to clear it.
           enum:
           - "OFF"
           - HUMAN_APPROVAL

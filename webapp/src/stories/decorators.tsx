@@ -48,9 +48,9 @@ export const withPageBehind: Decorator = (Story) => (
 					</div>
 				</header>
 				<div className="space-y-2">
-					{["Review-ready work", "Documentation", "Collaboration"].map((area) => (
-						<div key={area} className="rounded-lg border p-4">
-							<p className="font-medium">{area}</p>
+					{["Review-ready work", "Documentation", "Collaboration"].map((group) => (
+						<div key={group} className="rounded-lg border p-4">
+							<p className="font-medium">{group}</p>
 							<p className="text-sm text-muted-foreground">3 practices</p>
 						</div>
 					))}

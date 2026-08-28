@@ -46,8 +46,10 @@ pnpm run format
 pnpm run check
 ```
 
-`check` is the whole gate — every leg is listed under `check` in the root `package.json`, and every
-one of them also runs in CI. Formatting must never be the reason a remote build fails.
+`check` is the complete local quality gate — every leg is listed under `check` in the root
+`package.json`, and every one also runs in CI. CI additionally runs service tests, builds, images,
+security checks, and workflow-specific gates. Formatting must never be the reason a remote build
+fails.
 
 ## 4. Regenerate what your change invalidated
 
@@ -68,12 +70,10 @@ busy — HTTP, management, or the JMX port it defaults to. Pass free ports; the 
 
 ```bash
 pnpm run test:webapp
-cd server && ./mvnw test -P'!quick' -Dsurefire.includedGroups=unit -T 2C --batch-mode -q
+cd server && ./mvnw -pl application -am test -Dsurefire.includedGroups=unit -T 2C --batch-mode -q
 ```
 
-`-P'!quick'` is not optional: the `quick` profile is activated by the presence of generated GraphQL
-sources and sets `maven.test.skip=true`, so a plain `./mvnw test` prints BUILD SUCCESS having run
-nothing.
+`-am` is required so a cold checkout builds the generated-client dependency before the application.
 
 ## 6. Re-run format + check
 

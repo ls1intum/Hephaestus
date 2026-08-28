@@ -6,9 +6,9 @@ does not maintain exhaustive implementation inventories.
 Use the executable sources for exact details:
 
 - [generated database schema](./database-schema.mdx) for tables, columns, keys, and relationships;
-- [the `practices` module](https://github.com/ls1intum/Hephaestus/tree/main/server/src/main/java/de/tum/cit/aet/hephaestus/practices)
+- [the `practices` module](https://github.com/ls1intum/Hephaestus/tree/main/server/application/src/main/java/de/tum/cit/aet/hephaestus/practices)
   for the domain model;
-- [Liquibase changelogs](https://github.com/ls1intum/Hephaestus/tree/main/server/src/main/resources/db/changelog)
+- [Liquibase changelogs](https://github.com/ls1intum/Hephaestus/tree/main/server/application/src/main/resources/db/changelog)
   for persisted constraints and indexes;
 - [`openapi.yaml`](https://github.com/ls1intum/Hephaestus/blob/main/server/openapi.yaml) for HTTP projections;
 - [ADR 0021](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0021-observations-feedback-synthesis-seam.md)
@@ -21,8 +21,8 @@ Use the executable sources for exact details:
 
 | Concept               | Role                                                                       | Relationships                                                                   |
 | --------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `PracticeArea`        | Workspace-defined grouping for practices                                   | Has many practices; a practice may be unassigned                                |
-| `Practice`            | Configurable criterion used by detection                                   | Belongs to a workspace and may belong to an area                                |
+| `PracticeGroup`        | Workspace-defined grouping for practices                                   | Has many practices; a practice may be unassigned                                |
+| `Practice`            | Configurable criterion used by detection                                   | Belongs to a workspace and may belong to a group                                |
 | `PracticeRevision`    | Criteria snapshot used to interpret a past result                          | Belongs to one practice; an observation may pin one revision                    |
 | `Observation`         | Evidence produced by one review job                                        | Belongs to one practice and one job; may support many pieces of feedback        |
 | `Feedback`            | One recipient-specific piece of feedback and its delivery outcome          | Belongs to one job; may draw on many observations and have many placements      |
@@ -30,7 +30,7 @@ Use the executable sources for exact details:
 | `FeedbackDispatch`    | Crash-safe provider delivery of one exact review package                   | Owns one job or approved feedback proposal; records provider placements before ledger projection |
 | `FeedbackObservation` | Ordered evidence binding between one piece of feedback and one observation | Joins feedback to observations with a primary or supporting role                |
 | `FeedbackPlacement`   | Where a piece of feedback was placed                                       | Belongs to one `Feedback`; records a summary, inline, or conversation placement |
-| `Reaction`            | A developer response to delivered feedback                                 | Belongs to one `Feedback` and retains its recurrence key                        |
+| `Reaction`            | Legacy persistence name for an immutable feedback-response snapshot         | Belongs to one `Feedback`; stores usefulness, resolution, or both               |
 
 ## Invariants
 
@@ -123,16 +123,29 @@ content before egress and records each provider placement as it converges. A ter
 into feedback and placement rows under a separate lease, so a crash between provider acknowledgement and
 ledger recording resumes projection without posting the package again.
 
+### One feedback response has two independent dimensions
+
+The recipient responds to the delivered `Feedback` unit, not to a private observation. One response may
+record perceived usefulness (`HELPFUL` or `UNHELPFUL`), a resolution (`ADDRESSED`, `DISPUTED`, or
+`NOT_APPLICABLE`), or both. `DISPUTED` requires a comment because it rejects the feedback's judgement;
+usefulness alone does not change standing, trend, or re-nag suppression.
+
+PUT replaces the complete response; omitted dimensions are cleared. DELETE removes the response. Both
+operations are idempotent at the API boundary.
+
+Response history is append-only in persistence. Read projections expose only the current response, so a
+change of mind never counts as several currently resolved pieces of feedback.
+
 ## Read projections and access
 
 The persistence model is not an authorization boundary. Controllers define who may see each projection:
 
-- developer observation list, detail, summary, and reflection endpoints are scoped to the authenticated
+- developer observation list, detail, and summary endpoints, and practice standings are scoped to the authenticated
   developer;
 - the pull-request observation projection shows workspace members every relevant observation for that pull
   request;
 - the workspace-admin practice-review endpoints expose observations and feedback across that workspace;
-- learner-facing practice projections omit detector criteria by construction.
+- developer-facing practice projections omit detector criteria by construction.
 
 Keep these rules enforceable in controller authorization, repository predicates, DTO shape, and tests.
 Do not add a field matrix here: the

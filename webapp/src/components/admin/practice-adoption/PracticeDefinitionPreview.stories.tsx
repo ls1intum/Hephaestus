@@ -21,7 +21,7 @@ const definition: CuratedPracticeDefinition = {
 	precomputeScript: "export default { hasDescription: pullRequest.body.length > 0 };",
 	whyItMatters: "Reviewers need intent to assess whether the change solves the right problem.",
 	whatGoodLooksLike: "A concise summary, motivation, and verification steps.",
-	areaSlug: "review-ready-work",
+	groupSlug: "review-ready-work",
 };
 
 const meta = {

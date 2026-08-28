@@ -16,7 +16,6 @@
   "projectId": "Project:66a8981a27ced8fef3190d41",
   "skip": "dependabot/**",
   "storybookBaseDir": "webapp",
-  "storybookBuildDir": "storybook-static",
   "traceChanged": "expanded",
   "untraced": [
     "**/*.md",

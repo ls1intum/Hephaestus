@@ -16,8 +16,8 @@ export const CURATED_CATALOG_SEARCH_PARAMS: Array<keyof CuratedCatalogSearch> = 
 export const CURATED_LEVEL_KINDS = [
 	"practice-edit",
 	"practice-new",
-	"area-edit",
-	"area-new",
+	"group-edit",
+	"group-new",
 ] as const;
 
 export type CuratedLevelKind = (typeof CURATED_LEVEL_KINDS)[number];
@@ -34,10 +34,10 @@ export function curatedPracticeLevel(slug?: string): DetailStackEntry<CuratedLev
 		: { kind: "practice-edit", id: slug };
 }
 
-export function curatedAreaLevel(slug?: string): DetailStackEntry<CuratedLevelKind> {
+export function curatedGroupLevel(slug?: string): DetailStackEntry<CuratedLevelKind> {
 	return slug === undefined
-		? { kind: "area-new", id: NEW_ENTRY_ID }
-		: { kind: "area-edit", id: slug };
+		? { kind: "group-new", id: NEW_ENTRY_ID }
+		: { kind: "group-edit", id: slug };
 }
 
 const curatedCatalogFilterSchema = z.object({

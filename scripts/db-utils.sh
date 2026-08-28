@@ -134,13 +134,15 @@ stop_postgres() {
 apply_migrations() {
     log_info "Applying Liquibase migrations..."
     cd "$APP_SERVER_DIR"
-    SPRING_PROFILES_ACTIVE=local,dev ./mvnw liquibase:update -P'!quick' -Dpostgres.port="$POSTGRES_PORT"
+    ./mvnw -pl generated-clients -am install -DskipTests --batch-mode
+    SPRING_PROFILES_ACTIVE=local,dev ./mvnw -f application/pom.xml liquibase:update -Dpostgres.port="$POSTGRES_PORT"
 }
 
 apply_migrations_and_generate_diff() {
     log_info "Applying Liquibase migrations and generating changelog diff..."
     cd "$APP_SERVER_DIR"
-    SPRING_PROFILES_ACTIVE=local,dev ./mvnw liquibase:update liquibase:diff -P'!quick' -Dpostgres.port="$POSTGRES_PORT"
+    ./mvnw -pl generated-clients -am install -DskipTests --batch-mode
+    SPRING_PROFILES_ACTIVE=local,dev ./mvnw -f application/pom.xml liquibase:update liquibase:diff -Dpostgres.port="$POSTGRES_PORT"
 }
 
 DB_NAME="${POSTGRES_DB:-hephaestus}"

@@ -1,6 +1,6 @@
 import { ChevronRight, Library } from "lucide-react";
 import type { CatalogPracticeSummary } from "@/api/types.gen";
-import { AreaPill } from "@/components/admin/practice-catalog/AreaPill";
+import { GroupPill } from "@/components/admin/practice-catalog/GroupPill";
 import { DetailStackLink } from "@/components/core/detail-drawer/DetailStackLink";
 import { Section } from "@/components/core/Section";
 import { CATALOG_AVAILABILITY_DEFS } from "@/components/practice-vocabulary/catalog-availability-defs";
@@ -26,26 +26,17 @@ import {
 
 export interface AvailablePracticeListProps {
 	practices: CatalogPracticeSummary[];
-	/**
-	 * The areas the workspace already has. An area missing from this set is one the catalog can
-	 * put back, which is why its practices stay listed even after they have been added.
-	 */
-	existingAreaSlugs: ReadonlySet<string>;
+	existingGroupSlugs: ReadonlySet<string>;
 }
 
-/**
- * What the instance catalog still has to offer this workspace, grouped by the area each entry would
- * land in. A practice already added into an area the workspace still has is not offered again; one
- * whose group was deleted stays, because the group is what the catalog can put back.
- */
 export function AvailablePracticeList({
 	practices,
-	existingAreaSlugs,
+	existingGroupSlugs,
 }: AvailablePracticeListProps) {
 	const offered = practices.filter(
 		(practice) =>
 			practice.availability !== "ADOPTED" ||
-			(practice.areaSlug !== undefined && !existingAreaSlugs.has(practice.areaSlug)),
+			(practice.groupSlug !== undefined && !existingGroupSlugs.has(practice.groupSlug)),
 	);
 
 	if (offered.length === 0) {
@@ -69,21 +60,19 @@ export function AvailablePracticeList({
 
 	const groups = new Map<string, CatalogPracticeSummary[]>();
 	for (const practice of offered) {
-		const key = practice.areaSlug ?? "__unassigned__";
+		const key = practice.groupSlug ?? "__unassigned__";
 		groups.set(key, [...(groups.get(key) ?? []), practice]);
 	}
 
 	return (
 		<div className="space-y-5">
 			{Array.from(groups, ([key, entries]) => {
-				// A group exists because something was filed under it, so the first entry is what names
-				// it — an empty one would be a group nothing put anything in.
 				const [first] = entries;
 				if (!first) return null;
-				const areaSlug = first.areaSlug;
+				const groupSlug = first.groupSlug;
 				const available = entries.filter(({ availability }) => availability === "AVAILABLE").length;
 				const restorable = entries.filter(({ availability }) => availability === "ADOPTED").length;
-				const areaMissing = areaSlug !== undefined && !existingAreaSlugs.has(areaSlug);
+				const groupMissing = groupSlug !== undefined && !existingGroupSlugs.has(groupSlug);
 
 				return (
 					<Section
@@ -92,19 +81,19 @@ export function AvailablePracticeList({
 						level={3}
 						title={
 							<span className="flex items-center gap-2">
-								<AreaPill size="sm" slug={areaSlug} name={first.areaName} />
-								{first.areaName ?? "Unassigned"}
+								<GroupPill size="sm" slug={groupSlug} name={first.groupName} />
+								{first.groupName ?? "Unassigned"}
 							</span>
 						}
 						actions={
-							areaSlug && (available > 0 || (areaMissing && restorable > 0)) ? (
+							groupSlug && (available > 0 || (groupMissing && restorable > 0)) ? (
 								<DetailStackLink
-									entry={{ kind: "catalog-area", id: areaSlug }}
+									entry={{ kind: "catalog-group", id: groupSlug }}
 									className={buttonVariants({ size: "sm", variant: "outline" })}
 								>
-									{areaMissing && available === 0
+									{groupMissing && available === 0
 										? `Restore group · ${countLabel(restorable)}`
-										: existingAreaSlugs.has(areaSlug)
+										: existingGroupSlugs.has(groupSlug)
 											? `Review ${countLabel(available)}`
 											: `Review group · ${countLabel(available)}`}
 								</DetailStackLink>
@@ -146,7 +135,7 @@ function PracticeRow({ practice }: { practice: CatalogPracticeSummary }) {
 		// visible text is the name; the registry's verb phrase stands in for the chevron.
 		<Item variant="outline" render={link}>
 			<ItemMedia variant="icon" className="bg-transparent">
-				<AreaPill size="md" slug={practice.areaSlug} name={practice.areaName} />
+				<GroupPill size="md" slug={practice.groupSlug} name={practice.groupName} />
 			</ItemMedia>
 			<ItemContent className="min-w-0">
 				<ItemTitle className="line-clamp-none break-words">

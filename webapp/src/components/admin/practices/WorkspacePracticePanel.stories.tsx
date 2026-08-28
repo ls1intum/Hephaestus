@@ -18,7 +18,7 @@ const ready = (over: Partial<ReadyState> = {}): ReadyState => ({
 	status: "ready",
 	practice,
 	definitionOptions: mockPracticeDefinitionOptions,
-	areaName: "Review-ready work",
+	groupName: "Review-ready work",
 	...over,
 });
 
@@ -66,7 +66,7 @@ export const InheritedAutonomy: Story = {
 				autonomy: {
 					effective: "HUMAN_APPROVAL",
 					inherited: true,
-					source: "AREA",
+					source: "GROUP",
 				},
 			},
 		}),
@@ -79,7 +79,7 @@ export const InheritedAutonomy: Story = {
 
 export const Unassigned: Story = {
 	args: {
-		state: ready({ practice: { ...practice, areaSlug: undefined }, areaName: undefined }),
+		state: ready({ practice: { ...practice, groupSlug: undefined }, groupName: undefined }),
 	},
 };
 

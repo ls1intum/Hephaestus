@@ -85,11 +85,6 @@ export const PracticeOpensItsDefinition: Story = {
 	},
 };
 
-/**
- * A caller that has no practice list — one still loading, or a screen that never fetched it — keeps
- * every link and simply shows no card. Nothing the card holds is load-bearing: the name and the area
- * are on the row, and the rest is a field on the page the link opens.
- */
 export const WithoutPracticeRecords: Story = {
 	args: { practices: undefined },
 	parameters: { chromatic: { disableSnapshot: true } },

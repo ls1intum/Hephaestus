@@ -1,0 +1,261 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://hephaestus.aet.cit.tum.de/schemas/practices/default-catalog.schema.json",
+	"title": "Bundled practice catalog",
+	"description": "Repository-managed practice definitions installed into the curated instance catalog.",
+	"type": "object",
+	"additionalProperties": false,
+	"required": ["$schema", "criteriaPreambles", "groups"],
+	"properties": {
+		"$schema": {
+			"description": "Schema used by editors and CI to validate this catalog.",
+			"const": "./default-catalog.schema.json"
+		},
+		"criteriaPreambles": {
+			"description": "Shared review instructions keyed by reviewed work type or a named specialization.",
+			"type": "object",
+			"minProperties": 1,
+			"additionalProperties": {
+				"type": "string",
+				"minLength": 1
+			}
+		},
+		"groups": {
+			"description": "Ordered practice groups; array order is the bundled display order.",
+			"type": "array",
+			"minItems": 1,
+			"items": {
+				"$ref": "#/$defs/group"
+			}
+		}
+	},
+	"$defs": {
+		"group": {
+			"description": "A named group of related practices.",
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["slug", "name", "practices"],
+			"properties": {
+				"slug": {
+					"description": "Stable group identifier used for provenance and URLs.",
+					"$ref": "#/$defs/slug"
+				},
+				"name": {
+					"description": "Human-facing group name.",
+					"$ref": "#/$defs/name"
+				},
+				"description": {
+					"description": "Optional explanation of the group's purpose.",
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 2000
+				},
+				"icon": {
+					"description": "Optional icon name supported by the admin interface.",
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 64
+				},
+				"color": {
+					"description": "Optional color name supported by the admin interface.",
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 64
+				},
+				"practices": {
+					"description": "Ordered practices in this group; array order is the bundled display order.",
+					"type": "array",
+					"items": {
+						"$ref": "#/$defs/practice"
+					}
+				}
+			}
+		},
+		"practice": {
+			"description": "One bundled engineering-practice definition.",
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["slug", "name", "on", "criteria"],
+			"properties": {
+				"slug": {
+					"description": "Stable practice identifier used for provenance, findings, and URLs.",
+					"$ref": "#/$defs/slug"
+				},
+				"name": {
+					"description": "Human-facing practice name.",
+					"$ref": "#/$defs/name"
+				},
+				"on": {
+					"description": "Occasions this practice is reviewed on. A bare signal name is shorthand for a binding on that signal reading the artifact kind's default evidence.",
+					"type": "array",
+					"minItems": 1,
+					"items": {
+						"oneOf": [
+							{
+								"$ref": "#/$defs/signalName"
+							},
+							{
+								"$ref": "#/$defs/binding"
+							}
+						]
+					}
+				},
+				"precomputeScript": {
+					"description": "Optional classpath resource containing TypeScript that prepares structured review context.",
+					"type": "string",
+					"pattern": "^practices/precompute/[a-z0-9]+(?:-[a-z0-9]+)*\\.ts$"
+				},
+				"preamble": {
+					"description": "Optional named criteria preamble; defaults to the reviewed work type.",
+					"type": "string",
+					"minLength": 1
+				},
+				"criteria": {
+					"description": "Markdown rules used by any reviewer and by Hephaestus when automated review is enabled.",
+					"type": "string",
+					"minLength": 3,
+					"maxLength": 50000
+				},
+				"whyItMatters": {
+					"description": "Optional developer guidance explaining the value of the practice.",
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 2000
+				},
+				"whatGoodLooksLike": {
+					"description": "Optional developer guidance giving a concrete positive example.",
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 2000
+				}
+			}
+		},
+		"slug": {
+			"description": "Lowercase, hyphen-separated stable identifier.",
+			"type": "string",
+			"pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+			"minLength": 3,
+			"maxLength": 64
+		},
+		"name": {
+			"description": "Short human-facing label.",
+			"type": "string",
+			"minLength": 3,
+			"maxLength": 128
+		},
+		"binding": {
+			"description": "One occasion this practice is reviewed on, and the evidence that review reads.",
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["signals"],
+			"properties": {
+				"signals": {
+					"description": "Signals that occasion this review. All must share one artifact kind; that kind is what the practice reviews.",
+					"type": "array",
+					"minItems": 1,
+					"uniqueItems": true,
+					"items": {
+						"$ref": "#/$defs/signalName"
+					}
+				},
+				"needs": {
+					"description": "Sources a review occasioned this way reads. Omit to read the artifact kind's default evidence.",
+					"type": "array",
+					"minItems": 1,
+					"items": {
+						"type": "object",
+						"additionalProperties": false,
+						"required": ["sourceKind", "stance"],
+						"properties": {
+							"sourceKind": {
+								"description": "Stable source identifier from the shipped source contract.",
+								"type": "string",
+								"minLength": 1
+							},
+							"stance": {
+								"description": "REQUIRED: the claim reads it. EXHAUSTIVE: the claim asserts something is absent from it, so a partial capture cannot satisfy it. CONTEXTUAL: used if present, never fatal.",
+								"enum": ["REQUIRED", "EXHAUSTIVE", "CONTEXTUAL"]
+							}
+						}
+					}
+				},
+				"onDrafts": {
+					"description": "Whether an artifact still marked draft occasions this review. Defaults to false.",
+					"type": "boolean"
+				},
+				"subject": {
+					"description": "Whose conduct a review occasioned this way judges, and therefore which person its observations are filed against. Defaults to AUTHOR. A practice about reviewing somebody else's work names REVIEWER.",
+					"enum": ["AUTHOR", "ASSIGNEE", "REVIEWER"]
+				},
+				"appliesWhen": {
+					"description": "What must be in the work for this practice to have anything to judge. Decided from staged evidence before the practice is put to a model, so a practice whose subject is provably absent is not asked. Omit to apply to every artifact of this kind.",
+					"$ref": "#/$defs/subject"
+				}
+			}
+		},
+		"signalName": {
+			"description": "Vendor-neutral signal name, <domain>.<kind>.<signal>; its prefix is the artifact kind.",
+			"type": "string",
+			"pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+			"maxLength": 128
+		},
+		"subject": {
+			"description": "A subject declaration: what has to be in a piece of work for a practice to have anything to judge about it, and the sentence to show a reader when it is not.",
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["absentSays", "anyOf"],
+			"properties": {
+				"absentSays": {
+					"description": "Sentence shown wherever the resulting silence is explained, in the practice author's voice and phrased as a fact about the work, e.g. 'the change touches no dependency manifest or lockfile'.",
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 300
+				},
+				"anyOf": {
+					"description": "Shapes the subject may take. The subject is present when any one is found, and provably absent only when every one was decided and none was found, so adding a clause can only make the practice run more often.",
+					"type": "array",
+					"minItems": 1,
+					"maxItems": 10,
+					"items": {
+						"$ref": "#/$defs/subjectClause"
+					}
+				}
+			}
+		},
+		"subjectClause": {
+			"description": "One shape the subject may take. Exactly one of the three properties is stated; a clause nothing could settle leaves the practice running.",
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"changedPathMatches": {
+					"description": "Globs matched against every path the change names, both sides of a rename. '*' does not cross a '/', '**' does, and a leading '**/' also matches zero segments so '**/pom.xml' finds a root pom.xml. Every other character is literal.",
+					"type": "array",
+					"minItems": 1,
+					"maxItems": 100,
+					"items": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 200
+					}
+				},
+				"diffContains": {
+					"description": "Literal strings sought anywhere in the diff \u2014 added, removed or context \u2014 so that removing the last test in a file still counts as the subject being present. Literals rather than patterns: the declaration is operator-editable and is scanned over every diff of every review.",
+					"type": "array",
+					"minItems": 1,
+					"maxItems": 100,
+					"items": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 200
+					}
+				},
+				"evidenceHasItems": {
+					"description": "A named evidence collection that must hold at least one entry. An empty collection settles the clause only when its source was captured whole.",
+					"enum": ["scm.review-threads", "scm.inline-review-comments", "scm.general-review-comments"]
+				}
+			},
+			"minProperties": 1,
+			"maxProperties": 1
+		}
+	}
+}

@@ -253,7 +253,7 @@ export function FeedbackDetailPage({
 												workspaceSlug={workspaceSlug}
 												practiceSlug={observation.practiceSlug}
 												practiceName={observation.practiceName}
-												area={observation.area}
+												group={observation.group}
 												practice={practices?.find(
 													(practice) => practice.slug === observation.practiceSlug,
 												)}

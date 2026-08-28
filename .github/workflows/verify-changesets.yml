@@ -35,7 +35,7 @@ jobs:
           # Image contents, excluding tests and in-tree documentation.
           SHIPPED_PATHS=(
             "server" "webapp" "docker"
-            ":!**/*.md" ":!server/src/test" ":!webapp/e2e"
+            ":!**/*.md" ":!server/application/src/test" ":!webapp/e2e"
             ":!**/*.test.ts" ":!**/*.test.tsx" ":!**/*.stories.tsx"
           )
 
@@ -56,7 +56,7 @@ jobs:
             node scripts/verify-changesets.ts /tmp/changeset-status.json "${changesets_changed[@]}"
           fi
 
-          if git diff --name-only "$BASE_SHA"...HEAD -- server/src/main/resources/db/changelog/ | grep -q .; then
+          if git diff --name-only "$BASE_SHA"...HEAD -- server/application/src/main/resources/db/changelog/ | grep -q .; then
             echo "::notice::This PR contains Liquibase changesets — the release notes will flag the migration automatically. If the operator must act, say so in your changeset and update MIGRATION.md."
           fi
 

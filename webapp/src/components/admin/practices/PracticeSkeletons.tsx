@@ -28,20 +28,20 @@ export function PracticeListSkeleton({ rows }: PracticeListSkeletonProps) {
 }
 
 export interface PracticeTreeSkeletonProps {
-	areas: number;
-	practicesPerArea: number;
+	groups: number;
+	practicesPerGroup: number;
 }
 
-export function PracticeTreeSkeleton({ areas, practicesPerArea }: PracticeTreeSkeletonProps) {
+export function PracticeTreeSkeleton({ groups, practicesPerGroup }: PracticeTreeSkeletonProps) {
 	return (
 		<div className="space-y-6" aria-hidden>
-			{Array.from({ length: areas }, (_, index) => (
+			{Array.from({ length: groups }, (_, index) => (
 				<div key={index} className="space-y-3">
 					<div className="flex items-center gap-2">
 						<Skeleton className="size-6 rounded-md" />
 						<Skeleton className="h-5 w-full max-w-56" />
 					</div>
-					<PracticeListSkeleton rows={practicesPerArea} />
+					<PracticeListSkeleton rows={practicesPerGroup} />
 				</div>
 			))}
 		</div>

@@ -170,7 +170,8 @@ export function PracticeReviewCoverageSettings({
 					What gets reviewed
 				</h2>
 				<p className="text-muted-foreground text-sm">
-					A review starts only when both the repository and linked author are covered. About{" "}
+					A review starts only when both the repository and linked person it evaluates are covered.
+					That person is usually the author; reviewer practices use the reviewer. About{" "}
 					{settings.coverageSummary.recentReviewVolume} review jobs entered the queue in this
 					workspace during the last {settings.coverageSummary.estimateWindowDays} days.
 				</p>
@@ -291,8 +292,8 @@ export function PracticeReviewCoverageSettings({
 					noun="eligible people"
 				/>
 				<FieldDescription>
-					Only eligible, linked human members can be selected. Missing or unlinked authors remain
-					outside coverage.
+					Only eligible, linked human members can be selected. Outside contributors, unlinked
+					reviewers, and bots remain outside coverage.
 				</FieldDescription>
 				<RadioGroup
 					aria-labelledby={`${personScopeId}-label`}
