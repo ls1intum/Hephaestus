@@ -2,6 +2,37 @@ name: Security mutation testing
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/security-mutation.yml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "scripts/run-security-mutations.ts"
+      - "server/application/pom.xml"
+      - "server/application/src/main/java/de/tum/cit/aet/hephaestus/core/auth/oauth/AdminBootstrapPolicy.java"
+      - "server/application/src/main/java/de/tum/cit/aet/hephaestus/core/auth/oauth/AuthIntentCookie.java"
+      - "server/application/src/main/java/de/tum/cit/aet/hephaestus/core/auth/oauth/CookieOAuth2AuthorizationRequestRepository.java"
+      - "server/application/src/main/java/de/tum/cit/aet/hephaestus/core/auth/oauth/ReturnToValidator.java"
+      - "server/application/src/main/java/de/tum/cit/aet/hephaestus/core/security/ImpersonationGuard.java"
+      - "server/application/src/main/java/de/tum/cit/aet/hephaestus/core/security/OutlineOriginPolicy.java"
+      - "server/application/src/main/java/de/tum/cit/aet/hephaestus/core/security/PrivateAddressGuard.java"
+      - "server/application/src/main/java/de/tum/cit/aet/hephaestus/core/security/ServerUrlValidator.java"
+      - "server/application/src/main/java/de/tum/cit/aet/hephaestus/integration/core/connection/EncryptionContext.java"
+      - "server/application/src/main/java/de/tum/cit/aet/hephaestus/integration/core/oauth/state/HmacOAuthStateService.java"
+      - "server/application/src/main/java/de/tum/cit/aet/hephaestus/integration/scm/gitlab/webhook/GitlabWebhookSignatureVerifier.java"
+      - "server/application/src/test/java/de/tum/cit/aet/hephaestus/core/auth/oauth/AdminBootstrapPolicyTest.java"
+      - "server/application/src/test/java/de/tum/cit/aet/hephaestus/core/auth/oauth/AuthIntentCookieTest.java"
+      - "server/application/src/test/java/de/tum/cit/aet/hephaestus/core/auth/oauth/CookieOAuth2AuthorizationRequestRepositoryTest.java"
+      - "server/application/src/test/java/de/tum/cit/aet/hephaestus/core/auth/oauth/ReturnToValidatorTest.java"
+      - "server/application/src/test/java/de/tum/cit/aet/hephaestus/core/security/ImpersonationGuardTest.java"
+      - "server/application/src/test/java/de/tum/cit/aet/hephaestus/core/security/OutlineOriginPolicyTest.java"
+      - "server/application/src/test/java/de/tum/cit/aet/hephaestus/core/security/PrivateAddressGuardTest.java"
+      - "server/application/src/test/java/de/tum/cit/aet/hephaestus/core/security/ServerUrlValidatorTest.java"
+      - "server/application/src/test/java/de/tum/cit/aet/hephaestus/integration/core/connection/EncryptionContextTest.java"
+      - "server/application/src/test/java/de/tum/cit/aet/hephaestus/integration/core/oauth/state/HmacOAuthStateServiceTest.java"
+      - "server/application/src/test/java/de/tum/cit/aet/hephaestus/integration/scm/gitlab/webhook/GitlabWebhookSignatureVerifierTest.java"
+  schedule:
+    - cron: "17 4 1 * *"
 
 permissions:
   contents: read

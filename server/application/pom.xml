@@ -808,17 +808,29 @@
                             </jvmArgs>
                             <targetClasses>
                                 <param>de.tum.cit.aet.hephaestus.core.security.ServerUrlValidator</param>
+                                <param>de.tum.cit.aet.hephaestus.core.security.PrivateAddressGuard</param>
+                                <param>de.tum.cit.aet.hephaestus.core.security.OutlineOriginPolicy</param>
+                                <param>de.tum.cit.aet.hephaestus.core.security.ImpersonationGuard</param>
                                 <param>de.tum.cit.aet.hephaestus.integration.core.oauth.state.HmacOAuthStateService</param>
                                 <param>de.tum.cit.aet.hephaestus.core.auth.oauth.AdminBootstrapPolicy</param>
                                 <param>de.tum.cit.aet.hephaestus.core.auth.oauth.ReturnToValidator</param>
+                                <param>de.tum.cit.aet.hephaestus.core.auth.oauth.AuthIntentCookie</param>
+                                <param>de.tum.cit.aet.hephaestus.core.auth.oauth.CookieOAuth2AuthorizationRequestRepository</param>
                                 <param>de.tum.cit.aet.hephaestus.integration.core.connection.EncryptionContext</param>
+                                <param>de.tum.cit.aet.hephaestus.integration.scm.gitlab.webhook.GitlabWebhookSignatureVerifier</param>
                             </targetClasses>
                             <targetTests>
                                 <param>de.tum.cit.aet.hephaestus.core.security.ServerUrlValidatorTest</param>
+                                <param>de.tum.cit.aet.hephaestus.core.security.PrivateAddressGuardTest</param>
+                                <param>de.tum.cit.aet.hephaestus.core.security.OutlineOriginPolicyTest</param>
+                                <param>de.tum.cit.aet.hephaestus.core.security.ImpersonationGuardTest</param>
                                 <param>de.tum.cit.aet.hephaestus.integration.core.oauth.state.HmacOAuthStateServiceTest</param>
                                 <param>de.tum.cit.aet.hephaestus.core.auth.oauth.AdminBootstrapPolicyTest</param>
                                 <param>de.tum.cit.aet.hephaestus.core.auth.oauth.ReturnToValidatorTest</param>
+                                <param>de.tum.cit.aet.hephaestus.core.auth.oauth.AuthIntentCookieTest</param>
+                                <param>de.tum.cit.aet.hephaestus.core.auth.oauth.CookieOAuth2AuthorizationRequestRepositoryTest</param>
                                 <param>de.tum.cit.aet.hephaestus.integration.core.connection.EncryptionContextTest</param>
+                                <param>de.tum.cit.aet.hephaestus.integration.scm.gitlab.webhook.GitlabWebhookSignatureVerifierTest</param>
                             </targetTests>
                             <outputFormats>
                                 <param>HTML</param>

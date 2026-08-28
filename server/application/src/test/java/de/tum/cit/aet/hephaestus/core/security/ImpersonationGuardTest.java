@@ -6,8 +6,10 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Instant;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -44,7 +46,8 @@ class ImpersonationGuardTest extends BaseUnitTest {
     }
 
     /** Runs the guard once and reports whether the request was passed downstream and the response status. */
-    private record Outcome(boolean proceeded, int status, String body) {}
+    private record Outcome(
+            boolean proceeded, int status, @Nullable String contentType, String body) {}
 
     private Outcome run(String method, String path, boolean impersonating, boolean allowWrites) throws Exception {
         authenticate(impersonating);
@@ -56,7 +59,8 @@ class ImpersonationGuardTest extends BaseUnitTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
         boolean[] proceeded = {false};
         guard.doFilter(request, response, (req, res) -> proceeded[0] = true);
-        return new Outcome(proceeded[0], response.getStatus(), response.getContentAsString());
+        return new Outcome(
+                proceeded[0], response.getStatus(), response.getContentType(), response.getContentAsString());
     }
 
     @Test
@@ -64,7 +68,11 @@ class ImpersonationGuardTest extends BaseUnitTest {
         Outcome o = run("POST", "/user", true, false);
         assertThat(o.proceeded()).isFalse();
         assertThat(o.status()).isEqualTo(HttpServletResponse.SC_FORBIDDEN);
-        assertThat(o.body()).contains("impersonation_read_only");
+        assertThat(o.contentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+        assertThat(o.body())
+                .contains("\"title\":\"Forbidden\"")
+                .contains("\"instance\":\"/user\"")
+                .contains("\"code\":\"impersonation_read_only\"");
     }
 
     @Test
