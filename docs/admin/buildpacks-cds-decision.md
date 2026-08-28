@@ -7,7 +7,8 @@ description: How and why the application-server image is built with Paketo Cloud
 
 The `application-server` image is built from the `server/application` module with Spring Boot's
 `build-image` goal (Paketo Cloud Native Buildpacks) and Application Class Data Sharing (CDS)
-enabled. The hand-rolled `Dockerfile` was removed. Spring Boot AOT processing is **off** (see below).
+enabled. The hand-rolled `Dockerfile` was removed, and this is the only recipe: pull request
+previews run this same image at their own commit rather than building a second one. Spring Boot AOT processing is **off** (see below).
 
 ## Why
 
