@@ -107,9 +107,9 @@ The gates that remain are the ones that describe *what may run*, not *who asked*
   is refused rather than trusted. Coolify re-reads the Compose file from the commit it deploys, so
   this rule is load-bearing.
   `ci-compose-validate.yml` holds the other half: on every pull request it renders that file and fails
-  if the stack gains a way out of its sandbox — a socket, a build stage, a published port, an external
-  network, an unbounded memory limit, a network every preview would share, or a renamed or flipped
-  integration switch. `scripts/check-preview-stack.ts` is the authoritative list, and its own tests prove each
+  if the stack gains a way out of its sandbox — a build stage, a published port, an unbounded memory
+  limit, a network every preview would share, the Docker socket on anything but the seed loader or
+  writable on that, or a renamed or flipped integration switch. `scripts/check-preview-stack.ts` is the authoritative list, and its own tests prove each
   assertion fails when that escape is present.
 - Every service runs the image CI published for the exact head commit, and each digest must carry a
   build attestation signed by this repository's `reusable-docker-build.yml`, verified before Coolify
@@ -156,9 +156,10 @@ the author why, so the refusal is immediate and names the pull requests holding 
 
 - A contributor previews their own pull request with one click, and every commit after that follows on
   its own, red tests included. This is the outcome the whole design exists to produce.
-- Anyone with push access can put pull-request code on a public URL. This is accepted deliberately:
-  the preview holds no staging credential, database, network or control socket, and the same person
-  can already run that code in CI.
+- Anyone with push access can put pull-request code on a public URL, against a copy of staging's
+  data and reading staging's event stream. This is accepted deliberately: previews exist to be
+  reviewed against real data, the copy is silenced and re-homed before the application server boots,
+  and the same person can already run that code in CI.
 - **A stack can hold several slots at once**, one per labelled layer, because each layer is a
   separate pull request. The admission message names the occupants, so the author can see it and drop
   a label.

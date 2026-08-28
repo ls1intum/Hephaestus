@@ -15,15 +15,20 @@ interface Service {
 	cap_add?: string[];
 	build?: { context: string; dockerfile?: string };
 	deploy?: { resources: { limits: { memory: string } } };
-	volumes?: { source: string }[];
+	volumes?: { source: string; read_only?: boolean }[];
 	privileged?: boolean;
 	network_mode?: string;
 	ports?: { published: string }[];
 }
 
 interface Stack {
-	services: { appserver: Service; postgres: Service; webapp?: Service };
-	networks: Record<string, { internal?: boolean }>;
+	services: {
+		appserver: Service;
+		postgres: Service;
+		webapp?: Service;
+		"seed-loader"?: Service;
+	};
+	networks: Record<string, { internal?: boolean; external?: boolean; name?: string }>;
 }
 
 const sandboxed: Stack = {
@@ -65,11 +70,24 @@ void describe("preview stack sandbox", () => {
 	void test("rejects every documented way out of the sandbox", () => {
 		const escapes: [string, (stack: Stack) => void, RegExp][] = [
 			[
-				"docker socket",
+				"docker socket on a service that runs pull-request code",
 				(s) => {
-					s.services.postgres.volumes = [{ source: "/var/run/docker.sock" }];
+					s.services.appserver.volumes = [{ source: "/var/run/docker.sock", read_only: true }];
 				},
-				/Docker socket/,
+				/only seed-loader may hold/,
+			],
+			[
+				"a writable socket on the seed loader",
+				(s) => {
+					s.services["seed-loader"] = {
+						environment: {},
+						deploy: { resources: { limits: { memory: "1" } } },
+						security_opt: ["no-new-privileges:true"],
+						cap_drop: ["ALL"],
+						volumes: [{ source: "/var/run/docker.sock" }],
+					};
+				},
+				/mounts the Docker socket writable/,
 			],
 			[
 				"build stage",
@@ -107,7 +125,7 @@ void describe("preview stack sandbox", () => {
 				/no memory limit/,
 			],
 			[
-				"a network every preview would share",
+				"a project-scoped network every preview would share",
 				(s) => {
 					s.networks.backend = { internal: true };
 				},
@@ -155,6 +173,16 @@ void describe("preview stack sandbox", () => {
 				`${label}: ${violations.join("; ")}`,
 			);
 		}
+	});
+
+	void test("accepts an external network, which names one that already exists", () => {
+		const violations = findViolations(
+			mutated((s) => {
+				s.networks["staging-shared"] = { external: true, name: "shared-network" };
+			}),
+		);
+
+		assert.deepEqual(violations, []);
 	});
 
 	void test("catches a flipped integration switch", () => {

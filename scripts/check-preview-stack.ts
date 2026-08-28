@@ -125,6 +125,9 @@ const ALLOWED_CAPABILITIES: Record<string, readonly string[]> = {
 
 const REQUIRED_NON_EMPTY = ["HEPHAESTUS_TRUSTED_PROXIES", "WEBHOOK_SECRET"];
 
+/** The one service allowed to hold the Docker socket, and only read-only. */
+const SOCKET_HOLDER = "seed-loader";
+
 /**
  * Switches that keep a preview from reaching anything outside itself. A rename or a typo would not
  * fail at boot — Spring would fall back to its own default, several of which are on — it would quietly
@@ -162,7 +165,15 @@ export function findViolations(stack: unknown): string[] {
 		const mounts = Array.isArray(service.volumes) ? service.volumes : [];
 		for (const mount of mounts) {
 			const source = isRecord(mount) && typeof mount.source === "string" ? mount.source : "";
-			if (source.includes("docker.sock")) violations.push(`${name} mounts the Docker socket`);
+			if (!source.includes("docker.sock")) continue;
+			// The seed loader drives pg_dump and psql inside the two database containers, which is the
+			// whole reason it holds the socket. Read-only keeps it to that: it can inspect and exec,
+			// not rebuild the daemon's state. Nothing that runs pull-request code may hold it at all.
+			if (name !== SOCKET_HOLDER) {
+				violations.push(`${name} mounts the Docker socket, which only ${SOCKET_HOLDER} may hold`);
+			} else if (isRecord(mount) && mount.read_only !== true) {
+				violations.push(`${SOCKET_HOLDER} mounts the Docker socket writable`);
+			}
 		}
 		// A preview runs the artifact CI published, not one built here: a build stage would make it a
 		// lookalike of the shipped image rather than the shipped image.
@@ -227,13 +238,18 @@ export function findViolations(stack: unknown): string[] {
 		violations.push("the rendered stack has no appserver service, so no switch was checked");
 	}
 	// Coolify runs every preview of this application under one Compose project, named after the
-	// application UUID with no pull request in it. A network named here is therefore `<uuid>_<name>`
-	// for all of them at once, and one preview reaches another's database over it. Coolify's own
-	// per-preview network, which its proxy joins, is what keeps them apart. `default` is Compose's
-	// own and carries the project name too, but nothing joins it once no service names a network.
-	for (const [name] of records(stack.networks)) {
+	// application UUID with no pull request in it. A network defined here is therefore `<uuid>_<name>`
+	// for all of them at once, and one preview reaches another's database over it — a shared network
+	// that reads as private. An external one is the opposite: it names a network that already exists,
+	// so joining it is a decision someone made rather than a side effect of the project name.
+	// `default` is Compose's own and carries the project name too, but nothing joins it once no
+	// service names a network.
+	for (const [name, network] of records(stack.networks)) {
 		if (name === "default") continue;
-		violations.push(`the stack declares the ${name} network, which every preview would share`);
+		if (network.external === true && typeof network.name === "string" && network.name !== "") {
+			continue;
+		}
+		violations.push(`the stack defines the ${name} network, which every preview would share`);
 	}
 
 	return violations;

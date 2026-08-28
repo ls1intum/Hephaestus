@@ -58,21 +58,159 @@ services:
           memory: 512M
           pids: 256
 
-  nats:
-    image: nats:2.14.6-alpine@sha256:ad7a43eb7e3337c3c38ce5d784d1461791f95f730f252d2b25eee699752a0ca3
-    restart: unless-stopped
-    command: ["--jetstream", "--store_dir=/data", "--http_port=8222"]
+  # Clones the running staging database into this preview so it starts with real data. Only ever
+  # reads through pg_dump: it never mounts staging's data volume, and never starts a second Postgres
+  # against it. Every review entry point is paused, and the instance identity dropped, before the
+  # application server is allowed to boot. Runs once — a redeploy finds the marker and exits.
+  #
+  # Every postgres binary runs inside the two database containers, so this image needs the Docker
+  # CLI and nothing else.
+  seed-loader:
+    image: docker:cli@sha256:000bb62ff495f986c9f5578eb67cc2cb98b91138eda81d7762d5371eb8a497fe
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SERVICE_NAME_POSTGRES: ${SERVICE_NAME_POSTGRES:-}
+      SERVICE_FQDN_APPSERVER: ${SERVICE_FQDN_APPSERVER:-}
+      SERVICE_FQDN_WEBAPP: ${SERVICE_FQDN_WEBAPP:-}
+      PREVIEW_SEED_SOURCE_CONTAINER: ${PREVIEW_SEED_SOURCE_CONTAINER:-app-postgres-1}
+      PREVIEW_SEED_SOURCE_USERNAME: ${PREVIEW_SEED_SOURCE_USERNAME:-root}
+      PREVIEW_SEED_SOURCE_DATABASE: ${PREVIEW_SEED_SOURCE_DATABASE:-hephaestus}
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+
+        APP_FQDN="$${SERVICE_FQDN_APPSERVER:-$${SERVICE_FQDN_WEBAPP:-}}"
+        if ! echo "$$APP_FQDN" | grep -Eq "^pr[0-9]+"; then
+          echo "Skipping seed-loader: non-PR deployment detected"
+          exit 0
+        fi
+
+        SOURCE_CTN="$$PREVIEW_SEED_SOURCE_CONTAINER"
+        PREVIEW_PG_SERVICE="$${SERVICE_NAME_POSTGRES:-}"
+        COMPOSE_PROJECT=$$(docker inspect "$$HOSTNAME" \
+          --format '{{ index .Config.Labels "com.docker.compose.project" }}')
+        PREVIEW_PG=$$(docker ps \
+          --filter "label=com.docker.compose.project=$$COMPOSE_PROJECT" \
+          --filter "label=com.docker.compose.service=$$PREVIEW_PG_SERVICE" \
+          --format "{{.Names}}")
+        PREVIEW_PG_COUNT=$$(printf '%s\n' "$$PREVIEW_PG" | awk 'NF { count++ } END { print count + 0 }')
+        if [ -z "$$PREVIEW_PG_SERVICE" ] || [ "$$PREVIEW_PG_COUNT" -ne 1 ]; then
+          echo "Could not uniquely resolve this preview's Postgres container from its Compose labels"
+          exit 1
+        fi
+        if [ "$$SOURCE_CTN" = "$$PREVIEW_PG" ]; then
+          echo "Refusing to use the preview database as its own seed source"
+          exit 1
+        fi
+        if ! docker ps --format "{{.Names}}" | grep -Fxq "$$SOURCE_CTN"; then
+          echo "Staging seed source '$$SOURCE_CTN' is not running"
+          exit 1
+        fi
+        if docker exec "$$PREVIEW_PG" test -f /var/lib/postgresql/data/.hephaestus-preview-seeded; then
+          echo "Skipping seed-loader: this preview has already been seeded"
+          exit 0
+        fi
+
+        echo "Dumping staging data from $$SOURCE_CTN"
+        docker exec "$$SOURCE_CTN" pg_dump \
+          -U "$$PREVIEW_SEED_SOURCE_USERNAME" \
+          -d "$$PREVIEW_SEED_SOURCE_DATABASE" \
+          --format=custom --no-owner --no-privileges > /tmp/seed.dump
+        test -s /tmp/seed.dump
+
+        echo "Resetting the private preview database"
+        docker exec "$$PREVIEW_PG" psql \
+          -v ON_ERROR_STOP=1 -U hephaestus -d postgres \
+          -c 'DROP DATABASE IF EXISTS hephaestus WITH (FORCE);' \
+          -c 'CREATE DATABASE hephaestus OWNER hephaestus;'
+
+        echo "Restoring staging data into $$PREVIEW_PG"
+        docker exec -i "$$PREVIEW_PG" pg_restore \
+          -U hephaestus -d hephaestus \
+          --exit-on-error --no-owner --no-privileges < /tmp/seed.dump
+
+        # Inline rather than a mounted .sql file: Coolify materialises a relative bind mount as an
+        # empty managed directory, which `psql <` reads as zero bytes and exits 0 on.
+        echo "Applying the preview policy"
+        docker exec -i "$$PREVIEW_PG" psql -v ON_ERROR_STOP=1 -U hephaestus -d hephaestus <<'SQL'
+        -- 1. Silence: a clone must not act.
+        UPDATE workspace
+           SET practice_review_auto_trigger_enabled = FALSE,
+               practice_review_manual_trigger_enabled = FALSE;
+
+        UPDATE workspace_agent_binding
+           SET enabled = FALSE,
+               updated_at = NOW()
+         WHERE purpose = 'PRACTICE_REVIEW';
+
+        UPDATE review_sweep_schedule
+           SET enabled = FALSE,
+               updated_at = NOW();
+
+        UPDATE agent_job
+           SET status = 'CANCELLED',
+               completed_at = COALESCE(completed_at, NOW()),
+               worker_id = NULL,
+               error_message = 'Cancelled when staging data was cloned into a preview.',
+               cancellation_reason = NULL
+         WHERE status IN ('QUEUED', 'RUNNING');
+
+        UPDATE agent_job
+           SET delivery_status = 'FAILED',
+               error_message = CONCAT_WS(E'\n', NULLIF(error_message, ''),
+                   'Delivery paused when staging data was cloned into a preview.')
+         WHERE status = 'COMPLETED'
+           AND delivery_status = 'PENDING';
+
+        UPDATE sync_job
+           SET status = 'CANCELLED',
+               cancel_requested = TRUE,
+               finished_at = COALESCE(finished_at, NOW()),
+               heartbeat_at = NULL,
+               error_summary = 'Cancelled when staging data was cloned into a preview.'
+         WHERE status IN ('PENDING', 'RUNNING');
+
+        -- 2. Re-home: a clone must not keep the source instance's identity. login_provider and
+        -- jwt_signing_key are reseeded from this deployment's own config on boot; issued_jwt is
+        -- simply dropped. Accounts survive — identity_link keys on identity_provider.
+        DELETE FROM issued_jwt;
+        DELETE FROM jwt_signing_key;
+        DELETE FROM login_provider;
+        SQL
+
+        # The marker promises the policy is in force, so verify against the database rather than
+        # against psql's exit code — see the bind-mount note above for why those differ.
+        echo "Verifying the preview policy took effect"
+        LIVE=$$(docker exec "$$PREVIEW_PG" psql -tAX -v ON_ERROR_STOP=1 -U hephaestus -d hephaestus -c "
+          SELECT (SELECT count(*) FROM workspace
+                   WHERE practice_review_auto_trigger_enabled OR practice_review_manual_trigger_enabled)
+               + (SELECT count(*) FROM workspace_agent_binding WHERE enabled AND purpose = 'PRACTICE_REVIEW')
+               + (SELECT count(*) FROM review_sweep_schedule WHERE enabled)
+               + (SELECT count(*) FROM agent_job WHERE status IN ('QUEUED', 'RUNNING'))
+               + (SELECT count(*) FROM agent_job
+                   WHERE status = 'COMPLETED' AND delivery_status = 'PENDING')
+               + (SELECT count(*) FROM sync_job WHERE status IN ('PENDING', 'RUNNING'))
+               + (SELECT count(*) FROM login_provider)
+               + (SELECT count(*) FROM jwt_signing_key)
+               + (SELECT count(*) FROM issued_jwt)")
+        if [ "$$LIVE" != "0" ]; then
+          echo "Preview policy did not take effect ($$LIVE rows still live); refusing to mark this preview seeded"
+          exit 1
+        fi
+
+        docker exec "$$PREVIEW_PG" touch /var/lib/postgresql/data/.hephaestus-preview-seeded
+        echo "Seed loaded; reviews are paused and the preview owns its login apps and signing key"
     volumes:
-      - nats-data:/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8222/healthz"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
     logging:
       driver: json-file
       options:
@@ -81,8 +219,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.25"
-          memory: 256M
+          cpus: "0.5"
+          memory: 512M
           pids: 128
 
   appserver:
@@ -117,11 +255,19 @@ services:
       DATABASE_URL: postgresql://${SERVICE_NAME_POSTGRES:-postgres}:5432/hephaestus?sslmode=disable
       DATABASE_USERNAME: hephaestus
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
-      NATS_SERVER: nats://${SERVICE_NAME_NATS:-nats}:4222
-      HEPHAESTUS_SYNC_NATS_SERVER: nats://${SERVICE_NAME_NATS:-nats}:4222
+      # The integration consumer reads staging's JetStream, so a preview sees the events a shared
+      # GitHub App delivers there rather than an empty broker. The agent job queue runs on
+      # PostgreSQL, not NATS, and stays local to this stack's own database.
+      NATS_SERVER: ${NATS_SERVER:-nats://nats-server:4222}
       NATS_ENABLED: "true"
-      NATS_DURABLE_CONSUMER_NAME: preview-consumer
-      HEPHAESTUS_INTEGRATION_CONSUMER_INACTIVE_THRESHOLD: 24h
+      # Per-deploy durable name, so previews get their own JetStream consumers instead of competing
+      # for one and stealing each other's messages.
+      NATS_DURABLE_CONSUMER_NAME: ${SERVICE_NAME_APPSERVER:-appserver}-consumer
+      # A preview is deleted, not shut down, so it never removes the durables it created on the
+      # shared stream. Far shorter than the 30d a long-lived deployment uses, because a preview is
+      # abandoned the day its pull request merges. Still long enough that a redeploy, or a testing
+      # session paused overnight, resumes on its own cursor instead of skipping to the head.
+      HEPHAESTUS_INTEGRATION_CONSUMER_INACTIVE_THRESHOLD: 72h
       HEPHAESTUS_AUTH_ISSUER: https://${SERVICE_FQDN_WEBAPP}
       HEPHAESTUS_AUTH_STATE_COOKIE_KEY: ${HEPHAESTUS_AUTH_STATE_COOKIE_KEY}
       HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS: ${HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS:-}
@@ -144,11 +290,15 @@ services:
       SENTRY_DSN: ""
       WEBHOOK_SECRET: ${WEBHOOK_SECRET}
       WEBHOOK_EXTERNAL_URL: ""
+    # Only the application server joins staging's network, and only to reach its broker. The
+    # database and the SPA stay on Coolify's per-preview network.
+    networks:
+      - staging-shared
     depends_on:
       postgres:
         condition: service_healthy
-      nats:
-        condition: service_healthy
+      seed-loader:
+        condition: service_completed_successfully
     stop_grace_period: 30s
     security_opt:
       - no-new-privileges:true
@@ -215,6 +365,12 @@ services:
           memory: 256M
           pids: 128
 
+networks:
+  # Staging's own network, joined by name rather than declared here, so this is a deliberate shared
+  # network and not one of the project-scoped ones every preview would silently share.
+  staging-shared:
+    external: true
+    name: shared-network
+
 volumes:
   postgres-data:
-  nats-data:
