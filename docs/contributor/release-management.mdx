@@ -32,7 +32,11 @@ sequenceDiagram
     M->>VP: changesets action folds pending changesets into the accumulating Version PR
     Note over VP: CHANGELOG.md + version bump preview
     VP->>M: Maintainer merges when the release is ready
-    M->>R: Tag vX.Y.Z, GitHub Release with curated notes,<br/>docker images X.Y.Z / X.Y / latest
+    M->>R: Create draft vX.Y.Z release
+    R->>R: Generate and verify digest-bound evidence
+    R->>R: Promote X.Y.Z / X.Y / latest image tags
+    R->>R: Publish release and deploy staging
+    Note over R: Production still requires approval
 ```
 
 1. **Every user-facing PR carries a changeset.** `bun changeset` asks for the bump type and an
@@ -50,10 +54,73 @@ sequenceDiagram
    the full suite and a release is only cut if that run succeeds. Maintainers bypass the branch
    ruleset, so the absent required checks don't block the merge. Versioning also moves any
    `### Next release` section in `MIGRATION.md` under the version being cut.
-3. **Merging the Version PR cuts the release.** The release workflow tags `vX.Y.Z` at the merge
-   commit, creates the GitHub Release from the new changelog section, retags the CI-built Docker
-   images as `X.Y.Z`, `X.Y`, and `latest`, publishes the signed release-pin asset, and starts the
-   deploy chain (staging automatically, production after approval).
+3. **Merging the Version PR cuts the release.** The workflow creates a draft release at the merge
+   commit. After its evidence gate passes, it promotes the CI-built images to `X.Y.Z`, `X.Y`, and
+   `latest`, publishes the release, deploys staging, and requests production approval.
+
+## Supply-chain evidence
+
+A release remains a draft until every first-party and upstream production image in
+`security/release-images.json` has passed the evidence
+gate. The gate resolves each image index and its `linux/amd64` and `linux/arm64` manifests to immutable
+digests. It generates a lossless Syft inventory plus SPDX and CycloneDX SBOMs for each deployed platform.
+The gate proves that the Syft source metadata identifies the exact digest and architecture, checks that
+every discovered package survives both standard-format conversions, and records packages whose license
+could not be detected. It also scans each platform manifest with Trivy, signs its SPDX predicate as an OCI
+attestation, and verifies the image signature and build provenance. The SBOMs, license summaries, scan
+reports, applied policy, checksums, and `manifest.json` are GitHub Release assets, so they outlive Actions
+artifact retention. Publication requires every artifact to be present, well formed, and bound to its
+recorded digest.
+
+Upstream NATS, Traefik, nginx, and Alpine images are versioned and digest-pinned in the production
+Compose topology. They receive the same per-platform SBOM, license, vulnerability, and index-membership
+evidence as first-party images. Hephaestus requires its own signatures and build provenance only for
+images it builds; it does not misrepresent observed upstream images as Hephaestus-built artifacts.
+
+The version-controlled policy rejects new fixable HIGH or CRITICAL findings. Baselines use exact
+image/CVE/package/installed-version fingerprints. Exceptions use the same scope and require an owner,
+justification, and future expiry.
+
+The latest release is rescanned weekly. A policy violation or scan failure is reported on
+[the vulnerability response issue](https://github.com/ls1intum/Hephaestus/issues/1369); scanner failure
+is never treated as no findings.
+
+### Operator verification
+
+Install `gh`, `jq`, `cosign`, and GNU `sha256sum`, then use a clean directory and replace `vX.Y.Z`
+below. Verification uses the digests in the release manifest, never mutable tags:
+
+```bash
+gh release download vX.Y.Z --repo ls1intum/Hephaestus
+sha256sum -c SHA256SUMS
+
+jq -r '.subjects[] | [.image, .platform, .digest] | @tsv' manifest.json |
+while IFS=$'\t' read -r image platform digest; do
+  ref="ghcr.io/ls1intum/hephaestus/$image@$digest"
+  suffix=${platform//\//-}
+  cosign verify-attestation --type spdxjson \
+    --certificate-identity 'https://github.com/ls1intum/Hephaestus/.github/workflows/release.yml@refs/heads/main' \
+    --certificate-oidc-issuer https://token.actions.githubusercontent.com "$ref" \
+    > verified-attestations.json
+  jq -e --slurpfile sbom "$image-$suffix.spdx.json" \
+    'any(.[]; (.payload | @base64d | fromjson | .predicate) == $sbom[0])' \
+    verified-attestations.json >/dev/null
+done
+
+jq -r '[.subjects[] | [.image, .indexDigest]] | unique[] | @tsv' manifest.json |
+while IFS=$'\t' read -r image digest; do
+  ref="ghcr.io/ls1intum/hephaestus/$image@$digest"
+  cosign verify "$ref" \
+    --certificate-identity 'https://github.com/ls1intum/Hephaestus/.github/workflows/reusable-docker-build.yml@refs/heads/main' \
+    --certificate-oidc-issuer https://token.actions.githubusercontent.com
+  gh attestation verify "oci://$ref" --owner ls1intum \
+    --signer-workflow ls1intum/Hephaestus/.github/workflows/reusable-docker-build.yml
+done
+```
+
+The downloaded `*.spdx.json` and `*.cdx.json` files are the machine-readable package and license
+inventories. `*.trivy.json` is a point-in-time scan, not a promise that vulnerability knowledge remains
+unchanged.
 
 ## Writing changesets
 

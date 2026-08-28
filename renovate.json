@@ -69,7 +69,24 @@
 			"description": "Docker images",
 			"matchManagers": ["dockerfile", "docker-compose"],
 			"groupName": "Docker images",
+			"pinDigests": true,
 			"labels": ["dependencies", "infrastructure"]
+		},
+		{
+			"description": "Release runtime images",
+			"matchPackageNames": [
+				"docker.io/library/alpine",
+				"docker.io/library/nats",
+				"docker.io/library/nginx",
+				"docker.io/library/traefik",
+				"alpine",
+				"nats",
+				"nginx",
+				"traefik"
+			],
+			"groupName": "Release runtime images",
+			"automerge": false,
+			"labels": ["dependencies", "infrastructure", "security"]
 		}
 	],
 	"customManagers": [
@@ -81,6 +98,25 @@
 				"# renovate: datasource=(?<datasource>[a-z-]+) depName=(?<depName>\\S+)(?: versioning=(?<versioning>\\S+))?(?: extractVersion=(?<extractVersion>\\S+))?\\s*\\nARG [A-Z_]+_VERSION=(?<currentValue>\\S+)"
 			],
 			"versioningTemplate": "{{#if versioning}}{{versioning}}{{else}}semver{{/if}}"
+		},
+		{
+			"description": "Track release security tool versions",
+			"customType": "regex",
+			"managerFilePatterns": ["/^\\.github/actions/setup-release-security-tools/action\\.yml$/"],
+			"matchStrings": [
+				"# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+(?<envName>[A-Z_]+): (?<currentValue>\\S+)"
+			],
+			"extractVersionTemplate": "^v(?<version>.*)$",
+			"versioningTemplate": "semver"
+		},
+		{
+			"description": "Keep the release evidence inventory aligned with reviewed upstream image pins",
+			"customType": "regex",
+			"managerFilePatterns": ["/^security/release-images\\.json$/"],
+			"matchStrings": [
+				"\"repository\": \"(?<depName>[^\"]+)\",\\s+\"tag\": \"(?<currentValue>[^\"]+)\",\\s+\"digest\": \"(?<currentDigest>sha256:[a-f0-9]{64})\""
+			],
+			"datasourceTemplate": "docker"
 		}
 	],
 	"vulnerabilityAlerts": {
@@ -88,8 +124,7 @@
 		"schedule": ["at any time"],
 		"minimumReleaseAge": null,
 		"dependencyDashboardApproval": false,
-		"prPriority": 10,
-		"automerge": true,
+		"automerge": false,
 		"groupName": null
 	},
 	"ignorePaths": ["**/node_modules/**", "**/target/**", "**/dist/**", "**/build/**"]

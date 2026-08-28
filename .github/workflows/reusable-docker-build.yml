@@ -71,7 +71,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      security-events: write
       id-token: write
       attestations: write
     steps:
@@ -227,89 +226,6 @@ jobs:
           fi
           echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
           echo "Per-arch digest: $DIGEST"
-
-      # SBOMs are emitted by Paketo into /layers/sbom/ during the build; pack downloads them via
-      # the OCI label io.buildpacks.lifecycle.metadata.
-      - name: Install pack CLI (Buildpacks SBOM extraction)
-        if: inputs.use-buildpacks
-        env:
-          PACK_VERSION: v0.40.6
-        run: |
-          set -euo pipefail
-          ARCH_SUFFIX=$([ "${{ runner.arch }}" = "ARM64" ] && echo "-arm64" || echo "")
-          BASE="https://github.com/buildpacks/pack/releases/download/${PACK_VERSION}"
-          curl -fsSL --proto =https -o /tmp/pack.tgz       "${BASE}/pack-${PACK_VERSION}-linux${ARCH_SUFFIX}.tgz"
-          curl -fsSL --proto =https -o /tmp/pack.sha256    "${BASE}/pack-${PACK_VERSION}-linux${ARCH_SUFFIX}.tgz.sha256"
-          ( cd /tmp && awk '{print $1"  pack.tgz"}' pack.sha256 | sha256sum -c - )
-          tar -xzf /tmp/pack.tgz -C /usr/local/bin pack
-          pack version
-
-      - name: Extract SBOM from buildpack image
-        if: inputs.use-buildpacks
-        continue-on-error: true
-        env:
-          PER_ARCH_TAG: ${{ inputs.registry }}/${{ inputs.image-name }}:ci-${{ github.run_id }}-${{ steps.prep.outputs.platform_pair }}
-        run: |
-          set -euo pipefail
-          mkdir -p "${{ runner.temp }}/sbom"
-          # --remote reads from the registry rather than the local daemon — the image was just
-          # pushed by spring-boot:build-image. Auth is inherited from the docker/login-action
-          # earlier in this job via ~/.docker/config.json.
-          pack sbom download "$PER_ARCH_TAG" --remote --output-dir "${{ runner.temp }}/sbom"
-          ls -la "${{ runner.temp }}/sbom/layers/sbom/"
-
-      - name: Upload SBOM
-        if: inputs.use-buildpacks
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: sbom-${{ steps.prep.outputs.image_name }}-${{ steps.prep.outputs.platform_pair }}
-          path: ${{ runner.temp }}/sbom/
-          if-no-files-found: error
-          retention-days: 90
-
-      # Direct trivy binary install — aquasecurity/trivy-action's transitive setup-trivy dep
-      # breaks consumers of this reusable workflow when it can't resolve. Report-only baseline;
-      # flip --exit-code 1 once HIGH+ is at zero on main.
-      - name: Install Trivy
-        id: install-trivy
-        if: inputs.use-buildpacks
-        continue-on-error: true
-        env:
-          TRIVY_VERSION: 0.70.0
-        run: |
-          set -euo pipefail
-          ARCH=$([ "${{ runner.arch }}" = "ARM64" ] && echo "ARM64" || echo "64bit")
-          BASE="https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}"
-          ARCHIVE="trivy_${TRIVY_VERSION}_Linux-${ARCH}.tar.gz"
-          curl -fsSL --proto =https -o "/tmp/${ARCHIVE}"          "${BASE}/${ARCHIVE}"
-          curl -fsSL --proto =https -o /tmp/trivy_checksums.txt   "${BASE}/trivy_${TRIVY_VERSION}_checksums.txt"
-          ( cd /tmp && grep " ${ARCHIVE}$" trivy_checksums.txt | sha256sum -c - )
-          tar -xzf "/tmp/${ARCHIVE}" -C /usr/local/bin trivy
-          trivy --version
-
-      - name: Run Trivy (CVE scan, report-only)
-        if: inputs.use-buildpacks && steps.install-trivy.outcome == 'success'
-        continue-on-error: true
-        env:
-          # Trivy queries the registry directly (not the local daemon) and does not read
-          # ~/.docker/config.json — explicit credentials are required for ghcr.io.
-          TRIVY_USERNAME: ${{ github.actor }}
-          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
-          PER_ARCH_TAG: ${{ inputs.registry }}/${{ inputs.image-name }}:ci-${{ github.run_id }}-${{ steps.prep.outputs.platform_pair }}
-        run: |
-          set -euo pipefail
-          trivy image --severity CRITICAL,HIGH --ignore-unfixed --exit-code 0 \
-            --format sarif --output "${{ runner.temp }}/trivy.sarif" "$PER_ARCH_TAG"
-
-      # Surface findings in the GitHub Security tab + PR annotations rather than a 30-day artifact
-      # nobody opens. continue-on-error keeps the workflow green while the baseline is non-zero.
-      - name: Upload Trivy SARIF to GitHub code scanning
-        if: inputs.use-buildpacks && steps.install-trivy.outcome == 'success'
-        continue-on-error: true
-        uses: github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.30.9
-        with:
-          sarif_file: ${{ runner.temp }}/trivy.sarif
-          category: trivy-image-${{ steps.prep.outputs.platform_pair }}
 
       - name: Export digest
         env:

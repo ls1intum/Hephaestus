@@ -43,7 +43,7 @@
 		"format:config:check": "oxfmt --check *.ts *.json .oxfmtrc.json .oxlintrc.json .changeset/*.cjs .changeset/*.json .vscode/*.json scripts/tsconfig.json project.code-workspace",
 		"lint:agents": "oxlint server docker scripts docs .changeset .github commitlint.config.ts",
 		"lint:agents:fix": "oxlint --fix server docker scripts docs .changeset .github commitlint.config.ts",
-		"check:agents": "bun run format:agents:check && bun run format:docs:check && bun run format:config:check && bun run lint:agents && bun run typecheck:agents && bun run typecheck:scripts && bun run test:tooling",
+		"check:agents": "bun run format:agents:check && bun run format:docs:check && bun run format:config:check && bun run lint:agents && bun run typecheck:agents && bun run typecheck:scripts && bun scripts/check-release-image-inventory.ts && bun run test:tooling",
 		"check:agents:fix": "bun run format:agents && bun run format:docs && bun run format:config && oxlint --fix server docker scripts docs .changeset .github commitlint.config.ts",
 		"ci:agents": "bun run format:agents:check && bun run format:docs:check && bun run format:config:check && oxlint -f github server docker scripts docs .changeset .github commitlint.config.ts",
 		"format:server": "bun run format:java",
