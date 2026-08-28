@@ -1,8 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 
 const digestPattern = /^sha256:[a-f0-9]{64}$/;
-const releasePattern =
-	/^v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?$/;
 const commitPattern = /^[a-f0-9]{40}$/;
 const repositoryPattern = /^(?:ghcr\.io|docker\.io)\/[a-z0-9][a-z0-9._/-]*$/;
 const platforms = ["linux/amd64", "linux/arm64"] as const;
@@ -23,7 +21,20 @@ export type ReleaseImageLock = {
 };
 
 export function isRelease(value: string): boolean {
-	return releasePattern.test(value);
+	if (!value.startsWith("v")) return false;
+	const separator = value.indexOf("-");
+	const version = value.slice(1, separator < 0 ? undefined : separator);
+	const prerelease = separator < 0 ? undefined : value.slice(separator + 1);
+	const core = version.split(".");
+	if (core.length !== 3 || core.some((part) => !/^(?:0|[1-9]\d*)$/.test(part))) return false;
+	if (prerelease === undefined) return true;
+	const identifiers = prerelease.split(".");
+	return identifiers.every(
+		(identifier) =>
+			identifier.length > 0 &&
+			/^[0-9A-Za-z-]+$/.test(identifier) &&
+			(!/^\d+$/.test(identifier) || !identifier.startsWith("0") || identifier === "0"),
+	);
 }
 
 function record(value: unknown): Record<string, unknown> {

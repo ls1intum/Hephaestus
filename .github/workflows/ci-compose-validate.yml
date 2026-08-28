@@ -23,6 +23,8 @@ jobs:
   validate:
     name: "Render compose stacks"
     runs-on: ubuntu-latest
+    env:
+      COMPOSE_ENV_FILES: .env,release-lock.env
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -45,10 +47,10 @@ jobs:
           while IFS= read -r image; do
             name="HEPHAESTUS_IMAGE_${image^^}"
             name=${name//-/_}
-            printf '%s=%s@sha256:%s\n' "$name" "example.invalid/${image}" "$(printf '0%.0s' {1..64})" >> .env
+            printf '%s=%s@sha256:%s\n' "$name" "example.invalid/${image}" "$(printf '0%.0s' {1..64})" >> release-lock.env
           done < <(jq -r '.images[], .upstream[].name' ../../security/release-images.json)
-          printf 'HEPHAESTUS_RELEASE=v0.0.0\nHEPHAESTUS_RELEASE_COMMIT=%s\n' \
-            "$(printf '0%.0s' {1..40})" >> .env
+          printf 'IMAGE_TAG=0.0.0\nHEPHAESTUS_RELEASE=v0.0.0\nHEPHAESTUS_RELEASE_COMMIT=%s\n' \
+            "$(printf '0%.0s' {1..40})" >> release-lock.env
           docker compose config > /dev/null
           echo "Rendered services:"
           docker compose config --services | sort
@@ -96,4 +98,4 @@ jobs:
           # still render, not that they are correct for production.
           docker compose \
             -f compose.proxy.yaml -f compose.core.yaml -f compose.app.yaml \
-            --env-file self-host/.env config --quiet
+            --env-file self-host/.env --env-file self-host/release-lock.env config --quiet

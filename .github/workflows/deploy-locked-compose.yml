@@ -60,7 +60,21 @@ jobs:
           RELEASE: ${{ inputs.release }}
           ENVIRONMENT: ${{ inputs.environment }}
           VARS_CONTEXT: ${{ toJson(vars) }}
-          SECRETS_CONTEXT: ${{ toJson(secrets) }}
+          SECRET_GH_APP_PRIVATE_KEY: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          SECRET_GH_AUTH_TOKEN: ${{ secrets.GH_AUTH_TOKEN }}
+          SECRET_GH_OAUTH_CLIENT_SECRET: ${{ secrets.GH_OAUTH_CLIENT_SECRET }}
+          SECRET_GITLAB_OAUTH_CLIENT_SECRET: ${{ secrets.GITLAB_OAUTH_CLIENT_SECRET }}
+          SECRET_HEPHAESTUS_AUTH_BOOTSTRAP_TOKEN: ${{ secrets.HEPHAESTUS_AUTH_BOOTSTRAP_TOKEN }}
+          SECRET_HEPHAESTUS_AUTH_STATE_COOKIE_KEY: ${{ secrets.HEPHAESTUS_AUTH_STATE_COOKIE_KEY }}
+          SECRET_HEPHAESTUS_INTEGRATION_SLACK_CLIENT_SECRET: ${{ secrets.HEPHAESTUS_INTEGRATION_SLACK_CLIENT_SECRET }}
+          SECRET_HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET: ${{ secrets.HEPHAESTUS_INTEGRATION_SLACK_SIGNING_SECRET }}
+          SECRET_HEPHAESTUS_SECURITY_ENCRYPTION_KEY: ${{ secrets.HEPHAESTUS_SECURITY_ENCRYPTION_KEY }}
+          SECRET_HEPHAESTUS_WORKER_REGISTRATION_TOKEN: ${{ secrets.HEPHAESTUS_WORKER_REGISTRATION_TOKEN }}
+          SECRET_OUTLINE_OAUTH_CLIENT_SECRET: ${{ secrets.OUTLINE_OAUTH_CLIENT_SECRET }}
+          SECRET_POSTHOG_PERSONAL_API_KEY: ${{ secrets.POSTHOG_PERSONAL_API_KEY }}
+          SECRET_POSTHOG_PROJECT_API_KEY: ${{ secrets.POSTHOG_PROJECT_API_KEY }}
+          SECRET_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SECRET_WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
         run: |
           set -euo pipefail
           asset="release-${RELEASE}.json"
@@ -75,9 +89,10 @@ jobs:
             {
               printf 'ENVIRONMENT=%s\n' "$ENVIRONMENT"
               cat release-lock.env
-              jq -r --argjson allowed "$allowed" '
-                to_entries[] | select(.key as $key | $allowed | index($key)) |
-                "\(.key)=\(.value | @json)"' <<<"$SECRETS_CONTEXT"
+              jq -n 'env | with_entries(select(.key | startswith("SECRET_")))' |
+                jq -r --argjson allowed "$allowed" '
+                  to_entries[] | (.key | ltrimstr("SECRET_")) as $key |
+                  select($allowed | index($key)) | "\($key)=\(.value | @json)"'
               jq -r --argjson allowed "$allowed" '
                 to_entries[] | select(.key as $key | $allowed | index($key)) |
                 "\(.key)=\(.value | @json)"' <<<"$VARS_CONTEXT"
