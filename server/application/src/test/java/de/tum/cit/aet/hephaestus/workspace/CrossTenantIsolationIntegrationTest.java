@@ -57,34 +57,9 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Systematic cross-tenant isolation suite. Provisions two workspaces (A and B) that deliberately
- * share the same {@code account_login} ({@code shared-org}) with an <b>overlapping</b> member
- * ({@code mentor}, matching {@link WithMentorUser}), then asserts that reading through A's slug never
- * exposes B's rows across every workspace-scoped read path.
- *
- * <p>Two design choices make this a sharp probe rather than a happy-path smoke test:
- * <ul>
- *   <li><b>Shared {@code account_login}</b> — the org-login string is not a tenant boundary, so any
- *       path that scopes by it instead of {@code workspace_id} leaks here (and only here).</li>
- *   <li><b>Overlapping member</b> — authentication succeeds in both tenants, so a leaked row is a
- *       pure data-scoping bug, not an access-control artifact.</li>
- * </ul>
- *
- * <p>Each detail read carries a positive control (own row through own slug returns {@code 200}) so a
- * {@code 404} assertion cannot pass against a globally broken endpoint. New workspace-scoped read
- * paths add a case here — see {@code docs/contributor/testing.mdx} ("Cross-tenant isolation").
- *
- * <p><b>Known gaps this suite does NOT cover</b> (each needs work beyond a test):
- * <ul>
- *   <li>{@code RepositoryToMonitor.nameWithOwner} is joined by bare string to {@code repository}, which
- *       is keyed {@code (provider_id, name_with_owner)} — a cross-provider name collision leaks PR bodies
- *       through the leaderboard, profile, and mentor-context read paths. Needs a schema migration.</li>
- *   <li>Achievements aggregate {@code activity_event} across all workspaces by design
- *       ({@code user_achievement} is global), which contradicts {@code docs/user/achievements.mdx}. Needs a
- *       product decision, not an assertion.</li>
- *   <li>{@code UserProfileService} resolves the login globally, so a non-member returns {@code 200} with
- *       empty data rather than {@code 404} — an existence oracle.</li>
- * </ul>
+ * Cross-tenant probes use two workspaces with the same account login and an overlapping member. This
+ * keeps authentication valid while distinguishing workspace scoping from organization- or user-based
+ * filtering. Detail probes include a successful same-workspace request before the foreign request.
  */
 class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
@@ -135,16 +110,15 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
     private WorkspaceRepository workspaceRepository;
 
     private User overlapUser;
-    private User bobOnlyB; // read by the leaderboard roster test; alice stays a local
+    private User bobOnlyB;
 
     private Workspace workspaceA;
     private Workspace workspaceB;
-    private Workspace outsiderWorkspace; // overlapUser is NOT a member here
+    private Workspace outsiderWorkspace;
 
     private TenantData tenantA;
     private TenantData tenantB;
 
-    /** IDs of the data seeded into one workspace, used to build cross-tenant probe URLs. */
     private record TenantData(String practiceSlug, UUID observationId, UUID feedbackId, UUID threadId) {}
 
     @BeforeEach
@@ -170,7 +144,6 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         tenantB = seed(workspaceB);
     }
 
-    /** Seed one practice + observation + feedback + mentor thread, all about/owned by {@link #overlapUser}. */
     private TenantData seed(Workspace ws) {
         String practiceSlug = "practice-" + ws.getWorkspaceSlug();
         Practice practice = new Practice();
@@ -235,10 +208,6 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         return new TenantData(practiceSlug, observationId, feedback.getId(), thread.getId());
     }
 
-    /**
-     * Links a workspace to a synced {@link Organization} so its provider resolves — this is what real
-     * org sync does, and it is what {@code resolveTeamProviderId} reads to scope team queries.
-     */
     private void linkSyncedOrg(Workspace ws, IdentityProvider provider) {
         Organization org = new Organization();
         org.setNativeId(800_000L + ws.getId());
@@ -321,13 +290,6 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
                     .isNotFound();
         }
 
-        /**
-         * The advice on a detail read is the body of a {@link Feedback} row, and the join table that binds
-         * feedback to observations is written by native SQL that carries no tenancy check of its own. The
-         * observation is correctly scoped by the read above; without a workspace predicate on the advice
-         * query, the newest-bound unit wins whatever tenant it belongs to — so a row written in B decides
-         * what a reader in A is shown.
-         */
         @Test
         @WithMentorUser
         void adviceOnTheDetailReadComesOnlyFromThisWorkspace() {
@@ -352,7 +314,6 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         }
     }
 
-    /** A DELIVERED in-context unit in one tenant, bound as evidence to an observation named by the caller. */
     private void bindAdvice(Workspace ws, UUID observationId, String body, Instant createdAt) {
         AgentJob job = new AgentJob();
         job.setWorkspace(ws);
@@ -384,7 +345,6 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         @Test
         @WithMentorUser
         void reactionsAreScopedToWorkspace() {
-            // 204 = own feedback found, no reaction yet; 404 = foreign feedback not in this workspace.
             expectDetailStatus("/practices/feedback/{key}/response", tenantA.feedbackId())
                     .isNoContent();
             expectDetailStatus("/practices/feedback/{key}/response", tenantB.feedbackId())
@@ -396,11 +356,6 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
     @DisplayName("In-app feedback (the developer's own practice pages)")
     class InAppFeedback {
 
-        /**
-         * The in-app lane is recipient-scoped rather than slug-scoped in its own right — the same person
-         * is a member of both tenants here — so the workspace predicate on the query is the only thing
-         * keeping tenant B's private text off tenant A's page.
-         */
         @Test
         @WithMentorUser
         void readsOnlyTheMessagesPreparedInThisWorkspace() {
@@ -421,13 +376,6 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
                     .isEqualTo("A habit measured in tenant A");
         }
 
-        /**
-         * Two tenants that installed the same curated practice legitimately hold the same continuity key
-         * for the same person, because the key is computed from the habit and the recipient and knows
-         * nothing about workspaces. So on the supersession path the {@code workspace_id} predicate is the
-         * entire boundary: without it a review in tenant A would retire a card queued in tenant B and
-         * that message would never be said.
-         */
         @Test
         @WithMentorUser
         void neverRetiresACardQueuedInAnotherTenant() {
@@ -447,11 +395,6 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
                     .isEqualTo(1);
         }
 
-        /**
-         * The practice behind a queued card is staged for the composer to recognise it by, and it is read
-         * through a join to {@code observation}. That join is exactly where a missing predicate hides — it
-         * is how another workspace's advice once reached an observation's detail page.
-         */
         @Test
         @WithMentorUser
         void namesOnlyThisTenantsPracticeForAQueuedCard() {
@@ -467,10 +410,6 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         }
     }
 
-    /**
-     * An IN_APP unit for {@link #overlapUser} in one tenant, with the evidence a read has to clear:
-     * a practice revision to pin the claim to, and cited evidence the delivery purpose admits.
-     */
     private Feedback seedInAppUnit(Workspace ws, String headline) {
         return seedInAppUnit(ws, headline, null);
     }
@@ -567,13 +506,6 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
     @DisplayName("Leaderboard member roster")
     class Leaderboard {
 
-        /**
-         * The zero-activity roster is enumerated by workspace membership, not by the shared org-login
-         * string. Old code padded via {@code findAllHumanInTeamsOfOrganization("shared-org")}, which
-         * returned {@code bob-only-b} (a member of B, reachable through a {@code shared-org} team) into
-         * A's leaderboard — the leak this guards. It also dropped {@code alice-only-a} (an A member with
-         * no team), so both assertions fail against the old query.
-         */
         @Test
         @WithMentorUser
         void rosterIsScopedToWorkspaceMembership() {
@@ -585,10 +517,6 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
             assertThat(logins).contains("alice-only-a").doesNotContain("bob-only-b");
         }
 
-        /**
-         * XP comes from the {@code activity_event} ledger, which is {@code workspace_id}-scoped. The
-         * overlapping member has activity in both tenants, so A's score must count only A's events.
-         */
         @Test
         @WithMentorUser
         void xpCountsOnlyOwnWorkspaceActivity() {
@@ -606,14 +534,29 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
     }
 
     @Nested
+    @DisplayName("Contributor profiles and activity")
+    class Profiles {
+
+        @Test
+        @WithMentorUser
+        void shouldReturnNotFoundWhenProfileUserOnlyBelongsToAnotherWorkspace() {
+            expectDetailStatus("/profile/{key}", "mentor").isOk();
+            expectDetailStatus("/profile/{key}", bobOnlyB.getLogin()).isNotFound();
+        }
+
+        @Test
+        @WithMentorUser
+        void shouldReturnNotFoundWhenActivityUserOnlyBelongsToAnotherWorkspace() {
+            expectDetailStatus("/profile/{key}/activity-monitor", "mentor").isOk();
+            expectDetailStatus("/profile/{key}/activity-monitor", bobOnlyB.getLogin())
+                    .isNotFound();
+        }
+    }
+
+    @Nested
     @DisplayName("Teams")
     class Teams {
 
-        /**
-         * Team reads are scoped by {@code (organization, provider_id)}. A same-named team on a different
-         * provider (whose {@code organization} string collides with the workspace's {@code account_login})
-         * must not appear; the workspace's own team must.
-         */
         @Test
         @WithMentorUser
         void listIsScopedToWorkspaceProvider() {
@@ -635,12 +578,6 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
                     .doesNotExist();
         }
 
-        /**
-         * A {@link User} is global, so the workspace roster hydrates the member's team memberships from
-         * EVERY tenant they belong to. {@code GET /users} must project only this tenant's teams — the
-         * per-workspace hidden-team setting is a display filter, not a tenancy boundary. Needs no provider
-         * collision: the overlapping member is simply in a team under each workspace.
-         */
         @Test
         @WithMentorUser
         void memberRosterExposesOnlyOwnWorkspaceTeams() {
@@ -664,11 +601,6 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
                     .doesNotExist();
         }
 
-        /**
-         * The write path authorizes the same way as the read: a workspace admin cannot mutate a
-         * same-named team on a different provider (that would silently write settings for another tenant's
-         * team). Own team returns 200; foreign team returns 404.
-         */
         @Test
         @WithAdminUser
         void visibilityWriteIsScopedToWorkspaceProvider() {
