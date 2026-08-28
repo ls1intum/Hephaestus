@@ -292,7 +292,7 @@ the stored configuration. New connections and models start inactive. Test the co
 its price (or explicitly mark it as having no metered API cost), then activate it and bind it to a
 purpose (`PRACTICE_REVIEW` or `MENTOR`) on the workspace's **AI models** page.
 
-For an automated local end-to-end setup, use `scripts/e2e-setup.sh`. It creates the connection,
+For an automated local end-to-end setup, use `bun run e2e:setup`. It creates the connection,
 model, and agent binding through the application API and keeps provider credentials out of source
 control and command-line history by reading them from `E2E_*` environment variables.
 

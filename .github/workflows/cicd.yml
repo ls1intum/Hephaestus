@@ -74,8 +74,7 @@ jobs:
               - 'bunfig.toml'
             application-server:
               - 'server/**'
-              # check:env, check:contracts, check:diagrams and db-utils.sh all live here and run on
-              # the App Server or Database leg.
+              # Repository tooling runs on the App Server or Database leg.
               - 'scripts/**'
               # test:agents and typecheck:agents cover the precompute tree.
               - 'docker/agents/**'

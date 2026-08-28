@@ -36,7 +36,7 @@ read -rsp "LLM key: " E2E_LLM_KEY && echo && export E2E_LLM_KEY
 export E2E_LLM_PRICING_MODE=PRICED
 export E2E_LLM_INPUT_USD="$YOUR_CONTRACT_INPUT_RATE_PER_1M"
 export E2E_LLM_OUTPUT_USD="$YOUR_CONTRACT_OUTPUT_RATE_PER_1M"
-scripts/e2e-setup.sh \
+bun run e2e:setup -- \
   --account-login group/subgroup \
   --repo group/subgroup/project \
   --llm-base-url https://llm.example/v1 \
@@ -56,7 +56,8 @@ Existing resources are reused only when their immutable SCM and model-routing fi
 
 ## Running the review
 
-The script prints the dev-trigger command after sync has produced a suitable artifact:
+The setup output identifies the workspace and, when one has synced, the selected artifact. Use those
+IDs with the dev trigger:
 
 ```bash
 JWT="$(curl -fsS -i -X POST http://localhost:8080/auth/dev-login \

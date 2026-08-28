@@ -281,14 +281,14 @@ jobs:
           # draft-changelog first applies the full master.xml chain to the empty DB via
           # liquibase:update — so this step is ALSO the empty→head migration-chain replay gate (a
           # changelog that doesn't apply fails here). Keep that apply intact.
-          scripts/db-utils.sh draft-changelog || ISSUES_FOUND+=("Schema check / migration-chain apply failed. Run: bun run db:draft-changelog")
+          bun run db:draft-changelog || ISSUES_FOUND+=("Schema check / migration-chain apply failed. Run: bun run db:draft-changelog")
           if [ -f "server/application/src/main/resources/db/changelog_new.xml" ]; then
             echo "::error::Schema drift detected. Run: bun run db:draft-changelog"
             cat server/application/src/main/resources/db/changelog_new.xml
             ISSUES_FOUND+=("Schema drift detected")
           fi
 
-          scripts/db-utils.sh generate-erd || ISSUES_FOUND+=("ERD generation failed. Run: bun run db:generate-erd-docs")
+          bun run db:generate-erd-docs || ISSUES_FOUND+=("ERD generation failed. Run: bun run db:generate-erd-docs")
           git add docs/contributor/erd/schema.mmd
           if ! git diff --cached --quiet docs/contributor/erd/schema.mmd; then
             echo "::error::ERD outdated. Run: bun run db:generate-erd-docs"

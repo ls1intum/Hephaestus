@@ -2,20 +2,34 @@
 
 Utility scripts for Hephaestus development. Bun executes TypeScript scripts directly.
 
-## Prerequisites
-
-Scripts use dependencies from the root `package.json`. Run `bun install` at the repo root first.
+Most scripts require `bun install` at the repository root. Jean setup performs that installation; the
+lockfile qualifier intentionally starts from a clean dependency tree.
 
 ## Available Scripts
 
-### Database Utilities
+### Repository orchestration
 
-Database documentation commands use `db-utils.sh` and require Docker with the Compose plugin:
+Substantive developer orchestration under `scripts/` uses typed Bun entry points:
 
-```bash
-bun run db:generate-erd-docs                    # Generate Mermaid ERD diagram
-bun run db:draft-changelog                       # Generate Liquibase changelog diff
-```
+| Command | Purpose |
+| --- | --- |
+| `bun run check:ports` | Validate configured local ports and report listeners. |
+| `bun run db:draft-changelog` | Rebuild a disposable database and generate a Liquibase diff. |
+| `bun run db:generate-erd-docs` | Apply migrations and regenerate the Mermaid ERD. |
+| `bun run e2e:setup -- <options>` | Configure a local E2E workspace against the selected SCM and model provider. Secrets are environment-only. |
+| `bun run jean:public-test -- <command>` | Manage the machine-local public test route. |
+
+The database commands require Docker with the Compose plugin.
+
+`jean:public-test` accepts `start`, `stop`, `status`, `smoke`, and `seed-status`. The route is
+internet-facing and requires Docker, the machine's Coolify network and Traefik configuration
+directory, and `server/.env`.
+
+Jean runs `bun "$JEAN_ROOT_PATH/scripts/jean-setup.ts"` from a new worktree to copy machine-local
+configuration and install dependencies. It is not a general contributor command.
+
+`bun run qualify:bun-lockfile -- 25` is a maintainer and CI diagnostic. Each iteration removes the
+root, webapp, and docs `node_modules` directories before reinstalling with the frozen lockfile.
 
 **ERD generation environment variables:**
 
@@ -64,10 +78,11 @@ bun run nats:extract-examples -- --event push --event pull_request:opened
 | `--until <iso>`           | Only messages before this timestamp |
 | `--dry-run`               | Validate config without extracting  |
 
-## Dependencies
+## Retained shell boundaries
 
-Scripts depend on packages in root `package.json`:
+The retained shell files run where shell is already part of the runtime:
 
-- `commander` - CLI parsing
-- `pg` and `@types/pg` - PostgreSQL client with TypeScript types
-- `@nats-io/jetstream` and `@nats-io/transport-node` - NATS JetStream client
+- `.husky/_/husky.sh` is Husky's generated, minimal Git-hook bootstrap.
+- `webapp/docker/entrypoint.sh` prepares assets in the final nginx image, which does not contain Bun.
+
+No substantive shell script is permitted under `scripts/`.
