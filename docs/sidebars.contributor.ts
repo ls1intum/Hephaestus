@@ -12,6 +12,7 @@ const sidebars: SidebarsConfig = {
 			label: "Development Workflow",
 			items: [
 				"local-development",
+				"local-verification",
 				"testing",
 				"e2e-testing",
 				"coding-guidelines",
