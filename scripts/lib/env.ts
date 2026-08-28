@@ -23,3 +23,19 @@ export function positivePort(value: string, name: string): number {
 	if (port < 1 || port > 65_535) throw new Error(`${name} must be an integer from 1 to 65535`);
 	return port;
 }
+
+/** A required environment variable, or a failure naming it. */
+export function requiredEnv(environment: NodeJS.ProcessEnv, name: string): string {
+	const value = environment[name];
+	if (!value) throw new Error(`${name} is not configured.`);
+	return value;
+}
+
+/** A required environment variable that must be a positive whole number. */
+export function requiredPositiveInteger(environment: NodeJS.ProcessEnv, name: string): number {
+	const value = Number(requiredEnv(environment, name));
+	if (!Number.isSafeInteger(value) || value <= 0) {
+		throw new Error(`${name} must be a positive whole number.`);
+	}
+	return value;
+}

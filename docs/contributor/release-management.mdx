@@ -132,9 +132,9 @@ The whole app is versioned as one product: changesets target the root `hephaestu
 
 | Environment | Trigger | Approval | URL |
 | --- | --- | --- | --- |
-| Staging | Release cut | None (auto) | https://staging.hephaestus.cit.tum.de |
-| Production | Release cut | Required reviewer | https://hephaestus.cit.tum.de |
-| PR previews | Coolify per PR (opt-in) | — | — |
+| Staging | Green commit on `main` | None (auto) | https://staging.hephaestus.aet.cit.tum.de |
+| Production | Release cut | Required reviewer | https://hephaestus.aet.cit.tum.de |
+| PR previews | `preview` label on a same-repo PR | None (push access) | PR deployment link |
 
 Verify staging before approving production. Hotfixes have no separate process: PR → changeset →
 merge → merge the Version PR.

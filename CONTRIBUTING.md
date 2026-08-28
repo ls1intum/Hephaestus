@@ -50,6 +50,14 @@ follow GitHub's [stacked PR quickstart](https://docs.github.com/en/pull-requests
 This workflow is for branches in this repository; contributors working from forks should use one PR or
 coordinate with a maintainer.
 
+### Preview Deployments
+
+Want a running copy of your branch on a URL? Add the `preview` label to your pull request. It runs the
+images CI built for your commit and redeploys on every push; it never waits for your tests, so it
+exists even when they are red. Remove the label to tear it down. See
+[Preview Deployments](https://ls1intum.github.io/Hephaestus/contributor/ci-cd) for what a preview does
+and does not contain.
+
 ## Pull Request Title Guidelines
 
 We use automated semantic pull request validation to ensure consistent and meaningful commit history. Your pull request titles must follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
