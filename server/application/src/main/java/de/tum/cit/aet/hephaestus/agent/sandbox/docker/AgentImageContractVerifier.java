@@ -34,7 +34,7 @@ public class AgentImageContractVerifier {
     private static final String METRIC = "agent.image.contract";
 
     /** Informational labels quoted back in a drift report, because they name what actually differs. */
-    private static final String BUN_VERSION_LABEL = "hephaestus.agent.bun-version";
+    private static final String NODE_VERSION_LABEL = "hephaestus.agent.node-version";
 
     private static final String PI_VERSION_LABEL = "hephaestus.agent.pi-version";
 
@@ -84,12 +84,12 @@ public class AgentImageContractVerifier {
         }
         if (!declared.equals(Integer.toString(expected))) {
             log.error(
-                    "Agent image {} implements runtime contract v{} but this server stages for v{} (image bun={}, pi={}). "
+                    "Agent image {} implements runtime contract v{} but this server stages for v{} (image node={}, pi={}). "
                             + "Practice reviews and mentor sessions in this image will fail. See docs/admin/release-image-lock.md.",
                     image,
                     declared,
                     expected,
-                    labels.get().getOrDefault(BUN_VERSION_LABEL, "unknown"),
+                    labels.get().getOrDefault(NODE_VERSION_LABEL, "unknown"),
                     labels.get().getOrDefault(PI_VERSION_LABEL, "unknown"));
             return Outcome.MISMATCH;
         }

@@ -2,7 +2,7 @@
 // over-broad-permission / secret-exposure constructs ADDED in the diff, across languages. CANDIDATES only —
 // the LLM confirms whether each is a real, exploitable insecure default on a reachable path. General by
 // design: a pattern table keyed off the construct, applied to every added code line regardless of language.
-import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types";
+import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types.ts";
 
 // [label, regex] — each fires on an ADDED line. Tuned to the auth/transport/secret surface a login or API
 // change touches, where a "looks fine" review most often misses the real insecure default.

@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
  */
 class AgentImageContractSyncTest extends BaseUnitTest {
 
-    private static final Pattern BUN_VERSION_ARG = Pattern.compile("^ARG BUN_VERSION=(\\S+)$", Pattern.MULTILINE);
+    private static final Pattern NODE_VERSION_ARG = Pattern.compile("^ARG NODE_VERSION=(\\S+)$", Pattern.MULTILINE);
     private static final Pattern PI_VERSION_ARG = Pattern.compile("^ARG PI_VERSION=(\\S+)$", Pattern.MULTILINE);
 
     @Test
@@ -33,7 +33,7 @@ class AgentImageContractSyncTest extends BaseUnitTest {
 
         assertThat(body)
                 .as("drift reports can name the interpreter and SDK the image actually carries")
-                .contains("LABEL hephaestus.agent.bun-version=${BUN_VERSION}")
+                .contains("LABEL hephaestus.agent.node-version=${NODE_VERSION}")
                 .contains("LABEL hephaestus.agent.pi-version=${PI_VERSION}");
     }
 
@@ -46,10 +46,10 @@ class AgentImageContractSyncTest extends BaseUnitTest {
     void dockerfileStaysOnTheInterpreterAndSdkMajorsTheRunnersAreWrittenAgainst() throws IOException {
         String body = dockerfile();
 
-        assertThat(majorOf(body, BUN_VERSION_ARG, "BUN_VERSION"))
-                .as("docker/agents/pi/Dockerfile moved to a new Bun major: decide whether the staged runners "
-                        + "still run on it, then bump SandboxLayout.BUN_MAJOR and RUNTIME_CONTRACT_VERSION together")
-                .isEqualTo(SandboxLayout.BUN_MAJOR);
+        assertThat(majorOf(body, NODE_VERSION_ARG, "NODE_VERSION"))
+                .as("docker/agents/pi/Dockerfile moved to a new Node major: decide whether the staged runners "
+                        + "still run on it, then bump SandboxLayout.NODE_MAJOR and RUNTIME_CONTRACT_VERSION together")
+                .isEqualTo(SandboxLayout.NODE_MAJOR);
 
         assertThat(majorOf(body, PI_VERSION_ARG, "PI_VERSION"))
                 .as(

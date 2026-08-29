@@ -3,13 +3,13 @@
 **Status:** Superseded by [ADR 0034](0034-signed-release-image-lock.md)
 **Date:** 2026-08-22
 **Authors:** Felix T.J. Dietrich
-**Builds on:** [ADR 0030](0030-agent-runtime-is-typescript-on-bun.md) (the runtime contract the image implements), [ADR 0007](0007-sandbox-spi-shape.md) (the sandbox the image is run through)
+**Builds on:** [ADR 0036](0036-agent-runtime-runs-on-node-24.md) (the runtime contract the image implements), [ADR 0007](0007-sandbox-spi-shape.md) (the sandbox the image is run through)
 
 ## Context
 
 The application server and the `agent-pi` image are **one runtime contract shipped as two artifacts**.
-The server stages TypeScript runners into a workspace and execs `bun` inside the image; the image has
-to carry a compatible Bun, the Pi SDK, and the layout `SandboxLayout` describes. Neither artifact is
+The server stages TypeScript runners into a workspace and execs `node` inside the image; the image has
+to carry a compatible Node, the Pi SDK, and the layout `SandboxLayout` describes. Neither artifact is
 useful without a matching other half.
 
 Only the release path bound the two together. `release.yml` retags both images from one commit,
@@ -94,8 +94,8 @@ all. A release still overrides this with the cosign-verified digest through `spr
 and an operator still overrides both with `HEPHAESTUS_AGENT_IMAGE_REFERENCE`.
 
 **The image declares the contract it implements, and the server checks it.** The `agent-pi` build
-already proves the contract — Bun resolves and imports the SDK exactly as `PiRuntimeFactory` arranges
-it, and the build fails if any Node artefact survives. It now stamps that proof as
+validates selected executable invariants: Node imports the SDK and no Bun artefact survives. It stamps
+the declared contract as
 `hephaestus.agent.runtime-contract`, which the server compares against
 `SandboxLayout.RUNTIME_CONTRACT_VERSION` from the image's labels, before it commits work to a
 container and without running one.
@@ -111,7 +111,7 @@ container and without running one.
 - The two failures are covered independently. Resolution makes the common case right; the contract
   label catches an unmatched image *however* it was chosen — including an operator's hand-pinned
   digest, which no amount of resolution logic would have caught.
-- A version mismatch is reported as one ERROR naming the image, both contract versions, and the Bun
+- A version mismatch is reported as one ERROR naming the image, both contract versions, and the Node
   and Pi SDK versions the image's own labels carry — enough to act on without inspecting anything. The
   other two verdicts are necessarily thinner: an image with no contract label has no versions to
   quote, and an image the daemon cannot describe yields only a WARN naming the image, because nothing
@@ -153,7 +153,7 @@ container and without running one.
   would resolve to `""` and every deployment that does not override would fail to boot.
 - **The contract version is a number a human must remember to bump.** `AgentImageContractSyncTest`
   pins the Dockerfile literal to the Java constant so the two cannot diverge, and additionally pins
-  the image's Bun and Pi SDK **majors** to `SandboxLayout`, so a Renovate bump across either major
+  the image's Node and Pi SDK **majors** to `SandboxLayout`, so a Renovate bump across either major
   cannot land without someone deciding whether the contract moved with it. Neither pin can tell that
   a genuinely breaking change should have bumped the contract, and the Pi SDK is pre-1.0 — where the
   breaking boundary is the minor — so its major pin catches only `0.x` → `1.x`. This is the same
@@ -212,7 +212,7 @@ container and without running one.
   references the class, so without that assertion deleting its stereotype disables every other
   assertion in the file without failing any of them.
 - `AgentImageContractSyncTest` pins the Dockerfile's `LABEL` to `SandboxLayout`, and its
-  `ARG BUN_VERSION` / `ARG PI_VERSION` majors to `SandboxLayout.BUN_MAJOR` / `PI_SDK_MAJOR`. The label
+  `ARG NODE_VERSION` / `ARG PI_VERSION` majors to `SandboxLayout.NODE_MAJOR` / `PI_SDK_MAJOR`. The label
   assertion alone holds for every value of those ARGs — both are Renovate-managed, so a major bump
   would otherwise land unattended and leave the image declaring a contract it no longer implements.
 - `ci-quality-gates.yml` greps for the literal string `agent-pi:latest` outside the files that must
@@ -226,7 +226,7 @@ container and without running one.
   image reads as present and the deploy proceeds against an unmatched pair. The digest is captured
   after the probe and shape-checked, as in `release.yml`.
 - `release.yml` compares the image's contract label against the released tree's constant before it
-  writes the pin asset, and asserts the sandbox is Bun-only rather than asserting `node` runs.
+  writes the pin asset, and asserts that Node runs and Bun does not.
 
 ## Revisit trigger
 
@@ -243,7 +243,7 @@ container and without running one.
 ## Contract locations
 
 - `AgentImageProperties`, `AgentImageReferenceGuard`, `AgentImagePinGuard`, `AgentImageContractVerifier`
-- `SandboxLayout.RUNTIME_CONTRACT_VERSION`, `SandboxLayout.BUN_MAJOR`, `SandboxLayout.PI_SDK_MAJOR`,
+- `SandboxLayout.RUNTIME_CONTRACT_VERSION`, `SandboxLayout.NODE_MAJOR`, `SandboxLayout.PI_SDK_MAJOR`,
   `docker/agents/pi/Dockerfile`
 - `ci-docker-build.yml` (`agent-pi-build`'s head-SHA tag, which is what a preview derives against)
 - `docker/compose.app.yaml` (`release-pin-fetcher`, and the `HEPHAESTUS_AGENT_IMAGE_REFERENCE`

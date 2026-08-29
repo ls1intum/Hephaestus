@@ -3,7 +3,7 @@
 // genuinely swallowed (no surfacing, logging, or recovery). Empty/no-op catch bodies routinely span lines
 // (`catch {\n}`), so patterns run over a window of CONSECUTIVE added lines per file, NOT a single line.
 // General by design: a per-language pattern table keyed off the file extension. Adding a language = a row.
-import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types";
+import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types.ts";
 
 // language key -> [human label, regex] of error-discarding / swallowing constructs in ADDED code. The `\s`
 // in each regex spans the newlines joined into a window, so multi-line empty bodies match.

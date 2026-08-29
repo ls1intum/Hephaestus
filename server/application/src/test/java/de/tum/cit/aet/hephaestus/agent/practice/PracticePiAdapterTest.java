@@ -59,9 +59,14 @@ class PracticePiAdapterTest extends BaseUnitTest {
                 // Non-fatal contract: a failed runner falls into the '|| { … ; true; }' guard and continues.
                 .contains("|| {")
                 .contains("; true; }")
-                // Zero-script tolerance: bun is reached via ';' (not '&&') after the sed strip, so a missing
+                // Zero-script tolerance: Node is reached via ';' (not '&&') after the sed strip, so a missing
                 // '*.ts' / failed cp still lets the runner start.
-                .contains("2>/dev/null ; bun run")
+                .contains("2>/dev/null ; env -i HOME=/home/agent PATH=/usr/bin:/bin TMPDIR=/tmp node")
+                .contains("--permission")
+                .contains("--allow-fs-read=/workspace")
+                .contains("--allow-fs-read=/opt/precompute")
+                .contains("'--allow-fs-write=/workspace/work/precompute-out*'")
+                .contains("--allow-child-process /opt/precompute/runner.ts")
                 // The runner gets the repo mount, the cleaned diff, and writes into the precompute-out dir.
                 .contains("--repo " + SandboxLayout.REPO_MOUNT)
                 .contains("/diff_clean.patch")

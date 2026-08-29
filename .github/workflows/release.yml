@@ -219,7 +219,7 @@ jobs:
           set -euo pipefail
           docker pull "$IMAGE"
           docker run --rm --entrypoint /bin/sh "$IMAGE" -c \
-            'bun --version && ! command -v node >/dev/null 2>&1'
+            'node --version && for runtime in bun npm npx corepack yarn yarnpkg pnpm pnpx; do ! command -v "$runtime"; done'
 
           expected=$(grep -oE 'RUNTIME_CONTRACT_VERSION = [0-9]+' "$LAYOUT" | grep -oE '[0-9]+$')
           [ -n "$expected" ] || { echo "::error::Could not read RUNTIME_CONTRACT_VERSION from $LAYOUT"; exit 1; }

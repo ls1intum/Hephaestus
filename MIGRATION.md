@@ -63,6 +63,22 @@ Before upgrading to any new `0.x.0` version:
 Entries exist only for releases that need operator action. Everything else is in the
 [release notes](https://github.com/ls1intum/Hephaestus/releases).
 
+### v0.76.0
+
+#### 🔴 Upgrade the server and agent image together
+
+**Affected**: every deployment that runs practice reviews or mentor sessions.
+
+**Before**: runtime contract v1 executes staged TypeScript with Bun.
+
+**After**: runtime contract v2 executes it with Node.js 24, a 256 MB V8 heap ceiling, and scoped
+runner filesystem permissions. The server reports an image with a different contract as unsupported before sandbox work
+starts.
+
+**Migration**: deploy the application server/worker and the matching `hephaestus-agent` image from the
+same release. Do not reuse or independently pin an older agent image. After deployment, verify the agent
+image reports `hephaestus.agent.runtime-contract=2`, contains Node 24, and does not contain Bun.
+
 ### v0.75.0
 
 #### 🔴 Practice reviews now require the person being evaluated to be a workspace member

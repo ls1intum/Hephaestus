@@ -1,26 +1,29 @@
-#!/usr/bin/env bun
-import { cp, mkdir, rm, symlink } from "node:fs/promises";
+#!/usr/bin/env node
+import { spawnSync } from "node:child_process";
+import { cp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 /**
  * Validate precompute scripts WITHOUT the sandbox: runs each script over a real repo + diff exactly as the
  * runner does, checks the PracticeResult shape, and prints the metrics/directions/hints so you can eyeball
  * that the feature extraction is meaningful.
  *
- * Usage: bun run validate.ts --repo <clone> [--diff <patch>] [--scripts <dir>] [--metadata <json>]
+ * Usage: node validate.ts --repo <clone> [--diff <patch>] [--scripts <dir>] [--metadata <json>]
  *   --scripts defaults to ../../../server/application/src/main/resources/practices/precompute (the version-controlled home)
  */
 import { parseArgs } from "node:util";
 
-import { parsePracticeResult } from "./lib/practice-contract";
-import type { PracticeResult } from "./lib/types";
+import { globFilesSync } from "./lib/files.ts";
+
+import { parsePracticeResult } from "./lib/practice-contract.ts";
+import type { PracticeResult } from "./lib/types.ts";
 
 const DEFAULT_SCRIPTS_DIR = resolve(
-	import.meta.dir,
+	import.meta.dirname,
 	"../../../server/application/src/main/resources/practices/precompute",
 );
 
 const { values } = parseArgs({
-	args: Bun.argv.slice(2),
+	args: process.argv.slice(2),
 	options: {
 		repo: { type: "string" },
 		diff: { type: "string" },
@@ -39,38 +42,29 @@ const scriptsDir = values.scripts;
 const work = `/tmp/pc-validate.${process.pid}`;
 await rm(work, { recursive: true, force: true });
 await mkdir(`${work}/practices`, { recursive: true });
-await symlink(resolve(import.meta.dir, "lib"), `${work}/lib`);
-// copy only *.ts script files (skip the lib dir if scripts== a dir containing one)
-const glob = new Bun.Glob("*.ts");
+await writeFile(`${work}/package.json`, '{"type":"module"}\n');
+await symlink(resolve(import.meta.dirname, "lib"), `${work}/lib`);
 let n = 0;
-for (const f of glob.scanSync(scriptsDir)) {
+for (const f of globFilesSync("*.ts", scriptsDir)) {
 	await cp(join(scriptsDir, f), `${work}/practices/${f}`);
 	n++;
 }
 console.error(`Validating ${n} script(s) from ${scriptsDir}`);
 
-const args = [
-	"run",
-	resolve(import.meta.dir, "runner.ts"),
-	"--repo",
-	values.repo,
-	"--output",
-	work,
-];
+const args = [resolve(import.meta.dirname, "runner.ts"), "--repo", values.repo, "--output", work];
 if (values.diff) args.push("--diff", values.diff);
 if (values.metadata) args.push("--metadata", values.metadata);
 if (values.context) args.push("--context", values.context);
-const proc = Bun.spawnSync(["bun", ...args], { stderr: "inherit" });
-if (proc.exitCode !== 0) {
-	console.error(`runner exited ${proc.exitCode}; results below may be partial or absent`);
+const proc = spawnSync(process.execPath, args, { stdio: ["ignore", "ignore", "inherit"] });
+if (proc.status !== 0) {
+	console.error(`runner exited ${String(proc.status)}; results below may be partial or absent`);
 }
 
-// Inspect results against the same contract the runner enforces on a script's return value.
 let fail = 0;
-for (const f of new Bun.Glob("*.json").scanSync(work)) {
+for (const f of globFilesSync("*.json", work)) {
 	let result: PracticeResult;
 	try {
-		result = parsePracticeResult(await Bun.file(join(work, f)).json(), f);
+		result = parsePracticeResult(JSON.parse(await readFile(join(work, f), "utf8")), f);
 	} catch (e) {
 		fail++;
 		console.log(`\n❌ ${f}  [${e instanceof Error ? e.message : String(e)}]`);

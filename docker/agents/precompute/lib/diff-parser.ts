@@ -1,4 +1,4 @@
-import type { DiffFile, DiffHunk } from "./types";
+import type { DiffFile, DiffHunk } from "./types.ts";
 
 /**
  * Parse a unified diff (with optional [L<n>] annotations) into structured DiffFile objects.

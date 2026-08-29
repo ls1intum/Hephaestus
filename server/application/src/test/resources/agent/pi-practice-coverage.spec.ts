@@ -1,12 +1,13 @@
-import { expect, test } from "bun:test";
+import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { test } from "node:test";
 
-import { PracticeCoverageLedger } from "../../../main/resources/agent/pi-practice-coverage";
-import { mapConcurrent } from "../../../main/resources/agent/pi-review-tree";
+import { PracticeCoverageLedger } from "../../../main/resources/agent/pi-practice-coverage.ts";
+import { mapConcurrent } from "../../../main/resources/agent/pi-review-tree.ts";
 
-test("a watchdog abort leaves a complete atomic coverage snapshot", async () => {
+void test("a watchdog abort leaves a complete atomic coverage snapshot", async () => {
 	const directory = mkdtempSync(join(tmpdir(), "pi-practice-coverage-"));
 	try {
 		const eligible = ["a", "b", "c", "d"];
@@ -14,7 +15,7 @@ test("a watchdog abort leaves a complete atomic coverage snapshot", async () => 
 		const path = join(directory, "practice-coverage.json");
 		const ledger = new PracticeCoverageLedger(path, eligible);
 
-		expect(JSON.parse(readFileSync(path, "utf8"))).toEqual({
+		assert.deepEqual(JSON.parse(readFileSync(path, "utf8")), {
 			eligible: 4,
 			evaluated: 0,
 			outcomes: eligible.map((practiceSlug) => ({ practiceSlug, outcome: "NOT_REACHED" })),
@@ -30,7 +31,7 @@ test("a watchdog abort leaves a complete atomic coverage snapshot", async () => 
 			abort.signal,
 		);
 
-		expect(JSON.parse(readFileSync(path, "utf8"))).toEqual({
+		assert.deepEqual(JSON.parse(readFileSync(path, "utf8")), {
 			eligible: 4,
 			evaluated: 2,
 			outcomes: [
@@ -45,20 +46,22 @@ test("a watchdog abort leaves a complete atomic coverage snapshot", async () => 
 	}
 });
 
-test("the ledger rejects outcomes outside its eligible practice set", () => {
+void test("the ledger rejects outcomes outside its eligible practice set", () => {
 	const directory = mkdtempSync(join(tmpdir(), "pi-practice-coverage-"));
 	try {
 		const ledger = new PracticeCoverageLedger(join(directory, "practice-coverage.json"), [
 			"eligible",
 		]);
-		expect(() => ledger.markEvaluated(["eligible", "unknown"])).toThrow(
-			"evaluated practice is not eligible: unknown",
+		assert.throws(
+			() => ledger.markEvaluated(["eligible", "unknown"]),
+			/evaluated practice is not eligible: unknown/,
 		);
-		expect(
+		assert.partialDeepStrictEqual(
 			JSON.parse(readFileSync(join(directory, "practice-coverage.json"), "utf8")),
-		).toMatchObject({
-			evaluated: 0,
-		});
+			{
+				evaluated: 0,
+			},
+		);
 	} finally {
 		rmSync(directory, { recursive: true, force: true });
 	}

@@ -2,7 +2,7 @@
 // "done" artifact — an acceptance-criteria / definition-of-done block, a task checklist, or an explicit
 // outcome statement. FACTS only (section presence + checkbox counts); the LLM decides if "done" is truly
 // verifiable. No observation.
-import type { Hint } from "../lib/types";
+import type { Hint } from "../lib/types.ts";
 
 interface IssueMeta {
 	title?: string;

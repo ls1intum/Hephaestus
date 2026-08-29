@@ -2,7 +2,7 @@
 // LEGITIMATELY large/multi-part and (b) whether it already carries an explicit breakdown (task checklist,
 // sub-issues, referenced child issues). FACTS only — the LLM decides whether large work is adequately
 // decomposed. No observation.
-import type { Hint } from "../lib/types";
+import type { Hint } from "../lib/types.ts";
 
 interface IssueMeta {
 	title?: string;

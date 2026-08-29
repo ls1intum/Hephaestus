@@ -10,7 +10,9 @@
  * they never decide.
  */
 
-import { isJsonObject } from "./practice-contract";
+import { readFile } from "node:fs/promises";
+
+import { isJsonObject } from "./practice-contract.ts";
 
 /**
  * Best-effort JSON read of a context file; returns `null` when absent/unreadable (the common case).
@@ -25,9 +27,7 @@ export async function readContextJson(
 ): Promise<unknown> {
 	if (!contextDir) return null;
 	try {
-		const file = Bun.file(`${contextDir}/${name}`);
-		if (!(await file.exists())) return null;
-		return await file.json();
+		return JSON.parse(await readFile(`${contextDir}/${name}`, "utf8"));
 	} catch {
 		return null;
 	}

@@ -35,7 +35,7 @@
 		"nats:extract-examples": "node scripts/nats-extract-examples.ts",
 		"typecheck:scripts": "tsc -p scripts/tsconfig.json --noEmit",
 		"typecheck:agents": "tsc -p tsconfig.agents.json --noEmit",
-		"test:agents": "bun test server/application/src/test/resources/agent docker/agents/precompute",
+		"test:agents": "node --test server/application/src/test/resources/agent/*.spec.ts docker/agents/precompute/*.test.ts docker/agents/precompute/lib/*.test.ts",
 		"format:agents": "oxfmt --write 'server/application/src/{main,test}/resources/agent/**/*.ts' 'server/application/src/main/resources/practices/precompute/**/*.ts' 'docker/agents/precompute/**/*.ts' 'scripts/**/*.ts'",
 		"format:agents:check": "oxfmt --check 'server/application/src/{main,test}/resources/agent/**/*.ts' 'server/application/src/main/resources/practices/precompute/**/*.ts' 'docker/agents/precompute/**/*.ts' 'scripts/**/*.ts'",
 		"format:agent-runtime:check": "oxfmt --check 'server/application/src/{main,test}/resources/agent/**/*.ts' 'server/application/src/main/resources/practices/precompute/**/*.ts' 'docker/agents/precompute/**/*.ts'",

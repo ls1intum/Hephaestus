@@ -3,7 +3,7 @@
 // debug traces / leftover markers sitting right there; this points it at the exact added lines. General by
 // design: a per-language debug-output token table keyed off file extension. Adding a language = a row.
 // CANDIDATES, never an observation.
-import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types";
+import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types.ts";
 
 // language key -> [human label, regex] of debug-output / residue constructs that, when ADDED, are worth a look.
 const LANG_PATTERNS: Record<string, Array<[string, RegExp]>> = {

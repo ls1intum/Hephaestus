@@ -23,7 +23,7 @@ class InteractiveSandboxSpecTest extends BaseUnitTest {
                 "u1",
                 "w1",
                 "ghcr.io/example/agent:latest",
-                List.of("bun", "/run.ts"),
+                List.of("node", "/run.ts"),
                 env,
                 new NetworkPolicy(true, null, null),
                 new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofMinutes(1)),
@@ -74,7 +74,7 @@ class InteractiveSandboxSpecTest extends BaseUnitTest {
 
     @Test
     void commandIsCopied() {
-        List<String> cmd = new ArrayList<>(List.of("bun", "/run.ts"));
+        List<String> cmd = new ArrayList<>(List.of("node", "/run.ts"));
         InteractiveSandboxSpec s = new InteractiveSandboxSpec(
                 UUID.randomUUID(),
                 "u1",
