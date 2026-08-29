@@ -9,19 +9,18 @@ export interface PracticeCoverage {
 }
 
 export class PracticeCoverageLedger {
+	readonly #path: string;
 	readonly #eligible: readonly string[];
 	readonly #eligibleSet: ReadonlySet<string>;
 	readonly #evaluated = new Set<string>();
 
-	constructor(
-		private readonly path: string,
-		eligible: readonly string[],
-	) {
+	constructor(path: string, eligible: readonly string[]) {
 		if (new Set(eligible).size !== eligible.length || eligible.some((slug) => !slug.trim())) {
 			throw new Error("eligible practice slugs must be unique and non-empty");
 		}
 		this.#eligible = [...eligible];
 		this.#eligibleSet = new Set(eligible);
+		this.#path = path;
 		this.persist();
 	}
 
@@ -34,7 +33,7 @@ export class PracticeCoverageLedger {
 
 	persist() {
 		const coverage = reconcilePracticeCoverage(this.#eligible, [...this.#evaluated]);
-		writePracticeCoverage(this.path, coverage);
+		writePracticeCoverage(this.#path, coverage);
 		return coverage;
 	}
 }

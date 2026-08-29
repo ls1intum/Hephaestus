@@ -9,6 +9,13 @@ import java.util.Map;
  * they MUST NOT capture spec-level state (provider, credentials, baseUrl).
  */
 public interface PiRunnerProfile {
+    List<String> BASE_RUNTIME_FLAGS = List.of(
+            "--max-old-space-size=256",
+            "--permission",
+            "--allow-fs-read=/workspace",
+            "--allow-fs-read=/opt/pi-sdk",
+            "--allow-fs-write=/workspace/.sessions",
+            "--allow-fs-write=/workspace/out");
     /** Runner script filename under {@code resources/agent/}. */
     String runnerScript();
 
@@ -30,9 +37,11 @@ public interface PiRunnerProfile {
         return List.of();
     }
 
-    /** Flags for the {@code bun} invocation. */
-    List<String> runtimeFlags();
+    /** Flags for the {@code node} invocation. */
+    default List<String> runtimeFlags() {
+        return BASE_RUNTIME_FLAGS;
+    }
 
-    /** {@code KEY=value} pairs scoped to the {@code bun} invocation only — not image-wide ENV. */
+    /** {@code KEY=value} pairs scoped to the {@code node} invocation only — not image-wide ENV. */
     Map<String, String> additionalEnv();
 }

@@ -10,8 +10,8 @@
 //   PIN_LOOSENED  — exact/narrower constraint became a range/caret/tilde (==1.2.3 -> >=1.2, 1.2.3 -> ^1.2.3)
 //   PIN_DROPPED   — a version constraint was present and is now entirely absent
 //   BUMPED        — same constraint shape, different version value
-import { findFiles } from "../lib/grep";
-import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types";
+import { findFiles } from "../lib/grep.ts";
+import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types.ts";
 
 // ecosystem key -> how to recognise its manifest + lockfile, and how to read a "name => constraint" line.
 interface Ecosystem {

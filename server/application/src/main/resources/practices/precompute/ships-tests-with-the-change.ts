@@ -1,5 +1,6 @@
 // Precompute HINTS for ships-tests-with-the-change. Surfaces facts only — the LLM judges.
-import type { DiffFile, PullRequestMetadata } from "../lib/types";
+import { globFilesSync } from "../lib/files.ts";
+import type { DiffFile, PullRequestMetadata } from "../lib/types.ts";
 
 const TEST =
 	/(^|\/)(tests?|specs?|__tests__)(\/)|[._-](test|tests|spec|specs)\.[a-z]+$|Tests?\.[a-z0-9]+$|Spec\.[a-z0-9]+$/i;
@@ -18,10 +19,8 @@ export default function shipsTestsWithTheChange(
 	let repoCodeFileCount = 0;
 	// One tree walk classified by extension, instead of one full scan per extension (~19x the I/O
 	// under the shared 15s precompute timeout). The brace pattern enumerates the same code extensions.
-	const matcher = new Bun.Glob(
-		"**/*.{swift,ts,tsx,js,jsx,py,java,kt,go,rb,cs,cpp,cc,cxx,c,m,mm,h,hpp}",
-	);
-	for (const path of matcher.scanSync(repoPath)) {
+	const pattern = "**/*.{swift,ts,tsx,js,jsx,py,java,kt,go,rb,cs,cpp,cc,cxx,c,m,mm,h,hpp}";
+	for (const path of globFilesSync(pattern, repoPath)) {
 		if (isExcluded(path)) {
 			continue;
 		}

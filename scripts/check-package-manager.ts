@@ -87,7 +87,7 @@ for (const file of globSync("scripts/**/*.ts")) {
 	}
 }
 
-for (const file of ["docker/agents/pi/Dockerfile", "webapp/Dockerfile"]) {
+for (const file of ["webapp/Dockerfile"]) {
 	const dockerfile = readFileSync(file, "utf8");
 	const pins = dockerfile.match(/^ARG BUN_VERSION=(\S+)$/gm) ?? [];
 	if (pins.length !== 1 || pins[0] !== `ARG BUN_VERSION=${version}`)

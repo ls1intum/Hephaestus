@@ -3,8 +3,8 @@
 // many referenced child issues. FACTS only (counts + the sub-issue rollup); the LLM decides single vs
 // multi-concern. No observation.
 
-import { readProjectInventory } from "../lib/context";
-import type { Hint } from "../lib/types";
+import { readProjectInventory } from "../lib/context.ts";
+import type { Hint } from "../lib/types.ts";
 
 interface IssueMeta {
 	title?: string;

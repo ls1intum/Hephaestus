@@ -2,7 +2,7 @@
 // in the diff, across languages. These are CANDIDATES to investigate — the LLM decides whether each is a
 // real, unsafe crash a realistic input/state can trigger. General by design: a per-language pattern table
 // keyed off the file extension, NOT a Swift-only scan. Adding a language = adding a row, no engine change.
-import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types";
+import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types.ts";
 
 // language key -> [human label, regex] of deliberate-crash / force-unwrap constructs in ADDED code.
 const LANG_PATTERNS: Record<string, Array<[string, RegExp]>> = {

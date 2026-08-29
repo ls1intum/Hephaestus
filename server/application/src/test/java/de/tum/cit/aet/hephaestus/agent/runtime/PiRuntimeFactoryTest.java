@@ -78,6 +78,8 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             assertThat(new String(inputs.get(SandboxLayout.ORCHESTRATOR_PATH), StandardCharsets.UTF_8))
                     .contains("observations");
             assertThat(inputs.get(SandboxLayout.RUNNER_SCRIPT_FILENAME)).isNotEmpty();
+            assertThat(new String(inputs.get(SandboxLayout.NODE_PACKAGE_JSON_FILENAME), StandardCharsets.UTF_8))
+                    .isEqualTo("{\"type\":\"module\"}\n");
         }
 
         @Test
@@ -291,29 +293,33 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
     class CommandAssembly {
 
         @Test
-        @DisplayName("Practice profile contributes no flags and no per-process env")
+        @DisplayName("Practice profile contributes bounded permission flags and no per-process env")
         void runtimeFlagsForPractice() {
             String body = factory.build(spec("openai-completions", "gpt-x", false))
                     .command()
                     .get(2);
-            int bunIdx = body.indexOf("bun ");
+            int nodeIdx = body.indexOf("node ");
             int scriptIdx = body.indexOf(SandboxLayout.RUNNER_SCRIPT_FILENAME);
 
-            assertThat(body.substring(bunIdx, scriptIdx)).isEqualTo("bun " + SandboxLayout.WORKSPACE_ROOT + "/");
-            int lastAmp = body.lastIndexOf("&&", bunIdx);
+            assertThat(body.substring(nodeIdx, scriptIdx))
+                    .contains("--max-old-space-size=256")
+                    .contains("--permission");
+            int lastAmp = body.lastIndexOf("&&", nodeIdx);
             int sliceStart = lastAmp >= 0 ? lastAmp + 2 : 0;
-            assertThat(body.substring(sliceStart, bunIdx)).isBlank();
+            assertThat(body.substring(sliceStart, nodeIdx)).isBlank();
         }
 
         @Test
         void mentorProfileContributesMentorFlags() {
             String body = factory.build(spec(MENTOR)).command().get(2);
-            int bunIdx = body.indexOf("bun ");
+            int nodeIdx = body.indexOf("node ");
             int scriptIdx = body.indexOf(SandboxLayout.RUNNER_SCRIPT_FILENAME);
 
-            assertThat(body.substring(bunIdx, scriptIdx)).contains("--smol").contains("--expose-gc");
-            // V8 flags would be accepted and silently ignored by Bun, so none may be emitted.
-            assertThat(body).doesNotContain("--max-old-space-size").doesNotContain("--no-warnings");
+            assertThat(body.substring(nodeIdx, scriptIdx))
+                    .contains("--max-old-space-size=256")
+                    .contains("--expose-gc")
+                    .contains("--permission");
+            assertThat(body).contains("--allow-fs-read=/workspace").contains("--allow-fs-write=/workspace/out");
         }
 
         @Test

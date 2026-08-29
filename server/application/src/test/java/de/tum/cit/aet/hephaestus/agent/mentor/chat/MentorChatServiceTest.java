@@ -928,7 +928,7 @@ class MentorChatServiceTest extends BaseUnitTest {
                 Long.toString(USER_ID),
                 Long.toString(WORKSPACE_ID),
                 "image:test",
-                List.of("bun", "runner.ts"),
+                List.of("node", "runner.ts"),
                 Map.of(),
                 null,
                 ResourceLimits.DEFAULT,

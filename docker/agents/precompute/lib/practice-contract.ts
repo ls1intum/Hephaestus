@@ -12,7 +12,7 @@
  * agent must analyse this practice manually" and never corrupts the run.
  */
 
-import type { Hint, HintFlag, PracticeFindings, PracticeResult, PracticeScript } from "./types";
+import type { Hint, HintFlag, PracticeFindings, PracticeResult, PracticeScript } from "./types.ts";
 
 /** Narrow parsed JSON (or any foreign value) to a plain object — arrays and null are not objects here. */
 export function isJsonObject(value: unknown): value is Record<string, unknown> {

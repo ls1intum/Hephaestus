@@ -56,6 +56,9 @@ public class PiRuntimeFactory {
 
         inputFiles.put(SandboxLayout.PI_AGENT_PREFIX + "settings.json", buildPiSettingsJson(spec.upstreamModelId()));
         inputFiles.put(SandboxLayout.PROVIDER_CONFIG_FILENAME, buildProviderConfigJson(spec));
+        inputFiles.put(
+                SandboxLayout.NODE_PACKAGE_JSON_FILENAME,
+                "{\"type\":\"module\"}\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
 
         // Digested as the run's prompt version, so settings.json and pi-provider.json stay out: they
         // vary by model, which the job's config snapshot already pins.
@@ -102,7 +105,7 @@ public class PiRuntimeFactory {
                 + "/node_modules && "
                 + precomputeStep
                 + runtimeEnvFragment
-                + "bun "
+                + "node "
                 + runtimeFlagsFragment
                 + workspaceRoot
                 + "/"

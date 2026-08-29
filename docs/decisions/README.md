@@ -68,11 +68,12 @@ do, its home is the Admin Guide (`docs/admin/`) and the runbook links to it.
 | [0027](0027-dialog-lifetime-and-where-a-write-outcome-lands.md) | Dialog lifetime, and where a write's outcome lands when the dialog is gone | Accepted |
 | [0028](0028-source-synced-practice-catalog.md) | Source-synced practice catalog with sparse instance overrides | Accepted |
 | [0029](0029-measurement-intervention-seam-and-channel-levels.md) | Measurement and intervention are separate turns; a channel names where feedback lands, and its level follows | Accepted |
-| [0030](0030-agent-runtime-is-typescript-on-bun.md) | The agent runtime is TypeScript on Bun, with no Node in the sandbox | Accepted |
+| [0030](0030-agent-runtime-is-typescript-on-bun.md) | The agent runtime is TypeScript on Bun, with no Node in the sandbox | Superseded by [0036](0036-agent-runtime-runs-on-node-24.md) |
 | [0031](0031-agent-image-follows-the-deployments-own-tag.md) | The agent image reference follows the deployment's own image tag | Superseded by [0034](0034-signed-release-image-lock.md) |
 | [0032](0032-generated-clients-build-boundary.md) | Generated clients are a Maven build boundary | Accepted |
 | [0033](0033-bun-is-the-javascript-runtime-and-package-manager.md) | Bun is the JavaScript runtime and package manager | Accepted |
 | [0034](0034-signed-release-image-lock.md) | Production consumes one signed release image lock | Accepted |
 | [0035](0035-pull-request-previews-are-label-gated.md) | Pull request previews are label-gated and driven from the default branch | Accepted |
+| [0036](0036-agent-runtime-runs-on-node-24.md) | Agent runtime runs on Node.js 24 with bounded resources | Accepted |
 
 Template: [0000-template.md](0000-template.md).
