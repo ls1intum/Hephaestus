@@ -130,8 +130,13 @@ leaderboard are already there — which is what makes a preview worth looking at
 before the application server boots: review triggers, agent bindings and sweep schedules are off,
 queued jobs are cancelled, and the instance identity is dropped so the preview signs its own tokens.
 The application server also reads staging's event stream, on a durable of its own. Agent runs and
-inbound webhooks stay off. Sign-in works only if the preview-only GitHub OAuth app is configured, and
-the accounts in the preview application's `HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS` come up as admins.
+inbound webhooks stay off.
+
+Signing in needs one thing from an operator. GitHub rejects wildcard callback URLs, so the
+preview-only OAuth app's callback names a single preview host — `pr<id>.api.<zone>` — and only that
+preview can be signed into until someone re-points it. Ask in the maintainers' channel if you need
+sign-in on yours. Accounts listed in the preview application's `HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS`
+come up as admins once signed in.
 
 Each stack keeps its own PostgreSQL, preview-only credentials, and signed commit-addressed CI images.
 No container holds the Docker socket: the seed loader reads staging over the network as a role that
