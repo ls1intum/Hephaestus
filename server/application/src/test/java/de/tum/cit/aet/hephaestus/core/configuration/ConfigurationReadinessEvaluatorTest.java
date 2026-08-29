@@ -133,15 +133,41 @@ class ConfigurationReadinessEvaluatorTest extends BaseUnitTest {
     void shouldReportAnUnresolvablePlaceholderAsTheSettingItStandsFor() {
         MockEnvironment environment = environment(validProperties());
         environment.setActiveProfiles("prod");
-        // What a deployment with DATABASE_URL unset actually renders: application.yml pins
-        // spring.datasource.url to jdbc:${DATABASE_URL}, and resolving that throws instead of
-        // returning null. Reading it must not end the report that exists to name the omission.
+        // Resolving a placeholder over an unset variable throws instead of returning null, so
+        // reading it must not end the report. The second problem proves the report continues past
+        // the one it could not read, rather than stopping at it.
         environment.setProperty("spring.datasource.url", "jdbc:${DATABASE_URL}");
+        environment.setProperty("hephaestus.webhook.secret", "short-secret");
 
         assertThatThrownBy(() -> new ProductionConfigurationEnvironmentPostProcessor()
                         .postProcessEnvironment(environment, new SpringApplication(Object.class)))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("database.url");
+                .hasMessageContaining("database.url")
+                .hasMessageContaining("webhook.shared-secret");
+    }
+
+    @Test
+    void shouldMarkAnUnreadableSettingActionRequiredRatherThanNotConfigured() {
+        Map<String, Object> properties = validProperties();
+        properties.put("spring.datasource.url", "jdbc:${DATABASE_URL}");
+
+        List<ConfigurationFactDTO> facts = evaluateReadiness(properties, true);
+
+        // Only ACTION_REQUIRED reaches the startup filter; NOT_CONFIGURED would boot the server.
+        assertStatus(facts, "database.url", ConfigurationStatus.ACTION_REQUIRED);
+    }
+
+    @Test
+    void shouldRejectSecurityBooleansItCannotRead() {
+        Map<String, Object> properties = validProperties();
+        properties.put("hephaestus.llm.egress.allow-loopback", "${MISSING_EGRESS_FLAG}");
+        properties.put("hephaestus.sync.nats.enabled", "${MISSING_NATS_FLAG}");
+
+        List<ConfigurationFactDTO> facts = evaluateReadiness(properties, true);
+
+        // A value that cannot be read must not be answered with its permissive default.
+        assertStatus(facts, "llm.proxy-egress", ConfigurationStatus.ACTION_REQUIRED);
+        assertStatus(facts, "nats.role-contract", ConfigurationStatus.ACTION_REQUIRED);
     }
 
     @Test
