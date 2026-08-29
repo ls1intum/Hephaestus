@@ -1,0 +1,74 @@
+name: Seeded Release Upgrade
+
+on:
+  workflow_call:
+    inputs:
+      previous-application-image:
+        type: string
+        required: true
+      candidate-application-image:
+        type: string
+        required: true
+      postgres-image:
+        type: string
+        required: true
+      candidate-source-sha:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      previous-tag:
+        description: Previous stable release tag (defaults to latest)
+        required: false
+      candidate-sha:
+        description: Candidate commit SHA (defaults to this workflow commit)
+        required: false
+  schedule:
+    - cron: "37 4 * * 3"
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: release-upgrade-${{ inputs.candidate-application-image || inputs.candidate-sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.candidate-source-sha || inputs.candidate-sha || github.sha }}
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-bun
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Resolve immutable image references
+        id: images
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_PREVIOUS_APP: ${{ inputs.previous-application-image }}
+          INPUT_CANDIDATE_APP: ${{ inputs.candidate-application-image }}
+          INPUT_POSTGRES: ${{ inputs.postgres-image }}
+          REQUESTED_PREVIOUS: ${{ inputs.previous-tag }}
+          REQUESTED_CANDIDATE: ${{ inputs.candidate-sha }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: bun scripts/resolve-release-upgrade-images.ts
+
+      - name: Test seeded previous-release upgrade
+        env:
+          PREVIOUS_APP: ${{ steps.images.outputs.previous-app }}
+          CANDIDATE_APP: ${{ steps.images.outputs.candidate-app }}
+          POSTGRES_IMAGE: ${{ steps.images.outputs.postgres }}
+        run: bun scripts/release-upgrade-test.ts "$PREVIOUS_APP" "$CANDIDATE_APP" "$POSTGRES_IMAGE"
