@@ -8921,7 +8921,7 @@ components:
           type: integer
           format: int32
           description: Context window in tokens
-          minimum: 0
+          minimum: 1
         displayName:
           type: string
           description: Human-readable name
@@ -8934,7 +8934,7 @@ components:
           type: integer
           format: int32
           description: Maximum output tokens
-          minimum: 0
+          minimum: 1
         slug:
           type: string
           description: Optional internal slug; generated from displayName when omitted
@@ -9225,7 +9225,7 @@ components:
           type: integer
           format: int32
           description: Context window in tokens
-          minimum: 0
+          minimum: 1
         displayName:
           type: string
           description: Human-readable name
@@ -9238,7 +9238,7 @@ components:
           type: integer
           format: int32
           description: Maximum output tokens
-          minimum: 0
+          minimum: 1
         per1mCacheReadUsd:
           type: number
           format: decimal
@@ -15023,7 +15023,7 @@ components:
           type: integer
           format: int32
           description: Context window in tokens
-          minimum: 0
+          minimum: 1
         displayName:
           type: string
           description: Human-readable name
@@ -15036,7 +15036,7 @@ components:
           type: integer
           format: int32
           description: Maximum output tokens
-          minimum: 0
+          minimum: 1
         supportsReasoning:
           type: boolean
           description: Whether the model supports a reasoning mode
@@ -15414,7 +15414,7 @@ components:
           type: integer
           format: int32
           description: Context window in tokens
-          minimum: 0
+          minimum: 1
         displayName:
           type: string
           description: Human-readable name
@@ -15427,7 +15427,7 @@ components:
           type: integer
           format: int32
           description: Maximum output tokens
-          minimum: 0
+          minimum: 1
         per1mCacheReadUsd:
           type: number
           format: decimal
