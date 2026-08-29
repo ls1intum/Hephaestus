@@ -23,11 +23,11 @@ RUN --mount=type=cache,target=/root/.bun/install/cache,sharing=locked bun instal
 COPY webapp/ /repo/webapp/
 WORKDIR /repo/webapp
 RUN bun run build
-FROM nginx:stable-alpine
+FROM nginx:stable-alpine@sha256:97d490c12ba55b4946b01546d1c3ed324e8d41ab1c9fcb2a616aa470620e5b46
 ARG COOLIFY_BRANCH
 ARG SOURCE_COMMIT
 ENV BUILD_GIT_BRANCH=$COOLIFY_BRANCH BUILD_GIT_COMMIT=$SOURCE_COMMIT
-RUN apk update && apk upgrade && apk add --no-cache bash sed grep curl && rm -rf /var/cache/apk/*
+RUN apk add --no-cache bash sed grep curl
 COPY --from=build /repo/webapp/dist /usr/share/nginx/html
 COPY webapp/docker/entrypoint.sh /entrypoint.sh
 COPY webapp/docker/nginx.conf /etc/nginx/conf.d/default.conf

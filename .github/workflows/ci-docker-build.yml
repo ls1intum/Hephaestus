@@ -203,6 +203,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
       - name: Verify and tag unchanged images
         id: tag
         env:
@@ -214,6 +217,10 @@ jobs:
           PR_NUMBER: ${{ github.event.number }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           REPOSITORY: ${{ github.repository }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+          CURRENT_SHA: ${{ github.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_NUMBER: ${{ github.run_number }}
         run: |
           set -euo pipefail
 
@@ -237,12 +244,17 @@ jobs:
               return 1
             fi
             local verified="$image@$digest"
-            gh attestation verify "oci://$verified" --owner "${{ github.repository_owner }}"
+            cosign verify "$verified" \
+              --certificate-identity-regexp "^https://github\\.com/$REPOSITORY/\\.github/workflows/reusable-docker-build\\.yml@" \
+              --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+              --certificate-github-workflow-repository "$REPOSITORY" \
+              > /dev/null
+            gh attestation verify "oci://$verified" --owner "$REPOSITORY_OWNER"
             docker buildx imagetools create \
               --tag "$image:$ref_tag" \
-              --tag "$image:${{ github.sha }}" \
-              --tag "$image:${{ github.event.pull_request.head.sha }}" \
-              --tag "$image:ci-${{ github.run_number }}" \
+              --tag "$image:$CURRENT_SHA" \
+              --tag "$image:$HEAD_SHA" \
+              --tag "$image:ci-$RUN_NUMBER" \
               --tag "$image:pr-$PR_NUMBER" \
               "$verified"
           }

@@ -1,101 +1,126 @@
 name: API
 
 on:
-  pull_request:
+  pull_request_target: # zizmor: ignore[dangerous-triggers] PR code runs only in the read-only generate job.
     types: [labeled]
 
-jobs:
-  autocommit:
-    name: auto-commit spec and client changes
-    runs-on: ubuntu-latest
-    if: github.event.label.name == 'autocommit-openapi'
-    timeout-minutes: 15
+permissions: {}
 
+concurrency:
+  group: openapi-autocommit-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    name: Generate spec and client
+    if: >-
+      ${{ github.event.label.name == 'autocommit-openapi'
+        && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
-      - name: Checkout repository
+      - name: Checkout PR commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
-          token: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
-
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
       - name: Setup Bun
         uses: ./.github/actions/setup-bun
-
-      - name: Setup caches
-        uses: ./.github/actions/setup-caches
+      - name: Setup Java
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
         with:
-          cache-type: application-server-quality
-          os: ${{ runner.os }}
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Generate OpenAPI specs and clients
+          distribution: temurin
+          java-version: 21
+      - name: Install dependencies without lifecycle scripts
+        run: bun install --frozen-lockfile --ignore-scripts
+      # This executes PR-controlled Maven plugins, so this job must remain read-only and secretless.
+      - name: Generate OpenAPI spec and client
         run: bun run generate:api
-
-      - name: Check for changes in the API
-        id: check_changes
-        run: |
-          echo "Checking for changes in the API client directory..."
-          echo "Current git status:"
-          git status
-          echo "Current git diff:"
-          git diff
-          git add .
-          echo "Git status after adding changes:"
-          git status
-          if git diff --cached --quiet; then
-            echo "No changes detected in the API client directory."
-            echo "no_changes_detected=true" >> $GITHUB_OUTPUT
-          else
-            echo "Changes detected in the API client directory."
-            echo "Staged changes:"
-            git diff --cached
-            echo "no_changes_detected=false" >> $GITHUB_OUTPUT
-          fi
-
-      # No `always()`: a skipped `check_changes` has the empty string for its output, which passes
-      # `!= 'true'`. `generate:api` deletes `webapp/src/api` before regenerating it, so an `always()`
-      # here would commit that deletion to the contributor's branch.
-      - name: Commit files
-        if: ${{ contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') && steps.check_changes.outputs.no_changes_detected != 'true' }}
-        run: |
-          echo "Committing and pushing changes..."
-          git config --local user.name "github-actions[bot]"
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git commit -a -m "chore: update API specs and client"
-
-      - name: Push changes
-        if: ${{ contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') && steps.check_changes.outputs.no_changes_detected != 'true' }}
-        uses: ad-m/github-push-action@d91a481090679876dfc4178fef17f286781251df # v0.8.0
+      - name: Upload generated files
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          github_token: ${{ secrets.GH_PAT }}
-          branch: ${{ github.event.pull_request.head.ref }}
+          name: generated-openapi-${{ github.run_id }}
+          path: |
+            server/openapi.yaml
+            webapp/src/api
+          if-no-files-found: error
+          retention-days: 1
 
-      - name: Remove autocommit-openapi label
-        if: ${{ always() && contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') }}
+  commit:
+    name: Commit generated files
+    needs: generate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write # push generated files to the PR branch
+    outputs:
+      changed: ${{ steps.commit.outputs.changed }}
+    steps:
+      # Do not execute files from the checkout or artifact in this job.
+      - name: Checkout PR commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Remove checked-in client
+        run: rm -rf webapp/src/api
+      - name: Download generated files
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: generated-openapi-${{ github.run_id }}
+          path: .
+      - name: Commit and push generated files
+        id: commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
         run: |
-          echo "Removing the autocommit-openapi label..."
-          curl --silent --fail-with-body -X DELETE -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-          https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels/autocommit-openapi
-
-      - name: Add PR comment with results
-        if: always()
-        run: |
-          # A skipped step's output is the empty string, so generation having failed has to be its
-          # own branch: `== "true"` and `!= "true"` both read as "there were changes to commit",
-          # and the comment would report a commit that never happened.
-          if [[ -z "${{ steps.check_changes.outputs.no_changes_detected }}" ]]; then
-            COMMENT="🤖 Generating the OpenAPI specs and clients failed, so nothing was committed. See the workflow run for the error."
-          elif [[ "${{ steps.check_changes.outputs.no_changes_detected }}" == "true" ]]; then
-            COMMENT="🤖 No OpenAPI changes were needed - everything is already up to date."
-          else
-            COMMENT="🤖 OpenAPI specs and clients have been automatically updated and committed."
+          set -euo pipefail
+          git add -- server/openapi.yaml webapp/src/api
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: update API specs and client"
+          # Never force-push: stale runs must fail closed.
+          gh auth setup-git
+          git push origin "HEAD:$HEAD_BRANCH"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
 
-          curl -s -X POST \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"body\":\"$COMMENT\"}" \
-            "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments"
+  report:
+    name: Report result
+    if: >-
+      ${{ always()
+        && github.event.label.name == 'autocommit-openapi'
+        && github.event.pull_request.head.repo.full_name == github.repository }}
+    needs: [generate, commit]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      issues: write # remove the label and comment on the PR
+    steps:
+      - name: Remove label and report result
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GENERATE_RESULT: ${{ needs.generate.result }}
+          COMMIT_RESULT: ${{ needs.commit.result }}
+          CHANGED: ${{ needs.commit.outputs.changed }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh api --method DELETE "repos/$REPOSITORY/issues/$PR_NUMBER/labels/autocommit-openapi" || true
+          if [ "$GENERATE_RESULT" != success ]; then
+            comment="🤖 Generating the OpenAPI spec and client failed, so nothing was committed. See the workflow run for the error."
+          elif [ "$COMMIT_RESULT" != success ]; then
+            comment="🤖 The generated OpenAPI files could not be committed. The branch may have changed during generation; rerun the workflow."
+          elif [ "$CHANGED" = true ]; then
+            comment="🤖 OpenAPI specs and clients have been automatically updated and committed."
+          else
+            comment="🤖 No OpenAPI changes were needed — everything is already up to date."
+          fi
+          gh api --method POST "repos/$REPOSITORY/issues/$PR_NUMBER/comments" -f body="$comment"
