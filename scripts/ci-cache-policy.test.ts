@@ -23,7 +23,7 @@ await describe("CI cache policy", async () => {
 		}
 	});
 
-	await test("Webapp E2E uses Maven caches but not the Storybook browser cache", () => {
+	await test("Webapp E2E uses the server build caches", () => {
 		const javaSetup = actionStep("Set up JDK 21");
 		assert.ok(javaSetup.includes('"webapp-e2e"'));
 		assert.ok(javaSetup.includes('cache: "maven"'));
@@ -31,6 +31,15 @@ await describe("CI cache policy", async () => {
 		assert.ok(javaSetup.includes("cache-jdk: false"));
 		assert.ok(actionStep("Restore generated clients").includes('"webapp-e2e"'));
 		assert.ok(actionStep("Cache generated clients").includes('"webapp-e2e"'));
-		assert.ok(!actionStep("Cache Playwright browsers").includes("webapp-e2e"));
+	});
+
+	await test("browser consumers share one Playwright cache predicate", () => {
+		const identity = actionStep("Compute Playwright cache identity");
+		const cache = actionStep("Cache Playwright browsers");
+		const predicate = identity.match(/^\s+if: (.+)$/m)?.[1];
+		assert.ok(predicate);
+		assert.equal(cache.match(/^\s+if: (.+)$/m)?.[1], predicate);
+		assert.ok(predicate.includes("webapp-e2e"));
+		assert.ok(predicate.includes("webapp-storybook"));
 	});
 });

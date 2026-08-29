@@ -13,9 +13,11 @@
         "@nats-io/transport-node": "3.4.0",
         "@openapitools/openapi-generator-cli": "2.32.0",
         "@types/bun": "1.4.0",
+        "@types/js-yaml": "4.0.9",
         "@types/node": "24.12.4",
         "@types/npm-package-arg": "6.1.4",
         "@types/pg": "8.20.0",
+        "@types/picomatch": "4.0.3",
         "ajv": "8.20.0",
         "ajv-formats": "3.0.1",
         "commander": "14.0.3",
@@ -23,6 +25,7 @@
         "fast-xml-validator": "1.4.2",
         "graphql": "17.0.2",
         "husky": "9.1.7",
+        "js-yaml": "4.3.1",
         "jsdom": "29.1.1",
         "jsonc-parser": "3.3.1",
         "mdast-util-from-markdown": "2.0.3",
@@ -36,6 +39,7 @@
         "oxlint": "1.79.0",
         "oxlint-tsgolint": "7.0.2001",
         "pg": "8.20.0",
+        "picomatch": "4.0.7",
         "surge": "0.43.1",
         "typescript": "7.0.2",
       },
@@ -1776,6 +1780,8 @@
 
     "@types/istanbul-reports": ["@types/istanbul-reports@3.0.4", "", { "dependencies": { "@types/istanbul-lib-report": "*" } }, "sha512-pk2B1NWalF9toCRu6gjBzR69syFjP4Od8WRAX+0mmf9lAjCRicLOWc+ZrxZHx/0XRjotgkF9t6iaMJ+aXcOdZQ=="],
 
+    "@types/js-yaml": ["@types/js-yaml@4.0.9", "", {}, "sha512-k4MGaQl5TGo/iipqb2UDG2UwjXziSWkh0uysQelTlJpX1qGlpUZYm8PnO4DxG1qBomtJUdYJ6qR6xdIah10JLg=="],
+
     "@types/json-schema": ["@types/json-schema@7.0.15", "", {}, "sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA=="],
 
     "@types/katex": ["@types/katex@0.16.8", "", {}, "sha512-trgaNyfU+Xh2Tc+ABIb44a5AYUpicB3uwirOioeOkNPPbmgRNtcWyDeeFRzjPZENO9Vq8gvVqfhaaXWLlevVwg=="],
@@ -1795,6 +1801,8 @@
     "@types/npm-package-arg": ["@types/npm-package-arg@6.1.4", "", {}, "sha512-vDgdbMy2QXHnAruzlv68pUtXCjmqUk3WrBAsRboRovsOmxbfn/WiYCjmecyKjGztnMps5dWp4Uq2prp+Ilo17Q=="],
 
     "@types/pg": ["@types/pg@8.20.0", "", { "dependencies": { "@types/node": "*", "pg-protocol": "*", "pg-types": "^2.2.0" } }, "sha512-bEPFOaMAHTEP1EzpvHTbmwR8UsFyHSKsRisLIHVMXnpNefSbGA1bD6CVy+qKjGSqmZqNqBDV2azOBo8TgkcVow=="],
+
+    "@types/picomatch": ["@types/picomatch@4.0.3", "", {}, "sha512-iG0T6+nYJ9FAPmx9SsUlnwcq1ZVRuCXcVEvWnntoPlrOpwtSTKNDC9uVAxTsC3PUvJ+99n4RpAcNgBbHX3JSnQ=="],
 
     "@types/prismjs": ["@types/prismjs@1.26.6", "", {}, "sha512-vqlvI7qlMvcCBbVe0AKAb4f97//Hy0EBTaiW8AalRnG/xAN5zOiWWyrNqNXeq8+KAuvRewjCVY1+IPxk4RdNYw=="],
 

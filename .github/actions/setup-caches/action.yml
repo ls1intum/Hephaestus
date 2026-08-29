@@ -37,7 +37,7 @@ runs:
 
     - name: Compute Playwright cache identity
       id: playwright-identity
-      if: inputs.cache-type == 'webapp-storybook'
+      if: contains(fromJSON('["webapp-storybook", "webapp-e2e"]'), inputs.cache-type)
       shell: bash
       env:
         DEPENDENCY_HASH: ${{ hashFiles('bun.lock') }}
@@ -78,7 +78,7 @@ runs:
         key: ${{ inputs.os }}-${{ steps.java.outputs.distribution }}-${{ steps.java.outputs.version }}-generated-clients-${{ steps.generated-clients-identity.outputs.hash }}
 
     - name: Cache Playwright browsers
-      if: inputs.cache-type == 'webapp-storybook'
+      if: contains(fromJSON('["webapp-storybook", "webapp-e2e"]'), inputs.cache-type)
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/ms-playwright

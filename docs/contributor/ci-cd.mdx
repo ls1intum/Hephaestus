@@ -429,28 +429,34 @@ matrix:
 
 ### Step 3: Tests (`ci-tests.yml`)
 
-1. **Add to matrix:**
+Add a purpose-named job and gate it directly from the reusable workflow input:
 
 ```yaml
-matrix:
-  test-type: [
-      # ... existing tests
-      new-service-unit,
-      new-service-integration, # if applicable
-    ]
+new-service-unit:
+  name: "New Service: Unit"
+  if: inputs.should_skip != 'true' && inputs.new_service_changed == 'true'
+  runs-on: ubuntu-latest
+  timeout-minutes: 15
+  permissions:
+    contents: read
+    checks: write
+  steps:
+    - uses: actions/checkout@<full-commit-sha> # vX.Y.Z
+      with:
+        persist-credentials: false
+    - uses: ./.github/actions/setup-bun
+    - name: Run unit tests
+      run: bun run test:new-service:unit
+    - name: Upload test results
+      if: always()
+      uses: dorny/test-reporter@<full-commit-sha> # vX.Y.Z
+      with:
+        path: new-service/test-results/*.xml
+        reporter: java-junit
 ```
 
-1. **Add case statement** in "Determine if test should run":
-
-```yaml
-"new-service-unit"|"new-service-integration")
-  echo "run=${{ inputs.new_service_changed }}" >> $GITHUB_OUTPUT
-  ;;
-```
-
-1. **Add test execution step** with the test commands.
-
-2. **Add test result upload** for JUnit reporting.
+Declare `needs` only when the job consumes an artifact from another job. Upload JUnit results or
+failure diagnostics when the test runner produces them.
 
 ### Step 4: Docker Build (`ci-docker-build.yml`)
 

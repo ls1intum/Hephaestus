@@ -23,172 +23,168 @@ on:
         required: false
         type: string
         default: "true"
+      postgres_image_changed:
+        description: "Whether PostgreSQL image inputs changed"
+        required: false
+        type: string
+        default: "false"
+
+permissions: {}
+
+env:
+  SERVER_REACTOR_ARTIFACT: server-reactor-${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
-  tests:
+  server-build:
+    name: "App Server: Reactor"
+    if: inputs.should_skip != 'true' && (inputs.application_server_changed == 'true' || inputs.e2e_changed == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-bun
+      - uses: ./.github/actions/setup-caches
+        with:
+          cache-type: application-server-verification
+          os: ${{ runner.os }}
+      - name: Build reactor
+        run: |
+          rm -rf server/application/target/surefire-reports/*
+          cd server
+          if [[ "${{ inputs.application_server_changed }}" == "true" ]]; then
+            ./mvnw -pl application -am package -Parchitecture-tests \
+              -Dsurefire.includedGroups=unit,architecture -DskipCoverage=false --batch-mode
+          else
+            ./mvnw -pl application -am package -DskipTests --batch-mode
+          fi
+      - name: Validate built reactor
+        run: |
+          test -d server/application/target/classes
+          test -d server/application/target/test-classes
+          test -d server/generated-clients/target/classes
+          mapfile -t APPLICATION_JARS < <(find server/application/target -maxdepth 1 -name 'hephaestus-application-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar')
+          mapfile -t CLIENT_JARS < <(find server/generated-clients/target -maxdepth 1 -name 'hephaestus-generated-clients-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar')
+          (( ${#APPLICATION_JARS[@]} == 1 ))
+          (( ${#CLIENT_JARS[@]} == 1 ))
+      - name: Upload built reactor
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ env.SERVER_REACTOR_ARTIFACT }}
+          path: |
+            server/application/target/classes
+            server/application/target/test-classes
+            server/application/target/*.jar
+            server/generated-clients/target/classes
+            server/generated-clients/target/*.jar
+            !server/application/target/*-sources.jar
+            !server/application/target/*-javadoc.jar
+            !server/generated-clients/target/*-sources.jar
+            !server/generated-clients/target/*-javadoc.jar
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+      - name: Upload test results
+        if: always() && inputs.application_server_changed == 'true'
+        uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
+        with:
+          name: "Test Results - App Server Verification"
+          path: "server/application/target/surefire-reports/TEST-*.xml"
+          reporter: java-junit
+          fail-on-error: false
+
+  server-integration:
+    name: "App Server: Integration"
+    needs: server-build
+    if: inputs.should_skip != 'true' && inputs.application_server_changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-bun
+      - uses: ./.github/actions/setup-caches
+        with:
+          cache-type: application-server-integration
+          os: ${{ runner.os }}
+      - name: Download built reactor
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ env.SERVER_REACTOR_ARTIFACT }}
+          path: server
+      - name: Run integration tests from the built reactor
+        run: |
+          rm -rf server/application/target/surefire-reports/*
+          cd server
+          ./mvnw -pl application -am initialize surefire:test \
+            -Dsurefire.includedGroups=integration -Dparallel=none --batch-mode
+      - name: Upload test results
+        if: always()
+        uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
+        with:
+          name: "Test Results - App Server Integration"
+          path: "server/application/target/surefire-reports/TEST-*.xml"
+          reporter: java-junit
+          fail-on-error: false
+
+  webapp-storybook:
+    name: "Webapp: Stories"
+    if: inputs.should_skip != 'true' && inputs.webapp_changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       checks: write
       pull-requests: write
       statuses: write
-    name: "${{ matrix.display-name }}"
-    runs-on: ubuntu-latest
-    if: inputs.should_skip != 'true'
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - test-type: application-server-verification
-            display-name: "App Server: Unit and Architecture"
-          - test-type: application-server-integration
-            display-name: "App Server: Integration"
-          - test-type: webapp-storybook
-            display-name: "Webapp: Stories"
-          - test-type: webapp-e2e
-            display-name: "Webapp: E2E"
-
     steps:
-      - name: Determine if test should run
-        id: should_run
-        run: |
-          case "${{ matrix.test-type }}" in
-            "webapp-storybook")
-              echo "run=${{ inputs.webapp_changed }}" >> $GITHUB_OUTPUT
-              ;;
-            "webapp-e2e")
-              echo "run=${{ inputs.e2e_changed }}" >> $GITHUB_OUTPUT
-              ;;
-            application-server-*)
-              echo "run=${{ inputs.application_server_changed }}" >> $GITHUB_OUTPUT
-              ;;
-            *)
-              echo "::error::Unknown test type '${{ matrix.test-type }}' in ci-tests.yml matrix."
-              echo "::error::Please add a case for this test type in the 'Determine if test should run' step."
-              echo "run=false" >> $GITHUB_OUTPUT
-              exit 1
-              ;;
-          esac
-
-      - name: Skip notification
-        if: steps.should_run.outputs.run != 'true'
-        run: echo "⏭️ Skipping ${{ matrix.test-type }} - no relevant files changed"
-
-      - name: Checkout repository
-        if: steps.should_run.outputs.run == 'true'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Chromatic TurboSnap compares the stories job against its merge base.
-          fetch-depth: ${{ matrix.test-type == 'webapp-storybook' && '0' || '1' }}
+          fetch-depth: 0
           persist-credentials: false
-
-      - name: Setup Bun
-        if: steps.should_run.outputs.run == 'true'
-        uses: ./.github/actions/setup-bun
-
-      - name: Setup caches
-        if: steps.should_run.outputs.run == 'true'
-        uses: ./.github/actions/setup-caches
+      - uses: ./.github/actions/setup-bun
+      - uses: ./.github/actions/setup-caches
         with:
-          cache-type: ${{ matrix.test-type }}
+          cache-type: webapp-storybook
           os: ${{ runner.os }}
-
-      - name: Run server unit and architecture tests
-        if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'application-server-verification'
-        run: |
-          rm -rf server/application/target/surefire-reports/*
-          bun run test:server:verification
-
-      - name: Run server integration tests
-        if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'application-server-integration'
-        run: |
-          rm -rf server/application/target/surefire-reports/*
-          bun run test:server:integration
-
-      - name: Run tests
-        id: tests
-        continue-on-error: ${{ matrix.test-type == 'webapp-storybook' }}
-        if: steps.should_run.outputs.run == 'true' && startsWith(matrix.test-type, 'webapp-')
+      - name: Install dependencies and browser
         run: |
           bun install --frozen-lockfile
-          cd webapp
-
-          case "${{ matrix.test-type }}" in
-            "webapp-storybook")
-              bun run playwright install chromium --with-deps
-              # Bound browser-runner deadlocks without coupling CI to the current suite duration.
-              timeout --kill-after=30s 15m bun run test:storybook
-              bun run export:readme-assets
-              if [[ -n "$(git status --porcelain --untracked-files=all -- ../docs/images/readme)" ]]; then
-                echo "::error::README or documentation images are stale. Run 'bun run --filter webapp export:readme-assets' and commit the result."
-                git status --short --untracked-files=all -- ../docs/images/readme
-                exit 1
-              fi
-              ;;
-            "webapp-e2e")
-              docker compose -f ../server/compose.yaml up -d --wait postgres
-              cleanup() {
-                if [[ -n "${SERVER_PID:-}" ]]; then kill "${SERVER_PID}" 2>/dev/null || true; fi
-                docker compose -f ../server/compose.yaml down -v
-              }
-              trap cleanup EXIT
-
-              bun run playwright install chromium --with-deps
-              (
-                cd ../server
-                ./mvnw install -pl generated-clients -am -DskipTests --batch-mode
-                SERVER_PORT=8080 MANAGEMENT_PORT=8080 POSTGRES_PORT=5432 \
-                  SPRING_DOCKER_COMPOSE_ENABLED=false \
-                  APPLICATION_HOST_URL=http://localhost:4200 \
-                  ./mvnw -pl application spring-boot:run \
-                    -Dapp.profiles=e2e,playwright --batch-mode
-              ) > ../e2e-server.log 2>&1 &
-              SERVER_PID=$!
-
-              timeout 5m bash -c 'until curl --fail --silent http://localhost:8080/actuator/health/liveness >/dev/null; do kill -0 '"${SERVER_PID}"' || exit 1; sleep 2; done'
-              curl --fail --silent --show-error -X POST http://localhost:8080/auth/dev-login \
-                -H 'content-type: application/json' -d '{"username":"e2e","admin":true}' >/dev/null
-              docker compose -f ../server/compose.yaml exec -T postgres \
-                psql -v ON_ERROR_STOP=1 -U root -d hephaestus < e2e/seed.sql
-
-              timeout --kill-after=30s 10m bun run test:e2e
-              ;;
-          esac
-
-      - name: Summarize test results
-        if: steps.should_run.outputs.run == 'true' && always() && (startsWith(matrix.test-type, 'application-server-') || matrix.test-type == 'webapp-storybook')
+          bun run --filter webapp playwright install chromium --with-deps
+      - name: Run story tests and generated-asset check
+        id: tests
         continue-on-error: true
         run: |
-          mkdir -p ci-metrics
-          if [[ "${{ matrix.test-type }}" == application-server-* ]]; then
-            bun run summarize:test-results "${{ matrix.display-name }}" server/application/target/surefire-reports "ci-metrics/${{ matrix.test-type }}.json"
-          else
-            bun run summarize:test-results "${{ matrix.display-name }}" webapp/test-results "ci-metrics/${{ matrix.test-type }}.json"
+          timeout --kill-after=30s 15m bun run --filter webapp test:storybook
+          bun run --filter webapp export:readme-assets
+          if [[ -n "$(git status --porcelain --untracked-files=all -- docs/images/readme)" ]]; then
+            echo "::error::README or documentation images are stale. Run 'bun run --filter webapp export:readme-assets' and commit the result."
+            git status --short --untracked-files=all -- docs/images/readme
+            exit 1
           fi
-
-      - name: Upload test metrics
-        if: steps.should_run.outputs.run == 'true' && always() && (startsWith(matrix.test-type, 'application-server-') || matrix.test-type == 'webapp-storybook')
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: test-metrics-${{ matrix.test-type }}
-          path: ci-metrics/*.json
-          if-no-files-found: ignore
-          retention-days: 14
-
-      - name: Build Storybook for public preview
-        if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'webapp-storybook'
-        run: bun run --filter webapp build-storybook
-
-      - name: "Chromatic Visual Testing"
-        if: >-
-          steps.should_run.outputs.run == 'true' && matrix.test-type == 'webapp-storybook' && always() &&
-          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      - name: Build Storybook with dependency stats
+        run: |
+          bun run --filter webapp build-storybook
+          test -s webapp/storybook-static/preview-stats.json
+      - name: Chromatic visual testing
         id: chromatic
         continue-on-error: true
+        if: >-
+          success() &&
+          (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         uses: chromaui/action@1cfa065cbdab28f6ca3afaeb3d761383076a35aa # v11
         with:
           projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
           workingDir: webapp
+          storybookBuildDir: storybook-static
           onlyChanged: true
           zip: true
           skip: "@(dependabot/**|renovate/**)"
@@ -199,18 +195,15 @@ jobs:
         env:
           CHROMATIC_BRANCH: ${{ github.head_ref || github.ref_name }}
           CHROMATIC_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-
       - name: Deploy public Storybook preview
         id: storybook_preview
         if: >-
-          steps.should_run.outputs.run == 'true' && matrix.test-type == 'webapp-storybook' &&
           github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository &&
           startsWith(steps.chromatic.outputs.storybookUrl, 'http')
         env:
           PREVIEW_URL: ls1intum-hephaestus-storybook-pr-${{ github.event.number }}.surge.sh
           SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}
         run: ./node_modules/.bin/surge ./webapp/storybook-static "$PREVIEW_URL" --token "$SURGE_TOKEN"
-
       - name: Add Storybook preview to the pull request
         if: steps.storybook_preview.outcome == 'success'
         uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405 # v2.9.4
@@ -224,11 +217,9 @@ jobs:
             🔗 **[View Storybook Preview](https://ls1intum-hephaestus-storybook-pr-${{ github.event.number }}.surge.sh)**
 
             <sub>Preview for commit ${{ github.event.pull_request.head.sha }}. Updates automatically on new commits.</sub>
-
-      - name: "Create Storybook status check"
+      - name: Create Storybook status check
         if: >-
-          steps.should_run.outputs.run == 'true' && matrix.test-type == 'webapp-storybook' && always() &&
-          startsWith(steps.chromatic.outputs.storybookUrl, 'http') &&
+          always() && startsWith(steps.chromatic.outputs.storybookUrl, 'http') &&
           (github.event_name != 'pull_request' || steps.storybook_preview.outcome == 'success')
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
@@ -245,27 +236,86 @@ jobs:
               description: 'Click Details to view your Storybook',
               context: 'Preview / Storybook'
             });
-
-      - name: Upload application-server test results
-        if: steps.should_run.outputs.run == 'true' && always() && startsWith(matrix.test-type, 'application-server-')
+      - name: Upload Storybook test results
+        if: always()
         uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
         with:
-          name: "Test Results - ${{ matrix.test-type }}"
-          path: "server/application/target/surefire-reports/TEST-*.xml"
-          reporter: java-junit
-          fail-on-error: false
-
-      - name: Upload webapp-storybook test results
-        if: steps.should_run.outputs.run == 'true' && always() && matrix.test-type == 'webapp-storybook'
-        uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
-        with:
-          name: "Test Results - ${{ matrix.display-name }}"
+          name: "Test Results - Webapp Stories"
           path: "webapp/test-results/junit-storybook.xml"
           reporter: java-junit
           fail-on-error: false
+      - name: Upload Chromatic test results
+        if: always() && startsWith(steps.chromatic.outputs.storybookUrl, 'http')
+        uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
+        with:
+          name: "Test Results - Chromatic"
+          path: "webapp/chromatic-build-*.xml"
+          reporter: java-junit
+          fail-on-error: false
+      - name: Evaluate stories checks
+        if: always()
+        env:
+          STORYBOOK_TESTS: ${{ steps.tests.outcome }}
+          CHROMATIC: ${{ steps.chromatic.outcome }}
+        run: |
+          if [ "$STORYBOOK_TESTS" != success ] || { [ "$CHROMATIC" != success ] && [ "$CHROMATIC" != skipped ]; }; then
+            echo "::error::Storybook tests or Chromatic failed; review both independently reported steps."
+            exit 1
+          fi
 
-      - name: Upload webapp E2E diagnostics
-        if: steps.should_run.outputs.run == 'true' && failure() && matrix.test-type == 'webapp-e2e'
+  webapp-e2e:
+    name: "Webapp: E2E"
+    needs: server-build
+    if: inputs.should_skip != 'true' && inputs.e2e_changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-bun
+      - uses: ./.github/actions/setup-caches
+        with:
+          cache-type: webapp-e2e
+          os: ${{ runner.os }}
+      - name: Download built reactor
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ${{ env.SERVER_REACTOR_ARTIFACT }}
+          path: server
+      - name: Run end-to-end tests against the built server
+        run: |
+          bun install --frozen-lockfile
+          bun run --filter webapp playwright install chromium --with-deps
+          if [[ "${{ inputs.postgres_image_changed }}" == "true" ]]; then
+            docker build -t ghcr.io/ls1intum/hephaestus/postgres:dev docker/postgres
+          else
+            docker pull ghcr.io/ls1intum/hephaestus/postgres:${{ github.event.pull_request.base.sha || github.sha }}
+            docker tag ghcr.io/ls1intum/hephaestus/postgres:${{ github.event.pull_request.base.sha || github.sha }} ghcr.io/ls1intum/hephaestus/postgres:dev
+          fi
+          docker compose -f server/compose.yaml up -d --wait --no-build postgres
+          cleanup() {
+            if [[ -n "${SERVER_PID:-}" ]]; then kill "${SERVER_PID}" 2>/dev/null || true; fi
+            docker compose -f server/compose.yaml down -v
+          }
+          trap cleanup EXIT
+          mapfile -t SERVER_JARS < <(find server/application/target -maxdepth 1 -name 'hephaestus-application-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar')
+          (( ${#SERVER_JARS[@]} == 1 ))
+          SERVER_JAR=${SERVER_JARS[0]}
+          SERVER_PORT=8080 MANAGEMENT_PORT=8080 POSTGRES_PORT=5432 \
+            SPRING_DOCKER_COMPOSE_ENABLED=false APPLICATION_HOST_URL=http://localhost:4200 \
+            java -jar "$SERVER_JAR" --spring.profiles.active=e2e,playwright > e2e-server.log 2>&1 &
+          SERVER_PID=$!
+          timeout 5m bash -c 'until curl --fail --silent http://localhost:8080/actuator/health/liveness >/dev/null; do kill -0 '"${SERVER_PID}"' || exit 1; sleep 2; done'
+          curl --fail --silent --show-error -X POST http://localhost:8080/auth/dev-login \
+            -H 'content-type: application/json' -d '{"username":"e2e","admin":true}' >/dev/null
+          docker compose -f server/compose.yaml exec -T postgres \
+            psql -v ON_ERROR_STOP=1 -U root -d hephaestus < webapp/e2e/seed.sql
+          timeout --kill-after=30s 10m bun run --filter webapp test:e2e
+      - name: Upload diagnostics
+        if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: webapp-e2e-results
@@ -274,40 +324,3 @@ jobs:
             e2e-server.log
           if-no-files-found: warn
           retention-days: 7
-
-      - name: Upload Chromatic test results
-        if: steps.should_run.outputs.run == 'true' && always() && matrix.test-type == 'webapp-storybook' && startsWith(steps.chromatic.outputs.storybookUrl, 'http')
-        uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
-        with:
-          name: "Test Results - ${{ matrix.test-type }}"
-          path: "webapp/chromatic-build-*.xml"
-          reporter: java-junit
-          fail-on-error: false
-
-      - name: Evaluate stories checks
-        if: steps.should_run.outputs.run == 'true' && matrix.test-type == 'webapp-storybook' && always()
-        env:
-          STORYBOOK_TESTS: ${{ steps.tests.outcome }}
-          CHROMATIC: ${{ steps.chromatic.outcome }}
-        run: |
-          if [ "$STORYBOOK_TESTS" != "success" ] || { [ "$CHROMATIC" != "success" ] && [ "$CHROMATIC" != "skipped" ]; }; then
-            echo "::error::Storybook tests or Chromatic failed; review both independently reported steps."
-            exit 1
-          fi
-
-      - name: Generate test summary
-        if: steps.should_run.outputs.run == 'true' && always()
-        run: |
-          echo "### 🧪 ${{ matrix.test-type }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          case "${{ matrix.test-type }}" in
-            application-server-*)
-              if [ -d "server/application/target/surefire-reports" ]; then
-                TESTS=$(find server/application/target/surefire-reports -name "TEST-*.xml" -exec grep -h 'testsuite' {} \; 2>/dev/null | head -1 || echo "")
-                if [ -n "$TESTS" ]; then
-                  echo "✅ Tests completed. See **Test Results** tab for details." >> $GITHUB_STEP_SUMMARY
-                fi
-              fi
-              ;;
-          esac
