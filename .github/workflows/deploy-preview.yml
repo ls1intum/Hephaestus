@@ -77,7 +77,7 @@ jobs:
           GHCR_TOKEN: ${{ github.token }}
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ steps.context.outputs.head_sha }}
-        run: bun scripts/coolify-preview.ts images
+        run: node scripts/coolify-preview.ts images
 
       - name: Recheck opt-in and head before queueing
         id: recheck
@@ -132,7 +132,7 @@ jobs:
           AUTHOR_ASSOCIATION: ${{ steps.context.outputs.author_association }}
           HEAD_REF: ${{ steps.context.outputs.head_ref }}
           BASE_REF: ${{ steps.context.outputs.base_ref }}
-        run: bun scripts/coolify-preview.ts queue
+        run: node scripts/coolify-preview.ts queue
 
       - name: Wait for Coolify and verify the preview
         id: wait
@@ -143,7 +143,7 @@ jobs:
           EXPECTED_SHA: ${{ steps.context.outputs.head_sha }}
           PR_NUMBER: ${{ steps.context.outputs.pr_number }}
           PREVIEW_URL: ${{ steps.context.outputs.preview_url }}
-        run: bun scripts/coolify-preview.ts wait
+        run: node scripts/coolify-preview.ts wait
 
       - name: Finalize the GitHub deployment
         id: finalize

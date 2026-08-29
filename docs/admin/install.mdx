@@ -37,7 +37,7 @@ The stack you get:
 - Outbound HTTPS to `ghcr.io` and `docker.io` for images, `github.com` and `api.github.com` for the
   release lock, and `fulcio.sigstore.dev`, `rekor.sigstore.dev`, and `tuf-repo-cdn.sigstore.dev` for
   keyless signature verification.
-- The version of [Bun](https://bun.sh/docs/installation) pinned by `package.json`,
+- The [Node.js](https://nodejs.org/en/download) version pinned in `package.json#devEngines.runtime`,
   [GitHub CLI](https://cli.github.com/) authenticated with `gh auth login`, and
   [Cosign](https://docs.sigstore.dev/cosign/system_config/installation/) for release-lock verification.
 
@@ -55,7 +55,7 @@ cd /opt/hephaestus
 cd docker/self-host
 ./setup.sh
 cd ../..
-bun scripts/prepare-release-lock.ts "v$VERSION"
+node scripts/prepare-release-lock.ts "v$VERSION"
 cd docker/self-host
 ```
 
@@ -193,7 +193,7 @@ what a version number promises: [Compatibility Policy](./compatibility-policy).
 VERSION=<new version>
 cd /opt/hephaestus
 sudo git fetch --depth 1 origin tag "v$VERSION" && sudo git checkout "v$VERSION"
-bun scripts/prepare-release-lock.ts "v$VERSION"
+node scripts/prepare-release-lock.ts "v$VERSION"
 cd docker/self-host && docker compose --env-file .env --env-file release-lock.env pull && docker compose --env-file .env --env-file release-lock.env up -d
 ```
 
@@ -210,7 +210,7 @@ VERSION=<previous version>
 cd /opt/hephaestus
 sudo git fetch --depth 1 origin tag "v$VERSION"
 sudo git checkout "v$VERSION"
-bun scripts/prepare-release-lock.ts "v$VERSION"
+node scripts/prepare-release-lock.ts "v$VERSION"
 cd docker/self-host
 docker compose --env-file .env --env-file release-lock.env up -d --remove-orphans --wait
 ```

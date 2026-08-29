@@ -45,7 +45,7 @@ jobs:
           jq -er '.subjects[] | [.image, .platform, .indexDigest, .digest, .repository] | @tsv' release-evidence/manifest.json |
           while IFS=$'\t' read -r image platform index_digest digest repository; do
             suffix=${platform//\//-}
-            bun scripts/check-release-sbom.ts \
+            node scripts/check-release-sbom.ts \
               "release-evidence/$image-$suffix.syft.json" \
               "release-evidence/$image-$suffix.spdx.json" \
               "release-evidence/$image-$suffix.cdx.json" \
@@ -57,7 +57,7 @@ jobs:
             jq -e --arg ref "$repository@$digest" \
               '.ArtifactName == $ref and (.Results | type == "array")' \
               "release-evidence/$image-$suffix.license.json" >/dev/null
-            bun scripts/check-release-vulnerabilities.ts "$image" "$platform" "$digest" "$repository" \
+            node scripts/check-release-vulnerabilities.ts "$image" "$platform" "$digest" "$repository" \
               "release-evidence/$image-$suffix.trivy.json" \
               release-evidence/vulnerability-policy.json /tmp/policy.json
             cmp "release-evidence/$image-$suffix.policy.json" /tmp/policy.json
@@ -72,7 +72,7 @@ jobs:
             --certificate-identity 'https://github.com/ls1intum/Hephaestus/.github/workflows/release.yml@refs/heads/main' \
             --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
             "release-evidence/$lock"
-          bun scripts/release-image-lock.ts "release-evidence/$lock" \
+          node scripts/release-image-lock.ts "release-evidence/$lock" \
             release-evidence/manifest.json "$tag" /tmp/release-lock.env
       - name: Rescan immutable subjects
         env:
@@ -91,7 +91,7 @@ jobs:
           while IFS=$'\t' read -r image platform digest repository; do
             suffix=${platform//\//-}
             trivy image --scanners vuln --format json --output "reports/$image-$suffix.json" "$repository@$digest"
-            bun scripts/check-release-vulnerabilities.ts "$image" "$platform" "$digest" "$repository" \
+            node scripts/check-release-vulnerabilities.ts "$image" "$platform" "$digest" "$repository" \
               "reports/$image-$suffix.json" security/vulnerability-policy.json \
               "reports/$image-$suffix.policy.json"
           done

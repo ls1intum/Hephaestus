@@ -14,9 +14,11 @@ Install and configure the following tools before you attempt a local build:
 1. **Java JDK 21** – Required for the Spring Boot application server.
 2. **Docker and Docker Compose** – Required for PostgreSQL and NATS. Verify both with `docker info`
    and `docker compose version`.
-3. **Bun** – Match `package.json#packageManager`; it runs JavaScript and TypeScript tooling and
-   installs dependencies. See [ADR 0033](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0033-bun-is-the-javascript-runtime-and-package-manager.md).
-4. **NATS CLI (optional)** – Helpful when inspecting the webhook/sync event stream (NATS is disabled by default locally). The agent job queue runs on PostgreSQL and needs no NATS.
+3. **Node.js** – Match `package.json#devEngines.runtime`; it executes repository scripts and
+   application tooling.
+4. **Bun** – Match `package.json#packageManager`; it installs dependencies and dispatches package
+   scripts through `bun run`.
+5. **NATS CLI (optional)** – Helpful when inspecting the webhook/sync event stream (NATS is disabled by default locally). The agent job queue runs on PostgreSQL and needs no NATS.
 
 ## Recommended IDE setup
 

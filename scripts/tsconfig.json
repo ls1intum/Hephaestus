@@ -18,7 +18,7 @@
 		"esModuleInterop": true,
 		"resolveJsonModule": true,
 		"skipLibCheck": true,
-		"types": ["node", "bun"]
+		"types": ["node"]
 	},
 	"include": ["./**/*.ts"]
 }

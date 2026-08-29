@@ -21,7 +21,7 @@ const log = (message: string): void => console.log(`ℹ️  ${message}`);
 
 async function config(): Promise<Config> {
 	const fileEnv = await readEnvFile(join(server, ".env"));
-	const env = { ...fileEnv, ...Bun.env };
+	const env = { ...fileEnv, ...process.env };
 	return {
 		env,
 		ci: env.CI === "true",
@@ -46,7 +46,9 @@ async function checkEnvironment(value: Config, requirePg = false): Promise<void>
 async function waitForPostgres(value: Config): Promise<void> {
 	for (let attempt = 0; attempt < 30; attempt++) {
 		if (await succeeds("pg_isready", ["-h", value.host, "-p", String(value.port)])) return;
-		await Bun.sleep(1000);
+		await new Promise((resolve) => {
+			setTimeout(resolve, 1000);
+		});
 	}
 	throw new Error("PostgreSQL failed to become ready after 30 seconds");
 }
@@ -175,15 +177,15 @@ export async function withDisposableDatabase(
 }
 
 async function main(): Promise<void> {
-	const command = Bun.argv[2];
+	const command = process.argv[2];
 	if (!["generate-erd", "draft-changelog", "help", "-h", "--help"].includes(command ?? "")) {
 		console.error(command ? `Unknown command: ${command}` : "No command specified.");
-		console.error("Usage: bun scripts/db-utils.ts [generate-erd|draft-changelog]");
+		console.error("Usage: node scripts/db-utils.ts [generate-erd|draft-changelog]");
 		process.exitCode = 1;
 		return;
 	}
 	if (["help", "-h", "--help"].includes(command ?? "")) {
-		console.log("Usage: bun scripts/db-utils.ts [generate-erd|draft-changelog]");
+		console.log("Usage: node scripts/db-utils.ts [generate-erd|draft-changelog]");
 		return;
 	}
 	const value = await config();

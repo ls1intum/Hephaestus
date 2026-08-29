@@ -100,7 +100,7 @@ jobs:
           HEAD_REF: ${{ steps.pull.outputs.head_ref }}
           HEAD_SHA: ${{ steps.pull.outputs.head_sha }}
           BASE_REF: ${{ steps.pull.outputs.base_ref }}
-        run: bun scripts/coolify-preview.ts close
+        run: node scripts/coolify-preview.ts close
 
       - name: Retire the GitHub preview deployments
         if: steps.pull.outputs.stale == 'true' && steps.close.outcome == 'success'

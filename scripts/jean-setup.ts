@@ -28,10 +28,13 @@ async function copyFirst(
 	candidates: string[],
 ): Promise<void> {
 	for (const [index, candidate] of candidates.entries()) {
-		const source = Bun.file(join(rootPath, candidate));
-		if (!(await source.exists())) continue;
-		await mkdir(dirname(join(root, destination)), { recursive: true });
-		await copyFile(join(rootPath, candidate), join(root, destination));
+		try {
+			await mkdir(dirname(join(root, destination)), { recursive: true });
+			await copyFile(join(rootPath, candidate), join(root, destination));
+		} catch (error) {
+			if (error instanceof Error && "code" in error && error.code === "ENOENT") continue;
+			throw error;
+		}
 		console.log(
 			`  ${index ? "WARN: legacy layout — copied" : "copied"} ${destination}${index ? ` (from ${candidate})` : ""}`,
 		);
@@ -42,7 +45,7 @@ async function copyFirst(
 
 async function main(): Promise<void> {
 	console.log("Setting up Jean worktree...");
-	const jeanRoot = Bun.env.JEAN_ROOT_PATH;
+	const jeanRoot = process.env.JEAN_ROOT_PATH;
 	if (!jeanRoot) console.log("  JEAN_ROOT_PATH is not set — skipping config file copy.");
 	else {
 		console.log("Copying local config files...");
@@ -62,8 +65,13 @@ async function main(): Promise<void> {
 			await copyFirst(jeanRoot, destination, candidates);
 	}
 	const envPath = join(root, "server/.env");
-	if (await Bun.file(envPath).exists()) {
-		const before = await readFile(envPath, "utf8");
+	let before: string | undefined;
+	try {
+		before = await readFile(envPath, "utf8");
+	} catch (error) {
+		if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+	}
+	if (before !== undefined) {
 		const after = updateEnv(before);
 		if (after !== before) {
 			await writeFile(envPath, after, { mode: 0o600 });
@@ -71,17 +79,14 @@ async function main(): Promise<void> {
 		}
 	}
 	console.log("Installing dependencies...");
-	// Not a gate: `qualify:bun-lockfile` and every CI install enforce the lockfile. A stale one here
-	// is worth a warning, not a worktree with no node_modules in it.
-	const lockfile = Bun.file(join(root, "bun.lock"));
-	const lockfileBefore = await lockfile.text();
+	const lockfile = join(root, "bun.lock");
+	const lockfileBefore = await readFile(lockfile, "utf8");
 	try {
 		await run("bun", ["install", "--frozen-lockfile"], { cwd: root });
 	} catch {
 		console.log("  WARN: the frozen install failed — retrying without --frozen-lockfile.");
 		await run("bun", ["install"], { cwd: root });
-		// A network failure fails the frozen install too, and leaves nothing to commit.
-		if ((await lockfile.text()) !== lockfileBefore)
+		if ((await readFile(lockfile, "utf8")) !== lockfileBefore)
 			console.log("  WARN: bun.lock changed — commit it, or qualify:bun-lockfile fails in CI.");
 	}
 	console.log("✅ Jean worktree setup complete.");

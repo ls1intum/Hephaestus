@@ -10,12 +10,24 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 const manifest: unknown = JSON.parse(readFileSync("package.json", "utf8"));
 if (!isRecord(manifest)) throw new Error("package.json must be an object");
-const { packageManager, overrides, workspaces } = manifest;
+const { devEngines, engines, packageManager, overrides, workspaces } = manifest;
 if (typeof packageManager !== "string" || !isRecord(overrides)) {
 	throw new Error("package.json must declare packageManager and overrides");
 }
 if (!Array.isArray(workspaces) || !workspaces.includes(".")) {
 	throw new Error("package.json#workspaces must include the release-owning root package");
+}
+if (!isRecord(engines) || engines.node !== ">=24.19.0 <25") {
+	throw new Error("package.json#engines.node must require the supported Node 24 line");
+}
+const runtime = isRecord(devEngines) ? devEngines.runtime : undefined;
+if (
+	!isRecord(runtime) ||
+	runtime.name !== "node" ||
+	runtime.version !== "24.19.0" ||
+	runtime.onFail !== "error"
+) {
+	throw new Error("package.json#devEngines.runtime must pin Node 24.19.0");
 }
 const overrideEntries = Object.entries(overrides).filter(
 	(entry): entry is [string, string] => typeof entry[1] === "string",
@@ -31,15 +43,11 @@ if (runningVersion !== version) throw new Error(`Expected Bun ${version}, found 
 for (const file of ["package.json", "docs/package.json", "webapp/package.json"]) {
 	const workspaceManifest: unknown = JSON.parse(readFileSync(file, "utf8"));
 	if (!isRecord(workspaceManifest)) throw new Error(`${file} must be an object`);
-	const engines = workspaceManifest.engines;
-	if (isRecord(engines) && "node" in engines) {
-		throw new Error(`${file} must not declare a Node.js engine`);
-	}
 	const scripts = workspaceManifest.scripts;
 	if (isRecord(scripts)) {
 		for (const [name, command] of Object.entries(scripts)) {
-			if (typeof command === "string" && /(?:^|[;&|]\s*)\s*(?:node|tsx)(?:\s|$)/.test(command)) {
-				throw new Error(`${file}#scripts.${name} must use Bun`);
+			if (typeof command === "string" && /(?:^|[;&|]\s*)\s*tsx(?:\s|$)/.test(command)) {
+				throw new Error(`${file}#scripts.${name} must use Node directly`);
 			}
 		}
 	}
@@ -67,6 +75,17 @@ const setupBunAction = readFileSync(".github/actions/setup-bun/action.yml", "utf
 if (!/^\s*bun-version-file:\s*package\.json\s*$/m.test(setupBunAction)) {
 	throw new Error("setup-bun must read the exact Bun version from package.json");
 }
+if (!/^\s*node-version-file:\s*package\.json\s*$/m.test(setupBunAction)) {
+	throw new Error("setup-bun must read the exact Node version from package.json");
+}
+if (/^\[run]$/m.test(readFileSync("bunfig.toml", "utf8"))) {
+	throw new Error("bunfig.toml must not override Node script execution");
+}
+for (const file of globSync("scripts/**/*.ts")) {
+	if (/\bBun\.|from\s+["']bun:test["']/.test(readFileSync(file, "utf8"))) {
+		throw new Error(`${file} must run on Node.js without Bun APIs`);
+	}
+}
 
 for (const file of ["docker/agents/pi/Dockerfile", "webapp/Dockerfile"]) {
 	const dockerfile = readFileSync(file, "utf8");
@@ -81,20 +100,17 @@ if (!isRecord(packages)) throw new Error("bun.lock must contain packages");
 const packageValues = Object.values(packages).filter((value): value is unknown[] =>
 	Array.isArray(value),
 );
-/**
- * `bunfig.toml#publicHoistPattern` lifts a package to the root `node_modules` so the whole repo
- * shares one copy. For React and its types a second copy is two incompatible `JSX.Element`s, which
- * surfaces as a type error deep inside an unrelated library. Hoisting can only lift one, so the
- * lockfile resolving two is the moment that guarantee is gone — and nothing else notices.
- */
-const bunfig: unknown = Bun.TOML.parse(readFileSync("bunfig.toml", "utf8"));
-const publicHoistPattern =
-	isRecord(bunfig) && isRecord(bunfig.install) ? bunfig.install.publicHoistPattern : undefined;
-if (!Array.isArray(publicHoistPattern) || publicHoistPattern.length === 0) {
+// Multiple publicly hoisted React or type resolutions make workspace JSX types incompatible.
+const bunfig = readFileSync("bunfig.toml", "utf8");
+const publicHoistPattern = /^publicHoistPattern\s*=\s*\[([^\]]+)]$/m
+	.exec(bunfig)?.[1]
+	?.split(",")
+	.map((value) => value.trim().replace(/^"|"$/g, ""));
+if (!publicHoistPattern || publicHoistPattern.length === 0) {
 	throw new Error("bunfig.toml must declare install.publicHoistPattern");
 }
 for (const pattern of publicHoistPattern) {
-	// A glob cannot be matched against a resolution prefix, so it is left to Bun.
+	// The package manager owns glob expansion.
 	if (typeof pattern !== "string" || /[*?[\]]/.test(pattern)) continue;
 	const resolutions = new Set(
 		packageValues

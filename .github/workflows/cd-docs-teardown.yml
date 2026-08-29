@@ -27,12 +27,12 @@ jobs:
       - name: Teardown Surge.sh preview
         env:
           SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}
-        run: bun --bun surge teardown "$PREVIEW_URL" --token "$SURGE_TOKEN"
+        run: ./node_modules/.bin/surge teardown "$PREVIEW_URL" --token "$SURGE_TOKEN"
         continue-on-error: true
       - name: Teardown Storybook preview
         env:
           SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}
-        run: bun --bun surge teardown "$STORYBOOK_PREVIEW_URL" --token "$SURGE_TOKEN"
+        run: ./node_modules/.bin/surge teardown "$STORYBOOK_PREVIEW_URL" --token "$SURGE_TOKEN"
         continue-on-error: true
 
       - name: Update PR comment

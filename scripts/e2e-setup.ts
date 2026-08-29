@@ -175,7 +175,7 @@ async function login(config: Config): Promise<string> {
 }
 
 async function main(): Promise<void> {
-	const config = loadConfig(Bun.env, Bun.argv.slice(2));
+	const config = loadConfig(process.env, process.argv.slice(2));
 	const llmHeaders: Record<string, string> =
 		config.authMode === "API_KEY"
 			? { "api-key": config.llmKey }

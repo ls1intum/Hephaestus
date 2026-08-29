@@ -1,8 +1,15 @@
+import { readFile } from "node:fs/promises";
+
 export async function readEnvFile(path: string): Promise<Record<string, string>> {
-	const file = Bun.file(path);
-	if (!(await file.exists())) return {};
+	let contents: string;
+	try {
+		contents = await readFile(path, "utf8");
+	} catch (error) {
+		if (error instanceof Error && "code" in error && error.code === "ENOENT") return {};
+		throw error;
+	}
 	const values: Record<string, string> = {};
-	for (const line of (await file.text()).split(/\r?\n/)) {
+	for (const line of contents.split(/\r?\n/)) {
 		const match = /^\s*([A-Za-z_][A-Za-z0-9_]*)=(.*)$/.exec(line);
 		if (!match) continue;
 		const [, key, rawValue] = match;
@@ -24,14 +31,12 @@ export function positivePort(value: string, name: string): number {
 	return port;
 }
 
-/** A required environment variable, or a failure naming it. */
 export function requiredEnv(environment: NodeJS.ProcessEnv, name: string): string {
 	const value = environment[name];
 	if (!value) throw new Error(`${name} is not configured.`);
 	return value;
 }
 
-/** A required environment variable that must be a positive whole number. */
 export function requiredPositiveInteger(environment: NodeJS.ProcessEnv, name: string): number {
 	const value = Number(requiredEnv(environment, name));
 	if (!Number.isSafeInteger(value) || value <= 0) {

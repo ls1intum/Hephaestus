@@ -1,6 +1,7 @@
 # Scripts
 
-Utility scripts for Hephaestus development. Bun executes TypeScript scripts directly.
+The Node.js version pinned in `package.json#devEngines.runtime` executes these TypeScript utilities
+using native type stripping.
 
 Most scripts require `bun install` at the repository root. Jean setup performs that installation; the
 lockfile qualifier intentionally starts from a clean dependency tree.
@@ -9,7 +10,9 @@ lockfile qualifier intentionally starts from a clean dependency tree.
 
 ### Repository orchestration
 
-Substantive developer orchestration under `scripts/` uses typed Bun entry points:
+Substantive developer orchestration under `scripts/` uses typed Node.js entry points:
+
+Infrastructure tests use `node:test`; Vitest is reserved for the Vite-managed webapp and docs trees.
 
 | Command | Purpose |
 | --- | --- |
@@ -25,7 +28,7 @@ The database commands require Docker with the Compose plugin.
 internet-facing and requires Docker, the machine's Coolify network and Traefik configuration
 directory, and `server/.env`.
 
-Jean runs `bun "$JEAN_ROOT_PATH/scripts/jean-setup.ts"` from a new worktree to copy machine-local
+Jean runs `node "$JEAN_ROOT_PATH/scripts/jean-setup.ts"` from a new worktree to copy machine-local
 configuration and install dependencies. It is not a general contributor command.
 
 `bun run qualify:bun-lockfile -- 25` is a maintainer and CI diagnostic. Each iteration removes the

@@ -54,7 +54,7 @@ jobs:
 
           if [ "${#changesets_changed[@]}" -gt 0 ]; then
             bun changeset status --since "$BASE_SHA" --output /tmp/changeset-status.json
-            bun scripts/verify-changesets.ts /tmp/changeset-status.json "${changesets_changed[@]}"
+            node scripts/verify-changesets.ts /tmp/changeset-status.json "${changesets_changed[@]}"
           fi
 
           if git diff --name-only "$BASE_SHA"...HEAD -- server/application/src/main/resources/db/changelog/ | grep -q .; then
