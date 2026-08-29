@@ -146,6 +146,7 @@ jobs:
             ci-config:
               - '.github/workflows/**'
               - '.github/actions/**'
+              - '.github/actionlint.yaml'
             docker-config:
               - '.github/workflows/ci-docker-build.yml'
               - '.github/workflows/reusable-docker-build.yml'
@@ -165,6 +166,30 @@ jobs:
               - '!webapp/src/**/*.test.*'
               - '!webapp/src/**/*.stories.*'
               - '!webapp/src/test/**'
+
+  workflow-lint:
+    name: "Workflow syntax"
+    runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: |
+      needs.detect-changes.outputs.should_skip != 'true' && (
+        needs.detect-changes.outputs.ci-config == 'true' ||
+        github.event_name != 'pull_request'
+      )
+    permissions:
+      checks: write
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: reviewdog/action-actionlint@dbe5299849118fd6f099ba563d263d770955a64a # v1.73.2
+        with:
+          actionlint_flags: -shellcheck=
+          fail_level: error
+          filter_mode: nofilter
+          reporter: github-check
 
   Quality:
     uses: ./.github/workflows/ci-quality-gates.yml
@@ -263,7 +288,7 @@ jobs:
     permissions:
       actions: read
       statuses: write
-    needs: [detect-changes, Quality, Security, Test, Changesets, Docker]
+    needs: [detect-changes, workflow-lint, Quality, Security, Test, Changesets, Docker]
     if: always()
     steps:
       - name: Generate workflow timeline
@@ -314,6 +339,7 @@ jobs:
         id: evaluate
         run: |
           echo "detect-changes: ${{ needs.detect-changes.result }}"
+          echo "workflow-lint: ${{ needs.workflow-lint.result }}"
           echo "Quality:        ${{ needs.Quality.result }}"
           echo "Security:       ${{ needs.Security.result }}"
           echo "Test:           ${{ needs.Test.result }}"
@@ -362,6 +388,7 @@ jobs:
             esac
           }
 
+          echo "| Workflow syntax | $(result_to_emoji '${{ needs.workflow-lint.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Quality | $(result_to_emoji '${{ needs.Quality.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Test | $(result_to_emoji '${{ needs.Test.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Changesets | $(result_to_emoji '${{ needs.Changesets.result }}') |" >> $GITHUB_STEP_SUMMARY
