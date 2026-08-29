@@ -18,9 +18,9 @@ and neither the application nor a review is an *agent*.
   See `webapp/AGENTS.md`.
 - `docs/` — contributor docs published to GitHub Pages, including the generated ERD.
 
-The repository uses Bun for JavaScript and TypeScript execution and package management;
-`package.json#packageManager` is the authoritative version. `webapp` is the main TypeScript
-package; `docs` is a second. The runner
+The repository uses Node.js for repository scripts and application tooling, and Bun for package
+management; `package.json#devEngines.runtime` and `packageManager` are the authoritative versions.
+`webapp` is the main TypeScript package; `docs` is a second. The runner
 (`server/application/src/main/resources/agent/`), the precompute runner and lib (`docker/agents/precompute/`) and
 the per-practice precompute scripts (`server/application/src/main/resources/practices/precompute/`) are
 type-checked as one project via `tsconfig.agents.json` and
@@ -77,7 +77,7 @@ checks, and security scans. Run `check` before pushing and `verify` before reque
 |---|---|---|---|
 | the SPA (`webapp/`) | `webapp/.oxlintrc.json` | oxfmt (`.oxfmtrc.json`) | `format:webapp`, `lint:webapp`, `check:webapp` |
 | the docs site (`docs/`) | `docs/.oxlintrc.json` | oxfmt for JavaScript, TypeScript, JSON/JSONC, and CSS (`.oxfmtrc.json`) | `format:docs`; linted by `lint:agents` |
-| the Bun agent runtime and specs, both precompute trees, and `scripts/**` | `.oxlintrc.json` | oxfmt (`.oxfmtrc.json`) | `format:agents`, `lint:agents`, `check:agents` |
+| the agent runtime and specs, both precompute trees, and `scripts/**` | `.oxlintrc.json` | oxfmt (`.oxfmtrc.json`) | `format:agents`, `lint:agents`, `check:agents` |
 | selected repository tooling configuration | `.oxlintrc.json` where applicable | oxfmt (`.oxfmtrc.json`) | `format:config` |
 
 `docs:lint` is **not** the oxlint leg — it is the docs package's own `typecheck` plus
@@ -105,8 +105,8 @@ adding a rule there enables it nowhere. `webapp/AGENTS.md` § Linting has the re
 Holds wherever TypeScript is written here, the Bun agent trees and `scripts/**` included.
 `webapp/AGENTS.md` wins over it inside the SPA.
 
-Prefer typed Bun/TypeScript for repository automation, validation, and tests. Keep shell only at a
-real runtime boundary where Bun is unavailable, such as an end-user bootstrap that must run before
+Prefer typed Node.js/TypeScript for repository automation, validation, and tests. Keep shell only at a
+real runtime boundary where Node.js is unavailable, such as an end-user bootstrap that must run before
 the application toolchain is installed; keep that boundary POSIX-compatible and move its substantive
 test orchestration into TypeScript.
 

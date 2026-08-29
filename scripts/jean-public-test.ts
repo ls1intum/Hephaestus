@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { createHmac } from "node:crypto";
 import { access, open, readFile, readlink, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -7,28 +8,28 @@ import { positivePort, readEnvFile } from "./lib/env.ts";
 import { output, run, succeeds } from "./lib/process.ts";
 
 const root = join(import.meta.dirname, "..");
-const host = Bun.env.HEPHAESTUS_PUBLIC_TEST_HOST ?? "hephaestus-test.felixdietrich.com";
+const host = process.env.HEPHAESTUS_PUBLIC_TEST_HOST ?? "hephaestus-test.felixdietrich.com";
 if (!isHostname(host)) throw new Error("HEPHAESTUS_PUBLIC_TEST_HOST must be a DNS hostname");
 const origin = `https://${host}`;
 const appPort = positivePort(
-	Bun.env.HEPHAESTUS_PUBLIC_TEST_APP_PORT ?? "38085",
+	process.env.HEPHAESTUS_PUBLIC_TEST_APP_PORT ?? "38085",
 	"HEPHAESTUS_PUBLIC_TEST_APP_PORT",
 );
 const managementPort = positivePort(
-	Bun.env.HEPHAESTUS_PUBLIC_TEST_MANAGEMENT_PORT ?? "38086",
+	process.env.HEPHAESTUS_PUBLIC_TEST_MANAGEMENT_PORT ?? "38086",
 	"HEPHAESTUS_PUBLIC_TEST_MANAGEMENT_PORT",
 );
 const postgresPort = positivePort(
-	Bun.env.HEPHAESTUS_PUBLIC_TEST_POSTGRES_PORT ?? "55432",
+	process.env.HEPHAESTUS_PUBLIC_TEST_POSTGRES_PORT ?? "55432",
 	"HEPHAESTUS_PUBLIC_TEST_POSTGRES_PORT",
 );
-const container = Bun.env.HEPHAESTUS_PUBLIC_TEST_WEBAPP_CONTAINER ?? "heph-local-webapp";
+const container = process.env.HEPHAESTUS_PUBLIC_TEST_WEBAPP_CONTAINER ?? "heph-local-webapp";
 const traefikFile =
-	Bun.env.HEPHAESTUS_PUBLIC_TEST_TRAEFIK_FILE ??
+	process.env.HEPHAESTUS_PUBLIC_TEST_TRAEFIK_FILE ??
 	"/data/coolify/proxy/dynamic/hephaestus-local-test.yaml";
-const logFile = Bun.env.HEPHAESTUS_PUBLIC_TEST_SERVER_LOG ?? "/tmp/heph-public-server.log";
-const pidFile = Bun.env.HEPHAESTUS_PUBLIC_TEST_PID_FILE ?? "/tmp/heph-public-server.pid";
-const nginxFile = Bun.env.HEPHAESTUS_PUBLIC_TEST_NGINX_CONF ?? "/tmp/heph-local-nginx.conf";
+const logFile = process.env.HEPHAESTUS_PUBLIC_TEST_SERVER_LOG ?? "/tmp/heph-public-server.log";
+const pidFile = process.env.HEPHAESTUS_PUBLIC_TEST_PID_FILE ?? "/tmp/heph-public-server.pid";
+const nginxFile = process.env.HEPHAESTUS_PUBLIC_TEST_NGINX_CONF ?? "/tmp/heph-local-nginx.conf";
 
 export function isHostname(value: string): boolean {
 	return (
@@ -134,7 +135,11 @@ async function traefikConfig(): Promise<Record<string, unknown>> {
 }
 
 async function stopBackend(): Promise<void> {
-	if (!(await Bun.file(pidFile).exists())) return;
+	try {
+		await access(pidFile);
+	} catch {
+		return;
+	}
 	const pid = Number((await readFile(pidFile, "utf8")).trim());
 	if (!Number.isSafeInteger(pid) || pid <= 1) throw new Error(`Invalid backend PID in ${pidFile}`);
 	if (!processExists(pid)) {
@@ -144,9 +149,15 @@ async function stopBackend(): Promise<void> {
 	if (!(await isBackendProcess(pid)))
 		throw new Error(`Refusing to stop PID ${pid}: it is not this worktree's backend`);
 	process.kill(-pid, "SIGTERM");
-	for (let attempt = 0; attempt < 50 && processGroupExists(pid); attempt++) await Bun.sleep(100);
+	for (let attempt = 0; attempt < 50 && processGroupExists(pid); attempt++)
+		await new Promise((resolve) => {
+			setTimeout(resolve, 100);
+		});
 	if (processGroupExists(pid)) process.kill(-pid, "SIGKILL");
-	for (let attempt = 0; attempt < 20 && processGroupExists(pid); attempt++) await Bun.sleep(100);
+	for (let attempt = 0; attempt < 20 && processGroupExists(pid); attempt++)
+		await new Promise((resolve) => {
+			setTimeout(resolve, 100);
+		});
 	if (processGroupExists(pid)) throw new Error(`Backend process group ${pid} did not stop`);
 	await rm(pidFile, { force: true });
 }
@@ -194,7 +205,7 @@ async function startBackend(): Promise<void> {
 	const fileEnv = await readEnvFile(join(root, "server/.env"));
 	const env = {
 		...fileEnv,
-		...Bun.env,
+		...process.env,
 		HEPHAESTUS_AUTH_DEV_LOGIN_ENABLED: "false",
 		HEPHAESTUS_DEV_TRIGGER_ENABLED: "false",
 		HEPHAESTUS_WORKSPACE_INIT_DEFAULT: "false",
@@ -204,7 +215,7 @@ async function startBackend(): Promise<void> {
 		HEPHAESTUS_AUTH_API_BASE_PATH: fileEnv.HEPHAESTUS_AUTH_API_BASE_PATH ?? "/api",
 		HEPHAESTUS_INTEGRATION_SLACK_REDIRECT_URI: `${origin}/api/oauth/callback/slack`,
 		POSTGRES_PORT: String(postgresPort),
-		NATS_SERVER: Bun.env.HEPHAESTUS_PUBLIC_TEST_NATS_SERVER ?? "nats://localhost:4222",
+		NATS_SERVER: process.env.HEPHAESTUS_PUBLIC_TEST_NATS_SERVER ?? "nats://localhost:4222",
 		SERVER_PORT: String(appPort),
 		MANAGEMENT_PORT: String(managementPort),
 		SPRING_DOCKER_COMPOSE_ENABLED: "false",
@@ -220,14 +231,13 @@ async function startBackend(): Promise<void> {
 		{ cwd: join(root, "server"), env },
 	);
 	const log = await open(logFile, "a");
-	const child = Bun.spawn(
-		["./mvnw", "-f", "application/pom.xml", "spring-boot:run", "-Dspring-boot.run.profiles=local"],
+	const child = spawn(
+		"./mvnw",
+		["-f", "application/pom.xml", "spring-boot:run", "-Dspring-boot.run.profiles=local"],
 		{
 			cwd: join(root, "server"),
-			env: { ...Bun.env, ...env },
-			stdin: "ignore",
-			stdout: log.fd,
-			stderr: log.fd,
+			env: { ...process.env, ...env },
+			stdio: ["ignore", log.fd, log.fd],
 			detached: true,
 		},
 	);
@@ -240,7 +250,9 @@ async function startBackend(): Promise<void> {
 				.catch(() => false)
 		)
 			return;
-		await Bun.sleep(2000);
+		await new Promise((resolve) => {
+			setTimeout(resolve, 2000);
+		});
 	}
 	throw new Error(`Backend did not become ready. Inspect ${logFile}`);
 }
@@ -260,7 +272,7 @@ async function smoke(): Promise<void> {
 		throw new Error("/api/auth/me must return 401");
 	if ((await request("/api/api/dev/trigger-review", { method: "POST" })).ok)
 		throw new Error("Dev review trigger is exposed");
-	const env = { ...(await readEnvFile(join(root, "server/.env"))), ...Bun.env };
+	const env = { ...(await readEnvFile(join(root, "server/.env"))), ...process.env };
 	if (env.GITHUB_OAUTH_CLIENT_ID) {
 		const login = await request("/api/auth/login?provider=github&returnTo=/");
 		const authorization = await request("/api/oauth2/authorization/github");
@@ -299,7 +311,7 @@ async function smoke(): Promise<void> {
 }
 
 async function seedStatus(): Promise<void> {
-	const env = { ...(await readEnvFile(join(root, "server/.env"))), ...Bun.env };
+	const env = { ...(await readEnvFile(join(root, "server/.env"))), ...process.env };
 	const account = env.GITLAB_GROUP_PATH;
 	if (!env.GITLAB_PAT || !account) {
 		console.log("SCM seed: skipped (GITLAB_PAT or GITLAB_GROUP_PATH missing)");
@@ -350,7 +362,7 @@ async function seedStatus(): Promise<void> {
 }
 
 async function start(): Promise<void> {
-	if (Bun.env.HEPHAESTUS_PUBLIC_TEST_SKIP_WEBAPP_BUILD !== "true")
+	if (process.env.HEPHAESTUS_PUBLIC_TEST_SKIP_WEBAPP_BUILD !== "true")
 		await run("bun", ["run", "build:webapp"], { cwd: root });
 	await writeConfigs();
 	await succeeds("docker", ["rm", "-f", container]);
@@ -395,14 +407,18 @@ async function start(): Promise<void> {
 }
 
 async function backendStatus(): Promise<"running" | "stale" | "stopped"> {
-	if (!(await Bun.file(pidFile).exists())) return "stopped";
+	try {
+		await access(pidFile);
+	} catch {
+		return "stopped";
+	}
 	const pid = Number((await readFile(pidFile, "utf8")).trim());
 	if (!Number.isSafeInteger(pid) || pid <= 1 || !processExists(pid)) return "stale";
 	return (await isBackendProcess(pid)) ? "running" : "stale";
 }
 
 async function main(): Promise<void> {
-	switch (Bun.argv[2] ?? "start") {
+	switch (process.argv[2] ?? "start") {
 		case "start":
 			await start();
 			break;
@@ -447,10 +463,12 @@ async function main(): Promise<void> {
 		case "help":
 		case "-h":
 		case "--help":
-			console.log("Usage: bun scripts/jean-public-test.ts [start|stop|status|smoke|seed-status]");
+			console.log("Usage: node scripts/jean-public-test.ts [start|stop|status|smoke|seed-status]");
 			break;
 		default:
-			console.error("Usage: bun scripts/jean-public-test.ts [start|stop|status|smoke|seed-status]");
+			console.error(
+				"Usage: node scripts/jean-public-test.ts [start|stop|status|smoke|seed-status]",
+			);
 			process.exitCode = 2;
 	}
 }

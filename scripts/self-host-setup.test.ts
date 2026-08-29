@@ -1,4 +1,5 @@
-import { afterEach, expect, test } from "bun:test";
+import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import {
 	chmod,
 	copyFile,
@@ -12,6 +13,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { afterEach, test } from "node:test";
 
 const sourceDirectory = join(import.meta.dirname, "..", "docker", "self-host");
 const temporaryDirectories: string[] = [];
@@ -34,16 +36,18 @@ async function setup(
 	directory: string,
 	path?: string,
 ): Promise<{ exitCode: number; output: string }> {
-	const process = Bun.spawn([join(directory, "setup.sh")], {
-		env: path === undefined ? Bun.env : { ...Bun.env, PATH: path },
-		stdout: "pipe",
-		stderr: "pipe",
+	return await new Promise((resolve) => {
+		execFile(
+			join(directory, "setup.sh"),
+			{ env: path === undefined ? process.env : { ...process.env, PATH: path } },
+			(error, stdout) => {
+				resolve({
+					exitCode: typeof error?.code === "number" ? error.code : error ? 1 : 0,
+					output: stdout,
+				});
+			},
+		);
 	});
-	const [exitCode, output] = await Promise.all([
-		process.exited,
-		new Response(process.stdout).text(),
-	]);
-	return { exitCode, output };
 }
 
 function managedValues(environment: string): string[] {
@@ -60,26 +64,26 @@ function managedValues(environment: string): string[] {
 		.map(([, value]) => value ?? "");
 }
 
-test("generates protected secrets without printing them", async () => {
+await test("generates protected secrets without printing them", async () => {
 	const directory = await fixture();
 	const result = await setup(directory);
 	const environmentPath = join(directory, ".env");
 	const environment = await readFile(environmentPath, "utf8");
 
-	expect(result.exitCode).toBe(0);
-	expect(environment).toMatch(/^POSTGRES_PASSWORD=[0-9a-f]{32}$/m);
-	expect(environment).toMatch(/^HEPHAESTUS_SECURITY_ENCRYPTION_KEY=[0-9a-f]{32}$/m);
-	expect(environment).toMatch(/^HEPHAESTUS_AUTH_STATE_COOKIE_KEY=[A-Za-z0-9+/]{43}=$/m);
-	expect(environment).toMatch(/^WEBHOOK_SECRET=[0-9a-f]{64}$/m);
-	expect((await lstat(environmentPath)).mode & 0o777).toBe(0o600);
-	for (const secret of managedValues(environment)) expect(result.output).not.toContain(secret);
+	assert.equal(result.exitCode, 0);
+	assert.match(environment, /^POSTGRES_PASSWORD=[0-9a-f]{32}$/m);
+	assert.match(environment, /^HEPHAESTUS_SECURITY_ENCRYPTION_KEY=[0-9a-f]{32}$/m);
+	assert.match(environment, /^HEPHAESTUS_AUTH_STATE_COOKIE_KEY=[A-Za-z0-9+/]{43}=$/m);
+	assert.match(environment, /^WEBHOOK_SECRET=[0-9a-f]{64}$/m);
+	assert.equal((await lstat(environmentPath)).mode & 0o777, 0o600);
+	for (const secret of managedValues(environment)) assert.ok(!result.output.includes(secret));
 
 	const second = await setup(directory);
-	expect(second.exitCode).toBe(0);
-	expect(await readFile(environmentPath, "utf8")).toBe(environment);
+	assert.equal(second.exitCode, 0);
+	assert.equal(await readFile(environmentPath, "utf8"), environment);
 });
 
-test("preserves configured values and fills missing assignments", async () => {
+await test("preserves configured values and fills missing assignments", async () => {
 	const directory = await fixture();
 	const example = await readFile(join(directory, ".env.example"), "utf8");
 	await writeFile(
@@ -89,13 +93,13 @@ test("preserves configured values and fills missing assignments", async () => {
 			.replace(/^WEBHOOK_SECRET=.*\n/m, ""),
 	);
 
-	expect((await setup(directory)).exitCode).toBe(0);
+	assert.equal((await setup(directory)).exitCode, 0);
 	const environment = await readFile(join(directory, ".env"), "utf8");
-	expect(environment).toContain("POSTGRES_PASSWORD=preserved\n");
-	expect(environment).toMatch(/^WEBHOOK_SECRET=[0-9a-f]{64}$/m);
+	assert.ok(environment.includes("POSTGRES_PASSWORD=preserved\n"));
+	assert.match(environment, /^WEBHOOK_SECRET=[0-9a-f]{64}$/m);
 });
 
-test("rejects duplicate managed assignments", async () => {
+await test("rejects duplicate managed assignments", async () => {
 	const directory = await fixture();
 	const examplePath = join(directory, ".env.example");
 	await writeFile(
@@ -103,11 +107,11 @@ test("rejects duplicate managed assignments", async () => {
 		`${await readFile(examplePath, "utf8")}POSTGRES_PASSWORD=duplicate\n`,
 	);
 
-	expect((await setup(directory)).exitCode).not.toBe(0);
-	expect(await Bun.file(join(directory, ".env")).exists()).toBeFalse();
+	assert.notEqual((await setup(directory)).exitCode, 0);
+	await assert.rejects(lstat(join(directory, ".env")));
 });
 
-test("leaves an existing environment unchanged when generation fails", async () => {
+await test("leaves an existing environment unchanged when generation fails", async () => {
 	const directory = await fixture();
 	const environmentPath = join(directory, ".env");
 	const original = await readFile(join(directory, ".env.example"), "utf8");
@@ -118,16 +122,19 @@ test("leaves an existing environment unchanged when generation fails", async () 
 	await writeFile(openssl, "#!/bin/sh\nexit 1\n");
 	await chmod(openssl, 0o700);
 
-	expect((await setup(directory, `${binaryDirectory}:${Bun.env.PATH ?? ""}`)).exitCode).not.toBe(0);
-	expect(await readFile(environmentPath, "utf8")).toBe(original);
+	assert.notEqual(
+		(await setup(directory, `${binaryDirectory}:${process.env.PATH ?? ""}`)).exitCode,
+		0,
+	);
+	assert.equal(await readFile(environmentPath, "utf8"), original);
 });
 
-test("refuses to write through an environment symlink", async () => {
+await test("refuses to write through an environment symlink", async () => {
 	const directory = await fixture();
 	const target = join(directory, "target");
 	await writeFile(target, "unchanged");
 	await symlink(target, join(directory, ".env"));
 
-	expect((await setup(directory)).exitCode).not.toBe(0);
-	expect(await readFile(target, "utf8")).toBe("unchanged");
+	assert.notEqual((await setup(directory)).exitCode, 0);
+	assert.equal(await readFile(target, "utf8"), "unchanged");
 });

@@ -209,7 +209,7 @@ jobs:
         env:
           PREVIEW_URL: ls1intum-hephaestus-storybook-pr-${{ github.event.number }}.surge.sh
           SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}
-        run: bun --bun surge ./webapp/storybook-static "$PREVIEW_URL" --token "$SURGE_TOKEN"
+        run: ./node_modules/.bin/surge ./webapp/storybook-static "$PREVIEW_URL" --token "$SURGE_TOKEN"
 
       - name: Add Storybook preview to the pull request
         if: steps.storybook_preview.outcome == 'success'

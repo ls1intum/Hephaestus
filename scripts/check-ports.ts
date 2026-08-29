@@ -37,16 +37,16 @@ async function isPortListening(port: number): Promise<boolean> {
 }
 
 async function main(): Promise<void> {
-	const args = Bun.argv.slice(2);
+	const args = process.argv.slice(2);
 	if (args.some((arg) => !["--quiet", "-q"].includes(arg))) {
-		console.error("Usage: bun scripts/check-ports.ts [--quiet]");
+		console.error("Usage: node scripts/check-ports.ts [--quiet]");
 		process.exitCode = 2;
 		return;
 	}
 	const quiet = args.length > 0;
 	const fileEnv = await readEnvFile(join(import.meta.dirname, "../server/.env"));
 	const value = (name: string, fallback: string): string =>
-		Bun.env[name] ?? fileEnv[name] ?? fallback;
+		process.env[name] ?? fileEnv[name] ?? fallback;
 	let services: ServicePort[];
 	try {
 		services = [

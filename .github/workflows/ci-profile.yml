@@ -56,7 +56,7 @@ jobs:
       - name: Enforce performance budgets
         if: success() && github.ref_name == github.event.repository.default_branch
         run: |
-          bun scripts/check-ci-performance.ts ci-metrics/server-integration-profile.json ci-profile-history
+          node scripts/check-ci-performance.ts ci-metrics/server-integration-profile.json ci-profile-history
           mkdir -p ci-profile-history
           cp ci-metrics/server-integration-profile.json "ci-profile-history/${{ github.run_id }}.json"
 

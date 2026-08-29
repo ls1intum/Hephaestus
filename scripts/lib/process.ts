@@ -1,3 +1,8 @@
+import { execFile, spawn } from "node:child_process";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
+
 export interface RunOptions {
 	cwd?: string;
 	env?: Record<string, string | undefined>;
@@ -12,16 +17,20 @@ export async function run(
 	args: string[],
 	options: RunOptions = {},
 ): Promise<void> {
-	const process = Bun.spawn([command, ...args], {
+	const child = spawn(command, args, {
 		cwd: options.cwd,
-		env: { ...Bun.env, ...options.env },
-		stdin: options.stdin ?? "inherit",
-		stdout: options.stdout ?? "inherit",
-		stderr: options.stderr ?? "inherit",
+		env: { ...process.env, ...options.env },
+		stdio: [options.stdin ?? "inherit", options.stdout ?? "inherit", options.stderr ?? "inherit"],
 		signal: options.signal,
 	});
-	const exitCode = await process.exited;
-	if (exitCode !== 0) throw new Error(`${command} exited with code ${exitCode}`);
+	await new Promise<void>((resolve, reject) => {
+		child.once("error", reject);
+		child.once("exit", (code, signal) =>
+			code === 0
+				? resolve()
+				: reject(new Error(`${command} exited with ${signal ?? `code ${code}`}`)),
+		);
+	});
 }
 
 export async function succeeds(
@@ -42,18 +51,11 @@ export async function output(
 	args: string[],
 	options: RunOptions = {},
 ): Promise<string> {
-	const process = Bun.spawn([command, ...args], {
+	const { stdout } = await execFileAsync(command, args, {
 		cwd: options.cwd,
-		env: { ...Bun.env, ...options.env },
-		stdin: options.stdin ?? "ignore",
-		stdout: "pipe",
-		stderr: options.stderr ?? "ignore",
+		env: { ...process.env, ...options.env },
 		signal: options.signal,
+		encoding: "utf8",
 	});
-	const [exitCode, stdout] = await Promise.all([
-		process.exited,
-		new Response(process.stdout).text(),
-	]);
-	if (exitCode !== 0) throw new Error(`${command} exited with code ${exitCode}`);
 	return stdout;
 }

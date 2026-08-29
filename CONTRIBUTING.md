@@ -2,6 +2,10 @@
 
 Read the [local development guide](https://ls1intum.github.io/Hephaestus/contributor/local-development) on how to set up your environment.
 
+Repository tooling requires the Node.js version pinned in `package.json#devEngines.runtime`. Bun
+installs dependencies and dispatches package scripts; TypeScript scripts and application tools execute
+on Node.js.
+
 ## Maintenance Status
 
 Hephaestus is a research project at TUM, actively developed but maintained primarily by one person. Issues and pull requests are triaged on a best-effort basis. Security reports are the exception and get priority — see [SECURITY.md](SECURITY.md) for how to report vulnerabilities privately.

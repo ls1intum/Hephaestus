@@ -1,7 +1,9 @@
-import { describe, expect, test } from "bun:test";
+import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { describe, test } from "node:test";
 
 import { duplicatePorts } from "./check-ports.ts";
 import { withDisposableDatabase } from "./db-utils.ts";
@@ -11,66 +13,65 @@ import { updateEnv } from "./jean-setup.ts";
 import { positivePort, readEnvFile } from "./lib/env.ts";
 import { parseIterations } from "./qualify-bun-lockfile.ts";
 
-describe("environment parsing", () => {
-	test("parses data without evaluating shell syntax", async () => {
+await describe("environment parsing", async () => {
+	await test("parses data without evaluating shell syntax", async () => {
 		const directory = await mkdtemp(join(tmpdir(), "hephaestus-env-"));
 		try {
 			const path = join(directory, ".env");
 			await writeFile(path, "PORT=5432\nSECRET=$(echo leaked)\nexport BAD=ignored\n");
-			expect(await readEnvFile(path)).toEqual({ PORT: "5432", SECRET: "$(echo leaked)" });
+			assert.deepEqual(await readEnvFile(path), { PORT: "5432", SECRET: "$(echo leaked)" });
 		} finally {
 			await rm(directory, { recursive: true, force: true });
 		}
 	});
 
-	test("rejects invalid ports", () => {
-		expect(() => positivePort("0", "PORT")).toThrow("1 to 65535");
-		expect(() => positivePort("65536", "PORT")).toThrow("1 to 65535");
+	await test("rejects invalid ports", () => {
+		assert.throws(() => positivePort("0", "PORT"), /1 to 65535/);
+		assert.throws(() => positivePort("65536", "PORT"), /1 to 65535/);
 	});
 });
 
-test("duplicate port reporting identifies the conflicting pair", () => {
+await test("duplicate port reporting identifies the conflicting pair", () => {
 	const first = { name: "database", port: 5432 };
 	const second = { name: "server", port: 5432 };
-	expect(duplicatePorts([first, second])).toEqual([[second, first]]);
+	assert.deepEqual(duplicatePorts([first, second]), [[second, first]]);
 });
 
-test("duplicate configured ports fail the preflight", async () => {
-	const child = Bun.spawn(
-		[process.execPath, join(import.meta.dirname, "check-ports.ts"), "--quiet"],
-		{
-			env: { ...Bun.env, POSTGRES_PORT: "65431", SERVER_PORT: "65431", WEBAPP_PORT: "65431" },
-			stdout: "ignore",
-			stderr: "ignore",
-		},
-	);
-	expect(await child.exited).toBe(1);
+await test("duplicate configured ports fail the preflight", async () => {
+	const child = spawn(process.execPath, [join(import.meta.dirname, "check-ports.ts"), "--quiet"], {
+		env: { ...process.env, POSTGRES_PORT: "65431", SERVER_PORT: "65431", WEBAPP_PORT: "65431" },
+		stdio: "ignore",
+	});
+	const [exitCode] = await new Promise<[number | null]>((resolve) => {
+		child.once("exit", (code) => resolve([code]));
+	});
+	assert.equal(exitCode, 1);
 });
 
-test("lockfile qualification accepts only positive integers", () => {
-	expect(parseIterations(undefined)).toBe(25);
-	expect(parseIterations("3")).toBe(3);
-	expect(() => parseIterations("0")).toThrow("positive integer");
-	expect(() => parseIterations("1; rm -rf /")).toThrow("positive integer");
-	expect(() => parseIterations("999999999999999999999999")).toThrow("safe integer");
+await test("lockfile qualification accepts only positive integers", () => {
+	assert.equal(parseIterations(undefined), 25);
+	assert.equal(parseIterations("3"), 3);
+	assert.throws(() => parseIterations("0"), /positive integer/);
+	assert.throws(() => parseIterations("1; rm -rf /"), /positive integer/);
+	assert.throws(() => parseIterations("999999999999999999999999"), /safe integer/);
 });
 
-test("public host validation rejects Traefik rule syntax", () => {
-	expect(isHostname("preview.example.com")).toBeTrue();
-	expect(isHostname("example.com`) || Host(`attacker.example")).toBeFalse();
+await test("public host validation rejects Traefik rule syntax", () => {
+	assert.equal(isHostname("preview.example.com"), true);
+	assert.equal(isHostname("example.com`) || Host(`attacker.example"), false);
 });
 
-test("Jean setup updates only GitLab bootstrap settings and remains idempotent", () => {
+await test("Jean setup updates only GitLab bootstrap settings and remains idempotent", () => {
 	const initial =
 		"# machine-local config\nGITLAB_PAT=secret\nGITLAB_GROUP_PATH=group\nGITLAB_ENABLED=false\n";
 	const updated = updateEnv(initial);
-	expect(updated).toStartWith("# machine-local config\n");
-	expect(updated).toContain("GITLAB_ENABLED=true");
-	expect(updated).toContain("GITLAB_SERVER_URL=https://gitlab.lrz.de");
-	expect(updateEnv(updated)).toBe(updated);
+	assert.equal(updated.startsWith("# machine-local config\n"), true);
+	assert.ok(updated.includes("GITLAB_ENABLED=true"));
+	assert.ok(updated.includes("GITLAB_SERVER_URL=https://gitlab.lrz.de"));
+	assert.equal(updateEnv(updated), updated);
 });
 
-test("database drafting restores planted state after external-command failure", async () => {
+await test("database drafting restores planted state after external-command failure", async () => {
 	const directory = await mkdtemp(join(tmpdir(), "hephaestus-db-"));
 	const data = join(directory, "postgres-data");
 	const backup = join(directory, "backup");
@@ -96,16 +97,16 @@ test("database drafting restores planted state after external-command failure", 
 		} catch (error) {
 			failure = error;
 		}
-		expect(failure).toBeInstanceOf(Error);
-		expect(failure instanceof Error ? failure.message : "").toBe("planted migration failure");
-		expect(await readFile(join(data, "sentinel"), "utf8")).toBe("original");
-		expect(stops).toBe(2);
+		assert.ok(failure instanceof Error);
+		assert.equal(failure instanceof Error ? failure.message : "", "planted migration failure");
+		assert.equal(await readFile(join(data, "sentinel"), "utf8"), "original");
+		assert.equal(stops, 2);
 	} finally {
 		await rm(directory, { recursive: true, force: true });
 	}
 });
 
-test("database drafting does not move data after shutdown failure", async () => {
+await test("database drafting does not move data after shutdown failure", async () => {
 	const directory = await mkdtemp(join(tmpdir(), "hephaestus-db-stop-"));
 	const data = join(directory, "postgres-data");
 	const backup = join(directory, "backup");
@@ -132,20 +133,23 @@ test("database drafting does not move data after shutdown failure", async () => 
 		} catch (error) {
 			failure = error;
 		}
-		expect(failure instanceof Error ? failure.message : "").toBe("postgres still running");
-		expect(await readFile(join(backup, "sentinel"), "utf8")).toBe("original");
-		expect(await readFile(join(data, "sentinel"), "utf8")).toBe("disposable");
+		assert.equal(failure instanceof Error ? failure.message : "", "postgres still running");
+		assert.equal(await readFile(join(backup, "sentinel"), "utf8"), "original");
+		assert.equal(await readFile(join(data, "sentinel"), "utf8"), "disposable");
 	} finally {
 		await rm(directory, { recursive: true, force: true });
 	}
 });
 
-test("scripts contains no shell implementation", async () => {
+await test("scripts contains no shell implementation", async () => {
 	const entries = await readdir(import.meta.dirname, { recursive: true });
-	expect(entries.filter((path) => path.endsWith(".sh"))).toEqual([]);
+	assert.deepEqual(
+		entries.filter((path) => path.endsWith(".sh")),
+		[],
+	);
 });
 
-describe("E2E setup trust boundaries", () => {
+await describe("E2E setup trust boundaries", async () => {
 	const valid = {
 		E2E_GITLAB_PAT: "pat-secret",
 		E2E_LLM_KEY: "llm-secret",
@@ -155,23 +159,25 @@ describe("E2E setup trust boundaries", () => {
 		E2E_LLM_PRICE_NOTE: "internal test credits",
 	};
 
-	test("accepts credentials only from the environment", () => {
+	await test("accepts credentials only from the environment", () => {
 		const config = loadConfig(valid, []);
-		expect(config.pat).toBe("pat-secret");
-		expect(config.llmKey).toBe("llm-secret");
-		expect(() => loadConfig(valid, ["--llm-key", "leak"])).toThrow("invalid argument");
+		assert.equal(config.pat, "pat-secret");
+		assert.equal(config.llmKey, "llm-secret");
+		assert.throws(() => loadConfig(valid, ["--llm-key", "leak"]), /invalid argument/);
 	});
 
-	test("rejects non-loopback app and database endpoints", () => {
-		expect(() => loadConfig({ ...valid, E2E_APP_URL: "https://public.example" }, [])).toThrow(
-			"loopback",
+	await test("rejects non-loopback app and database endpoints", () => {
+		assert.throws(
+			() => loadConfig({ ...valid, E2E_APP_URL: "https://public.example" }, []),
+			/loopback/,
 		);
-		expect(() =>
-			loadConfig({ ...valid, E2E_DB_URL: "postgresql://secret@db.example/app" }, []),
-		).toThrow("loopback");
+		assert.throws(
+			() => loadConfig({ ...valid, E2E_DB_URL: "postgresql://secret@db.example/app" }, []),
+			/loopback/,
+		);
 	});
 
-	test("diagnostics never contain credential values", () => {
+	await test("diagnostics never contain credential values", () => {
 		for (const env of [
 			{ ...valid, E2E_LLM_PRICING_MODE: "invalid" },
 			{ ...valid, E2E_REPO: "bad;repo" },
@@ -182,9 +188,9 @@ describe("E2E setup trust boundaries", () => {
 			} catch (error) {
 				diagnostic = error instanceof Error ? error.message : String(error);
 			}
-			expect(diagnostic).toBeDefined();
-			expect(diagnostic).not.toContain("pat-secret");
-			expect(diagnostic).not.toContain("llm-secret");
+			assert.ok(diagnostic);
+			assert.ok(!diagnostic.includes("pat-secret"));
+			assert.ok(!diagnostic.includes("llm-secret"));
 		}
 	});
 });

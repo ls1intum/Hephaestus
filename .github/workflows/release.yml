@@ -272,7 +272,7 @@ jobs:
                 -o "syft-json=evidence/$image-$suffix.syft.json" \
                 -o "spdx-json=evidence/$image-$suffix.spdx.json" \
                 -o "cyclonedx-json=evidence/$image-$suffix.cdx.json"
-              bun scripts/check-release-sbom.ts \
+              node scripts/check-release-sbom.ts \
                 "evidence/$image-$suffix.syft.json" \
                 "evidence/$image-$suffix.spdx.json" \
                 "evidence/$image-$suffix.cdx.json" \
@@ -282,7 +282,7 @@ jobs:
               jq -e --arg ref "$platform_ref" \
                 '.ArtifactName == $ref and (.Results | type == "array")' \
                 "evidence/$image-$suffix.license.json" >/dev/null
-              bun scripts/check-release-vulnerabilities.ts "$image" "$platform" "$platform_digest" "$repository" \
+              node scripts/check-release-vulnerabilities.ts "$image" "$platform" "$platform_digest" "$repository" \
                 "evidence/$image-$suffix.trivy.json" security/vulnerability-policy.json \
                 "evidence/$image-$suffix.policy.json"
               if [ "$provenance" = first-party ]; then
@@ -356,7 +356,7 @@ jobs:
                   indexDigest: .[0].indexDigest,
                   platforms: (map({key: .platform, value: .digest}) | from_entries)})}' \
             evidence/manifest.json > "$ASSET"
-          bun scripts/release-image-lock.ts "$ASSET" evidence/manifest.json \
+          node scripts/release-image-lock.ts "$ASSET" evidence/manifest.json \
             "v${VERSION}" /tmp/release-lock.env
           echo "asset-path=$ASSET" >> "$GITHUB_OUTPUT"
           jq . "$ASSET"
@@ -457,7 +457,7 @@ jobs:
             --certificate-identity 'https://github.com/ls1intum/Hephaestus/.github/workflows/release.yml@refs/heads/main' \
             --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
             "evidence/$lock"
-          bun scripts/release-image-lock.ts "evidence/$lock" evidence/manifest.json \
+          node scripts/release-image-lock.ts "evidence/$lock" evidence/manifest.json \
             "$TAG_NAME" /tmp/release-lock.env
           jq -e --slurpfile inventory evidence/release-images.json \
             '.schemaVersion == 1 and
@@ -468,7 +468,7 @@ jobs:
           jq -er '.subjects[] | [.image, .platform, .digest, .repository, .provenance] | @tsv' evidence/manifest.json |
           while IFS=$'\t' read -r image platform digest repository provenance; do
             suffix=${platform//\//-}
-            bun scripts/check-release-sbom.ts \
+            node scripts/check-release-sbom.ts \
               "evidence/$image-$suffix.syft.json" \
               "evidence/$image-$suffix.spdx.json" \
               "evidence/$image-$suffix.cdx.json" \
@@ -480,7 +480,7 @@ jobs:
             jq -e --arg ref "$repository@$digest" \
               '.ArtifactName == $ref and (.Results | type == "array")' \
               "evidence/$image-$suffix.license.json" >/dev/null
-            bun scripts/check-release-vulnerabilities.ts "$image" "$platform" "$digest" "$repository" \
+            node scripts/check-release-vulnerabilities.ts "$image" "$platform" "$digest" "$repository" \
               "evidence/$image-$suffix.trivy.json" evidence/vulnerability-policy.json \
               /tmp/policy.json
             cmp "evidence/$image-$suffix.policy.json" /tmp/policy.json
