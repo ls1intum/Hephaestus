@@ -191,13 +191,14 @@ const config: Config = {
 				},
 				{
 					href: "https://github.com/ls1intum/Hephaestus",
-					label: "GitHub",
 					position: "right",
+					className: "navbarGithubLink",
+					"aria-label": "Hephaestus on GitHub",
 				},
 			],
 		},
 		footer: {
-			style: "dark",
+			style: "light",
 			links: [
 				{
 					title: "Product",
@@ -205,6 +206,10 @@ const config: Config = {
 						{
 							label: "User Guide",
 							to: "/user/overview",
+						},
+						{
+							label: "Admin Guide",
+							to: "/admin/overview",
 						},
 						{
 							label: "Release Notes",
@@ -234,15 +239,6 @@ const config: Config = {
 					],
 				},
 				{
-					title: "Admin",
-					items: [
-						{
-							label: "Admin Guide",
-							to: "/admin/overview",
-						},
-					],
-				},
-				{
 					title: "Project",
 					items: [
 						{
@@ -264,7 +260,7 @@ const config: Config = {
 					],
 				},
 			],
-			copyright: `Hephaestus is an MIT-licensed open-source project developed by Applied Education Technologies at the Technical University of Munich.`,
+			copyright: `Built by <a href="https://github.com/ls1intum">AET Team</a> at <a href="https://www.tum.de/en/">TUM</a>. Source on <a href="https://github.com/ls1intum/Hephaestus">GitHub</a>.`,
 		},
 		announcementBar: {
 			id: "pre-1-0",
@@ -283,8 +279,8 @@ const config: Config = {
 			maxHeadingLevel: 4,
 		},
 		prism: {
-			theme: prismThemes.github,
-			darkTheme: prismThemes.dracula,
+			theme: prismThemes.vsLight,
+			darkTheme: prismThemes.vsDark,
 			additionalLanguages: ["bash", "json", "yaml", "java"],
 		},
 	} satisfies Preset.ThemeConfig,

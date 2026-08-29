@@ -24,31 +24,11 @@
 	flex-direction: column;
 	gap: 1rem;
 	padding: 2rem;
-	border-radius: 20px;
+	border-radius: var(--ifm-global-radius);
 	background: var(--ifm-card-background-color);
 	border: 1px solid var(--ifm-toc-border-color);
-	box-shadow: 0 20px 50px rgba(15, 23, 42, 0.1);
 	position: relative;
-	overflow: hidden;
 	flex: 1;
-}
-
-.featureCard::after {
-	content: "";
-	position: absolute;
-	inset: -40% 40% 60% -40%;
-	background: radial-gradient(
-		circle,
-		color-mix(in srgb, var(--ifm-color-primary) 15%, transparent),
-		transparent 65%
-	);
-	pointer-events: none;
-	transform: rotate(-8deg);
-}
-
-.featureCard > * {
-	position: relative;
-	z-index: 1;
 }
 
 .kicker {

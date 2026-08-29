@@ -1,5 +1,5 @@
 .heroSection {
-	padding: 4.5rem 0 4rem;
+	padding: 3.5rem 0 2rem;
 	background: var(--ifm-background-color);
 	overflow: hidden;
 }
@@ -87,7 +87,7 @@
 }
 
 .quickstartSection {
-	padding: 4.5rem 0 5rem;
+	padding: 3.5rem 0 4rem;
 }
 
 .quickstartHeader {
@@ -117,12 +117,11 @@
 	position: relative;
 	display: flex;
 	flex-direction: column;
-	justify-content: space-between;
-	gap: 1.1rem;
+	justify-content: flex-start;
+	gap: 0.5rem;
 	padding: 1.85rem;
 	border: 1px solid var(--ifm-toc-border-color);
-	border-radius: 16px;
-	box-shadow: 0 18px 40px color-mix(in srgb, var(--ifm-font-color-base) 8%, transparent);
+	border-radius: var(--ifm-global-radius);
 	text-decoration: none;
 	color: inherit;
 	background: var(--ifm-card-background-color);
@@ -133,14 +132,8 @@
 }
 
 .quickstartCard:hover {
-	transform: translateY(-4px);
-	border-color: var(--ifm-color-primary);
-	box-shadow: 0 22px 44px color-mix(in srgb, var(--ifm-font-color-base) 14%, transparent);
-}
-
-.quickstartCard {
-	justify-content: flex-start;
-	gap: 0.5rem;
+	transform: translateY(-2px);
+	border-color: color-mix(in oklab, var(--ifm-color-primary) 45%, var(--ifm-toc-border-color));
 }
 
 .quickstartAudience {

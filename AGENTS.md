@@ -2,9 +2,14 @@
 
 **⚠️ Do NOT stage, commit, or push unless you have permission to do so.**
 
-Hephaestus reviews software practices for engineering teams: it ingests work from GitHub, GitLab,
-Slack and Outline, has an LLM agent observe it against a curated practice catalogue, and delivers
-feedback to the developer in-context, in a reflection page, or in conversation.
+Hephaestus is an open-source AI mentor for software teams. It reads the work developers already do
+in GitHub, GitLab, Slack and Outline against the engineering practices their project cares about — a
+curated catalog ships with it — and delivers practice feedback on the work itself, on the developer's
+own practice pages, or in conversation.
+
+`docs/contributor/practice-feedback-language.md` is the normative vocabulary and it binds this file
+too: the unit a review records is an **observation**, the unit a developer receives is **feedback**,
+and neither the application nor a review is an *agent*.
 
 - `server/` — Spring Boot 4 + Java 21 + Spring Modulith 2. Liquibase-managed PostgreSQL, SQL-layer
   multi-tenancy (`core/tenancy/`), generated `openapi.yaml`. Three runtime roles (`server`, `worker`,
@@ -189,10 +194,11 @@ as a Liquibase `<changeSet>` — a schema change needs both. Full flow:
 
 Each of these fails *quietly* — the command reports success and leaves you with a stale or wrong result.
 
-- **`generate:api:application-server:specs` exits 0 when the app never started.** It boots the server
-  to scrape springdoc, so a busy HTTP, management **or JMX** port means no spec is written and the exit
-  code is still 0 — you commit a spec missing your new endpoint. Pass free ports; the full recipe and
-  the default port numbers are in `server/AGENTS.md`.
+- **`generate:api:application-server:specs` needs three free ports.** It boots the server to scrape
+  springdoc, so a busy HTTP, management **or JMX** port fails the run. It fails loudly and restores
+  the previous spec rather than committing an empty one — `scripts/generate-openapi-spec.ts` — so the
+  cost is a wasted Maven cycle, not a wrong spec. The recipe and the default port numbers are in
+  `server/AGENTS.md` § OpenAPI generation ports.
 - **That script runs a full Maven `verify`.** On a cold cache the first run downloads the whole Spring
   Boot dependency tree; expect several minutes.
 - **`db:draft-changelog` needs Docker on PATH** and a running daemon.
