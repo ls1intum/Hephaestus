@@ -91,11 +91,11 @@ jobs:
           [ "$published" = "80 443 " ] || {
             echo "::error::reverse-proxy publishes '$published', expected '80 443 ' — !override was ignored"; exit 1; }
 
-      - name: Set up the repository's Bun version
-        uses: ./.github/actions/setup-bun
+      - name: Set up the repository's Node.js and pnpm versions
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Render the preview stack and assert it stays sandboxed
-        run: bun run check:preview-stack
+        run: pnpm run check:preview-stack
 
       - name: Render the reference deployment
         working-directory: docker

@@ -7,7 +7,7 @@ disable-model-invocation: true
 allowed-tools:
   - Bash(gh *)
   - Bash(git *)
-  - Bash(bun *)
+  - Bash(pnpm *)
   - Bash(./mvnw *)
   - Read
   - Grep
@@ -42,8 +42,8 @@ than guessing, and note the two shapes that surprise people:
 ## 3. Format, then check
 
 ```bash
-bun run format
-bun run check
+pnpm run format
+pnpm run check
 ```
 
 `check` is the complete local quality gate — every leg is listed under `check` in the root
@@ -57,9 +57,9 @@ Generated artefacts are never hand-edited, and regeneration is destructive — i
 directory first, so stash local edits.
 
 ```bash
-bun run generate:api          # controllers or DTOs changed: rewrites openapi.yaml AND webapp/src/api
-bun run db:draft-changelog    # entities changed (needs Docker); then prune the diff to real deltas
-bun run db:generate-erd-docs  # after any changelog change
+pnpm run generate:api          # controllers or DTOs changed: rewrites openapi.yaml AND webapp/src/api
+pnpm run db:draft-changelog    # entities changed (needs Docker); then prune the diff to real deltas
+pnpm run db:generate-erd-docs  # after any changelog change
 ```
 
 `generate:api:application-server:specs` **fails when a port it needs is busy** — HTTP, management, or
@@ -70,7 +70,7 @@ the cost is a wasted Maven cycle. Pass free ports; the exact invocation is in `s
 ## 5. Run the tests your diff can break
 
 ```bash
-bun run test:webapp
+pnpm run test:webapp
 cd server && ./mvnw -pl application -am test -Dsurefire.includedGroups=unit -T 2C --batch-mode -q
 ```
 
@@ -86,11 +86,11 @@ A PR touching `server/`, `webapp/` or `docker/` needs a `.changeset/*.md` or `ve
 fails it.
 
 ```bash
-bun changeset          # user-facing: pick the bump, write the summary in the operator's voice
-bun changeset --empty  # no user-facing effect; say why in the body
+pnpm changeset          # user-facing: pick the bump, write the summary in the operator's voice
+pnpm changeset --empty  # no user-facing effect; say why in the body
 ```
 
-`bun changeset` is interactive — with no TTY, hand-write `.changeset/<slug>.md` (`.changeset/README.md`
+`pnpm changeset` is interactive — with no TTY, hand-write `.changeset/<slug>.md` (`.changeset/README.md`
 has the shape). The summary lands in `CHANGELOG.md` verbatim, so it names what an operator or user can
 now do, not a class or a file. **Pre-1.0, never pick `major`** — it would cut 1.0.0 and the gate
 rejects it; a breaking change rides in `minor` with `**Operators:** …` in the summary and a

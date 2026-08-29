@@ -86,7 +86,7 @@ async function migrate(value: Config, diff = false, signal?: AbortSignal): Promi
 
 async function generateErd(value: Config): Promise<void> {
 	await run(
-		"bun",
+		"node",
 		[
 			"generate-mermaid-erd.ts",
 			"--jdbc-url",

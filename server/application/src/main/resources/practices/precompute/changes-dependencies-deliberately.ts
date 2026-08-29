@@ -96,15 +96,8 @@ function parseTomlDependency(line: string): { name: string; constraint: string }
 
 const ECOSYSTEMS: Ecosystem[] = [
 	{
-		// npm / yarn / pnpm / Bun
 		isManifest: (b) => b === "package.json",
-		lockfiles: [
-			"package-lock.json",
-			"yarn.lock",
-			"pnpm-lock.yaml",
-			"bun.lock",
-			"npm-shrinkwrap.json",
-		],
+		lockfiles: ["package-lock.json", "yarn.lock", "pnpm-lock.yaml", "npm-shrinkwrap.json"],
 		parse: (line) => {
 			// The value group matches empty (`"dep": ""`); the key group cannot, so its absence means the
 			// line is not a `"key": "value"` pair at all.

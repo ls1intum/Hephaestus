@@ -54,11 +54,11 @@ Before any release, code must pass:
 | Java formatting | Spotless + Palantir Java Format | Code style |
 | Java lint       | PMD         | Static analysis      |
 | Java nullness policy | NullAway policy scanner | Rejects suppressed analysis and empty source discovery |
-| Changeset policy | Bun test runner + Changesets | Tests release-note and version synchronization rules |
+| Changeset policy | Node test runner + Changesets | Tests release-note and version synchronization rules |
 | Webapp TypeScript | oxlint + oxfmt (`.oxfmtrc.json`) + tsc | Lint + format + typecheck |
 | Agent and repository-tooling files | oxlint + oxfmt + tsc | Lint, format, and typecheck where applicable |
 | Docs code and configuration | oxfmt | Format JavaScript, TypeScript, JSON/JSONC, and CSS |
-| Agent runtime   | Bun         | Runner and precompute specs on the version pinned by `package.json`; the package-manager contract rejects Docker image drift |
+| Agent runtime   | Node         | Runner and precompute specs on the version pinned by `package.json`; the package-manager contract rejects Docker image drift |
 
 ## 🔒 Security
 
@@ -295,7 +295,7 @@ profile options locally with:
 ```bash
 mkdir -p ci-metrics
 /usr/bin/time -v -o ci-metrics/server-integration-resource.txt \
-  bun run test:server:integration \
+  pnpm run test:server:integration \
   -DargLine=-XX:StartFlightRecording=filename=target/integration-profile.jfr,settings=profile,dumponexit=true \
   -Dlogging.level.org.springframework.test.context.cache=DEBUG
 ```
@@ -309,31 +309,31 @@ tiers that need more time or infrastructure.
 
 ```bash
 # Format and check all services
-bun run format && bun run check
+pnpm run format && pnpm run check
 ```
 
-When relevant to the change, also run `bun run build:webapp`,
-`bun run test:server:verification`, and the Docker-backed server integration suite. The pull request
+When relevant to the change, also run `pnpm run build:webapp`,
+`pnpm run test:server:verification`, and the Docker-backed server integration suite. The pull request
 workflow remains authoritative for its hosted jobs.
 
 ### Per-Service Commands
 
 ```bash
 # Webapp
-bun run check:webapp          # oxfmt format check, then oxlint
-bun run check:webapp:fix      # Same, applying every safe fix
-bun run typecheck:webapp      # A separate leg — check:webapp does not run it
-bun run test:webapp           # Unit tests
+pnpm run check:webapp          # oxfmt format check, then oxlint
+pnpm run check:webapp:fix      # Same, applying every safe fix
+pnpm run typecheck:webapp      # A separate leg — check:webapp does not run it
+pnpm run test:webapp           # Unit tests
 
 # Application Server (Java) — includes the integration.core.webhook receiver
-bun run format:java:check     # Check formatting
+pnpm run format:java:check     # Check formatting
 cd server && ./mvnw test       # Unit tests, including required reactor dependencies
 
-# Agent runtime (Bun) — the Pi runner and the practice precompute scripts
-bun run test:agents           # Runner + precompute specs
-bun run check:agents          # oxfmt check, then oxlint, then both typechecks
-bun run check:agents:fix      # Same, applying every safe fix
-bun run typecheck:agents      # Agent + precompute TypeScript
+# Agent runtime (Node) — the Pi runner and the practice precompute scripts
+pnpm run test:agents           # Runner + precompute specs
+pnpm run check:agents          # oxfmt check, then oxlint, then both typechecks
+pnpm run check:agents:fix      # Same, applying every safe fix
+pnpm run typecheck:agents      # Agent + precompute TypeScript
 ```
 
 `check:agents` formats the agent and tooling TypeScript trees, docs code, and selected repository
@@ -344,12 +344,12 @@ commands.
 
 | Issue                 | Solution                                      |
 | --------------------- | --------------------------------------------- |
-| Formatting errors     | Run `bun run format`                          |
-| Lint errors (agent runtime, precompute, `scripts/`) | Run `bun run check:agents:fix`, then fix what remains |
-| TypeScript errors     | Run `bun run typecheck` to see details        |
+| Formatting errors     | Run `pnpm run format`                          |
+| Lint errors (agent runtime, precompute, `scripts/`) | Run `pnpm run check:agents:fix`, then fix what remains |
+| TypeScript errors     | Run `pnpm run typecheck` to see details        |
 | Test failures         | Check the specific test output for details    |
-| OpenAPI out of sync   | Run `bun run generate:api`                    |
-| Database schema drift | Run `bun run db:draft-changelog`              |
+| OpenAPI out of sync   | Run `pnpm run generate:api`                    |
+| Database schema drift | Run `pnpm run db:draft-changelog`              |
 
 ## 📊 CI Features
 
@@ -399,8 +399,8 @@ filters: |
   new-service:
     - 'server/new-service/**'
     - 'package.json'
-    - 'bun.lock'
-    - 'bunfig.toml'
+    - 'pnpm-lock.yaml'
+    - 'pnpm-workspace.yaml'
 ```
 
 Update the `any-code` aggregate output to include the new service.
@@ -444,9 +444,9 @@ new-service-unit:
     - uses: actions/checkout@<full-commit-sha> # vX.Y.Z
       with:
         persist-credentials: false
-    - uses: ./.github/actions/setup-bun
+    - uses: ./.github/actions/setup-node-pnpm
     - name: Run unit tests
-      run: bun run test:new-service:unit
+      run: pnpm run test:new-service:unit
     - name: Upload test results
       if: always()
       uses: dorny/test-reporter@<full-commit-sha> # vX.Y.Z

@@ -38,7 +38,7 @@ public record UpdatePracticeRequestDTO(
         @Size(
                 max = PracticeDefinition.MAX_PRECOMPUTE_SCRIPT_LENGTH,
                 message = "Precompute script must be at most 100000 characters")
-        @Schema(description = "TypeScript/Bun static analysis run before automated review")
+        @Schema(description = "TypeScript/Node static analysis run before automated review")
         @Nullable
         String precomputeScript,
 

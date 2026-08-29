@@ -22,18 +22,18 @@ jobs:
       - name: "Checkout repository"
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Setup Bun
-        uses: ./.github/actions/setup-bun
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: "Install dependencies"
-        run: bun install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: "Validate PR title with commitlint"
         id: commitlint
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          echo "$PR_TITLE" | bun run commitlint 2>&1 | tee /tmp/commitlint-output.txt
+          echo "$PR_TITLE" | pnpm run commitlint 2>&1 | tee /tmp/commitlint-output.txt
           exit_code=${PIPESTATUS[1]}
 
           {

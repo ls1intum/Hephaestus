@@ -8,7 +8,7 @@
 		"start": "vite",
 		"build": "vite build && tsc",
 		"serve": "vite preview",
-		"test": "vitest run --exclude 'tools/oxlint/rules/**' --maxWorkers=4 && bun run test:lint-rules",
+		"test": "vitest run --exclude 'tools/oxlint/rules/**' --maxWorkers=4 && pnpm run test:lint-rules",
 		"test:watch": "vitest --exclude 'tools/oxlint/rules/**' --maxWorkers=4",
 		"test:coverage": "vitest run --coverage --exclude 'tools/oxlint/rules/**' --maxWorkers=4",
 		"test:lint-rules": "vitest run tools/oxlint/rules --maxWorkers=1 --outputFile.junit=./test-results/junit-webapp-lint-rules.xml",

@@ -10,15 +10,15 @@ are not here: write code that reads like the file you are editing.
 
 ## Local development loop
 
-`bun run dev` from the repo root launches `mprocs` with server and webapp in separate panes and brings up
-the Postgres container. For plain terminals: `bun run dev:server` and `bun run dev:webapp`.
+`pnpm run dev` from the repo root launches `mprocs` with server and webapp in separate panes and brings up
+the Postgres container. For plain terminals: `pnpm run dev:server` and `pnpm run dev:webapp`.
 
 - **No devtools.** Hot reload is JVM HotSwap via the IDE — IntelliJ's Spring Boot run config with
   *Update Classes and Resources* on save. Method-body edits reload; signature changes, new methods and
   `@Configuration` edits need a full restart
   ([ref](https://docs.spring.io/spring-boot/how-to/hotswapping.html)).
 - **`ddl-auto: validate`** locally — Liquibase owns DDL. If the validator fails on boot your DB has
-  drifted: `bun run dev:reset`. The Postgres folder is **bind-mounted**, so `docker compose down -v` alone
+  drifted: `pnpm run dev:reset`. The Postgres folder is **bind-mounted**, so `docker compose down -v` alone
   does not clear it.
 - **`BufferingApplicationStartup`** is wired in `Application.main()`. With `app.profiles=local`,
   `GET /actuator/startup` returns the timeline; `StartupBudgetIntegrationTest` catches per-step
@@ -30,13 +30,13 @@ Each of these can leave you with the wrong result.
 
 - **Use the reactor.** `server/generated-clients` owns every GraphQL and Outline generator and
   `server/application` consumes its JAR. From the repository root, use
-  `bun run test:server:unit` after a fresh checkout or generated-client input change. For the repeated
+  `pnpm run test:server:unit` after a fresh checkout or generated-client input change. For the repeated
   application-edit loop, use `./mvnw -f application/pom.xml test` from `server/` (and
   `-Dtest=ClassName` to focus a test) so Maven does not restore the generated module and invalidate
   application incremental compilation.
 - **`-Dgroups=architecture` silently runs the unit suite instead.** `pom.xml` sets Surefire's `<groups>`
   to `${surefire.includedGroups}`, and a POM element beats the `-Dgroups` user property — so the flag is
-  discarded and the default (`unit`) runs. Use `bun run test:server:architecture`; CI passes the
+  discarded and the default (`unit`) runs. Use `pnpm run test:server:architecture`; CI passes the
   `${surefire.includedGroups}` property that the POM reads.
 - **`clean` does not guarantee a cold build.** It removes workspace outputs, but Maven Build Cache can
   restore them. The repository enables the cache for `generated-clients`; Maven logs `Found cached
@@ -56,8 +56,8 @@ Each of these can leave you with the wrong result.
 spec if Maven does not produce a new one. Never stop another service to free a port; override:
 
 ```bash
-MANAGEMENT_PORT=0 bun run generate:api:application-server:specs -- -Dopenapi.server.port=38111 -Dopenapi.jmx.port=9031
-bun run generate:api:application-server:client
+MANAGEMENT_PORT=0 pnpm run generate:api:application-server:specs -- -Dopenapi.server.port=38111 -Dopenapi.jmx.port=9031
+pnpm run generate:api:application-server:client
 ```
 
 ## Boundaries
@@ -80,16 +80,16 @@ excluded. Every new package needs a `package-info.java` containing
 `NullAway` suppressions. Use `@Nullable` only for genuine absence and place it on the precise type:
 `List<@Nullable String>` permits null elements; `String @Nullable []` permits a null array reference.
 Fix violations at the contract or implementation boundary. In tests, refine a nullable result once
-before using it rather than adding duplicate assertions. Run `bun run test:server:unit` after changing
+before using it rather than adding duplicate assertions. Run `pnpm run test:server:unit` after changing
 a nullness contract.
 
 ## Test tiers
 
 | Tag | Runs | Command |
 |---|---|---|
-| `unit` | no Spring context | `bun run test:server:unit` |
-| `architecture` | ArchUnit + Modulith verification | `bun run test:server:architecture` |
-| `integration` | full context + Testcontainers | `bun run test:server:integration` |
+| `unit` | no Spring context | `pnpm run test:server:unit` |
+| `architecture` | ArchUnit + Modulith verification | `pnpm run test:server:architecture` |
+| `integration` | full context + Testcontainers | `pnpm run test:server:integration` |
 | `live` | real GitHub API | `./mvnw test -Plive-tests` |
 
 Live tests need GitHub App credentials in `application-live-local.yml` (gitignored); the Maven profile
@@ -120,7 +120,7 @@ or on "the only" result, and never write cleanup that another test depends on ha
   obsolete). Never delete one whose effect is not enforced elsewhere. Released changelogs are otherwise
   immutable and CI-enforced — root `AGENTS.md` § Database changes.
 - **The changelog is untested by the suite.** Tests run against `ddl-auto: create`, so a broken
-  changelog passes every tier. Use `bun run db:draft-changelog` to validate the migration history
+  changelog passes every tier. Use `pnpm run db:draft-changelog` to validate the migration history
   against the repository-managed PostgreSQL container; discard the draft when no schema change is
   intended.
 - **A native `@Query` may not contain an apostrophe inside a `--` comment.** Hibernate reads it as the
@@ -163,11 +163,11 @@ or on "the only" result, and never write cleanup that another test depends on ha
 ## Schema changes
 
 1. Modify the JPA entities.
-2. `bun run db:draft-changelog`, then prune the diff to the real deltas.
+2. `pnpm run db:draft-changelog`, then prune the diff to the real deltas.
 3. Rename to `<epoch-ms-timestamp>_changelog.xml`; `changeSet` ids are `<timestamp>-1`, `-2`, …
    One consolidated changelog per branch. Full rules in root `AGENTS.md` § Database changes.
-4. `bun run db:generate-erd-docs`.
-5. `bun changeset` — a user-facing summary. Touching `db/changelog/` without touching `.changeset/`
+4. `pnpm run db:generate-erd-docs`.
+5. `pnpm changeset` — a user-facing summary. Touching `db/changelog/` without touching `.changeset/`
    is always wrong. These are two unrelated things both called "changeset".
 
 ## Webhook receiver

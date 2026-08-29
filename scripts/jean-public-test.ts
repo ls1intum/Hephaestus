@@ -363,7 +363,7 @@ async function seedStatus(): Promise<void> {
 
 async function start(): Promise<void> {
 	if (process.env.HEPHAESTUS_PUBLIC_TEST_SKIP_WEBAPP_BUILD !== "true")
-		await run("bun", ["run", "build:webapp"], { cwd: root });
+		await run("pnpm", ["run", "build:webapp"], { cwd: root });
 	await writeConfigs();
 	await succeeds("docker", ["rm", "-f", container]);
 	await run("docker", [

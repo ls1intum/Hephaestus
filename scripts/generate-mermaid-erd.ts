@@ -480,7 +480,7 @@ class MermaidErdGenerator {
 			"erDiagram",
 			"    %% Generated automatically from PostgreSQL database schema",
 			"    %% using scripts/generate-mermaid-erd.ts",
-			"    %% To regenerate: bun run db:generate-erd-docs",
+			"    %% To regenerate: pnpm run db:generate-erd-docs",
 			"",
 			"    direction LR",
 			"",

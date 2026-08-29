@@ -32,7 +32,7 @@ await test("combines independent workspaces", () => {
 	]);
 });
 
-await test("selects the Bun runtime and precompute trees", () => {
+await test("selects the Node runtime and precompute trees", () => {
 	assert.deepEqual(
 		scopesFor([
 			"server/application/src/main/resources/agent/main.ts",
@@ -49,10 +49,10 @@ await test("selects documentation changes", () => {
 
 await test("maps scopes to the documented commands", () => {
 	assert.deepEqual(commandsFor(["agents", "docs", "server", "webapp"]), [
-		["bun", "run", "check:agent-runtime"],
-		["bun", "run", "check:docs"],
-		["bun", "run", "check:server:affected"],
-		["bun", "run", "check:webapp:affected"],
+		["pnpm", "run", "check:agent-runtime"],
+		["pnpm", "run", "check:docs"],
+		["pnpm", "run", "check:server:affected"],
+		["pnpm", "run", "check:webapp:affected"],
 	]);
 });
 
@@ -76,7 +76,7 @@ await test("fails closed for shared, generated, contract, tooling, and unknown i
 
 await test("a full-gate input overrides scoped inputs", () => {
 	assert.deepEqual(scopesFor(["webapp/src/a.tsx", "package.json"]), ["full"]);
-	assert.deepEqual(commandsFor(["full"]), [["bun", "run", "check"]]);
+	assert.deepEqual(commandsFor(["full"]), [["pnpm", "run", "check"]]);
 });
 
 await test("discovers committed, staged, unstaged, untracked, deleted, and renamed paths", async () => {

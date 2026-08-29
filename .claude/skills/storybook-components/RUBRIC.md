@@ -2,7 +2,7 @@
 
 Scope: `webapp/src/components/**` and their colocated `*.stories.tsx`. **Grade a diff, not the repo.**
 
-**Calibration contract.** A file that renders correctly, is formatted, passes `bun run check`, has a
+**Calibration contract.** A file that renders correctly, is formatted, passes `pnpm run check`, has a
 story per variant and a green a11y panel scores **C**. C is the floor for competent work, not a
 criticism. B costs deliberate design. A costs a rejected alternative written down. A+ is rare by
 construction — at most one dimension per PR should reach it.
@@ -192,7 +192,7 @@ Nearly every file carries `tags: ["autodocs"]`, so a JSDoc block above `meta` or
   (`webapp/src/components/admin/practice-catalog/SortableCatalogTree.stories.tsx` — the stories render
   a harness).
 
-`bun scripts/check-story-prose.ts` gates `<p>` only. For the D band there is no gate — it is a review
+`node scripts/check-story-prose.ts` gates `<p>` only. For the D band there is no gate — it is a review
 question: *delete this block; is anything lost?* Rather less than half the files carry a meta JSDoc and
 rather less than half the stories carry one, so the absence of a block is not by itself a finding.
 
@@ -201,7 +201,7 @@ rather less than half the stories carry one, so the absence of a block is not by
 - **D** — A new rule added to prose that contradicts existing code, with no migration and no gate.
 - **C** — Rule in prose, no gate.
 - **B** — Rule in prose plus a mechanical check — an oxlint rule in `webapp/tools/oxlint/rules/`, or a
-  repository gate in `scripts/` wired into `bun run check`.
+  repository gate in `scripts/` wired into `pnpm run check`.
 - **A** — B, and the gate's own comment explains the neighbouring shapes it deliberately does *not*
   match, so nobody widens it into a nuisance — the house rules in `webapp/tools/oxlint/rules/` are the
   worked examples.

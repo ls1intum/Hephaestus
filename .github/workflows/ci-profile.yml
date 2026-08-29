@@ -21,7 +21,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: ./.github/actions/setup-bun
+      - uses: ./.github/actions/setup-node-pnpm
 
       - uses: ./.github/actions/setup-caches
         with:
@@ -40,7 +40,7 @@ jobs:
         run: |
           mkdir -p ci-metrics
           /usr/bin/time -v -o ci-metrics/server-integration-resource.txt \
-            bun run test:server:integration \
+            pnpm run test:server:integration \
             -DargLine=-XX:StartFlightRecording=filename=target/integration-profile.jfr,settings=profile,dumponexit=true \
             -Dlogging.level.org.springframework.test.context.cache=DEBUG \
             2>&1 | tee ci-metrics/server-integration.log
@@ -49,7 +49,7 @@ jobs:
         if: always()
         continue-on-error: true
         run: >-
-          bun run summarize:test-results "Server Integration Profile"
+          pnpm run summarize:test-results "Server Integration Profile"
           server/application/target/surefire-reports ci-metrics/server-integration-profile.json
           ci-metrics/server-integration.log ci-metrics/server-integration-resource.txt
 

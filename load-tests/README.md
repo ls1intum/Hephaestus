@@ -25,7 +25,7 @@ both service objectives and saturation, following Google's SLO guidance
 Use the digest-pinned k6 image:
 
 ```bash
-bun run test:load:syntax
+pnpm run test:load:syntax
 ```
 
 ```bash

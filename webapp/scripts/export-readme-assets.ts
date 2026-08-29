@@ -107,8 +107,8 @@ async function capture(
 await rm(outputDirectory, { recursive: true, force: true });
 await mkdir(outputDirectory, { recursive: true });
 const storybook = spawn(
-	"bun",
-	["run", "storybook:dev", "--", "--port", String(port), "--ci", "--host", "127.0.0.1"],
+	"pnpm",
+	["run", "storybook:dev", "--port", String(port), "--ci", "--host", "127.0.0.1"],
 	{
 		cwd: webappDirectory,
 		stdio: "ignore",

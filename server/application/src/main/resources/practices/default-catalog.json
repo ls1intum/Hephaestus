@@ -807,8 +807,6 @@
 											"**/package-lock.json",
 											"**/pnpm-lock.yaml",
 											"**/yarn.lock",
-											"**/bun.lock",
-											"**/bun.lockb",
 											"**/npm-shrinkwrap.json",
 											"**/pom.xml",
 											"**/build.gradle",

@@ -354,7 +354,7 @@
 		// Same shape, plus `renderPageLink`: the `<a>`'s content comes from whoever renders it.
 		"jsx-a11y/anchor-has-content": "off",
 		// Both want ES2023 `toSorted`/`toReversed`, which this package's `tsconfig.json` does not declare
-		// — its `lib` is `ES2022`. (The Bun trees are on `ES2023`, so this reason does not travel to the
+		// — its `lib` is `ES2022`. (The Node trees are on `ES2023`, so this reason does not travel to the
 		// root config.) Copy before sorting an array a caller can observe — that mutation is the bug they
 		// describe.
 		"unicorn/no-array-sort": "off",

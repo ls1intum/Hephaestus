@@ -1,4 +1,4 @@
-// markdownlint configuration for the docs tree. Run by `bun run --filter docs lint:md`.
+// markdownlint configuration for the docs tree. Run by `pnpm --filter docs run lint:md`.
 //
 // This file holds BOTH the scope (`globs`/`ignores`) and the rules (`config`), because
 // markdownlint-cli2 does not support `.markdownlintignore` (see its README, "not supported"),
@@ -6,7 +6,7 @@
 //
 // Every rule turned off below states why it is wrong for this tree, not merely how loud it is.
 // Violation counts are deliberately absent: they rot within a release. To see what one costs, set
-// it to `true` here and run `bun run --filter docs lint:md`. Note that `--config` will NOT do
+// it to `true` here and run `pnpm --filter docs run lint:md`. Note that `--config` will NOT do
 // this — a `.markdownlint-cli2.jsonc` in the linted directory overrides the file you pass, so the
 // probe reads as zero findings. Edit this file and put it back.
 //

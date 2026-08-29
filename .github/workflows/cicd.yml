@@ -65,8 +65,8 @@ jobs:
               - 'scripts/check-story-prose.ts'
               - 'scripts/check-story-sort.ts'
               - 'package.json'
-              - 'bun.lock'
-              - 'bunfig.toml'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
             webapp-image:
               - 'patches/**'
               - 'webapp/public/**'
@@ -79,12 +79,12 @@ jobs:
               - 'webapp/vite.shared.ts'
               - 'docs/package.json'
               - 'package.json'
-              - 'bun.lock'
-              - 'bunfig.toml'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
             application-server:
               - 'server/**'
               - 'package.json'
-              - 'bun.lock'
+              - 'pnpm-lock.yaml'
               - 'scripts/run-mvnw.ts'
               # check:env validates these deployment inputs against application.yml.
               - 'docker/compose.app.yaml'
@@ -102,7 +102,8 @@ jobs:
               - '.oxlintrc.json'
               - '.oxfmtrc.json'
               - 'package.json'
-              - 'bun.lock'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
               - '.changeset/**'
               - 'commitlint.config.ts'
               - '.github/scripts/**'
@@ -138,12 +139,12 @@ jobs:
               - 'server/compose.yaml'
               - 'docker/postgres/**'
               - 'package.json'
-              - 'bun.lock'
-              - 'bunfig.toml'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
               - '.github/workflows/cicd.yml'
               - '.github/workflows/ci-tests.yml'
               - '.github/actions/setup-caches/**'
-              - '.github/actions/setup-bun/**'
+              - '.github/actions/setup-node-pnpm/**'
             agent-images:
               - 'docker/agents/**'
             postgres-image:
@@ -428,17 +429,17 @@ jobs:
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "| Issue | Fix Command |" >> $GITHUB_STEP_SUMMARY
               echo "|-------|-------------|" >> $GITHUB_STEP_SUMMARY
-              echo "| Formatting errors | \`bun run format\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| TypeScript errors | \`bun run typecheck\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Lint errors (webapp) | \`bun run check:webapp:fix\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Lint errors (outside webapp) | \`bun run check:agents:fix\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Java formatting | \`bun run format:java\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Java lint (PMD) | \`bun run lint:java:report\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Storybook sidebar order | \`bun run check:story-sort\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Mermaid diagram parse errors | \`bun run check:diagrams\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Stale \`routeTree.gen.ts\` | \`cd webapp && bun run build\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| OpenAPI out of sync | \`bun run generate:api\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Database schema drift | \`bun run db:draft-changelog\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Formatting errors | \`pnpm run format\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| TypeScript errors | \`pnpm run typecheck\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Lint errors (webapp) | \`pnpm run check:webapp:fix\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Lint errors (outside webapp) | \`pnpm run check:agents:fix\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Java formatting | \`pnpm run format:java\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Java lint (PMD) | \`pnpm run lint:java:report\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Storybook sidebar order | \`pnpm run check:story-sort\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Mermaid diagram parse errors | \`pnpm run check:diagrams\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Stale \`routeTree.gen.ts\` | \`cd webapp && pnpm run build\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| OpenAPI out of sync | \`pnpm run generate:api\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Database schema drift | \`pnpm run db:draft-changelog\` |" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "</details>" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
@@ -449,8 +450,8 @@ jobs:
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "| Test Suite | Run Locally |" >> $GITHUB_STEP_SUMMARY
               echo "|------------|-------------|" >> $GITHUB_STEP_SUMMARY
-              echo "| Webapp unit | \`bun run test:webapp\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Webapp Storybook | \`bun run --filter webapp test:storybook\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Webapp unit | \`pnpm run test:webapp\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Webapp Storybook | \`pnpm --filter webapp run test:storybook\` |" >> $GITHUB_STEP_SUMMARY
               echo "| Application server | \`cd server && ./mvnw test\` |" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "**Tip:** Check the **Test Results** tab above for specific failures." >> $GITHUB_STEP_SUMMARY
@@ -462,7 +463,7 @@ jobs:
             if [[ "${{ needs.Changesets.result }}" == "failure" ]]; then
               echo "<details><summary><b>❌ Changesets Failed</b></summary>" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
-              echo "Run \`bun run check:changesets\` for policy-test failures; otherwise correct the changeset reported by the job." >> $GITHUB_STEP_SUMMARY
+              echo "Run \`pnpm run check:changesets\` for policy-test failures; otherwise correct the changeset reported by the job." >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
               echo "</details>" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
@@ -493,7 +494,7 @@ jobs:
 
             echo "---" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Quick fix:** Run \`bun run format && bun run check\` before pushing." >> $GITHUB_STEP_SUMMARY
+            echo "**Quick fix:** Run \`pnpm run format && pnpm run check\` before pushing." >> $GITHUB_STEP_SUMMARY
           fi
 
           if [[ "${{ steps.evaluate.outputs.status }}" == "success" ]]; then

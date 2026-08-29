@@ -54,7 +54,7 @@ jobs:
           ref: ${{ steps.lock.outputs.commit }}
           persist-credentials: false
 
-      - uses: ./.github/actions/setup-bun
+      - uses: ./.github/actions/setup-node-pnpm
 
       - name: Validate and render release topology
         env:

@@ -31,7 +31,7 @@ public record PracticeDTO(
         @NonNull @Schema(description = "Practice review criteria")
         String criteria,
 
-        @Nullable @Schema(description = "TypeScript/Bun precompute script for static analysis before AI review")
+        @Nullable @Schema(description = "TypeScript/Node precompute script for static analysis before AI review")
         String precomputeScript,
 
         @NonNull PracticeAutomatedReviewPolicy automatedReviewPolicy,

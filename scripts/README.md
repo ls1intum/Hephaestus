@@ -3,8 +3,7 @@
 The Node.js version pinned in `package.json#devEngines.runtime` executes these TypeScript utilities
 using native type stripping.
 
-Most scripts require `bun install` at the repository root. Jean setup performs that installation; the
-lockfile qualifier intentionally starts from a clean dependency tree.
+Most scripts require `pnpm install` at the repository root. Jean setup performs that installation.
 
 ## Available Scripts
 
@@ -16,11 +15,11 @@ Substantive developer orchestration under `scripts/` uses typed Node.js entry po
 
 | Command | Purpose |
 | --- | --- |
-| `bun run check:ports` | Validate configured local ports and report listeners. |
-| `bun run db:draft-changelog` | Rebuild a disposable database and generate a Liquibase diff. |
-| `bun run db:generate-erd-docs` | Apply migrations and regenerate the Mermaid ERD. |
-| `bun run e2e:setup -- <options>` | Configure a local E2E workspace against the selected SCM and model provider. Secrets are environment-only. |
-| `bun run jean:public-test -- <command>` | Manage the machine-local public test route. |
+| `pnpm run check:ports` | Validate configured local ports and report listeners. |
+| `pnpm run db:draft-changelog` | Rebuild a disposable database and generate a Liquibase diff. |
+| `pnpm run db:generate-erd-docs` | Apply migrations and regenerate the Mermaid ERD. |
+| `pnpm run e2e:setup -- <options>` | Configure a local E2E workspace against the selected SCM and model provider. Secrets are environment-only. |
+| `pnpm run jean:public-test -- <command>` | Manage the machine-local public test route. |
 
 The database commands require Docker with the Compose plugin.
 
@@ -30,9 +29,6 @@ directory, and `server/.env`.
 
 Jean runs `node "$JEAN_ROOT_PATH/scripts/jean-setup.ts"` from a new worktree to copy machine-local
 configuration and install dependencies. It is not a general contributor command.
-
-`bun run qualify:bun-lockfile -- 25` is a maintainer and CI diagnostic. Each iteration removes the
-root, webapp, and docs `node_modules` directories before reinstalling with the frozen lockfile.
 
 **ERD generation environment variables:**
 
@@ -51,7 +47,7 @@ Rewrite `server/application/src/main/resources/achievements/achievements.yml` in
 [Achievements](../docs/contributor/achievements.mdx).
 
 ```bash
-bun run format:achievements
+pnpm run format:achievements
 ```
 
 ### NATS Webhook Example Extraction
@@ -59,9 +55,9 @@ bun run format:achievements
 Extract webhook payloads from NATS JetStream for test fixtures:
 
 ```bash
-bun run nats:extract-examples
+pnpm run nats:extract-examples
 # With options:
-bun run nats:extract-examples -- --event push --event pull_request:opened
+pnpm run nats:extract-examples -- --event push --event pull_request:opened
 ```
 
 **Environment variables:**
@@ -86,8 +82,8 @@ bun run nats:extract-examples -- --event push --event pull_request:opened
 The retained shell files run where shell is already part of the runtime:
 
 - `.husky/_/husky.sh` is Husky's generated, minimal Git-hook bootstrap.
-- `docker/self-host/setup.sh` bootstraps an operator installation before Bun is available; its test
+- `docker/self-host/setup.sh` bootstraps an operator installation before the repository toolchain is available; its test
   orchestration is typed TypeScript under `scripts/`.
-- `webapp/docker/entrypoint.sh` prepares assets in the final nginx image, which does not contain Bun.
+- `webapp/docker/entrypoint.sh` prepares assets in the final nginx image, which does not contain Node.
 
 No substantive shell script is permitted under `scripts/`.

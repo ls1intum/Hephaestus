@@ -170,7 +170,7 @@ public class Practice {
     private @Nullable String whatGoodLooksLike;
 
     /**
-     * Optional Bun/TypeScript static-analysis script that runs before the AI agent and produces structured
+     * Optional Node/TypeScript static-analysis script that runs before the AI agent and produces structured
      * hints (not observations) as starting points; {@code null} means no precomputation runs.
      */
     @Column(name = "precompute_script", columnDefinition = "TEXT")

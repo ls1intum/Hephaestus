@@ -95,16 +95,22 @@ class PracticeRunnerLiveLlmTest {
                             + PI_SDK_VERSION
                             + "\"}}");
             ProcessBuilder pb = new ProcessBuilder(
-                    "bun", "install", "--cwd", SDK_DIR.toString(), "--ignore-scripts", "--no-progress");
+                    "pnpm",
+                    "install",
+                    "--dir",
+                    SDK_DIR.toString(),
+                    "--ignore-workspace",
+                    "--ignore-scripts",
+                    "--reporter=silent");
             pb.redirectErrorStream(true);
             pb.inheritIO();
             Process p = pb.start();
             if (!p.waitFor(180, TimeUnit.SECONDS)) {
                 p.destroyForcibly();
-                throw new IllegalStateException("Bun install for Pi SDK timed out after 180s");
+                throw new IllegalStateException("pnpm install for Pi SDK timed out after 180s");
             }
             if (p.exitValue() != 0) {
-                throw new IllegalStateException("Bun install for Pi SDK failed; see stderr above");
+                throw new IllegalStateException("pnpm install for Pi SDK failed; see stderr above");
             }
             Files.writeString(marker, "ok\n");
             //noinspection ResultOfMethodCallIgnored
@@ -379,7 +385,7 @@ class PracticeRunnerLiveLlmTest {
     // Process plumbing
 
     private static Process spawnRunner(LiveLlmCredentials creds) throws IOException {
-        ProcessBuilder pb = new ProcessBuilder("bun", "pi-runner.ts");
+        ProcessBuilder pb = new ProcessBuilder("node", "pi-runner.ts");
         pb.directory(WORKSPACE.toFile());
         Map<String, String> env = pb.environment();
         // Fail closed: the agent has a bash tool, so inheriting the developer's shell environment would

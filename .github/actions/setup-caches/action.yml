@@ -40,7 +40,7 @@ runs:
       if: contains(fromJSON('["webapp-storybook", "webapp-e2e"]'), inputs.cache-type)
       shell: bash
       env:
-        DEPENDENCY_HASH: ${{ hashFiles('bun.lock') }}
+        DEPENDENCY_HASH: ${{ hashFiles('pnpm-lock.yaml') }}
       run: |
         if [[ -z "$DEPENDENCY_HASH" ]]; then
           echo "::error::Cannot compute the Playwright cache identity from the checked-out repository."
