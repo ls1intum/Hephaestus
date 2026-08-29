@@ -299,14 +299,7 @@ names the replacement in its message; for one it does not list, assert on the pl
 The matchers **are** available in stories, because `expect` from `storybook/test` ships them. Copying
 an assertion out of a story into a route test is exactly how this bites.
 
-## TypeScript versions
-
-Type checking runs on TypeScript 7 through the `typescript7` alias, invoked by path because both it
-and `typescript` install a `tsc` bin and the winner is undefined. `typescript` itself stays on 6
-because `@hey-api/openapi-ts` calls the TypeScript compiler API at runtime and the 7 package ships
-only `tsc` — its peer range accepts 7, so nothing warns you before the generator dies.
-An override cannot provide different compiler implementations to the typechecker and generator;
-the alias keeps both runtimes explicit.
+## Type checking
 
 **A dot-directory is invisible to a `**/*` include.** `tsconfig.json`'s `**/*.ts` does not match
 `.storybook/`, so a file there is type-checked only if something names the directory explicitly —
