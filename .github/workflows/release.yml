@@ -5,9 +5,9 @@ name: Release
 # after CI/CD succeeds so the Docker images for the commit already exist.
 #
 # A release: tags vX.Y.Z at the version-bump commit, creates the GitHub Release
-# from that version's CHANGELOG.md section (flagging schema migrations), retags
-# the CI-built images (X.Y.Z, X.Y, latest), verifies a seeded previous-release
-# upgrade before publication, and starts the deploy chain
+# from that version's CHANGELOG.md section (flagging schema migrations), verifies
+# a seeded previous-release upgrade before publication, retags the CI-built
+# images (X.Y.Z, X.Y, latest), and starts the deploy chain
 # (staging automatically, production after environment approval).
 #
 # Versioning contract: docs/admin/compatibility-policy.mdx
