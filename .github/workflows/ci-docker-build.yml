@@ -36,11 +36,18 @@ on:
         description: "Whether an application-server image exists at this commit"
         value: ${{ jobs.application-server-build.outputs.manifest-digest != '' || jobs.tag-unchanged-images.outputs.application-server-published == 'true' }}
 
+permissions: {}
+
 jobs:
   webapp-build:
     name: "Webapp"
     if: inputs.should_skip != 'true' && inputs.webapp_changed == 'true'
     uses: ./.github/workflows/reusable-docker-build.yml
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
     with:
       image-name: "ls1intum/hephaestus/webapp"
       docker-file: "./webapp/Dockerfile"
@@ -74,6 +81,11 @@ jobs:
       inputs.should_skip != 'true' &&
       (inputs.application_server_changed == 'true' || github.event_name != 'pull_request')
     uses: ./.github/workflows/reusable-docker-build.yml
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
     with:
       image-name: "ls1intum/hephaestus/application-server"
       # Paketo Cloud Native Buildpacks via spring-boot:build-image, with Application CDS.
@@ -107,6 +119,11 @@ jobs:
     name: "Agent: Pi"
     if: inputs.should_skip != 'true' && inputs.agent_images_changed == 'true'
     uses: ./.github/workflows/reusable-docker-build.yml
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
     with:
       image-name: "ls1intum/hephaestus/agent-pi"
       docker-file: "./docker/agents/pi/Dockerfile"
@@ -136,6 +153,11 @@ jobs:
       inputs.should_skip != 'true' &&
       (inputs.postgres_image_changed == 'true' || github.event_name != 'pull_request')
     uses: ./.github/workflows/reusable-docker-build.yml
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
     with:
       image-name: "ls1intum/hephaestus/postgres"
       docker-file: "./docker/postgres/Dockerfile"

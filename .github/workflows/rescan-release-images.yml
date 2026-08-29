@@ -22,13 +22,16 @@ jobs:
       - uses: ./.github/actions/setup-release-security-tools
         with:
           install-syft: "false"
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
       - name: Download and verify latest supported release evidence
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          tag=$(gh release view --repo "${{ github.repository }}" --json tagName --jq .tagName)
           mkdir release-evidence
-          gh release download --repo "${{ github.repository }}" --dir release-evidence
+          gh release download "$tag" --repo "${{ github.repository }}" --dir release-evidence
           (cd release-evidence && sha256sum -c SHA256SUMS)
           for file in manifest.json release-images.json tool-versions.json trivy-db.json vulnerability-policy.json; do
             test -s "release-evidence/$file"
@@ -46,16 +49,31 @@ jobs:
               "release-evidence/$image-$suffix.syft.json" \
               "release-evidence/$image-$suffix.spdx.json" \
               "release-evidence/$image-$suffix.cdx.json" \
-              "$digest" "$platform" /tmp/sbom-summary.json
-            cmp "release-evidence/$image-$suffix.sbom-summary.json" /tmp/sbom-summary.json
+              "$digest" "$platform" /tmp/sbom-validation.json
+            cmp "release-evidence/$image-$suffix.sbom-validation.json" /tmp/sbom-validation.json
             for kind in trivy policy; do
               test -s "release-evidence/$image-$suffix.$kind.json"
             done
+            jq -e --arg ref "$repository@$digest" \
+              '.ArtifactName == $ref and (.Results | type == "array")' \
+              "release-evidence/$image-$suffix.license.json" >/dev/null
+            bun scripts/check-release-vulnerabilities.ts "$image" "$platform" "$digest" "$repository" \
+              "release-evidence/$image-$suffix.trivy.json" \
+              release-evidence/vulnerability-policy.json /tmp/policy.json
+            cmp "release-evidence/$image-$suffix.policy.json" /tmp/policy.json
             architecture=${platform#*/}
             docker buildx imagetools inspect "$repository@$index_digest" --raw |
               jq -e --arg architecture "$architecture" --arg digest "$digest" \
                 'any(.manifests[]; .platform.os == "linux" and .platform.architecture == $architecture and .digest == $digest)' >/dev/null
           done
+          lock="release-$tag.json"
+          cosign verify-blob \
+            --bundle "release-evidence/$lock.sigstore.json" \
+            --certificate-identity 'https://github.com/ls1intum/Hephaestus/.github/workflows/release.yml@refs/heads/main' \
+            --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+            "release-evidence/$lock"
+          bun scripts/release-image-lock.ts "release-evidence/$lock" \
+            release-evidence/manifest.json "$tag" /tmp/release-lock.env
       - name: Rescan immutable subjects
         env:
           TRIVY_USERNAME: ${{ github.actor }}
@@ -73,7 +91,9 @@ jobs:
           while IFS=$'\t' read -r image platform digest repository; do
             suffix=${platform//\//-}
             trivy image --scanners vuln --format json --output "reports/$image-$suffix.json" "$repository@$digest"
-            bun scripts/check-release-vulnerabilities.ts "$image" "reports/$image-$suffix.json" security/vulnerability-policy.json "reports/$image-$suffix.policy.json"
+            bun scripts/check-release-vulnerabilities.ts "$image" "$platform" "$digest" "$repository" \
+              "reports/$image-$suffix.json" security/vulnerability-policy.json \
+              "reports/$image-$suffix.policy.json"
           done
       - name: Upload diagnostic reports
         if: always()
