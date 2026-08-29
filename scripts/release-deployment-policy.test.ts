@@ -17,3 +17,25 @@ await test("deployment uses Compose metadata, waits for readiness, and preserves
 	assert.match(deployment, /--wait --wait-timeout 600/);
 	assert.doesNotMatch(deployment, /docker image prune/);
 });
+
+await test("release publication requires the seeded upgrade gate", () => {
+	const upgrade = readFileSync(".github/workflows/release-upgrade.yml", "utf8");
+
+	assert.match(release, /publish-release:\n\s+needs: \[release, tag-images, upgrade-test\]/);
+	assert.match(
+		release,
+		/candidate-application-image: .*@\$\{\{ needs\.tag-images\.outputs\.application-server-digest \}\}/,
+	);
+	assert.match(
+		release,
+		/postgres-image: .*@\$\{\{ needs\.tag-images\.outputs\.postgres-digest \}\}/,
+	);
+	assert.match(release, /candidate-source-sha: \$\{\{ needs\.release\.outputs\.sha \}\}/);
+	assert.match(upgrade, /schedule:/);
+	assert.match(
+		upgrade,
+		/ref: \$\{\{ inputs\.candidate-source-sha \|\| inputs\.candidate-sha \|\| github\.sha \}\}/,
+	);
+	const upgradeGate = release.match(/ {2}upgrade-test:[\s\S]*?\n {2}publish-release:/)?.[0] ?? "";
+	assert.doesNotMatch(upgradeGate, /secrets: inherit/);
+});

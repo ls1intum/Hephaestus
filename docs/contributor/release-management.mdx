@@ -34,6 +34,7 @@ sequenceDiagram
     VP->>M: Maintainer merges when the release is ready
     M->>R: Create draft vX.Y.Z release
     R->>R: Generate and verify digest-bound evidence
+    R->>R: Upgrade seeded data from the previous stable release
     R->>R: Promote X.Y.Z / X.Y / latest image tags
     R->>R: Publish release and deploy staging
     Note over R: Production still requires approval
@@ -55,8 +56,9 @@ sequenceDiagram
    ruleset, so the absent required checks don't block the merge. Versioning also moves any
    `### Next release` section in `MIGRATION.md` under the version being cut.
 3. **Merging the Version PR cuts the release.** The workflow creates a draft release at the merge
-   commit. After its evidence gate passes, it promotes the CI-built images to `X.Y.Z`, `X.Y`, and
-   `latest`, publishes the release, deploys staging, and requests production approval.
+   commit. After its evidence and seeded-upgrade gates pass, it promotes the CI-built images to
+   `X.Y.Z`, `X.Y`, and `latest`, publishes the release, deploys staging, and requests production
+   approval.
 
 ## Supply-chain evidence
 

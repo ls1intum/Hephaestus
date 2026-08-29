@@ -5,8 +5,9 @@ name: Release
 # after CI/CD succeeds so the Docker images for the commit already exist.
 #
 # A release: tags vX.Y.Z at the version-bump commit, creates the GitHub Release
-# from that version's CHANGELOG.md section (flagging schema migrations), retags
-# the CI-built images (X.Y.Z, X.Y, latest), and starts the deploy chain
+# from that version's CHANGELOG.md section (flagging schema migrations), verifies
+# a seeded previous-release upgrade before publication, retags the CI-built
+# images (X.Y.Z, X.Y, latest), and starts the deploy chain
 # (staging automatically, production after environment approval).
 #
 # Versioning contract: docs/admin/compatibility-policy.mdx
@@ -43,6 +44,7 @@ jobs:
       major: ${{ steps.cut.outputs.major }}
       minor: ${{ steps.cut.outputs.minor }}
       tag_name: ${{ steps.cut.outputs.tag_name }}
+      previous_version: ${{ steps.cut.outputs.previous_version }}
       sha: ${{ steps.cut.outputs.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -86,7 +88,11 @@ jobs:
           fi
           echo "Cutting $TAG at $SHA (was $PARENT_VERSION)"
 
-          PREV_TAG=$(git tag --list 'v*' --sort=-v:refname | head -1)
+          PREV_TAG="v$PARENT_VERSION"
+          previous=$(gh release view "$PREV_TAG" --repo "${{ github.repository }}" --json isDraft,isPrerelease 2>/dev/null) || {
+            echo "::error::Previous package version $PARENT_VERSION is not a published release"; exit 1; }
+          jq -e '.isDraft == false and .isPrerelease == false' <<< "$previous" >/dev/null || {
+            echo "::error::$PREV_TAG is not a stable published release"; exit 1; }
 
           # Release notes = this version's CHANGELOG.md section (the assembled
           # changeset entries), with a first-class migration warning when the
@@ -127,6 +133,7 @@ jobs:
             MINOR="${VERSION#*.}"; echo "minor=${MINOR%%.*}"
             echo "tag_name=$TAG"
             echo "sha=$SHA"
+            echo "previous_version=$PARENT_VERSION"
           } >> "$GITHUB_OUTPUT"
 
       - name: Summary
@@ -148,6 +155,7 @@ jobs:
     outputs:
       agent-pi-digest: ${{ steps.retag.outputs.agent-pi-digest }}
       application-server-digest: ${{ steps.retag.outputs.application-server-digest }}
+      postgres-digest: ${{ steps.retag.outputs.postgres-digest }}
     steps:
       - name: Check out the released tree
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -204,6 +212,7 @@ jobs:
             case "$img" in
               agent-pi)            echo "agent-pi-digest=$SRC_DIGEST" >> "$GITHUB_OUTPUT" ;;
               application-server)  echo "application-server-digest=$SRC_DIGEST" >> "$GITHUB_OUTPUT" ;;
+              postgres)            echo "postgres-digest=$SRC_DIGEST" >> "$GITHUB_OUTPUT" ;;
             esac
             echo "::endgroup::"
           done
@@ -410,8 +419,20 @@ jobs:
             "$ASSET" "${ASSET}.sigstore.json" evidence/* \
             --repo "${{ github.repository }}"
 
-  publish-release:
+  upgrade-test:
     needs: [release, tag-images]
+    if: needs.release.outputs.released == 'true'
+    uses: ./.github/workflows/release-upgrade.yml
+    permissions:
+      contents: read
+      packages: read
+    with:
+      previous-application-image: ghcr.io/ls1intum/hephaestus/application-server:${{ needs.release.outputs.previous_version }}
+      candidate-application-image: ghcr.io/ls1intum/hephaestus/application-server@${{ needs.tag-images.outputs.application-server-digest }}
+      postgres-image: ghcr.io/ls1intum/hephaestus/postgres@${{ needs.tag-images.outputs.postgres-digest }}
+      candidate-source-sha: ${{ needs.release.outputs.sha }}
+  publish-release:
+    needs: [release, tag-images, upgrade-test]
     if: needs.release.outputs.released == 'true'
     timeout-minutes: 20
     runs-on: ubuntu-latest
