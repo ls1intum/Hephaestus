@@ -8851,6 +8851,9 @@ components:
         slug:
           type: string
           example: reviewing-work
+          maxLength: 64
+          minLength: 3
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
       required:
       - definition
       - slug
@@ -8863,6 +8866,9 @@ components:
         slug:
           type: string
           example: pr-description-quality
+          maxLength: 64
+          minLength: 3
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
       required:
       - definition
       - slug
@@ -8915,6 +8921,7 @@ components:
           type: integer
           format: int32
           description: Context window in tokens
+          minimum: 0
         displayName:
           type: string
           description: Human-readable name
@@ -8927,6 +8934,7 @@ components:
           type: integer
           format: int32
           description: Maximum output tokens
+          minimum: 0
         slug:
           type: string
           description: Optional internal slug; generated from displayName when omitted
@@ -9001,6 +9009,7 @@ components:
           format: int32
           description: Sort order within the workspace. Appended when omitted.
           example: 1
+          minimum: 0
         icon:
           type: string
           description: Optional lucide icon name giving the group a glanceable identity
@@ -9119,6 +9128,7 @@ components:
           format: int64
           description: "The artifact's internal id, as the trace and review listings\
             \ report it"
+          minimum: 0
         artifactKind:
           type: string
           description: "The artifact kind's wire id, e.g. scm.pull_request. A raw\
@@ -9215,6 +9225,7 @@ components:
           type: integer
           format: int32
           description: Context window in tokens
+          minimum: 0
         displayName:
           type: string
           description: Human-readable name
@@ -9227,6 +9238,7 @@ components:
           type: integer
           format: int32
           description: Maximum output tokens
+          minimum: 0
         per1mCacheReadUsd:
           type: number
           format: decimal
@@ -10524,9 +10536,11 @@ components:
           current:
             type: integer
             format: int32
+            minimum: 0
           target:
             type: integer
             format: int32
+            minimum: 0
       description: Linear progress with current and target counts
       required:
       - current
@@ -15009,6 +15023,7 @@ components:
           type: integer
           format: int32
           description: Context window in tokens
+          minimum: 0
         displayName:
           type: string
           description: Human-readable name
@@ -15021,6 +15036,7 @@ components:
           type: integer
           format: int32
           description: Maximum output tokens
+          minimum: 0
         supportsReasoning:
           type: boolean
           description: Whether the model supports a reasoning mode
@@ -15105,6 +15121,7 @@ components:
           type: integer
           format: int32
           description: Sort order within the workspace
+          minimum: 0
         icon:
           type: string
           description: Optional lucide icon name giving the group a glanceable identity
@@ -15397,6 +15414,7 @@ components:
           type: integer
           format: int32
           description: Context window in tokens
+          minimum: 0
         displayName:
           type: string
           description: Human-readable name
@@ -15409,6 +15427,7 @@ components:
           type: integer
           format: int32
           description: Maximum output tokens
+          minimum: 0
         per1mCacheReadUsd:
           type: number
           format: decimal

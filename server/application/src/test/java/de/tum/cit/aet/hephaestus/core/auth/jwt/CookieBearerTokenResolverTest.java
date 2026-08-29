@@ -10,18 +10,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 
-/**
- * Security contract for {@link CookieBearerTokenResolver}: the cookie token is authoritative and a
- * hostile {@code Authorization} header can never override it (cookie-first invariant, ADR 0017). The
- * HttpOnly access cookie is trusted; an attacker-supplied header is not, and the SPA never sends a
- * header at all. A regression that flips precedence is a token-confusion vulnerability — this test
- * fails loudly if that ever happens.
- */
+/** Verifies the cookie-first precedence contract from ADR 0017. */
 class CookieBearerTokenResolverTest extends BaseUnitTest {
 
     private static final String COOKIE_NAME = AuthProperties.DEFAULT_COOKIE_NAME;
-    private static final String COOKIE_TOKEN = "cookie-token-trusted";
-    private static final String HEADER_TOKEN = "attacker-token-hostile";
+    private static final String COOKIE_TOKEN = "cookie-token";
+    private static final String HEADER_TOKEN = "header-token";
 
     private CookieBearerTokenResolver resolver;
 
@@ -31,12 +25,11 @@ class CookieBearerTokenResolverTest extends BaseUnitTest {
     }
 
     @Test
-    void resolve_cookieAndHostileHeader_returnsCookieToken() {
+    void resolve_cookieAndHeader_returnsCookieToken() {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setCookies(new Cookie(COOKIE_NAME, COOKIE_TOKEN));
         request.addHeader("Authorization", "Bearer " + HEADER_TOKEN);
 
-        // Cookie-first: the trusted HttpOnly cookie wins; the hostile header is never consulted.
         assertThat(resolver.resolve(request)).isEqualTo(COOKIE_TOKEN);
     }
 
@@ -53,7 +46,6 @@ class CookieBearerTokenResolverTest extends BaseUnitTest {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Authorization", "Bearer " + HEADER_TOKEN);
 
-        // No cookie → standard header fallback (worker/API/test clients).
         assertThat(resolver.resolve(request)).isEqualTo(HEADER_TOKEN);
     }
 
@@ -65,7 +57,7 @@ class CookieBearerTokenResolverTest extends BaseUnitTest {
     @Test
     void resolve_blankCookieValue_fallsBackToHeader() {
         MockHttpServletRequest request = new MockHttpServletRequest();
-        request.setCookies(new Cookie(COOKIE_NAME, "")); // blank → not a usable token
+        request.setCookies(new Cookie(COOKIE_NAME, ""));
         request.addHeader("Authorization", "Bearer " + HEADER_TOKEN);
 
         assertThat(resolver.resolve(request)).isEqualTo(HEADER_TOKEN);

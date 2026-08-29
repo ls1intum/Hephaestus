@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -70,9 +71,10 @@ class PracticeRoleResolutionEndToEndIntegrationTest extends RealAuthIntegrationT
         seedLoginProvider(REGISTRATION_ID, LoginProvider.ProviderType.GITLAB, LOGIN_BASE_URL);
 
         // Pin the production seam that makes subject numeric: the real ClientRegistration's name attr.
-        ClientRegistration registration = clientRegistrationRepository.findByRegistrationId(REGISTRATION_ID);
-        String nameAttr =
-                registration.getProviderDetails().getUserInfoEndpoint().getUserNameAttributeName();
+        ClientRegistration registration =
+                Objects.requireNonNull(clientRegistrationRepository.findByRegistrationId(REGISTRATION_ID));
+        String nameAttr = Objects.requireNonNull(
+                registration.getProviderDetails().getUserInfoEndpoint().getUserNameAttributeName());
         assertThat(nameAttr)
                 .as("login must key the principal name on the provider's numeric id")
                 .isEqualTo("id");

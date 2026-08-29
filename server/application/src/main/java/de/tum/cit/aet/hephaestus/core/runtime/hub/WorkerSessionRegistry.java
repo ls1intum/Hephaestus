@@ -11,7 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.web.server.context.WebServerGracefulShutdownLifecycle;
+import org.springframework.boot.web.server.context.WebServerApplicationContext;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.web.socket.CloseStatus;
@@ -118,8 +118,8 @@ public class WorkerSessionRegistry implements SmartLifecycle {
     @Override
     public int getPhase() {
         // SmartLifecycle stops in DESCENDING phase order — higher phase stops first. A phase
-        // greater than WebServerGracefulShutdownLifecycle.SMART_LIFECYCLE_PHASE makes the WS
+        // greater than WebServerApplicationContext.GRACEFUL_SHUTDOWN_PHASE makes the WS
         // registry drain BEFORE the embedded server stops accepting traffic.
-        return WebServerGracefulShutdownLifecycle.SMART_LIFECYCLE_PHASE + 1;
+        return WebServerApplicationContext.GRACEFUL_SHUTDOWN_PHASE + 1;
     }
 }
