@@ -18,12 +18,10 @@ const REFERENCE_FILE = "docker/compose.app.yaml";
 const OWN_IMAGE_PREFIX = "ghcr.io/ls1intum/hephaestus/";
 
 /**
- * Reference variables a preview deliberately does not set. Inheriting the reference stack instead of
- * restating it was tried and rejected: Compose merges per key, so the sandbox would arrive with
- * `LEADERBOARD_NOTIFICATION_ENABLED`, `MONITORING_BACKFILL_ENABLED` and an hourly `MONITORING_SYNC_CRON`
- * switched on, and a *new* integration would arrive on too. Restating is the safe direction; this list
- * is what stops it from being a silent one — a variable added to the reference and not considered here
- * fails the build.
+ * Reference variables a preview deliberately does not set. Inheriting the reference instead of
+ * restating it was tried and rejected — Compose merges per key, so integrations arrive switched on
+ * (ADR 0035, option 6). This list is what keeps restating from being a silent omission: a variable
+ * added to the reference and not considered here fails the build.
  */
 const DELIBERATELY_OMITTED = new Set([
 	// Integrations a preview never reaches: no GitLab, Outline, Slack or PostHog credentials exist.
@@ -70,11 +68,6 @@ const DELIBERATELY_OMITTED = new Set([
 	"HEPHAESTUS_AUTH_BOOTSTRAP_TOKEN",
 ]);
 
-/**
- * A preview restates the reference stack rather than including it, so a variable added to the
- * reference reaches previews only if someone puts it there. This turns that from a silent omission
- * into a red check naming the variable.
- */
 export function findEnvDrift(referenceText: string, previewText: string): string[] {
 	const reference = readComposeServices(referenceText).get("application-server");
 	const preview = readComposeServices(previewText).get("appserver");
@@ -113,18 +106,17 @@ const RENDER_ENV: Record<string, string> = {
 	SERVICE_FQDN_APPSERVER: "pr1.api.example.com",
 };
 
-/** Values the server refuses to start without: it validates them before the context is built, so an
- * empty one here is a preview that restart-loops rather than a preview that misbehaves quietly. */
 /**
- * Capabilities a service may add back after `cap_drop: ALL`. Both entries are servers whose root
- * process prepares a directory and then runs its real work as another user; each set is the minimum
- * found by running the image with less. The application server needs none.
+ * Capabilities a service may add back after `cap_drop: ALL`. Each set is the minimum found by running
+ * the image with less; the application server needs none.
  */
 const ALLOWED_CAPABILITIES: Record<string, readonly string[]> = {
 	postgres: ["CHOWN", "DAC_OVERRIDE", "FOWNER", "SETGID", "SETUID"],
 	webapp: ["CHOWN", "SETGID", "SETUID"],
 };
 
+/** Values the server refuses to start without: it validates them before the context is built, so an
+ * empty one here is a preview that restart-loops rather than a preview that misbehaves quietly. */
 const REQUIRED_NON_EMPTY = ["HEPHAESTUS_TRUSTED_PROXIES", "WEBHOOK_SECRET"];
 
 /**
@@ -233,11 +225,8 @@ export function findViolations(stack: unknown): string[] {
 	}
 	// Coolify runs every preview of this application under one Compose project, named after the
 	// application UUID with no pull request in it. A network defined here is therefore `<uuid>_<name>`
-	// for all of them at once, and one preview reaches another's database over it — a shared network
-	// that reads as private. An external one is the opposite: it names a network that already exists,
-	// so joining it is a decision someone made rather than a side effect of the project name.
-	// `default` is Compose's own and carries the project name too, but nothing joins it once no
-	// service names a network.
+	// for all of them at once — a shared network that reads as private. An external one names a
+	// network that already exists, so joining it is a decision rather than a side effect.
 	for (const [name, network] of records(stack.networks)) {
 		if (name === "default") continue;
 		if (network.external === true && typeof network.name === "string" && network.name !== "") {

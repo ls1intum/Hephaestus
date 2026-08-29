@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, it } from "node:test";
 
 import {
 	assess,
-	CLEANUP_VERIFIED_DESCRIPTION,
+	TEARDOWN_REQUESTED_DESCRIPTION,
 	create,
 	finalize,
 	inactivate,
@@ -280,7 +280,7 @@ void describe("preview host capacity", () => {
 			github: makeGitHub({
 				deployments: occupants(3),
 				statuses: {
-					102: [{ description: CLEANUP_VERIFIED_DESCRIPTION, state: "inactive" }],
+					102: [{ description: TEARDOWN_REQUESTED_DESCRIPTION, state: "inactive" }],
 				},
 			}),
 			context: makeContext(),
@@ -556,7 +556,7 @@ void it("keeps the verified tombstone record when cleanup inactivates a preview"
 
 	await inactivate({ github, context: makeContext(), core: makeCore() });
 
-	assert.deepEqual(descriptions, [CLEANUP_VERIFIED_DESCRIPTION]);
+	assert.deepEqual(descriptions, [TEARDOWN_REQUESTED_DESCRIPTION]);
 	assert.equal(deletions, 0);
 });
 

@@ -2,22 +2,16 @@
 #
 # Coolify receives the opted-in PR head through its signed manual webhook and re-reads this file from
 # that commit, so a pull request's own copy defines its stack. The controller refuses to deploy a pull
-# request that edits this file, and scripts/check-preview-stack.ts asserts the sandbox properties
-# below on every pull request.
+# request that changes anything under docker/preview/, and scripts/check-preview-stack.ts asserts the
+# sandbox properties below on every pull request.
 #
 # Every service runs the image CI published for this exact commit — the same artifacts staging and
 # production run, buildpack-built application server included. Nothing is built here, so a preview
 # exercises the shipped runtime rather than a second recipe that could pass where the real one fails.
 #
-# This restates the reference stack rather than including it. Compose merges per key, so inheriting
+# This restates the reference stack rather than including it: Compose merges per key, so inheriting
 # would arrive with sync, notifications and the agent digest requirement switched on, and with the
-# Docker socket mounted — ADR 0035 option 6 has the rendered evidence. scripts/check-preview-stack.ts
-# fails when the reference gains a variable this file neither sets nor records as omitted.
-#
-# This file declares no networks. Coolify runs every preview of this application under one Compose
-# project — the project name is the application UUID, with no pull request in it — so a network named
-# here would be `<uuid>_backend`, shared by every preview at once. Coolify instead gives each preview
-# its own network and attaches its proxy to that, which is what keeps the stacks apart.
+# Docker socket mounted. ADR 0035 option 6 has the rendered evidence.
 
 services:
   postgres:
@@ -34,7 +28,7 @@ services:
     cap_drop:
       - ALL
     # The entrypoint chowns its data directory and drops to the postgres user; without these it exits
-    # with "failed switching to 'postgres'". Verified by running the stack, not inferred.
+    # with "failed switching to 'postgres'".
     cap_add:
       - CHOWN
       - DAC_OVERRIDE
@@ -58,20 +52,15 @@ services:
           memory: 512M
           pids: 256
 
-  # Clones the running staging database into this preview so it starts with real data. Reads over
-  # the network with a role that can only read: staging's data volume is never mounted, and no
-  # container here holds the Docker daemon. Every review entry point is paused, and the instance
-  # identity dropped, before the application server is allowed to boot. Runs once — a redeploy finds
-  # the marker table and exits.
-  #
-  # This is the image staging itself runs, so pg_dump always matches the server it reads.
+  # Clones staging into this preview over the network with a role that can only read; staging's data
+  # volume is never mounted. This is the image staging itself runs, so pg_dump always matches the
+  # server it reads.
   seed-loader:
     image: ghcr.io/ls1intum/hephaestus/postgres:${SOURCE_COMMIT:?Coolify supplies the deployed commit}
     restart: "no"
     depends_on:
       postgres:
         condition: service_healthy
-    # Reaches staging's Postgres by name; its own database it reaches on Coolify's preview network.
     networks:
       - staging-shared
     environment:
@@ -188,8 +177,8 @@ services:
         DELETE FROM login_provider;
         SQL
 
-        # The marker promises the policy is in force, so verify it against the database rather than
-        # trusting psql's exit status.
+        # Every statement above succeeds when it matches nothing, so the marker is earned by
+        # counting rather than by psql's exit status.
         echo "Verifying the preview policy took effect"
         LIVE=$$(psql -h "$$TARGET" -U hephaestus -d hephaestus -tAX -v ON_ERROR_STOP=1 -c "
           SELECT (SELECT count(*) FROM workspace
@@ -260,17 +249,15 @@ services:
       DATABASE_USERNAME: hephaestus
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
       # The integration consumer reads staging's JetStream, so a preview sees the events a shared
-      # GitHub App delivers there rather than an empty broker. The agent job queue runs on
-      # PostgreSQL, not NATS, and stays local to this stack's own database.
+      # GitHub App delivers there rather than an empty broker.
       NATS_SERVER: ${NATS_SERVER:-nats://nats-server:4222}
       NATS_ENABLED: "true"
       # Per-deploy durable name, so previews get their own JetStream consumers instead of competing
       # for one and stealing each other's messages.
       NATS_DURABLE_CONSUMER_NAME: ${SERVICE_NAME_APPSERVER:-appserver}-consumer
-      # A preview is deleted, not shut down, so it never removes the durables it created on the
-      # shared stream. Far shorter than the 30d a long-lived deployment uses, because a preview is
-      # abandoned the day its pull request merges. Still long enough that a redeploy, or a testing
-      # session paused overnight, resumes on its own cursor instead of skipping to the head.
+      # A preview is deleted, not shut down, so it never removes its durables from the shared
+      # stream. Shorter than the shipped 30d because a preview is abandoned at merge, and long
+      # enough that a redeploy resumes on its own cursor.
       HEPHAESTUS_INTEGRATION_CONSUMER_INACTIVE_THRESHOLD: 72h
       HEPHAESTUS_AUTH_ISSUER: https://${SERVICE_FQDN_WEBAPP}
       HEPHAESTUS_AUTH_STATE_COOKIE_KEY: ${HEPHAESTUS_AUTH_STATE_COOKIE_KEY}
@@ -294,8 +281,8 @@ services:
       SENTRY_DSN: ""
       WEBHOOK_SECRET: ${WEBHOOK_SECRET}
       WEBHOOK_EXTERNAL_URL: ""
-    # Only the application server joins staging's network, and only to reach its broker. The
-    # database and the SPA stay on Coolify's per-preview network.
+    # Joined to reach staging's broker; this stack's own database and SPA stay on Coolify's
+    # per-preview network.
     networks:
       - staging-shared
     depends_on:
@@ -312,8 +299,8 @@ services:
       test: ["CMD", "/workspace/health-check"]
       interval: 15s
       timeout: 5s
-      # A first boot runs Liquibase against an empty database on a shared host, and the webapp waits
-      # on this. Nothing here benefits from failing fast, and failing fast fails the whole deploy.
+      # First boot runs Liquibase over a freshly restored staging dump, on a host shared with
+      # staging.
       retries: 10
       start_period: 300s
     logging:

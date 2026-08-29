@@ -79,7 +79,8 @@ const TRUSTED_ASSOCIATIONS = new Set(["COLLABORATOR", "MEMBER", "OWNER"]);
 const COMPARE_FILE_LIMIT = 300;
 const DEFAULT_MAX_ACTIVE = 3;
 const LIVE_STATES = new Set(["in_progress", "pending", "queued", "success"]);
-const CLEANUP_VERIFIED_DESCRIPTION = "Preview teardown requested; awaiting Coolify reconciliation.";
+const TEARDOWN_REQUESTED_DESCRIPTION =
+	"Preview teardown requested; awaiting Coolify reconciliation.";
 
 const hasPreviewLabel = (pull: PullRequest): boolean =>
 	pull.labels.some((label) => label.name === PREVIEW_LABEL);
@@ -90,9 +91,9 @@ const maxActivePreviews = (): number =>
 		: DEFAULT_MAX_ACTIVE;
 
 /**
- * Environments holding a slot on the shared preview host. A verified cleanup tombstone is retained so
- * the nightly reconcile can repeat Coolify cleanup, but its host resources are gone, so it holds
- * nothing.
+ * Environments still holding a slot. A pull request whose teardown has been requested does not hold
+ * one: the request is the same close event Coolify acts on, and the nightly reconcile re-sends it if
+ * that was missed. Nothing here reads the host, so a slot is freed on the request, not on proof.
  */
 const occupiedEnvironments = async (
 	github: GitHubApi,
@@ -115,10 +116,10 @@ const occupiedEnvironments = async (
 			per_page: 1,
 		});
 		const latest = statuses.data[0]?.state;
-		// A verified tombstone has had its resources removed, and a failed deploy never took the
-		// host — counting either would let a run of failures report a full host that is empty.
+		// A requested teardown has been handed to Coolify and a failed deploy never reached the host,
+		// so neither holds anything — counting them would report a full host that is empty.
 		if (latest === "failure" || latest === "error") continue;
-		if (latest === "inactive" && statuses.data[0]?.description === CLEANUP_VERIFIED_DESCRIPTION) {
+		if (latest === "inactive" && statuses.data[0]?.description === TEARDOWN_REQUESTED_DESCRIPTION) {
 			continue;
 		}
 		occupied.add(deployment.environment);
@@ -389,7 +390,7 @@ async function retireDeployments(
 const inactivate = async ({ github, context }: ControllerInput): Promise<void> => {
 	const { owner, repo } = context.repo;
 	await retireDeployments(github, owner, repo, requiredEnv(process.env, "ENVIRONMENT"), {
-		description: CLEANUP_VERIFIED_DESCRIPTION,
+		description: TEARDOWN_REQUESTED_DESCRIPTION,
 		forceStatus: true,
 		keepRecords: true,
 	});
@@ -420,7 +421,7 @@ const retire = async ({ github, context }: ControllerInput): Promise<void> => {
 };
 
 export {
-	CLEANUP_VERIFIED_DESCRIPTION,
+	TEARDOWN_REQUESTED_DESCRIPTION,
 	PREVIEW_LABEL,
 	assess,
 	create,
