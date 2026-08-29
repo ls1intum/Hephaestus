@@ -30,6 +30,11 @@
 	"packageRules": [
 		{
 			"matchManagers": ["maven"],
+			"matchPackageNames": ["de.tum.cit.aet:hephaestus-server-parent"],
+			"enabled": false
+		},
+		{
+			"matchManagers": ["maven"],
 			"matchDepTypes": ["compile", "runtime", "provided", "optional", "parent", "parent-root"],
 			"matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"],
 			"groupName": "Java runtime and framework dependencies",
