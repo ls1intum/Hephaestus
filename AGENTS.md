@@ -53,7 +53,7 @@ Use `bun run check:affected` for in-session feedback; it is not the pre-push gat
 | `bun run verify` | Complete local CI mirror for checks that need no live service, image build, or hosted credential |
 | `bun run test:webapp` | Vitest |
 | `bun run test:agents` | Agent runtime and precompute specs, on Bun |
-| `cd server && ./mvnw test` | Server unit tests — see `server/AGENTS.md` for all four tiers |
+| `bun run test:server:unit` | Server unit tests — see `server/AGENTS.md` for all four tiers |
 
 Naming: `format` applies, `format:check` verifies read-only for CI, `lint` lints, `check` is the
 comprehensive local quality gate. A `:webapp`, `:server` or `:agents` suffix scopes any of them; `:java`
