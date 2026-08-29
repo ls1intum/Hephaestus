@@ -22,9 +22,11 @@ export function currentUserQueryOptions() {
  * with the in-app `useAuth` surface — this makes the first paint correct (no auth
  * flash) because the route blocks on the same query the rest of the app reads.
  *
- * `revalidateIfStale` refreshes in the background rather than blocking, because this guard runs on
- * EVERY authenticated navigation and one flaky request would bounce a signed-in user to /login.
- * Without it `ensureQueryData` would serve a revoked `appRole` for the life of the tab.
+ * Stale-while-revalidate in two calls: `staleTime: "static"` answers from cache and blocks only
+ * when nothing is cached, then the unawaited second call refetches under the real `staleTime`.
+ * This guard runs on EVERY authenticated navigation, so awaiting the refresh would let one flaky
+ * `GET /user` bounce a signed-in user to /login, while never refreshing would leave a role change
+ * unseen for the life of the tab.
  *
  * A 401/403 (or any fetch failure) resolves to `null` rather than throwing, so
  * guards can branch on authentication without try/catch noise at every call site.
@@ -32,11 +34,11 @@ export function currentUserQueryOptions() {
 export async function resolveCurrentUser(
 	queryClient: QueryClient,
 ): Promise<CurrentUserView | null> {
+	const options = currentUserQueryOptions();
 	try {
-		return await queryClient.ensureQueryData({
-			...currentUserQueryOptions(),
-			revalidateIfStale: true,
-		});
+		const user = await queryClient.query({ ...options, staleTime: "static" });
+		void queryClient.query(options).catch(() => undefined);
+		return user;
 	} catch {
 		return null;
 	}
@@ -77,15 +79,16 @@ export function workspaceMembershipQueryOptions(workspaceSlug: string) {
 }
 
 /**
- * `fetchQuery`, not `ensureQueryData`: the latter ignores `staleTime`, so a revoked admin would keep
- * the admin UI for the life of the tab. Any failure resolves to `null` — unverifiable is not allowed.
+ * Blocking on purpose, unlike `resolveCurrentUser` above: `query()` honours `staleTime`, so an
+ * admin navigation more than 30s after the last check re-verifies the role rather than trusting a
+ * cached one for the life of the tab. Any failure resolves to `null` — unverifiable is not allowed.
  */
 export async function resolveWorkspaceMembership(
 	queryClient: QueryClient,
 	workspaceSlug: string,
 ): Promise<WorkspaceMembership | null> {
 	try {
-		return await queryClient.fetchQuery(workspaceMembershipQueryOptions(workspaceSlug));
+		return await queryClient.query(workspaceMembershipQueryOptions(workspaceSlug));
 	} catch {
 		return null;
 	}

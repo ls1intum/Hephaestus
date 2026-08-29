@@ -32768,7 +32768,7 @@ type Group implements GroupInterface & Todoable {
     sort: ComplianceViolationSort = SEVERITY_LEVEL_DESC
 
     """Filters applied when retrieving compliance violations."""
-    filters: ComplianceViolationInput = {}
+    filters: ComplianceViolationInput = {  }
 
     """Returns the elements in the list that come after the specified cursor."""
     after: String
@@ -33237,7 +33237,7 @@ type Group implements GroupInterface & Todoable {
   """
   projectComplianceRequirementsStatus(
     """Filters applied when retrieving compliance requirement statuses."""
-    filters: GroupProjectRequirementComplianceStatusInput = {}
+    filters: GroupProjectRequirementComplianceStatusInput = {  }
 
     """Field used to sort compliance requirement statuses."""
     orderBy: ProjectComplianceRequirementStatusOrderBy
@@ -33262,7 +33262,7 @@ type Group implements GroupInterface & Todoable {
   """
   projectComplianceStandardsAdherence(
     """Filters applied when retrieving compliance standards adherence."""
-    filters: ComplianceStandardsAdherenceInput = {}
+    filters: ComplianceStandardsAdherenceInput = {  }
 
     """Returns the elements in the list that come after the specified cursor."""
     after: String
@@ -33284,7 +33284,7 @@ type Group implements GroupInterface & Todoable {
   """
   projectComplianceViolations(
     """Filters applied when retrieving compliance violations."""
-    filters: ProjectComplianceViolationFilterInput = {}
+    filters: ProjectComplianceViolationFilterInput = {  }
 
     """Returns the elements in the list that come after the specified cursor."""
     after: String
@@ -60592,7 +60592,7 @@ type Project implements ProjectInterface & Todoable {
     """
     Filters applied when retrieving compliance control statuses for the project.
     """
-    filters: ProjectComplianceControlStatusInput = {}
+    filters: ProjectComplianceControlStatusInput = {  }
 
     """Returns the elements in the list that come after the specified cursor."""
     after: String
@@ -60634,7 +60634,7 @@ type Project implements ProjectInterface & Todoable {
   """
   complianceRequirementStatuses(
     """Filters applied when retrieving compliance requirement statuses."""
-    filters: ProjectRequirementComplianceStatusInput = {}
+    filters: ProjectRequirementComplianceStatusInput = {  }
 
     """Field used to sort compliance requirement statuses."""
     orderBy: ProjectComplianceRequirementStatusOrderBy
@@ -60657,7 +60657,7 @@ type Project implements ProjectInterface & Todoable {
   """Compliance standards adherence for the project."""
   complianceStandardsAdherence(
     """Filters applied when retrieving compliance standards adherence."""
-    filters: ComplianceStandardsProjectAdherenceInput = {}
+    filters: ComplianceStandardsProjectAdherenceInput = {  }
 
     """Returns the elements in the list that come after the specified cursor."""
     after: String
@@ -62146,7 +62146,7 @@ type Project implements ProjectInterface & Todoable {
     sort: ComplianceViolationSort = SEVERITY_LEVEL_DESC
 
     """Filters applied when retrieving compliance violations."""
-    filters: ComplianceViolationProjectInput = {}
+    filters: ComplianceViolationProjectInput = {  }
 
     """Returns the elements in the list that come after the specified cursor."""
     after: String

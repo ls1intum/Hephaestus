@@ -3,6 +3,7 @@ import { createMemoryHistory, createRouter } from "@tanstack/react-router";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
 
+import { isRecord } from "@/lib/is-record";
 import { currentUser } from "@/mocks/fixtures/auth";
 import { server } from "@/mocks/server";
 import { routeTree } from "@/routeTree.gen";
@@ -19,10 +20,10 @@ function newRouter(url?: string) {
 	});
 }
 
-// `Object.values(routesById)` is `any[]`; the loose map's is `AnyRoute[]`. `fullPath` is untyped on
-// both, so it is checked on the way out.
-const adminUrls = Object.values(newRouter().looseRoutesById)
-	.map((route): unknown => route.fullPath)
+// `routesById` is keyed by generated route id, and its value type does not survive `Object.values`,
+// so `Object.values` widens to `any` and `fullPath` is narrowed on the way out rather than asserted.
+const adminUrls = Object.values(newRouter().routesById)
+	.map((route) => (isRecord(route) ? route.fullPath : undefined))
 	.filter((fullPath): fullPath is string => typeof fullPath === "string")
 	.filter((fullPath) => fullPath.startsWith("/admin/"));
 

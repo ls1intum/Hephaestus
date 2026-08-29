@@ -17,7 +17,7 @@ import { TanstackDevtools } from "@/integrations/devtools/TanstackDevtools";
 import { PostHogIdentity } from "@/integrations/posthog";
 import {
 	isPosthogEnabled,
-	posthogApiHost,
+	posthogOptions,
 	posthogProjectApiKey,
 } from "@/integrations/posthog/config";
 import { disableSentry, initSentry } from "@/integrations/sentry";
@@ -25,7 +25,6 @@ import { ThemeProvider } from "@/integrations/theme";
 import { useImpersonationStore } from "@/stores/impersonation-store";
 
 import * as TanstackQuery from "./integrations/tanstack-query/root-provider";
-import reportWebVitals from "./reportWebVitals";
 import { routeTree } from "./routeTree.gen";
 
 // No default request timeout, deliberately: it would have to clear the slowest honest response (a
@@ -129,14 +128,7 @@ function Root() {
 
 	if (analyticsEnabled) {
 		return (
-			<PostHogProvider
-				apiKey={posthogProjectApiKey}
-				options={{
-					api_host: posthogApiHost || undefined,
-					cross_subdomain_cookie: false,
-					opt_out_capturing_by_default: true,
-				}}
-			>
+			<PostHogProvider apiKey={posthogProjectApiKey} options={posthogOptions}>
 				{app}
 			</PostHogProvider>
 		);
@@ -161,8 +153,3 @@ if (rootElement && !rootElement.innerHTML) {
 		</StrictMode>,
 	);
 }
-
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
-reportWebVitals();

@@ -1,18 +1,11 @@
 import { format } from "date-fns";
-import {
-	AlertCircleIcon,
-	ArrowDownIcon,
-	ArrowUpIcon,
-	ChevronsUpDownIcon,
-	DatabaseIcon,
-	SearchIcon,
-	TriangleAlertIcon,
-} from "lucide-react";
+import { AlertCircleIcon, DatabaseIcon, SearchIcon, TriangleAlertIcon } from "lucide-react";
 import { Fragment, useState } from "react";
 
 import type { SyncResourceCount, SyncResourceState } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
+import { SortButton } from "@/components/common/SortButton";
 import { Button } from "@/components/ui/button";
 import {
 	Empty,
@@ -240,32 +233,15 @@ function SortableHeadCell({
 		);
 	}
 
-	const SortIcon = active
-		? sortState.dir === "asc"
-			? ArrowUpIcon
-			: ArrowDownIcon
-		: ChevronsUpDownIcon;
-
 	return (
 		<TableHead aria-sort={ariaSort} className={cn(align === "right" && "text-right", className)}>
-			<button
-				type="button"
-				onClick={() => onSort(sortKey)}
-				className={cn(
-					"group inline-flex items-center gap-1 rounded-sm outline-none hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50",
-					active ? "text-foreground" : "text-muted-foreground",
-					align === "right" && "flex-row-reverse",
-				)}
+			<SortButton
+				sorted={active ? sortState.dir : false}
+				onToggle={() => onSort(sortKey)}
+				reverse={align === "right"}
 			>
 				<span className="capitalize">{label}</span>
-				<SortIcon
-					className={cn(
-						"size-3.5 shrink-0",
-						active ? "opacity-100" : "opacity-40 group-hover:opacity-70",
-					)}
-					aria-hidden
-				/>
-			</button>
+			</SortButton>
 		</TableHead>
 	);
 }
