@@ -158,7 +158,7 @@ jobs:
       - name: Install dependencies and browser
         run: |
           bun install --frozen-lockfile
-          bun --cwd webapp run playwright install chromium --with-deps
+          bun run --cwd webapp playwright install chromium --with-deps
       - name: Run story tests and generated-asset check
         id: tests
         continue-on-error: true
@@ -288,7 +288,7 @@ jobs:
       - name: Run end-to-end tests against the built server
         run: |
           bun install --frozen-lockfile
-          bun --cwd webapp run playwright install chromium --with-deps
+          bun run --cwd webapp playwright install chromium --with-deps
           if [[ "${{ inputs.postgres_image_changed }}" == "true" ]]; then
             docker build -t ghcr.io/ls1intum/hephaestus/postgres:dev docker/postgres
           else
