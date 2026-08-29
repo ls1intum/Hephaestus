@@ -187,6 +187,7 @@ jobs:
       (inputs.webapp_changed != 'true' || inputs.application_server_changed != 'true' ||
        inputs.agent_images_changed != 'true' ||
        inputs.postgres_image_changed != 'true')
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     outputs:
       application-server-published: ${{ steps.tag.outputs.application-server-published }}

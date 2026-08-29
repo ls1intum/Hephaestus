@@ -22,6 +22,7 @@ permissions:
 jobs:
   validate:
     name: "Render compose stacks"
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     env:
       COMPOSE_ENV_FILES: .env,release-lock.env

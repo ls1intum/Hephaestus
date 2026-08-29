@@ -1,8 +1,5 @@
 name: Preview reconcile
 
-# Event-driven cleanup can be missed — a run cancelled, a Coolify hiccup, a pull request closed while
-# the lifecycle queue was busy. This sweeps what the events left behind, and joins the same global
-# lifecycle group as deploy and close so admission cannot race reclamation.
 on:
   schedule:
     - cron: "0 4 * * *"
@@ -59,14 +56,12 @@ jobs:
       pull-requests: read
     strategy:
       fail-fast: false
-      # Every job below joins the global preview lifecycle group, so a higher value would only start
-      # runners that immediately queue.
-      max-parallel: 1
+      max-parallel: 5
       matrix:
         pr: ${{ fromJSON(needs.inventory.outputs.previews) }}
     concurrency:
-      group: hephaestus-preview-lifecycle
-      queue: max
+      group: hephaestus-preview-lifecycle-${{ matrix.pr }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 8
     env:

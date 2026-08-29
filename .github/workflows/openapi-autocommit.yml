@@ -25,7 +25,7 @@ jobs:
       - name: Setup caches
         uses: ./.github/actions/setup-caches
         with:
-          cache-type: openapi-validation
+          cache-type: application-server-quality
           os: ${{ runner.os }}
 
       - name: Install dependencies

@@ -31,6 +31,7 @@ permissions: {}
 
 jobs:
   version-pr:
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     permissions:
       contents: write
