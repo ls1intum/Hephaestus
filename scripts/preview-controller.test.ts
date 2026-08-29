@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, it } from "node:test";
 
 import {
 	assess,
+	inventory,
 	TEARDOWN_REQUESTED_DESCRIPTION,
 	create,
 	finalize,
@@ -288,6 +289,24 @@ void describe("preview host capacity", () => {
 		});
 
 		assert.equal(core.outputs.get("eligible"), "true");
+	});
+
+	void it("sweeps only the previews that still hold a slot", async () => {
+		const core = makeCore();
+		await inventory({
+			github: makeGitHub({
+				deployments: occupants(3),
+				// pr-102's teardown was recorded, so re-sending its close event would ask Coolify to
+				// remove a stack that is already gone — and would spend the sweep's bound doing it.
+				statuses: {
+					102: [{ description: TEARDOWN_REQUESTED_DESCRIPTION, state: "inactive" }],
+				},
+			}),
+			context: makeContext(),
+			core,
+		});
+
+		assert.equal(core.outputs.get("previews"), JSON.stringify([100, 101]));
 	});
 
 	void it("still counts a preview whose cleanup was never verified", async () => {
