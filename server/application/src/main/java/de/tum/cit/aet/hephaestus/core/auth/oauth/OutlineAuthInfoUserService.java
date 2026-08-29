@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.WebClientConnectors;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
@@ -61,11 +62,13 @@ public class OutlineAuthInfoUserService implements OAuth2UserService<OAuth2UserR
 
     @Override
     public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
-        String authInfoUri = userRequest
-                .getClientRegistration()
-                .getProviderDetails()
-                .getUserInfoEndpoint()
-                .getUri();
+        String authInfoUri = Objects.requireNonNull(
+                userRequest
+                        .getClientRegistration()
+                        .getProviderDetails()
+                        .getUserInfoEndpoint()
+                        .getUri(),
+                "Outline auth.info URI must be configured");
         Map<String, Object> body;
         try {
             body = webClient

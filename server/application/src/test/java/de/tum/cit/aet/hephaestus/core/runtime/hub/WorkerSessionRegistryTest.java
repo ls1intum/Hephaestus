@@ -14,6 +14,7 @@ import java.util.HashMap;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
+import org.springframework.boot.web.server.context.WebServerApplicationContext;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.socket.WebSocketSession;
 import tools.jackson.databind.ObjectMapper;
@@ -21,6 +22,14 @@ import tools.jackson.databind.ObjectMapper;
 class WorkerSessionRegistryTest extends BaseUnitTest {
 
     private final FrameCodec codec = new FrameCodec(new ObjectMapper());
+
+    @Test
+    void drainsBeforeWebServerShutdown() {
+        WorkerSessionRegistry registry =
+                new WorkerSessionRegistry(mock(ApplicationEventPublisher.class), new SimpleMeterRegistry());
+
+        assertThat(registry.getPhase()).isGreaterThan(WebServerApplicationContext.GRACEFUL_SHUTDOWN_PHASE);
+    }
 
     @Test
     void duplicateRegistrationEvictsOlderAndKeepsNewer() throws Exception {

@@ -336,7 +336,7 @@ class WorkspaceLlmModelServiceTest extends BaseUnitTest {
         private DataIntegrityViolationException upstreamIdConstraintViolation() {
             org.hibernate.exception.ConstraintViolationException cve =
                     new org.hibernate.exception.ConstraintViolationException(
-                            "duplicate", null, "ux_ws_llm_model_connection_upstream");
+                            "duplicate", new java.sql.SQLException("duplicate"), "ux_ws_llm_model_connection_upstream");
             return new DataIntegrityViolationException("duplicate", cve);
         }
     }

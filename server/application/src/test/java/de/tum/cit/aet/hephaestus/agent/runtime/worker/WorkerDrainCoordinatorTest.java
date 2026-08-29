@@ -24,10 +24,16 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.boot.availability.AvailabilityChangeEvent;
 import org.springframework.boot.availability.ReadinessState;
+import org.springframework.boot.web.server.context.WebServerApplicationContext;
 import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationEventPublisher;
 
 class WorkerDrainCoordinatorTest extends BaseUnitTest {
+
+    @Test
+    void drainsAfterWebServerShutdown() {
+        assertThat(WorkerDrainCoordinator.PHASE).isLessThan(WebServerApplicationContext.GRACEFUL_SHUTDOWN_PHASE);
+    }
 
     @Test
     void gracefulDrainAwaitsThenSucceeds() {

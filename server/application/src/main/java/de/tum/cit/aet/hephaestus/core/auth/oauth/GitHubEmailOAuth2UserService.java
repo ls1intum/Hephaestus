@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.core.auth.oauth;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,11 +43,13 @@ public class GitHubEmailOAuth2UserService implements OAuth2UserService<OAuth2Use
     @Override
     public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
         OAuth2User user = delegate.loadUser(userRequest);
-        String nameAttrKey = userRequest
-                .getClientRegistration()
-                .getProviderDetails()
-                .getUserInfoEndpoint()
-                .getUserNameAttributeName(); // "id"
+        String nameAttrKey = Objects.requireNonNull(
+                userRequest
+                        .getClientRegistration()
+                        .getProviderDetails()
+                        .getUserInfoEndpoint()
+                        .getUserNameAttributeName(),
+                "GitHub user-name attribute must be configured");
 
         Map<String, Object> attrs = new HashMap<>(user.getAttributes());
         fetchPrimaryVerifiedEmail(userRequest).ifPresent(email -> {

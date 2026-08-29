@@ -14,13 +14,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.availability.AvailabilityChangeEvent;
 import org.springframework.boot.availability.ReadinessState;
-import org.springframework.boot.web.server.context.WebServerGracefulShutdownLifecycle;
+import org.springframework.boot.web.server.context.WebServerApplicationContext;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.SmartLifecycle;
 
 /**
- * SIGTERM-driven graceful shutdown for the worker. Runs at
- * {@link WebServerGracefulShutdownLifecycle#SMART_LIFECYCLE_PHASE} {@code - 1024} (after HTTP
+ * Graceful shutdown for the worker. Runs at
+ * {@link WebServerApplicationContext#GRACEFUL_SHUTDOWN_PHASE} {@code - 1024} (after HTTP
  * server stop, before executor teardown). Liveness stays {@code CORRECT} — kubelet must
  * not kill the pod early; only readiness flips to {@code REFUSING_TRAFFIC}.
  *
@@ -32,7 +32,7 @@ public class WorkerDrainCoordinator implements SmartLifecycle {
 
     private static final Logger log = LoggerFactory.getLogger(WorkerDrainCoordinator.class);
 
-    static final int PHASE = WebServerGracefulShutdownLifecycle.SMART_LIFECYCLE_PHASE - 1024;
+    static final int PHASE = WebServerApplicationContext.GRACEFUL_SHUTDOWN_PHASE - 1024;
 
     private final WorkerControlClient client;
     private final WorkerCapacityState state;

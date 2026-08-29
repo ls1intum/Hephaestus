@@ -14,17 +14,8 @@ spring:
         driver-class-name: org.h2.Driver
     jpa:
         hibernate:
-            # No schema is created: spec generation introspects controllers, never the DB, and MUST NOT
-            # read it at startup. Safe today — the only boot-time repository touch (AuthJwtConfig signing-key
-            # seed) swallows its failure, AuthEventPartitionManager runs on ApplicationReadyEvent and
-            # swallows, WorkspaceStartupListener is @Profile("!specs"), and specs configures no login
-            # providers. A future NON-swallowed boot-time repository read will break spec-gen with a
-            # cryptic "table not found".
+            # Spec generation introspects controllers and must not access the database during startup.
             ddl-auto: none
-        properties:
-            hibernate:
-                dialect: org.hibernate.dialect.H2Dialect
-
 hephaestus:
     auth:
         login-providers:

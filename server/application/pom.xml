@@ -43,23 +43,23 @@
         <skipCoverage>true</skipCoverage>
         <postgres.port>5432</postgres.port>
         <resilience4j.version>2.4.0</resilience4j.version>
-        <okhttp.version>5.3.2</okhttp.version>
+        <okhttp.version>5.5.0</okhttp.version>
         <docker-java.version>3.7.1</docker-java.version>
-        <archunit.version>1.4.2</archunit.version>
-        <spring-modulith.version>2.0.0</spring-modulith.version>
-        <liquibase-hibernate7.version>5.0.3</liquibase-hibernate7.version>
-        <springdoc.version>3.0.3</springdoc.version>
+        <archunit.version>1.5.0</archunit.version>
+        <spring-modulith.version>2.1.1</spring-modulith.version>
+        <liquibase.version>5.0.4</liquibase.version>
+        <liquibase-hibernate7.version>5.0.4</liquibase-hibernate7.version>
+        <springdoc.version>3.1.0</springdoc.version>
         <springdoc-maven-plugin.version>1.5</springdoc-maven-plugin.version>
-        <sentry.version>8.41.0</sentry.version>
-        <slack-bolt.version>1.48.1</slack-bolt.version>
-        <jnats.version>2.25.2</jnats.version>
-        <jgit.version>7.6.0.202603022253-r</jgit.version>
-        <java-jwt.version>4.5.2</java-jwt.version>
-        <postgresql.version>42.7.12</postgresql.version>
+        <sentry.version>8.53.0</sentry.version>
+        <slack-bolt.version>1.50.0</slack-bolt.version>
+        <jnats.version>2.26.2</jnats.version>
+        <jgit.version>7.7.1.202607240634-r</jgit.version>
+        <java-jwt.version>4.6.0</java-jwt.version>
         <therapi.version>0.15.0</therapi.version>
         <error-prone.version>2.50.0</error-prone.version>
         <nullaway.version>0.14.0</nullaway.version>
-        <shedlock.version>5.16.0</shedlock.version>
+        <shedlock.version>7.9.0</shedlock.version>
         <bucket4j.version>8.19.0</bucket4j.version>
         <maven.build.cache.skipCache>true</maven.build.cache.skipCache>
         <maven.build.cache.skipSave>true</maven.build.cache.skipSave>
@@ -190,8 +190,6 @@
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
-        <!-- Spring Modulith 2.0: declares module boundaries via @ApplicationModule,
-             verified by ModulithVerificationTest in the architecture surefire group. -->
         <dependency>
             <groupId>org.springframework.modulith</groupId>
             <artifactId>spring-modulith-starter-core</artifactId>
@@ -376,6 +374,11 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
+                <groupId>com.tngtech.archunit</groupId>
+                <artifactId>archunit</artifactId>
+                <version>${archunit.version}</version>
+            </dependency>
+            <dependency>
                 <groupId>com.squareup.okhttp3</groupId>
                 <artifactId>okhttp-bom</artifactId>
                 <version>${okhttp.version}</version>
@@ -454,7 +457,7 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.8.14</version>
+                <version>0.8.15</version>
                 <executions>
                     <execution>
                         <id>default-prepare-agent</id>
