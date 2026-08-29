@@ -12,6 +12,7 @@ on:
 jobs:
   validate-title:
     name: "Validate title"
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     if: ${{ !github.event.pull_request.draft }}
     permissions:
@@ -71,6 +72,7 @@ jobs:
 
   assign-author:
     name: "Assign author"
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -80,6 +82,7 @@ jobs:
 
   labeler:
     name: "Apply labels"
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     permissions:
       contents: read

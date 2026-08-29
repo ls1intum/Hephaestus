@@ -9,8 +9,8 @@ on:
 permissions: {}
 
 concurrency:
-  group: hephaestus-preview-lifecycle
-  queue: max
+  group: hephaestus-preview-lifecycle-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
 
 jobs:
   cleanup:

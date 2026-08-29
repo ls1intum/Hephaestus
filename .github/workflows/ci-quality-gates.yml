@@ -79,11 +79,18 @@ jobs:
         if: steps.should_run.outputs.run == 'true'
         uses: ./.github/actions/setup-bun
 
-      - name: Setup caches
-        if: steps.should_run.outputs.run == 'true'
+      - name: Setup application-server caches
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'application-server-quality'
         uses: ./.github/actions/setup-caches
         with:
-          cache-type: ${{ matrix.check }}
+          cache-type: application-server-quality
+          os: ${{ runner.os }}
+
+      - name: Setup server-contract caches
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'server-contracts'
+        uses: ./.github/actions/setup-caches
+        with:
+          cache-type: server-contracts
           os: ${{ runner.os }}
 
       - name: Application-server formatting + agent runtime + contracts
@@ -91,34 +98,30 @@ jobs:
         run: |
           bun install --frozen-lockfile
           bun run check:package-manager
+          bun run check:agent-runtime-pins
 
           ISSUES_FOUND=()
-          FMT_OK=true; PMD_OK=true; NULLNESS_OK=true; LINT_OK=true; TESTS_OK=true; TYPES_OK=true; SCRIPT_TYPES_OK=true; CONTRACTS_OK=true; ENV_OK=true; DOCS_OK=true; DIAGRAMS_OK=true; INSTRUCTIONS_OK=true
+          SERVER_OK=true; PMD_CANARY_OK=true; NULLNESS_OK=true; TOOLING_OK=true; TESTS_OK=true; CONTRACTS_OK=true; ENV_OK=true; DOCS_OK=true; DIAGRAMS_OK=true; INSTRUCTIONS_OK=true
 
-          bun run format:java:check || { FMT_OK=false; ISSUES_FOUND+=("Java formatting failed. Run: bun run format:java"); }
+          bun run check:server || { SERVER_OK=false; ISSUES_FOUND+=("Server formatting or PMD failed. Run: bun run check:server"); }
           bun run check:java-nullness \
             || { NULLNESS_OK=false; ISSUES_FOUND+=("Java nullness policy failed. Run: bun run check:java-nullness"); }
-          bun run lint:java || { PMD_OK=false; ISSUES_FOUND+=("PMD found violations. Run: bun run lint:java:report"); }
-          if [ "$PMD_OK" = "true" ] && [ "${{ inputs.pmd_canary }}" = "true" ]; then
+          if [ "$SERVER_OK" = "true" ] && [ "${{ inputs.pmd_canary }}" = "true" ]; then
             PMD_CANARY=server/application/src/main/java/de/tum/cit/aet/hephaestus/Application.java
             cp "$PMD_CANARY" "$RUNNER_TEMP/Application.java"
             trap 'cp "$RUNNER_TEMP/Application.java" "$PMD_CANARY"' EXIT
             sed -i '/public class Application {/a\    private int deliberatelyUnusedPmdCanary;' "$PMD_CANARY"
             if bun run lint:java; then
-              PMD_OK=false
+              PMD_CANARY_OK=false
               ISSUES_FOUND+=("PMD accepted a planted UnusedPrivateField violation; the gate is not analyzing current main sources")
             fi
             cp "$RUNNER_TEMP/Application.java" "$PMD_CANARY"
             trap - EXIT
           fi
-          bun run ci:agents \
-            || { LINT_OK=false; ISSUES_FOUND+=("Lint or formatting failed outside the webapp. Run: bun run check:agents:fix"); }
+          bun run check:agents \
+            || { TOOLING_OK=false; ISSUES_FOUND+=("Repository tooling checks failed. Run: bun run check:agents"); }
           bun run test:agents \
             || { TESTS_OK=false; ISSUES_FOUND+=("Agent runtime test(s) failed. Run: bun run test:agents"); }
-          bun run typecheck:agents \
-            || { TYPES_OK=false; ISSUES_FOUND+=("Agent TypeScript errors. Run: bun run typecheck:agents"); }
-          bun run typecheck:scripts \
-            || { SCRIPT_TYPES_OK=false; ISSUES_FOUND+=("scripts/ TypeScript errors. Run: bun run typecheck:scripts"); }
           bun run check:contracts || { CONTRACTS_OK=false; ISSUES_FOUND+=("Artifact-source contract validation failed. Run: bun run check:contracts"); }
           # Reads server/application.yml against docker/compose.{app,core}.yaml — the deployment that
           # has to deliver each setting. Both sides are behind this job's path filter.
@@ -140,13 +143,11 @@ jobs:
             echo "### App Server Quality" >> $GITHUB_STEP_SUMMARY
             echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
             echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
-            [[ "$FMT_OK" == "false" ]] && echo "| Java formatting | :x: Failed | \`bun run format:java\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$PMD_OK" == "false" ]] && echo "| Java lint (PMD) | :x: Failed | \`bun run lint:java:report\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$SERVER_OK" == "false" ]] && echo "| Server formatting and PMD | :x: Failed | \`bun run check:server\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$PMD_CANARY_OK" == "false" ]] && echo "| PMD canary | :x: Failed | Inspect the planted-violation check |" >> $GITHUB_STEP_SUMMARY
             [[ "$NULLNESS_OK" == "false" ]] && echo "| Java nullness policy | :x: Failed | \`bun run check:java-nullness\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$LINT_OK" == "false" ]] && echo "| Lint + format (outside webapp) | :x: Failed | \`bun run check:agents:fix\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$TOOLING_OK" == "false" ]] && echo "| Repository tooling | :x: Failed | \`bun run check:agents\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$TESTS_OK" == "false" ]] && echo "| Agent runtime tests | :x: Failed | \`bun run test:agents\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$TYPES_OK" == "false" ]] && echo "| Agent typecheck | :x: Failed | \`bun run typecheck:agents\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$SCRIPT_TYPES_OK" == "false" ]] && echo "| scripts/ typecheck | :x: Failed | \`bun run typecheck:scripts\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$CONTRACTS_OK" == "false" ]] && echo "| Artifact-source contracts | :x: Failed | \`bun run check:contracts\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$ENV_OK" == "false" ]] && echo "| Env delivery by runtime role | :x: Failed | \`bun run check:env\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$INSTRUCTIONS_OK" == "false" ]] && echo "| Agent instruction wiring | :x: Failed | \`bun run check:instructions\` |" >> $GITHUB_STEP_SUMMARY
@@ -165,8 +166,7 @@ jobs:
           cd webapp
 
           ISSUES_FOUND=()
-          LINT_OK=true
-          TYPES_OK=true
+          CLIENT_OK=true
           COMPONENTS_OK=true
           STORIES_OK=true
           SORT_OK=true
@@ -175,12 +175,14 @@ jobs:
           ROUTES_OK=true
           TESTS_OK=true
 
-          bun run check || { LINT_OK=false; ISSUES_FOUND+=("Lint or formatting failed. Run: cd webapp && bun run check:fix"); }
-          bun run typecheck || { TYPES_OK=false; ISSUES_FOUND+=("TypeScript errors found. Run: cd webapp && bun run typecheck"); }
-          bun ../scripts/check-presentational-components.ts || { COMPONENTS_OK=false; ISSUES_FOUND+=("Components must take data as props. Run: bun run check:components"); }
-          bun ../scripts/check-story-prose.ts || { STORIES_OK=false; ISSUES_FOUND+=("Story prose renders HTML paragraphs. Run: bun run check:stories"); }
-          bun ../scripts/check-story-sort.ts || { SORT_OK=false; ISSUES_FOUND+=("Storybook sidebar order is stale. Run: bun run check:story-sort"); }
-          bun ../scripts/check-docs-tokens.ts && bun test ../scripts/check-docs-tokens.test.ts || { TOKENS_OK=false; ISSUES_FOUND+=("The docs site copies a web app colour that has since changed. Run: bun run check:docs-tokens"); }
+          (cd .. && bun run check:client) || {
+            CLIENT_OK=false
+            ISSUES_FOUND+=("Webapp lint, formatting, or typecheck failed. Run: bun run check:client")
+          }
+          (cd .. && bun run check:components) || { COMPONENTS_OK=false; ISSUES_FOUND+=("Components must take data as props. Run: bun run check:components"); }
+          (cd .. && bun run check:stories) || { STORIES_OK=false; ISSUES_FOUND+=("Story prose renders HTML paragraphs. Run: bun run check:stories"); }
+          (cd .. && bun run check:story-sort) || { SORT_OK=false; ISSUES_FOUND+=("Storybook sidebar order is stale. Run: bun run check:story-sort"); }
+          (cd .. && bun run check:docs-tokens) || { TOKENS_OK=false; ISSUES_FOUND+=("The docs site copies a web app colour that has since changed. Run: bun run check:docs-tokens"); }
           timeout --kill-after=30s 10m bun run test \
             || { TESTS_OK=false; ISSUES_FOUND+=("Unit tests failed. Run: cd webapp && bun run test"); }
 
@@ -195,8 +197,7 @@ jobs:
             echo "### Webapp Quality" >> $GITHUB_STEP_SUMMARY
             echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
             echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
-            [[ "$LINT_OK" == "false" ]] && echo "| Lint + format (oxlint + oxfmt) | :x: Failed | \`cd webapp && bun run check:fix\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$TYPES_OK" == "false" ]] && echo "| TypeScript | :x: Failed | \`cd webapp && bun run typecheck\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$CLIENT_OK" == "false" ]] && echo "| Lint, format, and TypeScript | :x: Failed | \`bun run check:client\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$COMPONENTS_OK" == "false" ]] && echo "| Presentational components | :x: Failed | \`bun run check:components\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$STORIES_OK" == "false" ]] && echo "| Story prose | :x: Failed | \`bun run check:stories\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$SORT_OK" == "false" ]] && echo "| Storybook sidebar order | :x: Failed | \`bun run check:story-sort\` |" >> $GITHUB_STEP_SUMMARY

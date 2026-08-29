@@ -33,6 +33,7 @@ jobs:
       ${{ github.event.workflow_run.conclusion == 'success'
         && github.event.workflow_run.event == 'push'
         && github.event.workflow_run.head_repository.full_name == github.repository }}
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -137,6 +138,7 @@ jobs:
   tag-images:
     needs: release
     if: needs.release.outputs.released == 'true'
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     permissions:
       packages: write
@@ -411,6 +413,7 @@ jobs:
   publish-release:
     needs: [release, tag-images]
     if: needs.release.outputs.released == 'true'
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -557,6 +560,7 @@ jobs:
   deploy-production:
     needs: [release, deploy-staging]
     if: needs.release.outputs.released == 'true'
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Production Deploy

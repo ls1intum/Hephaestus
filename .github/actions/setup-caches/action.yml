@@ -12,6 +12,16 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Validate cache type
+      shell: bash
+      env:
+        CACHE_TYPE: ${{ inputs.cache-type }}
+      run: |
+        case "$CACHE_TYPE" in
+          application-server-quality|application-server-verification|application-server-integration|server-contracts|webapp-e2e|webapp-storybook) ;;
+          *) echo "::error::Unknown cache type '$CACHE_TYPE'."; exit 1 ;;
+        esac
+
     - name: Compute generated-client cache identity
       id: generated-clients-identity
       if: startsWith(inputs.cache-type, 'application-server-') || contains(fromJSON('["webapp-e2e", "server-contracts"]'), inputs.cache-type)

@@ -28,12 +28,9 @@ jobs:
     # Longer than the budgets inside the scripts (image wait, deploy, reachability), so a run that
     # exceeds them reports a deployment status instead of being cancelled without one.
     timeout-minutes: 40
-    # Serialized: admission counts the previews already holding a slot, so two concurrent runs would
-    # both see room. `queue: max` keeps the backlog instead of cancelling it; each queued run resolves
-    # the pull request's current head, so a burst of pushes collapses into one deployment.
     concurrency:
-      group: hephaestus-preview-lifecycle
-      queue: max
+      group: hephaestus-preview-admission
+      cancel-in-progress: false
     env:
       COOLIFY_URL: ${{ vars.COOLIFY_URL }}
       COOLIFY_APP_UUID: ${{ vars.COOLIFY_APP_UUID }}
