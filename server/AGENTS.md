@@ -29,15 +29,15 @@ the Postgres container. For plain terminals: `bun run dev:server` and `bun run d
 Each of these can leave you with the wrong result.
 
 - **Use the reactor.** `server/generated-clients` owns every GraphQL and Outline generator and
-  `server/application` consumes its JAR. From `server/`, `./mvnw test` runs the default unit suite;
-  use it after a fresh checkout or generated-client input change. For the repeated application-edit
-  loop, use `./mvnw -f application/pom.xml test` (and `-Dtest=ClassName` to focus a test) so Maven does
-  not restore the generated module and invalidate application incremental compilation.
+  `server/application` consumes its JAR. From the repository root, use
+  `bun run test:server:unit` after a fresh checkout or generated-client input change. For the repeated
+  application-edit loop, use `./mvnw -f application/pom.xml test` from `server/` (and
+  `-Dtest=ClassName` to focus a test) so Maven does not restore the generated module and invalidate
+  application incremental compilation.
 - **`-Dgroups=architecture` silently runs the unit suite instead.** `pom.xml` sets Surefire's `<groups>`
   to `${surefire.includedGroups}`, and a POM element beats the `-Dgroups` user property — so the flag is
-  discarded and the default (`unit`) runs. The tag is selected by profile, never by `-Dgroups`:
-  `./mvnw test -Parchitecture-tests`. CI is unaffected; it passes `-Dsurefire.includedGroups`,
-  which is the property the POM actually reads.
+  discarded and the default (`unit`) runs. Use `bun run test:server:architecture`; CI passes the
+  `${surefire.includedGroups}` property that the POM reads.
 - **`clean` does not guarantee a cold build.** It removes workspace outputs, but Maven Build Cache can
   restore them. The repository enables the cache for `generated-clients`; Maven logs `Found cached
   build` on a hit. Pass `-Dmaven.build.cache.enabled=false` when measuring a cold build. Schema,
@@ -80,16 +80,16 @@ excluded. Every new package needs a `package-info.java` containing
 `NullAway` suppressions. Use `@Nullable` only for genuine absence and place it on the precise type:
 `List<@Nullable String>` permits null elements; `String @Nullable []` permits a null array reference.
 Fix violations at the contract or implementation boundary. In tests, refine a nullable result once
-before using it rather than adding duplicate assertions. Run `./mvnw test` after changing a
-nullness contract.
+before using it rather than adding duplicate assertions. Run `bun run test:server:unit` after changing
+a nullness contract.
 
 ## Test tiers
 
 | Tag | Runs | Command |
 |---|---|---|
-| `unit` | no Spring context | `./mvnw test` |
-| `architecture` | ArchUnit + Modulith verification | `./mvnw test -Parchitecture-tests` |
-| `integration` | unit tests, then full context + Testcontainers | `./mvnw verify` |
+| `unit` | no Spring context | `bun run test:server:unit` |
+| `architecture` | ArchUnit + Modulith verification | `bun run test:server:architecture` |
+| `integration` | full context + Testcontainers | `bun run test:server:integration` |
 | `live` | real GitHub API | `./mvnw test -Plive-tests` |
 
 Live tests need GitHub App credentials in `application-live-local.yml` (gitignored); the Maven profile
