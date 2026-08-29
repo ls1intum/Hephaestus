@@ -560,29 +560,9 @@ jobs:
   deploy-production:
     needs: [release, deploy-staging]
     if: needs.release.outputs.released == 'true'
-    timeout-minutes: 10
-    runs-on: ubuntu-latest
-    steps:
-      - name: Trigger Production Deploy
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          github-token: ${{ secrets.GH_PAT }}
-          script: |
-            await github.rest.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'deploy-prod.yml',
-              ref: 'main',
-              inputs: {
-                'image-tag': '${{ needs.release.outputs.tag_name }}'
-              }
-            });
-            console.log('✅ Production deployment triggered for ${{ needs.release.outputs.tag_name }}');
-
-      - name: Summary
-        run: |
-          echo "## 🚀 Production Deployment Triggered" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Version **${{ needs.release.outputs.tag_name }}** deployment to production has been triggered." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "⏳ Waiting for approval in the [Deploy to Production](https://github.com/${{ github.repository }}/actions/workflows/deploy-prod.yml) workflow." >> $GITHUB_STEP_SUMMARY
+    uses: ./.github/workflows/deploy-prod.yml
+    permissions:
+      contents: read
+    with:
+      image-tag: ${{ needs.release.outputs.tag_name }}
+    secrets: inherit
