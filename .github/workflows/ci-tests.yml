@@ -120,7 +120,7 @@ jobs:
               timeout --kill-after=30s 15m bun run test:storybook
               bun run export:readme-assets
               if [[ -n "$(git status --porcelain --untracked-files=all -- ../docs/images/readme)" ]]; then
-                echo "::error::README images are stale. Run 'bun run --filter webapp export:readme-assets' and commit the result."
+                echo "::error::README or documentation images are stale. Run 'bun run --filter webapp export:readme-assets' and commit the result."
                 git status --short --untracked-files=all -- ../docs/images/readme
                 exit 1
               fi
