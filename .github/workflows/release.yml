@@ -210,7 +210,7 @@ jobs:
 
       # The pin asset below tells every production deploy to run THIS agent image, so this is the
       # last point at which an image the released server cannot drive is still catchable. The
-      # sandbox is Bun-only (ADR 0030), so `node` must be absent, not present.
+      # sandbox is Node-only (ADR 0036), so `bun` and every package-manager CLI must be absent.
       - name: Smoke-test agent-pi
         env:
           IMAGE: ghcr.io/ls1intum/hephaestus/agent-pi@${{ steps.retag.outputs.agent-pi-digest }}
@@ -219,7 +219,7 @@ jobs:
           set -euo pipefail
           docker pull "$IMAGE"
           docker run --rm --entrypoint /bin/sh "$IMAGE" -c \
-            'node --version && for runtime in bun npm npx corepack yarn yarnpkg pnpm pnpx; do ! command -v "$runtime"; done'
+            'node --version && for runtime in bun npm npx corepack yarn yarnpkg pnpm pnpx; do ! command -v "$runtime" || exit 1; done'
 
           expected=$(grep -oE 'RUNTIME_CONTRACT_VERSION = [0-9]+' "$LAYOUT" | grep -oE '[0-9]+$')
           [ -n "$expected" ] || { echo "::error::Could not read RUNTIME_CONTRACT_VERSION from $LAYOUT"; exit 1; }

@@ -61,7 +61,11 @@ class PracticePiAdapterTest extends BaseUnitTest {
                 .contains("; true; }")
                 // Zero-script tolerance: Node is reached via ';' (not '&&') after the sed strip, so a missing
                 // '*.ts' / failed cp still lets the runner start.
-                .contains("2>/dev/null ; env -i HOME=/home/agent PATH=/usr/bin:/bin TMPDIR=/tmp node")
+                .contains("2>/dev/null ; env -i HOME=/home/agent PATH=/usr/local/bin:/usr/bin:/bin TMPDIR=/tmp node")
+                // env -i re-resolves node from its own PATH, which must cover /usr/local/bin (node:24-slim).
+                .contains("PATH=/usr/local/bin:")
+                // The output dir must exist before the sed redirect writes diff_clean.patch into it.
+                .contains("mkdir -p /workspace/work/precompute-stage/practices /workspace/work/precompute-out")
                 .contains("--permission")
                 .contains("--allow-fs-read=/workspace")
                 .contains("--allow-fs-read=/opt/precompute")

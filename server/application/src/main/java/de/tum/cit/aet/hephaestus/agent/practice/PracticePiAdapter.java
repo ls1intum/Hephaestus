@@ -66,7 +66,8 @@ public class PracticePiAdapter {
         return ("(rm -rf " + precomputeStage
                 + " && mkdir -p "
                 + precomputeStage
-                + "/practices"
+                + "/practices "
+                + precomputeOut
                 + " && find "
                 + precomputeIn
                 + " -maxdepth 1 -type f -name '*.ts' -exec cp {} "
@@ -81,7 +82,10 @@ public class PracticePiAdapter {
                 + contextTarget
                 + "diff.patch > "
                 + precomputeOut
-                + "/diff_clean.patch 2>/dev/null ; env -i HOME=/home/agent PATH=/usr/bin:/bin TMPDIR=/tmp node"
+                +
+                // env -i resolves node through the PATH it sets, so it must include /usr/local/bin,
+                // where the node:24-slim base installs the binary.
+                "/diff_clean.patch 2>/dev/null ; env -i HOME=/home/agent PATH=/usr/local/bin:/usr/bin:/bin TMPDIR=/tmp node"
                 + " --permission"
                 + " --allow-fs-read=/workspace"
                 + " --allow-fs-read=/opt/precompute"

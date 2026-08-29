@@ -55,7 +55,13 @@ RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack 
         echo "FATAL: Bun artefacts present in the image:" >&2; echo "$found" >&2; exit 1; \
     fi; \
     node --version; \
-    for manager in npm npx corepack yarn yarnpkg pnpm pnpx; do ! command -v "$manager"; done
+    # `!` exempts a command from errexit and only the last iteration's status would escape the
+    # loop, so each hit must fail explicitly.
+    for manager in npm npx corepack yarn yarnpkg pnpm pnpx; do \
+        if command -v "$manager" >/dev/null 2>&1; then \
+            echo "FATAL: '$manager' resolves to $(command -v "$manager"); this image must carry no package manager." >&2; exit 1; \
+        fi; \
+    done
 
 LABEL hephaestus.agent.runtime-contract=2
 LABEL hephaestus.agent.node-version=${NODE_VERSION}

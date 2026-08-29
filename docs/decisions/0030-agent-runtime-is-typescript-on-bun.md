@@ -1,6 +1,6 @@
 # ADR 0030: The agent runtime is TypeScript on Bun, with no Node in the sandbox
 
-**Status:** Accepted
+**Status:** Superseded by [ADR 0036](0036-agent-runtime-runs-on-node-24.md)
 **Date:** 2026-08-22
 **Authors:** Felix T.J. Dietrich
 **Builds on:** [ADR 0007](0007-sandbox-spi-shape.md) (the sandbox SPI the runner is staged into), [ADR 0026](0026-per-purpose-agent-bindings-and-llm-governance.md) (the mentor and practice-review purposes this runtime serves)
