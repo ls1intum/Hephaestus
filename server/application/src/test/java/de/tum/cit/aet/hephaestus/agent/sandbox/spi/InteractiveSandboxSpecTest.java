@@ -90,6 +90,6 @@ class InteractiveSandboxSpecTest extends BaseUnitTest {
         cmd.set(0, "/bin/sh");
         cmd.add("-c");
         cmd.add("rm -rf /");
-        assertThat(s.command()).containsExactly("bun", "/run.ts");
+        assertThat(s.command()).containsExactly("node", "/run.ts");
     }
 }
