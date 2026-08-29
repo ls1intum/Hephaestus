@@ -35,6 +35,7 @@ sequenceDiagram
     M->>R: Create draft vX.Y.Z release
     R->>R: Generate and verify digest-bound evidence
     R->>R: Upgrade seeded data from the previous stable release
+    R->>R: Qualify supported hosts
     R->>R: Promote X.Y.Z / X.Y / latest image tags
     R->>R: Publish release and deploy staging
     Note over R: Production still requires approval
@@ -56,9 +57,18 @@ sequenceDiagram
    ruleset, so the absent required checks don't block the merge. Versioning also moves any
    `### Next release` section in `MIGRATION.md` under the version being cut.
 3. **Merging the Version PR cuts the release.** The workflow creates a draft release at the merge
-   commit. After its evidence and seeded-upgrade gates pass, it promotes the CI-built images to
+   commit. After its evidence, seeded-upgrade, and supported-host gates pass, it promotes the CI-built images to
    `X.Y.Z`, `X.Y`, and `latest`, publishes the release, deploys staging, and requests production
    approval.
+
+## Supported-host qualification
+
+Every release boots its signed, immutable image lock through the self-hosted topology on native Ubuntu
+24.04 `amd64` and `arm64` hosts. The gate enforces the [published support matrix](../admin/install#supported-host-matrix),
+waits for stack readiness, and exercises HTTPS ingress. Either cell can block publication.
+
+Each cell's status record is attached to the immutable GitHub release. This qualification covers a
+clean boot; the seeded-upgrade gate separately proves the supported migration path.
 
 ## Supply-chain evidence
 

@@ -22,6 +22,22 @@ The stack you get:
 
 ## Requirements
 
+### Supported host matrix
+
+Hephaestus supports the blessed single-host stack on the following native (not emulated) hosts:
+
+| Distribution | CPU architecture |
+| --- | --- |
+| Ubuntu 24.04 LTS | x86-64 (`amd64`) |
+| Ubuntu 24.04 LTS | ARMv8 64-bit (`arm64`) |
+
+Both require Docker Engine 28 or newer and Docker Compose 2.24.4 or newer. Docker supports these
+hosts according to its [Ubuntu installation requirements](https://docs.docker.com/engine/install/ubuntu/#os-requirements).
+Each release is qualified on both matrix cells before publication.
+
+Only the listed native hosts and the unmodified self-hosted Compose topology are supported. All other
+hosts, runtimes, and topologies are outside release qualification.
+
 - **4 vCPUs, 8 GB RAM, 40 GB SSD** recommended. Absolute floor: 2 vCPUs / **8 GB RAM** — the two JVMs
   ship with container memory limits of 5 GB (`application-server`) and 2 GB (`webhook-server`), so a
   smaller host does not swap, it OOM-kills. On a host below that, lower both limits before the first
@@ -30,8 +46,7 @@ The stack you get:
 - **AI practice review adds real memory**: each concurrent review sandbox may use up to
   4 GiB. The default caps it at 1 concurrent sandbox; raise
   `SANDBOX_MAX_CONCURRENT` only with RAM to match.
-- 64-bit Linux with **Docker Engine ≥ 24** and **Docker Compose ≥ 2.24.4** (`docker compose version`),
-  plus `git` and `openssl`.
+- A host in the supported matrix, plus `git` and `openssl`.
 - A **DNS A record** for your hostname pointing at the host, with ports **80 and 443**
   reachable from the internet (Let's Encrypt HTTP-01, OAuth callbacks, webhooks).
 - Outbound HTTPS to `ghcr.io` and `docker.io` for images, `github.com` and `api.github.com` for the

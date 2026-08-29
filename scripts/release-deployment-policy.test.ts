@@ -21,7 +21,10 @@ await test("deployment uses Compose metadata, waits for readiness, and preserves
 await test("release publication requires the seeded upgrade gate", () => {
 	const upgrade = readFileSync(".github/workflows/release-upgrade.yml", "utf8");
 
-	assert.match(release, /publish-release:\n\s+needs: \[release, tag-images, upgrade-test\]/);
+	assert.match(
+		release,
+		/publish-release:\n\s+needs: \[release, tag-images, upgrade-test, supported-host-smoke\]/,
+	);
 	assert.match(
 		release,
 		/candidate-application-image: .*@\$\{\{ needs\.tag-images\.outputs\.application-server-digest \}\}/,
@@ -36,6 +39,18 @@ await test("release publication requires the seeded upgrade gate", () => {
 		upgrade,
 		/ref: \$\{\{ inputs\.candidate-source-sha \|\| inputs\.candidate-sha \|\| github\.sha \}\}/,
 	);
-	const upgradeGate = release.match(/ {2}upgrade-test:[\s\S]*?\n {2}publish-release:/)?.[0] ?? "";
+	const upgradeGate =
+		release.match(/ {2}upgrade-test:[\s\S]*?\n {2}supported-host-smoke:/)?.[0] ?? "";
 	assert.doesNotMatch(upgradeGate, /secrets: inherit/);
+});
+
+await test("release publication requires native smoke tests for every supported host", () => {
+	const smokeGate =
+		release.match(/ {2}supported-host-smoke:[\s\S]*?\n {2}publish-release:/)?.[0] ?? "";
+
+	assert.match(smokeGate, /architecture: amd64\n\s+runner: ubuntu-24\.04/);
+	assert.match(smokeGate, /architecture: arm64\n\s+runner: ubuntu-24\.04-arm/);
+	assert.match(smokeGate, /up -d --wait --wait-timeout 600/);
+	assert.match(smokeGate, /prepare-release-lock\.ts/);
+	assert.match(release, /gh release upload "\$TAG_NAME" host-smoke\/\*\.json/);
 });
