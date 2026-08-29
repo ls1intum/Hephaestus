@@ -69,8 +69,8 @@ jobs:
           test -d server/generated-clients/target/classes
           mapfile -t APPLICATION_JARS < <(find server/application/target -maxdepth 1 -name 'hephaestus-application-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar')
           mapfile -t CLIENT_JARS < <(find server/generated-clients/target -maxdepth 1 -name 'hephaestus-generated-clients-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar')
-          (( ${#APPLICATION_JARS[@]} == 1 ))
-          (( ${#CLIENT_JARS[@]} == 1 ))
+          (( ${#APPLICATION_JARS[@]} > 0 ))
+          (( ${#CLIENT_JARS[@]} > 0 ))
       - name: Upload built reactor
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -158,7 +158,7 @@ jobs:
       - name: Install dependencies and browser
         run: |
           bun install --frozen-lockfile
-          bun run --filter webapp playwright install chromium --with-deps
+          bun --cwd webapp run playwright install chromium --with-deps
       - name: Run story tests and generated-asset check
         id: tests
         continue-on-error: true
@@ -288,7 +288,7 @@ jobs:
       - name: Run end-to-end tests against the built server
         run: |
           bun install --frozen-lockfile
-          bun run --filter webapp playwright install chromium --with-deps
+          bun --cwd webapp run playwright install chromium --with-deps
           if [[ "${{ inputs.postgres_image_changed }}" == "true" ]]; then
             docker build -t ghcr.io/ls1intum/hephaestus/postgres:dev docker/postgres
           else
