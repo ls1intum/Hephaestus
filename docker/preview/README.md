@@ -51,8 +51,7 @@ Coolify runs every preview of this application under one Compose project named a
 UUID, so a network defined here would be `<uuid>_backend` for all of them at once, private-looking
 and shared. `staging-shared` is joined by name, which makes it a decision rather than a side effect.
 
-The application server runs without Linux capabilities and with `no-new-privileges`. PostgreSQL
-keeps a PR-specific volume.
+PostgreSQL keeps a PR-specific volume; nothing else in the stack keeps state.
 
 Deployment authority is deliberately the same as push authority;
 [ADR 0035](../../docs/decisions/0035-pull-request-previews-are-label-gated.md) records why, and what
@@ -72,10 +71,9 @@ memory limit, a network every preview would share, or a flipped integration swit
 
 ## Host capacity
 
-Each stack is capped at about 2.8 GiB once running (2 GiB application server, 512 MiB PostgreSQL,
-256 MiB webapp); the seed loader adds 512 MiB while it runs and then exits. Its CPU ceilings total
-2.75 across the four services, so several previews oversubscribe a small host on paper. That is intended: a preview is idle almost all the time, and a
-ceiling stops one stack from taking the box rather than reserving capacity for it.
+Memory and CPU ceilings are set per service in `compose.app.yaml`; budget roughly 3 GiB per slot.
+The CPU ceilings deliberately oversubscribe a small host: a preview is idle almost all the time, and
+a ceiling stops one stack taking the box rather than reserving capacity for it.
 
 `PREVIEW_MAX_ACTIVE` caps concurrent previews and defaults to 3. It has to leave roughly 3 GiB of
 memory per slot in whatever staging is not already using — check `free -g` on the host before raising
@@ -168,10 +166,9 @@ draft sends Coolify a signed close event, and the GitHub deployment is then mark
 slot is free. Coolify queues that teardown and answers immediately, so the workflow reports that the
 request was accepted, not that the containers are gone.
 
-Nothing here checks the host. That is a deliberate scope choice, not an oversight: no leaked preview
-stack has been observed, and verifying it would mean a standing SSH credential and a root-owned
-binary installed out of band. If leaks do turn up, the nightly `Preview reconcile` workflow is where
-that check belongs — it already walks every retained preview and re-sends the close event.
+Nothing here checks the host. That is a deliberate scope choice: verifying teardown would mean a
+standing credential on the deployment host. If leaks turn up, the nightly `Preview reconcile`
+workflow is where that check belongs — it already walks every retained preview and re-sends the close
+event.
 
-Watch the host's disk and container list for the first few weeks. Preview images are pulled per
-commit and are never removed by this system.
+Preview images are pulled per commit and are never removed by this system.

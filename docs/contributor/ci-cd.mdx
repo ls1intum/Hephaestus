@@ -84,7 +84,7 @@ This is more efficient than a custom workflow and doesn't consume CI minutes.
 
 | Environment       | Eligibility | Deploys on |
 | ----------------- | ----------- | ---------- |
-| Preview (Coolify) | Same-repository PR with the `preview` label | Every push; never waits for CI |
+| Preview (Coolify) | Same-repository PR with the `preview` label | Every push; waits for its images, never for tests |
 | Staging           | `main` | Verified signed release |
 | Production        | Required reviewer | The same verified signed release |
 

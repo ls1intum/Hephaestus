@@ -49,8 +49,8 @@ reviewer wants *in order to* review.
    silently deploy it, which surprises the approver.
 3. **A GitHub Environment with required reviewers.** Rejected *for previews*. It is the correct
    primitive and it is what production uses, but it gates every individual deployment behind a click
-   — the same per-commit friction as option 2, with a nicer button. A required-reviewer environment gates every
-   individual deployment behind a click. Deleting such an environment also deletes its secrets and protection rules
+   — the same per-commit friction as option 2, with a nicer button.
+   Deleting such an environment also deletes its secrets and protection rules
    and fails any job waiting on them, and `GITHUB_TOKEN` cannot do it at all — which is why cleanup
    here marks deployments inactive and never deletes environments.
 4. **The `preview` label as opt-in state, push access as the authority.** Chosen — see below.

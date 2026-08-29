@@ -77,8 +77,8 @@ const DEPLOYMENT_STATES = new Set([
 	"in_progress",
 	"queued",
 ]);
-// Coolify pulls three published images and starts them; the images are already built by the time
-// this runs, so the budget covers pulls and startup rather than a build.
+// The images are already built by the time this runs, so this budget covers Coolify pulling and
+// starting them rather than a build.
 const BUILD_BUDGET_MS = 1_200_000;
 // Coolify reports `finished` once the containers are up; the preview URL only answers once the
 // application server clears its own healthcheck start period. This is additive on purpose: clamping

@@ -61,7 +61,7 @@ jobs:
           COOLIFY_WEBHOOK_SECRET: ${{ secrets.COOLIFY_PREVIEW_WEBHOOK_SECRET }}
         run: bun scripts/coolify-preview.ts close
 
-      - name: Keep a verified cleanup tombstone
+      - name: Record that teardown was requested
         id: tombstone
         if: steps.close.outcome == 'success'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
