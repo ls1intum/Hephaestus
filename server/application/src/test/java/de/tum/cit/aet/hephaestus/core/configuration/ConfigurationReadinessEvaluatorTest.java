@@ -130,6 +130,21 @@ class ConfigurationReadinessEvaluatorTest extends BaseUnitTest {
     }
 
     @Test
+    void shouldReportAnUnresolvablePlaceholderAsTheSettingItStandsFor() {
+        MockEnvironment environment = environment(validProperties());
+        environment.setActiveProfiles("prod");
+        // What a deployment with DATABASE_URL unset actually renders: application.yml pins
+        // spring.datasource.url to jdbc:${DATABASE_URL}, and resolving that throws instead of
+        // returning null. Reading it must not end the report that exists to name the omission.
+        environment.setProperty("spring.datasource.url", "jdbc:${DATABASE_URL}");
+
+        assertThatThrownBy(() -> new ProductionConfigurationEnvironmentPostProcessor()
+                        .postProcessEnvironment(environment, new SpringApplication(Object.class)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("database.url");
+    }
+
+    @Test
     void shouldNotAllowAnotherProfileToBypassProductionValidation() {
         MockEnvironment environment = new MockEnvironment();
         environment.setActiveProfiles("prod", "test");

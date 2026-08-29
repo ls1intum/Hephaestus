@@ -11,6 +11,7 @@ import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
+import org.springframework.util.PlaceholderResolutionException;
 
 @Component
 public final class ConfigurationReadinessEvaluator {
@@ -160,7 +161,7 @@ public final class ConfigurationReadinessEvaluator {
                 roles(ConfigurationRole.WORKER),
                 ConfigurationRequirement.RECOMMENDED,
                 worker,
-                "runsc".equals(environment.getProperty("hephaestus.sandbox.container-runtime")),
+                "runsc".equals(property("hephaestus.sandbox.container-runtime")),
                 "gVisor (runsc) is recommended for stronger agent sandbox isolation.",
                 "sandbox-isolation");
         add(
@@ -206,7 +207,7 @@ public final class ConfigurationReadinessEvaluator {
             Predicate<String> predicate,
             String explanation,
             String anchor) {
-        String value = environment.getProperty(subject);
+        String value = property(subject);
         boolean configured = requirement != ConfigurationRequirement.OPTIONAL || notBlank(value);
         boolean satisfied = applicable && predicate.test(value);
         add(facts, id, subject, roles, requirement, applicable, configured, satisfied, explanation, anchor);
@@ -244,8 +245,22 @@ public final class ConfigurationReadinessEvaluator {
         facts.add(new ConfigurationFactDTO(id, subject, roles, requirement, status, explanation, DOC + "#" + anchor));
     }
 
+    /**
+     * Reads a property the way an operator experiences it. A value like {@code jdbc:${DATABASE_URL}}
+     * throws rather than resolving when the variable behind it is unset, which is exactly the
+     * deployment this evaluator exists to describe — so an unresolvable placeholder is reported as
+     * the missing setting it stands for instead of ending the report with a stack trace.
+     */
+    private @Nullable String property(String key) {
+        try {
+            return environment.getProperty(key);
+        } catch (PlaceholderResolutionException unresolved) {
+            return null;
+        }
+    }
+
     private BooleanSetting booleanSetting(String key, boolean fallback) {
-        String value = environment.getProperty(key);
+        String value = property(key);
         if (value == null) return new BooleanSetting(true, fallback);
         if ("true".equalsIgnoreCase(value)) return new BooleanSetting(true, true);
         if ("false".equalsIgnoreCase(value)) return new BooleanSetting(true, false);
