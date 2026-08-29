@@ -1,6 +1,5 @@
 {
 	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
-	"description": "Renovate config - dashboard only, manual updates",
 	"extends": [
 		"config:best-practices",
 		":semanticCommitTypeAll(chore)",
@@ -11,9 +10,16 @@
 	"timezone": "Europe/Berlin",
 	"schedule": ["before 7am on monday"],
 	"minimumReleaseAge": "3 days",
-	"platformAutomerge": true,
-	"automergeStrategy": "squash",
 	"semanticCommitScope": "deps",
+	"enabledManagers": [
+		"bun",
+		"maven",
+		"maven-wrapper",
+		"dockerfile",
+		"docker-compose",
+		"github-actions",
+		"custom.regex"
+	],
 	"dependencyDashboard": true,
 	"dependencyDashboardTitle": "Dependency Dashboard",
 	"lockFileMaintenance": {
@@ -23,32 +29,53 @@
 	"rangeStrategy": "replace",
 	"packageRules": [
 		{
-			"description": "Group Java/Spring",
 			"matchManagers": ["maven"],
-			"groupName": "Java dependencies",
+			"matchDepTypes": ["compile", "runtime", "provided", "optional", "parent", "parent-root"],
+			"matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"],
+			"groupName": "Java runtime and framework dependencies",
 			"labels": ["dependencies", "java"]
 		},
 		{
-			"description": "Group webapp non-major updates",
+			"matchManagers": ["maven"],
+			"matchDepTypes": ["build", "test"],
+			"matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"],
+			"groupName": "Java developer tooling",
+			"labels": ["dependencies", "java"]
+		},
+		{
 			"matchFileNames": ["webapp/package.json"],
+			"matchDepTypes": ["dependencies"],
 			"matchUpdateTypes": ["minor", "patch"],
-			"groupName": "Webapp dependencies",
+			"groupName": "Webapp runtime dependencies",
 			"labels": ["dependencies", "webapp"]
 		},
 		{
-			"description": "Group documentation deps",
+			"matchFileNames": ["webapp/package.json"],
+			"matchDepTypes": ["devDependencies"],
+			"matchUpdateTypes": ["minor", "patch"],
+			"groupName": "Webapp developer tooling",
+			"labels": ["dependencies", "webapp"]
+		},
+		{
 			"matchFileNames": ["docs/package.json"],
-			"groupName": "Documentation dependencies",
+			"matchDepTypes": ["dependencies"],
+			"matchUpdateTypes": ["minor", "patch"],
+			"groupName": "Documentation runtime dependencies",
 			"labels": ["dependencies", "docs"]
 		},
 		{
-			"description": "Major updates",
+			"matchFileNames": ["docs/package.json"],
+			"matchDepTypes": ["devDependencies"],
+			"matchUpdateTypes": ["minor", "patch"],
+			"groupName": "Documentation developer tooling",
+			"labels": ["dependencies", "docs"]
+		},
+		{
 			"matchUpdateTypes": ["major"],
 			"minimumReleaseAge": "7 days",
 			"labels": ["dependencies", "breaking"]
 		},
 		{
-			"description": "Core frameworks",
 			"matchPackageNames": [
 				"typescript",
 				"react",
@@ -60,38 +87,23 @@
 			"groupName": "Core frameworks"
 		},
 		{
-			"description": "GitHub Actions",
 			"matchManagers": ["github-actions"],
+			"matchUpdateTypes": ["minor", "patch", "digest", "pin", "pinDigest"],
 			"groupName": "GitHub Actions",
 			"labels": ["dependencies", "ci"]
 		},
 		{
-			"description": "Docker images",
 			"matchManagers": ["dockerfile", "docker-compose"],
-			"groupName": "Docker images",
-			"pinDigests": true,
 			"labels": ["dependencies", "infrastructure"]
 		},
 		{
-			"description": "Release runtime images",
-			"matchPackageNames": [
-				"docker.io/library/alpine",
-				"docker.io/library/nats",
-				"docker.io/library/nginx",
-				"docker.io/library/traefik",
-				"alpine",
-				"nats",
-				"nginx",
-				"traefik"
-			],
-			"groupName": "Release runtime images",
-			"automerge": false,
-			"labels": ["dependencies", "infrastructure", "security"]
+			"matchUpdateTypes": ["major"],
+			"groupName": null
 		}
 	],
 	"customManagers": [
 		{
-			"description": "Track ARG <PKG>_VERSION pins in Dockerfiles via a `# renovate:` magic comment, so Renovate handles bumps for tools installed inside the image (e.g. agent-pi's @earendil-works/pi-coding-agent).",
+			"description": "Track Dockerfile ARG version pins",
 			"customType": "regex",
 			"managerFilePatterns": ["/(^|/)Dockerfile$/"],
 			"matchStrings": [
@@ -110,7 +122,7 @@
 			"versioningTemplate": "semver"
 		},
 		{
-			"description": "Keep the release evidence inventory aligned with reviewed upstream image pins",
+			"description": "Track release image tags and digests",
 			"customType": "regex",
 			"managerFilePatterns": ["/^security/release-images\\.json$/"],
 			"matchStrings": [
@@ -120,8 +132,8 @@
 		}
 	],
 	"vulnerabilityAlerts": {
+		"enabled": true,
 		"labels": ["security", "dependencies"],
-		"schedule": ["at any time"],
 		"minimumReleaseAge": null,
 		"dependencyDashboardApproval": false,
 		"automerge": false,

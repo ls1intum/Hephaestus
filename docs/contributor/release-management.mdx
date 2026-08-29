@@ -151,11 +151,11 @@ Check the current release: `git describe --tags --abbrev=0` or
 
 ## Dependency management
 
-Dependencies are managed through the
-[Renovate Dependency Dashboard](https://docs.renovatebot.com/key-concepts/dashboard/). Approved
-updates are scheduled after the configured release-age checks; vulnerability alerts may run and merge
-independently. Bot PRs are exempt from the changeset check — when a dependency bump is user-facing,
-a maintainer adds the changeset.
+Routine dependency updates require approval through the
+[Renovate Dependency Dashboard](https://docs.renovatebot.com/key-concepts/dashboard/) and observe
+the configured schedule and release age. Vulnerability-fix pull requests bypass those controls but
+still require review. Bot PRs are exempt from the changeset check — when a dependency bump is
+user-facing, a maintainer adds the changeset.
 
 Exact pins remain exact during Renovate updates. Formatter upgrades must include and separately review
 any resulting mechanical formatting changes.
