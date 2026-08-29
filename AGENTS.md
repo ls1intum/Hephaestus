@@ -4,7 +4,7 @@
 
 Hephaestus is an open-source AI mentor for software teams. It reads the work developers already do
 in GitHub, GitLab, Slack and Outline against the engineering practices their project cares about — a
-curated catalog ships with it — and delivers practice feedback on the work itself, on the developer's
+curated set of practices ships with it — and delivers practice feedback on the work itself, on the developer's
 own practice pages, or in conversation.
 
 `docs/contributor/practice-feedback-language.md` is the normative vocabulary and it binds this file

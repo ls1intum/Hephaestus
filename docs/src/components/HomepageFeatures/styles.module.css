@@ -20,22 +20,13 @@
 }
 
 .featureCard {
-	display: flex;
-	flex-direction: column;
+	composes: hephCard from global;
 	gap: 1rem;
-	padding: 2rem;
-	border-radius: var(--ifm-global-radius);
-	background: var(--ifm-card-background-color);
-	border: 1px solid var(--ifm-toc-border-color);
-	position: relative;
 	flex: 1;
 }
 
 .kicker {
-	font-size: 0.8rem;
-	font-weight: 650;
-	letter-spacing: 0.01em;
-	color: var(--ifm-color-primary);
+	composes: hephKicker from global;
 	margin: 0;
 }
 

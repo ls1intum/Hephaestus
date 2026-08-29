@@ -23,11 +23,10 @@ their project cares about, then says what went well, what could be better, and a
 Every piece of feedback names the practice it came from and points back to the work it saw, and
 developers can ask why, push back, or talk through the next step.
 
-Developers learn to work well in a team by doing the work and getting feedback on it. That feedback is
-a mentor's job, whether that is a coach on a university capstone or an experienced maintainer on an
-open-source project, and there is never enough of that attention to go round. The developers who need
-it most often get none. Hephaestus carries the routine part so that everyone gets some. It does not
-replace mentors: the harder judgement and the relationships stay with people.
+Feedback on how you work is a mentor's job — a coach on a university capstone, an experienced
+maintainer on an open-source project — and there is never enough of that attention to go round.
+Hephaestus carries the routine part so that everyone gets some. The harder judgement and the
+relationships stay with people.
 
 <div align="center">
   <picture>
@@ -49,15 +48,14 @@ replace mentors: the harder judgement and the relationships stay with people.
 
 ## What Hephaestus does
 
-- **Reviews contributions against engineering practices.** A curated catalog ships with it, covering
+- **Reviews contributions against engineering practices.** A curated set of practices ships with it, covering
   how work is scoped and described, how issues are written, how reviews are given and answered,
   testing, failure handling, security, maintainability, recorded decisions, version control, planning
   and communicating in the open. A workspace adopts the groups it cares about and can rewrite any
   practice inside them.
 - **Gets the feedback to the developer.** It can land on the work itself, on the developer's own
-  practice pages, or in their next conversation with Hephaestus — whichever stands the best chance of
-  being read and acted on. Every piece names the practice it came from and points at the evidence
-  behind it.
+  practice pages, or in their next conversation with Hephaestus. Every piece names the practice it
+  came from and points at the evidence behind it.
 - **Answers follow-up questions.** Developers can ask why a suggestion matters or supply the context
   it did not have. In chat Hephaestus goes by Heph, in the web app and, when Slack is connected, in a
   direct message.
@@ -79,8 +77,7 @@ replace mentors: the harder judgement and the relationships stay with people.
 5. They act on it, push back with a reason, or let it pass. Their next contribution is read the same
    way.
 
-The feedback is advisory. It does not approve a change for merge or grade anyone. Developers decide
-whether it fits their work.
+The feedback is advisory: it does not approve a change for merge or grade anyone.
 
 ## Get started
 

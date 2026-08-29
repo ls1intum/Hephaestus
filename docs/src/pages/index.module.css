@@ -19,14 +19,12 @@
 }
 
 .heroKicker {
+	composes: hephKicker from global;
 	display: inline-flex;
 	padding: 0.42rem 0.8rem;
 	border: 1px solid color-mix(in srgb, var(--ifm-color-primary) 24%, transparent);
 	border-radius: 999px;
 	background: color-mix(in srgb, var(--ifm-color-primary) 7%, transparent);
-	color: var(--ifm-color-primary);
-	font-size: 0.82rem;
-	font-weight: 650;
 }
 
 .heroTitle {
@@ -74,18 +72,6 @@
 	height: auto;
 }
 
-.heroVisualDark {
-	display: none !important;
-}
-
-:global([data-theme="dark"]) .heroVisualLight {
-	display: none;
-}
-
-:global([data-theme="dark"]) .heroVisualDark {
-	display: block !important;
-}
-
 .quickstartSection {
 	padding: 3.5rem 0 4rem;
 }
@@ -114,21 +100,11 @@
 }
 
 .quickstartCard {
-	position: relative;
-	display: flex;
-	flex-direction: column;
-	justify-content: flex-start;
+	composes: hephCard from global;
 	gap: 0.5rem;
-	padding: 1.85rem;
-	border: 1px solid var(--ifm-toc-border-color);
-	border-radius: var(--ifm-global-radius);
-	text-decoration: none;
-	color: inherit;
-	background: var(--ifm-card-background-color);
 	transition:
-		transform 0.2s ease,
-		box-shadow 0.2s ease,
-		border-color 0.2s ease;
+		border-color 0.2s ease,
+		transform 0.2s ease;
 }
 
 .quickstartCard:hover {
@@ -137,11 +113,8 @@
 }
 
 .quickstartAudience {
+	composes: hephKicker from global;
 	margin: 0;
-	color: var(--ifm-color-primary);
-	font-size: 0.8rem;
-	font-weight: 650;
-	letter-spacing: 0.01em;
 }
 
 .quickstartTitle {

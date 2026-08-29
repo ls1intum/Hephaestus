@@ -4,6 +4,16 @@ import { themes as prismThemes } from "prism-react-renderer";
 
 const envBaseUrl = process.env.DOCUSAURUS_BASE_URL;
 
+/*
+ * PR previews on Surge.sh need '/', production GitHub Pages needs '/Hephaestus/'. Unset and empty
+ * both mean production: an empty base URL would resolve every asset against the site root.
+ */
+const baseUrl = envBaseUrl === undefined || envBaseUrl === "" ? "/Hephaestus/" : envBaseUrl;
+
+/** The site's one-sentence definition of the product, kept in step with the README's opening. */
+const DESCRIPTION =
+	"Hephaestus is an open-source AI mentor for software teams. It reads the work developers already do against the practices their project cares about, and writes back feedback they can act on.";
+
 const config: Config = {
 	title: "Hephaestus Documentation",
 	tagline: "Learn from the work you're already doing",
@@ -22,9 +32,7 @@ const config: Config = {
 	},
 
 	url: "https://ls1intum.github.io",
-	// PR previews on Surge.sh need '/', production GitHub Pages needs '/Hephaestus/'. Unset and empty
-	// both mean production: an empty base URL would resolve every asset against the site root.
-	baseUrl: envBaseUrl === undefined || envBaseUrl === "" ? "/Hephaestus/" : envBaseUrl,
+	baseUrl,
 	organizationName: "ls1intum",
 	projectName: "Hephaestus",
 
@@ -137,11 +145,7 @@ const config: Config = {
 			disableSwitch: false,
 		},
 		metadata: [
-			{
-				name: "description",
-				content:
-					"Hephaestus is an open-source AI mentor for software teams. It reads the work developers already do against the practices their project cares about, and writes back feedback they can act on.",
-			},
+			{ name: "description", content: DESCRIPTION },
 			{
 				name: "keywords",
 				content: "Hephaestus, AI mentor, code review feedback, software engineering practices, TUM",
@@ -149,11 +153,7 @@ const config: Config = {
 			{ name: "twitter:card", content: "summary_large_image" },
 			{ name: "twitter:site", content: "@ls1intum" },
 			{ name: "twitter:title", content: "Hephaestus Documentation" },
-			{
-				name: "twitter:description",
-				content:
-					"Hephaestus is an open-source AI mentor for software teams. It reads the work developers already do against the practices their project cares about, and writes back feedback they can act on.",
-			},
+			{ name: "twitter:description", content: DESCRIPTION },
 		],
 		navbar: {
 			title: "Hephaestus",
@@ -264,8 +264,9 @@ const config: Config = {
 		},
 		announcementBar: {
 			id: "pre-1-0",
-			content:
-				'Hephaestus is <strong>pre-1.0</strong>: only the latest release is supported, and a minor release can require action. <a href="/admin/compatibility-policy">Read the compatibility policy</a>.',
+			// Raw HTML: Docusaurus neither prefixes this href with the base URL nor reports it to
+			// `onBrokenLinks`, so it has to carry the base URL itself or 404 on every page.
+			content: `Hephaestus is <strong>pre-1.0</strong>: only the latest release is supported, and a minor release can require action. <a href="${baseUrl}admin/compatibility-policy">Read the compatibility policy</a>.`,
 			isCloseable: true,
 		},
 		docs: {

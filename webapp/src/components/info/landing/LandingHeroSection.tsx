@@ -2,6 +2,7 @@ import { CircleCheck, MessageSquare, Square } from "lucide-react";
 import { motion, stagger, useReducedMotion } from "motion/react";
 import { LandingSignInCta } from "@/components/auth/LandingSignInCta";
 import { GithubIcon, GitlabIcon } from "@/components/icons/brand";
+import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -37,25 +38,12 @@ const groups = {
 	responding: { color: "cyan", icon: "MessageSquareReply" },
 };
 
-/** The acceptance criteria the issue is missing, drawn the way a task list renders. */
-function ProposedCriteria({ items }: { items: string[] }) {
-	return (
-		<ul className="flex flex-col gap-1">
-			{items.map((item) => (
-				<li key={item} className={cn(styles.cardText, "flex items-center gap-1.5")}>
-					<Square className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
-					{item}
-				</li>
-			))}
-		</ul>
-	);
-}
-
-/** Additions, deletions and the five-square proportion bar a change is summarised by. */
 function Diffstat({ added, removed }: { added: number; removed: number }) {
 	const greenSquares = Math.max(1, Math.round((added / (added + removed)) * 5));
 	return (
 		<span className="inline-flex items-center gap-1.5 font-mono">
+			{/* Fixed locale: the scene is captured as a committed image, and a grouping separator
+			    that follows the capturing machine's locale would rewrite that image in CI. */}
 			<span className="text-success">+{added.toLocaleString("en")}</span>
 			<span className="text-destructive">−{removed.toLocaleString("en")}</span>
 			<span className="flex gap-px" aria-hidden="true">
@@ -70,18 +58,6 @@ function Diffstat({ added, removed }: { added: number; removed: number }) {
 				))}
 			</span>
 		</span>
-	);
-}
-
-function ChangedFiles({ paths }: { paths: string[] }) {
-	return (
-		<ul className="flex flex-col gap-0.5 border-t border-border/70 px-3 py-2">
-			{paths.map((path) => (
-				<li key={path} className="truncate font-mono text-[0.6875rem] text-muted-foreground">
-					{path}
-				</li>
-			))}
-		</ul>
 	);
 }
 
@@ -108,9 +84,8 @@ function ReviewComment({
 			</span>
 			<p
 				className={cn(
-					styles.cardText,
 					styles.commentBubble,
-					"rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 leading-relaxed text-foreground",
+					"rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 text-[0.8125rem] leading-relaxed text-foreground",
 				)}
 			>
 				{children}
@@ -143,19 +118,31 @@ export function HeroScene() {
 						stance="gap"
 						rotate={2.5}
 					>
-						<ProposedCriteria items={["Which columns?", "How many rows?", "Who may export?"]} />
+						<ul className="flex flex-col gap-1">
+							{["Which columns?", "How many rows?", "Who may export?"].map((item) => (
+								<li key={item} className="flex items-center gap-1.5 text-[0.8125rem]">
+									<Square className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
+									{item}
+								</li>
+							))}
+						</ul>
 					</LandingFeedbackCard>
 				</LandingCluster>
 
 				<LandingCluster placement={{ column: 1, row: 2, offset: "1rem" }} delay={0.08}>
 					<LandingWorkCard state="ready" reference="#412" title="Add CSV export" rotate={3}>
-						<ChangedFiles
-							paths={[
-								"export/CsvWriter.ts",
-								"billing/InvoiceService.ts",
-								"config/application.yaml",
-							]}
-						/>
+						<ul className="flex flex-col gap-0.5 border-t border-border/70 px-3 py-2">
+							{["export/CsvWriter.ts", "billing/InvoiceService.ts", "config/application.yaml"].map(
+								(path) => (
+									<li
+										key={path}
+										className="truncate font-mono text-[0.6875rem] text-muted-foreground"
+									>
+										{path}
+									</li>
+								),
+							)}
+						</ul>
 						<LandingMetaRow>
 							<Diffstat added={1240} removed={380} />
 							<LandingMeta>34 files</LandingMeta>
@@ -238,12 +225,13 @@ export function LandingHeroSection({
 				)}
 			>
 				<motion.div className={cn(styles.heroCopy, "flex flex-col items-center")}>
-					<motion.p
-						variants={itemVariants}
-						className="relative z-10 inline-flex items-center rounded-full border border-mentor/20 bg-mentor/5 px-3 py-1.5 text-sm font-medium text-mentor"
+					<Badge
+						render={<motion.p variants={itemVariants} />}
+						variant="outline"
+						className="relative z-10 h-auto border-mentor/20 bg-mentor/5 px-3 py-1.5 text-sm whitespace-normal text-mentor"
 					>
 						Open-source AI mentoring for software teams
-					</motion.p>
+					</Badge>
 
 					<motion.h1
 						variants={itemVariants}
@@ -272,11 +260,8 @@ export function LandingHeroSection({
 						</span>
 					</motion.p>
 
-					{/* export-readme-assets.ts hides this row: repository documentation should not
-					    reproduce the web app's own navigation. */}
 					<motion.div
 						variants={itemVariants}
-						data-hero-actions=""
 						className="relative z-10 mt-8 flex w-full flex-col items-center gap-3 sm:w-auto sm:flex-row"
 					>
 						<LandingSignInCta
@@ -306,12 +291,14 @@ export function LandingHeroSection({
 						className="relative z-10 mt-5 flex flex-wrap items-center justify-center gap-2 text-sm text-muted-foreground"
 					>
 						<span>Works with</span>
-						<span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-2.5 py-1 font-medium text-foreground">
-							<GithubIcon className="size-3.5" aria-hidden="true" /> GitHub
-						</span>
-						<span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-2.5 py-1 font-medium text-foreground">
-							<GitlabIcon className="size-3.5" aria-hidden="true" /> GitLab
-						</span>
+						<Badge variant="outline" className="h-auto gap-1.5 bg-muted/40 px-2.5 py-1 text-sm">
+							<GithubIcon aria-hidden="true" />
+							GitHub
+						</Badge>
+						<Badge variant="outline" className="h-auto gap-1.5 bg-muted/40 px-2.5 py-1 text-sm">
+							<GitlabIcon aria-hidden="true" />
+							GitLab
+						</Badge>
 					</motion.p>
 				</motion.div>
 

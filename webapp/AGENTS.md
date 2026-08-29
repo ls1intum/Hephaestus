@@ -274,6 +274,15 @@ from the `--color-*` block in `src/styles.css` over a hard-coded value; `text-mu
 `text-foreground`, `bg-background` and `border-border` carry most of the tree. Read that block rather
 than guessing a name.
 
+**A `*.module.css` is for what a utility cannot express, and for nothing else.** There are two in the
+tree — `MentorIcon` and the landing scene — and each holds `@keyframes`, a generated `::before`, a
+`clip-path`, or a grid whose placement descendants override at a breakpoint. Anything a utility can
+say stays a utility: a module rule that is one `letter-spacing` or one `margin` is a utility in the
+wrong file, and it silently outranks the utility it duplicates, because Vite emits module CSS
+unlayered while Tailwind sits in `@layer utilities`. That inversion is the whole cost of the second
+system, so **own a property in one place or the other, never both** — a margin the module changes at
+a breakpoint belongs to the module at every width, not to `mt-8` at one of them.
+
 ## Testing
 
 `getByRole` > `getByLabelText` > `getByText`, and the ladder ends there: a `data-testid` skips past the

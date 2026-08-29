@@ -15,7 +15,6 @@ type Theme = "light" | "dark";
 interface CaptureConfig {
 	storyId: string;
 	selector: string;
-	/** Wide enough for the scattered composition; the export surface itself stays narrower. */
 	viewportWidth: number;
 	/** Asserted after render; a mismatch fails the export instead of committing a resized image. */
 	expectedWidth: number;

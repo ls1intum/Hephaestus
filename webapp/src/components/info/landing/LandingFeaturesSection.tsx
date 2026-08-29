@@ -18,10 +18,7 @@ import {
 } from "./LandingVisuals";
 import styles from "./LandingVisuals.module.css";
 
-/**
- * Groups from the curated catalog that ships with Hephaestus, shown to give the range a name. The
- * hero walks one change through four of them, so this section's own examples come from three others.
- */
+/** Groups from the set of practices that ships with Hephaestus, shown to give the range a name. */
 const practiceGroups = [
 	{ name: "Packaging work for review", color: "sky", icon: "Package" },
 	{ name: "Writing issues a maintainer can act on", color: "violet", icon: "FileText" },
@@ -33,7 +30,6 @@ const practiceGroups = [
 	{ name: "Communicating in the open", color: "violet", icon: "MessageCircle" },
 ];
 
-/** Removed and added lines, drawn the way a unified diff shows them. */
 function DiffLines({ removed, added }: { removed: string[]; added: string[] }) {
 	return (
 		<div className="flex flex-col border-t border-border/70 font-mono text-[0.6875rem] leading-relaxed">
@@ -83,22 +79,16 @@ export function LandingFeaturesSection() {
 						{practiceGroups.map((group) => {
 							const { Icon, pill } = getGroupVisual(group.icon, group.color);
 							return (
-								<li
-									key={group.name}
-									className={cn(
-										"inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium",
-										pill,
-									)}
-								>
-									<Icon className="size-3 shrink-0" aria-hidden="true" />
+								<Badge key={group.name} render={<li />} className={pill}>
+									<Icon aria-hidden="true" />
 									{group.name}
-								</li>
+								</Badge>
 							);
 						})}
 					</ul>
 					<p className="mt-3 text-sm text-muted-foreground">
-						A curated catalog ships with Hephaestus. Admins adopt the groups their project cares
-						about and can rewrite any practice inside them.
+						A curated set of practices ships with Hephaestus. Admins adopt the groups their project
+						cares about and can rewrite any practice inside them.
 					</p>
 				</div>
 
@@ -179,7 +169,7 @@ export function LandingFeaturesSection() {
 					whileInView={{ opacity: 1, scale: 1 }}
 					viewport={{ once: true, amount: 0.5 }}
 					transition={{ duration: 0.5, ease: landingEase, delay: 0.1 }}
-					className={cn(styles.featureHeph, "lg:col-start-1 lg:row-start-2")}
+					className={cn(styles.featureHeph, "mt-10 lg:col-start-1 lg:row-start-2")}
 				>
 					<LandingHephFigure
 						lead="Not sure which one to fix first?"

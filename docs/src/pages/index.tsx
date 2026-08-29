@@ -5,14 +5,11 @@ import feedbackSceneLight from "@site/images/readme/feedback-scene-light.png";
 import HomepageFeatures from "@site/src/components/HomepageFeatures";
 import Heading from "@theme/Heading";
 import Layout from "@theme/Layout";
+import ThemedImage from "@theme/ThemedImage";
 import type { ReactNode } from "react";
 
 import styles from "./index.module.css";
 
-/**
- * One card per audience, each with the pages that audience actually opens first. A docs homepage
- * that only links three overviews puts everything two clicks away.
- */
 const guides = [
 	{
 		title: "User guide",
@@ -74,19 +71,11 @@ function HomepageHeader() {
 						</div>
 					</div>
 					<figure className={styles.heroVisual}>
-						<img
-							className={styles.heroVisualLight}
-							src={feedbackSceneLight}
+						<ThemedImage
+							sources={{ light: feedbackSceneLight, dark: feedbackSceneDark }}
 							width={1792}
-							height={1414}
+							height={1412}
 							alt="Four cards from one change — an issue, a pull request, a review and the merge — each with the practice feedback Hephaestus attached to it."
-						/>
-						<img
-							className={styles.heroVisualDark}
-							src={feedbackSceneDark}
-							width={1792}
-							height={1414}
-							alt=""
 						/>
 					</figure>
 				</div>

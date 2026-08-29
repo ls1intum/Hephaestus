@@ -46,9 +46,8 @@
 }
 
 /*
- * Infima's own defaults are what make the docs feel like a different product from the web app.
- * Everything below re-points one of them at a token the app already uses, so a reader crossing
- * from the landing page into a guide does not change products on the way.
+ * Every override below re-points an Infima default at a value the web app already uses.
+ * `scripts/check-docs-tokens.ts` pins the ones copied from `webapp/src/styles.css`.
  */
 :root {
 	/* The app's --radius. Buttons, cards, code blocks and pagination all inherit it. */
@@ -82,8 +81,7 @@
 	--search-local-highlight-color: oklch(0.546 0.245 262.881);
 }
 
-/* The app's footer is a quiet strip that tracks the theme; Infima's is a fixed navy slab that
-   matches neither mode. */
+/* Infima's footer is a fixed navy slab that matches neither mode. */
 .footer {
 	--ifm-footer-background-color: var(--ifm-background-surface-color);
 	--ifm-footer-color: var(--ifm-color-emphasis-700);
@@ -105,7 +103,6 @@
 	font-size: 0.85rem;
 }
 
-/* The app's header is flat and its wordmark is semibold, not bold. */
 .navbar {
 	border-bottom: 1px solid var(--ifm-toc-border-color);
 }
@@ -114,7 +111,6 @@
 	font-weight: 600;
 }
 
-/* Headings in the app are tracked tight and stop at semibold. */
 .markdown h1:first-child {
 	font-size: 2.25rem;
 	letter-spacing: -0.03em;
@@ -131,7 +127,6 @@
 	letter-spacing: -0.01em;
 }
 
-/* The app renders a code block as a bordered card, not a bare tinted rectangle. */
 .theme-code-block {
 	border: 1px solid var(--ifm-toc-border-color);
 }
@@ -163,8 +158,6 @@
 	margin: 2rem auto;
 }
 
-/* The announcement bar is the pre-1.0 support window; it should read as part of the product,
-   not as the theme's default white strip over a dark page. */
 :root {
 	--docusaurus-announcement-bar-height: auto;
 }
@@ -176,7 +169,6 @@
 	font-size: 0.875rem;
 }
 
-/* Infima's large button is a size and a weight above anything in the app. */
 .button--lg {
 	font-size: 1rem;
 }
@@ -190,4 +182,24 @@
 
 [data-theme="dark"] .button--secondary:hover {
 	background-color: var(--ifm-color-emphasis-200);
+}
+
+/* Infima has no card or eyebrow primitive; both docs CSS modules `composes` these from here. */
+.hephCard {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	padding: 1.85rem;
+	border: 1px solid var(--ifm-toc-border-color);
+	border-radius: var(--ifm-global-radius);
+	background: var(--ifm-card-background-color);
+	color: inherit;
+	text-decoration: none;
+}
+
+.hephKicker {
+	color: var(--ifm-color-primary);
+	font-size: 0.8rem;
+	font-weight: 650;
+	letter-spacing: 0.01em;
 }

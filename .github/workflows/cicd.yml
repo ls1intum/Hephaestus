@@ -53,6 +53,9 @@ jobs:
             webapp:
               - 'webapp/**'
               - 'docs/images/readme/**'
+              # check:docs-tokens compares this stylesheet with webapp/src/styles.css, so both
+              # halves of that pair have to reach the leg that runs it.
+              - 'docs/src/css/custom.css'
               - '.oxlintrc.json'
               - '.oxfmtrc.json'
               # check:components, check:stories and check:story-sort live here, run on the Webapp leg.

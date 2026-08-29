@@ -1,29 +1,24 @@
-import { CircleDot, GitMerge, GitPullRequest, type LucideIcon } from "lucide-react";
+import { CircleDot, GitMerge, GitPullRequest, type LucideIcon, Sparkle } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import type { CSSProperties, ReactNode } from "react";
 import { getGroupVisual } from "@/components/admin/practice-catalog/group-visuals";
 import { MentorIcon } from "@/components/mentor/MentorIcon";
 import { ASSESSMENT_DEFS } from "@/components/practice-vocabulary/assessment-defs";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import styles from "./LandingVisuals.module.css";
 
 type StyleWithCustomProperties = CSSProperties & Record<`--${string}`, string>;
 
-/**
- * Where a cluster sits once its scene scatters; ignored while the scene is a single column.
- * Two clusters in the same column stack in flow, so text that grows pushes the one below it
- * down instead of landing on top of it.
- */
+/** Where a cluster sits once its scene scatters; ignored while the scene is a single column. */
 export interface LandingPlacement {
 	/** 1-based column of the scattered grid, or `full` to span it. */
 	column: number | "full";
-	/** 1-based row. */
 	row: number;
 	/** Static stagger, applied above the row it starts in. */
 	offset?: string;
 }
 
-/** A practice group's colour and lucide icon, as the shipped catalog records them. */
 export interface LandingGroupVisual {
 	color: string;
 	icon: string;
@@ -64,16 +59,7 @@ export function LandingCluster({ children, placement, delay }: LandingClusterPro
 }
 
 export function LandingSpark({ className }: { className?: string }) {
-	return (
-		<svg
-			className={cn(styles.accent, className)}
-			viewBox="0 0 24 24"
-			fill="currentColor"
-			aria-hidden="true"
-		>
-			<path d="M12 0c.85 6.4 4.75 10.3 11.9 12-7.15 1.7-11.05 5.6-11.9 12-.85-6.4-4.75-10.3-11.9-12C7.25 10.3 11.15 6.4 12 0Z" />
-		</svg>
-	);
+	return <Sparkle className={cn(styles.accent, "fill-current", className)} aria-hidden="true" />;
 }
 
 export function LandingGlow({ className }: { className?: string }) {
@@ -85,9 +71,8 @@ function rotation(degrees: number): StyleWithCustomProperties {
 }
 
 /**
- * The filled state badge GitHub and GitLab both put at the top of an issue or a change. Merged is
- * violet by GitHub's convention rather than by a token, the same way `group-visuals.ts` spells its
- * palette out: these are borrowed states, not part of our own colour system.
+ * Merged is violet by GitHub's convention rather than by a token, the same way `group-visuals.ts`
+ * spells its palette out: these are borrowed states, not part of our own colour system.
  */
 const WORK_STATES = {
 	open: { label: "Open", icon: CircleDot, className: "bg-success text-success-foreground" },
@@ -104,21 +89,15 @@ export type LandingWorkState = keyof typeof WORK_STATES;
 export function LandingStatePill({ state }: { state: LandingWorkState }) {
 	const { label, icon: Icon, className } = WORK_STATES[state];
 	return (
-		<span
-			className={cn(
-				"inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold",
-				className,
-			)}
-		>
-			<Icon className="size-3" aria-hidden="true" />
+		<Badge className={cn("text-[0.6875rem] font-semibold", className)}>
+			<Icon aria-hidden="true" />
 			{label}
-		</span>
+		</Badge>
 	);
 }
 
 interface LandingWorkCardProps {
 	state?: LandingWorkState;
-	/** The `#123` an issue or change is known by, shown the way the provider shows it. */
 	reference?: string;
 	title: string;
 	children?: ReactNode;
@@ -151,12 +130,7 @@ export function LandingWorkCard({
 /** A line lifted from the work itself: an issue body, a review comment, a status update. */
 export function LandingQuote({ children }: { children: ReactNode }) {
 	return (
-		<p
-			className={cn(
-				styles.cardText,
-				"border-t border-border/70 bg-muted/45 px-3 py-2 leading-relaxed text-muted-foreground",
-			)}
-		>
+		<p className="border-t border-border/70 bg-muted/45 px-3 py-2 text-[0.8125rem] leading-relaxed text-muted-foreground">
 			{children}
 		</p>
 	);
@@ -193,7 +167,6 @@ export function LandingMeta({ icon: Icon, tone = "neutral", children }: LandingM
 }
 
 interface LandingFeedbackCardProps {
-	/** The group the practice belongs to, so the chip wears the colour the catalog gave it. */
 	group: LandingGroupVisual;
 	/** A practice from the shipped catalog, named exactly as it is there. */
 	practice: string;
@@ -239,7 +212,7 @@ export function LandingFeedbackCard({
 				</p>
 				{children}
 			</div>
-			<span className={styles.slipMark} aria-hidden="true">
+			<span className="absolute right-2 bottom-1.5 text-mentor opacity-35" aria-hidden="true">
 				<MentorIcon size={13} pad={3} animated={false} />
 			</span>
 		</div>
@@ -260,8 +233,8 @@ export function LandingHephFigure({ className, lead, body }: LandingHephFigurePr
 			</span>
 			<div className={cn(styles.speechBubble, "text-left text-sm")}>
 				<p className="sr-only">Hephaestus says:</p>
-				<p className={cn(styles.bubbleLead, "leading-snug")}>{lead}</p>
-				<p className={cn(styles.bubbleBody, styles.cardText, "leading-relaxed")}>{body}</p>
+				<p className="font-bold tracking-[-0.01em] leading-snug">{lead}</p>
+				<p className="mt-1 text-[0.8125rem] leading-relaxed text-muted-foreground">{body}</p>
 			</div>
 		</div>
 	);

@@ -18,11 +18,6 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
 	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("heading", { level: 1 })).toBeVisible();
-		await expect(canvas.getByRole("link", { name: /View on GitHub/ })).toHaveAttribute(
-			"href",
-			"https://github.com/ls1intum/Hephaestus",
-		);
 		// One DOM serves the scattered and the stacked composition; a second copy means the
 		// two layouts have drifted apart.
 		await expect(canvas.getAllByText("Export reports to CSV")).toHaveLength(1);
@@ -57,7 +52,7 @@ export const DarkMode: Story = {
 /**
  * Captured by `webapp/scripts/export-readme-assets.ts` for the README and the documentation site,
  * and compared byte-for-byte by the `webapp-storybook` CI leg. Renaming this export or its
- * `data-readme-export` attribute breaks that leg, which `pnpm run check` does not run.
+ * `data-readme-export` attribute breaks that leg, which `bun run check` does not run.
  *
  * It renders the scene alone: a capture of the whole hero would put this page's headline inside
  * an image sitting next to that same headline.

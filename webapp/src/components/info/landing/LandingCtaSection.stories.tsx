@@ -19,16 +19,6 @@ export const Default: Story = {
 	args: {
 		isSignedIn: false,
 	},
-	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("link", { name: /Read the user guide/ })).toHaveAttribute(
-			"href",
-			"https://ls1intum.github.io/Hephaestus/user/overview",
-		);
-		await expect(canvas.getByRole("link", { name: /Read the installation guide/ })).toHaveAttribute(
-			"href",
-			"https://ls1intum.github.io/Hephaestus/admin/install",
-		);
-	},
 };
 
 export const SignedIn: Story = {

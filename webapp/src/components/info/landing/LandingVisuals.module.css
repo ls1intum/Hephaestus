@@ -1,14 +1,7 @@
 /*
- * The landing illustration: work cards, feedback slips and Heph, arranged as one scene.
- *
- * A scene is a single list in reading order. Below its breakpoint the list is a plain column;
- * above it, it becomes a grid whose column and row each cluster names through `--col`/`--row`.
- * One DOM serves both, so the scattered and stacked forms cannot say different things.
- *
  * The scatter breakpoint is owned here and nowhere else. A px breakpoint on the JSX would be a
  * second owner in a second unit — `80rem` tracks the root font size and `1281px` does not — so at
- * any root size but 16px the two would disagree. The Tailwind `lg:` that lays out the grid hosting
- * the feature scene is a different switch, and stays in rem so it cannot drift from this file.
+ * any root size but 16px the two would disagree.
  *
  * Nothing in a scene is pinned to a coordinate. Cards flow inside their cluster and clusters flow
  * inside their grid column, so text that grows — a translation, or the WCAG 1.4.12 text-spacing
@@ -167,7 +160,6 @@
 		0 1.75rem 2.5rem -1.5rem color-mix(in oklab, var(--foreground) 45%, transparent);
 }
 
-/* The tail points back at the avatar beside it. */
 .speechBubble::before {
 	content: "";
 	position: absolute;
@@ -179,19 +171,6 @@
 	border-bottom: 3px solid var(--foreground);
 	border-left: 3px solid var(--foreground);
 	background: color-mix(in oklab, var(--mentor) 10%, var(--background));
-}
-
-.cardText {
-	font-size: 0.8125rem;
-}
-
-/* Marks the card as Hephaestus speaking, without taking a place in the chip row. */
-.slipMark {
-	position: absolute;
-	right: 0.5rem;
-	bottom: 0.4rem;
-	color: var(--mentor);
-	opacity: 0.35;
 }
 
 /* The pointer a review comment has in GitHub's conversation view. */
@@ -220,21 +199,7 @@
 	border-right: 0.35rem solid color-mix(in oklab, var(--muted) 40%, var(--background));
 }
 
-.bubbleLead {
-	font-weight: 700;
-	letter-spacing: -0.01em;
-}
-
-.bubbleBody {
-	margin-top: 0.25rem;
-	color: var(--muted-foreground);
-}
-
-/*
- * A scene has three tiers, and the middle one matters most: between a phone and a wide desktop
- * there is no room for the scene beside the copy, but a single column strands it in the middle of
- * a viewport twice its width. So it pairs up before it scatters.
- */
+/* Pairs into two columns before it scatters: a single column strands the scene at tablet widths. */
 .sceneList {
 	display: flex;
 	flex-direction: column;
@@ -335,10 +300,6 @@
 	.headlineMark {
 		height: 1rem;
 	}
-}
-
-.featureHeph {
-	margin-top: 2.5rem;
 }
 
 /* ---- Scattered hero: the section becomes the canvas and the list its background layer. --- */

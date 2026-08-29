@@ -9,7 +9,7 @@ const faqItems = [
 	{
 		key: "practice-feedback",
 		q: "What is practice feedback?",
-		a: "Feedback on how the work was done rather than on the code itself. A practice is a defined way of working — scoping a change, writing an issue someone can act on, answering a reviewer, testing, handling failure, changing dependencies deliberately. A curated catalog ships with Hephaestus, and each piece of feedback names the practice it came from and points back to what it saw.",
+		a: "Feedback on how the work was done rather than on the code itself. A practice is a defined way of working — scoping a change, writing an issue someone can act on, answering a reviewer, testing, handling failure, changing dependencies deliberately. A curated set of practices ships with Hephaestus, and each piece of feedback names the practice it came from and points back to what it saw.",
 	},
 	{
 		key: "replaces-review",
