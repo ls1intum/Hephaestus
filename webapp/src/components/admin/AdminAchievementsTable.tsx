@@ -1,20 +1,17 @@
 import { Link } from "@tanstack/react-router";
 import {
-	type ColumnDef,
-	type ColumnFiltersState,
-	flexRender,
-	getCoreRowModel,
-	getFilteredRowModel,
-	getPaginationRowModel,
-	getSortedRowModel,
+	type ColumnVisibilityState,
+	createColumnHelper,
+	FlexRender,
 	type SortingState,
-	useReactTable,
-	type VisibilityState,
+	useTable,
 } from "@tanstack/react-table";
-import { ArrowUpDown, ChevronDown, RefreshCw, Search, Sparkles, Users } from "lucide-react";
-// oxlint-disable-next-line no-restricted-imports -- The compiler skips this component (see `useReactTable` below), so the memo on `columns` is written by hand.
+import { ChevronDown, RefreshCw, Search, Sparkles, Users } from "lucide-react";
+// oxlint-disable-next-line no-restricted-imports -- TanStack Table keys its model cache on `columns` identity, which the compiler memoises as an optimisation rather than promises; the `useMemo` below says what breaks without it.
 import { useMemo, useState } from "react";
 
+import { type DataTableFeatures, dataTableFeatures } from "@/components/common/data-table";
+import { DataTableHeader } from "@/components/common/DataTableHeader";
 import { TablePagination } from "@/components/common/TablePagination";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -34,17 +31,12 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils.ts";
 
 import type { ExtendedUserTeams } from "./types";
+
+const columnHelper = createColumnHelper<DataTableFeatures, ExtendedUserTeams>();
 
 interface AdminAchievementsTableProps {
 	users: ExtendedUserTeams[];
@@ -62,89 +54,71 @@ export function AdminAchievementsTable({
 	recalculatingUsers,
 }: AdminAchievementsTableProps) {
 	const [sorting, setSorting] = useState<SortingState>([]);
-	const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+	const [columnVisibility, setColumnVisibility] = useState<ColumnVisibilityState>({});
 	const [globalFilter, setGlobalFilter] = useState("");
 
 	// TanStack Table caches its column model — and every row model derived from it — against the
 	// identity of this array, so a fresh one each render rebuilds all of them.
-	const columns = useMemo<ColumnDef<ExtendedUserTeams>[]>(
-		() => [
-			{
-				accessorKey: "user.name",
-				header: ({ column }) => {
-					return (
-						<Button
-							variant="ghost"
-							onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-							className="h-auto p-0 font-semibold"
-						>
-							Name
-							<ArrowUpDown className="ml-2 h-4 w-4" />
-						</Button>
-					);
-				},
-				cell: ({ row }) => <div className="font-medium">{row.original.user.name}</div>,
-			},
-			{
-				accessorKey: "user.login",
-				header: ({ column }) => {
-					return (
-						<Button
-							variant="ghost"
-							onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-							className="h-auto p-0 font-semibold"
-						>
-							Username
-							<ArrowUpDown className="ml-2 h-4 w-4" />
-						</Button>
-					);
-				},
-				cell: ({ row }) => <div className="text-muted-foreground">{row.original.user.login}</div>,
-			},
-			{
-				id: "actions",
-				header: () => <span className="sr-only">Actions</span>,
-				cell: ({ row }) => {
-					const user = row.original;
-					const isRecalculating = recalculatingUsers.has(user.user.login);
-					return (
-						<div className="flex justify-end gap-2">
-							<Link
-								to="/w/$workspaceSlug/user/$username/achievements"
-								params={{ workspaceSlug, username: user.user.login }}
-								target="_blank"
-								className={cn(
-									buttonVariants({ variant: "outline", size: "sm" }),
-									"h-7 gap-1.5 text-muted-foreground hover:text-foreground",
-								)}
-							>
-								<Sparkles className="w-3.5 h-3.5" />
-								<span className="text-xs">View Achievements</span>
-							</Link>
-							<Button
-								variant="outline"
-								size="sm"
-								onClick={() => onRecalculate(user.user.login)}
-								disabled={isRecalculating}
-							>
-								{isRecalculating ? (
-									<>
-										<Spinner className="mr-2 h-4 w-4" />
-										Recalculating...
-									</>
-								) : (
-									<>
-										<RefreshCw className="mr-2 h-4 w-4" />
-										Recalculate
-									</>
-								)}
-							</Button>
-						</div>
-					);
-				},
-			},
-		],
+	const columns = useMemo(
+		() =>
+			columnHelper.columns([
+				// Ids are named, not derived: an unnamed deep accessor key becomes `user_name`, and the
+				// column menu below labels its entries with the id.
+				columnHelper.accessor("user.name", {
+					id: "name",
+					header: "Name",
+					cell: ({ row }) => <div className="font-medium">{row.original.user.name}</div>,
+				}),
+				columnHelper.accessor("user.login", {
+					id: "username",
+					header: "Username",
+					cell: ({ row }) => <div className="text-muted-foreground">{row.original.user.login}</div>,
+				}),
+				columnHelper.display({
+					id: "actions",
+					// Hiding a row's own controls is not a useful affordance.
+					enableHiding: false,
+					header: () => <span className="sr-only">Actions</span>,
+					cell: ({ row }) => {
+						const user = row.original;
+						const isRecalculating = recalculatingUsers.has(user.user.login);
+						return (
+							<div className="flex justify-end gap-2">
+								<Link
+									to="/w/$workspaceSlug/user/$username/achievements"
+									params={{ workspaceSlug, username: user.user.login }}
+									target="_blank"
+									className={cn(
+										buttonVariants({ variant: "outline", size: "sm" }),
+										"h-7 gap-1.5 text-muted-foreground hover:text-foreground",
+									)}
+								>
+									<Sparkles className="w-3.5 h-3.5" />
+									<span className="text-xs">View Achievements</span>
+								</Link>
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={() => onRecalculate(user.user.login)}
+									disabled={isRecalculating}
+								>
+									{isRecalculating ? (
+										<>
+											<Spinner className="mr-2 h-4 w-4" />
+											Recalculating...
+										</>
+									) : (
+										<>
+											<RefreshCw className="mr-2 h-4 w-4" />
+											Recalculate
+										</>
+									)}
+								</Button>
+							</div>
+						);
+					},
+				}),
+			]),
 		[onRecalculate, recalculatingUsers, workspaceSlug],
 	);
 
@@ -153,22 +127,17 @@ export function AdminAchievementsTable({
 		label: `${size}`,
 	}));
 
-	// oxlint-disable-next-line react/incompatible-library -- TanStack Table is a deliberate dependency; the compiler bail-out it causes is why `columns` above is memoised by hand.
-	const table = useReactTable({
+	// Every controlled slice gets its own change handler: v9 republishes `options.state` on each
+	// render, so a slice supplied without one is frozen.
+	const table = useTable({
+		features: dataTableFeatures,
 		data: users,
 		columns,
 		onSortingChange: setSorting,
-		onColumnFiltersChange: setColumnFilters,
-		getCoreRowModel: getCoreRowModel(),
-		getPaginationRowModel: getPaginationRowModel(),
-		getSortedRowModel: getSortedRowModel(),
-		getFilteredRowModel: getFilteredRowModel(),
 		onColumnVisibilityChange: setColumnVisibility,
 		onGlobalFilterChange: setGlobalFilter,
-		globalFilterFn: "includesString",
 		state: {
 			sorting,
-			columnFilters,
 			columnVisibility,
 			globalFilter,
 		},
@@ -230,25 +199,14 @@ export function AdminAchievementsTable({
 
 			<div className="rounded-md border">
 				<Table>
-					<TableHeader>
-						{table.getHeaderGroups().map((headerGroup) => (
-							<TableRow key={headerGroup.id}>
-								{headerGroup.headers.map((header) => {
-									return (
-										<TableHead key={header.id}>
-											{header.isPlaceholder
-												? null
-												: flexRender(header.column.columnDef.header, header.getContext())}
-										</TableHead>
-									);
-								})}
-							</TableRow>
-						))}
-					</TableHeader>
+					<DataTableHeader table={table} />
 					<TableBody>
 						{isLoading ? (
 							<TableRow>
-								<TableCell colSpan={columns.length} className="h-32 text-center">
+								<TableCell
+									colSpan={table.getVisibleLeafColumns().length}
+									className="h-32 text-center"
+								>
 									<div className="flex flex-col items-center justify-center space-y-2">
 										<Spinner />
 										<p className="text-sm text-muted-foreground">Loading users...</p>
@@ -257,21 +215,20 @@ export function AdminAchievementsTable({
 							</TableRow>
 						) : table.getRowModel().rows.length > 0 ? (
 							table.getRowModel().rows.map((row) => (
-								<TableRow
-									key={row.id}
-									data-state={row.getIsSelected() && "selected"}
-									className="hover:bg-muted/50 transition-colors"
-								>
+								<TableRow key={row.id} className="hover:bg-muted/50 transition-colors">
 									{row.getVisibleCells().map((cell) => (
 										<TableCell key={cell.id}>
-											{flexRender(cell.column.columnDef.cell, cell.getContext())}
+											<FlexRender cell={cell} />
 										</TableCell>
 									))}
 								</TableRow>
 							))
 						) : (
 							<TableRow>
-								<TableCell colSpan={columns.length} className="h-32 text-center">
+								<TableCell
+									colSpan={table.getVisibleLeafColumns().length}
+									className="h-32 text-center"
+								>
 									<div className="flex flex-col items-center justify-center space-y-2">
 										<Users className="h-8 w-8 text-muted-foreground" />
 										<p className="text-sm font-medium">No users found</p>
@@ -292,7 +249,7 @@ export function AdminAchievementsTable({
 				<div className="flex-1 text-sm text-muted-foreground order-2 sm:order-1">
 					<div className="flex flex-col sm:flex-row gap-1 sm:gap-4">
 						<span>
-							Showing {table.getRowModel().rows.length} of {users.length} users
+							Showing {table.getRowModel().rows.length} of {table.getRowCount()} users
 						</span>
 					</div>
 				</div>
@@ -306,7 +263,7 @@ export function AdminAchievementsTable({
 							Rows per page
 						</Label>
 						<Select
-							value={`${table.getState().pagination.pageSize}`}
+							value={`${table.state.pagination.pageSize}`}
 							onValueChange={(value) => {
 								table.setPageSize(Number(value));
 							}}
@@ -326,7 +283,7 @@ export function AdminAchievementsTable({
 					</div>
 
 					<TablePagination
-						page={table.getState().pagination.pageIndex}
+						page={table.state.pagination.pageIndex}
 						totalPages={table.getPageCount()}
 						onPageChange={(page) => table.setPageIndex(page)}
 					/>

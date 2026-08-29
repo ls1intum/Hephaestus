@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn } from "storybook/test";
+import { expect, fn, userEvent } from "storybook/test";
 
 import { AdminAchievementsTable } from "./AdminAchievementsTable";
 import type { ExtendedUserTeams } from "./types";
@@ -36,7 +36,24 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+	play: async ({ canvas }) => {
+		// Re-queried each time: sorting re-renders the header, so a held reference goes stale.
+		const nameHeader = () => canvas.getByRole("columnheader", { name: "Name" });
+		const sortByName = () => canvas.getByRole("button", { name: "Name" });
+
+		await expect(nameHeader()).toHaveAttribute("aria-sort", "none");
+		await userEvent.click(sortByName());
+		await expect(nameHeader()).toHaveAttribute("aria-sort", "ascending");
+		await userEvent.click(sortByName());
+		await expect(nameHeader()).toHaveAttribute("aria-sort", "descending");
+
+		// A column that cannot sort claims no sort state at all.
+		await expect(canvas.getByRole("columnheader", { name: "Actions" })).not.toHaveAttribute(
+			"aria-sort",
+		);
+	},
+};
 
 export const Loading: Story = {
 	args: { users: [], isLoading: true },

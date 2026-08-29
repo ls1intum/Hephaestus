@@ -39,7 +39,6 @@ const config: StorybookConfig = {
 			"ai",
 			"posthog-js/react",
 			"uuid",
-			"web-vitals",
 		];
 		return viteConfig;
 	},

@@ -81,6 +81,36 @@ if (!isRecord(packages)) throw new Error("bun.lock must contain packages");
 const packageValues = Object.values(packages).filter((value): value is unknown[] =>
 	Array.isArray(value),
 );
+/**
+ * `bunfig.toml#publicHoistPattern` lifts a package to the root `node_modules` so the whole repo
+ * shares one copy. For React and its types a second copy is two incompatible `JSX.Element`s, which
+ * surfaces as a type error deep inside an unrelated library. Hoisting can only lift one, so the
+ * lockfile resolving two is the moment that guarantee is gone — and nothing else notices.
+ */
+const bunfig: unknown = Bun.TOML.parse(readFileSync("bunfig.toml", "utf8"));
+const publicHoistPattern =
+	isRecord(bunfig) && isRecord(bunfig.install) ? bunfig.install.publicHoistPattern : undefined;
+if (!Array.isArray(publicHoistPattern) || publicHoistPattern.length === 0) {
+	throw new Error("bunfig.toml must declare install.publicHoistPattern");
+}
+for (const pattern of publicHoistPattern) {
+	// A glob cannot be matched against a resolution prefix, so it is left to Bun.
+	if (typeof pattern !== "string" || /[*?[\]]/.test(pattern)) continue;
+	const resolutions = new Set(
+		packageValues
+			.map(([resolution]) => resolution)
+			.filter((resolution): resolution is string => typeof resolution === "string")
+			.filter((resolution) => resolution.startsWith(`${pattern}@`)),
+	);
+	if (resolutions.size === 0)
+		throw new Error(`Publicly hoisted ${pattern} matches no lockfile package`);
+	if (resolutions.size > 1) {
+		throw new Error(
+			`Publicly hoisted ${pattern} resolves to ${resolutions.size} versions, so the workspaces cannot share one copy: ${[...resolutions].join(", ")}`,
+		);
+	}
+}
+
 for (const [dependency, expected] of overrideEntries) {
 	const resolutions = packageValues
 		.map(([resolution]) => resolution)

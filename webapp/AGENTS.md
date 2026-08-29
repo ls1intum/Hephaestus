@@ -181,12 +181,14 @@ suppressed at the call site with their reason.
 `forwardRef` are not imports you may take from `react` — the import line says so and why.
 
 **A `useMemo` that survives is load-bearing, and deleting it breaks something that still type-checks.**
-There are only two shapes that earn the suppression, and each names its own on the line above the
+There are only three shapes that earn the suppression, and each names its own on the line above the
 import: the value is a **dependency of an effect**, so its identity is what decides whether the effect
-re-runs; or the component is **opted out of the compiler** by a library it uses, so nothing memoises
-for it. `useReactTable` is the second case — `react/incompatible-library` names the same fact — and
-TanStack Table rebuilds its column model, and every row model downstream, whenever `columns` changes
-identity. Anything else is the memo the compiler exists to remove.
+re-runs; the component is **opted out of the compiler** by a library it uses, so nothing memoises for
+it — `react/incompatible-library` names that case where it can; or a **library keys a cache on the
+value's identity**, which the compiler memoises as an optimisation rather than promises. TanStack
+Table is the third: `useTable` compares `options.columns` and `options.data` with `!==` and rebuilds
+the column model, and every row model downstream, when either changes — so a table here memoises
+them by hand. Anything else is the memo the compiler exists to remove.
 
 ## The time of day
 
@@ -232,7 +234,7 @@ a routing table on the front page; its `RUBRIC.md` is the grading instrument for
 ## Routing
 
 Declare routes with `createFileRoute`. Keep loaders side-effect free and prefer
-`context.queryClient.ensureQueryData(...)` with the generated options. Put shared data (query client,
+`context.queryClient.query(...)` with the generated options. Put shared data (query client,
 auth) on the router context. Never hand-edit `routeTree.gen.ts` — there is no `tsr` CLI here; the
 TanStack Router Vite plugin regenerates it when the dev server runs.
 
