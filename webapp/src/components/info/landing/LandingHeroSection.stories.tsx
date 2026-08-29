@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn } from "storybook/test";
-import { LandingHeroSection } from "./LandingHeroSection";
+import { HeroScene, LandingHeroSection } from "./LandingHeroSection";
 
 const meta = {
 	component: LandingHeroSection,
@@ -55,17 +55,20 @@ export const DarkMode: Story = {
 };
 
 /**
- * Captured by `webapp/scripts/export-readme-assets.ts` for the README illustration, and
- * compared byte-for-byte by the `webapp-storybook` CI leg. Renaming this export or its
+ * Captured by `webapp/scripts/export-readme-assets.ts` for the README and the documentation site,
+ * and compared byte-for-byte by the `webapp-storybook` CI leg. Renaming this export or its
  * `data-readme-export` attribute breaks that leg, which `pnpm run check` does not run.
+ *
+ * It renders the scene alone: a capture of the whole hero would put this page's headline inside
+ * an image sitting next to that same headline.
  */
-export const ReadmeExport: Story = {
+export const SceneExport: Story = {
 	parameters: {
 		chromatic: { disableSnapshot: true },
 	},
-	render: (args) => (
-		<div data-readme-export="landing-hero" className="mx-auto w-full max-w-[1280px] bg-background">
-			<LandingHeroSection {...args} />
+	render: () => (
+		<div data-readme-export="feedback-scene" className="w-[56rem] bg-background p-6">
+			<HeroScene />
 		</div>
 	),
 };

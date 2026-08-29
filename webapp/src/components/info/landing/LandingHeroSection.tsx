@@ -119,7 +119,12 @@ function ReviewComment({
 	);
 }
 
-function HeroScene() {
+/**
+ * The story the hero tells, without the copy beside it. Exported so the asset pipeline can
+ * capture it on its own: a screenshot of the whole hero repeats its headline next to whatever
+ * heading the page already has.
+ */
+export function HeroScene() {
 	return (
 		<div className={styles.heroScene}>
 			<LandingGlow className={styles.heroGlowLeft} />

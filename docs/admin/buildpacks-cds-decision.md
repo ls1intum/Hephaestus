@@ -1,7 +1,6 @@
 ---
 id: buildpacks-cds-decision
 title: Server image build via Paketo Buildpacks + Application CDS
-sidebar_position: 4
 description: How and why the application-server image is built with Paketo Cloud Native Buildpacks + Application CDS, and the Java 25 + JEP 483 migration path.
 ---
 

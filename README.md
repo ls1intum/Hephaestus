@@ -31,11 +31,11 @@ replace mentors: the harder judgement and the relationships stay with people.
 
 <div align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./docs/images/readme/landing-hero-dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="./docs/images/readme/landing-hero-light.png">
-    <img alt="An illustration of one change through a project: issue #412 has no acceptance criteria, the pull request grew to 34 files and picked up an unrelated rename, a reviewer asks a good question, and it merges with that thread unresolved. Hephaestus points back to the issue." src="./docs/images/readme/landing-hero-light.png" width="1280">
+    <source media="(prefers-color-scheme: dark)" srcset="./docs/images/readme/feedback-scene-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="./docs/images/readme/feedback-scene-light.png">
+    <img alt="Four cards from one change — an issue with no acceptance criteria, a pull request that grew to 34 files, a review question, and the merge that left it unanswered — each with the practice feedback Hephaestus attached to it." src="./docs/images/readme/feedback-scene-light.png" width="896">
   </picture>
-  <p><sub>An illustration of the kind of feedback Hephaestus writes. See the <a href="https://ls1intum.github.io/Hephaestus/user/ai-code-review">user guide</a> for the real interface.</sub></p>
+  <p><sub>An illustration of the feedback Hephaestus writes. See the <a href="https://ls1intum.github.io/Hephaestus/user/ai-code-review">user guide</a> for the real interface.</sub></p>
 </div>
 
 > [!IMPORTANT]
@@ -127,5 +127,5 @@ quality checks, and open a pull request. Participation in the project is governe
 Hephaestus is an [MIT-licensed](./LICENSE) open-source project developed by
 [Applied Education Technologies](https://aet.cit.tum.de/) at the
 [Technical University of Munich](https://www.tum.de/en/). It is named after the Greek god of the
-forge. In the myth Plato tells, his craft was carried out of the workshop and handed to people so
-they could build for themselves — which is roughly the idea here.
+forge, whose craft — in the myth Plato tells — was stolen from his workshop and given to people so
+they could make things for themselves.

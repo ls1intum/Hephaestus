@@ -1,3 +1,8 @@
+---
+title: Unified integration migration
+description: The one-off cutover to the unified integration framework, kept for deployments that predate it.
+---
+
 # Migration guide — Unified integration framework (#1198 / PR #1306)
 
 Actionable, post-merge migration steps for operators upgrading from pre-#1198 releases to the unified

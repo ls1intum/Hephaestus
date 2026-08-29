@@ -1,3 +1,8 @@
+---
+title: Practice feedback schema
+description: The persisted shape of an observation and the feedback composed from it.
+---
+
 # Practice review data model
 
 This page records the durable relationships and invariants behind practice reviews. It deliberately

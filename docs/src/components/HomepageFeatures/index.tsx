@@ -72,8 +72,11 @@ function Feature({ title, kicker, description, bullets, cta }: FeatureItem) {
 
 export default function HomepageFeatures(): ReactNode {
 	return (
-		<section className={styles.features}>
+		<section className={styles.features} aria-labelledby="homepage-features-heading">
 			<div className="container">
+				<Heading as="h2" id="homepage-features-heading" className={styles.featuresHeading}>
+					What Hephaestus does
+				</Heading>
 				<div className={styles.featureRow}>
 					{FeatureList.map((feature) => (
 						<Feature key={feature.title} {...feature} />

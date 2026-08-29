@@ -1,3 +1,8 @@
+---
+title: Sync lifecycle
+description: How repository activity is ingested, backfilled and kept current.
+---
+
 # Integration sync lifecycle
 
 What each integration actually does at every phase of its life, from first connect to erasure.

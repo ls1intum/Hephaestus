@@ -122,8 +122,8 @@ const config: Config = {
 					{ label: { en: "Contributor Guide" }, path: "contributor" },
 					{ label: { en: "Admin Guide" }, path: "admin" },
 				],
-				hideSearchBarWithNoSearchContext: true,
-				useAllContextsWithNoSearchContext: false,
+				hideSearchBarWithNoSearchContext: false,
+				useAllContextsWithNoSearchContext: true,
 				highlightSearchTermsOnTargetPage: true,
 				searchResultContextMaxLength: 60,
 			},
@@ -253,10 +253,24 @@ const config: Config = {
 							label: "GitHub Repository",
 							href: "https://github.com/ls1intum/Hephaestus",
 						},
+						{
+							label: "Imprint",
+							href: "https://hephaestus.aet.cit.tum.de/imprint",
+						},
+						{
+							label: "Privacy",
+							href: "https://hephaestus.aet.cit.tum.de/privacy",
+						},
 					],
 				},
 			],
 			copyright: `Hephaestus is an MIT-licensed open-source project developed by Applied Education Technologies at the Technical University of Munich.`,
+		},
+		announcementBar: {
+			id: "pre-1-0",
+			content:
+				'Hephaestus is <strong>pre-1.0</strong>: only the latest release is supported, and a minor release can require action. <a href="/admin/compatibility-policy">Read the compatibility policy</a>.',
+			isCloseable: true,
 		},
 		docs: {
 			sidebar: {

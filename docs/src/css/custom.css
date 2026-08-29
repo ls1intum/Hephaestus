@@ -6,7 +6,7 @@
 
 /* You can override the default Infima variables here. */
 :root {
-	--ifm-color-primary: oklch(0.58 0.21 260);
+	--ifm-color-primary: oklch(0.546 0.245 262.881);
 	--ifm-color-primary-dark: oklch(0.53 0.21 260);
 	--ifm-color-primary-darker: oklch(0.49 0.2 260);
 	--ifm-color-primary-darkest: oklch(0.42 0.18 260);
@@ -20,13 +20,12 @@
 	--ifm-navbar-background-color: oklch(1 0 0);
 	--ifm-toc-border-color: oklch(0.92 0.004 286.32);
 	--ifm-code-font-size: 95%;
-	--ifm-hero-text-color: #f5f5ff;
 	--docusaurus-highlighted-code-line-bg: oklch(0.623 0.214 259.815 / 0.08);
 }
 
 /* Match the web app's neutral surfaces and blue mentor accent. */
 [data-theme="dark"] {
-	--ifm-color-primary: oklch(0.72 0.15 260);
+	--ifm-color-primary: oklch(0.707 0.165 254.624);
 	--ifm-color-primary-dark: oklch(0.67 0.17 260);
 	--ifm-color-primary-darker: oklch(0.63 0.19 260);
 	--ifm-color-primary-darkest: oklch(0.56 0.21 260);
@@ -59,4 +58,17 @@
 
 .markdown p > img {
 	margin: 2rem auto;
+}
+
+/* The announcement bar is the pre-1.0 support window; it should read as part of the product,
+   not as the theme's default white strip over a dark page. */
+:root {
+	--docusaurus-announcement-bar-height: auto;
+}
+
+div[class^="announcementBar_"] {
+	background: color-mix(in srgb, var(--ifm-color-primary) 12%, var(--ifm-background-color));
+	border-bottom: 1px solid color-mix(in srgb, var(--ifm-color-primary) 24%, transparent);
+	color: var(--ifm-font-color-base);
+	font-size: 0.9rem;
 }

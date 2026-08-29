@@ -1,6 +1,7 @@
 ---
 sidebar_position: 9
 title: Security mutation testing
+description: How PIT mutation testing is scoped to security-boundary classes, and what the advisory result does and does not prove.
 ---
 
 # Security mutation testing

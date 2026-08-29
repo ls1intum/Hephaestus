@@ -23,10 +23,12 @@ interface CaptureConfig {
 
 const themes: Theme[] = ["light", "dark"];
 const captureConfig: CaptureConfig = {
-	storyId: "components-info-landing-landingherosection--readme-export",
-	selector: '[data-readme-export="landing-hero"]',
-	viewportWidth: 1440,
-	expectedWidth: 1280,
+	storyId: "components-info-landing-landingherosection--scene-export",
+	selector: '[data-readme-export="feedback-scene"]',
+	// Under 80rem the scene pairs its clusters into two columns, which is the shape that stands
+	// on its own; above it the scene spreads around the hero copy and leaves a hole in the middle.
+	viewportWidth: 1024,
+	expectedWidth: 896,
 };
 
 function indexContains(index: unknown, storyId: string): boolean {
@@ -73,9 +75,7 @@ async function capture(
 		await page.evaluate(() => document.fonts.ready);
 		await page.addStyleTag({
 			content:
-				"*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}" +
-				// Repository documentation should not reproduce the web app's own navigation.
-				"[data-hero-actions]{display:none!important}",
+				"*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}",
 		});
 
 		const exportSurface = page.locator(config.selector);
@@ -110,7 +110,7 @@ try {
 	const browser = await chromium.launch();
 	try {
 		for (const theme of themes) {
-			await capture(browser, theme, "landing-hero", captureConfig);
+			await capture(browser, theme, "feedback-scene", captureConfig);
 		}
 	} finally {
 		await browser.close();
