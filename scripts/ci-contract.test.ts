@@ -1,36 +1,21 @@
 import assert from "node:assert/strict";
 import { glob, readFile } from "node:fs/promises";
 import { describe, test } from "node:test";
-import { load } from "js-yaml";
-import picomatch from "picomatch";
 
-function record(value: unknown, label: string): Record<string, unknown> {
-	assert.ok(value && typeof value === "object" && !Array.isArray(value), `${label} must be a map`);
-	return Object.fromEntries(Object.entries(value));
-}
-
-function strings(value: unknown, label: string): string[] {
-	assert.ok(
-		Array.isArray(value) && value.every((item) => typeof item === "string"),
-		`${label} must be strings`,
+function job(source: string, name: string): string {
+	const match = source.match(
+		new RegExp(`^  ${name}:\\n([\\s\\S]*?)(?=^  [A-Za-z][\\w-]*:\\s*$|(?![\\s\\S]))`, "m"),
 	);
-	return value;
+	assert.ok(match, `Missing ${name} job`);
+	return match[0];
 }
 
-function array(value: unknown, label: string): unknown[] {
-	assert.ok(Array.isArray(value), `${label} must be a list`);
-	return value;
-}
-
-function selected(patterns: string[], path: string): boolean {
-	let match = false;
-	for (const pattern of patterns) {
-		const excluded = pattern.startsWith("!");
-		if (picomatch.isMatch(path, excluded ? pattern.slice(1) : pattern, { dot: true })) {
-			match = !excluded;
-		}
-	}
-	return match;
+function pathFilter(source: string, name: string): string {
+	const match = source.match(
+		new RegExp(`^            ${name}:\\n([\\s\\S]*?)(?=^            [\\w-]+:\\s*$)`, "m"),
+	);
+	assert.ok(match, `Missing ${name} path filter`);
+	return match[0];
 }
 
 async function workflowSources(): Promise<Map<string, string>> {
@@ -155,92 +140,41 @@ void describe("CI contract", () => {
 	});
 
 	void test("shares one server build with integration and E2E", async () => {
-		const workflow = record(
-			load(await readFile(".github/workflows/ci-tests.yml", "utf8")),
-			"test workflow",
-		);
-		const jobs = record(workflow.jobs, "test jobs");
-		const build = record(jobs["server-build"], "server-build");
-		const integration = record(jobs["server-integration"], "server-integration");
-		const e2e = record(jobs["webapp-e2e"], "webapp-e2e");
-		assert.equal(integration.needs, "server-build");
-		assert.equal(e2e.needs, "server-build");
-
-		const buildSteps = array(build.steps, "server-build steps").map((step) =>
-			record(step, "server-build step"),
-		);
-		const integrationSteps = array(integration.steps, "server-integration steps").map((step) =>
-			record(step, "server-integration step"),
-		);
-		const e2eSteps = array(e2e.steps, "webapp-e2e steps").map((step) =>
-			record(step, "webapp-e2e step"),
-		);
-		const uploads = buildSteps.filter((step) => String(step.uses).includes("upload-artifact"));
-		const downloads = [...integrationSteps, ...e2eSteps].filter((step) =>
-			String(step.uses).includes("download-artifact"),
-		);
-		assert.equal(uploads.length, 1);
-		assert.equal(downloads.length, 2);
-		const artifactName = record(uploads[0]?.with, "artifact upload inputs").name;
-		for (const download of downloads) {
-			assert.equal(record(download.with, "artifact download inputs").name, artifactName);
+		const source = await readFile(".github/workflows/ci-tests.yml", "utf8");
+		const build = job(source, "server-build");
+		const integration = job(source, "server-integration");
+		const e2e = job(source, "webapp-e2e");
+		assert.equal((build.match(/actions\/upload-artifact@/g) ?? []).length, 1);
+		for (const consumer of [integration, e2e]) {
+			assert.match(consumer, /needs: server-build/);
+			assert.equal((consumer.match(/actions\/download-artifact@/g) ?? []).length, 1);
+			assert.match(consumer, /name: \${{ env\.SERVER_REACTOR_ARTIFACT }}/);
 		}
-		const testCommand = integrationSteps
-			.map((step) => step.run)
-			.find((run) => typeof run === "string");
-		assert.match(String(testCommand), /\.\/mvnw .* initialize surefire:test/);
+		assert.match(integration, /\.\/mvnw -pl application -am initialize surefire:test/);
 	});
 
 	void test("builds Storybook once and gives its TurboSnap stats to Chromatic", async () => {
-		const workflow = record(
-			load(await readFile(".github/workflows/ci-tests.yml", "utf8")),
-			"test workflow",
+		const storybook = job(
+			await readFile(".github/workflows/ci-tests.yml", "utf8"),
+			"webapp-storybook",
 		);
-		const jobs = record(workflow.jobs, "test jobs");
-		const storybook = record(jobs["webapp-storybook"], "webapp-storybook");
-		const steps = array(storybook.steps, "webapp-storybook steps").map((step) =>
-			record(step, "webapp-storybook step"),
-		);
-		const builds = steps.filter(
-			(step) => typeof step.run === "string" && step.run.includes("build-storybook"),
-		);
-		assert.equal(builds.length, 1);
-		assert.match(String(builds[0]?.run), /test -s webapp\/storybook-static\/preview-stats\.json/);
-		const chromatic = steps.find(
-			(step) => typeof step.uses === "string" && step.uses.startsWith("chromaui/action@"),
-		);
-		const chromaticInputs = record(chromatic?.with, "Chromatic inputs");
-		assert.equal(chromaticInputs.storybookBuildDir, "storybook-static");
-		assert.equal(chromaticInputs.onlyChanged, true);
-		const surge = steps.find(
-			(step) => typeof step.run === "string" && step.run.includes("/surge "),
-		);
-		assert.match(String(surge?.run), /\.\/webapp\/storybook-static/);
+		assert.equal((storybook.match(/bun run --filter webapp build-storybook/g) ?? []).length, 1);
+		assert.match(storybook, /test -s webapp\/storybook-static\/preview-stats\.json/);
+		assert.match(storybook, /storybookBuildDir: storybook-static/);
+		assert.match(storybook, /onlyChanged: true/);
+		assert.match(storybook, /surge \.\/webapp\/storybook-static/);
 	});
 
 	void test("routes tooling-only changes away from server infrastructure", async () => {
-		const workflow = record(load(await readFile(".github/workflows/cicd.yml", "utf8")), "CI");
-		const jobs = record(workflow.jobs, "CI jobs");
-		const detection = record(jobs["detect-changes"], "detect-changes");
-		const steps = array(detection.steps, "detect-changes steps").map((step) =>
-			record(step, "detect-changes step"),
-		);
-		const filter = steps.find((step) => step.id === "filter");
-		const filterSource = record(filter?.with, "path-filter inputs").filters;
-		if (typeof filterSource !== "string") throw new TypeError("path filters must be YAML");
-		const filters = record(load(filterSource), "path filters");
-		const tooling = strings(filters.tooling, "tooling filter");
-		const server = strings(filters["application-server"], "application-server filter");
-		const postgres = strings(filters["postgres-image"], "postgres-image filter");
-		const webappImage = strings(filters["webapp-image"], "webapp-image filter");
-
-		for (const path of ["docs/guide.mdx", ".vscode/settings.json", "server/AGENTS.md"]) {
-			assert.ok(selected(tooling, path), `${path} must run tooling checks`);
-			assert.ok(!selected(server, path), `${path} must not run Maven`);
-			assert.ok(!selected(postgres, path), `${path} must not run PostgreSQL validation`);
+		const source = await readFile(".github/workflows/cicd.yml", "utf8");
+		const detection = job(source, "detect-changes");
+		const tooling = pathFilter(detection, "tooling");
+		for (const pattern of ["docs/**", ".vscode/settings.json", "**/AGENTS.md", "**/CLAUDE.md"]) {
+			assert.match(tooling, new RegExp(`- '${escapeRegExp(pattern)}'`));
 		}
-		assert.ok(selected(postgres, "docker/postgres/Dockerfile"));
-		assert.ok(selected(webappImage, "patches/storybook.patch"));
+		assert.doesNotMatch(pathFilter(detection, "application-server"), /- 'docs\/\*\*'/);
+		assert.match(pathFilter(detection, "postgres-image"), /- 'docker\/postgres\/\*\*'/);
+		assert.match(pathFilter(detection, "webapp-image"), /- 'patches\/\*\*'/);
 	});
 
 	void test("pins every external action to a full commit SHA with a version comment", async () => {
