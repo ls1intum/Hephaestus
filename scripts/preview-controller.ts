@@ -78,6 +78,9 @@ const TRUSTED_ASSOCIATIONS = new Set(["COLLABORATOR", "MEMBER", "OWNER"]);
 // GitHub's comparison endpoint reports at most this many files and gives no truncation flag.
 const COMPARE_FILE_LIMIT = 300;
 const DEFAULT_MAX_ACTIVE = 3;
+
+/** One night's sweep. Reached only if teardown has been failing, which is when a bound matters. */
+const RECONCILE_LIMIT = 100;
 const LIVE_STATES = new Set(["in_progress", "pending", "queued", "success"]);
 const TEARDOWN_REQUESTED_DESCRIPTION =
 	"Preview teardown requested; awaiting Coolify reconciliation.";
@@ -415,6 +418,28 @@ const assess = async ({ github, context, core }: ControllerInput): Promise<void>
 	core.setOutput("base_ref", context.payload.repository.default_branch);
 };
 
+/**
+ * Candidates for the nightly sweep: the environments admission still believes are occupied. A
+ * preview whose teardown was already recorded holds nothing, so re-sending its close event would
+ * ask Coolify to remove a stack that is gone — every night, for every preview ever deployed. Worse,
+ * the sweep is bounded, and a list that only grows would fill that bound with previews already dealt
+ * with, leaving a genuinely leaked one unreached.
+ */
+const inventory = async ({ github, context, core }: ControllerInput): Promise<void> => {
+	const { owner, repo } = context.repo;
+	const occupied = await occupiedEnvironments(github, owner, repo);
+	const numbers = occupied
+		.map((environment) => Number(environment.slice("preview/pr-".length)))
+		.filter((number) => Number.isSafeInteger(number) && number > 0)
+		.toSorted((left, right) => left - right);
+	core.setOutput("previews", JSON.stringify(numbers.slice(0, RECONCILE_LIMIT)));
+	if (numbers.length > RECONCILE_LIMIT) {
+		core.notice(
+			`Found ${numbers.length} previews still holding a slot; reconciling the oldest ${RECONCILE_LIMIT}.`,
+		);
+	}
+};
+
 const retire = async ({ github, context }: ControllerInput): Promise<void> => {
 	const { owner, repo } = context.repo;
 	await retireDeployments(github, owner, repo, requiredEnv(process.env, "ENVIRONMENT"));
@@ -425,6 +450,7 @@ export {
 	PREVIEW_LABEL,
 	assess,
 	create,
+	inventory,
 	finalize,
 	inactivate,
 	recheck,

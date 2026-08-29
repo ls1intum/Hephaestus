@@ -26,28 +26,26 @@ jobs:
     outputs:
       previews: ${{ steps.candidates.outputs.previews }}
     steps:
-      - name: Find the preview environments GitHub still records
-        id: candidates
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          candidates="${RUNNER_TEMP}/preview-candidates.txt"
-          gh api --paginate "repos/${GITHUB_REPOSITORY}/deployments?task=deploy%3Apreview&per_page=100" \
-            --jq '.[] | .environment | select(test("^preview/pr-[1-9][0-9]*$")) | sub("^preview/pr-"; "")' \
-            | sort -nu > "${candidates}"
+      - name: Load the trusted preview controller
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            .github/actions/setup-bun
+            package.json
+            scripts
 
-          count=$(grep -c . "${candidates}" || true)
-          # Truncate rather than abort: a backlog past the bound is exactly when this job is needed,
-          # so refusing to run would make the next night's backlog larger still.
-          if [ "${count}" -gt 100 ]; then
-            echo "::warning::Found ${count} preview candidates; reconciling the oldest 100 this run."
-            head -100 "${candidates}" > "${candidates}.capped"
-            mv "${candidates}.capped" "${candidates}"
-          fi
-          previews=$(jq -Rsc 'split("\n") | map(select(length > 0) | tonumber)' "${candidates}")
-          echo "previews=${previews}" >> "${GITHUB_OUTPUT}"
-          echo "Found ${count} preview candidates."
+      - name: Set up the repository's Bun version
+        uses: ./.github/actions/setup-bun
+
+      - name: Find the previews that still hold a slot
+        id: candidates
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const controller = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview-controller.ts`);
+            await controller.inventory({ github, context, core });
 
   cleanup:
     name: "Preview / Reconcile PR ${{ matrix.pr }}"
