@@ -36,21 +36,35 @@ void describe("CI contract", () => {
 		const dependencies = (name: string): string[] => {
 			const command = scripts[name];
 			if (!command) return [];
-			return Object.keys(scripts).filter((candidate) =>
+			const viaRun = Object.keys(scripts).filter((candidate) =>
 				new RegExp(`(?:bun|npm|pnpm) run ${escapeRegExp(candidate)}(?:\\s|$)`).test(command),
 			);
+			// run-s chains package scripts by name, so every named token is an edge.
+			const viaRunS = /(?:^|[;&|]\s*)run-s(?:\s|$)/.test(command)
+				? command.split(/\s+/).filter((token) => scripts[token])
+				: [];
+			return [...new Set([...viaRun, ...viaRunS])];
 		};
 		const visit = (name: string): void => {
 			if (reachable.has(name)) return;
 			reachable.add(name);
 			for (const dependency of dependencies(name)) visit(dependency);
 		};
+		// A workflow that runs a script file directly on Node covers every package script built on it.
+		const scriptsByFile = new Map<string, string[]>();
+		for (const [name, command] of Object.entries(scripts)) {
+			for (const file of command.match(/scripts\/[\w./-]+\.ts/g) ?? []) {
+				scriptsByFile.set(file, [...(scriptsByFile.get(file) ?? []), name]);
+			}
+		}
 		for (const source of (await workflowSources()).values()) {
 			for (const line of source.split("\n")) {
 				const invocation = line.match(
 					/^\s*(?:run:\s+)?(?:\(cd \.\. && )?bun(?: --bun)? run ([\w:-]+)/,
 				)?.[1];
 				if (invocation && scripts[invocation]) visit(invocation);
+				const file = line.match(/(?:^|\s)node (?:--test )?(?:\.\.\/)?(scripts\/[\w./-]+\.ts)/)?.[1];
+				for (const name of file ? (scriptsByFile.get(file) ?? []) : []) visit(name);
 			}
 		}
 
