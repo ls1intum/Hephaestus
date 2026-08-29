@@ -1,0 +1,50 @@
+---
+id: overview
+title: Admin overview
+description: What a Hephaestus deployment consists of and the order to set it up in.
+---
+
+This guide is for the people who run a Hephaestus deployment: installing it, connecting it to GitHub
+or GitLab, choosing an AI provider, and keeping it healthy. Developers who use Hephaestus want the
+[User Guide](/user/overview); people changing the code want the
+[Contributor Guide](/contributor/overview).
+
+## What a deployment consists of
+
+One Docker Compose stack on a single 64-bit Linux host. One application image boots in three roles —
+`server`, `worker` and `webhook` — alongside PostgreSQL, a NATS event buffer, and Traefik for TLS.
+Sign-in runs through a GitHub or GitLab OAuth app you register during the install; the worker starts a
+sandboxed container for each practice review rather than keeping one running.
+[Runtime roles](./runtime-roles) explains what each role does and why the webhook role gets its own
+container.
+
+## Two kinds of admin
+
+- **Instance admin** — operates the whole deployment: the AI providers available to it, the practice
+  catalog workspaces may adopt from, and instance-wide settings.
+- **Workspace admin** — configures one workspace: its repositories, its practices, its members, its
+  AI model and spending cap.
+
+A person can be both. Every page below says which one it is written for.
+
+## Set it up in this order
+
+1. **[Install](./install)** — the supported Compose stack, the required `.env` values, and TLS.
+2. **[Connect a source](./github-integration)** — the GitHub App or the GitLab connection that brings
+   repository activity in. [Integrations & reference deployment](./production-setup) covers Slack and
+   Outline.
+3. **[Connect an AI provider](./ai-providers)** — any OpenAI-compatible endpoint, plus the spending
+   cap that bounds it.
+4. **[Choose practices](./practice-catalog)** — what the instance offers and what a workspace adopts.
+   [Practice review](./practice-review) explains how a review actually runs.
+5. **[Publish the legal pages](./legal-pages)** — imprint and privacy information for your
+   deployment. The [data-protection documentation](./dsms) has the GDPR records.
+
+## Keep it running
+
+[Practice review operations](./practice-review-operations) and
+[webhook ingestion operations](./webhook-ingestion-operations) cover the two pipelines that fail most
+visibly. [Backup & restore](./backup-restore) covers recovery. Before upgrading, read the
+[compatibility policy](./compatibility-policy) and the
+[migration guide](https://github.com/ls1intum/Hephaestus/blob/main/MIGRATION.md), then test the
+upgrade in staging — Hephaestus is pre-1.0, so a minor release can still require action.

@@ -21,7 +21,7 @@ export function NavMentor({ workspaceSlug }: { workspaceSlug: string }) {
 			<SidebarMenu>
 				<SidebarMenuItem>
 					<SidebarMenuButton
-						tooltip="Heph - AI mentor"
+						tooltip="Heph, AI mentor"
 						isActive={onMentor}
 						render={
 							<Link

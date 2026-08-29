@@ -4,14 +4,20 @@ const sidebars: SidebarsConfig = {
 	userSidebar: [
 		{
 			type: "category",
-			label: "Getting Started",
+			label: "Start here",
 			collapsible: false,
 			items: ["overview", "getting-started"],
 		},
 		{
 			type: "category",
-			label: "Core Experiences",
-			items: ["workspace", "ai-code-review", "ai-mentor", "leaderboard", "achievements"],
+			label: "Using Hephaestus",
+			collapsed: false,
+			items: ["ai-code-review", "ai-mentor", "workspace"],
+		},
+		{
+			type: "category",
+			label: "Optional features",
+			items: ["leaderboard", "achievements"],
 		},
 	],
 };

@@ -1,3 +1,8 @@
+---
+title: End-to-end testing
+description: How the Playwright suite is structured and how to run it locally.
+---
+
 # Live practice-review E2E
 
 This setup runs the complete local path: workspace creation, SCM sync, job execution in Docker, LLM

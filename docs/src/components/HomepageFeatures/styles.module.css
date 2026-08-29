@@ -1,3 +1,10 @@
+.featuresHeading {
+	margin: 0 0 2.5rem;
+	text-wrap: balance;
+	text-align: center;
+	font-size: clamp(1.75rem, 3vw, 2.25rem);
+}
+
 .features {
 	padding: 4rem 0;
 }
@@ -13,39 +20,13 @@
 }
 
 .featureCard {
-	display: flex;
-	flex-direction: column;
+	composes: hephCard from global;
 	gap: 1rem;
-	padding: 2rem;
-	border-radius: 20px;
-	background: var(--ifm-card-background-color);
-	border: 1px solid var(--ifm-toc-border-color);
-	box-shadow: 0 20px 50px rgba(15, 23, 42, 0.1);
-	position: relative;
-	overflow: hidden;
 	flex: 1;
 }
 
-.featureCard::after {
-	content: "";
-	position: absolute;
-	inset: -40% 40% 60% -40%;
-	background: radial-gradient(circle, rgba(67, 56, 202, 0.15), transparent 65%);
-	pointer-events: none;
-	transform: rotate(-8deg);
-}
-
-.featureCard > * {
-	position: relative;
-	z-index: 1;
-}
-
 .kicker {
-	text-transform: uppercase;
-	font-size: 0.75rem;
-	letter-spacing: 0.16em;
-	font-weight: 600;
-	color: var(--ifm-color-primary);
+	composes: hephKicker from global;
 	margin: 0;
 }
 
@@ -93,6 +74,12 @@
 }
 
 @media screen and (max-width: 996px) {
+	.featuresHeading {
+		margin: 0 0 2.5rem;
+		text-align: center;
+		font-size: clamp(1.75rem, 3vw, 2.25rem);
+	}
+
 	.features {
 		padding: 3rem 0;
 	}

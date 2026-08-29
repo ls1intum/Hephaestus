@@ -1,3 +1,8 @@
+---
+title: Practice feedback language
+description: The normative product vocabulary for observations, feedback, practices and groups.
+---
+
 # Practice feedback language
 
 Use these product terms in user-facing interfaces, documentation, and release notes.

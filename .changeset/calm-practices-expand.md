@@ -12,7 +12,7 @@ while paused is never released by resuming. Proposals that nobody has decided re
 administrator to approve or reject after sending resumes.
 
 When a review needs approval, the approval page now shows the exact summary and every inline comment
-as one package. One decision releases or rejects the whole review; automatically authorized findings
+as one package. One decision releases or rejects the whole review; automatically authorized observations
 in the same review wait for that decision instead of appearing early. After approval, the delivery
 page shows how many comments have reached the provider while safe retries finish the remainder.
 

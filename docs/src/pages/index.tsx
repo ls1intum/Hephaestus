@@ -1,29 +1,48 @@
 import Link from "@docusaurus/Link";
 import useDocusaurusContext from "@docusaurus/useDocusaurusContext";
-import feedbackPreviewDark from "@site/images/readme/landing-feedback-preview-dark.png";
-import feedbackPreviewLight from "@site/images/readme/landing-feedback-preview-light.png";
+import feedbackSceneDark from "@site/images/readme/feedback-scene-dark.png";
+import feedbackSceneLight from "@site/images/readme/feedback-scene-light.png";
 import HomepageFeatures from "@site/src/components/HomepageFeatures";
 import Heading from "@theme/Heading";
 import Layout from "@theme/Layout";
+import ThemedImage from "@theme/ThemedImage";
 import type { ReactNode } from "react";
 
 import styles from "./index.module.css";
 
-const guideLinks = [
+const guides = [
 	{
 		title: "User guide",
-		description: "Learn how practice feedback works and how to chat with Heph about your work.",
+		audience: "You use Hephaestus",
+		description: "What the feedback is, where it reaches you, and how to talk it through.",
 		to: "/user/overview",
-	},
-	{
-		title: "Contributor guide",
-		description: "Set up local services, follow coding standards, and ship with confidence.",
-		to: "/contributor/overview",
+		links: [
+			{ label: "Getting started", to: "/user/getting-started" },
+			{ label: "Practice feedback", to: "/user/ai-code-review" },
+			{ label: "Chat with Heph", to: "/user/ai-mentor" },
+		],
 	},
 	{
 		title: "Admin guide",
-		description: "Install Hephaestus on your own server and operate it.",
-		to: "/admin/install",
+		audience: "You run a deployment",
+		description: "Install it, connect a source and an AI provider, and keep it healthy.",
+		to: "/admin/overview",
+		links: [
+			{ label: "Install (self-hosted)", to: "/admin/install" },
+			{ label: "Connect an AI provider", to: "/admin/ai-providers" },
+			{ label: "Practice catalog", to: "/admin/practice-catalog" },
+		],
+	},
+	{
+		title: "Contributor guide",
+		audience: "You change the code",
+		description: "Set up the services, follow the standards, and ship a change.",
+		to: "/contributor/overview",
+		links: [
+			{ label: "Local development", to: "/contributor/local-development" },
+			{ label: "Coding guidelines", to: "/contributor/coding-guidelines" },
+			{ label: "Release management", to: "/contributor/release-management" },
+		],
 	},
 ];
 
@@ -33,64 +52,62 @@ function HomepageHeader() {
 			<div className="container">
 				<div className={styles.heroGrid}>
 					<div className={styles.heroCopy}>
-						<span className={styles.heroKicker}>Practice feedback for software teams</span>
+						<span className={styles.heroKicker}>Documentation</span>
 						<Heading as="h1" className={styles.heroTitle}>
-							Learn from the work you&apos;re{" "}
-							<span className={styles.heroHighlight}>already doing</span>
+							Hephaestus
 						</Heading>
 						<p className={styles.heroSubtitle}>
-							Hephaestus turns project activity already recorded in your team&apos;s tools into
-							feedback on engineering practices. See what worked, what could improve, and what to
-							try next.
+							An open-source AI mentor for software teams. It reads the work developers already do
+							against the engineering practices their project cares about, and writes back feedback
+							they can act on.
 						</p>
 						<div className={styles.heroActions}>
 							<Link className="button button--primary button--lg" to="/user/overview">
 								Read the user guide
 							</Link>
-							<Link
-								className="button button--link button--lg"
-								href="https://hephaestus.aet.cit.tum.de"
-							>
-								Open Hephaestus
+							<Link className="button button--secondary button--lg" to="/admin/install">
+								Install it yourself
 							</Link>
 						</div>
 					</div>
-					<div className={styles.heroVisual}>
-						<img
-							className={styles.heroVisualLight}
-							src={feedbackPreviewLight}
-							alt="An example of practice feedback and a question answered by Heph."
+					<figure className={styles.heroVisual}>
+						<ThemedImage
+							sources={{ light: feedbackSceneLight, dark: feedbackSceneDark }}
+							width={1792}
+							height={1412}
+							alt="Four cards from one change — an issue, a pull request, a review and the merge — each with the practice feedback Hephaestus attached to it."
 						/>
-						<img
-							className={styles.heroVisualDark}
-							src={feedbackPreviewDark}
-							alt="An example of practice feedback and a question answered by Heph."
-						/>
-						<p>Practice feedback, followed by a conversation with Heph</p>
-					</div>
+					</figure>
 				</div>
 			</div>
 		</header>
 	);
 }
 
-function QuickstartGuides(): ReactNode {
+function GuideRouter(): ReactNode {
 	return (
 		<section className={styles.quickstartSection}>
 			<div className="container">
 				<div className={styles.quickstartHeader}>
 					<Heading as="h2">Pick the guide that matches your role</Heading>
-					<p>Learn to use Hephaestus, contribute to the project, or run your own deployment.</p>
+					<p>Every page says who it is for in its first line.</p>
 				</div>
 				<div className={styles.quickstartGrid}>
-					{guideLinks.map((guide) => (
-						<Link key={guide.title} className={styles.quickstartCard} to={guide.to}>
-							<div>
-								<Heading as="h3">{guide.title}</Heading>
-								<p>{guide.description}</p>
-							</div>
-							<span aria-hidden="true">→</span>
-						</Link>
+					{guides.map((guide) => (
+						<div key={guide.title} className={styles.quickstartCard}>
+							<p className={styles.quickstartAudience}>{guide.audience}</p>
+							<Heading as="h3" className={styles.quickstartTitle}>
+								<Link to={guide.to}>{guide.title}</Link>
+							</Heading>
+							<p className={styles.quickstartBody}>{guide.description}</p>
+							<ul className={styles.quickstartLinks}>
+								{guide.links.map((link) => (
+									<li key={link.to}>
+										<Link to={link.to}>{link.label}</Link>
+									</li>
+								))}
+							</ul>
+						</div>
 					))}
 				</div>
 			</div>
@@ -103,12 +120,12 @@ export default function Home(): ReactNode {
 	return (
 		<Layout
 			title={siteConfig.title}
-			description="Hephaestus gives developers practice feedback on software project work, plus an AI mentor for talking through feedback and next steps."
+			description="Documentation for Hephaestus, an open-source AI mentor for software teams. User, administrator and contributor guides."
 		>
 			<HomepageHeader />
 			<main>
+				<GuideRouter />
 				<HomepageFeatures />
-				<QuickstartGuides />
 			</main>
 		</Layout>
 	);

@@ -1,3 +1,8 @@
+---
+title: Evaluation provenance
+description: How evaluation runs record what produced a result, so a number can be traced back.
+---
+
 # Evaluation provenance contract
 
 This document defines how an evaluation reconstructs a practice review. Exact columns and domain values

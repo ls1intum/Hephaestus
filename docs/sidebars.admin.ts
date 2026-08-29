@@ -2,6 +2,7 @@ import type { SidebarsConfig } from "@docusaurus/plugin-content-docs";
 
 const sidebars: SidebarsConfig = {
 	adminSidebar: [
+		{ type: "doc", id: "overview", label: "Overview" },
 		{ type: "doc", id: "install", label: "Install (Self-Hosted)" },
 		{ type: "doc", id: "github-integration", label: "GitHub Integration" },
 		{ type: "doc", id: "ai-providers", label: "Connect an AI Provider" },

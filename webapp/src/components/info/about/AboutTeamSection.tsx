@@ -18,11 +18,13 @@ export function AboutTeamSection({
 	isContributorsError,
 }: AboutTeamSectionProps) {
 	return (
-		<section>
+		<section aria-labelledby="about-team-heading">
 			<Badge className="mb-4" variant="outline">
 				Our people
 			</Badge>
-			<h2 className="text-3xl font-bold mb-10">The team</h2>
+			<h2 id="about-team-heading" className="text-3xl font-bold mb-10">
+				The team
+			</h2>
 			<ProjectManagerCard projectManager={projectManager} />
 			<ContributorSection
 				contributors={contributors}

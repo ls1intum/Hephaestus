@@ -118,7 +118,7 @@ export function Copilot({
 							onClick={handleTriggerClick}
 							className="size-16 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 active:scale-95"
 							size="icon"
-							aria-label="Open Heph - AI Mentor"
+							aria-label="Open Heph, AI mentor"
 						>
 							<MentorIcon size={56} pad={8} />
 						</Button>
@@ -192,7 +192,7 @@ export function Copilot({
 													variant="outline"
 													size="icon"
 													onClick={handleClose}
-													aria-label="Close Heph - AI Mentor"
+													aria-label="Close Heph, AI mentor"
 												/>
 											}
 										>

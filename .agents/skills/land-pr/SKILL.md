@@ -62,9 +62,10 @@ bun run db:draft-changelog    # entities changed (needs Docker); then prune the 
 bun run db:generate-erd-docs  # after any changelog change
 ```
 
-`generate:api:application-server:specs` **exits 0 having written nothing** when a port it needs is
-busy — HTTP, management, or the JMX port it defaults to. Pass free ports; the exact invocation is in
-`server/AGENTS.md` § OpenAPI generation exits 0 having written nothing.
+`generate:api:application-server:specs` **fails when a port it needs is busy** — HTTP, management, or
+the JMX port it defaults to. It restores the previous spec rather than committing an empty one, so
+the cost is a wasted Maven cycle. Pass free ports; the exact invocation is in `server/AGENTS.md`
+§ OpenAPI generation ports.
 
 ## 5. Run the tests your diff can break
 

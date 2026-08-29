@@ -1,3 +1,8 @@
+---
+title: Practice catalog curation
+description: How the catalog that ships with Hephaestus is written, reviewed and released.
+---
+
 # Practice catalog curation
 
 The practice catalog turns defined engineering practices into review criteria. Product terminology

@@ -15,6 +15,7 @@ const sidebars: SidebarsConfig = {
 				"local-verification",
 				"testing",
 				"e2e-testing",
+				"security-mutation-testing",
 				"coding-guidelines",
 				"api-error-handling",
 				"workspace-context",

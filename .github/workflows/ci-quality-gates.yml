@@ -170,6 +170,7 @@ jobs:
           COMPONENTS_OK=true
           STORIES_OK=true
           SORT_OK=true
+          TOKENS_OK=true
           BUILD_OK=true
           ROUTES_OK=true
           TESTS_OK=true
@@ -179,6 +180,7 @@ jobs:
           bun ../scripts/check-presentational-components.ts || { COMPONENTS_OK=false; ISSUES_FOUND+=("Components must take data as props. Run: bun run check:components"); }
           bun ../scripts/check-story-prose.ts || { STORIES_OK=false; ISSUES_FOUND+=("Story prose renders HTML paragraphs. Run: bun run check:stories"); }
           bun ../scripts/check-story-sort.ts || { SORT_OK=false; ISSUES_FOUND+=("Storybook sidebar order is stale. Run: bun run check:story-sort"); }
+          bun ../scripts/check-docs-tokens.ts && bun test ../scripts/check-docs-tokens.test.ts || { TOKENS_OK=false; ISSUES_FOUND+=("The docs site copies a web app colour that has since changed. Run: bun run check:docs-tokens"); }
           timeout --kill-after=30s 10m bun run test \
             || { TESTS_OK=false; ISSUES_FOUND+=("Unit tests failed. Run: cd webapp && bun run test"); }
 
@@ -198,6 +200,7 @@ jobs:
             [[ "$COMPONENTS_OK" == "false" ]] && echo "| Presentational components | :x: Failed | \`bun run check:components\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$STORIES_OK" == "false" ]] && echo "| Story prose | :x: Failed | \`bun run check:stories\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$SORT_OK" == "false" ]] && echo "| Storybook sidebar order | :x: Failed | \`bun run check:story-sort\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$TOKENS_OK" == "false" ]] && echo "| Docs colour tokens | :x: Failed | \`bun run check:docs-tokens\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$BUILD_OK" == "false" ]] && echo "| Vite build | :x: Failed | \`cd webapp && bun run build\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$ROUTES_OK" == "false" ]] && echo "| routeTree.gen.ts up to date | :x: Stale | \`cd webapp && bun run build\` and commit |" >> $GITHUB_STEP_SUMMARY
             [[ "$TESTS_OK" == "false" ]] && echo "| Unit tests | :x: Failed | \`cd webapp && bun run test\` |" >> $GITHUB_STEP_SUMMARY

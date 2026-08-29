@@ -89,7 +89,7 @@ missing, follow [Who counts as a person](https://ls1intum.github.io/Hephaestus/a
 role-inconsistent required setting.
 
 Production processes now validate the applicable requirements in the configuration readiness
-catalogue together and refuse to start until every reported error is resolved. The failure report
+catalog together and refuse to start until every reported error is resolved. The failure report
 identifies properties and documentation but never includes configured values.
 
 **Action**: before upgrading, compare every production role's settings with the
@@ -368,8 +368,8 @@ record whose conduct it judged, so their observations were filed against the aut
 rather than the reviewer who wrote the comments. An occasion now records it, and a review that cannot
 name the reviewer does not run.
 
-A workspace installs the shipped catalogue once, so an existing workspace still holds the old wording.
-Open **Practice catalogue** and apply the update to those three practices to pick it up. Until you do,
+A workspace installs the shipped catalog once, so an existing workspace still holds the old wording.
+Open **Practice catalog** and apply the update to those three practices to pick it up. Until you do,
 they behave exactly as they did before — nothing new is recorded against the wrong person, because the
 new guard reads the occasion and the old wording still says *author*.
 

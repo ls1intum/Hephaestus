@@ -2,40 +2,17 @@ import type { Meta, StoryObj } from "@storybook/react";
 
 import { AboutTeamSection } from "./AboutTeamSection";
 
-/**
- * Team section component that displays the project manager and contributors
- * with proper loading and error handling.
- */
 const meta = {
 	component: AboutTeamSection,
 	parameters: {
 		layout: "centered",
 	},
 	tags: ["autodocs"],
-	argTypes: {
-		projectManager: {
-			description: "Project manager information",
-		},
-		contributors: {
-			description: "List of project contributors",
-		},
-		isContributorsLoading: {
-			control: "boolean",
-			description: "Whether contributors are currently loading",
-		},
-		isContributorsError: {
-			control: "boolean",
-			description: "Whether there was an error loading contributors",
-		},
-	},
 } satisfies Meta<typeof AboutTeamSection>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Default view showing project manager and contributors
- */
 export const Default: Story = {
 	args: {
 		projectManager: {
@@ -70,9 +47,6 @@ export const Default: Story = {
 	},
 };
 
-/**
- * Loading state while contributors are being fetched
- */
 export const IsLoading: Story = {
 	args: {
 		...Default.args,
@@ -80,9 +54,6 @@ export const IsLoading: Story = {
 	},
 };
 
-/**
- * Error state when contributors cannot be loaded
- */
 export const IsError: Story = {
 	args: {
 		...Default.args,
@@ -90,9 +61,6 @@ export const IsError: Story = {
 	},
 };
 
-/**
- * Empty state when there are no contributors
- */
 export const NoContributors: Story = {
 	args: {
 		...Default.args,

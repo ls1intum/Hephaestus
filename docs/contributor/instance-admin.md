@@ -1,3 +1,8 @@
+---
+title: Instance administration
+description: "The instance-wide console: what it configures and how it differs from workspace administration."
+---
+
 # Instance Admin Area
 
 The **instance admin** (a.k.a. super-admin) area lets an operator manage the whole Hephaestus
