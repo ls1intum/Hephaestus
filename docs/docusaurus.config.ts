@@ -216,6 +216,10 @@ const config: Config = {
 							href: "https://github.com/ls1intum/Hephaestus/releases",
 						},
 						{
+							label: "Accessibility",
+							to: "/user/accessibility",
+						},
+						{
 							label: "Open Hephaestus",
 							href: "https://hephaestus.aet.cit.tum.de",
 						},

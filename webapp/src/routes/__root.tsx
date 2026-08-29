@@ -22,6 +22,7 @@ import { CookieConsentBanner } from "@/components/consent/CookieConsentBanner";
 import Footer from "@/components/core/Footer";
 import Header from "@/components/core/Header";
 import { AppSidebar, type SidebarContext } from "@/components/core/sidebar/AppSidebar";
+import { SkipToContent } from "@/components/core/SkipToContent";
 import { StandardPageSurface } from "@/components/core/StandardPageSurface";
 import { Chat } from "@/components/mentor/Chat";
 import { Copilot } from "@/components/mentor/Copilot";
@@ -78,9 +79,10 @@ function RootLayout() {
 		return (
 			<>
 				<HeadContent />
+				<SkipToContent />
 				<CookieConsentBanner />
 				<ProviderColorScope>
-					<main>
+					<main id="main-content" tabIndex={-1}>
 						<Outlet />
 					</main>
 				</ProviderColorScope>
@@ -92,6 +94,7 @@ function RootLayout() {
 	return (
 		<>
 			<HeadContent />
+			<SkipToContent />
 			{/* Rendered early so keyboard/AT users reach the consent region before the app chrome. */}
 			<CookieConsentBanner />
 			<ImpersonationBanner />
@@ -103,7 +106,7 @@ function RootLayout() {
 						style={{ marginRight: "var(--right-sidebar-width, 0)" }}
 					>
 						<HeaderContainer />
-						<div className="flex min-h-0 flex-1 flex-col">
+						<main id="main-content" tabIndex={-1} className="flex min-h-0 flex-1 flex-col">
 							{surface === "standard" ? (
 								<StandardPageSurface className="flex-1">
 									<Outlet />
@@ -117,13 +120,13 @@ function RootLayout() {
 									<Outlet />
 								</div>
 							)}
-							{surface !== "fullscreen" && (
-								<Footer
-									buildInfo={environment.buildInfo}
-									isProduction={environment.deployment.isProduction}
-								/>
-							)}
-						</div>
+						</main>
+						{surface !== "fullscreen" && (
+							<Footer
+								buildInfo={environment.buildInfo}
+								isProduction={environment.deployment.isProduction}
+							/>
+						)}
 					</SidebarInset>
 				</SidebarProvider>
 			</ProviderColorScope>
@@ -141,7 +144,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 	component: RootLayout,
 	notFoundComponent: () => (
 		<div className="mx-auto flex w-full max-w-2xl flex-col items-center justify-center py-16 text-center">
-			<h2 className="text-3xl font-bold mb-4">Page Not Found</h2>
+			<h1 className="text-3xl font-bold mb-4">Page Not Found</h1>
 			<p className="text-muted-foreground mb-8">
 				The page you're looking for doesn't exist or you don't have permission to view it.
 			</p>
