@@ -64,11 +64,11 @@ jobs:
           REQUESTED_CANDIDATE: ${{ inputs.candidate-sha }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_SHA: ${{ github.sha }}
-        run: bun scripts/resolve-release-upgrade-images.ts
+        run: node scripts/resolve-release-upgrade-images.ts
 
       - name: Test seeded previous-release upgrade
         env:
           PREVIOUS_APP: ${{ steps.images.outputs.previous-app }}
           CANDIDATE_APP: ${{ steps.images.outputs.candidate-app }}
           POSTGRES_IMAGE: ${{ steps.images.outputs.postgres }}
-        run: bun scripts/release-upgrade-test.ts "$PREVIOUS_APP" "$CANDIDATE_APP" "$POSTGRES_IMAGE"
+        run: node scripts/release-upgrade-test.ts "$PREVIOUS_APP" "$CANDIDATE_APP" "$POSTGRES_IMAGE"

@@ -1,12 +1,13 @@
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import process from "node:process";
+import { setTimeout as sleep } from "node:timers/promises";
 
 const [previousImage, candidateImage, postgresImage] = process.argv.slice(2);
 
 if (!previousImage || !candidateImage || !postgresImage) {
 	throw new Error(
-		"Usage: bun scripts/release-upgrade-test.ts <previous-app-image> <candidate-app-image> <postgres-image>",
+		"Usage: node scripts/release-upgrade-test.ts <previous-app-image> <candidate-app-image> <postgres-image>",
 	);
 }
 
@@ -70,7 +71,7 @@ async function waitUntilReady(name: string, port: number): Promise<void> {
 		} catch {
 			// The endpoint is unavailable while the container starts.
 		}
-		await Bun.sleep(2_000);
+		await sleep(2_000);
 	}
 	throw new Error(`${name} did not become ready within 180 seconds`);
 }
@@ -246,7 +247,7 @@ async function waitForSeededCatalog(): Promise<number> {
 	for (let attempt = 0; attempt < 60; attempt++) {
 		const catalogSize = seededCatalogSize();
 		if (catalogSize > 0) return catalogSize;
-		await Bun.sleep(1_000);
+		await sleep(1_000);
 	}
 	throw new Error("Previous release did not seed the practice catalog within 60 seconds");
 }
@@ -277,7 +278,7 @@ try {
 			break;
 		} catch {
 			if (attempt === 59) throw new Error("PostgreSQL did not become ready");
-			await Bun.sleep(1_000);
+			await sleep(1_000);
 		}
 	}
 
