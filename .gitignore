@@ -127,6 +127,7 @@ lib64/
 # local .env backups (deploy scratch) — must never be committed
 local_settings.py
 *.log
+/load-results/
 *.manifest
 MANIFEST
 MISSION.md

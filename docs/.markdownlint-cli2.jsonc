@@ -16,10 +16,9 @@
 {
 	"$schema": "https://raw.githubusercontent.com/DavidAnson/markdownlint-cli2/main/schema/markdownlint-cli2-config-schema.json",
 
-	// Lint EVERY markdown file in docs/, not just the three plugin-mounted guides.
 	// `decisions/` (33 ADRs) and `runbooks/` are mounted by no Docusaurus plugin, so the site
 	// build never compiles them and never link-checks them — the linter is their only gate.
-	"globs": ["**/*.md", "**/*.mdx"],
+	"globs": ["**/*.md", "**/*.mdx", "../load-tests/**/*.md"],
 	"ignores": ["node_modules", "build", ".docusaurus"],
 
 	"config": {

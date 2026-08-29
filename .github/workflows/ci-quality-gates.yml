@@ -120,6 +120,10 @@ jobs:
           fi
           bun run check:agents \
             || { TOOLING_OK=false; ISSUES_FOUND+=("Repository tooling checks failed. Run: bun run check:agents"); }
+          bun run format:load:check \
+            || { TOOLING_OK=false; ISSUES_FOUND+=("Load scenarios are not formatted. Run: bun run format:load"); }
+          bun run test:load:syntax \
+            || { TOOLING_OK=false; ISSUES_FOUND+=("k6 rejected a load scenario. Run: bun run test:load:syntax"); }
           bun run test:agents \
             || { TESTS_OK=false; ISSUES_FOUND+=("Agent runtime test(s) failed. Run: bun run test:agents"); }
           bun run check:contracts || { CONTRACTS_OK=false; ISSUES_FOUND+=("Artifact-source contract validation failed. Run: bun run check:contracts"); }
