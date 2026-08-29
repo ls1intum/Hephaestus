@@ -10,9 +10,9 @@ lockfile qualifier intentionally starts from a clean dependency tree.
 
 ### Repository orchestration
 
-Substantive developer orchestration under `scripts/` uses typed Node.js entry points:
-
 Infrastructure tests use `node:test`; Vitest is reserved for the Vite-managed webapp and docs trees.
+
+Substantive developer orchestration under `scripts/` uses typed Node.js entry points:
 
 | Command | Purpose |
 | --- | --- |
