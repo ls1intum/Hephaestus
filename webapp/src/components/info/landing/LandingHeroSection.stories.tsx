@@ -49,14 +49,17 @@ export const DarkMode: Story = {
 	globals: { theme: "dark" },
 };
 
-/**
- * Captured by `webapp/scripts/export-readme-assets.ts` for the README and the documentation site,
- * and compared byte-for-byte by the `webapp-storybook` CI leg. Renaming this export or its
- * `data-readme-export` attribute breaks that leg, which `bun run check` does not run.
- *
- * It renders the scene alone: a capture of the whole hero would put this page's headline inside
- * an image sitting next to that same headline.
- */
+export const ReadmeExport: Story = {
+	parameters: {
+		chromatic: { disableSnapshot: true },
+	},
+	render: (args) => (
+		<div data-readme-export="landing-hero" className="mx-auto w-full max-w-[1280px] bg-background">
+			<LandingHeroSection {...args} />
+		</div>
+	),
+};
+
 export const SceneExport: Story = {
 	parameters: {
 		chromatic: { disableSnapshot: true },

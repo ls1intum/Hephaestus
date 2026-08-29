@@ -13,6 +13,7 @@ const storybookUrl = `http://127.0.0.1:${port}`;
 type Theme = "light" | "dark";
 
 interface CaptureConfig {
+	name: string;
 	storyId: string;
 	selector: string;
 	viewportWidth: number;
@@ -21,14 +22,22 @@ interface CaptureConfig {
 }
 
 const themes: Theme[] = ["light", "dark"];
-const captureConfig: CaptureConfig = {
-	storyId: "components-info-landing-landingherosection--scene-export",
-	selector: '[data-readme-export="feedback-scene"]',
-	// Under 80rem the scene pairs its clusters into two columns, which is the shape that stands
-	// on its own; above it the scene spreads around the hero copy and leaves a hole in the middle.
-	viewportWidth: 1024,
-	expectedWidth: 896,
-};
+const captureConfigs: CaptureConfig[] = [
+	{
+		name: "landing-hero",
+		storyId: "components-info-landing-landingherosection--readme-export",
+		selector: '[data-readme-export="landing-hero"]',
+		viewportWidth: 1440,
+		expectedWidth: 1280,
+	},
+	{
+		name: "feedback-scene",
+		storyId: "components-info-landing-landingherosection--scene-export",
+		selector: '[data-readme-export="feedback-scene"]',
+		viewportWidth: 1024,
+		expectedWidth: 896,
+	},
+];
 
 function indexContains(index: unknown, storyId: string): boolean {
 	if (!index || typeof index !== "object" || !("entries" in index)) return false;
@@ -74,7 +83,8 @@ async function capture(
 		await page.evaluate(() => document.fonts.ready);
 		await page.addStyleTag({
 			content:
-				"*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}",
+				"*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}" +
+				"[data-readme-actions]{display:none!important}",
 		});
 
 		const exportSurface = page.locator(config.selector);
@@ -105,11 +115,11 @@ const storybook = spawn(
 );
 
 try {
-	await waitForStorybook(captureConfig.storyId);
+	for (const config of captureConfigs) await waitForStorybook(config.storyId);
 	const browser = await chromium.launch();
 	try {
-		for (const theme of themes) {
-			await capture(browser, theme, "feedback-scene", captureConfig);
+		for (const config of captureConfigs) {
+			for (const theme of themes) await capture(browser, theme, config.name, config);
 		}
 	} finally {
 		await browser.close();

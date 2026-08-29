@@ -30,9 +30,9 @@ relationships stay with people.
 
 <div align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./docs/images/readme/feedback-scene-dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="./docs/images/readme/feedback-scene-light.png">
-    <img alt="Four cards from one change — an issue with no acceptance criteria, a pull request that grew to 34 files, a review question, and the merge that left it unanswered — each with the practice feedback Hephaestus attached to it." src="./docs/images/readme/feedback-scene-light.png" width="896">
+    <source media="(prefers-color-scheme: dark)" srcset="./docs/images/readme/landing-hero-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="./docs/images/readme/landing-hero-light.png">
+    <img alt="An illustration of one change through a project: issue #412 has no acceptance criteria, the pull request grows to 34 files, a reviewer asks a specific question, and it merges with that thread unresolved. Hephaestus points back to the issue." src="./docs/images/readme/landing-hero-light.png" width="1280">
   </picture>
   <p><sub>An illustration of the feedback Hephaestus writes. See the <a href="https://ls1intum.github.io/Hephaestus/user/ai-code-review">user guide</a> for the real interface.</sub></p>
 </div>

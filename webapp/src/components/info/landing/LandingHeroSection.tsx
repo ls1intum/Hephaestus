@@ -262,6 +262,7 @@ export function LandingHeroSection({
 
 					<motion.div
 						variants={itemVariants}
+						data-readme-actions
 						className="relative z-10 mt-8 flex w-full flex-col items-center gap-3 sm:w-auto sm:flex-row"
 					>
 						<LandingSignInCta
