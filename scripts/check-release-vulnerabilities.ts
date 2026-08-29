@@ -1,7 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 
 type Finding = {
-	FixedVersion?: string;
 	InstalledVersion?: string;
 	PkgName?: string;
 	Severity?: string;
@@ -9,15 +8,19 @@ type Finding = {
 };
 
 type Exception = {
+	digest: string;
+	evidence: string;
 	expires: string;
 	image: string;
 	installedVersion: string;
 	justification: string;
 	owner: string;
 	package: string;
+	platform: string;
+	status: "affected" | "not_affected";
 	vulnerability: string;
 };
-type Policy = { baseline: string[]; exceptions: Exception[]; schemaVersion: number };
+type Policy = { exceptions: Exception[]; schemaVersion: 2 };
 
 const record = (value: unknown): value is Record<string, unknown> =>
 	typeof value === "object" && value !== null && !Array.isArray(value);
@@ -25,20 +28,23 @@ const record = (value: unknown): value is Record<string, unknown> =>
 const isException = (value: unknown): value is Exception =>
 	record(value) &&
 	[
+		"digest",
+		"evidence",
 		"expires",
 		"image",
 		"installedVersion",
 		"justification",
 		"owner",
 		"package",
+		"platform",
+		"status",
 		"vulnerability",
-	].every((field) => typeof value[field] === "string");
+	].every((field) => typeof value[field] === "string") &&
+	(value.status === "affected" || value.status === "not_affected");
 
 const isPolicy = (value: unknown): value is Policy =>
 	record(value) &&
-	value.schemaVersion === 1 &&
-	Array.isArray(value.baseline) &&
-	value.baseline.every((entry) => typeof entry === "string") &&
+	value.schemaVersion === 2 &&
 	Array.isArray(value.exceptions) &&
 	value.exceptions.every(isException);
 
@@ -55,6 +61,7 @@ export function evaluate(
 	reportValue: unknown,
 	policyValue: unknown,
 	now = new Date(),
+	subject?: { digest: string; platform: string; reference: string },
 ) {
 	if (!record(reportValue) || !Array.isArray(reportValue.Results))
 		throw new Error("malformed Trivy report");
@@ -62,27 +69,42 @@ export function evaluate(
 		throw new Error("malformed vulnerability policy");
 	}
 	const policy = policyValue;
-	const baseline = new Set(policy.baseline);
 	const errors: string[] = [];
-	if (baseline.size !== policy.baseline.length) errors.push("baseline contains duplicate entries");
-	for (const entry of baseline) {
-		if (!/^[^|]+\|[^|]+\|[^|]+\|[^|]+$/.test(entry))
-			errors.push(`malformed baseline entry: ${entry}`);
-	}
+	if (subject && reportValue.ArtifactName !== subject.reference)
+		errors.push(
+			`Trivy report is for ${String(reportValue.ArtifactName)}, not ${subject.reference}`,
+		);
+	const exceptionKeys = new Set<string>();
 	for (const exception of policy.exceptions) {
 		if (
-			!exception.owner ||
-			!exception.justification ||
+			!exception.owner.trim() ||
+			!exception.justification.trim() ||
 			!exception.expires ||
 			!exception.image ||
+			!exception.digest ||
+			!exception.evidence ||
 			!exception.installedVersion ||
 			!exception.package ||
+			!exception.platform ||
 			!exception.vulnerability
 		) {
 			errors.push(
-				"exception is missing an owner, justification, expiry, image, package, installed version, or vulnerability",
+				"exception is missing subject, status, evidence, owner, justification, expiry, package, installed version, or vulnerability",
 			);
 			continue;
+		}
+		const key = `${exception.image}|${exception.platform}|${exception.digest}|${exception.vulnerability}|${exception.package}|${exception.installedVersion}`;
+		if (exceptionKeys.has(key)) errors.push(`duplicate exception: ${key}`);
+		exceptionKeys.add(key);
+		if (!/^sha256:[a-f0-9]{64}$/.test(exception.digest))
+			errors.push(`malformed exception digest: ${exception.digest}`);
+		if (!/^linux\/(?:amd64|arm64)$/.test(exception.platform))
+			errors.push(`unsupported exception platform: ${exception.platform}`);
+		try {
+			if (new URL(exception.evidence).protocol !== "https:")
+				errors.push(`exception evidence must be an HTTPS URL: ${exception.evidence}`);
+		} catch {
+			errors.push(`exception evidence must be an HTTPS URL: ${exception.evidence}`);
 		}
 		const expiry = new Date(exception.expires);
 		if (
@@ -91,6 +113,10 @@ export function evaluate(
 			expiry <= now
 		)
 			errors.push(`exception expired: ${exception.vulnerability} (${exception.expires})`);
+		else if (expiry.valueOf() - now.valueOf() > 90 * 24 * 60 * 60 * 1000)
+			errors.push(
+				`exception exceeds 90-day limit: ${exception.vulnerability} (${exception.expires})`,
+			);
 	}
 	const findings: Finding[] = [];
 	for (const result of reportValue.Results) {
@@ -105,7 +131,6 @@ export function evaluate(
 				if (typeof value[field] !== "string" || value[field].length === 0)
 					throw new Error(`malformed Trivy vulnerability: missing ${field}`);
 			findings.push({
-				FixedVersion: typeof value.FixedVersion === "string" ? value.FixedVersion : undefined,
 				InstalledVersion:
 					typeof value.InstalledVersion === "string" ? value.InstalledVersion : undefined,
 				PkgName: typeof value.PkgName === "string" ? value.PkgName : undefined,
@@ -115,18 +140,17 @@ export function evaluate(
 			});
 		}
 	}
-	const actionable = findings.filter(
-		(finding) =>
-			(finding.Severity === "HIGH" || finding.Severity === "CRITICAL") &&
-			typeof finding.FixedVersion === "string" &&
-			finding.FixedVersion.trim().length > 0,
+	const highCritical = findings.filter(
+		(finding) => finding.Severity === "HIGH" || finding.Severity === "CRITICAL",
 	);
-	const rejected = actionable.filter((finding) => {
-		const id = fingerprint(image, finding);
-		if (baseline.has(id)) return false;
+	const subjectDigest = subject?.digest;
+	const subjectPlatform = subject?.platform;
+	const rejected = highCritical.filter((finding) => {
 		return !policy.exceptions.some(
 			(exception) =>
 				exception.image === image &&
+				exception.platform === subjectPlatform &&
+				exception.digest === subjectDigest &&
 				exception.package === finding.PkgName &&
 				exception.installedVersion === finding.InstalledVersion &&
 				exception.vulnerability === finding.VulnerabilityID &&
@@ -134,27 +158,35 @@ export function evaluate(
 		);
 	});
 	return {
-		actionable: actionable.map((finding) => fingerprint(image, finding)),
+		highCritical: highCritical.map((finding) => fingerprint(image, finding)),
 		errors,
 		rejected: rejected.map((finding) => fingerprint(image, finding)),
 	};
 }
 
 if (import.meta.main) {
-	const [image, reportPath, policyPath, outputPath] = process.argv.slice(2);
-	if (!image || !reportPath || !policyPath || !outputPath)
+	const [image, platform, digest, repository, reportPath, policyPath, outputPath] =
+		process.argv.slice(2);
+	if (!image || !platform || !digest || !repository || !reportPath || !policyPath || !outputPath)
 		throw new Error(
-			"usage: check-release-vulnerabilities <image> <trivy.json> <policy.json> <result.json>",
+			"usage: check-release-vulnerabilities <image> <platform> <digest> <repository> <trivy.json> <policy.json> <result.json>",
 		);
-	const result = evaluate(image, parseJson(reportPath), parseJson(policyPath));
+	if (!/^linux\/(?:amd64|arm64)$/.test(platform)) throw new Error("unsupported platform");
+	if (!/^sha256:[a-f0-9]{64}$/.test(digest)) throw new Error("malformed subject digest");
+	const reference = `${repository}@${digest}`;
+	const result = evaluate(image, parseJson(reportPath), parseJson(policyPath), new Date(), {
+		digest,
+		platform,
+		reference,
+	});
 	writeFileSync(
 		outputPath,
-		`${JSON.stringify({ image, status: result.errors.length === 0 && result.rejected.length === 0 ? "pass" : "fail", ...result }, null, 2)}\n`,
+		`${JSON.stringify({ image, platform, digest, status: result.errors.length === 0 && result.rejected.length === 0 ? "pass" : "fail", ...result }, null, 2)}\n`,
 	);
 	if (result.errors.length > 0 || result.rejected.length > 0) {
 		for (const message of [
 			...result.errors,
-			...result.rejected.map((finding) => `new actionable finding: ${finding}`),
+			...result.rejected.map((finding) => `undispositioned finding: ${finding}`),
 		])
 			process.stderr.write(`::error::${message}\n`);
 		process.exitCode = 1;

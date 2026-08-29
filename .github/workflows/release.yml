@@ -274,9 +274,15 @@ jobs:
                 "evidence/$image-$suffix.syft.json" \
                 "evidence/$image-$suffix.spdx.json" \
                 "evidence/$image-$suffix.cdx.json" \
-                "$platform_digest" "$platform" "evidence/$image-$suffix.sbom-summary.json"
+                "$platform_digest" "$platform" "evidence/$image-$suffix.sbom-validation.json"
               trivy image --scanners vuln --format json --output "evidence/$image-$suffix.trivy.json" "$platform_ref"
-              bun scripts/check-release-vulnerabilities.ts "$image" "evidence/$image-$suffix.trivy.json" security/vulnerability-policy.json "evidence/$image-$suffix.policy.json"
+              trivy image --scanners license --format json --output "evidence/$image-$suffix.license.json" "$platform_ref"
+              jq -e --arg ref "$platform_ref" \
+                '.ArtifactName == $ref and (.Results | type == "array")' \
+                "evidence/$image-$suffix.license.json" >/dev/null
+              bun scripts/check-release-vulnerabilities.ts "$image" "$platform" "$platform_digest" "$repository" \
+                "evidence/$image-$suffix.trivy.json" security/vulnerability-policy.json \
+                "evidence/$image-$suffix.policy.json"
               if [ "$provenance" = first-party ]; then
                 cosign attest --yes --type spdxjson --predicate "evidence/$image-$suffix.spdx.json" "$platform_ref"
               fi
@@ -463,11 +469,18 @@ jobs:
               "evidence/$image-$suffix.syft.json" \
               "evidence/$image-$suffix.spdx.json" \
               "evidence/$image-$suffix.cdx.json" \
-              "$digest" "$platform" /tmp/sbom-summary.json
-            cmp "evidence/$image-$suffix.sbom-summary.json" /tmp/sbom-summary.json
+              "$digest" "$platform" /tmp/sbom-validation.json
+            cmp "evidence/$image-$suffix.sbom-validation.json" /tmp/sbom-validation.json
             for kind in trivy policy; do
               test -s "evidence/$image-$suffix.$kind.json"
             done
+            jq -e --arg ref "$repository@$digest" \
+              '.ArtifactName == $ref and (.Results | type == "array")' \
+              "evidence/$image-$suffix.license.json" >/dev/null
+            bun scripts/check-release-vulnerabilities.ts "$image" "$platform" "$digest" "$repository" \
+              "evidence/$image-$suffix.trivy.json" evidence/vulnerability-policy.json \
+              /tmp/policy.json
+            cmp "evidence/$image-$suffix.policy.json" /tmp/policy.json
             if [ "$provenance" = first-party ]; then
               cosign verify-attestation --type spdxjson \
                 --certificate-identity 'https://github.com/${{ github.repository }}/.github/workflows/release.yml@refs/heads/main' \

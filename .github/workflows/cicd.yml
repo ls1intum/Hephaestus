@@ -11,6 +11,8 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+permissions: {}
+
 jobs:
   detect-changes:
     name: "Detect changes"
@@ -199,6 +201,9 @@ jobs:
         github.event_name != 'pull_request'
       )
     secrets: inherit
+    permissions:
+      checks: write
+      contents: read
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
       webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
@@ -215,6 +220,9 @@ jobs:
         github.event_name != 'pull_request'
       )
     secrets: inherit
+    permissions:
+      contents: read
+      security-events: write
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
 
@@ -228,6 +236,11 @@ jobs:
         github.event_name != 'pull_request'
       )
     secrets: inherit
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+      statuses: write
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
       webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
@@ -237,6 +250,8 @@ jobs:
   Changesets:
     if: github.event_name == 'pull_request'
     uses: ./.github/workflows/verify-changesets.yml
+    permissions:
+      contents: read
 
   Docker:
     uses: ./.github/workflows/ci-docker-build.yml
@@ -255,6 +270,11 @@ jobs:
         needs.detect-changes.outputs.ci-config == 'true'
       )
     secrets: inherit
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
     with:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
       webapp_changed: ${{ (needs.detect-changes.outputs.webapp-image == 'true' || needs.detect-changes.outputs.docker-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
