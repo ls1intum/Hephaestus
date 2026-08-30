@@ -103,6 +103,17 @@ try {
 	if (sql(source, "SHOW server_version_num").slice(0, 2) !== "17")
 		throw new Error("source is not PostgreSQL 17");
 
+	// liquibase:update is a single-module invocation, so the reactor sibling the application
+	// depends on must be installed to the local repository first — a warm CI cache is not a given.
+	run("node", [
+		"scripts/run-mvnw.ts",
+		"-pl",
+		"generated-clients",
+		"-am",
+		"install",
+		"-DskipTests",
+		"--quiet",
+	]);
 	run("node", [
 		"scripts/run-mvnw.ts",
 		"-f",
