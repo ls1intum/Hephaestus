@@ -330,7 +330,7 @@ jobs:
     if: always()
     steps:
       - name: Generate workflow timeline
-        uses: Kesin11/actions-timeline@7c7e0821d38f27460f4a71ef874a1c8cf23602e4 # v2
+        uses: Kesin11/actions-timeline@57fc93f20c6da7fbc14063c6d24a2a5627c799ad # v3.2.0
         with:
           show-waiting-runner: true
 

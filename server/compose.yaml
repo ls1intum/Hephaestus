@@ -32,7 +32,7 @@ services:
   # Available for opt-in agent/webhook pipeline work (set the relevant hephaestus.*.nats.enabled
   # in application-local.yml). Idle otherwise — no Spring connection opens unless enabled.
   nats:
-    image: nats:alpine
+    image: nats:2.14.6-alpine@sha256:ad7a43eb7e3337c3c38ce5d784d1461791f95f730f252d2b25eee699752a0ca3
     command: ['-js', '-m', '8222']
     ports:
       - '${NATS_PORT:-4222}:4222'

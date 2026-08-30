@@ -347,7 +347,7 @@ jobs:
           cat subjects.sha256
 
       - name: Attest release image lock
-        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-checksums: subjects.sha256
           predicate-type: https://in-toto.io/attestation/release/v0.1
