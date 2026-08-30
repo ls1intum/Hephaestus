@@ -58,7 +58,7 @@ do, its home is the Admin Guide (`docs/admin/`) and the runbook links to it.
 | [0017](0017-replace-keycloak-with-spring-native-auth.md) | Replace Keycloak with Spring-native auth (BFF cookie-JWT + `Connection`-backed workspace IdPs) | Accepted |
 | [0018](0018-pg-partman-for-auth-event-partitioning.md) | `pg_partman` for `auth_event` partitioning | Accepted |
 | [0019](0019-workspace-membership-keyed-on-account.md) | Workspace membership is keyed on `Account`, not the SCM `User` | Proposed |
-| [0020](0020-context-fabric-everything-is-an-integration.md) | Context Fabric: everything is an integration | Accepted (amended 2026-08-04 #1430) |
+| [0020](0020-context-fabric-everything-is-an-integration.md) | Context Fabric: everything is an integration | Accepted (amended 2026-08-04 #1430, 2026-08-30 #1636 — evidence storage superseded by [0039](0039-git-and-postgresql-own-evidence.md)) |
 | [0021](0021-observations-feedback-synthesis-seam.md) | Findings vs feedback — evidence and delivered feedback are separate records | Accepted (amended 2026-07-31 #1423, 2026-08-16 #1430) |
 | [0022](0022-observation-presence-assessment-and-schema-cleanup.md) | Observation = presence × assessment (drop `Practice.kind`); reaction anchors on feedback; ruthless column cleanup | Accepted |
 | [0023](0023-outline-documentation-integration.md) | Outline documentation integration — a content source, not a detection surface | Accepted |
