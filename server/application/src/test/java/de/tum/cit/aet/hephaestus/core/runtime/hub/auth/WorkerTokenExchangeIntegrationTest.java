@@ -36,7 +36,7 @@ class WorkerTokenExchangeIntegrationTest extends BaseIntegrationTest {
         assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
         assertThat(response.getBody())
                 .isInstanceOfSatisfying(WorkerTokenExchangeController.ExchangeResponse.class, body -> {
-                    WorkerJwt jwt = verifier.verify(body.token());
+                    WorkerSessionJwt jwt = (WorkerSessionJwt) verifier.verify(body.token());
                     assertThat(jwt.workerId()).isEqualTo("worker-it");
                     assertThat(jwt.jti()).isNotBlank();
                     assertThat(body.expiresAt()).isNotNull();

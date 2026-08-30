@@ -18,11 +18,14 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
+import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtVerifier;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
@@ -56,13 +59,20 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Autowired
     private LlmModelResolver modelResolver;
 
+    @Autowired
+    private WorkerJwtVerifier jwtVerifier;
+
+    @Autowired
+    private WorkerJwtIssuer jwtIssuer;
+
     private JobTokenAuthenticationFilter filter;
     private Workspace workspace;
 
     @BeforeEach
     void setUp() {
         SecurityContextHolder.clearContext();
-        filter = new JobTokenAuthenticationFilter(jobRepository, new MentorProxyCredentialRegistry(), objectMapper);
+        filter = new JobTokenAuthenticationFilter(
+                jobRepository, jwtVerifier, new MentorProxyCredentialRegistry(), objectMapper);
         User owner = persistUser("proxy-owner");
         workspace = createWorkspace("proxy-ws", "Proxy Workspace", "proxy-org", AccountType.ORG, owner);
     }
@@ -75,7 +85,8 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Test
     void shouldAuthenticateRunningJobTokenAgainstPersistedRouting() throws Exception {
         AgentJob job = runningJob(true);
-        AuthenticationResult result = authenticate(job.getJobToken());
+        AuthenticationResult result = authenticate(
+                jwtIssuer.issueForJob(job.getId(), workspace.getId(), job.getRetryCount(), Duration.ofMinutes(5)));
 
         assertThat(result.status()).isEqualTo(200);
         assertThat(result.authentication())

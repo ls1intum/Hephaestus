@@ -34,6 +34,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
+import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
 import de.tum.cit.aet.hephaestus.observability.StructuredLogKeys;
 import io.micrometer.core.instrument.Counter;
@@ -148,6 +149,7 @@ public class AgentJobExecutor {
     private final WorkspaceAgentBindingRepository bindingRepository;
     private final JobTypeHandlerRegistry handlerRegistry;
     private final PracticePiAdapter practiceAgent;
+    private final WorkerJwtIssuer workerJwtIssuer;
 
     private final SandboxManager sandboxManager;
     private final AsyncTaskExecutor sandboxExecutor;
@@ -187,6 +189,7 @@ public class AgentJobExecutor {
             WorkspaceAgentBindingRepository bindingRepository,
             JobTypeHandlerRegistry handlerRegistry,
             PracticePiAdapter practiceAgent,
+            WorkerJwtIssuer workerJwtIssuer,
             SandboxManager sandboxManager,
             @Qualifier("sandboxExecutor") AsyncTaskExecutor sandboxExecutor,
             TransactionTemplate transactionTemplate,
@@ -203,6 +206,7 @@ public class AgentJobExecutor {
         this.bindingRepository = bindingRepository;
         this.handlerRegistry = handlerRegistry;
         this.practiceAgent = practiceAgent;
+        this.workerJwtIssuer = workerJwtIssuer;
         this.sandboxManager = sandboxManager;
         this.sandboxExecutor = sandboxExecutor;
         this.transactionTemplate = transactionTemplate;
@@ -715,15 +719,19 @@ public class AgentJobExecutor {
             return handler.prepareInputs(managedJob);
         });
 
-        // Every sandbox reaches the provider through the in-app LLM proxy with the job's own token;
-        // there is no worker-side BYO-LLM override.
+        // Sandboxes access providers through the LLM proxy with an attempt-scoped credential.
+        String jobToken = workerJwtIssuer.issueForJob(
+                jobId,
+                job.getWorkspace().getId(),
+                job.getRetryCount(),
+                Duration.ofSeconds(snapshot.timeoutSeconds()).plusMinutes(5));
         PracticeAgentRequest adapterRequest = new PracticeAgentRequest(
                 snapshot.apiProtocol(),
                 snapshot.upstreamModelId(),
                 snapshot.contextWindow(),
                 snapshot.maxOutputTokens(),
                 snapshot.supportsReasoning(),
-                job.getJobToken(),
+                jobToken,
                 snapshot.allowInternet(),
                 snapshot.timeoutSeconds());
 

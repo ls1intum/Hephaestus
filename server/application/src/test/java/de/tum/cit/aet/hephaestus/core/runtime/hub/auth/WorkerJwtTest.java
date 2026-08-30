@@ -15,6 +15,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Stream;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,12 +47,25 @@ class WorkerJwtTest extends BaseUnitTest {
     @Test
     void issuedTokenVerifiesWithExpectedClaims() {
         WorkerJwtIssuer.IssuedWorkerJwt issued = issuer.issue("worker-1");
-        WorkerJwt jwt = verifier.verify(issued.token());
+        WorkerSessionJwt jwt = (WorkerSessionJwt) verifier.verify(issued.token());
 
         assertThat(jwt.workerId()).isEqualTo("worker-1");
         assertThat(jwt.jti()).isEqualTo(issued.jti());
         assertThat(jwt.expiresAt())
                 .isCloseTo(issued.expiresAt(), Assertions.within(1, java.time.temporal.ChronoUnit.SECONDS));
+    }
+
+    @Test
+    void issuedJobTokenVerifiesWithRequiredClaims() {
+        UUID jobId = UUID.randomUUID();
+
+        JobJwt jwt = (JobJwt) verifier.verify(issuer.issueForJob(jobId, 42L, 0, Duration.ofMinutes(5)));
+
+        assertThat(jwt.jobId()).isEqualTo(jobId);
+        assertThat(jwt.workspaceId()).isEqualTo(42L);
+        assertThat(jwt.scopes()).containsExactly("llm_proxy");
+        assertThat(jwt.issuedAt()).isNotNull();
+        assertThat(jwt.jti()).isNotBlank();
     }
 
     @Test

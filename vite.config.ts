@@ -105,7 +105,7 @@ export default defineConfig({
 				"vp -C webapp test --run --config vitest.config.storybook.ts",
 			),
 			"gate:verify:webapp-build": uncached("node scripts/verify-webapp-build.ts"),
-			"gate:verify:storybook-build": uncached("vp exec -C webapp storybook build --stats-json"),
+			"gate:verify:storybook-build": uncached("vp -C webapp exec storybook build --stats-json"),
 			"gate:verify:docs-build": uncached("vp run --filter docs build"),
 			"gate:verify:server": uncached("pnpm run test:server:verification"),
 			verification: uncached([
