@@ -264,7 +264,7 @@ therefore subject to the registry's anonymous rate limit.
 ### Parallel Execution
 
 - Test legs run in parallel across the app server and the webapp. Webhook reception is part of the app-server test surface since ADR 0008.
-- Quality-gate legs (App Server, Webapp, OpenAPI, Database, Migrations) run in parallel, plus a legacy-cleanup guard
+- Quality-gate legs (App Server, Tooling and Docs, Webapp, OpenAPI, Database, Migrations) run in parallel, plus a legacy-cleanup guard
 - Docker images build for both architectures (amd64 + arm64)
 - `fail-fast: false` ensures all jobs complete for full feedback
 

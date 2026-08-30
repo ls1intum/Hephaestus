@@ -82,7 +82,7 @@ checks, and security scans. Run `check` before pushing and `verify` before reque
 
 `docs:lint` is **not** the oxlint leg — it is the docs package's own `typecheck` plus
 `markdownlint-cli2`, configured by `docs/.markdownlint-cli2.jsonc`, which states both the file scope
-and the rules. It is the last leg of `bun run check` and runs on the App Server CI leg, which
+and the rules. It is the last leg of `bun run check` and runs on the Tooling and Docs CI leg, which
 `docs/**` already triggers.
 
 **Start every oxlint run from the repo root.** A nested config *replaces* the root's rules for the
