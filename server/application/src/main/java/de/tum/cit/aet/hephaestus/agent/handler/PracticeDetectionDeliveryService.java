@@ -95,10 +95,7 @@ public class PracticeDetectionDeliveryService {
         this.sourceCatalogs = sourceCatalogs;
     }
 
-    /**
-     * Job-metadata key carrying {@link ObservationOrigin}. Written at submission and read back here rather
-     * than re-derived: by delivery time, what occasioned the run is no longer reconstructable from the job row.
-     */
+    /** Metadata key for the run's immutable observation origin. */
     public static final String ORIGIN_METADATA_KEY = "observation_origin";
 
     private record Target(ArtifactKind type, Long id, Long aboutUserId) {}
@@ -115,8 +112,7 @@ public class PracticeDetectionDeliveryService {
         try {
             return ObservationOrigin.valueOf(node.asString());
         } catch (IllegalArgumentException unknown) {
-            // An unrecognized value is a newer writer, not license to guess: refuse rather than silently
-            // filing the run under LIVE and polluting the only population treated as unbiased.
+            // Reject unknown origins rather than classifying them as unbiased live runs.
             throw new JobDeliveryException("Unknown observation origin in job metadata: " + node.asString(), unknown);
         }
     }
@@ -215,9 +211,7 @@ public class PracticeDetectionDeliveryService {
                     revisionsBySlug.get(observation.practiceSlug()), "Validated practice revision is missing");
             Practice practice = revision.getPractice();
 
-            // The position the observation was SUBMITTED at, not its position among those admitted: this key
-            // is a retry's dedup grain, so a claim withheld on one attempt and not the next must not renumber
-            // the claims after it into keys that miss what is already stored.
+            // Submitted position keeps retry idempotency keys stable when admission outcomes change.
             String occurrenceKey = observation.practiceSlug() + ":"
                     + admittedIndexes.get(i)
                     + ":"
@@ -236,9 +230,7 @@ public class PracticeDetectionDeliveryService {
                 }
             }
 
-            // Cross-run identity (ADR 0021): a content-derived key STABLE across re-detections, so a later
-            // Feedback can supersede instead of re-post. Derived from what the observation is ABOUT, never from
-            // the job or a line number.
+            // Recurrence identity is content-derived and stable across runs (ADR 0021).
             String recurrenceKey = ObservationFingerprint.compute(
                     observation.practiceSlug(),
                     artifactKind.value(),
@@ -484,14 +476,7 @@ public class PracticeDetectionDeliveryService {
         return false;
     }
 
-    /**
-     * Holds a {@code NOT_APPLICABLE} observation to the claim it is making: unlike {@code ABSENT}, it costs
-     * nothing to say, so uncertainty drains into it unless naming the subject and what ruled it out costs as
-     * much as recording a search does — otherwise the honest answer, {@code INCONCLUSIVE}, loses every time.
-     *
-     * <p>Enforced here as well as in the sandbox: a guard the constrained party can skip is advice, not a
-     * boundary.
-     */
+    /** Requires NOT_APPLICABLE claims to identify the subject, exclusion reason, and consulted sources. */
     private void enforceStatedInapplicability(
             ValidatedObservation observation, EvidenceBoundary boundary, AgentJob job) {
         if (observation.presence() != Presence.NOT_APPLICABLE) {
@@ -543,25 +528,7 @@ public class PracticeDetectionDeliveryService {
         }
     }
 
-    /**
-     * Holds an {@code ABSENT} observation to the search it recorded: a partial capture of the review threads
-     * is equally consistent with "nobody raised it" and "the raising was in the part we did not fetch", so
-     * {@link EvidenceStance#EXHAUSTIVE} sources are exactly what the search must have covered.
-     *
-     * <p><b>The two directions of an absence do not need the same proof.</b> An {@code ABSENT, BAD} says a good
-     * behaviour is missing from the place its citation points at; the claim is anchored to that locus, and the
-     * recorded search bounds it. An {@code ABSENT, GOOD} says a harmful behaviour is <em>nowhere in the
-     * work</em> — a universal over the whole corpus, provable only if the corpus is closed and was covered
-     * whole. So a practice that declares no {@code EXHAUSTIVE} stance has closed no corpus and may not make
-     * that claim, whatever it is about; one that has, may, on exactly the evidence it already owes.
-     *
-     * <p>This is the rule that lets a clean surface be recorded as a strength at all. Eight defect detectors
-     * used to forbid {@code GOOD} outright on the true premise that a clean bill of health cannot be proved
-     * from a fragment — and paid for it by telling a developer who wrote sound error handling that their work
-     * had no subject for the practice, which is false and which reads identically to "you touched nothing
-     * relevant". The premise only ever held for an unbounded corpus; this is where the boundary is checked
-     * instead of assumed.
-     */
+    /** Requires an exhaustive search for ABSENT claims and a bounded corpus for ABSENT strengths. */
     private void enforceRecordedSearch(
             ValidatedObservation observation, Set<SourceKind> exhaustive, EvidenceBoundary boundary, AgentJob job) {
         if (observation.presence() != Presence.ABSENT) {
