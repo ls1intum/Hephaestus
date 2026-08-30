@@ -814,10 +814,10 @@ export type ConnectionSyncStatus = {
 };
 
 export type ConsentStatus = {
-  completed?: boolean;
+  completed: boolean;
   noticeText: string;
   noticeVersion: string;
-  participateInResearch?: boolean;
+  participateInResearch: boolean;
 };
 
 /**
@@ -1528,8 +1528,8 @@ export type FeedbackSourceCount = {
 
 export type FirstLoginConsent = {
   noticeVersion: string;
-  participateInResearch?: boolean;
-  termsAccepted?: boolean;
+  participateInResearch: boolean;
+  termsAccepted: boolean;
 };
 
 /**
@@ -3792,7 +3792,7 @@ export type RepositoryInfo = {
 };
 
 export type ResearchConsent = {
-  granted?: boolean;
+  granted: boolean;
 };
 
 /**

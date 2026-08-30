@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.Objects;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -157,15 +158,27 @@ public class ConsentService {
     public record ConsentStatusDTO(
             @NonNull String noticeVersion,
             @NonNull String noticeText,
+
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
             boolean completed,
+
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
             boolean participateInResearch) {}
 
     public record FirstLoginConsentDTO(
-            @NonNull String noticeVersion, boolean termsAccepted, boolean participateInResearch) {
+            @NonNull String noticeVersion,
+
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            boolean termsAccepted,
+
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            boolean participateInResearch) {
         public FirstLoginConsentDTO {
             Objects.requireNonNull(noticeVersion, "noticeVersion");
         }
     }
 
-    public record ResearchConsentDTO(boolean granted) {}
+    public record ResearchConsentDTO(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+            boolean granted) {}
 }

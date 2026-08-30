@@ -8875,8 +8875,10 @@ components:
         participateInResearch:
           type: boolean
       required:
+      - completed
       - noticeText
       - noticeVersion
+      - participateInResearch
     Contributor:
       type: object
       description: Information about a contributor to the Hephaestus project
@@ -10069,6 +10071,8 @@ components:
           type: boolean
       required:
       - noticeVersion
+      - participateInResearch
+      - termsAccepted
     FxRateInfo:
       type: object
       description: "Display-only currency conversion for the USD amounts in this response.\
@@ -13195,6 +13199,8 @@ components:
       properties:
         granted:
           type: boolean
+      required:
+      - granted
     ResourceCounts:
       type: object
       description: Resource-level rollup for the connection overview badge
