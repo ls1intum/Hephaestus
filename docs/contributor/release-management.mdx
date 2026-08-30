@@ -98,6 +98,15 @@ The latest release is rescanned weekly. A policy violation or scan failure is re
 [the vulnerability response issue](https://github.com/ls1intum/Hephaestus/issues/1369); scanner failure
 is never treated as no findings.
 
+## Browser source maps
+
+Image builds upload hidden source maps through Sentry's debug-ID integration when the repository
+secrets `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and `SENTRY_PROJECT` are all configured. The token must be
+authorized to upload artifacts to that project. Builds reject a partial configuration, pass the
+values as BuildKit secrets to the `amd64` build outside pull requests, and remove maps before creating
+either nginx image. The runtime release remains the same version the application server receives
+from the verified release lock.
+
 ### Operator verification
 
 The [release image lock](../admin/release-image-lock) is the canonical verification procedure. It

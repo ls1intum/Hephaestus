@@ -11,7 +11,15 @@ RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store,sharing=locked \
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store,sharing=locked \
     pnpm install --offline --frozen-lockfile --filter webapp
 COPY webapp/ /repo/webapp/
-RUN pnpm --filter webapp run build
+RUN --mount=type=secret,id=sentry_auth_token,required=false \
+    --mount=type=secret,id=sentry_org,required=false \
+    --mount=type=secret,id=sentry_project,required=false \
+    export SENTRY_AUTH_TOKEN="$(cat /run/secrets/sentry_auth_token 2>/dev/null || true)" && \
+    export SENTRY_ORG="$(cat /run/secrets/sentry_org 2>/dev/null || true)" && \
+    export SENTRY_PROJECT="$(cat /run/secrets/sentry_project 2>/dev/null || true)" && \
+    pnpm --filter webapp run build && \
+    find webapp/dist -name '*.map' -delete && \
+    ! find webapp/dist -name '*.map' -print -quit | grep -q .
 
 FROM nginx:stable-alpine@sha256:97d490c12ba55b4946b01546d1c3ed324e8d41ab1c9fcb2a616aa470620e5b46
 ARG COOLIFY_BRANCH

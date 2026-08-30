@@ -99,6 +99,7 @@ expectConfig("allowBuilds", {
 	esbuild: true,
 	"@google/genai": false,
 	"@swc/core": true,
+	"@sentry/cli": true,
 });
 
 const setup = readFileSync(".github/actions/setup-node-pnpm/action.yml", "utf8");

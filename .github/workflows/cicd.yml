@@ -294,6 +294,10 @@ jobs:
 
   Docker:
     uses: ./.github/workflows/ci-docker-build.yml
+    secrets:
+      SENTRY_AUTH_TOKEN: ${{ github.event_name != 'pull_request' && secrets.SENTRY_AUTH_TOKEN || '' }}
+      SENTRY_ORG: ${{ github.event_name != 'pull_request' && secrets.SENTRY_ORG || '' }}
+      SENTRY_PROJECT: ${{ github.event_name != 'pull_request' && secrets.SENTRY_PROJECT || '' }}
     # Image builds consume the detected source tree, not Quality outputs. Running both branches at
     # once keeps image and preview confidence without adding Docker as a second CI stage.
     needs: [detect-changes]
