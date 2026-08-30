@@ -107,7 +107,6 @@ jobs:
 
   server-integration:
     name: "App Server: Integration"
-    needs: server-build
     if: inputs.should_skip != 'true' && inputs.application_server_changed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -125,30 +124,10 @@ jobs:
         with:
           cache-type: application-server-integration
           os: ${{ runner.os }}
-      - name: Download built reactor
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: ${{ env.SERVER_REACTOR_ARTIFACT }}
-          path: server
-      - name: Install downloaded reactor dependencies
-        run: |
-          # Surefire resolves the generated-clients JAR from the local repository, which is only
-          # warm when the dependency cache hits — and its key hashes every server POM, so the PR
-          # that edits one starts cold. Install the downloaded reactor artifacts explicitly instead
-          # of relying on that cache.
-          cd server
-          CLIENT_JAR="$(find generated-clients/target -maxdepth 1 -name 'hephaestus-generated-clients-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' -print -quit)"
-          test -n "$CLIENT_JAR"
-          ./mvnw --batch-mode --non-recursive org.apache.maven.plugins:maven-install-plugin:3.1.4:install-file \
-            -Dfile=pom.xml -DpomFile=pom.xml
-          ./mvnw --batch-mode --non-recursive org.apache.maven.plugins:maven-install-plugin:3.1.4:install-file \
-            -Dfile="$CLIENT_JAR" -DpomFile=generated-clients/pom.xml
-      - name: Run integration tests from the built reactor
+      - name: Run integration tests
         run: |
           rm -rf server/application/target/surefire-reports/*
-          cd server
-          ./mvnw -pl application -am initialize surefire:test \
-            -Dsurefire.includedGroups=integration -Dparallel=none --batch-mode
+          pnpm run test:server:integration
       - name: Upload test results
         if: always()
         uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2 # v3.0.0
