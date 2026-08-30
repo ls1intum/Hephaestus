@@ -8,8 +8,10 @@ import io.micrometer.tracing.Span;
 import io.micrometer.tracing.TraceContext;
 import io.micrometer.tracing.Tracer;
 import io.micrometer.tracing.propagation.Propagator;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -34,10 +36,37 @@ class RequestCorrelationFilterTest {
         when(context.traceId()).thenReturn("0123456789abcdef0123456789abcdef");
 
         MockHttpServletResponse response = new MockHttpServletResponse();
-        new RequestCorrelationFilter(tracer, propagator)
+        new RequestCorrelationFilter(provider(tracer), provider(propagator))
                 .doFilter(new MockHttpServletRequest(), response, new MockFilterChain());
 
         assertThat(response.getHeader(RequestCorrelationFilter.HEADER_NAME))
                 .isEqualTo("0123456789abcdef0123456789abcdef");
+    }
+
+    @Test
+    void shouldPassThroughWithoutHeaderWhenTracingIsDisabled() throws Exception {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        new RequestCorrelationFilter(provider((Tracer) null), provider((Propagator) null))
+                .doFilter(new MockHttpServletRequest(), response, chain);
+
+        assertThat(response.getHeader(RequestCorrelationFilter.HEADER_NAME)).isNull();
+        assertThat(chain.getRequest()).isNotNull();
+    }
+
+    private static <T> ObjectProvider<T> provider(@Nullable T instance) {
+        return new ObjectProvider<>() {
+            @Override
+            public T getObject() {
+                if (instance == null) throw new IllegalStateException("no instance");
+                return instance;
+            }
+
+            @Override
+            public @Nullable T getIfAvailable() {
+                return instance;
+            }
+        };
     }
 }
