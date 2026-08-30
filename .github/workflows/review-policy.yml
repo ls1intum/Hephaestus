@@ -37,6 +37,12 @@ jobs:
               ...context.repo,
               pull_number: context.payload.pull_request.number,
             });
+            // pull_request_review supports no base-branch filter, so guard here: the
+            // policy applies to pull requests that target main only.
+            if (pull.base.ref !== 'main') {
+              core.info(`The review policy does not apply to base branch ${pull.base.ref}.`);
+              return;
+            }
             const author = pull.user.login.toLowerCase();
             const maintainers = new Set(
               (process.env.MAINTAINERS || '')

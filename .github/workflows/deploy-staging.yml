@@ -27,3 +27,6 @@ jobs:
     with:
       environment: Staging
       release: ${{ inputs.image-tag }}
+    # Deploy credentials include organization secrets, which reach the locked-compose
+    # workflow only through inheritance — environment secrets alone do not cover them.
+    secrets: inherit # zizmor: ignore[secrets-inherit]

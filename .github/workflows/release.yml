@@ -712,6 +712,9 @@ jobs:
       packages: read
     with:
       image-tag: ${{ needs.release.outputs.tag_name }}
+    # Deploy credentials include organization secrets, which reach nested reusable
+    # workflows only through inheritance — environment secrets alone do not cover them.
+    secrets: inherit # zizmor: ignore[secrets-inherit]
 
   deploy-production:
     needs: [release, deploy-staging]
@@ -721,3 +724,6 @@ jobs:
       contents: read
     with:
       image-tag: ${{ needs.release.outputs.tag_name }}
+    # Deploy credentials include organization secrets, which reach nested reusable
+    # workflows only through inheritance — environment secrets alone do not cover them.
+    secrets: inherit # zizmor: ignore[secrets-inherit]
