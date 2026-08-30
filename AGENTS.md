@@ -11,6 +11,9 @@ own practice pages, or in conversation.
 too: the unit a review records is an **observation**, the unit a developer receives is **feedback**,
 and neither the application nor a review is an *agent*.
 
+Parallel contributions follow the hot-file lanes, generated-artifact, main-breakage, and merge-queue
+protocol in `docs/contributor/ai-agent-workflow.mdx` § Parallel delivery protocol.
+
 - `server/` — Spring Boot 4 + Java 21 + Spring Modulith 2. Liquibase-managed PostgreSQL, SQL-layer
   multi-tenancy (`core/tenancy/`), generated `openapi.yaml`. Three runtime roles (`server`, `worker`,
   `webhook`) selected by `hephaestus.runtime.*` — ADR 0005 and ADR 0008. See `server/AGENTS.md`.
@@ -181,11 +184,11 @@ as a Liquibase `<changeSet>` — a schema change needs both. Full flow:
   ✗ `Refactor LeaderboardService scoring hooks` → ✓ `Fixes duplicate leaderboard entries after a team rename.`
   One changeset per user-visible change.
 - **The bump is the operator's upgrade cost, not code semantics.** `patch` — no action needed.
-  `minor` — new capability; name any new *optional* env var. `major` — the operator must act, and
-  `MIGRATION.md` is updated. **Pre-1.0 (now): never pick `major`** — it would cut 1.0.0 and
+  `minor` — new capability; name any new *optional* env var. `major` — the operator must act, and a
+  matching `.migration/<changeset-slug>.md` is added. **Pre-1.0 (now): never pick `major`** — it would cut 1.0.0 and
   `verify-changesets` rejects it. Breaking changes ride in `minor`, so a pre-1.0 `minor` is not
-  guaranteed zero-action: say `**Operators:** …` in the summary and update `MIGRATION.md` exactly as a
-  `major` would.
+  guaranteed zero-action: say `**Operators:** …` in the summary and add a migration fragment exactly
+  as a `major` would.
 - **Automatic migrations are flagged by the release workflow** (it diffs `db/changelog/`), so the
   changeset does not mention them — keep it user-facing. Touching `db/changelog/` without touching
   `.changeset/` is always wrong.
