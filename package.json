@@ -5,7 +5,6 @@
 	"packageManager": "pnpm@12.0.0",
 	"type": "module",
 	"scripts": {
-		"commitlint": "commitlint",
 		"changeset:version": "changeset version && node scripts/sync-release-version.ts",
 		"generate:api:application-server:clean": "node -e \"import('node:fs/promises').then(fs => fs.rm('webapp/src/api', {recursive: true, force: true}))\"",
 		"generate:api:application-server:specs": "node scripts/generate-openapi-spec.ts",
