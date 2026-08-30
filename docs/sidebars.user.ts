@@ -19,6 +19,7 @@ const sidebars: SidebarsConfig = {
 			label: "Optional features",
 			items: ["leaderboard", "achievements"],
 		},
+		{ type: "doc", id: "accessibility", label: "Accessibility" },
 	],
 };
 
