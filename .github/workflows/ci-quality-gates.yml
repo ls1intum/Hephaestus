@@ -268,10 +268,12 @@ jobs:
         continue-on-error: true
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'server-contracts' && always()
         run: |
-          if [[ "${{ inputs.postgres_image_changed }}" == "true" ]]; then
+          # The base-sha tag is published by that commit's own main run, which can still be in
+          # flight when the base just advanced — fall back to building the identical Dockerfile.
+          if [[ "${{ inputs.postgres_image_changed }}" == "true" ]] ||
+            ! docker pull ghcr.io/ls1intum/hephaestus/postgres:${{ github.event.pull_request.base.sha || github.sha }}; then
             docker build -t hephaestus-postgres:ci docker/postgres
           else
-            docker pull ghcr.io/ls1intum/hephaestus/postgres:${{ github.event.pull_request.base.sha || github.sha }}
             docker tag ghcr.io/ls1intum/hephaestus/postgres:${{ github.event.pull_request.base.sha || github.sha }} hephaestus-postgres:ci
           fi
           docker run -d --name postgres-db \
