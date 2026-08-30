@@ -47,9 +47,8 @@ jobs:
           cache-dependency-path: "server/**/pom.xml"
 
       - uses: ./.github/actions/setup-node-pnpm
-
-      - name: Install repository tooling
-        run: pnpm install --frozen-lockfile
+        with:
+          install: "frozen"
 
       - name: Run security mutation suite
         run: timeout --kill-after=30s 8m pnpm run test:server:mutation

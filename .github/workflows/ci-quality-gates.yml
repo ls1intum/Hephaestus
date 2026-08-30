@@ -106,6 +106,8 @@ jobs:
       - name: Setup Node.js and pnpm
         if: steps.should_run.outputs.run == 'true'
         uses: ./.github/actions/setup-node-pnpm
+        with:
+          install: "frozen"
 
       - name: Setup application-server caches
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'application-server-quality'
@@ -124,7 +126,6 @@ jobs:
       - name: Application-server quality
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'application-server-quality'
         run: |
-          pnpm install --frozen-lockfile
           ISSUES_FOUND=()
           SERVER_OK=true; PMD_CANARY_OK=true; NULLNESS_OK=true; CONTRACTS_OK=true; ENV_OK=true
 
@@ -164,7 +165,6 @@ jobs:
       - name: Tooling and docs quality
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'tooling-quality'
         run: |
-          pnpm install --frozen-lockfile
           pnpm run check:package-manager
           pnpm run check:agent-runtime-pins
           pnpm run check:agents
@@ -180,7 +180,6 @@ jobs:
         working-directory: ./webapp
         run: |
           cd ..
-          pnpm install --frozen-lockfile
           cd webapp
 
           ISSUES_FOUND=()
@@ -258,7 +257,6 @@ jobs:
           DATABASE_URL: postgresql://fake:fake@localhost:5432/fake
           MODEL_NAME: fake:model
         run: |
-          pnpm install --frozen-lockfile
           pnpm run generate:api
           git add .
           if ! git diff --cached --quiet; then

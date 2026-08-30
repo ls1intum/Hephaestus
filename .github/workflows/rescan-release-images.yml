@@ -19,11 +19,11 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
+        with:
+          install: "none"
       - uses: ./.github/actions/setup-release-security-tools
         with:
           install-syft: "false"
-      - name: Install cosign
-        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
       - name: Download and verify latest supported release evidence
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -33,39 +33,6 @@ jobs:
           mkdir release-evidence
           gh release download "$tag" --repo "${{ github.repository }}" --dir release-evidence
           (cd release-evidence && sha256sum -c SHA256SUMS)
-          for file in manifest.json release-images.json tool-versions.json trivy-db.json vulnerability-policy.json; do
-            test -s "release-evidence/$file"
-          done
-          jq -e --slurpfile inventory release-evidence/release-images.json \
-            '.schemaVersion == 1 and
-             ([.subjects[].image] | unique == (($inventory[0].images + [$inventory[0].upstream[].name]) | sort)) and
-             (group_by(.image) | all(.[]; [.[].platform] == ["linux/amd64", "linux/arm64"])) and
-             all(.subjects[]; (.digest | test("^sha256:[a-f0-9]{64}$")) and (.indexDigest | test("^sha256:[a-f0-9]{64}$")))' \
-            release-evidence/manifest.json >/dev/null
-          jq -er '.subjects[] | [.image, .platform, .indexDigest, .digest, .repository] | @tsv' release-evidence/manifest.json |
-          while IFS=$'\t' read -r image platform index_digest digest repository; do
-            suffix=${platform//\//-}
-            node scripts/check-release-sbom.ts \
-              "release-evidence/$image-$suffix.syft.json" \
-              "release-evidence/$image-$suffix.spdx.json" \
-              "release-evidence/$image-$suffix.cdx.json" \
-              "$digest" "$platform" /tmp/sbom-validation.json
-            cmp "release-evidence/$image-$suffix.sbom-validation.json" /tmp/sbom-validation.json
-            for kind in trivy policy; do
-              test -s "release-evidence/$image-$suffix.$kind.json"
-            done
-            jq -e --arg ref "$repository@$digest" \
-              '.ArtifactName == $ref and (.Results | type == "array")' \
-              "release-evidence/$image-$suffix.license.json" >/dev/null
-            node scripts/check-release-vulnerabilities.ts "$image" "$platform" "$digest" "$repository" \
-              "release-evidence/$image-$suffix.trivy.json" \
-              release-evidence/vulnerability-policy.json /tmp/policy.json
-            cmp "release-evidence/$image-$suffix.policy.json" /tmp/policy.json
-            architecture=${platform#*/}
-            docker buildx imagetools inspect "$repository@$index_digest" --raw |
-              jq -e --arg architecture "$architecture" --arg digest "$digest" \
-                'any(.manifests[]; .platform.os == "linux" and .platform.architecture == $architecture and .digest == $digest)' >/dev/null
-          done
           lock="release-$tag.json"
           cosign verify-blob \
             --bundle "release-evidence/$lock.sigstore.json" \
@@ -74,6 +41,7 @@ jobs:
             "release-evidence/$lock"
           node scripts/release-image-lock.ts "release-evidence/$lock" \
             release-evidence/manifest.json "$tag" /tmp/release-lock.env
+          node scripts/verify-release-evidence.ts release-evidence
       - name: Rescan immutable subjects
         env:
           TRIVY_USERNAME: ${{ github.actor }}

@@ -97,6 +97,8 @@ jobs:
 
       - name: Set up the repository's Node.js and pnpm versions
         uses: ./.github/actions/setup-node-pnpm
+        with:
+          install: "none"
 
       - name: Render the preview stack and assert it stays sandboxed
         run: pnpm run check:preview-stack

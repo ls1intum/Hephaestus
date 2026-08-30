@@ -193,4 +193,51 @@ void describe("CI contract", () => {
 		}
 		assert.deepEqual(invalid, [], "External uses must match @<40 lowercase hex> # v...");
 	});
+
+	void test("centralises dependency installation and browser setup", async () => {
+		const sources = await workflowSources();
+		for (const [file, source] of sources) {
+			assert.doesNotMatch(
+				source,
+				/pnpm install --frozen-lockfile/,
+				`${file} must install through setup-node-pnpm`,
+			);
+			const setupCalls = source.match(/uses: \.\/\.github\/actions\/setup-node-pnpm/g) ?? [];
+			const explicitModes =
+				source.match(
+					/uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+with:\n\s+install: "(?:none|frozen|hardened)"/g,
+				) ?? [];
+			assert.equal(
+				explicitModes.length,
+				setupCalls.length,
+				`${file} must select an explicit setup-node-pnpm install mode`,
+			);
+		}
+		const tests = await readFile(".github/workflows/ci-tests.yml", "utf8");
+		assert.equal((tests.match(/uses: \.\/\.github\/actions\/setup-browsers/g) ?? []).length, 2);
+		assert.doesNotMatch(tests, /playwright install chromium/);
+	});
+
+	void test("runs release evidence verification through tested TypeScript", async () => {
+		const release = await readFile(".github/workflows/release.yml", "utf8");
+		const rescan = await readFile(".github/workflows/rescan-release-images.yml", "utf8");
+		assert.match(rescan, /node scripts\/verify-release-evidence\.ts release-evidence/);
+		assert.doesNotMatch(rescan, /node scripts\/check-release-sbom\.ts/);
+		assert.equal((release.match(/node scripts\/verify-release-evidence\.ts/g) ?? []).length, 3);
+		assert.doesNotMatch(release, /node scripts\/check-release-(?:sbom|vulnerabilities)\.ts/);
+	});
+
+	void test("never invokes a repository-local action before checkout", async () => {
+		for (const [file, source] of await workflowSources()) {
+			for (const jobSource of source.split(/^ {2}(?=[A-Za-z][\w-]*:\s*$)/m).slice(1)) {
+				const firstLocalAction = jobSource.indexOf("uses: ./.github/actions/");
+				if (firstLocalAction < 0) continue;
+				const checkout = jobSource.indexOf("uses: actions/checkout@");
+				assert.ok(
+					checkout >= 0 && checkout < firstLocalAction,
+					`${file} invokes a local action before checking it out`,
+				);
+			}
+		}
+	});
 });

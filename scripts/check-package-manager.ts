@@ -105,8 +105,13 @@ const setup = readFileSync(".github/actions/setup-node-pnpm/action.yml", "utf8")
 if (!/^\s*uses: pnpm\/setup@[a-f0-9]{40} # v\d+\.\d+\.\d+$/m.test(setup)) {
 	throw new Error("setup-node-pnpm must pin pnpm/setup to a full commit SHA");
 }
-if (!/^\s*cache: true$/m.test(setup) || !/^\s*install: false$/m.test(setup)) {
-	throw new Error("setup-node-pnpm must cache the store and leave installs to each workflow");
+if (
+	!/^\s*cache: true$/m.test(setup) ||
+	!/^\s*install: \${{ inputs\.install == 'frozen' }}$/m.test(setup) ||
+	!/^\s*require-lockfile: \${{ inputs\.install == 'frozen' }}$/m.test(setup) ||
+	!setup.includes("pnpm install --frozen-lockfile --ignore-scripts")
+) {
+	throw new Error("setup-node-pnpm must own frozen and hardened dependency installation");
 }
 if (/^\s*(?:version|runtime):/m.test(setup)) {
 	throw new Error("setup-node-pnpm must read tool versions from package.json");
