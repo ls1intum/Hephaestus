@@ -96,6 +96,39 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     @Test
+    void shouldRejectLegacyOpaqueJobToken() throws Exception {
+        // The database-backed secret the entity still persists is a pre-migration credential; the
+        // proxy accepts only per-job JWTs — there is deliberately no dual-accept window.
+        AgentJob job = runningJob(true);
+
+        AuthenticationResult result = authenticate(job.getJobToken());
+
+        assertThat(result.status()).isEqualTo(401);
+        assertThat(result.authentication()).isNull();
+    }
+
+    @Test
+    void shouldRejectWorkerSessionJwtAtTheProxy() throws Exception {
+        runningJob(true);
+
+        AuthenticationResult result = authenticate(jwtIssuer.issue("worker-1").token());
+
+        assertThat(result.status()).isEqualTo(401);
+        assertThat(result.authentication()).isNull();
+    }
+
+    @Test
+    void shouldRejectJobJwtBoundToAnotherWorkspace() throws Exception {
+        AgentJob job = runningJob(true);
+
+        AuthenticationResult result = authenticate(
+                jwtIssuer.issueForJob(job.getId(), workspace.getId() + 1, job.getRetryCount(), Duration.ofMinutes(5)));
+
+        assertThat(result.status()).isEqualTo(401);
+        assertThat(result.authentication()).isNull();
+    }
+
+    @Test
     void shouldFailClosedWhenCatalogModelIsDisabled() {
         AgentJob job = runningJob(false);
         long connectionId = job.getConfigSnapshot().get("connectionId").asLong();
