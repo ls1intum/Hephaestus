@@ -29,6 +29,7 @@ class ConfigurationReadinessEvaluatorTest extends BaseUnitTest {
         properties.put("spring.datasource.url", SECRET_MARKER);
         properties.put("spring.datasource.password", SECRET_MARKER);
         properties.put("hephaestus.security.encryption-key", SECRET_MARKER);
+        properties.put("hephaestus.security.credential-encryption-key", SECRET_MARKER);
         properties.put("hephaestus.webhook.secret", "PLANTED");
         properties.put("hephaestus.auth.state-cookie-key", SECRET_MARKER);
         properties.put("hephaestus.auth.login-providers.github.client-secret", "");
@@ -41,6 +42,7 @@ class ConfigurationReadinessEvaluatorTest extends BaseUnitTest {
                 .contains(
                         "database.url",
                         "security.credential-encryption",
+                        "security.value-encryption",
                         "webhook.shared-secret",
                         "auth.state-cookie-key",
                         "auth.login-provider");
@@ -117,6 +119,7 @@ class ConfigurationReadinessEvaluatorTest extends BaseUnitTest {
         environment.setActiveProfiles("prod");
         environment.setProperty("spring.datasource.url", SECRET_MARKER);
         environment.setProperty("hephaestus.security.encryption-key", SECRET_MARKER);
+        environment.setProperty("hephaestus.security.credential-encryption-key", SECRET_MARKER);
         environment.setProperty("hephaestus.webhook.secret", "short-secret");
 
         assertThatThrownBy(() -> new ProductionConfigurationEnvironmentPostProcessor()
@@ -124,6 +127,7 @@ class ConfigurationReadinessEvaluatorTest extends BaseUnitTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("database.url")
                 .hasMessageContaining("security.credential-encryption")
+                .hasMessageContaining("security.value-encryption")
                 .hasMessageContaining("webhook.shared-secret")
                 .hasMessageNotContaining(SECRET_MARKER);
         assertThat(output).doesNotContain(SECRET_MARKER).doesNotContain("short-secret");
@@ -194,11 +198,13 @@ class ConfigurationReadinessEvaluatorTest extends BaseUnitTest {
     void shouldRejectWhitespaceAndControlCharacterSecrets() {
         Map<String, Object> properties = validProperties();
         properties.put("hephaestus.security.encryption-key", " ".repeat(32));
+        properties.put("hephaestus.security.credential-encryption-key", " ".repeat(32));
         properties.put("hephaestus.webhook.secret", "a".repeat(31) + "\t");
 
         List<ConfigurationFactDTO> facts = evaluateReadiness(properties, true);
 
         assertStatus(facts, "security.credential-encryption", ConfigurationStatus.ACTION_REQUIRED);
+        assertStatus(facts, "security.value-encryption", ConfigurationStatus.ACTION_REQUIRED);
         assertStatus(facts, "webhook.shared-secret", ConfigurationStatus.ACTION_REQUIRED);
     }
 
@@ -219,6 +225,7 @@ class ConfigurationReadinessEvaluatorTest extends BaseUnitTest {
         properties.put("spring.datasource.username", "hephaestus");
         properties.put("spring.datasource.password", "database-secret");
         properties.put("hephaestus.security.encryption-key", "0123456789abcdef0123456789abcdef");
+        properties.put("hephaestus.security.credential-encryption-key", "0123456789abcdef0123456789abcdef");
         properties.put("hephaestus.host-url", "https://hephaestus.example.com");
         properties.put("hephaestus.webhook.secret", "0123456789abcdef0123456789abcdef");
         properties.put("hephaestus.sync.nats.enabled", true);
