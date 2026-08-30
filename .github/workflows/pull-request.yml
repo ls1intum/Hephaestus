@@ -33,7 +33,7 @@ jobs:
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          echo "$PR_TITLE" | pnpm exec commitlint 2>&1 | tee /tmp/commitlint-output.txt
+          echo "$PR_TITLE" | pnpm run commitlint 2>&1 | tee /tmp/commitlint-output.txt
           exit_code=${PIPESTATUS[1]}
 
           {
