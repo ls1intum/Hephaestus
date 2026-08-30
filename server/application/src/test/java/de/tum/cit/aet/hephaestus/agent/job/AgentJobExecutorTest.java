@@ -728,6 +728,20 @@ class AgentJobExecutorTest extends BaseUnitTest {
                             .counter()
                             .count())
                     .isOne();
+            // The pre-existing execution-duration label is unchanged; the lifecycle contract records
+            // the committed terminal state as completed.
+            assertThat(meterRegistry
+                            .get("agent.job.execution.duration")
+                            .tag("status", "INSUFFICIENT_EVIDENCE")
+                            .timer()
+                            .count())
+                    .isOne();
+            assertThat(meterRegistry
+                            .get("agent.job.total")
+                            .tag("outcome", "completed")
+                            .counter()
+                            .count())
+                    .isOne();
             verify(sandboxManager, never()).execute(any());
         }
 

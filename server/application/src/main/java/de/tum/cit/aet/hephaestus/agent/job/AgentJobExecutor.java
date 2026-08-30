@@ -617,7 +617,10 @@ public class AgentJobExecutor {
                         jobId, workerId, job.getRetryCount(), Instant.now(), output));
                 if (updated != null && updated == 1) {
                     recordPracticeReviewRefusal(job, "insufficient_evidence");
-                    metricOutcome = AgentJobStatus.COMPLETED.name();
+                    // Keep the pre-existing execution-duration outcome label; the lifecycle contract
+                    // still records the committed terminal state as COMPLETED.
+                    metricOutcome = "INSUFFICIENT_EVIDENCE";
+                    jobTelemetry.terminal(job, AgentJobStatus.COMPLETED, AgentJobTelemetry.age(job));
                     log.info(
                             "Completed agent job without model execution: jobId={}, outcome=INSUFFICIENT_EVIDENCE",
                             jobId);
