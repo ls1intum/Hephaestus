@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.webhook;
 
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.ConsumerSubjectMath;
+import de.tum.cit.aet.hephaestus.integration.core.metrics.IntegrationCoreMetrics;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -95,7 +96,7 @@ class WebhookStreamMonitor {
             // Effective retention, measured rather than claimed: max-age is a ceiling and max-bytes is
             // the floor under it, so which one a deployment actually gets is a function of its volume.
             Gauge.builder(
-                            "webhook.stream.oldest.message.age",
+                            IntegrationCoreMetrics.WEBHOOK_STREAM_OLDEST_MESSAGE_AGE,
                             this,
                             monitor -> monitor.usage.getOrDefault(name, UNKNOWN).oldestMessageAgeSeconds())
                     .tags(tags)
@@ -106,18 +107,18 @@ class WebhookStreamMonitor {
 
             AtomicLong gap = new AtomicLong();
             unacknowledgedGap.put(name, gap);
-            Gauge.builder("webhook.stream.unacknowledged.gap", gap, AtomicLong::doubleValue)
+            Gauge.builder(IntegrationCoreMetrics.WEBHOOK_STREAM_UNACKNOWLEDGED_GAP, gap, AtomicLong::doubleValue)
                     .tags(tags)
                     .register(meterRegistry);
             dropped.put(
                     name,
-                    Counter.builder("webhook.stream.unacknowledged.deletions")
+                    Counter.builder(IntegrationCoreMetrics.WEBHOOK_STREAM_UNACKNOWLEDGED_DELETIONS)
                             .tags(tags)
                             .register(meterRegistry));
 
             AtomicLong polled = new AtomicLong();
             lastSuccessfulPollMillis.put(name, polled);
-            Gauge.builder("webhook.stream.poll.age", polled, WebhookStreamMonitor::secondsSince)
+            Gauge.builder(IntegrationCoreMetrics.WEBHOOK_STREAM_POLL_AGE, polled, WebhookStreamMonitor::secondsSince)
                     .tags(tags)
                     .baseUnit("seconds")
                     .register(meterRegistry);

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.sync.push;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.integration.core.metrics.IntegrationCoreMetrics;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -92,7 +93,7 @@ public class SyncEventHub {
         this.eventsDelivered = counter(meterRegistry, "integration.sync.sse.events", "delivered");
         this.eventsDropped = counter(meterRegistry, "integration.sync.sse.events", "dropped");
         this.eventsFailed = counter(meterRegistry, "integration.sync.sse.events", "error");
-        Gauge.builder("integration.sync.sse.subscribers", this, SyncEventHub::totalSubscriberCount)
+        Gauge.builder(IntegrationCoreMetrics.INTEGRATION_SYNC_SSE_SUBSCRIBERS, this, SyncEventHub::totalSubscriberCount)
                 .description("Currently active sync-observability SSE subscribers on this server replica")
                 .register(meterRegistry);
     }

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.runtime.worker;
 
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobExecutor;
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameCodec;
 import io.micrometer.core.instrument.Gauge;
@@ -99,7 +100,7 @@ public class WorkerConfiguration {
             ObjectMapper objectMapper,
             MeterRegistry meterRegistry) {
         WorkerControlClient client = new WorkerControlClient(properties, frameCodec, objectMapper, meterRegistry);
-        Gauge.builder("worker.control.channel.connected", client, c -> c.isConnected() ? 1.0 : 0.0)
+        Gauge.builder(AgentMetrics.WORKER_CONTROL_CHANNEL_CONNECTED, client, c -> c.isConnected() ? 1.0 : 0.0)
                 .description("1 when the worker control channel is connected, 0 otherwise")
                 .strongReference(true)
                 .register(meterRegistry);

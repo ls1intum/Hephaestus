@@ -37,14 +37,19 @@ import org.springframework.modulith.core.ApplicationModules;
 @Tag("architecture")
 class ModulithVerificationTest {
 
+    private static final ApplicationModules MODULES = ApplicationModules.of(
+            Application.class,
+            resideInAnyPackage(
+                    "..integration.scm.github.graphql.model..",
+                    "..integration.scm.gitlab.graphql.model..",
+                    "..integration.outline.client.model.."));
+
     @Test
     void modulesAreCycleFreeAndRespectNamedInterfaces() {
-        ApplicationModules.of(
-                        Application.class,
-                        resideInAnyPackage(
-                                "..integration.scm.github.graphql.model..",
-                                "..integration.scm.gitlab.graphql.model..",
-                                "..integration.outline.client.model.."))
-                .verify();
+        MODULES.verify();
+    }
+
+    static ApplicationModules applicationModules() {
+        return MODULES;
     }
 }

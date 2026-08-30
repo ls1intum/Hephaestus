@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.common;
 
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationSuspendedException;
+import de.tum.cit.aet.hephaestus.integration.scm.github.metrics.GithubMetrics;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.io.IOException;
@@ -134,33 +135,32 @@ public class GitHubExceptionClassifier {
     private final Counter unknownCounter;
 
     public GitHubExceptionClassifier(MeterRegistry meterRegistry) {
-        // Register counters for each error category
-        this.retryableCounter = Counter.builder("github.sync.errors.total")
+        this.retryableCounter = Counter.builder(GithubMetrics.GITHUB_SYNC_ERRORS_TOTAL)
                 .description("Total GitHub sync errors by category")
                 .tag("category", "retryable")
                 .register(meterRegistry);
 
-        this.rateLimitedCounter = Counter.builder("github.sync.errors.total")
+        this.rateLimitedCounter = Counter.builder(GithubMetrics.GITHUB_SYNC_ERRORS_TOTAL)
                 .description("Total GitHub sync errors by category")
                 .tag("category", "rate_limited")
                 .register(meterRegistry);
 
-        this.notFoundCounter = Counter.builder("github.sync.errors.total")
+        this.notFoundCounter = Counter.builder(GithubMetrics.GITHUB_SYNC_ERRORS_TOTAL)
                 .description("Total GitHub sync errors by category")
                 .tag("category", "not_found")
                 .register(meterRegistry);
 
-        this.authErrorCounter = Counter.builder("github.sync.errors.total")
+        this.authErrorCounter = Counter.builder(GithubMetrics.GITHUB_SYNC_ERRORS_TOTAL)
                 .description("Total GitHub sync errors by category")
                 .tag("category", "auth_error")
                 .register(meterRegistry);
 
-        this.clientErrorCounter = Counter.builder("github.sync.errors.total")
+        this.clientErrorCounter = Counter.builder(GithubMetrics.GITHUB_SYNC_ERRORS_TOTAL)
                 .description("Total GitHub sync errors by category")
                 .tag("category", "client_error")
                 .register(meterRegistry);
 
-        this.unknownCounter = Counter.builder("github.sync.errors.total")
+        this.unknownCounter = Counter.builder(GithubMetrics.GITHUB_SYNC_ERRORS_TOTAL)
                 .description("Total GitHub sync errors by category")
                 .tag("category", "unknown")
                 .register(meterRegistry);

@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.common;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RateLimitSnapshot;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHRateLimit;
+import de.tum.cit.aet.hephaestus.integration.scm.github.metrics.GithubMetrics;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -396,27 +397,27 @@ public class ScopedRateLimitTracker implements RateLimitTracker, RateLimitObserv
         Tags tags = Tags.of("scope_id", String.valueOf(scopeId));
 
         // NaN, not 0, while unobserved: a gauge is a measurement too, and 0 would read as "exhausted".
-        Gauge.builder("github.graphql.ratelimit.points.remaining", state, s -> asDouble(s.remaining.get()))
+        Gauge.builder(GithubMetrics.GITHUB_GRAPHQL_RATELIMIT_POINTS_REMAINING, state, s -> asDouble(s.remaining.get()))
                 .tags(tags)
                 .description("GitHub GraphQL API rate limit points remaining")
                 .register(meterRegistry);
 
-        Gauge.builder("github.graphql.ratelimit.points.limit", state, s -> asDouble(s.limit.get()))
+        Gauge.builder(GithubMetrics.GITHUB_GRAPHQL_RATELIMIT_POINTS_LIMIT, state, s -> asDouble(s.limit.get()))
                 .tags(tags)
                 .description("GitHub GraphQL API rate limit total points per hour")
                 .register(meterRegistry);
 
-        Gauge.builder("github.graphql.ratelimit.points.used", state.used, AtomicInteger::get)
+        Gauge.builder(GithubMetrics.GITHUB_GRAPHQL_RATELIMIT_POINTS_USED, state.used, AtomicInteger::get)
                 .tags(tags)
                 .description("GitHub GraphQL API rate limit points used in current window")
                 .register(meterRegistry);
 
-        Gauge.builder("github.graphql.ratelimit.last_query_cost", state.lastQueryCost, AtomicInteger::get)
+        Gauge.builder(GithubMetrics.GITHUB_GRAPHQL_RATELIMIT_LAST_QUERY_COST, state.lastQueryCost, AtomicInteger::get)
                 .tags(tags)
                 .description("Cost of the last GitHub GraphQL query")
                 .register(meterRegistry);
 
-        Gauge.builder("github.graphql.ratelimit.seconds_until_reset", state, s -> {
+        Gauge.builder(GithubMetrics.GITHUB_GRAPHQL_RATELIMIT_SECONDS_UNTIL_RESET, state, s -> {
                     Instant reset = s.resetAt.get();
                     if (reset == null) {
                         return 0.0;

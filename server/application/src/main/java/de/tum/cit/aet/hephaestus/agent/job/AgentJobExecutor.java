@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.agent.context.InsufficientEvidenceException;
 import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeAgentRequest;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticePiAdapter;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeSandboxSpec;
@@ -211,13 +212,13 @@ public class AgentJobExecutor {
         this.workerProperties = workerProperties;
         this.workerId = workerProperties.map(WorkerProperties::resolvedWorkerId).orElse(null);
 
-        this.concurrencyRejected = Counter.builder("agent.job.concurrency.rejected")
+        this.concurrencyRejected = Counter.builder(AgentMetrics.AGENT_JOB_CONCURRENCY_REJECTED)
                 .description("Jobs rejected due to concurrency limits")
                 .register(meterRegistry);
-        this.claimLatency = Timer.builder("agent.job.claim.latency")
+        this.claimLatency = Timer.builder(AgentMetrics.AGENT_JOB_CLAIM_LATENCY)
                 .description("Time between a job becoming available (available_at) and being claimed")
                 .register(meterRegistry);
-        this.infraRetryRequeued = Counter.builder("agent.job.infra.retry.requeued")
+        this.infraRetryRequeued = Counter.builder(AgentMetrics.AGENT_JOB_INFRA_RETRY_REQUEUED)
                 .description("Jobs requeued (not failed) after a classified sandbox-infrastructure failure")
                 .register(meterRegistry);
     }
@@ -640,7 +641,7 @@ public class AgentJobExecutor {
     }
 
     private void recordExecutionDuration(AgentJobType jobType, String outcome, Duration duration) {
-        Timer.builder("agent.job.execution.duration")
+        Timer.builder(AgentMetrics.AGENT_JOB_EXECUTION_DURATION)
                 .description("Total duration of agent job execution")
                 .tag("jobType", jobType != null ? jobType.name() : "unknown")
                 .tag("status", outcome)

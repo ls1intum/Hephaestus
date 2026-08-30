@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.sandbox.docker.interactive;
 
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.sandbox.InteractiveSandboxProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.docker.DockerOperations;
 import de.tum.cit.aet.hephaestus.agent.sandbox.docker.SandboxContainerManager;
@@ -55,7 +56,7 @@ public class InteractiveSandboxRegistry {
         this.containerManager = containerManager;
         this.metrics = metrics;
         this.watchdog = watchdog;
-        Gauge.builder("mentor.session.active", sessions, ConcurrentHashMap::size)
+        Gauge.builder(AgentMetrics.MENTOR_SESSION_ACTIVE, sessions, ConcurrentHashMap::size)
                 .description("Currently attached mentor sandbox sessions on this replica")
                 .register(meterRegistry);
         meterRegistry.gauge("mentor.watchdog.targets", Tags.empty(), watchdog, StdinWriteWatchdog::activeTargets);

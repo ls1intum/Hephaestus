@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.webhook;
 
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
+import de.tum.cit.aet.hephaestus.integration.core.metrics.IntegrationCoreMetrics;
 import io.github.resilience4j.retry.Retry;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -42,11 +43,14 @@ public class JetStreamPublisher {
         this.jetStream = jetStream;
         this.retry = retry;
         this.properties = properties;
-        this.successCounter =
-                Counter.builder("webhook.publish").tag("outcome", "success").register(meterRegistry);
-        this.failureCounter =
-                Counter.builder("webhook.publish").tag("outcome", "failure").register(meterRegistry);
-        this.retryCounter = Counter.builder("webhook.publish.retry").register(meterRegistry);
+        this.successCounter = Counter.builder(IntegrationCoreMetrics.WEBHOOK_PUBLISH)
+                .tag("outcome", "success")
+                .register(meterRegistry);
+        this.failureCounter = Counter.builder(IntegrationCoreMetrics.WEBHOOK_PUBLISH)
+                .tag("outcome", "failure")
+                .register(meterRegistry);
+        this.retryCounter =
+                Counter.builder(IntegrationCoreMetrics.WEBHOOK_PUBLISH_RETRY).register(meterRegistry);
         retry.getEventPublisher().onRetry(event -> retryCounter.increment());
     }
 

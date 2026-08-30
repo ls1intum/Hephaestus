@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.micrometer.core.instrument.Counter;
@@ -41,25 +42,25 @@ public class AgentQueueHealthSampler {
 
     public AgentQueueHealthSampler(AgentJobRepository jobRepository, MeterRegistry meterRegistry) {
         this.jobRepository = jobRepository;
-        Gauge.builder("agent.queue.depth", depth, AtomicLong::get)
+        Gauge.builder(AgentMetrics.AGENT_QUEUE_DEPTH, depth, AtomicLong::get)
                 .description(
                         "QUEUED jobs currently eligible to run (available_at <= now); last-good on sampler failure")
                 .register(meterRegistry);
-        Gauge.builder("agent.queue.oldest_age_seconds", oldestAgeSeconds, AtomicLong::get)
+        Gauge.builder(AgentMetrics.AGENT_QUEUE_OLDEST_AGE_SECONDS, oldestAgeSeconds, AtomicLong::get)
                 .description(
                         "Age in seconds of the oldest eligible QUEUED job; 0 when the queue is empty; last-good on sampler failure")
                 .register(meterRegistry);
         // Without this, a workspace over its monthly LLM cap is indistinguishable from an idle instance:
         // its whole backlog sits at available_at in the future, so agent.queue.depth reads 0 and the
         // "queue is backed up" alert stays silent while nothing runs. Alert on held > 0 sustained.
-        Gauge.builder("agent.queue.held", held, AtomicLong::get)
+        Gauge.builder(AgentMetrics.AGENT_QUEUE_HELD, held, AtomicLong::get)
                 .description(
                         "QUEUED jobs parked on an admin-undoable hold (monthly LLM cap); excluded from agent.queue.depth; last-good on sampler failure")
                 .register(meterRegistry);
-        Gauge.builder("agent.queue.running", running, AtomicLong::get)
+        Gauge.builder(AgentMetrics.AGENT_QUEUE_RUNNING, running, AtomicLong::get)
                 .description("Jobs currently RUNNING fleet-wide; last-good on sampler failure")
                 .register(meterRegistry);
-        this.samplerFailures = Counter.builder("agent.queue.health.sampler.failures")
+        this.samplerFailures = Counter.builder(AgentMetrics.AGENT_QUEUE_HEALTH_SAMPLER_FAILURES)
                 .description("Queue-health sample passes that failed (gauges kept their last-good value)")
                 .register(meterRegistry);
     }

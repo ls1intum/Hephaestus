@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -99,7 +100,7 @@ public class ProxyAccounting {
     }
 
     public void stopTimer(Timer.Sample sample, String apiProtocol) {
-        sample.stop(Timer.builder("llm.proxy.duration")
+        sample.stop(Timer.builder(AgentMetrics.LLM_PROXY_DURATION)
                 .description("LLM proxy request duration")
                 .tag("apiProtocol", apiProtocol)
                 .register(meterRegistry));

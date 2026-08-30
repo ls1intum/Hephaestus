@@ -25,6 +25,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.jackson.GitHubProjectV2O
 import de.tum.cit.aet.hephaestus.integration.scm.github.jackson.GitHubPullRequestMixin;
 import de.tum.cit.aet.hephaestus.integration.scm.github.jackson.GitHubRepositoryOwnerMixin;
 import de.tum.cit.aet.hephaestus.integration.scm.github.jackson.GitHubRequestedReviewerMixin;
+import de.tum.cit.aet.hephaestus.integration.scm.github.metrics.GithubMetrics;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.netty.resolver.DefaultAddressResolverGroup;
@@ -88,13 +89,13 @@ public class GitHubGraphQlConfig {
     private final AtomicInteger rateLimitUsed = new AtomicInteger(0);
 
     public GitHubGraphQlConfig(MeterRegistry meterRegistry) {
-        Gauge.builder("github.graphql.ratelimit.remaining", rateLimitRemaining, AtomicInteger::get)
+        Gauge.builder(GithubMetrics.GITHUB_GRAPHQL_RATELIMIT_REMAINING, rateLimitRemaining, AtomicInteger::get)
                 .description("GitHub GraphQL API rate limit points remaining")
                 .register(meterRegistry);
-        Gauge.builder("github.graphql.ratelimit.limit", rateLimitLimit, AtomicInteger::get)
+        Gauge.builder(GithubMetrics.GITHUB_GRAPHQL_RATELIMIT_LIMIT, rateLimitLimit, AtomicInteger::get)
                 .description("GitHub GraphQL API rate limit total points")
                 .register(meterRegistry);
-        Gauge.builder("github.graphql.ratelimit.used", rateLimitUsed, AtomicInteger::get)
+        Gauge.builder(GithubMetrics.GITHUB_GRAPHQL_RATELIMIT_USED, rateLimitUsed, AtomicInteger::get)
                 .description("GitHub GraphQL API rate limit points used")
                 .register(meterRegistry);
     }
