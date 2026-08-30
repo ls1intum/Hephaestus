@@ -431,8 +431,113 @@ jobs:
       candidate-application-image: ghcr.io/ls1intum/hephaestus/application-server@${{ needs.tag-images.outputs.application-server-digest }}
       postgres-image: ghcr.io/ls1intum/hephaestus/postgres@${{ needs.tag-images.outputs.postgres-digest }}
       candidate-source-sha: ${{ needs.release.outputs.sha }}
+
+  supported-host-smoke:
+    needs: [release, tag-images]
+    if: needs.release.outputs.released == 'true'
+    name: Host smoke (${{ matrix.architecture }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            runner: ubuntu-24.04
+          - architecture: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    permissions:
+      # The release is still a draft here, and draft releases are visible only to tokens with push
+      # access, so `gh release download` in prepare-release-lock.ts needs contents: write.
+      contents: write
+      packages: read
+    steps:
+      - name: Check out the released tree
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.release.outputs.sha }}
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-bun
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Smoke-test the blessed install
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_SHA: ${{ needs.release.outputs.sha }}
+          TAG_NAME: ${{ needs.release.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          cd docker/self-host
+          cleanup() {
+            status=$?
+            if [ "$status" -ne 0 ]; then
+              docker compose --env-file .env --env-file release-lock.env logs --no-color || true
+            fi
+            docker compose --env-file .env --env-file release-lock.env down -v --remove-orphans || true
+            exit "$status"
+          }
+          trap cleanup EXIT
+
+          actual_arch=$(docker version --format '{{.Server.Arch}}')
+          [ "$actual_arch" = "$ARCHITECTURE" ] || { echo "::error::Expected native $ARCHITECTURE, got $actual_arch"; exit 1; }
+          . /etc/os-release
+          [ "$ID" = ubuntu ] && [ "$VERSION_ID" = 24.04 ] || { echo "::error::Ubuntu 24.04 is required"; exit 1; }
+          docker_major=$(docker version --format '{{.Server.Version}}' | cut -d. -f1)
+          [ "$docker_major" -ge 28 ] || { echo "::error::Docker Engine 28 or newer is required"; exit 1; }
+          compose_version=$(docker compose version --short)
+          [ "$(printf '%s\n' 2.24.4 "$compose_version" | sort -V | head -n1)" = 2.24.4 ] || {
+            echo "::error::Docker Compose 2.24.4 or newer is required"; exit 1; }
+
+          ./setup.sh
+          sed -i \
+            -e 's/^APP_HOSTNAME=$/APP_HOSTNAME=hephaestus-smoke.invalid/' \
+            -e 's/^ACME_EMAIL=$/ACME_EMAIL=release-smoke@example.invalid/' \
+            -e 's/^GH_OAUTH_CLIENT_ID=$/GH_OAUTH_CLIENT_ID=release-smoke/' \
+            -e 's/^GH_OAUTH_CLIENT_SECRET=$/GH_OAUTH_CLIENT_SECRET=release-smoke-secret/' \
+            -e 's/^HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS=$/HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS=github:1/' \
+            .env
+          node ../../scripts/prepare-release-lock.ts "$TAG_NAME"
+          docker compose --env-file .env --env-file release-lock.env config --quiet
+          docker compose --env-file .env --env-file release-lock.env up -d --wait --wait-timeout 600
+          curl --fail --insecure --silent --show-error --max-time 10 --noproxy '*' \
+            --resolve hephaestus-smoke.invalid:443:127.0.0.1 \
+            https://hephaestus-smoke.invalid/ >/dev/null
+
+          jq -n \
+            --arg schemaVersion "1" \
+            --arg release "$TAG_NAME" \
+            --arg commit "$RELEASE_SHA" \
+            --arg testedAt "$(date -u +%FT%TZ)" \
+            --arg os "$(. /etc/os-release; printf '%s %s' "$NAME" "$VERSION_ID")" \
+            --arg architecture "$actual_arch" \
+            --arg dockerEngine "$(docker version --format '{{.Server.Version}}')" \
+            --arg dockerCompose "$compose_version" \
+            --argjson services "$(docker compose --env-file .env --env-file release-lock.env ps --all --format json | jq -s 'map({service: .Service, state: .State, health: .Health, exitCode: .ExitCode}) | sort_by(.service)')" \
+            '{schemaVersion: ($schemaVersion | tonumber), release: $release, commit: $commit,
+              testedAt: $testedAt, host: {os: $os, architecture: $architecture,
+              dockerEngine: $dockerEngine, dockerCompose: $dockerCompose}, services: $services}' \
+            > "../../host-smoke-$ARCHITECTURE.json"
+
+      - name: Upload smoke-test record
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: host-smoke-${{ matrix.architecture }}
+          path: host-smoke-${{ matrix.architecture }}.json
+          if-no-files-found: error
+
   publish-release:
-    needs: [release, tag-images, upgrade-test]
+    needs: [release, tag-images, upgrade-test, supported-host-smoke]
     if: needs.release.outputs.released == 'true'
     timeout-minutes: 20
     runs-on: ubuntu-latest
@@ -459,6 +564,34 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download supported-host smoke records
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: host-smoke-*
+          path: host-smoke
+          merge-multiple: true
+
+      - name: Verify supported-host smoke records
+        env:
+          RELEASE_SHA: ${{ needs.release.outputs.sha }}
+          TAG_NAME: ${{ needs.release.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          jq -s -e --arg release "$TAG_NAME" --arg commit "$RELEASE_SHA" '
+            length == 2 and
+            ([.[].host.architecture] | sort) == ["amd64", "arm64"] and
+            all(.[];
+              .schemaVersion == 1 and .release == $release and .commit == $commit and
+              (.testedAt | fromdateiso8601) and
+              .host.os == "Ubuntu 24.04" and
+              (.host.dockerEngine | type) == "string" and
+              (.host.dockerCompose | type) == "string" and
+              (.services | length) > 0 and
+              ([.services[].service] | length) == ([.services[].service] | unique | length) and
+              all(.services[];
+                if .state == "exited" then .exitCode == 0
+                else .state == "running" and .health == "healthy" end))' host-smoke/*.json >/dev/null
 
       - name: Verify durable assets from a clean environment
         env:
@@ -563,6 +696,7 @@ jobs:
           TAG_NAME: ${{ needs.release.outputs.tag_name }}
         run: |
           set -euo pipefail
+          gh release upload "$TAG_NAME" host-smoke/*.json --repo "${{ github.repository }}"
           gh release edit "$TAG_NAME" --repo "${{ github.repository }}" --draft=false
           [ "$(gh release view "$TAG_NAME" --repo "${{ github.repository }}" --json isImmutable --jq .isImmutable)" = true ] || {
             echo "::error::Repository immutable releases must be enabled before publishing"; exit 1; }
