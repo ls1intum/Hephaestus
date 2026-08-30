@@ -425,12 +425,13 @@ class ProductionSchemaContractIntegrationTest {
         long workspaceId = insertWorkspace(key);
         UUID jobId = UUID.randomUUID();
         jdbcTemplate.update(
-                "INSERT INTO agent_job (id, workspace_id, job_type, status, config_snapshot, job_token, retry_count, "
+                "INSERT INTO agent_job (id, workspace_id, job_type, status, config_snapshot, job_token, trace_id, retry_count, "
                         + "created_at, available_at, delivery_attempts, practice_rollout_revision, practice_trigger_mode) "
-                        + "VALUES (?, ?, 'PULL_REQUEST_REVIEW', 'COMPLETED', '{}'::jsonb, ?, 0, now(), now(), 0, 0, 'AUTO')",
+                        + "VALUES (?, ?, 'PULL_REQUEST_REVIEW', 'COMPLETED', '{}'::jsonb, ?, ?, 0, now(), now(), 0, 0, 'AUTO')",
                 jobId,
                 workspaceId,
-                "token-" + jobId);
+                "token-" + jobId,
+                UUID.randomUUID().toString().replace("-", ""));
         return new DispatchOwner(workspaceId, jobId);
     }
 
