@@ -447,7 +447,9 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
     permissions:
-      contents: read
+      # The release is still a draft here, and draft releases are visible only to tokens with push
+      # access, so `gh release download` in prepare-release-lock.ts needs contents: write.
+      contents: write
       packages: read
     steps:
       - name: Check out the released tree

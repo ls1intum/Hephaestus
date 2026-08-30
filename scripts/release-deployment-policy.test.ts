@@ -52,5 +52,8 @@ await test("release publication requires native smoke tests for every supported 
 	assert.match(smokeGate, /architecture: arm64\n\s+runner: ubuntu-24\.04-arm/);
 	assert.match(smokeGate, /up -d --wait --wait-timeout 600/);
 	assert.match(smokeGate, /prepare-release-lock\.ts/);
+	// Draft releases are visible only to tokens with push access; a read-only token cannot
+	// download the still-draft release lock and would fail every smoke run.
+	assert.match(smokeGate, /contents: write/);
 	assert.match(release, /gh release upload "\$TAG_NAME" host-smoke\/\*\.json/);
 });
