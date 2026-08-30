@@ -48,6 +48,8 @@ jobs:
             -e 's|^HEPHAESTUS_SECURITY_ENCRYPTION_KEY=$|HEPHAESTUS_SECURITY_ENCRYPTION_KEY=0123456789abcdef0123456789abcdef|' \
             -e 's|^HEPHAESTUS_AUTH_STATE_COOKIE_KEY=$|HEPHAESTUS_AUTH_STATE_COOKIE_KEY=Y2ktbm90LWEtcmVhbC1zdGF0ZS1jb29raWUta2V5|' \
             -e 's|^WEBHOOK_SECRET=$|WEBHOOK_SECRET=ci000000000000000000000000000000000|' \
+            -e 's|^NATS_USERNAME=$|NATS_USERNAME=ci|' \
+            -e 's|^NATS_PASSWORD=$|NATS_PASSWORD=ci-not-a-real-password|' \
             .env
           while IFS= read -r image; do
             name="HEPHAESTUS_IMAGE_${image^^}"
@@ -88,6 +90,19 @@ jobs:
           # publish the reference's dashboard port and keep the maintainers' ACME
           # email. Assert the merged result rather than trust the runner's version.
           rendered=$(docker compose config)
+          for required in \
+            'security-headers@docker,request-body-limit@docker' \
+            'contentSecurityPolicy: default-src' \
+            'stsSeconds: "2592000"' \
+            'maxRequestBodyBytes: "26214400"' \
+            'minVersion: VersionTLS12'; do
+            grep -Fq "$required" <<< "$rendered" || {
+              echo "::error::runtime edge envelope is missing '$required'"; exit 1; }
+          done
+          edge_csp=$(sed -n 's/.*contentSecurityPolicy=\(.*\)"/\1/p' ../compose.proxy.yaml)
+          nginx_csp=$(sed -n 's/add_header Content-Security-Policy "\(.*\)" always;/\1/p' ../../webapp/docker/security-headers.conf)
+          [ "$edge_csp" = "$nginx_csp" ] || {
+            echo "::error::Traefik and nginx Content-Security-Policy values differ"; exit 1; }
           grep -q "admin@tum.de" <<< "$rendered" && {
             echo "::error::the maintainers' ACME email survived the override — Compose is too old to honour !override"; exit 1; } || true
           published=$(docker compose config --format json \

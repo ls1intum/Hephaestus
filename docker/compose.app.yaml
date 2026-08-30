@@ -112,6 +112,8 @@ services:
     # Bounds heap sizing to this container; without it the JVM targets host RAM and co-located
     # services oversubscribe and swap. Hosts the NATS sync consumers, so it takes the largest limit.
     mem_limit: ${APPLICATION_SERVER_MEM_LIMIT:-5g}
+    cpus: ${APPLICATION_SERVER_CPUS:-4.0}
+    pids_limit: ${APPLICATION_SERVER_PIDS_LIMIT:-512}
     ports:
       - "8080"
     environment:
@@ -136,6 +138,8 @@ services:
       DATABASE_USERNAME: root
       DATABASE_PASSWORD: root
       NATS_SERVER: nats://nats-server:4222
+      NATS_USERNAME: ${NATS_USERNAME:?Set NATS_USERNAME}
+      NATS_PASSWORD: ${NATS_PASSWORD:?Set NATS_PASSWORD}
       # Auth (Hephaestus-native; ADR 0017). State-cookie key MUST be base64 32-byte AES.
       HEPHAESTUS_AUTH_ISSUER: https://${APP_HOSTNAME}
       HEPHAESTUS_AUTH_STATE_COOKIE_KEY: ${HEPHAESTUS_AUTH_STATE_COOKIE_KEY}
@@ -256,7 +260,7 @@ services:
       THC_PATH: /actuator/health/liveness
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
       volume-init:
         condition: service_completed_successfully
     restart: unless-stopped
@@ -276,19 +280,23 @@ services:
       # the sandbox network IP and route requests to an unreachable internal network.
       - "traefik.docker.network=shared-network"
       - "traefik.http.middlewares.https-application-server-stripprefix.stripprefix.prefixes=/api"
+      - "traefik.http.middlewares.edge-api-rate-limit.ratelimit.average=100"
+      - "traefik.http.middlewares.edge-api-rate-limit.ratelimit.period=1s"
+      - "traefik.http.middlewares.edge-api-rate-limit.ratelimit.burst=200"
       - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
       - "traefik.http.routers.http-application-server.entryPoints=http"
       - "traefik.http.routers.http-application-server.middlewares=redirect-to-https"
       - "traefik.http.routers.http-application-server.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/api`)"
       - "traefik.http.routers.http-application-server.service=http-application-server"
       - "traefik.http.routers.https-application-server.entryPoints=https"
-      - "traefik.http.routers.https-application-server.middlewares=https-application-server-stripprefix"
+      - "traefik.http.routers.https-application-server.middlewares=edge-api-rate-limit,https-application-server-stripprefix"
       - "traefik.http.routers.https-application-server.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/api`)"
       - "traefik.http.routers.https-application-server.tls.certresolver=letsencrypt"
       - "traefik.http.routers.https-application-server.tls=true"
       - "traefik.http.routers.https-application-server.service=https-application-server"
       - "traefik.http.services.http-application-server.loadbalancer.server.port=8080"
       - "traefik.http.services.https-application-server.loadbalancer.server.port=8080"
+      - "traefik.http.services.https-application-server.loadbalancer.serverstransport=application@docker"
       - "traefik.http.routers.http-application-server.priority=5"
       - "traefik.http.routers.https-application-server.priority=10"
       # Replica affinity for workspace traffic (mentor lives here) — see docs/contributor/unified-pi-runtime.mdx.
@@ -325,6 +333,8 @@ services:
     image: "${HEPHAESTUS_IMAGE_APPLICATION_SERVER:?verified release lock required}"
     # Bounds heap sizing to this container (see application-server).
     mem_limit: ${APPLICATION_WORKER_MEM_LIMIT:-3g}
+    cpus: ${APPLICATION_WORKER_CPUS:-4.0}
+    pids_limit: ${APPLICATION_WORKER_PIDS_LIMIT:-512}
     environment:
       # See application-server: the buildpack's 10M direct-memory default is too small.
       JAVA_TOOL_OPTIONS: "-XX:MaxDirectMemorySize=${APP_MAX_DIRECT_MEMORY:-128M}"
@@ -395,7 +405,9 @@ services:
       THC_PATH: /actuator/health/liveness
     depends_on:
       application-server:
-        condition: service_started
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
       volume-init:
         condition: service_completed_successfully
     restart: unless-stopped

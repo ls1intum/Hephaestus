@@ -29,6 +29,7 @@ RUN apk add --no-cache bash sed grep curl
 COPY --from=build /repo/webapp/dist /usr/share/nginx/html
 COPY webapp/docker/entrypoint.sh /entrypoint.sh
 COPY webapp/docker/nginx.conf /etc/nginx/conf.d/default.conf
+COPY webapp/docker/security-headers.conf /etc/nginx/security-headers.conf
 COPY webapp/src/environment/index.ts /app/src/environment/index.ts
 RUN chmod +x /entrypoint.sh
 EXPOSE 80

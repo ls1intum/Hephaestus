@@ -12,6 +12,8 @@ services:
     # Must fit the Spring classpath-scan startup spike (well above the small steady footprint),
     # or the JVM OOMs during boot.
     mem_limit: ${WEBHOOK_SERVER_MEM_LIMIT:-2g}
+    cpus: ${WEBHOOK_SERVER_CPUS:-2.0}
+    pids_limit: ${WEBHOOK_SERVER_PIDS_LIMIT:-256}
     expose:
       - "8080"
     environment:
@@ -24,6 +26,8 @@ services:
       # NATS — reuses the existing `natsConnection` bean to publish inbound events.
       HEPHAESTUS_SYNC_NATS_ENABLED: "true"
       HEPHAESTUS_SYNC_NATS_SERVER: "nats://nats-server:4222"
+      NATS_USERNAME: ${NATS_USERNAME:?Set NATS_USERNAME}
+      NATS_PASSWORD: ${NATS_PASSWORD:?Set NATS_PASSWORD}
       # Stream bounds belong on THIS container. The beans that read hephaestus.webhook.stream.* are
       # gated on the webhook role, so the same variables on application-server (which runs with the
       # role off) would configure nothing at all. `check:env` fails the build if they drift back.
@@ -95,6 +99,8 @@ services:
     depends_on:
       nats-server:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     # Spring drains HTTP (timeout-per-shutdown-phase 20s) THEN WebhookGracefulShutdown drains
     # NATS (up to 15s). Docker must allow ≥35s before SIGKILL, or the JVM is cut mid-drain.
@@ -139,10 +145,12 @@ services:
     image: ${HEPHAESTUS_IMAGE_NATS:?verified release lock required}
     restart: unless-stopped
     ports:
-      # Loopback-only by default. Set NATS_BIND_HOST=0.0.0.0 (or a specific interface) to let other
-      # hosts reach the bus — only on a trusted or firewalled network, as NATS runs unauthenticated.
+      # Publish on loopback by default.
       - "${NATS_BIND_HOST:-127.0.0.1}:4222:4222"
     command: ["--config", "/etc/nats/nats-server.conf"]
+    environment:
+      NATS_USERNAME: ${NATS_USERNAME:?Set NATS_USERNAME}
+      NATS_PASSWORD: ${NATS_PASSWORD:?Set NATS_PASSWORD}
     volumes:
       - nats-data:/data
     configs:
@@ -175,6 +183,11 @@ configs:
   nats-server.conf:
     content: |
       listen: "0.0.0.0:4222" 
+
+      authorization {
+        user: $$NATS_USERNAME
+        password: $$NATS_PASSWORD
+      }
 
       http_port: 8222
 

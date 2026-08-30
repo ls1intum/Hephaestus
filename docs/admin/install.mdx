@@ -52,6 +52,12 @@ hosts, runtimes, and topologies are outside release qualification.
 - **AI practice review adds real memory**: each concurrent review sandbox may use up to
   4 GiB. The default caps it at 1 concurrent sandbox; raise
   `SANDBOX_MAX_CONCURRENT` only with RAM to match.
+- Container defaults are 4 CPUs / 512 PIDs for the application server and worker, and 2 CPUs / 256
+  PIDs for the webhook server. Override them with the corresponding `APPLICATION_SERVER_*`,
+  `APPLICATION_WORKER_*`, or `WEBHOOK_SERVER_*` limit variables. Keep PID limits on roles with Docker
+  access.
+- `HIKARI_MAXIMUM_POOL_SIZE` defaults to 20. Provision at least that value multiplied by the total JVM
+  replica count, plus capacity for migrations and operator access.
 - A host in the supported matrix, plus `git` and `openssl`.
 - A **DNS A record** for your hostname pointing at the host, with ports **80 and 443**
   reachable from the internet (Let's Encrypt HTTP-01, OAuth callbacks, webhooks).

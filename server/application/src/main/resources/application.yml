@@ -35,7 +35,7 @@ spring:
             connection-timeout: 45000
             idle-timeout: 600000
             max-lifetime: 1800000
-            maximum-pool-size: 30
+            maximum-pool-size: ${HIKARI_MAXIMUM_POOL_SIZE:20}
             minimum-idle: 5
 
     jpa:
@@ -178,6 +178,8 @@ springdoc:
     writer-with-order-by-keys: true
 
 hephaestus:
+    database:
+        allow-insecure-remote: ${HEPHAESTUS_DATABASE_ALLOW_INSECURE_REMOTE:false}
     auth:
         issuer: ${HEPHAESTUS_AUTH_ISSUER:http://localhost:8080}
         audience: ${HEPHAESTUS_AUTH_AUDIENCE:hephaestus-spa}
@@ -249,6 +251,15 @@ hephaestus:
             export:
                 capacity: ${HEPHAESTUS_AUTH_RATE_LIMIT_EXPORT_CAPACITY:10}
                 period: ${HEPHAESTUS_AUTH_RATE_LIMIT_EXPORT_PERIOD:1h}
+            mentor-chat:
+                capacity: ${HEPHAESTUS_RATE_LIMIT_MENTOR_CHAT_CAPACITY:20}
+                period: ${HEPHAESTUS_RATE_LIMIT_MENTOR_CHAT_PERIOD:10m}
+            review-request:
+                capacity: ${HEPHAESTUS_RATE_LIMIT_REVIEW_REQUEST_CAPACITY:10}
+                period: ${HEPHAESTUS_RATE_LIMIT_REVIEW_REQUEST_PERIOD:1h}
+            sync-trigger:
+                capacity: ${HEPHAESTUS_RATE_LIMIT_SYNC_TRIGGER_CAPACITY:10}
+                period: ${HEPHAESTUS_RATE_LIMIT_SYNC_TRIGGER_PERIOD:1h}
 
     host-url: ${APPLICATION_HOST_URL:http://localhost:4200}
 
@@ -328,6 +339,8 @@ hephaestus:
             enabled: false
             durable-consumer-name: ${NATS_DURABLE_CONSUMER_NAME:hephaestus}
             server: ""
+            username: ${NATS_USERNAME:}
+            password: ${NATS_PASSWORD:}
             consumer:
                 # Request timeout for JetStream API calls. Increase for workspaces with many
                 # repositories. The remaining consumer tuning (ack-wait, poison handling, …)

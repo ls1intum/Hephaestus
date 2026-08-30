@@ -14,6 +14,11 @@ This document helps you upgrade between versions of Hephaestus. For what a versi
 | 🟡 | **Deprecated**: Works now; removed in a later release — the release notes say which |
 | 🟢 | **New**: No action needed |
 
+## Configure NATS authentication
+
+🔴 Set `NATS_USERNAME` and `NATS_PASSWORD` before upgrading. The reference deployment no longer starts
+an unauthenticated NATS broker.
+
 ## Check Your Version
 
 Run these from the directory you deploy from — for a self-hosted install that is
