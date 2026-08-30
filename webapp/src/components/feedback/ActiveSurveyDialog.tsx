@@ -30,7 +30,10 @@ export function ActiveSurveyDialog({
 	onDismiss,
 }: ActiveSurveyDialogProps) {
 	const [answers, setAnswers] = useState<Record<string, string>>({});
-	if (!survey) return null;
+	// Escape, the close button and a backdrop click mean "not now": hide until the next page load.
+	// Only the explicit "Don't ask me again" button records the permanent, irreversible dismissal.
+	const [snoozed, setSnoozed] = useState(false);
+	if (!survey || snoozed) return null;
 	const complete = survey.questions.every(
 		(question) => !question.required || answers[question.id]?.trim(),
 	);
@@ -38,7 +41,7 @@ export function ActiveSurveyDialog({
 		<Dialog
 			open
 			onOpenChange={(nextOpen) => {
-				if (!nextOpen && !isDismissing) onDismiss();
+				if (!nextOpen && !isDismissing && !isSubmitting) setSnoozed(true);
 			}}
 		>
 			<DialogContent>
@@ -59,7 +62,7 @@ export function ActiveSurveyDialog({
 				>
 					{survey.questions.map((question) => (
 						<fieldset className="space-y-2" key={question.id}>
-							<legend className="text-sm font-medium">
+							<legend className="text-sm font-medium" id={`survey-${question.id}-legend`}>
 								{question.prompt}
 								{question.required ? " (required)" : ""}
 							</legend>
@@ -81,9 +84,10 @@ export function ActiveSurveyDialog({
 								</>
 							) : (
 								<RadioGroup
+									aria-labelledby={`survey-${question.id}-legend`}
 									className="flex flex-wrap gap-3"
 									name={question.id}
-									value={answers[question.id]}
+									value={answers[question.id] ?? ""}
 									onValueChange={(value) =>
 										setAnswers((current) => ({ ...current, [question.id]: value }))
 									}

@@ -28,12 +28,20 @@ export function useActiveSurvey(workspaceSlug: string | undefined) {
 			toast.success("Thank you for your response.");
 			refresh();
 		},
-		onError: () => toast.error("Couldn't submit the survey."),
+		// Refresh on error too: a 409 means another tab already answered or dismissed the survey,
+		// and the refetch is what removes the stale dialog.
+		onError: () => {
+			toast.error("Couldn't submit the survey.");
+			refresh();
+		},
 	});
 	const dismiss = useMutation({
 		...dismissProductSurveyMutation(),
 		onSuccess: refresh,
-		onError: () => toast.error("Couldn't dismiss the survey."),
+		onError: () => {
+			toast.error("Couldn't dismiss the survey.");
+			refresh();
+		},
 	});
 	return {
 		survey,

@@ -91,7 +91,8 @@ export function setStoredConsent(consent: ConsentChoice) {
 	try {
 		window.localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify(value));
 	} catch {
-		return;
+		// localStorage may be unavailable (private mode / disabled); fall through so the banner
+		// still closes and subscribers re-read — the decision is simply not persisted.
 	}
 	closeConsentReopen();
 	emitChange();

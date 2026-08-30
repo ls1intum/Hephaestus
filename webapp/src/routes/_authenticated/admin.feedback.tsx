@@ -83,9 +83,9 @@ function AdminProductFeedbackPage() {
 			setWorkspaceId("all");
 			setQuestionType("TEXT");
 			setChoiceOptions("");
-			void queryClient.invalidateQueries({
-				queryKey: adminListProductSurveysQueryKey({ query: { page: surveyPage, size: 20 } }),
-			});
+			// Key without page params so every cached page of the list is invalidated, not just the
+			// one currently shown.
+			void queryClient.invalidateQueries({ queryKey: adminListProductSurveysQueryKey() });
 		},
 		onError: () => toast.error("Couldn't publish the survey."),
 	});
@@ -264,7 +264,9 @@ function AdminProductFeedbackPage() {
 									/>
 								</div>
 								<div className="space-y-2">
-									<Label htmlFor="survey-type">Answer type</Label>
+									<Label id="survey-type-label" htmlFor="survey-type">
+										Answer type
+									</Label>
 									<Select
 										items={QUESTION_TYPES}
 										value={questionType}
@@ -273,7 +275,7 @@ function AdminProductFeedbackPage() {
 										<SelectTrigger id="survey-type">
 											<SelectValue />
 										</SelectTrigger>
-										<SelectContent aria-labelledby="survey-type">
+										<SelectContent aria-labelledby="survey-type-label">
 											<SelectItem value="TEXT">Free text</SelectItem>
 											<SelectItem value="SINGLE_CHOICE">Single choice</SelectItem>
 											<SelectItem value="RATING">Rating (1–5)</SelectItem>
@@ -294,7 +296,9 @@ function AdminProductFeedbackPage() {
 									</div>
 								) : null}
 								<div className="space-y-2">
-									<Label htmlFor="survey-workspace">Audience</Label>
+									<Label id="survey-workspace-label" htmlFor="survey-workspace">
+										Audience
+									</Label>
 									<Select
 										items={workspaceOptions}
 										value={workspaceId}
@@ -303,7 +307,7 @@ function AdminProductFeedbackPage() {
 										<SelectTrigger id="survey-workspace">
 											<SelectValue />
 										</SelectTrigger>
-										<SelectContent aria-labelledby="survey-workspace">
+										<SelectContent aria-labelledby="survey-workspace-label">
 											<SelectItem value="all">All workspaces</SelectItem>
 											{workspaces.data?.map((workspace) => (
 												<SelectItem key={workspace.id} value={String(workspace.id)}>

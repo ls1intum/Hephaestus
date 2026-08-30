@@ -78,7 +78,10 @@ class FeedbackService {
         List<QuestionDTO> questions = readQuestions(survey.getQuestions());
         Set<String> valid = new HashSet<>();
         questions.forEach(q -> valid.add(q.id()));
-        if (!valid.containsAll(request.answers().keySet())
+        // JSON `null` answer values reach here despite the DTO's constraints (@Size skips null),
+        // and must be a 400, not a NullPointerException in the required-answer check below.
+        if (request.answers().values().stream().anyMatch(Objects::isNull)
+                || !valid.containsAll(request.answers().keySet())
                 || questions.stream()
                         .anyMatch(q -> q.required()
                                 && request.answers().getOrDefault(q.id(), "").isBlank()))

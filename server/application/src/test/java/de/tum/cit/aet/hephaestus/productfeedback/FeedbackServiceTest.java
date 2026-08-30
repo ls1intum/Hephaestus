@@ -43,6 +43,20 @@ class FeedbackServiceTest {
     }
 
     @Test
+    void shouldRejectNullAnswerValueAsBadRequest() {
+        Survey survey = survey(List.of(new QuestionDTO("q", "Question?", QuestionType.TEXT, List.of(), true)));
+        when(surveys.findById(survey.getId())).thenReturn(Optional.of(survey));
+        // Built through Jackson because that is where the null comes from: a JSON `null` answer
+        // passes the DTO's @Size constraints and must become a 400, not a NullPointerException.
+        SubmitSurveyDTO request = new ObjectMapper().readValue("{\"answers\":{\"q\":null}}", SubmitSurveyDTO.class);
+
+        assertThatThrownBy(() -> service.submit(survey.getId(), 7L, 42L, request))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("400");
+        verifyNoInteractions(submissions);
+    }
+
+    @Test
     void shouldRejectChoiceOutsideAuthoredOptions() {
         Survey survey = survey(List.of(new QuestionDTO("q", "Choose", QuestionType.SINGLE_CHOICE, List.of("A"), true)));
         when(surveys.findById(survey.getId())).thenReturn(Optional.of(survey));

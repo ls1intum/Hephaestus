@@ -65,7 +65,9 @@ export function ProductFeedbackDialog({ isSubmitting, onSubmit }: ProductFeedbac
 					}}
 				>
 					<div className="space-y-2">
-						<Label htmlFor="feedback-kind">Type</Label>
+						<Label id="feedback-kind-label" htmlFor="feedback-kind">
+							Type
+						</Label>
 						<Select
 							items={FEEDBACK_KINDS}
 							value={kind}
@@ -74,7 +76,7 @@ export function ProductFeedbackDialog({ isSubmitting, onSubmit }: ProductFeedbac
 							<SelectTrigger id="feedback-kind">
 								<SelectValue />
 							</SelectTrigger>
-							<SelectContent aria-labelledby="feedback-kind">
+							<SelectContent aria-labelledby="feedback-kind-label">
 								{FEEDBACK_KINDS.map((item) => (
 									<SelectItem key={item.value} value={item.value}>
 										{item.label}
