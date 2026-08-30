@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.sandbox.docker.interactive;
 
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.EvictionReason;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.DistributionSummary;
@@ -55,15 +56,15 @@ public final class InteractiveSandboxMetrics {
         this.attachFailureMaxSessions = attachFailure(registry, "max_sessions");
         this.attachFailureOther = attachFailure(registry, "other");
 
-        this.attachDuration = Timer.builder("mentor.attach.duration")
+        this.attachDuration = Timer.builder(AgentMetrics.MENTOR_ATTACH_DURATION)
                 .description("Time from container spawn to first JSONL frame received from runner")
                 .register(registry);
 
-        this.sendBytes = Counter.builder("mentor.send.frame.bytes")
+        this.sendBytes = Counter.builder(AgentMetrics.MENTOR_SEND_FRAME_BYTES)
                 .tag("direction", "in")
                 .description("Bytes sent to runner stdin (UTF-8 encoded JSONL including the newline terminator)")
                 .register(registry);
-        this.recvBytes = Counter.builder("mentor.send.frame.bytes")
+        this.recvBytes = Counter.builder(AgentMetrics.MENTOR_SEND_FRAME_BYTES)
                 .tag("direction", "out")
                 .description("Bytes received from runner stdout (UTF-8 encoded JSONL line, no terminator)")
                 .register(registry);
@@ -73,28 +74,28 @@ public final class InteractiveSandboxMetrics {
         this.sendRejectedBrokenPipe = sendRejected(registry, "broken_pipe");
         this.sendRejectedClosed = sendRejected(registry, "closed");
 
-        this.ringBufferDropped = Counter.builder("mentor.ring.buffer.dropped")
+        this.ringBufferDropped = Counter.builder(AgentMetrics.MENTOR_RING_BUFFER_DROPPED)
                 .description("Frames evicted from the per-session ring buffer (drop-oldest on overflow)")
                 .register(registry);
 
-        this.subscriberDropped = Counter.builder("mentor.subscriber.dropped")
+        this.subscriberDropped = Counter.builder(AgentMetrics.MENTOR_SUBSCRIBER_DROPPED)
                 .tag("reason", "queue_full")
                 .description("Frames dropped from a subscriber's bounded queue due to slow listener")
                 .register(registry);
-        this.subscriberError = Counter.builder("mentor.subscriber.error")
+        this.subscriberError = Counter.builder(AgentMetrics.MENTOR_SUBSCRIBER_ERROR)
                 .description("Subscriber listener invocations that threw")
                 .register(registry);
 
-        this.frameParseError = Counter.builder("mentor.frame.parse.error")
+        this.frameParseError = Counter.builder(AgentMetrics.MENTOR_FRAME_PARSE_ERROR)
                 .description("JSONL frames that failed to parse (skipped, session continues)")
                 .register(registry);
 
         // Per-session counters / timers / gauges share the mentor.session.* stem.
-        this.lifetime = Timer.builder("mentor.session.lifetime")
+        this.lifetime = Timer.builder(AgentMetrics.MENTOR_SESSION_LIFETIME)
                 .description("End-to-end session lifetime (attach to close)")
                 .register(registry);
 
-        this.subscribersAtClose = DistributionSummary.builder("mentor.session.subscribers.at.close")
+        this.subscribersAtClose = DistributionSummary.builder(AgentMetrics.MENTOR_SESSION_SUBSCRIBERS_AT_CLOSE)
                 .description("Subscriber count observed at session close")
                 .register(registry);
 
@@ -102,7 +103,7 @@ public final class InteractiveSandboxMetrics {
         for (EvictionReason r : EvictionReason.values()) {
             evictionsByReason.put(
                     r,
-                    Counter.builder("mentor.session.eviction")
+                    Counter.builder(AgentMetrics.MENTOR_SESSION_EVICTION)
                             .tag("reason", r.tag())
                             .description("Session evictions by reason (covers all termination causes)")
                             .register(registry));
@@ -114,14 +115,14 @@ public final class InteractiveSandboxMetrics {
     }
 
     private static Counter attachFailure(MeterRegistry registry, String reason) {
-        return Counter.builder("mentor.attach.failure")
+        return Counter.builder(AgentMetrics.MENTOR_ATTACH_FAILURE)
                 .tag("reason", reason)
                 .description("attach() failures by reason")
                 .register(registry);
     }
 
     private static Counter sendRejected(MeterRegistry registry, String reason) {
-        return Counter.builder("mentor.send.rejected")
+        return Counter.builder(AgentMetrics.MENTOR_SEND_REJECTED)
                 .tag("reason", reason)
                 .description("send() rejections by reason")
                 .register(registry);

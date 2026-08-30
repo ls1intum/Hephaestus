@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.runtime.worker;
 
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CancelJob;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CapacityReport;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.ForceReconnect;
@@ -93,16 +94,16 @@ public class WorkerControlClient {
         this.objectMapper = objectMapper;
         this.httpClient =
                 HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
-        this.framesSent = Counter.builder("worker.control.frames.sent")
+        this.framesSent = Counter.builder(AgentMetrics.WORKER_CONTROL_FRAMES_SENT)
                 .description("WSS frames written to the hub")
                 .register(meterRegistry);
-        this.framesReceived = Counter.builder("worker.control.frames.received")
+        this.framesReceived = Counter.builder(AgentMetrics.WORKER_CONTROL_FRAMES_RECEIVED)
                 .description("WSS frames decoded from the hub")
                 .register(meterRegistry);
-        this.sendDropped = Counter.builder("worker.control.frames.dropped")
+        this.sendDropped = Counter.builder(AgentMetrics.WORKER_CONTROL_FRAMES_DROPPED)
                 .description("Outbound frames dropped (queue full or transport closed)")
                 .register(meterRegistry);
-        this.reconnects = Counter.builder("worker.control.reconnects")
+        this.reconnects = Counter.builder(AgentMetrics.WORKER_CONTROL_RECONNECTS)
                 .description("Reconnection attempts after a connect/handshake failure")
                 .register(meterRegistry);
     }

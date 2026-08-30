@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.sync.push;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.events.ConnectionLifecycleEvent;
+import de.tum.cit.aet.hephaestus.integration.core.metrics.IntegrationCoreMetrics;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncStateChangedEvent;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -155,7 +156,7 @@ public class SyncPushService {
     }
 
     private static Counter counter(MeterRegistry meterRegistry, String transport, String outcome) {
-        return Counter.builder("integration.sync.push.messages")
+        return Counter.builder(IntegrationCoreMetrics.INTEGRATION_SYNC_PUSH_MESSAGES)
                 .description("Sync invalidation messages by transport boundary and outcome")
                 .tag("transport", transport)
                 .tag("outcome", outcome)

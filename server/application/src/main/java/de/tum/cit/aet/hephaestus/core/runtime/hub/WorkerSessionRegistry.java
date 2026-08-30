@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.runtime.hub;
 
+import de.tum.cit.aet.hephaestus.core.metrics.CoreMetrics;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.ForceReconnect;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -32,7 +33,7 @@ public class WorkerSessionRegistry implements SmartLifecycle {
 
     public WorkerSessionRegistry(ApplicationEventPublisher events, MeterRegistry meterRegistry) {
         this.events = events;
-        Gauge.builder("worker.hub.sessions.active", byWorkerId, ConcurrentHashMap::size)
+        Gauge.builder(CoreMetrics.WORKER_HUB_SESSIONS_ACTIVE, byWorkerId, ConcurrentHashMap::size)
                 .description("Active worker WSS connections registered on this app-pod")
                 .register(meterRegistry);
     }

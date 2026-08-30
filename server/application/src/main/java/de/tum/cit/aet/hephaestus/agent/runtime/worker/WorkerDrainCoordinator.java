@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.runtime.worker;
 
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobCancellationReason;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobExecutor;
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CapacityReport;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.Heartbeat;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.WorkerControlFrame;
@@ -54,7 +55,7 @@ public class WorkerDrainCoordinator implements SmartLifecycle {
         this.properties = properties;
         this.executor = executor;
         this.events = events;
-        Gauge.builder("worker.drain.active", draining, b -> b.get() ? 1.0 : 0.0)
+        Gauge.builder(AgentMetrics.WORKER_DRAIN_ACTIVE, draining, b -> b.get() ? 1.0 : 0.0)
                 .description("1 while the worker is draining, 0 otherwise")
                 .register(meterRegistry);
     }

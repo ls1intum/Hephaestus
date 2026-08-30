@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerProperties;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
@@ -58,7 +59,7 @@ public class WorkerLivenessReporter {
         this.transactionTemplate = transactionTemplate;
         this.interval = agentProperties.heartbeatInterval();
         this.workerId = workerProperties.resolvedWorkerId();
-        this.heartbeatFailures = Counter.builder("worker.liveness.heartbeat.failures")
+        this.heartbeatFailures = Counter.builder(AgentMetrics.WORKER_LIVENESS_HEARTBEAT_FAILURES)
                 .description("Failed worker_registry heartbeat writes (a stalled reporter risks false orphaning)")
                 .register(meterRegistry);
     }

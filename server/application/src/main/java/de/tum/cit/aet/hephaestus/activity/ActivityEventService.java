@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.activity;
 
+import de.tum.cit.aet.hephaestus.activity.metrics.ActivityMetrics;
 import de.tum.cit.aet.hephaestus.activity.scoring.ExperiencePointProperties;
 import de.tum.cit.aet.hephaestus.activity.scoring.XpPrecision;
 import de.tum.cit.aet.hephaestus.activity.spi.ActivityRecorder;
@@ -72,16 +73,16 @@ public class ActivityEventService implements ActivityRecorder {
         this.workspaceRepository = workspaceRepository;
         this.xpProperties = xpProperties;
         this.eventPublisher = eventPublisher;
-        this.eventsRecordedCounter = Counter.builder("activity.events.recorded")
+        this.eventsRecordedCounter = Counter.builder(ActivityMetrics.ACTIVITY_EVENTS_RECORDED)
                 .description("Number of activity events recorded")
                 .register(meterRegistry);
-        this.eventsDuplicateCounter = Counter.builder("activity.events.duplicate")
+        this.eventsDuplicateCounter = Counter.builder(ActivityMetrics.ACTIVITY_EVENTS_DUPLICATE)
                 .description("Number of duplicate activity events skipped")
                 .register(meterRegistry);
-        this.eventsFailedCounter = Counter.builder("activity.events.failed")
+        this.eventsFailedCounter = Counter.builder(ActivityMetrics.ACTIVITY_EVENTS_FAILED)
                 .description("Number of activity events that failed to record after retries")
                 .register(meterRegistry);
-        this.xpDistribution = DistributionSummary.builder("activity.xp.distribution")
+        this.xpDistribution = DistributionSummary.builder(ActivityMetrics.ACTIVITY_XP_DISTRIBUTION)
                 .description("Distribution of XP values recorded")
                 .publishPercentiles(0.5, 0.95, 0.99)
                 .register(meterRegistry);
@@ -95,7 +96,7 @@ public class ActivityEventService implements ActivityRecorder {
     private Timer getTimerForEventType(ActivityEventType eventType) {
         return eventTypeTimers.computeIfAbsent(
                 eventType,
-                type -> Timer.builder("activity.events.record.duration.by_type")
+                type -> Timer.builder(ActivityMetrics.ACTIVITY_EVENTS_RECORD_DURATION_BY_TYPE)
                         .description("Time to persist activity event by type")
                         .tag("eventType", type.name())
                         .publishPercentiles(0.5, 0.95, 0.99)

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.auth.metrics;
 
+import de.tum.cit.aet.hephaestus.core.metrics.CoreMetrics;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -35,7 +36,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class AuthMetrics {
 
-    /** Outcome tagged on {@code auth.login}. Fixed set → bounded cardinality. */
     public enum LoginResult {
         SUCCESS("success"),
         FAILURE("failure");
@@ -59,13 +59,9 @@ public class AuthMetrics {
      * without inferring it from latency. Fixed set → bounded cardinality.
      */
     public enum RefreshResult {
-        /** A fresh access token was minted and set on the cookie. */
         SUCCESS("success"),
-        /** Conditional revoke affected 0 rows (a concurrent refresh/logout already rotated the jti). */
         NOOP("noop"),
-        /** Account was not ACTIVE (SUSPENDED / DELETING / DELETED / missing) — session ended, no re-mint. */
         SUSPENDED("suspended"),
-        /** The rotation threw after the presenting token was revoked (re-mint / cookie failure). */
         ERROR("error");
 
         private final String tag;
@@ -98,7 +94,7 @@ public class AuthMetrics {
         this.registry = registry;
         this.loginSuccess = login(registry, LoginResult.SUCCESS);
         this.loginFailure = login(registry, LoginResult.FAILURE);
-        this.tokenRefresh = Timer.builder("auth.token.refresh")
+        this.tokenRefresh = Timer.builder(CoreMetrics.AUTH_TOKEN_REFRESH)
                 .description("Wall-clock latency of the access-token rotation in AuthSessionService.refresh.")
                 .publishPercentileHistogram()
                 .register(registry);

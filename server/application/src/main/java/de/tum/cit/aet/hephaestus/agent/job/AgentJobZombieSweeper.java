@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
@@ -91,19 +92,19 @@ public class AgentJobZombieSweeper {
         this.transactionTemplate = transactionTemplate;
         this.lifecycleService = lifecycleService;
         this.usageRecorder = usageRecorder;
-        this.zombieReaped = Counter.builder("agent.job.zombie.reaped")
+        this.zombieReaped = Counter.builder(AgentMetrics.AGENT_JOB_ZOMBIE_REAPED)
                 .description("Stale RUNNING jobs marked as TIMED_OUT")
                 .register(meterRegistry);
-        this.orphanRequeued = Counter.builder("agent.job.orphan.requeued")
+        this.orphanRequeued = Counter.builder(AgentMetrics.AGENT_JOB_ORPHAN_REQUEUED)
                 .description("RUNNING jobs whose owning worker was lost, requeued for another worker")
                 .register(meterRegistry);
-        this.orphanFailed = Counter.builder("agent.job.orphan.failed")
+        this.orphanFailed = Counter.builder(AgentMetrics.AGENT_JOB_ORPHAN_FAILED)
                 .description("Orphaned jobs that hit the retry cap and were failed")
                 .register(meterRegistry);
-        this.deliveryRecovered = Counter.builder("agent.job.delivery.recovered")
+        this.deliveryRecovered = Counter.builder(AgentMetrics.AGENT_JOB_DELIVERY_RECOVERED)
                 .description("Stuck PENDING deliveries successfully re-attempted by the recovery sweep")
                 .register(meterRegistry);
-        this.snapshotUnreadable = Counter.builder("agent.job.snapshot.unreadable")
+        this.snapshotUnreadable = Counter.builder(AgentMetrics.AGENT_JOB_SNAPSHOT_UNREADABLE)
                 .description("Terminal accounting events whose config snapshot could not be read; billed UNPRICED")
                 .register(meterRegistry);
     }

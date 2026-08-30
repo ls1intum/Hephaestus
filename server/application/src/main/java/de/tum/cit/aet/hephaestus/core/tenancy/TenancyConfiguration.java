@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.tenancy;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
+import de.tum.cit.aet.hephaestus.core.metrics.CoreMetrics;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.hibernate.cfg.AvailableSettings;
@@ -24,7 +25,7 @@ public class TenancyConfiguration {
 
     @Bean
     Counter tenancyParseFailureCounter(MeterRegistry registry) {
-        return Counter.builder("tenancy.parse_failure.total")
+        return Counter.builder(CoreMetrics.TENANCY_PARSE_FAILURE_TOTAL)
                 .description("SQL statements WorkspaceStatementInspector could not parse — fail-open.")
                 .tag("module", "tenancy")
                 .register(registry);

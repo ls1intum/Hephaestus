@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.sandbox.docker;
 
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxCancelledException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
@@ -122,24 +123,24 @@ public class DockerSandboxAdapter implements SandboxManager {
         this.properties = properties;
         this.serverPort = serverPort;
 
-        this.executionsSuccess = Counter.builder("sandbox.executions")
+        this.executionsSuccess = Counter.builder(AgentMetrics.SANDBOX_EXECUTIONS)
                 .tag("outcome", "success")
                 .description("Successful sandbox executions")
                 .register(meterRegistry);
-        this.executionsFailed = Counter.builder("sandbox.executions")
+        this.executionsFailed = Counter.builder(AgentMetrics.SANDBOX_EXECUTIONS)
                 .tag("outcome", "failure")
                 .description("Failed sandbox executions")
                 .register(meterRegistry);
-        this.executionsTimedOut = Counter.builder("sandbox.executions")
+        this.executionsTimedOut = Counter.builder(AgentMetrics.SANDBOX_EXECUTIONS)
                 .tag("outcome", "timeout")
                 .description("Timed-out sandbox executions")
                 .register(meterRegistry);
-        this.executionsCancelled = Counter.builder("sandbox.executions")
+        this.executionsCancelled = Counter.builder(AgentMetrics.SANDBOX_EXECUTIONS)
                 .tag("outcome", "cancelled")
                 .description("Cancelled sandbox executions")
                 .register(meterRegistry);
         this.meterRegistry = meterRegistry;
-        this.executionDuration = Timer.builder("sandbox.execution.duration")
+        this.executionDuration = Timer.builder(AgentMetrics.SANDBOX_EXECUTION_DURATION)
                 .description("Duration of sandbox executions")
                 .register(meterRegistry);
 

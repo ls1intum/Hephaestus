@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.sandbox.docker;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -68,23 +69,23 @@ public class SandboxReconciler {
         this.containerManager = containerManager;
         this.networkManager = networkManager;
         this.clock = clock;
-        this.orphanedContainers = Counter.builder("sandbox.reconciler.orphaned")
+        this.orphanedContainers = Counter.builder(AgentMetrics.SANDBOX_RECONCILER_ORPHANED)
                 .tag("resource", "container")
                 .description("Orphaned containers removed")
                 .register(meterRegistry);
-        this.orphanedNetworks = Counter.builder("sandbox.reconciler.orphaned")
+        this.orphanedNetworks = Counter.builder(AgentMetrics.SANDBOX_RECONCILER_ORPHANED)
                 .tag("resource", "network")
                 .description("Orphaned networks removed")
                 .register(meterRegistry);
-        this.completedSweeps = Counter.builder("sandbox.reconciler.sweeps")
+        this.completedSweeps = Counter.builder(AgentMetrics.SANDBOX_RECONCILER_SWEEPS)
                 .tag("outcome", "completed")
                 .description("Reconciliation sweeps that ran to completion")
                 .register(meterRegistry);
-        this.skippedSweeps = Counter.builder("sandbox.reconciler.sweeps")
+        this.skippedSweeps = Counter.builder(AgentMetrics.SANDBOX_RECONCILER_SWEEPS)
                 .tag("outcome", "skipped")
                 .description("Reconciliation sweeps skipped because an inventory they depend on was unreadable")
                 .register(meterRegistry);
-        this.reconciliationDuration = Timer.builder("sandbox.reconciler.duration")
+        this.reconciliationDuration = Timer.builder(AgentMetrics.SANDBOX_RECONCILER_DURATION)
                 .description("Duration of periodic reconciliation sweeps")
                 .register(meterRegistry);
     }

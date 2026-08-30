@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.runtime;
 
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -43,13 +44,13 @@ public class PiResultParser {
     public PiResultParser(ObjectMapper objectMapper, MeterRegistry meterRegistry) {
         this.objectMapper = objectMapper;
         this.meterRegistry = meterRegistry;
-        this.eligiblePractices = DistributionSummary.builder("agent.review.practice.coverage.eligible")
+        this.eligiblePractices = DistributionSummary.builder(AgentMetrics.AGENT_REVIEW_PRACTICE_COVERAGE_ELIGIBLE)
                 .description("Eligible practices per review run.")
                 .register(meterRegistry);
-        this.evaluatedPractices = DistributionSummary.builder("agent.review.practice.coverage.evaluated")
+        this.evaluatedPractices = DistributionSummary.builder(AgentMetrics.AGENT_REVIEW_PRACTICE_COVERAGE_EVALUATED)
                 .description("Evaluated practices per review run.")
                 .register(meterRegistry);
-        this.practiceCoverageRatio = DistributionSummary.builder("agent.review.practice.coverage.ratio")
+        this.practiceCoverageRatio = DistributionSummary.builder(AgentMetrics.AGENT_REVIEW_PRACTICE_COVERAGE_RATIO)
                 .description("Fraction of eligible practices evaluated per review run.")
                 .maximumExpectedValue(1.0)
                 .register(meterRegistry);

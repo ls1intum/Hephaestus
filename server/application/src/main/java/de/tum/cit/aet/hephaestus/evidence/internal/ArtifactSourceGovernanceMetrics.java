@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.evidence.internal;
 
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.evidence.metrics.EvidenceMetrics;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Clock;
@@ -13,7 +14,7 @@ final class ArtifactSourceGovernanceMetrics {
     ArtifactSourceGovernanceMetrics(
             ArtifactSourceCatalogRegistry sourceCatalogs, Clock clock, MeterRegistry meterRegistry) {
         Gauge.builder(
-                        "artifact.source.governance.expiry.seconds",
+                        EvidenceMetrics.ARTIFACT_SOURCE_GOVERNANCE_EXPIRY_SECONDS,
                         sourceCatalogs,
                         catalogs -> catalogs.earliestUseDecisionExpiry(null)
                                 .map(expiry -> (double) Duration.between(clock.instant(), expiry)
