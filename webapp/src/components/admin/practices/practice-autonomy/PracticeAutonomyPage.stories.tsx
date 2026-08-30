@@ -100,7 +100,6 @@ const oneUnreviewablePractice = buildAutonomyFixture({
 	],
 });
 
-/** Built once and shared: resolving the whole inheritance chain over this many rows is not free. */
 const atScale = scaleFixture();
 
 const idle = {
@@ -136,12 +135,6 @@ const meta = {
 	},
 	decorators: [withWidePage],
 	tags: ["autodocs"],
-	/**
-	 * Only the scope filter is held in state; the autonomy setters stay spies. {@link buildAutonomyFixture}
-	 * resolves the three-level inheritance chain the way the server does, so applying an autonomy locally
-	 * would mean resolving it a second time by hand — and the page would show a rollup its own rows
-	 * contradict the first time the two disagreed.
-	 */
 	render: (args) => (
 		<Stateful initial={args.overridesOnly}>
 			{(overridesOnly, setOverridesOnly) => (
@@ -170,8 +163,6 @@ export const WorkspaceDefaultUnset: Story = {
 		await expect(
 			canvas.getByRole("radiogroup", { name: "How far reviews go without you" }),
 		).toBeVisible();
-		// The workspace makes one decision, not two: how far a review goes is the only axis, and
-		// Review before sending means a person decides whether the composed feedback is released.
 		await expect(canvas.queryByText(/feedback may go/i)).not.toBeInTheDocument();
 		await expect(canvas.queryByText(/mentor conversation/i)).not.toBeInTheDocument();
 		await expectNoPageOverflow();
@@ -202,6 +193,9 @@ export const GroupOverride: Story = {
 		});
 		await expect(within(testing).getByRole("radio", { name: "Off" })).toBeChecked();
 		await userEvent.click(within(testing).getByRole("radio", { name: "Send automatically" }));
+		const dialog = within(await screen.findByRole("alertdialog"));
+		await expect(args.onSetGroupAutonomy).not.toHaveBeenCalled();
+		await userEvent.click(dialog.getByRole("button", { name: "Start sending automatically" }));
 		await expect(args.onSetGroupAutonomy).toHaveBeenCalledWith("testing", "AUTOMATIC");
 
 		const unassigned = canvas.getByText("Unassigned").closest('[data-slot="accordion-item"]');
@@ -213,14 +207,40 @@ export const GroupOverride: Story = {
 	},
 };
 
+export const WorkspaceAutomaticCanBeCancelled: Story = {
+	play: async ({ args, canvas, userEvent }) => {
+		const workspace = canvas.getByRole("radiogroup", {
+			name: "How far reviews go without you",
+		});
+		await userEvent.click(within(workspace).getByRole("radio", { name: "Send automatically" }));
+		const dialog = within(await screen.findByRole("alertdialog"));
+		await userEvent.click(dialog.getByRole("button", { name: "Cancel" }));
+		await expect(args.onSetWorkspaceDefault).not.toHaveBeenCalled();
+	},
+};
+
+export const PracticeAutomaticRequiresConfirmation: Story = {
+	play: async ({ args, canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: /Pull request hygiene/ }));
+		const row = canvas.getByText("States the motivation").closest("li");
+		if (!(row instanceof HTMLElement)) throw new Error("Practice row not rendered");
+		await userEvent.click(within(row).getByRole("radio", { name: "Send automatically" }));
+		const dialog = within(await screen.findByRole("alertdialog"));
+		await expect(args.onSetPracticeAutonomy).not.toHaveBeenCalled();
+		await userEvent.click(dialog.getByRole("button", { name: "Start sending automatically" }));
+		await expect(args.onSetPracticeAutonomy).toHaveBeenCalledWith(
+			"pull-request-hygiene-states-the-motivation",
+			"AUTOMATIC",
+		);
+	},
+};
+
 export const PracticeOverrideWithReset: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: /Pull request hygiene/ }));
 		const row = canvas.getByText("Links the issue it closes").closest("li");
 		if (!(row instanceof HTMLElement)) throw new Error("Practice row not rendered");
 
-		// `getByText` matches an element's own text nodes, so this is the paragraph and not the button
-		// inside it; the button is asserted by role below.
 		await expect(within(row).getByText("Set here.")).toBeVisible();
 		await expect(
 			within(row).getByRole("radiogroup", {
@@ -241,11 +261,6 @@ export const PracticeOverrideWithReset: Story = {
 	},
 };
 
-/**
- * A practice carrying no prose gets no preview card at all, rather than an empty popup appearing
- * under the pointer. Locally written practices usually carry none, so this is a state production
- * reaches routinely.
- */
 export const PracticeContext: Story = {
 	args: from(oneDescribedAndOneBare),
 	play: async ({ canvas, userEvent }) => {
@@ -258,7 +273,6 @@ export const PracticeContext: Story = {
 			within(described).queryByText(/reads as arbitrary six months later/),
 		).not.toBeInTheDocument();
 
-		// The card is portalled, so it is found on the screen and not in the row.
 		await userEvent.hover(
 			within(described).getByRole("link", { name: "Explains the trade-off it chose" }),
 		);
@@ -267,9 +281,6 @@ export const PracticeContext: Story = {
 		const bare = canvas.getByText("Written by hand, and says nothing more").closest("li");
 		if (!(bare instanceof HTMLElement)) throw new Error("Bare row not rendered");
 		await expect(within(bare).getByText("Pull or merge request")).toBeVisible();
-		// A practice with neither field renders its link bare rather than wrapped in a card that
-		// would open on hover with nothing in it. Asserted on the element, not by hovering and
-		// waiting for nothing, which passes just as well when the card is merely slow.
 		await expect(
 			within(bare).getByRole("link", { name: "Written by hand, and says nothing more" }),
 		).not.toHaveAttribute("data-slot", "hover-card-trigger");
@@ -277,11 +288,6 @@ export const PracticeContext: Story = {
 	},
 };
 
-/**
- * The card hangs off the practice's own link rather than a help icon, so the tab stop the row already
- * has is the keyboard path and no row grows a second one. This story is what keeps that a fact rather
- * than a claim: Base UI's hover card opens on focus-visible, Radix's does not.
- */
 export const PracticeDetailOnKeyboardFocus: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	args: from(oneDescribedPractice),
@@ -290,8 +296,6 @@ export const PracticeDetailOnKeyboardFocus: Story = {
 		const link = canvas.getByRole("link", { name: "Explains the trade-off it chose" });
 
 		await expect(screen.queryByText(/reads as arbitrary six months later/)).not.toBeInTheDocument();
-		// `link.focus()` would not do: the card opens on focus-*visible*, so focus has to arrive by
-		// keyboard. Bounded, so a DOM change ahead of the link fails the story instead of hanging it.
 		for (let step = 0; step < 12 && document.activeElement !== link; step++) {
 			await userEvent.tab();
 		}
@@ -340,7 +344,7 @@ export const BulkSet: Story = {
 	},
 };
 
-export const BulkAutomaticShowsBlastRadius: Story = {
+export const BulkAutomaticRequiresConfirmation: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: /Pull request hygiene/ }));
 		await userEvent.click(
@@ -354,11 +358,9 @@ export const BulkAutomaticShowsBlastRadius: Story = {
 		);
 
 		const dialog = within(await screen.findByRole("alertdialog"));
-		await expectSettledVisible(dialog.getByText(/2 selected practices/));
-		await expectSettledVisible(dialog.getByText(/42 review jobs entered/));
 		await expect(args.onBulkSetAutonomy).not.toHaveBeenCalled();
 
-		await userEvent.click(dialog.getByRole("button", { name: "Send automatically" }));
+		await userEvent.click(dialog.getByRole("button", { name: "Start sending automatically" }));
 		await expect(args.onBulkSetAutonomy).toHaveBeenCalledWith(
 			[
 				"pull-request-hygiene-states-the-motivation",
@@ -409,18 +411,12 @@ export const AtScale: Story = {
 	},
 };
 
-/**
- * A geometry assertion, because a ladder laid out after a content-width header takes its left edge
- * from the length of the group's name — and nothing about the DOM, the roles or the text changes when
- * that happens, so no other kind of assertion catches it.
- */
+/** Text and role assertions cannot detect column drift, so this story verifies geometry. */
 export const DecisionsShareOneColumn: Story = {
 	args: from(atScale),
 	globals: { viewport: { value: "desktop" } },
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvas, userEvent }) => {
-		// Below `sm` every ladder is full width and shares a left edge regardless, so a runner that
-		// ignored the viewport would pass this story for the wrong reason.
 		await expect(window.innerWidth).toBeGreaterThanOrEqual(640);
 
 		await userEvent.click(canvas.getByRole("button", { name: /^Pull request hygiene/ }));
@@ -430,7 +426,6 @@ export const DecisionsShareOneColumn: Story = {
 			.map((group) => Math.round(group.getBoundingClientRect().left));
 
 		await expect(lefts.length).toBeGreaterThan(25);
-		// One column, to within the sub-pixel rounding of a grid track inside a grid track.
 		await expect(Math.max(...lefts) - Math.min(...lefts)).toBeLessThanOrEqual(2);
 	},
 };
