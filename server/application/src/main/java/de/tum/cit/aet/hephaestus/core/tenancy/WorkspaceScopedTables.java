@@ -63,6 +63,9 @@ public class WorkspaceScopedTables {
             "jwt_signing_key",
             // GDPR Art. 20 self-service export — account-scoped, spans a principal's data across workspaces.
             "account_export",
+            // Account-scoped consent evidence and its system-wide notice archive
+            "consent_decision",
+            "consent_notice",
             // Fleet-wide worker liveness/capacity registry (#1138); not workspace-scoped
             "worker_registry",
             // Instance-scoped OAuth login providers (sign-in options); shared across all workspaces
