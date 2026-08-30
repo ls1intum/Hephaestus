@@ -6,6 +6,7 @@
 	"type": "module",
 	"scripts": {
 		"changeset:version": "changeset version && node scripts/sync-release-version.ts",
+		"commitlint": "commitlint",
 		"generate:api:application-server:clean": "node -e \"import('node:fs/promises').then(fs => fs.rm('webapp/src/api', {recursive: true, force: true}))\"",
 		"generate:api:application-server:specs": "node scripts/generate-openapi-spec.ts",
 		"generate:api:application-server:client": "pnpm run generate:api:application-server:clean && pnpm --filter webapp run generate:api",
