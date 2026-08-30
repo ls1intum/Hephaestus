@@ -204,6 +204,7 @@ Organisational
 Tick in DSMS:
 
 - Art. 6.1a GDPR (consent) — for workspaces collecting explicit consent (e.g., the AET capstone course).
+- Art. 6.1a GDPR (consent) — for optional academic-research participation requested at first login.
 - Art. 6.1b GDPR (contract / service request) — for voluntary sign-in by non-TUM contributors.
 - Art. 6.1e GDPR (public task) — for TUM/AET operation of the platform.
 
@@ -217,6 +218,8 @@ TUM/AET as platform operator: Art. 6(1)(e) GDPR i.V.m. Art. 2 BayHIG (Allgemeine
 Per-workspace lawful basis: workspace administrator and TUM/AET are joint controllers under Art. 26 GDPR for the workspace's processing. The administrator invokes the basis applicable to their workspace's contributors — typically Art. 6(1)(a) GDPR (consent, e.g. the AET capstone course's application phase) or Art. 6(1)(e) GDPR i.V.m. Art. 2 BayHIG (public-task activity by a TUM unit, e.g. regular courses or public open-source repositories such as ls1intum/Artemis). Administrators outside TUM cannot invoke Art. 6(1)(e) BayHIG and invoke a basis available to them (typically Art. 6(1)(a) consent, or Art. 6(1)(f) for private bodies under their own LIA).
 
 Voluntary sign-in by non-TUM contributors to use personal features: Art. 6(1)(b) GDPR.
+
+Optional academic-research participation: Art. 6(1)(a) GDPR. It is separate from the terms and from the public-task basis for platform operation. Research enrollment and analysis require the latest `RESEARCH_PARTICIPATION` decision to be a grant for the current notice version; they do not fall back to a preference flag or another legal basis after withdrawal. The append-only ledger records grants, refusals and withdrawals with a UTC timestamp, mechanism, notice version and SHA-256 digest. `consent_notice` preserves the corresponding first-layer text. Withdrawal ends the authorization for further research processing immediately. Account erasure removes the ledger's account reference; the resulting non-account-linked event remains with the archived notice as evidence of how consent was managed.
 
 The Hephaestus session cookie (`__Host-HEPHAESTUS_AT`), the CSRF + OAuth-state cookies, and theme-preference localStorage: § 25 Abs. 2 Nr. 2 TDDDG (technisch unbedingt erforderlich) i.V.m. Art. 6(1)(e) GDPR.
 ```

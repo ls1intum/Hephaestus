@@ -98,7 +98,7 @@ public class SlackAppHomeService {
                 monitoredChannelRepository.countByWorkspaceIdAndConsentState(workspaceId, ConsentState.ACTIVE);
         boolean participating = login.flatMap(preferencesQuery::preferencesForLogin)
                 .map(AccountPreferencesQuery.PreferencesView::participateInResearch)
-                .orElse(true); // opt-out model: default participation is on until the user turns it off
+                .orElse(false);
 
         blocks.addAll(overviewBlocks(
                 new HomeOverviewState(mentorReady, login, channelMessagesAllowed, activeChannels, participating)));

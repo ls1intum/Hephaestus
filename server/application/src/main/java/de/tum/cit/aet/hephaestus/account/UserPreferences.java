@@ -44,7 +44,7 @@ public class UserPreferences {
     private User user;
 
     @Column(name = "participate_in_research", nullable = false)
-    private boolean participateInResearch = true;
+    private boolean participateInResearch = false;
 
     @Column(name = "ai_review_enabled", nullable = false)
     private boolean practiceFeedbackDeliveryEnabled =

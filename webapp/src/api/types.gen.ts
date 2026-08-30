@@ -813,6 +813,13 @@ export type ConnectionSyncStatus = {
   webhookRegistered?: boolean;
 };
 
+export type ConsentStatus = {
+  completed?: boolean;
+  noticeText: string;
+  noticeVersion: string;
+  participateInResearch?: boolean;
+};
+
 /**
  * Information about a contributor to the Hephaestus project
  */
@@ -1517,6 +1524,12 @@ export type FeedbackSourceCount = {
    * The kind of work the feedback came from
    */
   workKind: string;
+};
+
+export type FirstLoginConsent = {
+  noticeVersion: string;
+  participateInResearch?: boolean;
+  termsAccepted?: boolean;
 };
 
 /**
@@ -3776,6 +3789,10 @@ export type RepositoryInfo = {
    * Full name including owner (e.g., 'owner/repo')
    */
   nameWithOwner: string;
+};
+
+export type ResearchConsent = {
+  granted?: boolean;
 };
 
 /**
@@ -7346,6 +7363,54 @@ export type GetCurrentUserResponses = {
 };
 
 export type GetCurrentUserResponse = GetCurrentUserResponses[keyof GetCurrentUserResponses];
+
+export type GetConsentStatusData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: '/user/consent';
+};
+
+export type GetConsentStatusResponses = {
+  /**
+   * OK
+   */
+  200: ConsentStatus;
+};
+
+export type GetConsentStatusResponse = GetConsentStatusResponses[keyof GetConsentStatusResponses];
+
+export type CompleteFirstLoginConsentData = {
+  body: FirstLoginConsent;
+  path?: never;
+  query?: never;
+  url: '/user/consent';
+};
+
+export type CompleteFirstLoginConsentResponses = {
+  /**
+   * OK
+   */
+  200: ConsentStatus;
+};
+
+export type CompleteFirstLoginConsentResponse = CompleteFirstLoginConsentResponses[keyof CompleteFirstLoginConsentResponses];
+
+export type UpdateResearchConsentData = {
+  body: ResearchConsent;
+  path?: never;
+  query?: never;
+  url: '/user/consent/research';
+};
+
+export type UpdateResearchConsentResponses = {
+  /**
+   * OK
+   */
+  200: ConsentStatus;
+};
+
+export type UpdateResearchConsentResponse = UpdateResearchConsentResponses[keyof UpdateResearchConsentResponses];
 
 export type RequestDataExportData = {
   body?: never;

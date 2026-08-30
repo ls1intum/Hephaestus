@@ -251,6 +251,24 @@ erDiagram
         TIMESTAMPTZ occurred_at "NOT NULL"
     }
 
+    ConsentDecision {
+        BIGINT id PK
+        BIGINT account_id FK
+        VARCHAR(40) purpose "NOT NULL"
+        BOOLEAN granted "NOT NULL"
+        VARCHAR(32) mechanism "NOT NULL"
+        VARCHAR(32) notice_version FK "NOT NULL"
+        VARCHAR(64) notice_sha256 FK "NOT NULL"
+        TIMESTAMPTZ occurred_at "NOT NULL"
+    }
+
+    ConsentNotice {
+        VARCHAR(32) version PK,UK
+        TEXT notice_text "NOT NULL"
+        VARCHAR(64) sha256 UK "NOT NULL"
+        TIMESTAMPTZ published_at "NOT NULL"
+    }
+
     CuratedGroupOverride {
         VARCHAR(64) slug PK
         VARCHAR(128) name
@@ -951,6 +969,40 @@ erDiagram
         JSONB automated_review_policy
     }
 
+    ProductFeedback {
+        UUID id PK
+        BIGINT account_id FK,UK "NOT NULL"
+        BIGINT workspace_id FK
+        VARCHAR(16) kind "NOT NULL"
+        VARCHAR(5000) message "NOT NULL"
+        VARCHAR(500) page_path
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ submission_minute UK "NOT NULL"
+    }
+
+    ProductSurvey {
+        UUID id PK
+        VARCHAR(160) title "NOT NULL"
+        VARCHAR(500) description "NOT NULL"
+        JSONB questions_json "NOT NULL"
+        BIGINT workspace_id FK
+        TIMESTAMPTZ starts_at "NOT NULL"
+        TIMESTAMPTZ ends_at
+        BOOLEAN active "NOT NULL"
+        BIGINT created_by_account_id FK "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
+    }
+
+    ProductSurveySubmission {
+        UUID id PK
+        UUID survey_id FK,UK "NOT NULL"
+        BIGINT account_id FK,UK "NOT NULL"
+        BIGINT workspace_id FK
+        VARCHAR(16) disposition "NOT NULL"
+        JSONB answers_json
+        TIMESTAMPTZ created_at "NOT NULL"
+    }
+
     Project {
         BIGINT id PK
         VARCHAR(64) node_id UK
@@ -1530,6 +1582,8 @@ erDiagram
     Workspace ||--o{ ConfigAuditEvent : has
     Workspace ||--o{ Connection : has
     Connection ||--o{ ConnectionAudit : has
+    Account ||--o{ ConsentDecision : has
+    ConsentNotice ||--o{ ConsentDecision : references
     Feedback ||--o{ DeliveryPolicyEvaluation : references
     AgentJob ||--o{ DeliveryPolicyEvaluation : references
     Workspace ||--o{ DeliveryPolicyEvaluation : has
@@ -1596,6 +1650,13 @@ erDiagram
     Workspace ||--o{ Practice : has
     Workspace ||--o{ PracticeGroup : has
     Practice ||--o{ PracticeRevision : has
+    Account ||--o{ ProductFeedback : has
+    Workspace ||--o{ ProductFeedback : has
+    Account ||--o{ ProductSurvey : has
+    Workspace ||--o{ ProductSurvey : has
+    Account ||--o{ ProductSurveySubmission : has
+    ProductSurvey ||--o{ ProductSurveySubmission : has
+    Workspace ||--o{ ProductSurveySubmission : has
     User ||--o{ Project : created_by
     IdentityProvider ||--o{ Project : references
     Project ||--o{ ProjectField : has

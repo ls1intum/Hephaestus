@@ -44,6 +44,7 @@ public class AccountPurger {
         jdbcTemplate.update("DELETE FROM identity_link WHERE account_id = ?", accountId);
         jdbcTemplate.update("DELETE FROM issued_jwt WHERE account_id = ?", accountId);
         jdbcTemplate.update("DELETE FROM account_export WHERE account_id = ?", accountId);
+        jdbcTemplate.update("UPDATE consent_decision SET account_id = NULL WHERE account_id = ?", accountId);
         anonymizeAuditRows(accountId);
 
         Account account = accountRepository.findById(accountId).orElse(null);

@@ -31,6 +31,14 @@ type AdminUserPatch = { appRole?: string };
 export const handlers = [
 	// --- current user -------------------------------------------------------
 	http.get("*/user", () => HttpResponse.json(currentUser)),
+	http.get("*/user/consent", () =>
+		HttpResponse.json({
+			completed: true,
+			noticeText: "Current transparency notice",
+			noticeVersion: "2026-08-30",
+			participateInResearch: false,
+		}),
+	),
 	// Mirror the server contract: the confirmation header MUST equal the caller's
 	// account id, else 400. A `"true"`-style placeholder must NOT pass — that mismatch
 	// is exactly the regression a unconditional-204 mock would hide.

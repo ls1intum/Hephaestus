@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 
-import { getUserSettingsOptions } from "@/api/@tanstack/react-query.gen";
+import { getConsentStatusOptions } from "@/api/@tanstack/react-query.gen";
 import { useAuth } from "@/integrations/auth";
 
 import { isPosthogEnabled } from "./config";
@@ -16,16 +16,16 @@ export function PostHogIdentity() {
 	const hasIdentified = useRef(false);
 
 	const {
-		data: userSettings,
+		data: consent,
 		isLoading: isSettingsLoading,
 		isError: isSettingsError,
 	} = useQuery({
-		...getUserSettingsOptions({}),
+		...getConsentStatusOptions({}),
 		enabled: isAuthenticated && isPosthogEnabled,
 		retry: 1,
 	});
 
-	const participatesInResearch = userSettings?.participateInResearch;
+	const participatesInResearch = consent?.participateInResearch;
 	const shouldDenyTracking = !isAuthenticated
 		? false
 		: isSettingsError

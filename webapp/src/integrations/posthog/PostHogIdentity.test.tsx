@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AuthContextType } from "@/integrations/auth/AuthContext";
 
-/** Only the calls this component makes; `usePostHogClient` is mocked, so nothing wider is needed. */
 const client = {
 	opt_in_capturing: vi.fn(),
 	opt_out_capturing: vi.fn(),
@@ -14,18 +13,16 @@ const client = {
 };
 
 const posthogConfig = { isPosthogEnabled: false };
-const userSettingsQuery = {
+const consentQuery = {
 	data: { participateInResearch: true },
 	isLoading: false,
 	isError: false,
 };
 const mockUseAuth = vi.fn<() => AuthContextType>();
 
-// Only `useQuery` is stubbed: the generated `getUserSettingsOptions` still builds its real options
-// off `queryOptions`, so a rename there fails this file rather than passing against a fake.
 vi.mock("@tanstack/react-query", async (importOriginal) => ({
 	...(await importOriginal<typeof import("@tanstack/react-query")>()),
-	useQuery: () => userSettingsQuery,
+	useQuery: () => consentQuery,
 }));
 
 vi.mock("@/integrations/auth", () => ({
@@ -78,17 +75,15 @@ const signedIn: AuthContextType = {
 describe("PostHogIdentity", () => {
 	beforeEach(() => {
 		mockUseAuth.mockReturnValue(signedIn);
-		userSettingsQuery.data = { participateInResearch: true };
-		userSettingsQuery.isLoading = false;
-		userSettingsQuery.isError = false;
+		consentQuery.data = { participateInResearch: true };
+		consentQuery.isLoading = false;
+		consentQuery.isError = false;
 	});
 
 	afterEach(() => {
 		vi.clearAllMocks();
 	});
 
-	// The gate: with PostHog switched off the provider never mounts, so the client this reaches is
-	// the un-`init`ed module singleton. Touching it at all would queue capture against no project.
 	it("leaves the client alone when PostHog is disabled, even for a consenting signed-in user", () => {
 		posthogConfig.isPosthogEnabled = false;
 
@@ -113,7 +108,7 @@ describe("PostHogIdentity", () => {
 
 	it("opts out and clears state for a signed-in user who has not consented", () => {
 		posthogConfig.isPosthogEnabled = true;
-		userSettingsQuery.data = { participateInResearch: false };
+		consentQuery.data = { participateInResearch: false };
 
 		render(<PostHogIdentity />);
 
@@ -125,11 +120,22 @@ describe("PostHogIdentity", () => {
 
 	it("stays opted out while consent is still loading", () => {
 		posthogConfig.isPosthogEnabled = true;
-		userSettingsQuery.isLoading = true;
+		consentQuery.isLoading = true;
 
 		render(<PostHogIdentity />);
 
 		expect(client.opt_out_capturing).toHaveBeenCalled();
 		expect(client.opt_in_capturing).not.toHaveBeenCalled();
+	});
+
+	it("stays opted out when the consent status cannot be loaded", () => {
+		posthogConfig.isPosthogEnabled = true;
+		consentQuery.isError = true;
+
+		render(<PostHogIdentity />);
+
+		expect(client.opt_out_capturing).toHaveBeenCalled();
+		expect(client.reset).toHaveBeenCalled();
+		expect(client.identify).not.toHaveBeenCalled();
 	});
 });
