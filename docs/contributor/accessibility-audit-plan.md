@@ -5,46 +5,66 @@ description: Scope and evidence requirements for evaluating the web application 
 
 # Accessibility audit plan
 
-The audit follows [WCAG-EM](https://www.w3.org/WAI/test-evaluate/conformance/wcag-em/). Automated
-checks supplement rather than replace manual evaluation.
+Evaluate the web application using
+[WCAG-EM](https://www.w3.org/WAI/test-evaluate/conformance/wcag-em/) against
+[WCAG 2.2 Level AA](https://www.w3.org/TR/WCAG22/).
 
 ## Scope
 
-- **Standard:** [WCAG 2.2](https://www.w3.org/TR/WCAG22/), Levels A and AA
-- **Application:** the Hephaestus SPA, including public, authentication, loading, empty, error, and
-  permission-denied states
-- **Complete processes:** authentication, workspace creation, developer feedback, mentor, settings,
-  workspace administration, and instance administration
-- **Outside the application scope:** linked external sites and identity-provider pages
+The scope is the Hephaestus SPA at one tested commit and deployment, including:
 
-Hephaestus controls and presentation around imported content remain in scope even when the content
-comes from a third party.
+- public, authenticated, loading, empty, error and permission-denied states;
+- authentication, workspace creation, developer feedback, mentor and settings processes;
+- workspace and instance administration for every supported role; and
+- Hephaestus controls and presentation around imported content.
 
-## Evaluation matrix
+Linked sites and identity-provider pages are outside the application scope. The handoff to and return
+from those pages remain in scope.
 
-| Surface or process | Representative routes and states | Manual status |
-| --- | --- | --- |
-| Public and legal | `/`, `/about`, `/imprint`, `/privacy`, not found | Not evaluated |
-| Authentication | `/login`, workspace login, callback and error | Not evaluated |
-| Workspace creation | provider selection, GitHub, GitLab, validation and errors | Not evaluated |
-| Workspace home | dashboard, teams, achievements and user profiles | Not evaluated |
-| Developer feedback | reviews, trace, observations, findings, delivery and targets | Not evaluated |
-| Mentor | thread list, greeting, transcript, composer and copilot | Not evaluated |
-| Personal settings | settings, integrations and destructive actions | Not evaluated |
-| Workspace administration | members, practices, review operations, models, usage and integrations | Not evaluated |
-| Instance administration | users, workspaces, audit, catalogue, providers, models and usage | Not evaluated |
+## Surface inventory
 
-For each row, record the tested revision and deployment, route or process, state, applicable WCAG
-criteria, result, tester, date, and exact operating-system, browser, and assistive-technology versions.
-The manual matrix must include keyboard-only operation, NVDA with Firefox on Windows, and VoiceOver
-with Safari on macOS. Link every failure to an issue containing its reproduction steps, user impact,
-WCAG criterion, owner, and target release.
+| Surface | Representative routes and states |
+| --- | --- |
+| Public and legal | `/`, `/about`, `/imprint`, `/privacy`, not found |
+| Authentication | `/login`, workspace login, callback and error |
+| Workspace creation | provider selection, GitHub, GitLab, validation and errors |
+| Workspace home | dashboard, teams, achievements and user profiles |
+| Developer feedback | reviews, trace, observations, feedback delivery and targets |
+| Mentor | thread list, greeting, transcript, composer and copilot |
+| Personal settings | settings, integrations and destructive actions |
+| Workspace administration | members, practices, review operations, models, usage and integrations |
+| Instance administration | users, workspaces, audit, catalogue, providers, models and usage |
 
-## Automated checks
+The dated [audit record](./accessibility-audit-record-template.md) expands this inventory to the routes,
+states and roles present in the tested revision.
 
-`pnpm --filter webapp run test:storybook` runs the maintained Storybook states in Chromium and treats
-axe violations as errors. Record the revision, browser version, command result, and retained report
-with each audit. Automated results do not establish WCAG conformance.
+## Evaluation
 
-Until every matrix row is evaluated and each failure is fixed or linked, the public accessibility
-statement must make no conformance claim.
+Record the revision, deployment, test data, tester, date, and exact operating-system, browser and
+assistive-technology versions.
+
+1. On every surface, use only the keyboard to check operation, focus visibility and order, skip
+   navigation, overlay dismissal and focus restoration, and keyboard traps.
+2. On every surface, inspect landmarks, headings, names, roles and states with NVDA and Firefox on
+   Windows and VoiceOver and Safari on macOS. Complete every end-to-end process in both combinations,
+   including validation and error recovery.
+3. Build the structured and random samples required by WCAG-EM. Across those samples, evaluate every
+   applicable Level A and AA criterion, including 200% zoom, 320 CSS-pixel reflow,
+   [text spacing](https://www.w3.org/WAI/WCAG22/Understanding/text-spacing.html), contrast, use of
+   colour, target size and motion. Record the results with the
+   [WCAG-EM Report Tool](https://www.w3.org/WAI/eval/report-tool/).
+4. Run axe on the integrated sampled pages and reconcile its results with the manual evaluation.
+
+## Findings and completion
+
+Link every failure to an issue with its context, reproduction steps, expected and observed behaviour,
+user impact, environment, applicable WCAG criterion and evidence. Use GitHub assignment, priority and
+milestones for ownership and scheduling. Check other callers when the failure is in a shared component.
+
+`pnpm --filter webapp run test:storybook` runs axe against the maintained Storybook states in Chromium.
+Retain its report, revision and browser version with the audit, and document any rule exclusions.
+
+An AA conformance claim requires every scoped page and complete process to pass every applicable Level
+A and AA criterion. Follow W3C's
+[conformance-claim requirements](https://www.w3.org/TR/WCAG22/#conformance-claims) when updating the
+public accessibility statement.
