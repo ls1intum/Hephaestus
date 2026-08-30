@@ -119,6 +119,19 @@ jobs:
         with:
           name: ${{ env.SERVER_REACTOR_ARTIFACT }}
           path: server
+      - name: Install downloaded reactor dependencies
+        run: |
+          # Surefire resolves the generated-clients JAR from the local repository, which is only
+          # warm when the dependency cache hits — and its key hashes every server POM, so the PR
+          # that edits one starts cold. Install the downloaded reactor artifacts explicitly instead
+          # of relying on that cache.
+          cd server
+          CLIENT_JAR="$(find generated-clients/target -maxdepth 1 -name 'hephaestus-generated-clients-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' -print -quit)"
+          test -n "$CLIENT_JAR"
+          ./mvnw --batch-mode --non-recursive org.apache.maven.plugins:maven-install-plugin:3.1.4:install-file \
+            -Dfile=pom.xml -DpomFile=pom.xml
+          ./mvnw --batch-mode --non-recursive org.apache.maven.plugins:maven-install-plugin:3.1.4:install-file \
+            -Dfile="$CLIENT_JAR" -DpomFile=generated-clients/pom.xml
       - name: Run integration tests from the built reactor
         run: |
           rm -rf server/application/target/surefire-reports/*

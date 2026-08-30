@@ -81,6 +81,21 @@ value of `HEPHAESTUS_SECURITY_ENCRYPTION_KEY`. After every runtime is upgraded, 
 to replace it with an independent key. Self-hosted installations using `docker/self-host/setup.sh`
 receive the initial value automatically.
 
+#### 🔴 Server logs are now structured JSON
+
+**Affected**: deployments that parse the application server or worker console output — log shippers,
+alerting rules, or grep-based tooling built for the previous plain-text lines.
+
+**Before**: the server and worker wrote human-readable plain-text log lines.
+
+**After**: every log line is a single JSON object (`timestamp`, `level`, `logger`, `message`, `mdc`,
+`stacktrace`), in every profile, with known credential formats masked before output. Nothing changes
+for `docker compose logs` itself — the lines are still printed to the console, just as JSON.
+
+**Migration**: point existing parsers at the JSON fields instead of the plain-text layout. Filters
+that matched free text can key on `mdc."job.id"` and `mdc."workspace.id"`; see the log-correlation
+examples in the practice-review operations guide.
+
 ### v0.76.0
 
 #### 🔴 Upgrade the server and agent image together

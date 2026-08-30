@@ -81,7 +81,7 @@ class WorkspaceContextExecutorTest {
         AtomicReference<String> capturedSlug = new AtomicReference<>();
 
         Runnable wrapped = WorkspaceContextExecutor.wrap(() -> {
-            capturedWorkspaceId.set(MDC.get("workspace_id"));
+            capturedWorkspaceId.set(MDC.get("workspace.id"));
             capturedSlug.set(MDC.get("workspace_slug"));
         });
 

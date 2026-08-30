@@ -77,6 +77,24 @@ visible in **Review activity** and the refusal counter; they do not remove the w
 Gauges are sampled periodically; timers and counters are recorded when the corresponding event occurs.
 Metric names in the instrumented code are the source of truth for dashboards and alerts.
 
+### Log correlation
+
+The application emits one JSON object per log line, so worker logs filter by the correlation keys
+under `mdc` with the tools already in the shipped Compose stack. From the directory you deploy from:
+
+```bash
+# All log lines for one agent job
+docker compose logs --no-log-prefix application-worker \
+  | jq -cR 'fromjson? | select(.mdc."job.id" == "<job-uuid>")'
+
+# All errors for one workspace
+docker compose logs --no-log-prefix application-worker \
+  | jq -cR 'fromjson? | select(.mdc."workspace.id" == "<workspace-id>" and .level == "ERROR")'
+```
+
+A deployment that ships logs to its own collector can key dashboards and alerts on the same `mdc`
+fields; label names there are deployment-specific.
+
 **Retention.** Terminal job payloads are stripped before their rows are deleted, so row retention shorter
 than payload retention is incoherent — the application refuses to start rather than accept it. Treat the
 fabric root as sensitive storage. Delivery-policy evaluations and dispatch intents follow their owning
