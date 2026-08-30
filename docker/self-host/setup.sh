@@ -28,7 +28,7 @@ else
 fi
 chmod 600 "$working_file"
 
-for key in POSTGRES_PASSWORD HEPHAESTUS_SECURITY_ENCRYPTION_KEY HEPHAESTUS_AUTH_STATE_COOKIE_KEY WEBHOOK_SECRET; do
+for key in POSTGRES_PASSWORD HEPHAESTUS_SECURITY_ENCRYPTION_KEY HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY HEPHAESTUS_AUTH_STATE_COOKIE_KEY WEBHOOK_SECRET; do
 	if [ "$(grep -c "^${key}=" "$working_file")" -gt 1 ]; then
 		printf 'Refusing duplicate %s assignments in %s.\n' "$key" "$environment_file" >&2
 		exit 1
@@ -66,6 +66,22 @@ set_if_empty() {
 
 set_if_empty POSTGRES_PASSWORD hex16
 set_if_empty HEPHAESTUS_SECURITY_ENCRYPTION_KEY hex16
+if ! grep -q '^HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY=.' "$working_file"; then
+	credential_key=$(sed -n 's/^HEPHAESTUS_SECURITY_ENCRYPTION_KEY=//p' "$working_file")
+	if grep -q '^HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY=' "$working_file"; then
+		while IFS= read -r line; do
+			if [ "$line" = 'HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY=' ]; then
+				printf 'HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY=%s\n' "$credential_key"
+			else
+				printf '%s\n' "$line"
+			fi
+		done < "$working_file" > "$working_file.next"
+		mv "$working_file.next" "$working_file"
+	else
+		printf 'HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY=%s\n' "$credential_key" >> "$working_file"
+	fi
+	generated_keys="$generated_keys HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY"
+fi
 set_if_empty HEPHAESTUS_AUTH_STATE_COOKIE_KEY base64
 set_if_empty WEBHOOK_SECRET hex32
 

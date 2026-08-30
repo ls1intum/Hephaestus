@@ -63,6 +63,24 @@ Before upgrading to any new `0.x.0` version:
 Entries exist only for releases that need operator action. Everything else is in the
 [release notes](https://github.com/ls1intum/Hephaestus/releases).
 
+### Next minor release
+
+#### 🔴 Integration credentials use a dedicated encryption key
+
+**Affected**: reference deployments and custom deployments. The supported self-host installer handles
+this migration automatically.
+
+**Before**: integration credentials use `HEPHAESTUS_SECURITY_ENCRYPTION_KEY`.
+
+**After**: integration credentials use `HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY`, which can be
+rotated independently without invalidating sessions or unrelated encrypted data.
+
+**Migration**: before deploying, set `HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY` to the current
+value of `HEPHAESTUS_SECURITY_ENCRYPTION_KEY`. After every runtime is upgraded, follow the
+[credential-key rotation procedure](https://ls1intum.github.io/Hephaestus/admin/credential-key-rotation)
+to replace it with an independent key. Self-hosted installations using `docker/self-host/setup.sh`
+receive the initial value automatically.
+
 ### v0.76.0
 
 #### 🔴 Upgrade the server and agent image together

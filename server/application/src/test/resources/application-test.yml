@@ -71,6 +71,7 @@ hephaestus:
         # this, integration tests that go through ConnectionService.rotateBearerToken
         # fail at the boot stage where the converter requires a key.
         encryption-key: test-encryption-key-32-bytes-aes
+        credential-encryption-key: test-encryption-key-32-bytes-aes
     workspace:
         init-default: false # Disable PAT workspace bootstrap
         creation-policy: SELF_SERVICE

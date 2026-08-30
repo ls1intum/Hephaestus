@@ -101,10 +101,11 @@ secrets listed above; do not replace them manually.
 | `GH_OAUTH_CLIENT_ID` / `_SECRET` | From step 3 |
 | `HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS` | From step 4 — set it **before** first boot |
 
-:::danger Back up the encryption key
-`HEPHAESTUS_SECURITY_ENCRYPTION_KEY` encrypts every stored provider token and seals the JWT
-signing key. If you lose or change it, those tokens become unreadable and all sessions
-invalidate. Store it as carefully as the database itself, and never change it after first boot.
+:::danger Back up both encryption keys
+`HEPHAESTUS_SECURITY_ENCRYPTION_KEY` protects legacy encrypted values and the JWT signing key.
+`HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY` protects integration credentials. Losing either key
+makes the corresponding database values unreadable. Store both with the database backup. Rotate the
+credential key only with the [credential-key rotation procedure](./credential-key-rotation).
 :::
 
 The other generated values also have lifecycle consequences: changing the database password does not

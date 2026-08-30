@@ -36,7 +36,6 @@ import org.jspecify.annotations.Nullable;
  * may have two GitHub orgs as two Connection rows, distinct instance_key values.
  *
  * <p>Config is a sealed JSONB column. Credentials are an opaque AES-GCM-encrypted blob.
- * Audit lives in a separate append-only table.
  */
 @Entity
 @Table(
@@ -90,6 +89,10 @@ public class Connection {
     @Column(name = "credentials_alg", length = 64)
     @Nullable
     private String credentialsAlg;
+
+    @Column(name = "credentials_key_version")
+    @Nullable
+    private Integer credentialsKeyVersion;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -183,6 +186,11 @@ public class Connection {
         return credentialsAlg;
     }
 
+    @Nullable
+    public Integer getCredentialsKeyVersion() {
+        return credentialsKeyVersion;
+    }
+
     public Instant getCreatedAt() {
         return Objects.requireNonNull(createdAt, "Connection has not been persisted");
     }
@@ -219,37 +227,25 @@ public class Connection {
         this.credentialsAlg = credentialsAlg;
     }
 
-    /**
-     * Encrypt {@code bundle} and stamp the algorithm tag. Passing {@code null} clears
-     * both columns; the surrounding transition's {@code stateReason} records why.
-     *
-     * <p>The encryption context — {@code (workspaceId, kind, instanceKey)} — is derived
-     * from {@code this} and bound into the AES-GCM AAD; a ciphertext written for one row
-     * cannot be substituted into another.
-     */
+    /** Encrypts or clears this connection's credentials. */
     public void setCredentials(@Nullable CredentialBundle bundle, CredentialBundleConverter converter) {
         if (bundle == null) {
             this.credentialsEncrypted = null;
             this.credentialsAlg = null;
+            this.credentialsKeyVersion = null;
             return;
         }
         this.credentialsEncrypted = converter.encrypt(bundle, encryptionContext());
         this.credentialsAlg = CredentialBundleConverter.ALGORITHM_TAG;
+        this.credentialsKeyVersion = converter.activeKeyVersion();
     }
 
-    /**
-     * Decrypt the credential blob if present. Empty when no blob is stored.
-     *
-     * <p>v2 (per-row AAD) only. Throws {@link
-     * de.tum.cit.aet.hephaestus.core.security.EncryptionException} on tamper,
-     * unsupported version, or context mismatch (the closure the AAD binding provides).
-     * Callers must treat that as an unrecoverable data error, not "no auth available".
-     */
+    /** Returns the decrypted credentials, if configured. */
     public Optional<CredentialBundle> credentials(CredentialBundleConverter converter) {
         if (credentialsEncrypted == null) {
             return Optional.empty();
         }
-        return Optional.of(converter.decrypt(credentialsEncrypted, encryptionContext()));
+        return Optional.of(converter.decrypt(credentialsEncrypted, encryptionContext(), credentialsKeyVersion));
     }
 
     private EncryptionContext encryptionContext() {

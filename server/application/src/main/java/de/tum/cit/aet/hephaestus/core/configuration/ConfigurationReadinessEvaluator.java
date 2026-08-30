@@ -81,12 +81,22 @@ public final class ConfigurationReadinessEvaluator {
         add(
                 facts,
                 "security.credential-encryption",
+                "hephaestus.security.credential-encryption-key",
+                allRoles(),
+                ConfigurationRequirement.REQUIRED,
+                true,
+                this::validEncryptionKey,
+                "A 32-character printable ASCII key is required to encrypt stored integration credentials.",
+                "credential-encryption");
+        add(
+                facts,
+                "security.value-encryption",
                 "hephaestus.security.encryption-key",
                 allRoles(),
                 ConfigurationRequirement.REQUIRED,
                 true,
                 this::validEncryptionKey,
-                "A 32-character printable ASCII key is required to encrypt stored credentials.",
+                "A 32-character printable ASCII key is required to seal JWT signing keys and other encrypted values.",
                 "credential-encryption");
         add(
                 facts,

@@ -34,12 +34,13 @@ consists of:
 ## Base environment variables
 
 The required base values — `HEPHAESTUS_SECURITY_ENCRYPTION_KEY`,
+`HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY`,
 `HEPHAESTUS_AUTH_STATE_COOKIE_KEY`, `WEBHOOK_SECRET`, `POSTGRES_PASSWORD`, the GitHub OAuth pair, and
 `HEPHAESTUS_AUTH_BOOTSTRAP_ADMINS` — are documented once in the
 [Install guide](./install#2-configure-env), along with their lifecycle constraints. The self-host
 installer generates its internal secrets; operators of the reference deployment must provision
-equivalent values through its protected secret-management system. The warning about never changing
-the encryption key applies to both stacks.
+equivalent values through its protected secret-management system. Rotate integration credential keys
+with the [credential-key rotation procedure](./credential-key-rotation).
 
 These variables exist only in the reference deployment, so they live here:
 
@@ -74,10 +75,9 @@ Actions reserves the `GITHUB_` prefix, so Compose maps them to the server's
 no effect, and the provider is skipped with no sign-in button to show for it.
 :::
 
-`HEPHAESTUS_SECURITY_ENCRYPTION_KEY` carries one extra constraint on an instance that predates the
-unified integration framework: it must be set **before that first deploy**, because the Liquibase
-backfill re-encrypts existing credentials on boot and fails fast — or HALTs the migration — without
-it.
+Set `HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY` before deploying the unified integration
+framework. Existing installations may initially copy `HEPHAESTUS_SECURITY_ENCRYPTION_KEY`; rotate to
+an independent key after the deployment succeeds.
 
 ### Slack app configuration
 
