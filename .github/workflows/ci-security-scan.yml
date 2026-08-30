@@ -42,14 +42,14 @@ jobs:
       - name: Upload Trivy results
         if: always()
         continue-on-error: true
-        uses: github/codeql-action/upload-sarif@89a39a4e59826350b863aa6b6252a07ad50cf83e # v4.32.4
+        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
           sarif_file: "trivy-results.sarif"
 
       - name: Secret detection
         id: secrets
         continue-on-error: true
-        uses: trufflesecurity/trufflehog@7c0734f987ad0bb30ee8da210773b800ee2016d3 # v3.93.4
+        uses: trufflesecurity/trufflehog@20652fbbdefffcdaa493a5bf57ab2ac6b1db715b # v3.97.1
         with:
           path: ./
           base: ${{ github.event_name == 'pull_request' && github.base_ref || '' }}

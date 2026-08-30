@@ -22,8 +22,8 @@
 		{
 			"name": "traefik",
 			"repository": "docker.io/library/traefik",
-			"tag": "v3.7.4",
-			"digest": "sha256:fcdef599e6259359833dd2e1d49f9e964f66825d69bd3dd468f51102ce013d03"
+			"tag": "v3.7.11",
+			"digest": "sha256:5203c3f39ca70de6790d964624e042463ffbd57715bc82be155cf224c0dd5144"
 		}
 	]
 }
