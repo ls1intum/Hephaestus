@@ -27,4 +27,3 @@ jobs:
     with:
       environment: Staging
       release: ${{ inputs.image-tag }}
-    secrets: inherit

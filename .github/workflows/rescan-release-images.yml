@@ -81,7 +81,14 @@ jobs:
         run: |
           set -euo pipefail
           mkdir reports
-          trivy image --download-db-only
+          for attempt in 1 2 3; do
+            trivy image --timeout 90s --download-db-only && break
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::Trivy database download failed after $attempt attempts"
+              exit 1
+            fi
+            sleep $((attempt * 5))
+          done
           db_metadata="${TRIVY_CACHE_DIR:-$HOME/.cache/trivy}/db/metadata.json"
           jq -e '(.UpdatedAt | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) as $updated |
             ((now - $updated) >= 0) and ((now - $updated) <= 86400)' \
@@ -90,7 +97,7 @@ jobs:
           jq -er '.subjects[] | [.image, .platform, .digest, .repository] | @tsv' release-evidence/manifest.json |
           while IFS=$'\t' read -r image platform digest repository; do
             suffix=${platform//\//-}
-            trivy image --scanners vuln --format json --output "reports/$image-$suffix.json" "$repository@$digest"
+            trivy image --skip-db-update --scanners vuln --format json --output "reports/$image-$suffix.json" "$repository@$digest"
             node scripts/check-release-vulnerabilities.ts "$image" "$platform" "$digest" "$repository" \
               "reports/$image-$suffix.json" security/vulnerability-policy.json \
               "reports/$image-$suffix.policy.json"

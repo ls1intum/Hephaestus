@@ -1,10 +1,8 @@
 name: Preview deployment
 
-# Since 2025-12-08 `pull_request_target` always takes the workflow file and the checked-out commit
-# from the default branch, whatever the pull request targets. Pull-request code therefore never runs
-# on this runner, which holds the Coolify webhook secret.
 on:
-  pull_request_target:
+  pull_request_target: # zizmor: ignore[dangerous-triggers] No pull-request code is checked out or executed.
+    branches: [main]
     types: [labeled, synchronize, reopened, ready_for_review]
 
 permissions: {}

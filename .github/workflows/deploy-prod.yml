@@ -27,4 +27,3 @@ jobs:
     with:
       environment: Production
       release: ${{ inputs.image-tag }}
-    secrets: inherit

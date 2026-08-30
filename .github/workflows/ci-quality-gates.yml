@@ -66,16 +66,16 @@ jobs:
         run: |
           case "${{ matrix.check }}" in
             "webapp-quality")
-              echo "run=${{ inputs.webapp_changed }}" >> $GITHUB_OUTPUT
+              echo "run=${INPUTS_WEBAPP_CHANGED}" >> $GITHUB_OUTPUT
               ;;
             "application-server-quality")
-              echo "run=${{ inputs.application_server_changed }}" >> $GITHUB_OUTPUT
+              echo "run=${INPUTS_APPLICATION_SERVER_CHANGED}" >> $GITHUB_OUTPUT
               ;;
             "server-contracts")
-              echo "run=${{ inputs.contracts_changed }}" >> $GITHUB_OUTPUT
+              echo "run=${INPUTS_CONTRACTS_CHANGED}" >> $GITHUB_OUTPUT
               ;;
             "tooling-quality")
-              echo "run=${{ inputs.tooling_changed }}" >> $GITHUB_OUTPUT
+              echo "run=${INPUTS_TOOLING_CHANGED}" >> $GITHUB_OUTPUT
               ;;
             *)
               echo "::error::Unknown check type '${{ matrix.check }}' in ci-quality-gates.yml matrix."
@@ -84,6 +84,11 @@ jobs:
               exit 1
               ;;
           esac
+        env:
+          INPUTS_WEBAPP_CHANGED: ${{ inputs.webapp_changed }}
+          INPUTS_APPLICATION_SERVER_CHANGED: ${{ inputs.application_server_changed }}
+          INPUTS_CONTRACTS_CHANGED: ${{ inputs.contracts_changed }}
+          INPUTS_TOOLING_CHANGED: ${{ inputs.tooling_changed }}
 
       - name: Skip notification
         if: steps.should_run.outputs.run != 'true'
@@ -126,7 +131,7 @@ jobs:
           pnpm run check:server || { SERVER_OK=false; ISSUES_FOUND+=("Server formatting or PMD failed. Run: pnpm run check:server"); }
           pnpm run check:java-nullness \
             || { NULLNESS_OK=false; ISSUES_FOUND+=("Java nullness policy failed. Run: pnpm run check:java-nullness"); }
-          if [ "$SERVER_OK" = "true" ] && [ "${{ inputs.pmd_canary }}" = "true" ]; then
+          if [ "$SERVER_OK" = "true" ] && [ "${INPUTS_PMD_CANARY}" = "true" ]; then
             PMD_CANARY=server/application/src/main/java/de/tum/cit/aet/hephaestus/Application.java
             cp "$PMD_CANARY" "$RUNNER_TEMP/Application.java"
             trap 'cp "$RUNNER_TEMP/Application.java" "$PMD_CANARY"' EXIT
@@ -153,6 +158,8 @@ jobs:
             for issue in "${ISSUES_FOUND[@]}"; do echo "::error::$issue"; done
             exit 1
           fi
+        env:
+          INPUTS_PMD_CANARY: ${{ inputs.pmd_canary }}
 
       - name: Tooling and docs quality
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'tooling-quality'
@@ -268,9 +275,8 @@ jobs:
         continue-on-error: true
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'server-contracts' && always()
         run: |
-          # The base-sha tag is published by that commit's own main run, which can still be in
-          # flight when the base just advanced — fall back to building the identical Dockerfile.
-          if [[ "${{ inputs.postgres_image_changed }}" == "true" ]] ||
+          # The base image may still be publishing; build the same Dockerfile as fallback.
+          if [[ "${INPUTS_POSTGRES_IMAGE_CHANGED}" == "true" ]] ||
             ! docker pull ghcr.io/ls1intum/hephaestus/postgres:${{ github.event.pull_request.base.sha || github.sha }}; then
             docker build -t hephaestus-postgres:ci docker/postgres
           else
@@ -328,6 +334,8 @@ jobs:
             done
             exit 1
           fi
+        env:
+          INPUTS_POSTGRES_IMAGE_CHANGED: ${{ inputs.postgres_image_changed }}
 
       - name: Evaluate API and database contracts
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'server-contracts' && always()

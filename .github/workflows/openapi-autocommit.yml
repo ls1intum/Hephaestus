@@ -2,6 +2,7 @@ name: API
 
 on:
   pull_request_target: # zizmor: ignore[dangerous-triggers] PR code runs only in the read-only generate job.
+    branches: [main]
     types: [labeled]
 
 permissions: {}

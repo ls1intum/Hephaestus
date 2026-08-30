@@ -28,6 +28,11 @@ on:
         required: false
         type: string
         default: "false"
+    secrets:
+      CHROMATIC_PROJECT_TOKEN:
+        required: false
+      SURGE_TOKEN:
+        required: false
 
 permissions: {}
 
@@ -56,12 +61,14 @@ jobs:
         run: |
           rm -rf server/application/target/surefire-reports/*
           cd server
-          if [[ "${{ inputs.application_server_changed }}" == "true" ]]; then
+          if [[ "${INPUTS_APPLICATION_SERVER_CHANGED}" == "true" ]]; then
             ./mvnw -pl application -am package -Parchitecture-tests \
               -Dsurefire.includedGroups=unit,architecture -DskipCoverage=false --batch-mode
           else
             ./mvnw -pl application -am package -DskipTests --batch-mode
           fi
+        env:
+          INPUTS_APPLICATION_SERVER_CHANGED: ${{ inputs.application_server_changed }}
       - name: Validate built reactor
         run: |
           test -d server/application/target/classes
@@ -301,9 +308,8 @@ jobs:
         run: |
           pnpm install --frozen-lockfile
           pnpm --filter webapp exec playwright install chromium --with-deps
-          # The base-sha tag is published by that commit's own main run, which can still be in
-          # flight when the base just advanced — fall back to building the identical Dockerfile.
-          if [[ "${{ inputs.postgres_image_changed }}" == "true" ]] ||
+          # The base image may still be publishing; build the same Dockerfile as fallback.
+          if [[ "${INPUTS_POSTGRES_IMAGE_CHANGED}" == "true" ]] ||
             ! docker pull ghcr.io/ls1intum/hephaestus/postgres:${{ github.event.pull_request.base.sha || github.sha }}; then
             docker build -t ghcr.io/ls1intum/hephaestus/postgres:dev docker/postgres
           else
@@ -311,7 +317,18 @@ jobs:
           fi
           docker compose -f server/compose.yaml up -d --wait --no-build postgres
           cleanup() {
-            if [[ -n "${SERVER_PID:-}" ]]; then kill "${SERVER_PID}" 2>/dev/null || true; fi
+            if [[ -n "${SERVER_PID:-}" ]]; then
+              kill -TERM -- "-$SERVER_PID" 2>/dev/null || true
+              (sleep 10; kill -KILL -- "-$SERVER_PID" 2>/dev/null || true) &
+              KILL_WATCHDOG=$!
+              wait "$SERVER_PID" 2>/dev/null || true
+              if kill -0 -- "-$SERVER_PID" 2>/dev/null; then
+                wait "$KILL_WATCHDOG" 2>/dev/null || true
+              else
+                kill "$KILL_WATCHDOG" 2>/dev/null || true
+                wait "$KILL_WATCHDOG" 2>/dev/null || true
+              fi
+            fi
             docker compose -f server/compose.yaml down -v
           }
           trap cleanup EXIT
@@ -320,7 +337,7 @@ jobs:
           SERVER_JAR=${SERVER_JARS[0]}
           SERVER_PORT=8080 MANAGEMENT_PORT=8080 POSTGRES_PORT=5432 \
             SPRING_DOCKER_COMPOSE_ENABLED=false APPLICATION_HOST_URL=http://localhost:4200 \
-            java -jar "$SERVER_JAR" --spring.profiles.active=e2e,playwright > e2e-server.log 2>&1 &
+            setsid java -jar "$SERVER_JAR" --spring.profiles.active=e2e,playwright > e2e-server.log 2>&1 &
           SERVER_PID=$!
           timeout 5m bash -c 'until curl --fail --silent http://localhost:8080/actuator/health/liveness >/dev/null; do kill -0 '"${SERVER_PID}"' || exit 1; sleep 2; done'
           curl --fail --silent --show-error -X POST http://localhost:8080/auth/dev-login \
@@ -328,6 +345,8 @@ jobs:
           docker compose -f server/compose.yaml exec -T postgres \
             psql -v ON_ERROR_STOP=1 -U root -d hephaestus < webapp/e2e/seed.sql
           timeout --kill-after=30s 10m pnpm --filter webapp run test:e2e
+        env:
+          INPUTS_POSTGRES_IMAGE_CHANGED: ${{ inputs.postgres_image_changed }}
       - name: Upload diagnostics
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
