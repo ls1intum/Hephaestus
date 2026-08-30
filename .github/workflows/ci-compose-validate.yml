@@ -92,11 +92,15 @@ jobs:
           rendered=$(docker compose config)
           for required in \
             'security-headers@docker,request-body-limit@docker' \
-            'contentSecurityPolicy: default-src' \
-            'stsSeconds: "2592000"' \
-            'maxRequestBodyBytes: "26214400"' \
-            'minVersion: VersionTLS12'; do
-            grep -Fq "$required" <<< "$rendered" || {
+            'contentsecuritypolicy' \
+            'default-src' \
+            'stsseconds' \
+            '2592000' \
+            'maxrequestbodybytes' \
+            '26214400' \
+            'minversion' \
+            'versiontls12'; do
+            grep -Fiq "$required" <<< "$rendered" || {
               echo "::error::runtime edge envelope is missing '$required'"; exit 1; }
           done
           edge_csp=$(sed -n 's/.*contentSecurityPolicy=\(.*\)"/\1/p' ../compose.proxy.yaml)
