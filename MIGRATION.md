@@ -63,7 +63,7 @@ Before upgrading to any new `0.x.0` version:
 Entries exist only for releases that need operator action. Everything else is in the
 [release notes](https://github.com/ls1intum/Hephaestus/releases).
 
-### Next minor release
+### Next release
 
 #### 🔴 Integration credentials use a dedicated encryption key
 
@@ -95,6 +95,15 @@ for `docker compose logs` itself — the lines are still printed to the console,
 **Migration**: point existing parsers at the JSON fields instead of the plain-text layout. Filters
 that matched free text can key on `mdc."job.id"` and `mdc."workspace.id"`; see the log-correlation
 examples in the practice-review operations guide.
+
+#### 🔴 Restore PostgreSQL 17 data into PostgreSQL 18 before starting the stack
+
+**Affected**: operators upgrading a self-hosted deployment whose database volume was initialized by
+the bundled PostgreSQL 17 image.
+
+**Migration**: before starting this release, follow the
+[Backup & Restore](https://ls1intum.github.io/Hephaestus/admin/backup-restore#postgresql-17-to-18).
+Keep the PostgreSQL 17 volume until the upgraded deployment passes its acceptance checks.
 
 ### v0.76.0
 

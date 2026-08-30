@@ -295,6 +295,8 @@ jobs:
             exit 1
           fi
 
+          pnpm run test:postgres-upgrade
+
           ISSUES_FOUND=()
 
           # draft-changelog first applies the full master.xml chain to the empty DB via

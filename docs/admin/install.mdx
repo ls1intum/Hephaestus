@@ -17,7 +17,7 @@ The stack you get:
 | `webapp` | React SPA served by nginx |
 | `application-server` | Spring Boot API + in-process job worker |
 | `webhook-server` | Same image, webhook profile — keeps receiving events while the app restarts |
-| `postgres` | PostgreSQL 17 + pg_partman (custom image — vanilla `postgres:17` is **not** a drop-in) |
+| `postgres` | PostgreSQL 18 + pg_partman (custom image — vanilla `postgres:18` is **not** a drop-in) |
 | `nats-server` | NATS JetStream event buffer |
 
 ## Requirements
@@ -219,9 +219,10 @@ node scripts/prepare-release-lock.ts "v$VERSION"
 cd docker/self-host && docker compose --env-file .env --env-file release-lock.env pull && docker compose --env-file .env --env-file release-lock.env up -d
 ```
 
-Compare your `.env` against the new release's `.env.example` for added variables. A release
-that changes the bundled PostgreSQL major version needs a dump and restore, not an in-place
-upgrade — such releases say so in their notes.
+Compare your `.env` against the new release's `.env.example` for added variables. When a release
+changes the PostgreSQL major version, follow its entry in
+[`MIGRATION.md`](https://github.com/ls1intum/Hephaestus/blob/main/MIGRATION.md) before starting the new
+stack.
 
 ## Rollback
 
