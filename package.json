@@ -30,6 +30,7 @@
 		"test:server:verification": "cd server && ./mvnw -pl application -am package -Dspring-boot.repackage.skip=true -Parchitecture-tests -Dsurefire.includedGroups=unit,architecture -DskipCoverage=false --batch-mode",
 		"test:server:integration": "cd server && ./mvnw -pl application -am package -Dspring-boot.repackage.skip=true -Dsurefire.includedGroups=integration -Dparallel=none --batch-mode",
 		"test:server:mutation": "node scripts/run-security-mutations.ts",
+		"test:postgres-upgrade": "node scripts/postgres-major-upgrade-test.ts",
 		"test:load:syntax": "docker run --rm -v \"$PWD/load-tests:/tests:ro\" grafana/k6:1.2.3@sha256:4f82892217f3110cb233e2b2622bcc97fabc70f14bd241fbfbfe7305105c68aa inspect -e BASE_URL=http://example.test -e WEBHOOK_SECRET=abcdefghijklmnopqrstuvwxyz123456 /tests/webhook-burst.js >/dev/null && docker run --rm -v \"$PWD/load-tests:/tests:ro\" grafana/k6:1.2.3@sha256:4f82892217f3110cb233e2b2622bcc97fabc70f14bd241fbfbfe7305105c68aa inspect -e API_BASE_URL=http://example.test/api -e AUTH_TOKEN=test -e WORKSPACE_SLUG=test -e ARTIFACT_IDS=1,2 /tests/detection-mentor.js >/dev/null",
 		"summarize:test-results": "node scripts/summarize-test-results.ts",
 		"build:webapp": "pnpm --filter webapp run build",

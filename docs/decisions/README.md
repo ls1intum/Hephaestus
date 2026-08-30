@@ -76,5 +76,6 @@ do, its home is the Admin Guide (`docs/admin/`) and the runbook links to it.
 | [0035](0035-pull-request-previews-are-label-gated.md) | Pull request previews are label-gated and driven from the default branch | Accepted |
 | [0036](0036-agent-runtime-runs-on-node-24.md) | Agent runtime runs on Node.js 24 with bounded resources | Accepted |
 | [0037](0037-node-24-and-pnpm-12-are-the-javascript-toolchain.md) | Node.js 24 and pnpm 12 are the JavaScript toolchain | Accepted |
+| [0038](0038-postgresql-18-release-baseline.md) | PostgreSQL 18 is the qualified release baseline | Accepted |
 
 Template: [0000-template.md](0000-template.md).

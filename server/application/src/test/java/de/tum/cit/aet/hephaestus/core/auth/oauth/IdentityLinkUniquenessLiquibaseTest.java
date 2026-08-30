@@ -32,8 +32,7 @@ import org.junit.jupiter.api.Test;
  * <p>That difference is load-bearing: it is the index violation that makes
  * {@link AccountProvisioningService}'s concurrent-first-login loser read-after-conflict and return
  * the winner instead of minting a duplicate account. A unit/ddl-auto test cannot see it, so this
- * raw-JDBC test runs the real {@code db/master.xml} on a stock {@code postgres:16} and asserts the
- * index semantics directly.
+ * raw-JDBC test runs {@code db/master.xml} and asserts the index semantics directly.
  */
 @Tag("database")
 class IdentityLinkUniquenessLiquibaseTest {

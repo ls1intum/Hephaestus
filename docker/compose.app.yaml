@@ -438,7 +438,7 @@ services:
           - postgres
     restart: unless-stopped
     volumes:
-      - postgresql-data:/var/lib/postgresql/data
+      - postgresql-data-v18:/var/lib/postgresql
     healthcheck:
       test:
         - CMD-SHELL
@@ -461,5 +461,5 @@ networks:
     driver: bridge
 
 volumes:
-  postgresql-data:
+  postgresql-data-v18:
   git-repos:

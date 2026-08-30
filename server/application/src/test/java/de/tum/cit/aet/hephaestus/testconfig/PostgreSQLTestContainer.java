@@ -115,7 +115,7 @@ public final class PostgreSQLTestContainer {
 
     @SuppressWarnings("resource") // Closed by the JVM shutdown hook.
     private static PostgreSQLContainer<?> createContainer() {
-        PostgreSQLContainer<?> newContainer = new PostgreSQLContainer<>("postgres:16")
+        PostgreSQLContainer<?> newContainer = new PostgreSQLContainer<>("postgres:18")
                 .withDatabaseName(DEFAULT_TEST_DB)
                 .withUsername(DEFAULT_TEST_USER)
                 .withPassword(DEFAULT_TEST_PASSWORD);
