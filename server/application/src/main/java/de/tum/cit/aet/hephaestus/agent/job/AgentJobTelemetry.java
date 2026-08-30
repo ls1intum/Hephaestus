@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
+import de.tum.cit.aet.hephaestus.observability.StructuredLogKeys;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -83,8 +84,8 @@ final class AgentJobTelemetry {
     static void queued(AgentJob job) {
         log.atInfo()
                 .addKeyValue("event.name", "agent.job.queued")
-                .addKeyValue("job.id", job.getId())
-                .addKeyValue("workspace.id", job.getWorkspace().getId())
+                .addKeyValue(StructuredLogKeys.JOB_ID, job.getId())
+                .addKeyValue(StructuredLogKeys.WORKSPACE_ID, job.getWorkspace().getId())
                 .addKeyValue("job.type", job.getJobType())
                 .addKeyValue("job.phase", Phase.QUEUE.tag)
                 .addKeyValue("job.outcome", "queued")
@@ -95,8 +96,8 @@ final class AgentJobTelemetry {
     void transition(AgentJob job, String event, Phase phase, Outcome outcome, Duration duration) {
         log.atInfo()
                 .addKeyValue("event.name", event)
-                .addKeyValue("job.id", job.getId())
-                .addKeyValue("workspace.id", job.getWorkspace().getId())
+                .addKeyValue(StructuredLogKeys.JOB_ID, job.getId())
+                .addKeyValue(StructuredLogKeys.WORKSPACE_ID, job.getWorkspace().getId())
                 .addKeyValue("job.type", job.getJobType())
                 .addKeyValue("job.phase", phase.tag)
                 .addKeyValue("job.outcome", outcome.tag)
