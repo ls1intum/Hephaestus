@@ -35,6 +35,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
+import de.tum.cit.aet.hephaestus.observability.StructuredLogKeys;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -103,7 +104,7 @@ public class AgentJobExecutor {
 
     private static final Logger log = LoggerFactory.getLogger(AgentJobExecutor.class);
 
-    private static final String MDC_JOB_ID = "agent.jobId";
+    private static final String MDC_JOB_ID = StructuredLogKeys.JOB_ID;
     private static final String MDC_JOB_TYPE = "agent.jobType";
     private static final int MAX_ERROR_MESSAGE_LENGTH = 4000;
     private static final int MAX_CONTAINER_LOGS_CHARS = 65536; // 64KB
@@ -564,6 +565,7 @@ public class AgentJobExecutor {
     private void runClaimedJob(UUID jobId, ClaimResult claim) {
         MDC.put(MDC_JOB_ID, jobId.toString());
         AgentJob job = claim.job;
+        MDC.put(StructuredLogKeys.WORKSPACE_ID, job.getWorkspace().getId().toString());
         MDC.put(MDC_JOB_TYPE, job.getJobType().name());
         Instant startTime = Instant.now();
         String metricOutcome = "unknown";
@@ -630,6 +632,7 @@ public class AgentJobExecutor {
             releaseCapacity();
             localRunningJobs.remove(jobId);
             MDC.remove(MDC_JOB_ID);
+            MDC.remove(StructuredLogKeys.WORKSPACE_ID);
             MDC.remove(MDC_JOB_TYPE);
         }
     }

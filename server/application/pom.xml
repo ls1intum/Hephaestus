@@ -52,6 +52,7 @@
         <springdoc.version>3.1.0</springdoc.version>
         <springdoc-maven-plugin.version>1.5</springdoc-maven-plugin.version>
         <sentry.version>8.53.0</sentry.version>
+        <logstash-logback-encoder.version>9.0</logstash-logback-encoder.version>
         <slack-bolt.version>1.50.0</slack-bolt.version>
         <jnats.version>2.26.2</jnats.version>
         <jgit.version>7.7.1.202607240634-r</jgit.version>
@@ -78,6 +79,19 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>${logstash-logback-encoder.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>context-propagation</artifactId>
         </dependency>
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>

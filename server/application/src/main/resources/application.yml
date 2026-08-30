@@ -18,6 +18,9 @@ spring:
         virtual:
             enabled: true
 
+    reactor:
+        context-propagation: auto
+
     # Virtual threads are always daemons. With virtual threads enabled, both the request executor
     # and the @Scheduled TaskScheduler use them — so no non-daemon thread remains after main().
     # keep-alive registers one to hold the JVM open between cron firings.

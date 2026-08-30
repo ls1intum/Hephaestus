@@ -77,6 +77,19 @@ visible in **Review activity** and the refusal counter; they do not remove the w
 Gauges are sampled periodically; timers and counters are recorded when the corresponding event occurs.
 Metric names in the instrumented code are the source of truth for dashboards and alerts.
 
+### Log correlation
+
+Collector labels are deployment-specific. In these examples, replace the stream selector with one that
+selects the worker logs in your deployment:
+
+```logql
+{container="application-worker"} | json job_id=`mdc["job.id"]` | job_id="<job-uuid>"
+```
+
+```logql
+{container="application-worker"} | json workspace_id=`mdc["workspace.id"]` | workspace_id="<workspace-id>" | level="ERROR"
+```
+
 **Retention.** Terminal job payloads are stripped before their rows are deleted, so row retention shorter
 than payload retention is incoherent — the application refuses to start rather than accept it. Treat the
 fabric root as sensitive storage. Delivery-policy evaluations and dispatch intents follow their owning
