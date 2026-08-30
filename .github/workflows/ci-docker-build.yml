@@ -2,6 +2,13 @@ name: Docker
 
 on:
   workflow_call:
+    secrets:
+      SENTRY_AUTH_TOKEN:
+        required: false
+      SENTRY_ORG:
+        required: false
+      SENTRY_PROJECT:
+        required: false
     inputs:
       should_skip:
         description: "Whether to skip the workflow"
@@ -48,6 +55,10 @@ jobs:
       packages: write
       id-token: write
       attestations: write
+    secrets:
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
     with:
       image-name: "ls1intum/hephaestus/webapp"
       docker-file: "./webapp/Dockerfile"

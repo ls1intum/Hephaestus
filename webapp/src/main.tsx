@@ -6,6 +6,7 @@ import ReactDOM from "react-dom/client";
 
 import { client } from "@/api/client.gen";
 import environment from "@/environment";
+import { RouteError } from "@/integrations/sentry/RouteError";
 
 import "./styles.css";
 
@@ -70,6 +71,7 @@ const router = createRouter({
 	scrollRestorationBehavior: "instant",
 	defaultStructuralSharing: true,
 	defaultPreloadStaleTime: 0,
+	defaultErrorComponent: RouteError,
 });
 
 // Register the router instance for type safety
@@ -141,10 +143,9 @@ const rootElement = document.getElementById("app");
 if (rootElement && !rootElement.innerHTML) {
 	const root = ReactDOM.createRoot(rootElement, {
 		onUncaughtError: Sentry.reactErrorHandler((error, errorInfo) => {
-			// oxlint-disable-next-line no-console -- Supplying `onUncaughtError` replaces React's own console report, so without this line an uncaught render error leaves nothing in the browser console for a developer with devtools open; the component stack is available nowhere else on the page.
+			// oxlint-disable-next-line no-console -- The custom handler replaces React's console report.
 			console.warn("Uncaught error", error, errorInfo.componentStack);
 		}),
-		onCaughtError: Sentry.reactErrorHandler(),
 		onRecoverableError: Sentry.reactErrorHandler(),
 	});
 	root.render(

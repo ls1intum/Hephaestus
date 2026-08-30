@@ -42,10 +42,15 @@ public class SentryConfiguration {
 
             Sentry.init(options -> {
                 options.setDsn(dsn);
-                options.setSendDefaultPii(true);
+                options.setSendDefaultPii(false);
+                options.setBeforeSend((event, hint) -> {
+                    event.setUser(null);
+                    event.setRequest(null);
+                    event.setBreadcrumbs(null);
+                    return event;
+                });
                 options.setEnvironment(getEnvironment());
                 options.setRelease(hephaestusVersion);
-                options.setTracesSampleRate(getTracesSampleRate());
             });
 
             log.info("Initialized Sentry");
@@ -62,13 +67,5 @@ public class SentryConfiguration {
         } else {
             return "local";
         }
-    }
-
-    private double getTracesSampleRate() {
-        return switch (getEnvironment()) {
-            case "test" -> 1.0;
-            case "prod" -> 0.2;
-            default -> 0.0;
-        };
     }
 }
