@@ -2,8 +2,7 @@
 # environment (Alpine has no partman package). No shared_preload_libraries: maintenance runs as plain
 # SQL from the app scheduler, so this stays stock Postgres + one extension. See ADR 0018 and ADR 0038.
 ARG PG_MAJOR=18
-# The digest is the multi-platform OCI index for 18-bookworm; refresh it when bumping the tag.
-FROM postgres:${PG_MAJOR}-bookworm@sha256:1c59e2c3c818eaa0f0628f695b36e7c9e362d6b219b36a54a32df645cbd7e1af
+FROM postgres:${PG_MAJOR}-bookworm
 ARG PG_MAJOR=18
 # Pinned for reproducibility (PGDG bookworm pool). Bump deliberately.
 ARG PARTMAN_VERSION=5.5.0-1.pgdg12+1
