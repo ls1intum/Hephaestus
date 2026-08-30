@@ -6,7 +6,7 @@
 
 @source "../node_modules/streamdown/dist/index.js";
 
-@plugin "tailwindcss-animate";
+@import "tw-animate-css";
 @plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
