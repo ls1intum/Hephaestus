@@ -78,6 +78,7 @@ jobs:
               - 'bunfig.toml'
             application-server:
               - 'server/**'
+              - 'load-tests/**'
               # Repository tooling runs on the App Server or Database leg.
               - 'scripts/**'
               # test:agents and typecheck:agents cover the precompute tree.

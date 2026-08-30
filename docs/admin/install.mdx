@@ -38,11 +38,17 @@ Each release is qualified on both matrix cells before publication.
 Only the listed native hosts and the unmodified self-hosted Compose topology are supported. All other
 hosts, runtimes, and topologies are outside release qualification.
 
-- **4 vCPUs, 8 GB RAM, 40 GB SSD** recommended. Absolute floor: 2 vCPUs / **8 GB RAM** — the two JVMs
+- **4 vCPUs, 8 GB RAM, 40 GB SSD** is the conservative recommended starting point. Absolute floor:
+  2 vCPUs / **8 GB RAM** — the two JVMs
   ship with container memory limits of 5 GB (`application-server`) and 2 GB (`webhook-server`), so a
   smaller host does not swap, it OOM-kills. On a host below that, lower both limits before the first
   start: set `APPLICATION_SERVER_MEM_LIMIT` and `WEBHOOK_SERVER_MEM_LIMIT` in `.env` (each JVM sizes
   its heap from its own limit, so lowering the limit lowers the heap with it).
+- These are deployment limits, not a claim that every workload fits. Before raising webhook volume,
+  mentor concurrency, or `SANDBOX_MAX_CONCURRENT`, reproduce the release's
+  [Compose capacity qualification](https://github.com/ls1intum/Hephaestus/tree/main/load-tests) on
+  your host shape. A release baseline is valid only when it includes the raw k6 and container-resource
+  evidence described there; absent that evidence, keep the conservative defaults above.
 - **AI practice review adds real memory**: each concurrent review sandbox may use up to
   4 GiB. The default caps it at 1 concurrent sandbox; raise
   `SANDBOX_MAX_CONCURRENT` only with RAM to match.
