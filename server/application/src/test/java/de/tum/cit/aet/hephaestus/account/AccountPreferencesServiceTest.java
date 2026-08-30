@@ -1,15 +1,9 @@
 package de.tum.cit.aet.hephaestus.account;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
-import de.tum.cit.aet.hephaestus.analytics.posthog.PosthogClient;
-import de.tum.cit.aet.hephaestus.analytics.posthog.PosthogClientException;
 import de.tum.cit.aet.hephaestus.core.auth.spi.ConsentSource;
 import de.tum.cit.aet.hephaestus.core.auth.spi.ResearchConsentAudit;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -18,32 +12,18 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.Mock;
 import org.springframework.beans.factory.ObjectProvider;
 
-/**
- * Research opt-out SPI. Deterministic: mocks lock the <strong>lenient</strong> {@code setForLogin} contract —
- * a missing analytics subject or a PostHog failure never fails the opt-out (contrast {@code updateUserSettings},
- * which throws {@code BAD_REQUEST}/{@code BAD_GATEWAY}), and an opt-out always appends the audit event.
- */
 class AccountPreferencesServiceTest extends BaseUnitTest {
-
     @Mock
-    private UserPreferencesRepository userPreferencesRepository;
+    private UserPreferencesRepository preferencesRepository;
 
     @Mock
     private UserRepository userRepository;
 
     @Mock
-    private ObjectProvider<PosthogClient> posthogClientProvider;
-
-    @Mock
-    private ObjectProvider<ResearchConsentAudit> researchConsentAuditProvider;
-
-    @Mock
-    private PosthogClient posthogClient;
+    private ObjectProvider<ResearchConsentAudit> auditProvider;
 
     @Mock
     private ResearchConsentAudit audit;
@@ -52,100 +32,61 @@ class AccountPreferencesServiceTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        service = new AccountPreferencesService(
-                userPreferencesRepository, userRepository, posthogClientProvider, researchConsentAuditProvider);
+        service = new AccountPreferencesService(preferencesRepository, userRepository, auditProvider);
     }
 
-    private static User user(long id, String login) {
-        User u = new User();
-        u.setId(id);
-        u.setLogin(login);
-        return u;
-    }
+    @Test
+    void shouldPersistAndAuditResearchOptOut() {
+        User user = user();
+        UserPreferences preferences = preferences(user, true);
+        when(userRepository.findByLogin("octocat")).thenReturn(Optional.of(user));
+        when(preferencesRepository.findByUserId(42L)).thenReturn(Optional.of(preferences));
+        when(auditProvider.getIfAvailable()).thenReturn(audit);
 
-    private UserPreferences prefs(User u, boolean participate) {
-        UserPreferences p = new UserPreferences(u);
-        p.setParticipateInResearch(participate);
-        return p;
-    }
+        service.setForLogin("octocat", false, ConsentSource.SLACK_APP_HOME);
 
-    private enum PosthogOutcome {
-        RETURNS_FALSE,
-        THROWS,
-    }
-
-    @ParameterizedTest
-    @EnumSource(PosthogOutcome.class)
-    void optOut_posthogNoMatchOrFailure_stillSucceeds_andWritesAudit(PosthogOutcome outcome) {
-        User u = user(42L, "octocat");
-        UserPreferences p = prefs(u, true);
-        when(userRepository.findByLogin("octocat")).thenReturn(Optional.of(u));
-        when(userPreferencesRepository.findByUserId(42L)).thenReturn(Optional.of(p));
-        when(posthogClientProvider.getIfAvailable()).thenReturn(posthogClient);
-        // Fallback (user-id) distinct id: no matching person (false) or a PostHog outage — neither may fail the
-        // opt-out.
-        switch (outcome) {
-            case RETURNS_FALSE -> when(posthogClient.deletePersonData("42")).thenReturn(false);
-            case THROWS ->
-                when(posthogClient.deletePersonData("42")).thenThrow(new PosthogClientException("posthog down"));
-        }
-        when(researchConsentAuditProvider.getIfAvailable()).thenReturn(audit);
-
-        assertThatCode(() -> service.setForLogin("octocat", false, ConsentSource.SLACK_APP_HOME))
-                .doesNotThrowAnyException();
-
-        assertThat(p.isParticipateInResearch()).isFalse();
-        verify(userPreferencesRepository).save(p);
-        verify(posthogClient).deletePersonData("42"); // subjectId absent → falls back to the user id
+        assertThat(preferences.isParticipateInResearch()).isFalse();
+        verify(preferencesRepository).save(preferences);
         verify(audit).recordOptOut("octocat", ConsentSource.SLACK_APP_HOME);
     }
 
     @Test
-    void optOut_withPosthogAndAuditDisabled_stillSucceeds() {
-        User u = user(42L, "octocat");
-        UserPreferences p = prefs(u, true);
-        when(userRepository.findByLogin("octocat")).thenReturn(Optional.of(u));
-        when(userPreferencesRepository.findByUserId(42L)).thenReturn(Optional.of(p));
-        when(posthogClientProvider.getIfAvailable()).thenReturn(null); // analytics disabled off-server-role
-        when(researchConsentAuditProvider.getIfAvailable()).thenReturn(null); // audit adapter absent
-
-        assertThatCode(() -> service.setForLogin("octocat", false, ConsentSource.SLACK_APP_HOME))
-                .doesNotThrowAnyException();
-
-        assertThat(p.isParticipateInResearch()).isFalse();
-        verify(userPreferencesRepository).save(p);
-    }
-
-    @Test
-    void optIn_doesNotRevokeOrAudit() {
-        User u = user(42L, "octocat");
-        UserPreferences p = prefs(u, false);
-        when(userRepository.findByLogin("octocat")).thenReturn(Optional.of(u));
-        when(userPreferencesRepository.findByUserId(42L)).thenReturn(Optional.of(p));
+    void shouldNotAuditResearchOptIn() {
+        User user = user();
+        UserPreferences preferences = preferences(user, false);
+        when(userRepository.findByLogin("octocat")).thenReturn(Optional.of(user));
+        when(preferencesRepository.findByUserId(42L)).thenReturn(Optional.of(preferences));
 
         service.setForLogin("octocat", true, ConsentSource.SETTINGS_UI);
 
-        assertThat(p.isParticipateInResearch()).isTrue();
-        verify(userPreferencesRepository).save(p);
-        verifyNoInteractions(posthogClientProvider, researchConsentAuditProvider);
+        assertThat(preferences.isParticipateInResearch()).isTrue();
+        verifyNoInteractions(auditProvider);
     }
 
     @Test
-    void blankLogin_isNoOp() {
+    void shouldIgnoreBlankLogin() {
         service.setForLogin("   ", false, ConsentSource.SLACK_APP_HOME);
-
-        verifyNoInteractions(
-                userRepository, userPreferencesRepository, posthogClientProvider, researchConsentAuditProvider);
+        verifyNoInteractions(userRepository, preferencesRepository, auditProvider);
     }
 
     @Test
-    void unknownLogin_isLenientNoOp() {
+    void shouldIgnoreUnknownLogin() {
         when(userRepository.findByLogin("ghost")).thenReturn(Optional.empty());
+        service.setForLogin("ghost", false, ConsentSource.SLACK_APP_HOME);
+        verify(preferencesRepository, never()).save(any());
+        verifyNoInteractions(auditProvider);
+    }
 
-        assertThatCode(() -> service.setForLogin("ghost", false, ConsentSource.SLACK_APP_HOME))
-                .doesNotThrowAnyException();
+    private static User user() {
+        User user = new User();
+        user.setId(42L);
+        user.setLogin("octocat");
+        return user;
+    }
 
-        verify(userPreferencesRepository, never()).save(any());
-        verifyNoInteractions(researchConsentAuditProvider);
+    private static UserPreferences preferences(User user, boolean participates) {
+        UserPreferences preferences = new UserPreferences(user);
+        preferences.setParticipateInResearch(participates);
+        return preferences;
     }
 }

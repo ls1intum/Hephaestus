@@ -130,7 +130,6 @@ or on "the only" result, and never write cleanup that another test depends on ha
 - **`EntityManager` is injected as a `@PersistenceContext` field**, not through the constructor
   (`WorkspaceMembershipService`, `GitHubUserProcessor`). Everything else is constructor injection via
   `@RequiredArgsConstructor`.
-- **Optional integrations are `ObjectProvider<T>`, not `@Autowired(required=false)`.** `PosthogClient`
   is gated by `@ConditionalOnProperty`; tolerant consumers (`AccountService`,
   `LeaderboardTaskScheduler`) take `ObjectProvider`. A bean that is not gated the same way will
   crash-loop the `worker` and `webhook` runtimes, which start a different slice of the context.

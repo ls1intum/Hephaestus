@@ -391,6 +391,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
         @Test
         void objectProviderUsageIsLimited() {
             Set<String> knownCycleBreakers = Set.of(
+                    "AccountPreferencesService",
                     "WorkspaceActivationService",
                     "GithubLifecycleListener", // IntegrationNatsConsumer absent under the webhook runtime role
                     // (server.enabled=false) — see ADR 0008
@@ -409,8 +410,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     "GitlabDataSyncScheduler", // Optional GitLab beans gated by @ConditionalOnProperty
                     "GitLabHistoricalBackfillService", // Optional GitLab beans gated by @ConditionalOnProperty
                     "HistoricalBackfillScheduler", // Optional GitLab backfill service gated by @ConditionalOnProperty
-                    "AccountPreferencesService", // PosthogClient is optional, gated by
-                    // @ConditionalOnProperty(hephaestus.posthog.enabled=true)
                     "GitHubWorkspaceDataSyncTrigger", // Lazy-loads GithubDataSyncService + SyncTargetProvider to break
                     // the same circular reference WorkspaceProvisioningAdapter
                     // handled; the workspace-side trigger sits on the GitHub adapter

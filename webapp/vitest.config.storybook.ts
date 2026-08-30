@@ -30,7 +30,6 @@ export default defineConfig({
 		noDiscovery: true,
 		include: [
 			...runtimeDeps.filter((dependency) => dependency !== "@monaco-editor/react"),
-			"posthog-js/react",
 			"use-sync-external-store/shim",
 			"use-sync-external-store/shim/with-selector",
 		],

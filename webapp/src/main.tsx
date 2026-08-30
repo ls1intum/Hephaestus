@@ -1,6 +1,5 @@
 import * as Sentry from "@sentry/react";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
-import { PostHogProvider } from "posthog-js/react";
 import { StrictMode, useEffect } from "react";
 import ReactDOM from "react-dom/client";
 
@@ -15,12 +14,6 @@ import { handlePossibleSessionExpiry } from "@/integrations/auth/session-expiry"
 import { SessionKeepAlive } from "@/integrations/auth/use-session-keep-alive";
 import { useCookieConsent } from "@/integrations/consent";
 import { TanstackDevtools } from "@/integrations/devtools/TanstackDevtools";
-import { PostHogIdentity } from "@/integrations/posthog";
-import {
-	isPosthogEnabled,
-	posthogOptions,
-	posthogProjectApiKey,
-} from "@/integrations/posthog/config";
 import { disableSentry, initSentry } from "@/integrations/sentry";
 import { ThemeProvider } from "@/integrations/theme";
 import { useImpersonationStore } from "@/stores/impersonation-store";
@@ -98,23 +91,10 @@ function WrappedRouterProvider() {
 	return <RouterProvider router={router} context={{ ...TanstackQuery.getContext(), auth }} />;
 }
 
-/**
- * App root. Tracking integrations are consent-gated (ADR 0017 cookie consent):
- *  - Sentry initializes only once error-monitoring consent is granted (and a DSN is configured).
- *  - PostHog is only mounted (PostHogProvider) when analytics consent is granted AND PostHog is
- *    enabled via its env flag. The PostHogProvider already opts out of capturing by default and
- *    PostHogIdentity gates opt-in on the per-user research setting, so consent is an ADDITIONAL,
- *    ANDed gate. When consent is withdrawn the provider unmounts on the next decision.
- */
 function Root() {
 	const consent = useCookieConsent();
 	const errorMonitoring = consent?.errorMonitoring === true;
 
-	// Sentry follows the consent decision as an effect (never as a render side effect): init when
-	// error-monitoring consent is granted, tear down when it is withdrawn. Both calls are
-	// idempotent, so re-running on any consent change is safe. This mirrors PostHog's
-	// mount/unmount gating below — withdrawing consent must actually STOP capture, not just
-	// avoid the first init.
 	useEffect(() => {
 		if (errorMonitoring) {
 			initSentry();
@@ -123,12 +103,9 @@ function Root() {
 		}
 	}, [errorMonitoring]);
 
-	const analyticsEnabled = isPosthogEnabled && consent?.analytics === true;
-
-	const app = (
+	return (
 		<TanstackQuery.Provider>
 			<AuthProvider>
-				{analyticsEnabled ? <PostHogIdentity /> : null}
 				{/* Proactively rotates the access cookie before it expires (only while active), so an
 				    active user is never auto-logged-out and an idle session still times out. */}
 				<SessionKeepAlive />
@@ -139,16 +116,6 @@ function Root() {
 			</AuthProvider>
 		</TanstackQuery.Provider>
 	);
-
-	if (analyticsEnabled) {
-		return (
-			<PostHogProvider apiKey={posthogProjectApiKey} options={posthogOptions}>
-				{app}
-			</PostHogProvider>
-		);
-	}
-
-	return app;
 }
 
 const rootElement = document.getElementById("app");

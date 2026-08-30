@@ -37,7 +37,6 @@ const config: StorybookConfig = {
 			"@tanstack/react-query-devtools",
 			"@tanstack/react-router-devtools",
 			"ai",
-			"posthog-js/react",
 			"uuid",
 		];
 		return viteConfig;

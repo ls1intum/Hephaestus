@@ -116,10 +116,6 @@ Detail of the substrate packages:
   `Type.OPEN` by empirical necessity — the leaderboard fan-out crosses module
   boundaries; full CLOSED is deferred. Opt-in (matchIfMissing=false).
 
-`analytics/` is a sibling of `integration/`, not under it. PostHog is
-product analytics, not a vendor integration. Naming the package after the
-capability avoids the `integration/` vs `integrations/` foot-gun.
-
 The SPI in `integration/core/spi/` is organised on three axes — **lifecycle**
 (provisioning + membership listeners, `ConnectionStrategy`), **wire** (signature
 verification, subject parsing, token/credential sources), and **capability**

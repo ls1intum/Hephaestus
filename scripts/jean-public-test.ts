@@ -65,7 +65,23 @@ async function gateway(): Promise<string> {
 async function writeConfigs(): Promise<void> {
 	await writeFile(
 		join(root, "webapp/dist/env-config.js"),
-		`window.__ENV__ = ${JSON.stringify({ APPLICATION_VERSION: "DEV-public-test", APPLICATION_CLIENT_URL: origin, APPLICATION_SERVER_URL: `${origin}/api`, XSRF_COOKIE_NAME: "__Host-XSRF-TOKEN", SENTRY_ENVIRONMENT: "local-public-test", SENTRY_DSN: "", POSTHOG_ENABLED: "false", POSTHOG_PROJECT_API_KEY: "", POSTHOG_API_HOST: "", LEGAL_PROFILE: "", TANSTACK_DEVTOOLS_ENABLED: "false", GIT_BRANCH: (await output("git", ["branch", "--show-current"], { cwd: root })).trim(), GIT_COMMIT: (await output("git", ["rev-parse", "--short", "HEAD"], { cwd: root })).trim(), DEPLOYED_AT: new Date().toISOString() }, undefined, 2)};\n`,
+		`window.__ENV__ = ${JSON.stringify(
+			{
+				APPLICATION_VERSION: "DEV-public-test",
+				APPLICATION_CLIENT_URL: origin,
+				APPLICATION_SERVER_URL: `${origin}/api`,
+				XSRF_COOKIE_NAME: "__Host-XSRF-TOKEN",
+				SENTRY_ENVIRONMENT: "local-public-test",
+				SENTRY_DSN: "",
+				LEGAL_PROFILE: "",
+				TANSTACK_DEVTOOLS_ENABLED: "false",
+				GIT_BRANCH: (await output("git", ["branch", "--show-current"], { cwd: root })).trim(),
+				GIT_COMMIT: (await output("git", ["rev-parse", "--short", "HEAD"], { cwd: root })).trim(),
+				DEPLOYED_AT: new Date().toISOString(),
+			},
+			undefined,
+			2,
+		)};\n`,
 	);
 	await writeFile(
 		nginxFile,

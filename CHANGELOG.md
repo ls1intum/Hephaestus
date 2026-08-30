@@ -1102,7 +1102,6 @@
 
   The user guide now matches the shipped multi-workspace GitHub and GitLab setup, current Heph chat, practice-feedback delivery, optional leaderboard and leagues, and configurable Slack digest. Account settings now state clearly that turning off pull-request comments controls delivery only; reviews still run and observations remain available to workspace admins.
 
-  The TUM privacy statement now describes the self-service data export, consent-gated PostHog and Sentry storage, comment-delivery preference, and absence of HTTP access logs as implemented.
 
 - When a review has more to say than one comment can hold, the suggestions that survive are now chosen by how much of your change they were actually seen in, rather than by how sure the reviewer said it felt. Previously every observation carried a self-reported confidence score, and that score decided which suggestions made the cut and which strength got acknowledged. Measured across 580 real observations it never once dropped below 90% and was a flat 100% more than half the time — so it was deciding those cuts on noise. It is gone.
 

@@ -17,7 +17,6 @@ import org.junit.jupiter.api.Test;
  *   <li><b>config</b> - Application configuration</li>
  *   <li><b>core</b> - Shared core utilities</li>
  *   <li><b>shared</b> - Cross-cutting shared code</li>
- *   <li><b>analytics</b> - Product analytics adapters (PostHog)</li>
  * </ul>
  *
  * @see ArchitectureTestConstants
@@ -203,32 +202,6 @@ class CrossCuttingModuleBoundaryTest extends HephaestusArchitectureTest {
     }
 
     // ANALYTICS MODULE ISOLATION
-
-    @Nested
-    class AnalyticsModuleTests {
-
-        /**
-         * Analytics module should not depend on feature module internals.
-         *
-         * <p>Analytics adapters (PostHog) are outbound clients. Feature modules
-         * may consume them; they must not pull feature internals.
-         */
-        @Test
-        void analyticsDoesNotDependOnFeatureInternals() {
-            ArchRule rule = noClasses()
-                    .that()
-                    .resideInAPackage("..analytics..")
-                    .should()
-                    .dependOnClassesThat()
-                    .resideInAnyPackage(
-                            "..leaderboard..service..",
-                            "..activity..service..",
-                            "..mentor..service..",
-                            "..profile..service..")
-                    .because("Analytics adapters are consumed by features, not vice versa");
-            rule.check(classes);
-        }
-    }
 
     // CONFIG MODULE ISOLATION
 

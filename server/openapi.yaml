@@ -1442,6 +1442,143 @@ paths:
       summary: "Exclude a practice from new workspaces, or include it again"
       tags:
       - Admin Practice Catalog
+  /admin/product-feedback:
+    get:
+      operationId: adminListProductFeedback
+      parameters:
+      - description: Zero-based page index (0..N)
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - description: The size of the page to be returned
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          default: 50
+          minimum: 1
+      - description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedModelFeedbackItem"
+          description: OK
+      summary: List recent free-text product feedback
+      tags:
+      - feedback-admin
+  /admin/product-feedback/responses:
+    get:
+      operationId: adminListProductSurveyResponses
+      parameters:
+      - description: Zero-based page index (0..N)
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - description: The size of the page to be returned
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          default: 50
+          minimum: 1
+      - description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedModelSubmission"
+          description: OK
+      summary: List recent survey responses
+      tags:
+      - feedback-admin
+  /admin/product-feedback/surveys:
+    get:
+      operationId: adminListProductSurveys
+      parameters:
+      - description: Zero-based page index (0..N)
+        in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+      - description: The size of the page to be returned
+        in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          default: 50
+          minimum: 1
+      - description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: array
+          default:
+          - "createdAt,DESC"
+          items:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedModelSurvey"
+          description: OK
+      summary: List authored product surveys
+      tags:
+      - feedback-admin
+    post:
+      operationId: adminCreateProductSurvey
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSurvey"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Survey"
+          description: OK
+      summary: Publish a product survey
+      tags:
+      - feedback-admin
   /admin/settings:
     get:
       operationId: adminGetInstanceSettings
@@ -1758,6 +1895,21 @@ paths:
           description: OK
       tags:
       - o-auth-callback
+  /product-feedback:
+    post:
+      operationId: submitInstanceProductFeedback
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeedbackRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+      summary: Send instance-scoped product feedback
+      tags:
+      - instance-feedback
   /user:
     delete:
       operationId: deleteCurrentUser
@@ -6461,6 +6613,104 @@ paths:
       summary: Place a practice in the catalog
       tags:
       - Practice Catalog
+  /workspaces/{workspaceSlug}/product-feedback:
+    post:
+      operationId: submitWorkspaceProductFeedback
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeedbackRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+      summary: Send product feedback to instance administrators
+      tags:
+      - feedback
+  /workspaces/{workspaceSlug}/product-feedback/surveys:
+    get:
+      operationId: listAvailableProductSurveys
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Survey"
+          description: OK
+      summary: List surveys not yet handled by the current account
+      tags:
+      - feedback
+  /workspaces/{workspaceSlug}/product-feedback/surveys/{surveyId}/dismissal:
+    put:
+      operationId: dismissProductSurvey
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: surveyId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+      summary: Permanently dismiss a survey for the current account
+      tags:
+      - feedback
+  /workspaces/{workspaceSlug}/product-feedback/surveys/{surveyId}/responses:
+    post:
+      operationId: submitProductSurveyResponse
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: surveyId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitSurvey"
+        required: true
+      responses:
+        "200":
+          description: OK
+      summary: Submit a survey response once
+      tags:
+      - feedback
   /workspaces/{workspaceSlug}/profile/{login}:
     get:
       description: "Returns user profile with workspace-scoped activity data including\
@@ -9244,6 +9494,37 @@ components:
       - artifactKind
       - cadence
       - lookbackDays
+    CreateSurvey:
+      type: object
+      properties:
+        description:
+          type: string
+          maxLength: 500
+          minLength: 0
+        endsAt:
+          type: string
+          format: date-time
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Question"
+          maxItems: 20
+          minItems: 0
+        startsAt:
+          type: string
+          format: date-time
+        title:
+          type: string
+          maxLength: 160
+          minLength: 0
+        workspaceId:
+          type: integer
+          format: int64
+      required:
+      - description
+      - questions
+      - startsAt
+      - title
     CreateWorkspaceLlmConnectionRequest:
       type: object
       description: Connect your own AI provider
@@ -9985,6 +10266,54 @@ components:
           - DUPLICATE
           - INAPPROPRIATE_PLACEMENT
           - OTHER
+    FeedbackItem:
+      type: object
+      properties:
+        accountId:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum:
+          - FEEDBACK
+          - BUG
+        message:
+          type: string
+        pagePath:
+          type: string
+        workspaceId:
+          type: integer
+          format: int64
+      required:
+      - accountId
+      - id
+      - kind
+      - message
+    FeedbackRequest:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum:
+          - FEEDBACK
+          - BUG
+        message:
+          type: string
+          maxLength: 5000
+          minLength: 0
+        pagePath:
+          type: string
+          maxLength: 500
+          minLength: 0
+      required:
+      - kind
+      - message
     FeedbackResolutionCounts:
       type: object
       description: Feedback resolution counts for the current developer
@@ -11491,6 +11820,15 @@ components:
           $ref: "#/components/schemas/SortObject"
         unpaged:
           type: boolean
+    PagedModelFeedbackItem:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/FeedbackItem"
+        page:
+          $ref: "#/components/schemas/PageMetadata"
     PagedModelReviewFeedback:
       type: object
       properties:
@@ -11516,6 +11854,24 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ReviewRunSummary"
+        page:
+          $ref: "#/components/schemas/PageMetadata"
+    PagedModelSubmission:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/Submission"
+        page:
+          $ref: "#/components/schemas/PageMetadata"
+    PagedModelSurvey:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/Survey"
         page:
           $ref: "#/components/schemas/PageMetadata"
     PagedModelTracedArtifact:
@@ -13048,6 +13404,39 @@ components:
       - number
       - state
       - title
+    Question:
+      type: object
+      properties:
+        id:
+          type: string
+          maxLength: 80
+          minLength: 0
+          pattern: "[A-Za-z0-9_-]+"
+        options:
+          type: array
+          items:
+            type: string
+            maxLength: 200
+            minLength: 0
+          maxItems: 20
+          minItems: 0
+        prompt:
+          type: string
+          maxLength: 300
+          minLength: 0
+        required:
+          type: boolean
+        type:
+          type: string
+          enum:
+          - TEXT
+          - SINGLE_CHOICE
+          - RATING
+      required:
+      - id
+      - options
+      - prompt
+      - type
     RateLimitSnapshot:
       type: object
       description: "Vendor API rate-limit observation, read from in-memory trackers\
@@ -14478,6 +14867,90 @@ components:
           type: boolean
         unsorted:
           type: boolean
+    Submission:
+      type: object
+      properties:
+        accountId:
+          type: integer
+          format: int64
+        answers:
+          type: object
+          additionalProperties:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        disposition:
+          type: string
+          enum:
+          - RESPONDED
+          - DISMISSED
+        id:
+          type: string
+          format: uuid
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Question"
+        surveyId:
+          type: string
+          format: uuid
+        surveyTitle:
+          type: string
+        workspaceId:
+          type: integer
+          format: int64
+      required:
+      - accountId
+      - disposition
+      - id
+      - questions
+      - surveyId
+      - surveyTitle
+    SubmitSurvey:
+      type: object
+      properties:
+        answers:
+          type: object
+          additionalProperties:
+            type: string
+      required:
+      - answers
+    Survey:
+      type: object
+      properties:
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        description:
+          type: string
+        endsAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Question"
+        startsAt:
+          type: string
+          format: date-time
+        title:
+          type: string
+        workspaceId:
+          type: integer
+          format: int64
+      required:
+      - active
+      - description
+      - id
+      - questions
+      - startsAt
+      - title
     SyncJob:
       type: object
       description: One sync_job row — a single INITIAL/RECONCILIATION/BACKFILL pass

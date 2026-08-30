@@ -20,7 +20,9 @@ The training run boots under the `cds-training` profile (`application-cds-traini
 
 ## Why not Spring AOT processing (`spring.aot.enabled=true`)
 
-AOT processing evaluates `@Conditional` at **build time**, baking the build-time environment into the image ([reference](https://docs.spring.io/spring-boot/reference/packaging/aot.html)). The codebase has ~70 `@ConditionalOn*` sites (Sentry, Slack, PostHog, Resilience4j, etc.) that depend on env vars intentionally absent in CI — enabling AOT now would silently drop those beans from the production image. Revisit when the JDK move to Java 25 LTS lands (epic #1096); [JEP 483 AOT cache](https://openjdk.org/jeps/483) then supersedes CDS via `BP_JVM_AOTCACHE_ENABLED=true`.
+AOT evaluates conditional bean registration at build time. Hephaestus selects integrations and runtime roles from
+deployment configuration, so an image built in CI cannot safely fix those choices without omitting beans needed in
+production. CDS preserves runtime configuration while improving startup.
 
 ## Why not GraalVM Native Image
 

@@ -336,7 +336,6 @@ services:
       TANSTACK_DEVTOOLS_ENABLED: "true"
       SENTRY_ENVIRONMENT: preview
       SENTRY_DSN: ""
-      POSTHOG_ENABLED: "false"
     depends_on:
       appserver:
         condition: service_healthy
