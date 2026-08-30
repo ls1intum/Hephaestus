@@ -225,7 +225,7 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
         // Both gates run before ANYTHING persists, so a refused turn leaves no partial rows and never
         // warms a sandbox. Budget runs after admission: which purse applies depends on who pays for
         // the bound model.
-        MentorLlmConfig llmConfig = resolveLlmConfig(request.workspaceId());
+        MentorLlmConfig llmConfig = resolveWorkspaceLlmConfig(request.workspaceId());
 
         FundingSource mentorFunding =
                 Objects.requireNonNull(llmConfig.connectionScope(), "Mentor model must have a funding source");
@@ -663,13 +663,7 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
                 request.workspaceId(), user.getId(), request.threadId(), currentUserMessageId));
     }
 
-    /**
-     * Resolve exactly the workspace's own mentor binding, failing closed rather than substituting
-     * another — a silent swap would change provider, model and price mid-conversation. SECURITY: the
-     * workspace-scoped finder, never a bare {@code findById}: prod tenancy enforcement only logs, so
-     * this query is the real cross-tenant guard.
-     */
-    private MentorLlmConfig resolveLlmConfig(long workspaceId) {
+    private MentorLlmConfig resolveWorkspaceLlmConfig(long workspaceId) {
         WorkspaceAgentBinding binding = agentBindingRepository
                 .findByWorkspaceIdAndPurpose(workspaceId, AgentPurpose.MENTOR)
                 .orElseThrow(

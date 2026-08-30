@@ -35,6 +35,8 @@ Hephaestus is pre-1.0 and released continuously from `main`; **only the latest r
 
 In scope: the code in this repository — the Spring Boot application server (including the webhook receiver), the React webapp, and the deployment/Docker configuration we ship.
 
+See the [published threat model](https://ls1intum.github.io/Hephaestus/admin/threat-model) for trust boundaries, attacker assumptions, controls, and residual risks.
+
 Out of scope:
 
 - Vulnerabilities in third-party dependencies without a Hephaestus-specific exploit path — report those upstream

@@ -22,6 +22,7 @@ const sidebars: SidebarsConfig = {
 		{ type: "doc", id: "compatibility-policy", label: "Compatibility Policy" },
 		{ type: "doc", id: "runtime-roles", label: "Runtime Roles" },
 		{ type: "doc", id: "configuration-readiness", label: "Configuration Readiness" },
+		{ type: "doc", id: "threat-model", label: "Threat Model" },
 		{ type: "doc", id: "release-image-lock", label: "Release image lock" },
 		{ type: "doc", id: "buildpacks-cds-decision", label: "Server image build (Buildpacks + CDS)" },
 		{ type: "doc", id: "legal-pages", label: "Legal Pages" },

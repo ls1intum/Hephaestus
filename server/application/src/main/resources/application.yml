@@ -275,16 +275,14 @@ hephaestus:
     # ═══════════════════════════════════════════════════════════════════════════
     # TENANCY ENFORCEMENT (WorkspaceStatementInspector)
     # ═══════════════════════════════════════════════════════════════════════════
-    # SQL-layer enforcement that every query against a workspace-scoped table
-    # carries a workspace_id predicate. See core/tenancy/* and ADR 0004.
+    # SQL-shape defect detection for workspace-scoped tables. This complements, but does
+    # not replace, workspace authorization. See core/tenancy/* and ADR 0004.
     #
-    #   throw — TenancyViolationException on violations (fail loud; default in test)
-    #   log   — log + Micrometer counter, query passes (default outside test —
-    #           one calendar week of clean counter readings before flipping to throw
-    #           in prod)
-    #   off   — disable inspection (only for perf debugging)
+    #   throw — TenancyViolationException on violations (default)
+    #   log   — log + Micrometer counter, query passes (diagnostics only)
+    #   off   — disable inspection entirely (diagnostics only)
     tenancy:
-        enforcement: ${HEPHAESTUS_TENANCY_ENFORCEMENT:log}
+        enforcement: ${HEPHAESTUS_TENANCY_ENFORCEMENT:throw}
 
     # Provider-agnostic sync scheduler (SyncSchedulerProperties). The GitHub-specific sync
     # tuning (GraphQL timeouts, incremental buffer, backfill page size) lives under

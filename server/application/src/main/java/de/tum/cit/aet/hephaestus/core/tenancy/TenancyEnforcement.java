@@ -1,11 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.tenancy;
 
-/**
- * Enforcement mode for {@link WorkspaceStatementInspector}. Configured via
- * {@code hephaestus.tenancy.enforcement}; defaults to {@link #THROW} in test, {@link #LOG}
- * elsewhere. Production flips to {@link #THROW} after a staging canary week of clean
- * {@code tenancy.violation.total} counter readings.
- */
+/** Enforcement mode for {@link WorkspaceStatementInspector}. */
 public enum TenancyEnforcement {
     /** Throw {@code TenancyViolationException} on any unguarded scoped-table query. */
     THROW,
