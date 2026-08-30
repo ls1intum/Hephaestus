@@ -47,13 +47,18 @@ public record NatsConnectionProperties(
         if (enabled && (server == null || server.isBlank())) {
             throw new IllegalStateException("hephaestus.sync.nats.server must be set when enabled=true");
         }
-        if ((username == null) != (password == null)) {
+        // application.yml binds `${NATS_USERNAME:}` / `${NATS_PASSWORD:}`, so an unset variable
+        // arrives as "" — treat blank as absent, or the pairing check below never fires from the
+        // environment and blank credentials would be sent to the broker.
+        String normalizedUsername = username == null || username.isBlank() ? null : username;
+        String normalizedPassword = password == null || password.isBlank() ? null : password;
+        if ((normalizedUsername == null) != (normalizedPassword == null)) {
             throw new IllegalStateException("NATS username and password must be configured together");
         }
         this.enabled = enabled;
         this.server = server;
-        this.username = username;
-        this.password = password;
+        this.username = normalizedUsername;
+        this.password = normalizedPassword;
         this.durableConsumerName = durableConsumerName;
         this.consumer = consumer == null ? new Consumer(Duration.ofSeconds(60)) : consumer;
     }

@@ -91,7 +91,9 @@ jobs:
           # email. Assert the merged result rather than trust the runner's version.
           rendered=$(docker compose config)
           for required in \
-            'security-headers@docker,request-body-limit@docker' \
+            'entrypoints.https.http.middlewares=security-headers@docker' \
+            'request-body-limit@docker' \
+            'providers.file.filename=/etc/traefik/dynamic.yml' \
             'contentsecuritypolicy' \
             'default-src' \
             'stsseconds' \
@@ -104,9 +106,12 @@ jobs:
               echo "::error::runtime edge envelope is missing '$required'"; exit 1; }
           done
           edge_csp=$(sed -n 's/.*contentSecurityPolicy=\(.*\)"/\1/p' ../compose.proxy.yaml)
+          selfhost_csp=$(sed -n 's/.*contentSecurityPolicy=\(.*\)"/\1/p' compose.single-host.yaml)
           nginx_csp=$(sed -n 's/add_header Content-Security-Policy "\(.*\)" always;/\1/p' ../../webapp/docker/security-headers.conf)
           [ "$edge_csp" = "$nginx_csp" ] || {
             echo "::error::Traefik and nginx Content-Security-Policy values differ"; exit 1; }
+          [ "$edge_csp" = "$selfhost_csp" ] || {
+            echo "::error::reference and single-host Content-Security-Policy values differ"; exit 1; }
           grep -q "admin@tum.de" <<< "$rendered" && {
             echo "::error::the maintainers' ACME email survived the override — Compose is too old to honour !override"; exit 1; } || true
           published=$(docker compose config --format json \

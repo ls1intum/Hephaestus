@@ -18,7 +18,11 @@ services:
       - "--metrics.prometheus=true"
       - "--entrypoints.http.address=:80"
       - "--entrypoints.https.address=:443"
-      - "--entrypoints.https.http.middlewares=security-headers@docker,request-body-limit@docker"
+      # Entrypoint-wide response headers only. The request-body-limit buffering middleware must NOT
+      # sit on the entrypoint: Traefik's buffering middleware buffers whole responses, which would
+      # hold back every SSE stream (mentor chat, sync live-push) until it closes. It is attached
+      # per-router to the non-streaming surfaces (webapp, webhook-server) instead.
+      - "--entrypoints.https.http.middlewares=security-headers@docker"
       - "--entrypoints.http.http.encodequerysemicolons=true"
       - "--entryPoints.http.http2.maxConcurrentStreams=50"
       - "--entrypoints.https.http.encodequerysemicolons=true"
@@ -36,6 +40,13 @@ services:
       - "--certificatesresolvers.letsencrypt.acme.email=admin@tum.de"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=http"
       - "--providers.docker=true"
+      # TLS options and serversTransports are NOT definable through Docker labels (the docker
+      # provider silently drops them, and a dangling serversTransport reference disables the whole
+      # router), so they live in this file-provider fragment.
+      - "--providers.file.filename=/etc/traefik/dynamic.yml"
+    configs:
+      - source: traefik-dynamic
+        target: /etc/traefik/dynamic.yml
     labels:
       - traefik.enable=true
       - traefik.http.middlewares.security-headers.headers.stsSeconds=2592000
@@ -47,9 +58,6 @@ services:
       - "traefik.http.middlewares.security-headers.headers.contentSecurityPolicy=default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https: wss:; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests"
       - traefik.http.middlewares.request-body-limit.buffering.maxRequestBodyBytes=26214400
       - traefik.http.middlewares.request-body-limit.buffering.memRequestBodyBytes=1048576
-      - traefik.tls.options.default.minVersion=VersionTLS12
-      - traefik.http.serverstransports.application.forwardingtimeouts.dialtimeout=10s
-      - traefik.http.serverstransports.application.forwardingtimeouts.responseheadertimeout=30s
       - traefik.http.middlewares.errorpage.errors.status=501,502,503,504
       - traefik.http.middlewares.errorpage.errors.service=maintenance
       - traefik.http.middlewares.errorpage.errors.query=/index.html
@@ -111,6 +119,22 @@ networks:
     driver: bridge
 
 configs:
+  traefik-dynamic:
+    content: |
+      # File-provider fragment for dynamic configuration the docker provider cannot express as
+      # labels. Traefik silently ignores tls.options and serversTransports labels, so putting
+      # these there would leave TLS 1.0/1.1 accepted and (for a referenced transport) disable
+      # the router that names it.
+      tls:
+        options:
+          default:
+            minVersion: VersionTLS12
+      http:
+        serversTransports:
+          application:
+            forwardingTimeouts:
+              dialTimeout: 10s
+              responseHeaderTimeout: 30s
   nginx-default-config:
     content: |
       server {

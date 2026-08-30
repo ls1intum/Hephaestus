@@ -45,6 +45,18 @@ client.setConfig({
 // While impersonating, writes are blocked by the server's ImpersonationGuard unless the operator has
 // explicitly enabled write-mode (a second confirmation in ImpersonationBanner); the flag is in-memory
 // and resets on reload, so it is always a deliberate, fresh opt-in.
+// Register the web-app manifest from here rather than an inline <script> in index.html: the
+// deployed Content-Security-Policy is `script-src 'self'` (webapp/docker/security-headers.conf and
+// the Traefik edge middleware), which blocks inline scripts. Browsers process a manifest <link>
+// whenever it is added, so doing it from the bundle loses nothing.
+{
+	const manifestLink = document.createElement("link");
+	manifestLink.rel = "manifest";
+	manifestLink.href =
+		window.location.hostname === "localhost" ? "/manifest-dev.json" : "/manifest.json";
+	document.head.appendChild(manifestLink);
+}
+
 client.interceptors.request.use((request) =>
 	applyStateChangingHeaders(request, useImpersonationStore.getState().writesEnabled),
 );

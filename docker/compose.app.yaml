@@ -66,6 +66,10 @@ services:
       - "traefik.http.routers.http-webapp.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/`)"
       - "traefik.http.routers.http-webapp.service=http-webapp"
       - "traefik.http.routers.https-webapp.entryPoints=https"
+      # Request-body cap (defined in compose.proxy.yaml). Router-scoped rather than entrypoint-wide
+      # because the buffering middleware also buffers responses, which would stall the /api SSE
+      # streams; the static SPA and the webhook receiver have no streaming responses.
+      - "traefik.http.routers.https-webapp.middlewares=request-body-limit@docker"
       - "traefik.http.routers.https-webapp.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/`)"
       - "traefik.http.routers.https-webapp.service=https-webapp"
       - "traefik.http.routers.https-webapp.tls.certresolver=letsencrypt"
@@ -296,7 +300,9 @@ services:
       - "traefik.http.routers.https-application-server.service=https-application-server"
       - "traefik.http.services.http-application-server.loadbalancer.server.port=8080"
       - "traefik.http.services.https-application-server.loadbalancer.server.port=8080"
-      - "traefik.http.services.https-application-server.loadbalancer.serverstransport=application@docker"
+      # The transport is defined by the proxy's file provider (compose.proxy.yaml): serversTransports
+      # cannot be defined via docker labels, and referencing an undefined one disables this router.
+      - "traefik.http.services.https-application-server.loadbalancer.serverstransport=application@file"
       - "traefik.http.routers.http-application-server.priority=5"
       - "traefik.http.routers.https-application-server.priority=10"
       # Replica affinity for workspace traffic (mentor lives here) — see docs/contributor/unified-pi-runtime.mdx.

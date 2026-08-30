@@ -24,4 +24,22 @@ class NatsOptionsTest extends BaseUnitTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("configured together");
     }
+
+    @Test
+    void shouldRejectPartialCredentialsWhenTheOtherHalfIsBlank() {
+        // `${NATS_PASSWORD:}` binds an unset variable as "" — that must count as absent.
+        assertThatThrownBy(() -> new NatsConnectionProperties(true, "nats://localhost:4222", "user", "", null, null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("configured together");
+    }
+
+    @Test
+    void shouldNotSendBlankCredentials() {
+        var properties = new NatsConnectionProperties(true, "nats://localhost:4222", "", "", null, null);
+
+        var options = NatsOptions.builder(properties).build();
+
+        assertThat(options.getUsername()).isNull();
+        assertThat(options.getPassword()).isNull();
+    }
 }

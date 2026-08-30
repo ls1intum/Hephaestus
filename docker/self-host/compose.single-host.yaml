@@ -39,7 +39,9 @@ services:
       - "--metrics.prometheus=true"
       - "--entrypoints.http.address=:80"
       - "--entrypoints.https.address=:443"
-      - "--entrypoints.https.http.middlewares=security-headers@docker,request-body-limit@docker"
+      # Response headers only at the entrypoint; the request-body-limit buffering middleware is
+      # router-scoped (webapp, webhook-server) because it would stall the /api SSE streams.
+      - "--entrypoints.https.http.middlewares=security-headers@docker"
       # HTTP/2 rapid-reset hardening, same as the reference (default is 250).
       - "--entryPoints.http.http2.maxConcurrentStreams=50"
       - "--entryPoints.https.http2.maxConcurrentStreams=50"
@@ -59,6 +61,9 @@ services:
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=http"
       - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
       - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:?Set ACME_EMAIL in .env (Let's Encrypt expiry notices)}"
+      # TLS floor and the application serversTransport come from the reference's file-provider
+      # fragment (compose.proxy.yaml `traefik-dynamic`); neither is expressible as docker labels.
+      - "--providers.file.filename=/etc/traefik/dynamic.yml"
     labels: !override
       - traefik.enable=true
       - traefik.http.middlewares.security-headers.headers.stsSeconds=2592000
@@ -70,9 +75,6 @@ services:
       - "traefik.http.middlewares.security-headers.headers.contentSecurityPolicy=default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https: wss:; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests"
       - traefik.http.middlewares.request-body-limit.buffering.maxRequestBodyBytes=26214400
       - traefik.http.middlewares.request-body-limit.buffering.memRequestBodyBytes=1048576
-      - traefik.tls.options.default.minVersion=VersionTLS12
-      - traefik.http.serverstransports.application.forwardingtimeouts.dialtimeout=10s
-      - traefik.http.serverstransports.application.forwardingtimeouts.responseheadertimeout=30s
     networks:
       # Fixed address so proxy trust below can name exactly this container.
       shared-network:

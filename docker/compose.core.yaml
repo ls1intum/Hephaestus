@@ -117,7 +117,10 @@ services:
       - "traefik.http.routers.https-webhook-server.entryPoints=https"
       # No stripprefix: the receiver owns the full "/webhooks/{kind}" path (controller + payload-size
       # filter + security chain all bind to /webhooks/**). Stripping it would 404 every delivery.
-      - "traefik.http.routers.https-webhook-server.middlewares=gzip"
+      # request-body-limit (defined in compose.proxy.yaml) caps webhook deliveries at the same
+      # 25 MiB the receiver admits; router-scoped because entrypoint-wide buffering would stall
+      # the /api SSE streams (see compose.proxy.yaml).
+      - "traefik.http.routers.https-webhook-server.middlewares=request-body-limit@docker,gzip"
       - "traefik.http.routers.https-webhook-server.rule=Host(`${APP_HOSTNAME}`) && PathPrefix(`/webhooks`)"
       - "traefik.http.routers.https-webhook-server.tls.certresolver=letsencrypt"
       - "traefik.http.routers.https-webhook-server.tls=true"
