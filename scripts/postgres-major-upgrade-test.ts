@@ -192,4 +192,5 @@ try {
 	for (const container of [source, target]) spawnSync("docker", ["rm", "-f", container]);
 	for (const volume of [sourceVolume, targetVolume])
 		spawnSync("docker", ["volume", "rm", "-f", volume]);
+	for (const image of [`${id}:17`, `${id}:18`]) spawnSync("docker", ["rmi", "-f", image]);
 }
