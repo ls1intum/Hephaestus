@@ -79,16 +79,21 @@ Metric names in the instrumented code are the source of truth for dashboards and
 
 ### Log correlation
 
-Collector labels are deployment-specific. In these examples, replace the stream selector with one that
-selects the worker logs in your deployment:
+The application emits one JSON object per log line, so worker logs filter by the correlation keys
+under `mdc` with the tools already in the shipped Compose stack. From the directory you deploy from:
 
-```logql
-{container="application-worker"} | json job_id=`mdc["job.id"]` | job_id="<job-uuid>"
+```bash
+# All log lines for one agent job
+docker compose logs --no-log-prefix application-worker \
+  | jq -cR 'fromjson? | select(.mdc."job.id" == "<job-uuid>")'
+
+# All errors for one workspace
+docker compose logs --no-log-prefix application-worker \
+  | jq -cR 'fromjson? | select(.mdc."workspace.id" == "<workspace-id>" and .level == "ERROR")'
 ```
 
-```logql
-{container="application-worker"} | json workspace_id=`mdc["workspace.id"]` | workspace_id="<workspace-id>" | level="ERROR"
-```
+A deployment that ships logs to its own collector can key dashboards and alerts on the same `mdc`
+fields; label names there are deployment-specific.
 
 **Retention.** Terminal job payloads are stripped before their rows are deleted, so row retention shorter
 than payload retention is incoherent — the application refuses to start rather than accept it. Treat the
