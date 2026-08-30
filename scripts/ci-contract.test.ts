@@ -2,6 +2,22 @@ import assert from "node:assert/strict";
 import { glob, readFile } from "node:fs/promises";
 import { describe, test } from "node:test";
 
+function job(source: string, name: string): string {
+	const match = source.match(
+		new RegExp(`^  ${name}:\\n([\\s\\S]*?)(?=^  [A-Za-z][\\w-]*:\\s*$|(?![\\s\\S]))`, "m"),
+	);
+	assert.ok(match, `Missing ${name} job`);
+	return match[0];
+}
+
+function pathFilter(source: string, name: string): string {
+	const match = source.match(
+		new RegExp(`^            ${name}:\\n([\\s\\S]*?)(?=^            [\\w-]+:\\s*$)`, "m"),
+	);
+	assert.ok(match, `Missing ${name} path filter`);
+	return match[0];
+}
+
 async function workflowSources(): Promise<Map<string, string>> {
 	const files = (await Array.fromAsync(glob(".github/workflows/*.{yml,yaml}"))).toSorted();
 	return readSources(files);
@@ -121,6 +137,44 @@ void describe("CI contract", () => {
 			}
 		}
 		assert.deepEqual(rejected, [], "Workflows may only request recognised cache types");
+	});
+
+	void test("shares one server build with integration and E2E", async () => {
+		const source = await readFile(".github/workflows/ci-tests.yml", "utf8");
+		const build = job(source, "server-build");
+		const integration = job(source, "server-integration");
+		const e2e = job(source, "webapp-e2e");
+		assert.equal((build.match(/actions\/upload-artifact@/g) ?? []).length, 1);
+		for (const consumer of [integration, e2e]) {
+			assert.match(consumer, /needs: server-build/);
+			assert.equal((consumer.match(/actions\/download-artifact@/g) ?? []).length, 1);
+			assert.match(consumer, /name: \${{ env\.SERVER_REACTOR_ARTIFACT }}/);
+		}
+		assert.match(integration, /\.\/mvnw -pl application -am initialize surefire:test/);
+	});
+
+	void test("builds Storybook once and gives its TurboSnap stats to Chromatic", async () => {
+		const storybook = job(
+			await readFile(".github/workflows/ci-tests.yml", "utf8"),
+			"webapp-storybook",
+		);
+		assert.equal((storybook.match(/bun run --filter webapp build-storybook/g) ?? []).length, 1);
+		assert.match(storybook, /test -s webapp\/storybook-static\/preview-stats\.json/);
+		assert.match(storybook, /storybookBuildDir: storybook-static/);
+		assert.match(storybook, /onlyChanged: true/);
+		assert.match(storybook, /surge \.\/webapp\/storybook-static/);
+	});
+
+	void test("routes tooling-only changes away from server infrastructure", async () => {
+		const source = await readFile(".github/workflows/cicd.yml", "utf8");
+		const detection = job(source, "detect-changes");
+		const tooling = pathFilter(detection, "tooling");
+		for (const pattern of ["docs/**", ".vscode/settings.json", "**/AGENTS.md", "**/CLAUDE.md"]) {
+			assert.match(tooling, new RegExp(`- '${escapeRegExp(pattern)}'`));
+		}
+		assert.doesNotMatch(pathFilter(detection, "application-server"), /- 'docs\/\*\*'/);
+		assert.match(pathFilter(detection, "postgres-image"), /- 'docker\/postgres\/\*\*'/);
+		assert.match(pathFilter(detection, "webapp-image"), /- 'patches\/\*\*'/);
 	});
 
 	void test("pins every external action to a full commit SHA with a version comment", async () => {

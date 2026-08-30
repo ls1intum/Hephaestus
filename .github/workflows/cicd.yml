@@ -24,6 +24,7 @@ jobs:
       webapp: ${{ steps.filter.outputs.webapp }}
       webapp-image: ${{ steps.filter.outputs.webapp-image == 'true' || steps.webapp_image_source.outputs.webapp-image-source == 'true' }}
       application-server: ${{ steps.filter.outputs.application-server }}
+      tooling: ${{ steps.filter.outputs.tooling }}
       application-server-image: ${{ steps.filter.outputs.application-server-image }}
       e2e: ${{ steps.filter.outputs.e2e }}
       agent-images: ${{ steps.filter.outputs.agent-images }}
@@ -32,7 +33,7 @@ jobs:
       ci-config: ${{ steps.filter.outputs.ci-config }}
       docker-config: ${{ steps.filter.outputs.docker-config }}
       pmd-canary: ${{ steps.filter.outputs.pmd-canary }}
-      any-code: ${{ steps.filter.outputs.webapp == 'true' || steps.filter.outputs.application-server == 'true' || steps.filter.outputs.agent-images == 'true' }}
+      any-code: ${{ steps.filter.outputs.webapp == 'true' || steps.filter.outputs.application-server == 'true' || steps.filter.outputs.tooling == 'true' || steps.filter.outputs.agent-images == 'true' || steps.filter.outputs.postgres-image == 'true' }}
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
     timeout-minutes: 5
     steps:
@@ -58,12 +59,16 @@ jobs:
               - 'docs/src/css/custom.css'
               - '.oxlintrc.json'
               - '.oxfmtrc.json'
-              # check:components, check:stories and check:story-sort live here, run on the Webapp leg.
-              - 'scripts/**'
+              - 'scripts/check-docs-tokens.ts'
+              - 'scripts/check-docs-tokens.test.ts'
+              - 'scripts/check-presentational-components.ts'
+              - 'scripts/check-story-prose.ts'
+              - 'scripts/check-story-sort.ts'
               - 'package.json'
               - 'bun.lock'
               - 'bunfig.toml'
             webapp-image:
+              - 'patches/**'
               - 'webapp/public/**'
               - 'webapp/docker/**'
               - 'webapp/Dockerfile'
@@ -78,31 +83,29 @@ jobs:
               - 'bunfig.toml'
             application-server:
               - 'server/**'
-              - 'load-tests/**'
-              # Repository tooling runs on the App Server or Database leg.
-              - 'scripts/**'
-              # test:agents and typecheck:agents cover the precompute tree.
-              - 'docker/agents/**'
-              - 'tsconfig.agents.json'
-              - '.oxlintrc.json'
-              - '.oxfmtrc.json'
-              - 'tsconfig.json'
               - 'package.json'
               - 'bun.lock'
-              # Linted by the same leg (docs/.oxlintrc.json decides that verdict), markdown-linted by
-              # docs:lint, and parsed by check:diagrams. The `docs` filter below feeds no job, so this
-              # entry is the only thing that puts a docs-only PR into `any-code`.
+              - 'scripts/run-mvnw.ts'
+              # check:env validates these deployment inputs against application.yml.
+              - 'docker/compose.app.yaml'
+              - 'docker/compose.core.yaml'
+              - '!server/**/AGENTS.md'
+              - '!server/**/CLAUDE.md'
+            tooling:
+              - 'scripts/**'
+              - 'docker/agents/**'
+              # format:load:check and test:load:syntax run on this leg.
+              - 'load-tests/**'
               - 'docs/**'
+              - 'tsconfig.agents.json'
+              - 'tsconfig.json'
+              - '.oxlintrc.json'
+              - '.oxfmtrc.json'
+              - 'package.json'
+              - 'bun.lock'
               - '.changeset/**'
               - 'commitlint.config.ts'
               - '.github/scripts/**'
-              # check:env compares application.yml against the deployment that has to deliver it.
-              - 'docker/compose.app.yaml'
-              - 'docker/compose.core.yaml'
-              # check:instructions runs on this leg and reads every one of these. The two markdown
-              # globs are named even though webapp/** and server/** already carry them, because
-              # webapp/** is behind the *webapp* filter — a PR touching only webapp/CLAUDE.md would
-              # otherwise run the leg that does not hold this gate.
               - '**/AGENTS.md'
               - '**/CLAUDE.md'
               - '.claude/**'
@@ -213,6 +216,9 @@ jobs:
       should_skip: ${{ needs.detect-changes.outputs.should_skip }}
       webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      tooling_changed: ${{ (needs.detect-changes.outputs.tooling == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      postgres_image_changed: ${{ (needs.detect-changes.outputs.postgres-image == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      contracts_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.postgres-image == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       pmd_canary: ${{ (needs.detect-changes.outputs.pmd-canary == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
   Security:
@@ -251,6 +257,7 @@ jobs:
       webapp_changed: ${{ (needs.detect-changes.outputs.webapp == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       application_server_changed: ${{ (needs.detect-changes.outputs.application-server == 'true' || needs.detect-changes.outputs.ci-config == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
       e2e_changed: ${{ (needs.detect-changes.outputs.e2e == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
+      postgres_image_changed: ${{ (needs.detect-changes.outputs.postgres-image == 'true' || github.event_name != 'pull_request') && 'true' || 'false' }}
 
   Changesets:
     if: github.event_name == 'pull_request'

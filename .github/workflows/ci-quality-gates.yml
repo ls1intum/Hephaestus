@@ -18,6 +18,21 @@ on:
         required: false
         type: string
         default: "true"
+      tooling_changed:
+        description: "Whether repository tooling, docs, or instruction files changed"
+        required: false
+        type: string
+        default: "true"
+      postgres_image_changed:
+        description: "Whether the PostgreSQL image inputs changed"
+        required: false
+        type: string
+        default: "false"
+      contracts_changed:
+        description: "Whether server contracts or their PostgreSQL image changed"
+        required: false
+        type: string
+        default: "true"
       pmd_canary:
         description: "Whether PMD wiring inputs changed"
         required: false
@@ -39,6 +54,8 @@ jobs:
         include:
           - check: application-server-quality
             display-name: "App Server"
+          - check: tooling-quality
+            display-name: "Tooling and Docs"
           - check: webapp-quality
             display-name: "Webapp"
           - check: server-contracts
@@ -51,8 +68,14 @@ jobs:
             "webapp-quality")
               echo "run=${{ inputs.webapp_changed }}" >> $GITHUB_OUTPUT
               ;;
-            "application-server-quality"|"server-contracts")
+            "application-server-quality")
               echo "run=${{ inputs.application_server_changed }}" >> $GITHUB_OUTPUT
+              ;;
+            "server-contracts")
+              echo "run=${{ inputs.contracts_changed }}" >> $GITHUB_OUTPUT
+              ;;
+            "tooling-quality")
+              echo "run=${{ inputs.tooling_changed }}" >> $GITHUB_OUTPUT
               ;;
             *)
               echo "::error::Unknown check type '${{ matrix.check }}' in ci-quality-gates.yml matrix."
@@ -93,15 +116,12 @@ jobs:
           cache-type: server-contracts
           os: ${{ runner.os }}
 
-      - name: Application-server formatting + agent runtime + contracts
+      - name: Application-server quality
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'application-server-quality'
         run: |
           bun install --frozen-lockfile
-          bun run check:package-manager
-          bun run check:agent-runtime-pins
-
           ISSUES_FOUND=()
-          SERVER_OK=true; PMD_CANARY_OK=true; NULLNESS_OK=true; TOOLING_OK=true; TESTS_OK=true; CONTRACTS_OK=true; ENV_OK=true; DOCS_OK=true; DIAGRAMS_OK=true; INSTRUCTIONS_OK=true
+          SERVER_OK=true; PMD_CANARY_OK=true; NULLNESS_OK=true; CONTRACTS_OK=true; ENV_OK=true
 
           bun run check:server || { SERVER_OK=false; ISSUES_FOUND+=("Server formatting or PMD failed. Run: bun run check:server"); }
           bun run check:java-nullness \
@@ -118,30 +138,8 @@ jobs:
             cp "$RUNNER_TEMP/Application.java" "$PMD_CANARY"
             trap - EXIT
           fi
-          bun run check:agents \
-            || { TOOLING_OK=false; ISSUES_FOUND+=("Repository tooling checks failed. Run: bun run check:agents"); }
-          bun run format:load:check \
-            || { TOOLING_OK=false; ISSUES_FOUND+=("Load scenarios are not formatted. Run: bun run format:load"); }
-          bun run test:load:syntax \
-            || { TOOLING_OK=false; ISSUES_FOUND+=("k6 rejected a load scenario. Run: bun run test:load:syntax"); }
-          bun run test:agents \
-            || { TESTS_OK=false; ISSUES_FOUND+=("Agent runtime test(s) failed. Run: bun run test:agents"); }
           bun run check:contracts || { CONTRACTS_OK=false; ISSUES_FOUND+=("Artifact-source contract validation failed. Run: bun run check:contracts"); }
-          # Reads server/application.yml against docker/compose.{app,core}.yaml — the deployment that
-          # has to deliver each setting. Both sides are behind this job's path filter.
           bun run check:env || { ENV_OK=false; ISSUES_FOUND+=("A setting does not reach a container that can read it. Run: bun run check:env"); }
-          # An AGENTS.md no CLAUDE.md imports is loaded by every agent except Claude Code, and nothing
-          # about the file says so — this is the only place that reads the wiring end to end.
-          bun run check:instructions \
-            || { INSTRUCTIONS_OK=false; ISSUES_FOUND+=("An agent instruction file reaches no agent, or exists in two copies. Run: bun run check:instructions"); }
-          # docs/decisions/ and docs/runbooks/ are mounted by no Docusaurus plugin, so the site build
-          # never compiles or link-checks them. Markdown lint is the only gate they have.
-          bun run docs:lint || { DOCS_OK=false; ISSUES_FOUND+=("docs/ markdown or typecheck failed. Run: bun run docs:lint"); }
-          # Docusaurus renders mermaid in the browser, so a diagram it cannot parse builds green and
-          # publishes as an error box — the docs deployment can never be the gate for it. This leg
-          # owns the check because docs/** is behind this job's path filter and no other job's.
-          bun run check:diagrams \
-            || { DIAGRAMS_OK=false; ISSUES_FOUND+=("A committed Mermaid diagram does not parse. Run: bun run check:diagrams"); }
 
           if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
             echo "### App Server Quality" >> $GITHUB_STEP_SUMMARY
@@ -150,16 +148,25 @@ jobs:
             [[ "$SERVER_OK" == "false" ]] && echo "| Server formatting and PMD | :x: Failed | \`bun run check:server\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$PMD_CANARY_OK" == "false" ]] && echo "| PMD canary | :x: Failed | Inspect the planted-violation check |" >> $GITHUB_STEP_SUMMARY
             [[ "$NULLNESS_OK" == "false" ]] && echo "| Java nullness policy | :x: Failed | \`bun run check:java-nullness\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$TOOLING_OK" == "false" ]] && echo "| Repository tooling | :x: Failed | \`bun run check:agents\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$TESTS_OK" == "false" ]] && echo "| Agent runtime tests | :x: Failed | \`bun run test:agents\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$CONTRACTS_OK" == "false" ]] && echo "| Artifact-source contracts | :x: Failed | \`bun run check:contracts\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$ENV_OK" == "false" ]] && echo "| Env delivery by runtime role | :x: Failed | \`bun run check:env\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$INSTRUCTIONS_OK" == "false" ]] && echo "| Agent instruction wiring | :x: Failed | \`bun run check:instructions\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$DOCS_OK" == "false" ]] && echo "| Docs lint + typecheck | :x: Failed | \`bun run docs:lint\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$DIAGRAMS_OK" == "false" ]] && echo "| Mermaid diagrams | :x: Failed | \`bun run check:diagrams\` |" >> $GITHUB_STEP_SUMMARY
             for issue in "${ISSUES_FOUND[@]}"; do echo "::error::$issue"; done
             exit 1
           fi
+
+      - name: Tooling and docs quality
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'tooling-quality'
+        run: |
+          bun install --frozen-lockfile
+          bun run check:package-manager
+          bun run check:agent-runtime-pins
+          bun run check:agents
+          bun run format:load:check
+          bun run test:load:syntax
+          bun run test:agents
+          bun run check:instructions
+          bun run docs:lint
+          bun run check:diagrams
 
       - name: Webapp quality
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'webapp-quality'
@@ -261,10 +268,12 @@ jobs:
         continue-on-error: true
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'server-contracts' && always()
         run: |
-          # The pg_partman image, not stock Postgres: the auth_event changeset that calls
-          # partman.create_parent is preconditioned onFail="MARK_RAN" on the extension being
-          # available, so on a stock image the chain replays with that changeset never executed.
-          docker build -t hephaestus-postgres:ci docker/postgres
+          if [[ "${{ inputs.postgres_image_changed }}" == "true" ]]; then
+            docker build -t hephaestus-postgres:ci docker/postgres
+          else
+            docker pull ghcr.io/ls1intum/hephaestus/postgres:${{ github.event.pull_request.base.sha || github.sha }}
+            docker tag ghcr.io/ls1intum/hephaestus/postgres:${{ github.event.pull_request.base.sha || github.sha }} hephaestus-postgres:ci
+          fi
           docker run -d --name postgres-db \
             -e POSTGRES_DB=hephaestus -e POSTGRES_PASSWORD=root -e POSTGRES_USER=root \
             -p 5432:5432 hephaestus-postgres:ci
