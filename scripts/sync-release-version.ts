@@ -54,7 +54,8 @@ if (pending !== "" || fragmentFiles.length > 0) {
 	const section = ["### Next release", `### v${version}`, pending, ...fragments].filter(Boolean);
 	writeFileSync(
 		migrationFile,
-		migration.replace(pendingSections[0]?.[0] ?? "", `${section.join("\n\n")}\n\n`),
+		// The replacer is a function so `$&`/`$$` in migration notes stay literal.
+		migration.replace(pendingSections[0]?.[0] ?? "", () => `${section.join("\n\n")}\n\n`),
 	);
 	for (const file of fragmentFiles) rmSync(join(fragmentDirectory, file));
 }

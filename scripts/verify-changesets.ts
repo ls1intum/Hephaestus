@@ -20,8 +20,11 @@ export const verifyMigrationFragment = (file: string, summary: string, content: 
 	if (!summary.includes("**Operators:**")) {
 		throw new Error(`${file}: matching changeset summary must contain **Operators:**`);
 	}
-	const entryHeadings = content.match(/^#### /gm) ?? [];
-	if (entryHeadings.length !== 1 || !/^#### 🔴 \S/m.test(content) || /^#{1,3} /m.test(content)) {
+	// Fenced code blocks may contain `# comment` lines (see MIGRATION.md v0.74.0); only prose
+	// outside them is subject to the heading rules.
+	const prose = content.replace(/^```[^\n]*\n[\s\S]*?^```[^\S\n]*$/gm, "");
+	const entryHeadings = prose.match(/^#### /gm) ?? [];
+	if (entryHeadings.length !== 1 || !/^#### 🔴 \S/m.test(prose) || /^#{1,3} /m.test(prose)) {
 		throw new Error(`${file}: must contain exactly one #### 🔴 entry and no level 1-3 headings`);
 	}
 };

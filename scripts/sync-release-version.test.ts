@@ -25,7 +25,10 @@ void test("synchronizes every release-owned version reference", async () => {
 		join(cwd, "MIGRATION.md"),
 		"### Next release\n\n#### 🔴 Existing action\n\nDo it.\n\n### v0.74.0\n\nOld.\n",
 	);
-	await writeFile(join(cwd, ".migration/z-last.md"), "#### 🔴 Z action\n\nDo Z.\n");
+	await writeFile(
+		join(cwd, ".migration/z-last.md"),
+		"#### 🔴 Z action\n\nDo Z: keep `$$VAR`, `$&`, and `$'` literal.\n",
+	);
 	await writeFile(join(cwd, ".migration/a-first.md"), "#### 🔴 A action\n\nDo A.\n");
 	await writeFile(join(cwd, ".migration/README.md"), "instructions\n");
 
@@ -41,14 +44,14 @@ void test("synchronizes every release-owned version reference", async () => {
 	);
 	assert.equal(
 		await readFile(join(cwd, "MIGRATION.md"), "utf8"),
-		"### Next release\n\n### v0.75.0\n\n#### 🔴 Existing action\n\nDo it.\n\n#### 🔴 A action\n\nDo A.\n\n#### 🔴 Z action\n\nDo Z.\n\n### v0.74.0\n\nOld.\n",
+		"### Next release\n\n### v0.75.0\n\n#### 🔴 Existing action\n\nDo it.\n\n#### 🔴 A action\n\nDo A.\n\n#### 🔴 Z action\n\nDo Z: keep `$$VAR`, `$&`, and `$'` literal.\n\n### v0.74.0\n\nOld.\n",
 	);
 	assert.deepEqual(await readdir(join(cwd, ".migration")), ["README.md"]);
 
 	await run(process.execPath, [join(import.meta.dirname, "sync-release-version.ts")], { cwd });
 	assert.equal(
 		await readFile(join(cwd, "MIGRATION.md"), "utf8"),
-		"### Next release\n\n### v0.75.0\n\n#### 🔴 Existing action\n\nDo it.\n\n#### 🔴 A action\n\nDo A.\n\n#### 🔴 Z action\n\nDo Z.\n\n### v0.74.0\n\nOld.\n",
+		"### Next release\n\n### v0.75.0\n\n#### 🔴 Existing action\n\nDo it.\n\n#### 🔴 A action\n\nDo A.\n\n#### 🔴 Z action\n\nDo Z: keep `$$VAR`, `$&`, and `$'` literal.\n\n### v0.74.0\n\nOld.\n",
 	);
 	assert.deepEqual(await readdir(join(cwd, ".migration")), ["README.md"]);
 

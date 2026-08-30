@@ -75,6 +75,13 @@ void test("migration fragments require an operator marker and one entry", () => 
 			"#### 🔴 Do the thing\n\n**Migration**: act.\n",
 		),
 	);
+	assert.doesNotThrow(() =>
+		verifyMigrationFragment(
+			".migration/note.md",
+			"**Operators:** act.",
+			"#### 🔴 Pin the image\n\n```bash\n# either: remove the line entirely\n#### not a heading here\nVERSION=1\n```\n",
+		),
+	);
 	assert.throws(
 		() => verifyMigrationFragment(".migration/note.md", "Change.", "#### 🔴 Act\n"),
 		/must contain \*\*Operators:/,
