@@ -668,6 +668,7 @@ export interface DecisionNoteProps {
 	onClear: () => void;
 }
 
+/** `DecisionNote` reads `null` as "chosen here, so offer the reset" — narrowed once, not per site. */
 function inheritedSentenceOrNull(
 	assignment: Parameters<typeof autonomySourceOf>[0],
 	inheritedFrom: string,
