@@ -1,5 +1,5 @@
 import type * as Preset from "@docusaurus/preset-classic";
-import type { Config } from "@docusaurus/types";
+import type { Config, LoadContext, Plugin } from "@docusaurus/types";
 import { themes as prismThemes } from "prism-react-renderer";
 
 const envBaseUrl = process.env.DOCUSAURUS_BASE_URL;
@@ -13,6 +13,19 @@ const baseUrl = envBaseUrl === undefined || envBaseUrl === "" ? "/Hephaestus/" :
 /** The site's one-sentence definition of the product, kept in step with the README's opening. */
 const DESCRIPTION =
 	"Hephaestus is an open-source AI mentor for software teams. It reads the work developers already do against the practices their project cares about, and writes back feedback they can act on.";
+
+function rawMermaidSourcePlugin(_context: LoadContext): Plugin {
+	return {
+		name: "raw-mermaid-source",
+		configureWebpack() {
+			return {
+				module: {
+					rules: [{ test: /\.mmd$/i, type: "asset/source" }],
+				},
+			};
+		},
+	};
+}
 
 const config: Config = {
 	title: "Hephaestus Documentation",
@@ -81,6 +94,7 @@ const config: Config = {
 	],
 
 	plugins: [
+		rawMermaidSourcePlugin,
 		[
 			"@docusaurus/plugin-content-docs",
 			{
