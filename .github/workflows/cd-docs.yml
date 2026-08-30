@@ -17,12 +17,7 @@ concurrency:
   group: docs-deploy-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || github.ref }}
   cancel-in-progress: true
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-  pull-requests: write
-  statuses: write
+permissions: {}
 
 jobs:
   build-preview:
@@ -30,6 +25,8 @@ jobs:
     if: github.event_name == 'pull_request'
     timeout-minutes: 15
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup-node-pnpm
@@ -57,6 +54,8 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     timeout-minutes: 15
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup-node-pnpm
@@ -85,6 +84,10 @@ jobs:
     if: github.event_name == 'pull_request'
     timeout-minutes: 10
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      statuses: write
     env:
       PREVIEW_URL: ls1intum-hephaestus-docs-pr-${{ github.event.number }}.surge.sh
     steps:
@@ -111,6 +114,8 @@ jobs:
 
             <sub>Preview for commit ${{ github.event.pull_request.head.sha }}. Updates automatically on new commits.</sub>
       - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          TARGET_URL: https://${{ env.PREVIEW_URL }}
         with:
           script: |
             const sha = context.payload.pull_request?.head?.sha || context.sha;
@@ -119,7 +124,7 @@ jobs:
               repo: context.repo.repo,
               sha: sha,
               state: 'success',
-              target_url: 'https://${{ env.PREVIEW_URL }}',
+              target_url: process.env.TARGET_URL,
               description: 'Click Details to view Docs Preview',
               context: 'Preview / Docs'
             });
@@ -130,6 +135,9 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     timeout-minutes: 10
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      pages: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

@@ -6,6 +6,7 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["**"]
+  merge_group:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -176,7 +177,7 @@ jobs:
               - '!webapp/src/test/**'
 
   workflow-lint:
-    name: "Workflow syntax"
+    name: "Actionlint"
     timeout-minutes: 10
     runs-on: ubuntu-latest
     needs: [detect-changes]
@@ -194,11 +195,35 @@ jobs:
           persist-credentials: false
 
       - uses: reviewdog/action-actionlint@dbe5299849118fd6f099ba563d263d770955a64a # v1.73.2
+        env:
+          SHELLCHECK_OPTS: --severity=warning
         with:
-          actionlint_flags: -shellcheck=
           fail_level: error
           filter_mode: nofilter
           reporter: github-check
+
+  zizmor:
+    name: "Zizmor"
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: zizmor
+        uses: zizmorcore/zizmor-action@3dc1ecc9bcb9e94e9b2c709687979e1298497054 # v0.6.2
+        with:
+          min-confidence: medium
+          # renovate: datasource=github-releases depName=zizmorcore/zizmor
+          version: 1.29.0
+
+      - name: Enforce Zizmor findings
+        env:
+          ZIZMOR_SARIF: ${{ steps.zizmor.outputs.output-file }}
+        run: jq -e '[.runs[]?.results[]?] | length == 0' "$ZIZMOR_SARIF"
 
   Quality:
     uses: ./.github/workflows/ci-quality-gates.yml
@@ -209,7 +234,6 @@ jobs:
         needs.detect-changes.outputs.ci-config == 'true' ||
         github.event_name != 'pull_request'
       )
-    secrets: inherit
     permissions:
       checks: write
       contents: read
@@ -231,7 +255,6 @@ jobs:
         needs.detect-changes.outputs.ci-config == 'true' ||
         github.event_name != 'pull_request'
       )
-    secrets: inherit
     permissions:
       contents: read
       security-events: write
@@ -247,7 +270,9 @@ jobs:
         needs.detect-changes.outputs.ci-config == 'true' ||
         github.event_name != 'pull_request'
       )
-    secrets: inherit
+    secrets:
+      CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+      SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}
     permissions:
       contents: read
       checks: write
@@ -282,7 +307,6 @@ jobs:
         needs.detect-changes.outputs.any-code == 'true' ||
         needs.detect-changes.outputs.ci-config == 'true'
       )
-    secrets: inherit
     permissions:
       contents: read
       packages: write
@@ -302,7 +326,7 @@ jobs:
     permissions:
       actions: read
       statuses: write
-    needs: [detect-changes, workflow-lint, Quality, Security, Test, Changesets, Docker]
+    needs: [detect-changes, workflow-lint, zizmor, Quality, Security, Test, Changesets, Docker]
     if: always()
     steps:
       - name: Generate workflow timeline
@@ -354,6 +378,7 @@ jobs:
         run: |
           echo "detect-changes: ${{ needs.detect-changes.result }}"
           echo "workflow-lint: ${{ needs.workflow-lint.result }}"
+          echo "zizmor:        ${{ needs.zizmor.result }}"
           echo "Quality:        ${{ needs.Quality.result }}"
           echo "Security:       ${{ needs.Security.result }}"
           echo "Test:           ${{ needs.Test.result }}"
@@ -402,7 +427,8 @@ jobs:
             esac
           }
 
-          echo "| Workflow syntax | $(result_to_emoji '${{ needs.workflow-lint.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Actionlint | $(result_to_emoji '${{ needs.workflow-lint.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Zizmor | $(result_to_emoji '${{ needs.zizmor.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Quality | $(result_to_emoji '${{ needs.Quality.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Test | $(result_to_emoji '${{ needs.Test.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Changesets | $(result_to_emoji '${{ needs.Changesets.result }}') |" >> $GITHUB_STEP_SUMMARY

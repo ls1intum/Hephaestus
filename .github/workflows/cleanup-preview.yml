@@ -1,9 +1,8 @@
 name: Preview cleanup
 
-# Since 2025-12-08 `pull_request_target` always takes the workflow file and the checked-out commit from
-# the default branch, so no fork code runs beside the secrets here.
 on:
-  pull_request_target:
+  pull_request_target: # zizmor: ignore[dangerous-triggers] No pull-request code is checked out or executed.
+    branches: [main]
     types: [closed, unlabeled, converted_to_draft]
 
 permissions: {}

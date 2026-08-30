@@ -51,10 +51,9 @@ sequenceDiagram
    titled `chore(release): version packages` that previews the next version and the assembled
    `CHANGELOG.md` section. It is safe to leave open — it updates itself. It is opened by
    `github-actions[bot]` and deliberately runs **no CI**: it only bumps a version string and
-   rewrites the changelog, and it is re-pushed on every merge to `main`, so running the full matrix
-   on it would burn CI without validating anything. Validation happens after the merge — `main` runs
-   the full suite and a release is only cut if that run succeeds. Maintainers bypass the branch
-   ruleset, so the absent required checks don't block the merge. Versioning also moves any
+   rewrites the changelog. `GITHUB_TOKEN` updates do not trigger the required workflows, so release
+   automation uses the ruleset bypass. Validation happens after the merge: `main` runs the full suite
+   and a release is only cut if that run succeeds. Versioning also moves any
    `### Next release` section in `MIGRATION.md` under the version being cut.
 3. **Merging the Version PR cuts the release.** The workflow creates a draft release at the merge
    commit. After its evidence, seeded-upgrade, and supported-host gates pass, it promotes the CI-built images to

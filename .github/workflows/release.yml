@@ -13,7 +13,7 @@ name: Release
 # Versioning contract: docs/admin/compatibility-policy.mdx
 
 on:
-  workflow_run:
+  workflow_run: # zizmor: ignore[dangerous-triggers] The guard authenticates the completed run before privileged jobs start.
     workflows: ["CI/CD"]
     types: [completed]
     branches: [main]
@@ -177,22 +177,22 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Authoritative registry-side digest of the manifest list.
-          manifest_digest() {
-            docker buildx imagetools inspect "$1" --format '{{json .Manifest}}' | jq -r '.digest'
-          }
-
           mapfile -t IMAGES < <(jq -er '.images[]' security/release-images.json)
           [ "${#IMAGES[@]}" -gt 0 ] || { echo "::error::Release image inventory is empty"; exit 1; }
+          declare -A DIGESTS=()
           : > release-images.tsv
 
-          # Probe all images first; refuse to partial-publish if any is missing.
+          # Resolve every source digest before publishing any release tag.
           for img in "${IMAGES[@]}"; do
             FULL_IMAGE="ghcr.io/ls1intum/hephaestus/$img"
             for i in $(seq 1 24); do
-              if docker buildx imagetools inspect "$FULL_IMAGE:$SHA" > /dev/null 2>&1; then break; fi
+              digest=$(docker buildx imagetools inspect "$FULL_IMAGE:$SHA" --format '{{json .Manifest}}' 2>/dev/null | jq -er '.digest' 2>/dev/null) || true
+              if [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+                DIGESTS[$img]=$digest
+                break
+              fi
               if [ "$i" -ge 24 ]; then
-                echo "::error::Image $FULL_IMAGE:$SHA not found after 120 s"
+                echo "::error::Could not resolve a valid digest for $FULL_IMAGE:$SHA after 120 s"
                 exit 1
               fi
               sleep 5
@@ -203,9 +203,7 @@ jobs:
             FULL_IMAGE="ghcr.io/ls1intum/hephaestus/$img"
             echo "::group::$img"
 
-            SRC_DIGEST=$(manifest_digest "$FULL_IMAGE:$SHA")
-            [[ "$SRC_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]] || {
-              echo "::error::$img source digest is malformed: ${SRC_DIGEST:-<empty>}"; exit 1; }
+            SRC_DIGEST=${DIGESTS[$img]}
             echo "$img source digest: $SRC_DIGEST"
             printf '%s\t%s\n' "$img" "$SRC_DIGEST" >> release-images.tsv
 
@@ -252,7 +250,14 @@ jobs:
           mkdir -p evidence
           : > release-platforms.tsv
           started=$SECONDS
-          trivy image --download-db-only
+          for attempt in 1 2 3; do
+            trivy image --timeout 90s --download-db-only && break
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::Trivy database download failed after $attempt attempts"
+              exit 1
+            fi
+            sleep $((attempt * 5))
+          done
           db_metadata="${TRIVY_CACHE_DIR:-$HOME/.cache/trivy}/db/metadata.json"
           jq -e '(.UpdatedAt | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601) as $updated |
             ((now - $updated) >= 0) and ((now - $updated) <= 86400)' \
@@ -283,8 +288,8 @@ jobs:
                 "evidence/$image-$suffix.spdx.json" \
                 "evidence/$image-$suffix.cdx.json" \
                 "$platform_digest" "$platform" "evidence/$image-$suffix.sbom-validation.json"
-              trivy image --scanners vuln --format json --output "evidence/$image-$suffix.trivy.json" "$platform_ref"
-              trivy image --scanners license --format json --output "evidence/$image-$suffix.license.json" "$platform_ref"
+              trivy image --skip-db-update --scanners vuln --format json --output "evidence/$image-$suffix.trivy.json" "$platform_ref"
+              trivy image --skip-db-update --scanners license --format json --output "evidence/$image-$suffix.license.json" "$platform_ref"
               jq -e --arg ref "$platform_ref" \
                 '.ArtifactName == $ref and (.Results | type == "array")' \
                 "evidence/$image-$suffix.license.json" >/dev/null
@@ -707,7 +712,9 @@ jobs:
       packages: read
     with:
       image-tag: ${{ needs.release.outputs.tag_name }}
-    secrets: inherit
+    # Deploy credentials include organization secrets, which reach nested reusable
+    # workflows only through inheritance — environment secrets alone do not cover them.
+    secrets: inherit # zizmor: ignore[secrets-inherit]
 
   deploy-production:
     needs: [release, deploy-staging]
@@ -717,4 +724,6 @@ jobs:
       contents: read
     with:
       image-tag: ${{ needs.release.outputs.tag_name }}
-    secrets: inherit
+    # Deploy credentials include organization secrets, which reach nested reusable
+    # workflows only through inheritance — environment secrets alone do not cover them.
+    secrets: inherit # zizmor: ignore[secrets-inherit]

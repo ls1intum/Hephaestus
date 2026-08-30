@@ -127,6 +127,15 @@
 			"versioningTemplate": "semver"
 		},
 		{
+			"description": "Track the Zizmor CLI version",
+			"customType": "regex",
+			"managerFilePatterns": ["/^\\.github/workflows/cicd\\.yml$/"],
+			"matchStrings": [
+				"# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+version: (?<currentValue>\\S+)"
+			],
+			"versioningTemplate": "semver"
+		},
+		{
 			"description": "Track release image tags and digests",
 			"customType": "regex",
 			"managerFilePatterns": ["/^security/release-images\\.json$/"],

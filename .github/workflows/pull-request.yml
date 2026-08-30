@@ -1,13 +1,18 @@
 name: "PR"
 
 on:
-  pull_request_target:
+  pull_request_target: # zizmor: ignore[dangerous-triggers] No pull-request code is checked out or executed.
+    branches: [main]
     types:
       - opened
       - edited
       - synchronize
       - reopened
       - ready_for_review
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   validate-title:
