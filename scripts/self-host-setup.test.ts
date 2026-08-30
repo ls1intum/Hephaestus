@@ -54,6 +54,7 @@ function managedValues(environment: string): string[] {
 	const keys = new Set([
 		"POSTGRES_PASSWORD",
 		"HEPHAESTUS_SECURITY_ENCRYPTION_KEY",
+		"HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY",
 		"HEPHAESTUS_AUTH_STATE_COOKIE_KEY",
 		"WEBHOOK_SECRET",
 	]);
@@ -73,6 +74,11 @@ await test("generates protected secrets without printing them", async () => {
 	assert.equal(result.exitCode, 0);
 	assert.match(environment, /^POSTGRES_PASSWORD=[0-9a-f]{32}$/m);
 	assert.match(environment, /^HEPHAESTUS_SECURITY_ENCRYPTION_KEY=[0-9a-f]{32}$/m);
+	const encryptionKey = environment.match(/^HEPHAESTUS_SECURITY_ENCRYPTION_KEY=(.+)$/m)?.[1];
+	const credentialKey = environment.match(
+		/^HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY=(.+)$/m,
+	)?.[1];
+	assert.equal(credentialKey, encryptionKey);
 	assert.match(environment, /^HEPHAESTUS_AUTH_STATE_COOKIE_KEY=[A-Za-z0-9+/]{43}=$/m);
 	assert.match(environment, /^WEBHOOK_SECRET=[0-9a-f]{64}$/m);
 	assert.equal((await lstat(environmentPath)).mode & 0o777, 0o600);

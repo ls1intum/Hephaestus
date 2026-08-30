@@ -18,6 +18,7 @@ const sidebars: SidebarsConfig = {
 		},
 		{ type: "doc", id: "webhook-ingestion-operations", label: "Webhook Ingestion Operations" },
 		{ type: "doc", id: "backup-restore", label: "Backup & Restore" },
+		{ type: "doc", id: "credential-key-rotation", label: "Credential Key Rotation" },
 		{ type: "doc", id: "production-setup", label: "Integrations & Reference Deployment" },
 		{ type: "doc", id: "compatibility-policy", label: "Compatibility Policy" },
 		{ type: "doc", id: "runtime-roles", label: "Runtime Roles" },

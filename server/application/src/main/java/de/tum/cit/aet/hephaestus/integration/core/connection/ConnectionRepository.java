@@ -14,6 +14,17 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface ConnectionRepository extends JpaRepository<Connection, Long> {
+    @WorkspaceAgnostic("Rotates credentials across all workspaces")
+    @Query(value = """
+                    SELECT id FROM connection
+                    WHERE credentials_encrypted IS NOT NULL
+                      AND credentials_key_version IS DISTINCT FROM :activeVersion
+                    ORDER BY id
+                    LIMIT :batchSize
+                    FOR UPDATE SKIP LOCKED
+                    """, nativeQuery = true)
+    List<Long> lockCredentialRotationBatch(
+            @Param("activeVersion") int activeVersion, @Param("batchSize") int batchSize);
     /**
      * Serializes connection lifecycle changes with sync-job creation. Both paths acquire this row lock
      * before checking their respective state, closing the check-then-act window in which a job could

@@ -33,6 +33,7 @@ Compose maps `POSTGRES_PASSWORD` to `DATABASE_PASSWORD` and owns the runtime-rol
 | `hephaestus.runtime.webhook.enabled` | `HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED` |
 | `hephaestus.host-url` | `APPLICATION_HOST_URL` |
 | `hephaestus.security.encryption-key` | `HEPHAESTUS_SECURITY_ENCRYPTION_KEY` |
+| `hephaestus.security.credential-encryption-key` | `HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY` |
 | `hephaestus.webhook.secret` | `WEBHOOK_SECRET` |
 | `hephaestus.sync.nats.enabled` | `NATS_ENABLED` |
 | `hephaestus.sync.nats.server` | `NATS_SERVER` |
@@ -58,9 +59,9 @@ connection and migration health checks performed by Spring Boot and Liquibase.
 
 ## Credential encryption
 
-Set `hephaestus.security.encryption-key` to exactly 32 printable, non-space ASCII characters and keep it
-with the database backup. The supported self-host setup generates it. Do not change it on an existing
-installation.
+Set both encryption keys to exactly 32 printable, non-space ASCII characters and keep them with the
+database backup. The supported self-host setup generates them. Do not change the general encryption
+key on an existing installation. Rotate the credential key with the documented online procedure.
 
 ## External URL
 

@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.HashSet;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
@@ -93,6 +94,16 @@ class CredentialBundleConverterTest extends BaseUnitTest {
         }
 
         @Test
+        void ivIsUniqueAcrossOneThousandEncryptions() {
+            CredentialBundleConverter c = enabled();
+            var ciphertexts = new HashSet<String>();
+            for (int i = 0; i < 1_000; i++) {
+                ciphertexts.add(Arrays.toString(c.encrypt(new BearerToken("same-input", null), CTX_A)));
+            }
+            assertThat(ciphertexts).hasSize(1_000);
+        }
+
+        @Test
         void nullInstanceKey_roundTrips() {
             CredentialBundleConverter c = enabled();
             EncryptionContext pending =
@@ -108,10 +119,9 @@ class CredentialBundleConverterTest extends BaseUnitTest {
     class Format {
 
         @Test
-        void encryptedBlob_isV2Tagged_andHasAuthTag() {
+        void encryptedBlob_isV2TaggedAndHasAuthTag() {
             CredentialBundleConverter c = enabled();
             byte[] blob = c.encrypt(new BearerToken("x", null), CTX_A);
-            // 1-byte version + 12-byte IV + 16-byte GCM tag at minimum.
             assertThat(blob[0]).isEqualTo(CredentialBundleConverter.FORMAT_VERSION_V2);
             assertThat(blob.length).isGreaterThan(1 + 12 + 16);
         }
@@ -120,7 +130,7 @@ class CredentialBundleConverterTest extends BaseUnitTest {
         void unknownVersion_throwsUnsupported() {
             CredentialBundleConverter c = enabled();
             byte[] blob = new byte[1 + 12 + 17];
-            blob[0] = 0x03;
+            blob[0] = 0x04;
 
             assertThatThrownBy(() -> c.decrypt(blob, CTX_A))
                     .isInstanceOf(EncryptionException.class)
@@ -208,31 +218,26 @@ class CredentialBundleConverterTest extends BaseUnitTest {
     }
 
     @Nested
-    class AttributeConverterAPI {
+    class KeyRotation {
 
         @Test
-        void nullPassesThrough() {
-            CredentialBundleConverter c = enabled();
-            assertThat(c.convertToDatabaseColumn(null)).isNull();
-            assertThat(c.convertToEntityAttribute(null)).isNull();
+        void keyVersionColumnSelectsPriorAndActiveKeysDuringRotation() {
+            CredentialBundleConverter old = new CredentialBundleConverter(KEY, 7, null, null, "dev");
+            byte[] oldBlob = old.encrypt(new BearerToken("secret", null), CTX_A);
+            CredentialBundleConverter rotating = new CredentialBundleConverter(OTHER_KEY, 8, KEY, 7, "dev");
+
+            assertThat(rotating.decrypt(oldBlob, CTX_A, 7)).isEqualTo(new BearerToken("secret", null));
+            byte[] newBlob = rotating.encrypt(new BearerToken("new", null), CTX_A);
+            assertThat(rotating.decrypt(newBlob, CTX_A, 8)).isEqualTo(new BearerToken("new", null));
         }
 
         @Test
-        void contextLessWrite_throws() {
+        void unknownColumnKeyVersionFailsClosed() {
             CredentialBundleConverter c = enabled();
-            assertThatThrownBy(() -> c.convertToDatabaseColumn(new BearerToken("x", null)))
+            byte[] blob = c.encrypt(new BearerToken("secret", null), CTX_A);
+            assertThatThrownBy(() -> c.decrypt(blob, CTX_A, 99))
                     .isInstanceOf(EncryptionException.class)
-                    .hasMessageContaining("requires per-row EncryptionContext");
-        }
-
-        @Test
-        void contextLessRead_rejectsV2Blobs() {
-            CredentialBundleConverter c = enabled();
-            byte[] v2Blob = c.encrypt(new BearerToken("s", null), CTX_A);
-
-            assertThatThrownBy(() -> c.convertToEntityAttribute(v2Blob))
-                    .isInstanceOf(EncryptionException.class)
-                    .hasMessageContaining("requires per-row EncryptionContext");
+                    .hasMessageContaining("No encryption key configured");
         }
     }
 
@@ -246,7 +251,7 @@ class CredentialBundleConverterTest extends BaseUnitTest {
 
             assertThatThrownBy(() -> disabled.encrypt(new BearerToken("x", null), CTX_A))
                     .isInstanceOf(EncryptionException.class)
-                    .hasMessageContaining("not enabled");
+                    .hasMessageContaining("disabled");
         }
 
         @Test
@@ -256,13 +261,6 @@ class CredentialBundleConverterTest extends BaseUnitTest {
             anyBytes[0] = CredentialBundleConverter.FORMAT_VERSION_V2;
 
             assertThatThrownBy(() -> disabled.decrypt(anyBytes, CTX_A)).isInstanceOf(EncryptionException.class);
-        }
-
-        @Test
-        void disabled_nullStillPassesThrough() {
-            CredentialBundleConverter disabled = new CredentialBundleConverter("", "dev");
-            assertThat(disabled.convertToDatabaseColumn(null)).isNull();
-            assertThat(disabled.convertToEntityAttribute(null)).isNull();
         }
 
         @Test
@@ -276,7 +274,7 @@ class CredentialBundleConverterTest extends BaseUnitTest {
         void wrongLengthKey_failsFast() {
             assertThatThrownBy(() -> new CredentialBundleConverter("short", "dev"))
                     .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("exactly 32 characters");
+                    .hasMessageContaining("exactly 32");
         }
     }
 }

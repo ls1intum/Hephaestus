@@ -183,6 +183,11 @@ services:
       # chars. Required in prod (fail-fast); the Liquibase backfill re-encrypts on boot, so this
       # MUST be set on application-server (where Liquibase runs). Keep it stable.
       HEPHAESTUS_SECURITY_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_ENCRYPTION_KEY}
+      HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY}
+      HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY_VERSION: ${HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY_VERSION:-1}
+      HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY:-}
+      HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY_VERSION: ${HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY_VERSION:-}
+      HEPHAESTUS_SECURITY_CREDENTIAL_ROTATION_ENABLED: ${HEPHAESTUS_SECURITY_CREDENTIAL_ROTATION_ENABLED:-false}
       # Slack OAuth/admin and mentor replies run here. Inbound Events API + interactivity are verified on webhook-server.
       HEPHAESTUS_INTEGRATION_SLACK_ENABLED: ${HEPHAESTUS_INTEGRATION_SLACK_ENABLED:-false}
       HEPHAESTUS_INTEGRATION_SLACK_CLIENT_ID: ${HEPHAESTUS_INTEGRATION_SLACK_CLIENT_ID:-}
@@ -353,7 +358,7 @@ services:
       HEPHAESTUS_WORKER_CAPACITY_MENTOR_MAX: ${HEPHAESTUS_WORKER_MENTOR_MAX:-auto}
       HEPHAESTUS_WORKER_DRAIN_TIMEOUT: ${HEPHAESTUS_WORKER_DRAIN_TIMEOUT:-5m}
       SENTRY_DSN: ${SENTRY_DSN}
-      # Persistence for the JPA layer the worker shares (connection-credential AttributeConverter,
+      # Persistence for the JPA layer the worker shares (connection credentials,
       # workspace/agent context). The auth web layer is gated off this role, so no auth env is needed.
       # Internal, trusted docker-network DB: skip TLS. pgJDBC doesn't validate Postgres' self-signed cert
       # so it adds no authentication, only the SSL handshake's NIO direct buffers that OOM the JVM off-heap
@@ -361,8 +366,13 @@ services:
       DATABASE_URL: postgresql://postgres:5432/hephaestus?sslmode=disable
       DATABASE_USERNAME: root
       DATABASE_PASSWORD: root
-      # CredentialBundleConverter (JPA AttributeConverter) decrypts connection credentials on every role.
+      # Connection credentials are decrypted on every role.
       HEPHAESTUS_SECURITY_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_ENCRYPTION_KEY}
+      HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY}
+      HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY_VERSION: ${HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY_VERSION:-1}
+      HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY: ${HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY:-}
+      HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY_VERSION: ${HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY_VERSION:-}
+      HEPHAESTUS_SECURITY_CREDENTIAL_ROTATION_ENABLED: ${HEPHAESTUS_SECURITY_CREDENTIAL_ROTATION_ENABLED:-false}
       # The worker assembles the sandbox context itself (AgentJobExecutor → JobTypeHandler
       # #prepareInputFiles → WorkspaceContextBuilder), and OutlineDocumentContentSource carries only
       # the integration gate — no runtime-role gate. Without this flag the source bean is absent here

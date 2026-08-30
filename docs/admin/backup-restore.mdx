@@ -12,7 +12,7 @@ bounded evidence copies that may no longer be reproducible after upstream conten
 | Data | Where | Priority |
 | --- | --- | --- |
 | PostgreSQL database | `postgresql-data` volume | **Everything.** Accounts, workspaces, observations, feedback, encrypted provider tokens, JWT signing keys. |
-| `.env` | `/opt/hephaestus/docker/self-host/.env` | **Equal priority.** `HEPHAESTUS_SECURITY_ENCRYPTION_KEY` encrypts the tokens *inside* the database backup — a database backup without the key is partially unreadable (all stored provider credentials are lost, and all sessions invalidate). |
+| `.env` | `/opt/hephaestus/docker/self-host/.env` | **Equal priority.** Its encryption keys protect values inside the database backup. Without them, provider credentials and signing material are unreadable. |
 | TLS certificates | `./letsencrypt/` | Optional — Let's Encrypt re-issues on first boot (rate limits permitting). |
 | Context Fabric | `git-repos` volume | Back up when replayable evidence is required. Skipping it discards repository clones and bounded replay/CAS content; durable job provenance remains in PostgreSQL, but the exact source bytes may be unrecoverable. |
 | NATS JetStream | `nats-data` volume | Skip — a transient event buffer, not a source of truth. |
@@ -33,7 +33,7 @@ Ship both files **off the host**, encrypted. Cron it daily; test-restore it at l
 ## Restore
 
 On a fresh host, complete install steps 1–2 first, restoring the saved `.env` (same
-`POSTGRES_PASSWORD`, same `HEPHAESTUS_SECURITY_ENCRYPTION_KEY` — non-negotiable). Then:
+`POSTGRES_PASSWORD` and both `HEPHAESTUS_SECURITY_*ENCRYPTION_KEY` values). Then:
 
 ```bash
 cd /opt/hephaestus/docker/self-host
