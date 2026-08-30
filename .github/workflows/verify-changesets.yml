@@ -19,9 +19,8 @@ jobs:
 
       - name: Setup Node.js and pnpm
         uses: ./.github/actions/setup-node-pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
+        with:
+          install: "hardened"
 
       - name: Test changeset and version-sync policies
         run: pnpm run check:changesets

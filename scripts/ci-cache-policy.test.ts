@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { describe, test } from "node:test";
 
 const cacheAction = await readFile(".github/actions/setup-caches/action.yml", "utf8");
+const browserAction = await readFile(".github/actions/setup-browsers/action.yml", "utf8");
 
 function actionStep(name: string): string {
 	const marker = `    - name: ${name}\n`;
@@ -33,13 +34,14 @@ await describe("CI cache policy", async () => {
 		assert.ok(actionStep("Cache generated clients").includes('"webapp-e2e"'));
 	});
 
-	await test("browser consumers share one Playwright cache predicate", () => {
-		const identity = actionStep("Compute Playwright cache identity");
-		const cache = actionStep("Cache Playwright browsers");
-		const predicate = identity.match(/^\s+if: (.+)$/m)?.[1];
-		assert.ok(predicate);
-		assert.equal(cache.match(/^\s+if: (.+)$/m)?.[1], predicate);
-		assert.ok(predicate.includes("webapp-e2e"));
-		assert.ok(predicate.includes("webapp-storybook"));
+	await test("browser consumers share one cache-and-install action", async () => {
+		assert.match(
+			browserAction,
+			/key: \${{ runner\.os }}-playwright-\${{ steps\.playwright\.outputs\.version }}/,
+		);
+		assert.doesNotMatch(browserAction, /restore-keys:/);
+		assert.match(browserAction, /playwright install chromium --with-deps/);
+		const workflow = await readFile(".github/workflows/ci-tests.yml", "utf8");
+		assert.equal((workflow.match(/uses: \.\/\.github\/actions\/setup-browsers/g) ?? []).length, 2);
 	});
 });

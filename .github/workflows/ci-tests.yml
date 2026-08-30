@@ -53,6 +53,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
+        with:
+          install: "none"
       - uses: ./.github/actions/setup-caches
         with:
           cache-type: application-server-verification
@@ -117,6 +119,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
+        with:
+          install: "none"
       - uses: ./.github/actions/setup-caches
         with:
           cache-type: application-server-integration
@@ -170,14 +174,9 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
-      - uses: ./.github/actions/setup-caches
         with:
-          cache-type: webapp-storybook
-          os: ${{ runner.os }}
-      - name: Install dependencies and browser
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm --filter webapp exec playwright install chromium --with-deps
+          install: "frozen"
+      - uses: ./.github/actions/setup-browsers
       - name: Run story tests and generated-asset check
         id: tests
         continue-on-error: true
@@ -295,10 +294,13 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
+        with:
+          install: "frozen"
       - uses: ./.github/actions/setup-caches
         with:
           cache-type: webapp-e2e
           os: ${{ runner.os }}
+      - uses: ./.github/actions/setup-browsers
       - name: Download built reactor
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -306,8 +308,6 @@ jobs:
           path: server
       - name: Run end-to-end tests against the built server
         run: |
-          pnpm install --frozen-lockfile
-          pnpm --filter webapp exec playwright install chromium --with-deps
           # The base image may still be publishing; build the same Dockerfile as fallback.
           if [[ "${INPUTS_POSTGRES_IMAGE_CHANGED}" == "true" ]] ||
             ! docker pull ghcr.io/ls1intum/hephaestus/postgres:${{ github.event.pull_request.base.sha || github.sha }}; then

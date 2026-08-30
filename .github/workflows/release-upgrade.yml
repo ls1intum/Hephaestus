@@ -45,11 +45,12 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/setup-node-pnpm
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
-          registry: ghcr.io
+          install: "none"
+
+      - name: Log in to GitHub Container Registry
+        uses: ./.github/actions/ghcr-login
+        with:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 

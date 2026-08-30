@@ -1,5 +1,5 @@
 name: "Setup CI caches"
-description: "Caches Maven dependencies, generated-client build outputs, and Playwright browsers."
+description: "Set up the JDK and cache Maven dependencies and generated clients."
 inputs:
   cache-type:
     description: "Type of cache to setup"
@@ -18,7 +18,7 @@ runs:
         CACHE_TYPE: ${{ inputs.cache-type }}
       run: |
         case "$CACHE_TYPE" in
-          application-server-quality|application-server-verification|application-server-integration|server-contracts|webapp-e2e|webapp-storybook) ;;
+          application-server-quality|application-server-verification|application-server-integration|server-contracts|webapp-e2e) ;;
           *) echo "::error::Unknown cache type '$CACHE_TYPE'."; exit 1 ;;
         esac
 
@@ -31,19 +31,6 @@ runs:
       run: |
         if [[ -z "$DEPENDENCY_HASH" ]]; then
           echo "::error::Cannot compute the generated-client cache identity from the checked-out repository."
-          exit 1
-        fi
-        echo "hash=$DEPENDENCY_HASH" >> "$GITHUB_OUTPUT"
-
-    - name: Compute Playwright cache identity
-      id: playwright-identity
-      if: contains(fromJSON('["webapp-storybook", "webapp-e2e"]'), inputs.cache-type)
-      shell: bash
-      env:
-        DEPENDENCY_HASH: ${{ hashFiles('pnpm-lock.yaml') }}
-      run: |
-        if [[ -z "$DEPENDENCY_HASH" ]]; then
-          echo "::error::Cannot compute the Playwright cache identity from the checked-out repository."
           exit 1
         fi
         echo "hash=$DEPENDENCY_HASH" >> "$GITHUB_OUTPUT"
@@ -76,12 +63,3 @@ runs:
       with:
         path: ~/.m2/build-cache
         key: ${{ inputs.os }}-${{ steps.java.outputs.distribution }}-${{ steps.java.outputs.version }}-generated-clients-${{ steps.generated-clients-identity.outputs.hash }}
-
-    - name: Cache Playwright browsers
-      if: contains(fromJSON('["webapp-storybook", "webapp-e2e"]'), inputs.cache-type)
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-      with:
-        path: ~/.cache/ms-playwright
-        key: ${{ inputs.os }}-playwright-${{ steps.playwright-identity.outputs.hash }}
-        restore-keys: |
-          ${{ inputs.os }}-playwright-

@@ -55,6 +55,8 @@ jobs:
           persist-credentials: false
 
       - uses: ./.github/actions/setup-node-pnpm
+        with:
+          install: "none"
 
       - name: Validate and render release topology
         env:
