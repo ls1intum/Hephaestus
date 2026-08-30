@@ -4,6 +4,7 @@ import { test } from "node:test";
 
 const release = readFileSync(".github/workflows/release.yml", "utf8");
 const deployment = readFileSync(".github/workflows/deploy-locked-compose.yml", "utf8");
+const upgradeDrill = readFileSync("scripts/release-upgrade-test.ts", "utf8");
 
 await test("release promotion deploys the complete topology by signed tag", () => {
 	assert.match(release, /image-tag: \$\{\{ needs\.release\.outputs\.tag_name \}\}/);
@@ -42,6 +43,13 @@ await test("release publication requires the seeded upgrade gate", () => {
 	const upgradeGate =
 		release.match(/ {2}upgrade-test:[\s\S]*?\n {2}supported-host-smoke:/)?.[0] ?? "";
 	assert.doesNotMatch(upgradeGate, /secrets: inherit/);
+});
+
+await test("release upgrade runs the server topology without optional infrastructure", () => {
+	assert.match(upgradeDrill, /"HEPHAESTUS_RUNTIME_WORKER_ENABLED=false"/);
+	assert.match(upgradeDrill, /"HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED=false"/);
+	assert.match(upgradeDrill, /"HEPHAESTUS_SYNC_NATS_ENABLED=false"/);
+	assert.doesNotMatch(upgradeDrill, /"NATS_ENABLED=false"/);
 });
 
 await test("release publication requires native smoke tests for every supported host", () => {

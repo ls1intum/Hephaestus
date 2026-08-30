@@ -107,4 +107,9 @@ recommendation is non-fatal.
 ## Optional observability
 
 Sentry is optional. When configured, `hephaestus.sentry.dsn` must use HTTPS. The fact is classified
-`OPTIONAL` and never prevents startup.
+`OPTIONAL` and never prevents startup. Activating it requires the processing review in the
+[processor checklist](./dsms/processor-checklist#follow-up-if-the-processing-surface-changes).
+
+Frontend error rates include only browsers whose users accepted error monitoring. Treat them as
+consent-biased diagnostics, not as an availability metric or a basis for comparing deployments.
+Server-side error rates do not have this selection bias.

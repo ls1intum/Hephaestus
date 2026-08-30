@@ -2,6 +2,13 @@ name: Docker Build (Cached)
 
 on:
   workflow_call:
+    secrets:
+      SENTRY_AUTH_TOKEN:
+        required: false
+      SENTRY_ORG:
+        required: false
+      SENTRY_PROJECT:
+        required: false
     inputs:
       image-name:
         type: string
@@ -159,6 +166,10 @@ jobs:
           file: ${{ inputs.docker-file }}
           platforms: ${{ matrix.platform }}
           build-args: ${{ inputs.build-args }}
+          secrets: |
+            sentry_auth_token=${{ github.event_name != 'pull_request' && matrix.platform == 'linux/amd64' && secrets.SENTRY_AUTH_TOKEN || '' }}
+            sentry_org=${{ github.event_name != 'pull_request' && matrix.platform == 'linux/amd64' && secrets.SENTRY_ORG || '' }}
+            sentry_project=${{ github.event_name != 'pull_request' && matrix.platform == 'linux/amd64' && secrets.SENTRY_PROJECT || '' }}
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ inputs.single-arch && steps.meta.outputs.tags || '' }}
           push: ${{ inputs.single-arch }}

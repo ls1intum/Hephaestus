@@ -1,6 +1,10 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+import { captureException } from "@/integrations/sentry";
 
 const queryClient = new QueryClient({
+	queryCache: new QueryCache({ onError: (error) => captureException(error) }),
+	mutationCache: new MutationCache({ onError: (error) => captureException(error) }),
 	defaultOptions: {
 		queries: {
 			/**

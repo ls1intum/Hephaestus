@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import path, { resolve } from "node:path";
 
+import { sentryVitePlugin } from "@sentry/vite-plugin";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import { parse } from "jsonc-parser";
 import type { OxfmtConfig } from "oxfmt";
@@ -35,6 +36,17 @@ const lint = {
 	options: { ...lintConfig.options, typeAware: true, typeCheck: true },
 };
 
+const sentryUploadValues = [
+	process.env.SENTRY_AUTH_TOKEN,
+	process.env.SENTRY_ORG,
+	process.env.SENTRY_PROJECT,
+];
+const sentryUploadConfigured = sentryUploadValues.every(Boolean);
+if (sentryUploadValues.some(Boolean) && !sentryUploadConfigured) {
+	throw new Error(
+		"Sentry source-map upload requires SENTRY_AUTH_TOKEN, SENTRY_ORG, and SENTRY_PROJECT",
+	);
+}
 const viteConfig = {
 	root: import.meta.dirname,
 	fmt,
@@ -42,6 +54,13 @@ const viteConfig = {
 	plugins: [
 		tanstackRouter({ autoCodeSplitting: true }),
 		...appSourcePlugins(),
+		sentryVitePlugin({
+			org: process.env.SENTRY_ORG,
+			project: process.env.SENTRY_PROJECT,
+			authToken: process.env.SENTRY_AUTH_TOKEN,
+			disable: !sentryUploadConfigured,
+			telemetry: false,
+		}),
 		...Terminal({ output: ["terminal", "console"] }).map(
 			(plugin) => plugin && { ...plugin, apply: "serve" as const },
 		),
@@ -81,7 +100,7 @@ const viteConfig = {
 		},
 	],
 	build: {
-		sourcemap: false,
+		sourcemap: "hidden" as const,
 	},
 	optimizeDeps: {
 		exclude: ["storybook-static"],

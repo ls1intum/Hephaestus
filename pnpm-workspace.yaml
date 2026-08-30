@@ -18,6 +18,7 @@ allowBuilds:
   '@google/genai': false
   '@nestjs/core': false
   '@openapitools/openapi-generator-cli': false
+  '@sentry/cli': true
   "@swc/core": true
   core-js: false
   esbuild: true

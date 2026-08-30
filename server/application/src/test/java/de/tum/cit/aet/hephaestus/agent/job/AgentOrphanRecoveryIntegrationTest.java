@@ -95,7 +95,8 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                 transactionTemplate,
                 lifecycleService,
                 usageRecorder,
-                meterRegistry);
+                meterRegistry,
+                new AgentJobTelemetry(meterRegistry));
         workspace = workspaceRepository.save(TestEntities.activeWorkspace("orphan-recovery-ws"));
 
         LlmConnection connection = connectionRepository.save(LlmCatalogTestFixtures.connection("orphan-recovery"));

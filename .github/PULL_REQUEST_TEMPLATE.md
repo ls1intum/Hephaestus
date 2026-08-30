@@ -39,7 +39,8 @@ Fixes # <!-- Link issue if applicable, or delete this line -->
 <!-- Only what CI can't check for you. Changeset presence is enforced by `verify-changesets`. -->
 
 - [ ] My changeset summary reads as an operator/user-facing note (it becomes the changelog entry) — see `.changeset/README.md`
-- [ ] If the operator must act on this change (new required env var, manual migration step), the changeset summary says how (`**Operators:** …`) and `MIGRATION.md` is updated
+- [ ] If operators must act, the changeset and migration entry give actionable upgrade instructions
+- [ ] I did not commit generated-artifact changes that this PR did not cause
 
 ## Screenshots
 

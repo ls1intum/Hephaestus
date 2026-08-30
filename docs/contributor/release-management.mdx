@@ -54,7 +54,8 @@ sequenceDiagram
    rewrites the changelog. `GITHUB_TOKEN` updates do not trigger the required workflows, so release
    automation uses the ruleset bypass. Validation happens after the merge: `main` runs the full suite
    and a release is only cut if that run succeeds. Versioning also moves any
-   `### Next release` section in `MIGRATION.md` under the version being cut.
+   migration fragments at the existing `### Next release` anchor in `MIGRATION.md`, creates the
+   versioned section beneath it, and consumes the fragments.
 3. **Merging the Version PR cuts the release.** The workflow creates a draft release at the merge
    commit. After its evidence, seeded-upgrade, and supported-host gates pass, it promotes the CI-built images to
    `X.Y.Z`, `X.Y`, and `latest`, publishes the release, deploys staging, and requests production
@@ -97,6 +98,15 @@ The latest release is rescanned weekly. A policy violation or scan failure is re
 [the vulnerability response issue](https://github.com/ls1intum/Hephaestus/issues/1369); scanner failure
 is never treated as no findings.
 
+## Browser source maps
+
+Image builds upload hidden source maps through Sentry's debug-ID integration when the repository
+secrets `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and `SENTRY_PROJECT` are all configured. The token must be
+authorized to upload artifacts to that project. Builds reject a partial configuration, pass the
+values as BuildKit secrets to the `amd64` build outside pull requests, and remove maps before creating
+either nginx image. The runtime release remains the same version the application server receives
+from the verified release lock.
+
 ### Operator verification
 
 The [release image lock](../admin/release-image-lock) is the canonical verification procedure. It
@@ -118,21 +128,23 @@ A changeset summary becomes the `CHANGELOG.md` entry **verbatim** — write it i
 - **Don't mention automatic migrations** — the release notes get an automatic "back up before
   upgrading" banner whenever a release touches `server/application/src/main/resources/db/changelog/`, so the
   changeset stays user-facing. Only a migration that requires operator action belongs in the summary
-  (`**Operators:** …` + [`MIGRATION.md`](https://github.com/ls1intum/Hephaestus/blob/main/MIGRATION.md)).
+  (`**Operators:** …` plus a `.migration/<changeset-slug>.md` fragment).
 - **Bump = the operator's upgrade cost**, not code semantics:
   - `patch` — upgrade needs no action (bug fix, internal change, additive auto-applied migration).
   - `minor` — new capability, still zero-action; note any new *optional* env var / flag in the summary.
   - `major` — operator must act first (required new env var, removed/renamed config, destructive/manual
-    migration, dropped API); state the action and update [`MIGRATION.md`](https://github.com/ls1intum/Hephaestus/blob/main/MIGRATION.md).
+    migration, dropped API); state the action and add a `.migration` fragment.
 
 No TTY (agents, CI)? `pnpm changeset` is interactive — write the file by hand instead: create
 `.changeset/<slug>.md` with frontmatter `"hephaestus": <bump>` and the summary as the body (see
-`.changeset/README.md`). Never hand-edit `CHANGELOG.md`.
+`.changeset/README.md`). When action is required, add `.migration/<slug>.md` with the complete
+`#### 🔴 …` guide entry. CI requires the matching slug and `**Operators:**` marker. Never hand-edit
+`CHANGELOG.md` or `MIGRATION.md`; versioning generates both.
 
 :::caution Pre-1.0
 Never pick a `major` bump while the version is `0.x` — it would cut 1.0.0, and CI rejects it. Breaking
 changes ride in `minor` instead, so a pre-1.0 `minor` is **not** guaranteed zero-action: if the operator
-must act, say so in the summary and update `MIGRATION.md` exactly as a `major` would. The 1.0.0 release
+must act, say so in the summary and add a migration fragment exactly as a `major` would. The 1.0.0 release
 ships deliberately with the [1.0 milestone](https://github.com/ls1intum/Hephaestus/issues/1378) via a
 single sanctioned major changeset.
 :::

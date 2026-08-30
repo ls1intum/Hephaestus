@@ -71,6 +71,12 @@ const GROUP_GRID = "sm:grid-cols-[minmax(0,1fr)_20rem]";
 
 const ROW_GRID = "grid-cols-[auto_minmax(0,1fr)] sm:grid-cols-[auto_minmax(0,1fr)_20rem]";
 
+type AutomaticPromotion =
+	| { scope: "workspace" }
+	| { scope: "group"; slug: string; name: string }
+	| { scope: "practice"; slug: string; name: string }
+	| { scope: "bulk"; slugs: string[] };
+
 export interface PracticeAutonomyPendingState {
 	workspace: boolean;
 	groupSlugs: ReadonlySet<string>;
@@ -113,7 +119,7 @@ export function PracticeAutonomyPage({
 }: PracticeAutonomyPageProps) {
 	const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
 	const [openGroups, setOpenGroups] = useState<string[]>([]);
-	const [automaticPromotion, setAutomaticPromotion] = useState<string[] | null>(null);
+	const [automaticPromotion, setAutomaticPromotion] = useState<AutomaticPromotion | null>(null);
 
 	const groups = groupPracticesByGroup(rollup, practices, { overridesOnly });
 	const overrides = countOverrides(rollup);
@@ -145,30 +151,29 @@ export function PracticeAutonomyPage({
 			>
 				<AlertDialogContent>
 					<AlertDialogHeader>
-						<AlertDialogTitle>Send feedback automatically?</AlertDialogTitle>
+						<AlertDialogTitle>Start sending automatically?</AlertDialogTitle>
 						<AlertDialogDescription>
-							Set {automaticPromotion?.length ?? 0} selected{" "}
-							{automaticPromotion?.length === 1 ? "practice" : "practices"} to Send automatically.
-							Their eligible feedback will no longer wait for approval. Current coverage includes{" "}
-							{settings.coverageSummary.coveredRepositories} of{" "}
-							{settings.coverageSummary.monitoredRepositories} monitored repositories and{" "}
-							{settings.coverageSummary.coveredPeople} of {settings.coverageSummary.eligiblePeople}{" "}
-							eligible people. {settings.coverageSummary.recentReviewVolume} review jobs entered
-							this workspace's queue during the last {settings.coverageSummary.estimateWindowDays}{" "}
-							days.
+							Set {automaticPromotionLabel(automaticPromotion)} to Send automatically. Eligible new
+							feedback affected by this setting can proceed without approval, subject to delivery
+							policy. Feedback already awaiting approval will remain unchanged.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
-						<AlertDialogCancel>Keep current settings</AlertDialogCancel>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
 						<AlertDialogAction
 							onClick={() => {
 								if (automaticPromotion !== null) {
-									onBulkSetAutonomy(automaticPromotion, "AUTOMATIC");
+									applyAutomaticPromotion(automaticPromotion, {
+										onSetWorkspaceDefault,
+										onSetGroupAutonomy,
+										onSetPracticeAutonomy,
+										onBulkSetAutonomy,
+									});
 								}
 								setAutomaticPromotion(null);
 							}}
 						>
-							Send automatically
+							Start sending automatically
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
@@ -176,7 +181,13 @@ export function PracticeAutonomyPage({
 			<WorkspaceDecisionCard
 				settings={settings}
 				saving={pending.workspace}
-				onSetWorkspaceDefault={onSetWorkspaceDefault}
+				onSetWorkspaceDefault={(autonomy) => {
+					if (autonomy === "AUTOMATIC") {
+						setAutomaticPromotion({ scope: "workspace" });
+						return;
+					}
+					onSetWorkspaceDefault(autonomy);
+				}}
 				onClearWorkspaceDefault={onClearWorkspaceDefault}
 			/>
 			<div className="sticky top-0 z-20 space-y-3 border-b bg-background/95 py-3 backdrop-blur supports-backdrop-filter:bg-background/80">
@@ -189,7 +200,7 @@ export function PracticeAutonomyPage({
 					bulk={pending.bulk}
 					onSet={(autonomy) => {
 						if (autonomy === "AUTOMATIC") {
-							setAutomaticPromotion(actionable);
+							setAutomaticPromotion({ scope: "bulk", slugs: actionable });
 							return;
 						}
 						onBulkSetAutonomy(actionable, autonomy);
@@ -235,9 +246,30 @@ export function PracticeAutonomyPage({
 									return next;
 								})
 							}
-							onSetGroupAutonomy={onSetGroupAutonomy}
+							onSetGroupAutonomy={(groupSlug, autonomy) => {
+								if (autonomy === "AUTOMATIC") {
+									setAutomaticPromotion({ scope: "group", slug: groupSlug, name: group.name });
+									return;
+								}
+								onSetGroupAutonomy(groupSlug, autonomy);
+							}}
 							onClearGroupAutonomy={onClearGroupAutonomy}
-							onSetPracticeAutonomy={onSetPracticeAutonomy}
+							onSetPracticeAutonomy={(practiceSlug, autonomy) => {
+								if (autonomy === "AUTOMATIC") {
+									const practice = group.practices.find(
+										(candidate) => candidate.slug === practiceSlug,
+									);
+									if (practice) {
+										setAutomaticPromotion({
+											scope: "practice",
+											slug: practiceSlug,
+											name: practice.name,
+										});
+									}
+									return;
+								}
+								onSetPracticeAutonomy(practiceSlug, autonomy);
+							}}
 							onClearPracticeAutonomy={onClearPracticeAutonomy}
 						/>
 					))}
@@ -245,6 +277,36 @@ export function PracticeAutonomyPage({
 			)}
 		</div>
 	);
+}
+
+function automaticPromotionLabel(promotion: AutomaticPromotion | null): string {
+	if (promotion === null) return "this selection";
+	if (promotion.scope === "workspace") return "the workspace default";
+	if (promotion.scope === "group") return `the ${promotion.name} group`;
+	if (promotion.scope === "practice") return promotion.name;
+	return `${promotion.slugs.length} selected ${promotion.slugs.length === 1 ? "practice" : "practices"}`;
+}
+
+function applyAutomaticPromotion(
+	promotion: AutomaticPromotion,
+	actions: Pick<
+		PracticeAutonomyPageProps,
+		"onSetWorkspaceDefault" | "onSetGroupAutonomy" | "onSetPracticeAutonomy" | "onBulkSetAutonomy"
+	>,
+) {
+	switch (promotion.scope) {
+		case "workspace":
+			actions.onSetWorkspaceDefault("AUTOMATIC");
+			return;
+		case "group":
+			actions.onSetGroupAutonomy(promotion.slug, "AUTOMATIC");
+			return;
+		case "practice":
+			actions.onSetPracticeAutonomy(promotion.slug, "AUTOMATIC");
+			return;
+		case "bulk":
+			actions.onBulkSetAutonomy(promotion.slugs, "AUTOMATIC");
+	}
 }
 
 function WorkspaceDecisionCard({

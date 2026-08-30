@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerJobCancelDispatcher;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
@@ -37,6 +38,7 @@ public class AgentJobLifecycleService {
     private final LlmUsageRecorder usageRecorder;
     private final ObjectMapper objectMapper;
     private final FeedbackDispatchRepository feedbackDispatchRepository;
+    private final AgentJobTelemetry jobTelemetry;
 
     public AgentJobLifecycleService(
             AgentJobRepository agentJobRepository,
@@ -46,7 +48,8 @@ public class AgentJobLifecycleService {
             Optional<WorkerJobCancelDispatcher> workerJobCancelDispatcher,
             LlmUsageRecorder usageRecorder,
             ObjectMapper objectMapper,
-            FeedbackDispatchRepository feedbackDispatchRepository) {
+            FeedbackDispatchRepository feedbackDispatchRepository,
+            AgentJobTelemetry jobTelemetry) {
         this.agentJobRepository = agentJobRepository;
         this.handlerRegistry = handlerRegistry;
         this.transactionTemplate = transactionTemplate;
@@ -55,6 +58,7 @@ public class AgentJobLifecycleService {
         this.usageRecorder = usageRecorder;
         this.objectMapper = objectMapper;
         this.feedbackDispatchRepository = feedbackDispatchRepository;
+        this.jobTelemetry = jobTelemetry;
     }
 
     /**
@@ -86,14 +90,27 @@ public class AgentJobLifecycleService {
 
         // Delivery leaves the database (GitHub/GitLab), so it must not run inside a transaction.
         JobTypeHandler handler = handlerRegistry.getHandler(job.getJobType());
+        Instant deliveryStarted = Instant.now();
         try {
             handler.deliver(job);
             transactionTemplate.executeWithoutResult(tx -> agentJobRepository.updateDeliveryStatus(
                     jobId, DeliveryStatus.DELIVERED, job.getDeliveryCommentId()));
             log.info("Delivery retry succeeded: jobId={}", jobId);
+            jobTelemetry.transition(
+                    job,
+                    "agent.job.delivery",
+                    AgentJobTelemetry.Phase.DELIVERY,
+                    AgentJobTelemetry.Outcome.DELIVERED,
+                    Duration.between(deliveryStarted, Instant.now()));
         } catch (Exception e) {
             transactionTemplate.executeWithoutResult(tx ->
                     agentJobRepository.updateDeliveryStatus(jobId, DeliveryStatus.FAILED, job.getDeliveryCommentId()));
+            jobTelemetry.transition(
+                    job,
+                    "agent.job.delivery",
+                    AgentJobTelemetry.Phase.DELIVERY,
+                    AgentJobTelemetry.Outcome.DELIVERY_FAILED,
+                    Duration.between(deliveryStarted, Instant.now()));
             log.warn("Delivery retry failed: jobId={}, error={}", jobId, e.getMessage(), e);
             throw new AgentJobStateConflictException("Delivery retry failed: " + e.getMessage(), e);
         }
@@ -178,6 +195,7 @@ public class AgentJobLifecycleService {
         // Reload to read worker_id, which is only set at claim.
         AgentJob fresh = requireJob(workspaceId, jobId);
         recordUnverifiableUsageIfStarted(workspaceId, fresh);
+        jobTelemetry.terminal(fresh, AgentJobStatus.CANCELLED, AgentJobTelemetry.age(fresh));
         return new CancelOutcome(fresh, true);
     }
 

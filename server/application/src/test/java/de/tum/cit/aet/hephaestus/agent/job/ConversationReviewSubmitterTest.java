@@ -125,7 +125,8 @@ class ConversationReviewSubmitterTest extends BaseUnitTest {
         AgentJob job = new AgentJob();
         job.setId(UUID.randomUUID());
         when(agentJobService.submitWithOutcome(anyLong(), any(), any(), any(), any()))
-                .thenReturn(SubmissionOutcome.refused(SignalStateReason.SUBJECT_UNLINKED), SubmissionOutcome.of(job));
+                .thenReturn(
+                        SubmissionOutcome.refused(SignalStateReason.SUBJECT_UNLINKED), SubmissionOutcome.created(job));
 
         assertThat(submitter.submitAndSettle(candidate(11L, 12L), key())).isEqualTo(1);
         verify(signalRecorder).markTriggered(key(), job.getId());
@@ -184,7 +185,7 @@ class ConversationReviewSubmitterTest extends BaseUnitTest {
                 .thenAnswer(invocation -> {
                     AgentJob job = new AgentJob();
                     job.setId(UUID.randomUUID());
-                    return SubmissionOutcome.of(job);
+                    return SubmissionOutcome.created(job);
                 });
     }
 

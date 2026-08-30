@@ -26,6 +26,7 @@ import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -79,7 +80,8 @@ class AgentJobLifecycleServiceTest extends BaseUnitTest {
                 Optional.empty(),
                 usageRecorder,
                 objectMapper,
-                feedbackDispatchRepository);
+                feedbackDispatchRepository,
+                new AgentJobTelemetry(new SimpleMeterRegistry()));
 
         workspace = new Workspace();
         workspace.setId(1L);
