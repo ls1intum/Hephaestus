@@ -166,6 +166,7 @@ public class AgentJobExecutor {
     private final Counter concurrencyRejected;
     private final Timer claimLatency;
     private final Counter infraRetryRequeued;
+    private final AgentJobTelemetry jobTelemetry;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private volatile @Nullable Thread pollThread;
     private final Phaser inFlight = new Phaser(1); // 1 = the executor itself; deregistered on stop
@@ -191,6 +192,7 @@ public class AgentJobExecutor {
             TransactionTemplate transactionTemplate,
             ObjectMapper objectMapper,
             MeterRegistry meterRegistry,
+            AgentJobTelemetry jobTelemetry,
             LlmUsageRecorder usageRecorder,
             LlmBudgetService llmBudgetService,
             @Nullable LlmAdmissionService llmAdmissionService,
@@ -206,6 +208,7 @@ public class AgentJobExecutor {
         this.transactionTemplate = transactionTemplate;
         this.objectMapper = objectMapper;
         this.meterRegistry = meterRegistry;
+        this.jobTelemetry = jobTelemetry;
         this.usageRecorder = usageRecorder;
         this.llmBudgetService = llmBudgetService;
         this.llmAdmissionService = llmAdmissionService;
@@ -466,6 +469,10 @@ public class AgentJobExecutor {
             log.warn("Claim failed for job {}, will retry on next poll: {}", jobId, e.getMessage());
             return false;
         }
+        if (attempt instanceof TerminalClaim terminal) {
+            jobTelemetry.terminal(terminal.job(), terminal.status(), AgentJobTelemetry.age(terminal.job()));
+            return false;
+        }
         if (!(attempt instanceof ClaimResult claim)) {
             return false;
         }
@@ -572,7 +579,13 @@ public class AgentJobExecutor {
         boolean sandboxExecutionStarted = false;
         PreparedJobInputs stagedInputs = null;
         try {
-            log.info("Executing agent job: jobId={}, jobType={}", jobId, job.getJobType());
+            Duration queueDuration = Duration.between(job.getCreatedAt(), job.getStartedAt());
+            jobTelemetry.transition(
+                    job,
+                    "agent.job.started",
+                    AgentJobTelemetry.Phase.QUEUE,
+                    AgentJobTelemetry.Outcome.STARTED,
+                    queueDuration);
 
             PreparedSandbox preparedSandbox = prepareSandboxSpec(jobId, job, claim.snapshot);
             stagedInputs = preparedSandbox.stagedInputs();
@@ -595,8 +608,7 @@ public class AgentJobExecutor {
 
             log.info("Agent job completed: jobId={}, duration={}", jobId, Duration.between(startTime, Instant.now()));
         } catch (SandboxCancelledException e) {
-            handleCancellation(jobId, job);
-            metricOutcome = AgentJobStatus.CANCELLED.name();
+            metricOutcome = handleCancellation(jobId, job) ? AgentJobStatus.CANCELLED.name() : "OWNERSHIP_LOST";
         } catch (InsufficientEvidenceException e) {
             try {
                 persistRefusedEvidence(jobId, job.getJobType(), job.getRetryCount(), e.preparedInputs());
@@ -605,7 +617,7 @@ public class AgentJobExecutor {
                         jobId, workerId, job.getRetryCount(), Instant.now(), output));
                 if (updated != null && updated == 1) {
                     recordPracticeReviewRefusal(job, "insufficient_evidence");
-                    metricOutcome = "INSUFFICIENT_EVIDENCE";
+                    metricOutcome = AgentJobStatus.COMPLETED.name();
                     log.info(
                             "Completed agent job without model execution: jobId={}, outcome=INSUFFICIENT_EVIDENCE",
                             jobId);
@@ -628,12 +640,27 @@ public class AgentJobExecutor {
             if (stagedInputs != null) {
                 stagedInputs.close();
             }
-            recordExecutionDuration(job.getJobType(), metricOutcome, Duration.between(startTime, Instant.now()));
+            Duration executionDuration = Duration.between(startTime, Instant.now());
+            recordExecutionDuration(job.getJobType(), metricOutcome, executionDuration);
+            jobTelemetry.record(AgentJobTelemetry.Phase.EXECUTION, executionDuration);
+            AgentJobStatus terminalStatus = terminalStatus(metricOutcome);
+            if (terminalStatus != null) {
+                jobTelemetry.terminal(job, terminalStatus, AgentJobTelemetry.age(job));
+            }
             releaseCapacity();
             localRunningJobs.remove(jobId);
             MDC.remove(MDC_JOB_ID);
             MDC.remove(StructuredLogKeys.WORKSPACE_ID);
             MDC.remove(MDC_JOB_TYPE);
+        }
+    }
+
+    private static @Nullable AgentJobStatus terminalStatus(String outcome) {
+        try {
+            AgentJobStatus status = AgentJobStatus.valueOf(outcome);
+            return status.isTerminal() ? status : null;
+        } catch (IllegalArgumentException ignored) {
+            return null;
         }
     }
 
@@ -785,13 +812,18 @@ public class AgentJobExecutor {
                 agentSpec.volumeMounts());
     }
 
-    private void handleCancellation(UUID jobId, AgentJob job) {
-        transactionTemplate.executeWithoutResult(status -> {
+    private boolean handleCancellation(UUID jobId, AgentJob job) {
+        Boolean cancelled = transactionTemplate.execute(status -> {
             int updated =
                     transitionTerminal(jobId, AgentJobStatus.CANCELLED, Instant.now(), "Cancelled during execution");
             if (updated > 0) billTerminatedJob(job, "cancelled during execution");
+            return updated > 0;
         });
-        log.info("Agent job cancelled: jobId={}", jobId);
+        if (Boolean.TRUE.equals(cancelled)) {
+            log.info("Agent job cancelled: jobId={}", jobId);
+            return true;
+        }
+        return false;
     }
 
     /** Reads the counts itself, so this overload is safe only on terminal (non-requeue) paths. */
@@ -864,11 +896,12 @@ public class AgentJobExecutor {
                     jobId);
         }
 
-        transactionTemplate.executeWithoutResult(status -> {
+        Integer failed = transactionTemplate.execute(status -> {
             int updated = transitionTerminal(jobId, AgentJobStatus.FAILED, Instant.now(), errorMessage);
             if (updated > 0 && sandboxExecutionStarted) billTerminatedJob(job, "execution failure");
+            return updated;
         });
-        return AgentJobStatus.FAILED.name();
+        return failed != null && failed > 0 ? AgentJobStatus.FAILED.name() : "OWNERSHIP_LOST";
     }
 
     /**
@@ -900,12 +933,12 @@ public class AgentJobExecutor {
     private enum ClaimOutcome implements ClaimAttempt {
         ALREADY_CLAIMED,
         CONCURRENCY_FULL,
-        BUDGET_BLOCKED,
         BUDGET_HELD,
-        MODEL_UNAVAILABLE,
     }
 
     private record ClaimResult(AgentJob job, ConfigSnapshot snapshot) implements ClaimAttempt {}
+
+    private record TerminalClaim(AgentJob job, AgentJobStatus status) implements ClaimAttempt {}
 
     private @Nullable ClaimAttempt claimJob(UUID jobId) {
         return transactionTemplate.execute(status -> {
@@ -1009,7 +1042,7 @@ public class AgentJobExecutor {
      * having failed, so {@code retry_count} stays untouched. The age bound is what keeps that from
      * being unbounded when neither ever happens.
      */
-    private ClaimOutcome holdOrCancelOverBudget(AgentJob job, LlmBudgetBlockReason blockReason) {
+    private ClaimAttempt holdOrCancelOverBudget(AgentJob job, LlmBudgetBlockReason blockReason) {
         Instant now = Instant.now();
         boolean tooOldToHold = job.getCreatedAt() != null
                 && Duration.between(job.getCreatedAt(), now).compareTo(BUDGET_HOLD_MAX_JOB_AGE) > 0;
@@ -1029,7 +1062,7 @@ public class AgentJobExecutor {
                     blockReason);
             recordPracticeReviewRefusal(job, "budget_exhausted");
             meterRegistry.counter("agent.job.budget.refused").increment();
-            return ClaimOutcome.BUDGET_BLOCKED;
+            return new TerminalClaim(job, AgentJobStatus.CANCELLED);
         }
         job.setAvailableAt(now.plus(BUDGET_HOLD_INTERVAL));
         // Marks this as a budget hold specifically, so raising the cap can release it at once instead
@@ -1046,7 +1079,7 @@ public class AgentJobExecutor {
         return ClaimOutcome.BUDGET_HELD;
     }
 
-    private ClaimOutcome refuseUnavailableModel(AgentJob job) {
+    private ClaimAttempt refuseUnavailableModel(AgentJob job) {
         String message = "Configured model is unavailable.";
         job.setStatus(AgentJobStatus.CANCELLED);
         job.setCompletedAt(Instant.now());
@@ -1056,7 +1089,7 @@ public class AgentJobExecutor {
         meterRegistry.counter("agent.job.model.refused").increment();
         recordPracticeReviewRefusal(job, "model_unavailable");
         log.info("Refusing claim — configured model unavailable: jobId={}", job.getId());
-        return ClaimOutcome.MODEL_UNAVAILABLE;
+        return new TerminalClaim(job, AgentJobStatus.CANCELLED);
     }
 
     private void recordPracticeReviewRefusal(AgentJob job, String reason) {
@@ -1085,7 +1118,7 @@ public class AgentJobExecutor {
                 : jobRepository.transitionStatus(jobId, status, now, error, Set.of(AgentJobStatus.RUNNING));
     }
 
-    private AgentJobStatus completeJob(
+    private @Nullable AgentJobStatus completeJob(
             UUID jobId, AgentResult agentResult, SandboxResult sandboxResult, JobTypeHandler handler, AgentJob job) {
         AgentJobStatus terminalStatus = determineTerminalStatus(sandboxResult, agentResult);
         // persistTerminalState returns false when we lost the fence (cancelled / orphan-requeued); we
@@ -1093,10 +1126,11 @@ public class AgentJobExecutor {
         boolean persisted = persistTerminalState(jobId, agentResult, sandboxResult, terminalStatus);
         if (persisted) {
             deliverResults(jobId, terminalStatus, handler);
+            return terminalStatus;
         } else {
             log.info("Skipping delivery: job no longer owned/RUNNING (requeued or cancelled): jobId={}", jobId);
+            return null;
         }
-        return terminalStatus;
     }
 
     /**
@@ -1276,13 +1310,26 @@ public class AgentJobExecutor {
         // Reload to get the freshly persisted output
         AgentJob deliverJob = jobRepository.findById(jobId).orElse(null);
         if (deliverJob != null) {
+            Instant deliveryStarted = Instant.now();
             try {
                 handler.deliver(deliverJob);
                 persistDeliveryStatus(jobId, DeliveryStatus.DELIVERED, deliverJob.getDeliveryCommentId());
+                jobTelemetry.transition(
+                        deliverJob,
+                        "agent.job.delivery",
+                        AgentJobTelemetry.Phase.DELIVERY,
+                        AgentJobTelemetry.Outcome.DELIVERED,
+                        Duration.between(deliveryStarted, Instant.now()));
             } catch (Exception e) {
                 log.warn("Delivery failed for job {} (output saved, job still COMPLETED): {}", jobId, e.getMessage());
                 // Preserve the comment id from a partial delivery: the comment may already be posted.
                 persistDeliveryStatus(jobId, DeliveryStatus.FAILED, deliverJob.getDeliveryCommentId());
+                jobTelemetry.transition(
+                        deliverJob,
+                        "agent.job.delivery",
+                        AgentJobTelemetry.Phase.DELIVERY,
+                        AgentJobTelemetry.Outcome.DELIVERY_FAILED,
+                        Duration.between(deliveryStarted, Instant.now()));
                 meterRegistry.counter("agent.job.delivery.failure").increment();
             }
         }

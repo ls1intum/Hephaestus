@@ -4,28 +4,28 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
-/**
- * What one submission attempt did: the job it created or joined, or the reason it created none.
- *
- * <p>The reason is the same controlled one the ledger records, carried through to the caller rather than
- * flattened into an empty result — a wrong guessed reason is worse than a missing one.
- */
-record SubmissionOutcome(@Nullable AgentJob job, @Nullable SignalStateReason refusal) {
+record SubmissionOutcome(@Nullable AgentJob job, @Nullable SignalStateReason refusal, boolean created) {
     SubmissionOutcome {
         if ((job == null) == (refusal == null)) {
             throw new IllegalArgumentException("A submission either produced a job or a reason it produced none");
         }
+        if (created && job == null) {
+            throw new IllegalArgumentException("Only a submission with a job can be newly created");
+        }
     }
 
-    static SubmissionOutcome of(AgentJob job) {
-        return new SubmissionOutcome(Objects.requireNonNull(job, "job"), null);
+    static SubmissionOutcome created(AgentJob job) {
+        return new SubmissionOutcome(Objects.requireNonNull(job, "job"), null, true);
+    }
+
+    static SubmissionOutcome joined(AgentJob job) {
+        return new SubmissionOutcome(Objects.requireNonNull(job, "job"), null, false);
     }
 
     static SubmissionOutcome refused(SignalStateReason refusal) {
-        return new SubmissionOutcome(null, Objects.requireNonNull(refusal, "refusal"));
+        return new SubmissionOutcome(null, Objects.requireNonNull(refusal, "refusal"), false);
     }
 
-    /** The refusal, for callers that have already established there is no job. */
     SignalStateReason requireRefusal() {
         return Objects.requireNonNull(refusal, "refusal");
     }

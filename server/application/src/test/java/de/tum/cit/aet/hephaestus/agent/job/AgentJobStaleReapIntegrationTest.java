@@ -96,7 +96,8 @@ class AgentJobStaleReapIntegrationTest extends BaseIntegrationTest {
                 transactionTemplate,
                 lifecycleService,
                 usageRecorder,
-                meterRegistry);
+                meterRegistry,
+                new AgentJobTelemetry(meterRegistry));
         workspace = workspaceRepository.save(TestEntities.activeWorkspace("stale-reap-ws"));
         LlmConnection connection = connectionRepository.save(LlmCatalogTestFixtures.connection("stale-reap"));
         instanceModel =
