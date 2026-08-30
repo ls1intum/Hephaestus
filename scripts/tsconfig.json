@@ -8,7 +8,7 @@
 		"lib": ["ESNext", "DOM", "DOM.Iterable"],
 		"strict": true,
 		// The workflows import preview-controller.ts through actions/github-script, which runs on
-		// Node type stripping rather than Bun; syntax that needs a transform would fail there at
+		// Node type stripping rather than a transpiler; syntax that needs a transform would fail there at
 		// runtime with no local signal.
 		"erasableSyntaxOnly": true,
 		"noEmit": true,

@@ -1,5 +1,5 @@
 procs:
   server:
-    shell: bun dev:server
+    shell: pnpm run dev:server
   webapp:
-    shell: bun dev:webapp
+    shell: pnpm run dev:webapp

@@ -1,0 +1,14 @@
+name: "Setup Node.js and pnpm"
+description: "Installs the versions declared by package.json and restores the pnpm store cache."
+runs:
+  using: "composite"
+  steps:
+    - name: Disable Git hooks in CI
+      shell: bash
+      run: echo "HUSKY=0" >> "$GITHUB_ENV"
+    - name: Setup Node.js and pnpm
+      uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
+      with:
+        cache: true
+        cache-dependency-path: pnpm-lock.yaml
+        install: false

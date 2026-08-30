@@ -40,7 +40,7 @@ push their own fixes afterwards, which is why neither loops back through it. Rea
 yourself is the review that matters — the gates prove the tree is consistent, not that the change is
 right.
 
-`bun run format && bun run check` is the floor, not the whole ask. Name the thing your change could
+`pnpm run format && pnpm run check` is the floor, not the whole ask. Name the thing your change could
 actually break: the test file that covers it rather than "run the tests", a request against the
 endpoint you added, a query confirming the row was written, the logs after the change.
 
@@ -99,7 +99,7 @@ The two tools reach them differently, and neither difference is visible from the
   loads a nested one the first time it reads a file anywhere in that tree. That is what keeps the
   webapp guide out of a server-only session.
 
-`bun run check:instructions` fails on an `AGENTS.md` no `CLAUDE.md` imports, an `@` reference
+`pnpm run check:instructions` fails on an `AGENTS.md` no `CLAUDE.md` imports, an `@` reference
 resolving to nothing, an `instructions` entry matching no file, a typed-only skill with no opencode
 command, a Codex mirror that has drifted, two agent files with one body, and any committed symlink
 among them. Each failure explains itself. Bodies are compared exactly, so a copy is caught when it is

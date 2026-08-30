@@ -1,0 +1,44 @@
+packages:
+  - .
+  - webapp
+  - docs
+
+linkWorkspacePackages: true
+nodeLinker: isolated
+hoist: false
+publicHoistPattern:
+  - react
+  - react-dom
+  - "@types/react"
+  - "@types/react-dom"
+  - "@types/hast"
+minimumReleaseAge: 4320
+
+allowBuilds:
+  '@google/genai': false
+  '@nestjs/core': false
+  '@openapitools/openapi-generator-cli': false
+  "@swc/core": true
+  core-js: false
+  esbuild: true
+  msw: false
+  protobufjs: false
+
+overrides:
+  # unplugin 3.1+ declares an optional peer on the retired runtime's types package, whose name
+  # would re-enter the lockfile and fail check:package-manager's repository-wide token ban.
+  "@tanstack/router-plugin>unplugin": 3.0.0
+  mermaid: 11.16.1
+  vitest: 4.1.11
+  "@vitest/browser": 4.1.11
+  "@vitest/runner": 4.1.11
+  dompurify: 3.4.13
+  lodash: 4.18.1
+  lodash-es: 4.18.1
+  serialize-javascript: 7.0.5
+  "js-yaml@>=4.0.0": 4.3.1
+
+patchedDependencies:
+  "zod@4.4.3": patches/zod@4.4.3.patch
+  "storybook@10.4.0": patches/storybook@10.4.0.patch
+  "gray-matter@4.0.3": patches/gray-matter@4.0.3.patch

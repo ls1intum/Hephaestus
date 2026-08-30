@@ -98,9 +98,9 @@ jobs:
           fetch-depth: ${{ matrix.check == 'application-server-quality' && '0' || '1' }}
           persist-credentials: false
 
-      - name: Setup Bun
+      - name: Setup Node.js and pnpm
         if: steps.should_run.outputs.run == 'true'
-        uses: ./.github/actions/setup-bun
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Setup application-server caches
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'application-server-quality'
@@ -119,37 +119,37 @@ jobs:
       - name: Application-server quality
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'application-server-quality'
         run: |
-          bun install --frozen-lockfile
+          pnpm install --frozen-lockfile
           ISSUES_FOUND=()
           SERVER_OK=true; PMD_CANARY_OK=true; NULLNESS_OK=true; CONTRACTS_OK=true; ENV_OK=true
 
-          bun run check:server || { SERVER_OK=false; ISSUES_FOUND+=("Server formatting or PMD failed. Run: bun run check:server"); }
-          bun run check:java-nullness \
-            || { NULLNESS_OK=false; ISSUES_FOUND+=("Java nullness policy failed. Run: bun run check:java-nullness"); }
+          pnpm run check:server || { SERVER_OK=false; ISSUES_FOUND+=("Server formatting or PMD failed. Run: pnpm run check:server"); }
+          pnpm run check:java-nullness \
+            || { NULLNESS_OK=false; ISSUES_FOUND+=("Java nullness policy failed. Run: pnpm run check:java-nullness"); }
           if [ "$SERVER_OK" = "true" ] && [ "${{ inputs.pmd_canary }}" = "true" ]; then
             PMD_CANARY=server/application/src/main/java/de/tum/cit/aet/hephaestus/Application.java
             cp "$PMD_CANARY" "$RUNNER_TEMP/Application.java"
             trap 'cp "$RUNNER_TEMP/Application.java" "$PMD_CANARY"' EXIT
             sed -i '/public class Application {/a\    private int deliberatelyUnusedPmdCanary;' "$PMD_CANARY"
-            if bun run lint:java; then
+            if pnpm run lint:java; then
               PMD_CANARY_OK=false
               ISSUES_FOUND+=("PMD accepted a planted UnusedPrivateField violation; the gate is not analyzing current main sources")
             fi
             cp "$RUNNER_TEMP/Application.java" "$PMD_CANARY"
             trap - EXIT
           fi
-          bun run check:contracts || { CONTRACTS_OK=false; ISSUES_FOUND+=("Artifact-source contract validation failed. Run: bun run check:contracts"); }
-          bun run check:env || { ENV_OK=false; ISSUES_FOUND+=("A setting does not reach a container that can read it. Run: bun run check:env"); }
+          pnpm run check:contracts || { CONTRACTS_OK=false; ISSUES_FOUND+=("Artifact-source contract validation failed. Run: pnpm run check:contracts"); }
+          pnpm run check:env || { ENV_OK=false; ISSUES_FOUND+=("A setting does not reach a container that can read it. Run: pnpm run check:env"); }
 
           if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
             echo "### App Server Quality" >> $GITHUB_STEP_SUMMARY
             echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
             echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
-            [[ "$SERVER_OK" == "false" ]] && echo "| Server formatting and PMD | :x: Failed | \`bun run check:server\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$SERVER_OK" == "false" ]] && echo "| Server formatting and PMD | :x: Failed | \`pnpm run check:server\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$PMD_CANARY_OK" == "false" ]] && echo "| PMD canary | :x: Failed | Inspect the planted-violation check |" >> $GITHUB_STEP_SUMMARY
-            [[ "$NULLNESS_OK" == "false" ]] && echo "| Java nullness policy | :x: Failed | \`bun run check:java-nullness\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$CONTRACTS_OK" == "false" ]] && echo "| Artifact-source contracts | :x: Failed | \`bun run check:contracts\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$ENV_OK" == "false" ]] && echo "| Env delivery by runtime role | :x: Failed | \`bun run check:env\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$NULLNESS_OK" == "false" ]] && echo "| Java nullness policy | :x: Failed | \`pnpm run check:java-nullness\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$CONTRACTS_OK" == "false" ]] && echo "| Artifact-source contracts | :x: Failed | \`pnpm run check:contracts\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$ENV_OK" == "false" ]] && echo "| Env delivery by runtime role | :x: Failed | \`pnpm run check:env\` |" >> $GITHUB_STEP_SUMMARY
             for issue in "${ISSUES_FOUND[@]}"; do echo "::error::$issue"; done
             exit 1
           fi
@@ -157,23 +157,23 @@ jobs:
       - name: Tooling and docs quality
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'tooling-quality'
         run: |
-          bun install --frozen-lockfile
-          bun run check:package-manager
-          bun run check:agent-runtime-pins
-          bun run check:agents
-          bun run format:load:check
-          bun run test:load:syntax
-          bun run test:agents
-          bun run check:instructions
-          bun run docs:lint
-          bun run check:diagrams
+          pnpm install --frozen-lockfile
+          pnpm run check:package-manager
+          pnpm run check:agent-runtime-pins
+          pnpm run check:agents
+          pnpm run format:load:check
+          pnpm run test:load:syntax
+          pnpm run test:agents
+          pnpm run check:instructions
+          pnpm run docs:lint
+          pnpm run check:diagrams
 
       - name: Webapp quality
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'webapp-quality'
         working-directory: ./webapp
         run: |
           cd ..
-          bun install --frozen-lockfile
+          pnpm install --frozen-lockfile
           cd webapp
 
           ISSUES_FOUND=()
@@ -186,36 +186,36 @@ jobs:
           ROUTES_OK=true
           TESTS_OK=true
 
-          (cd .. && bun run check:client) || {
+          (cd .. && pnpm run check:client) || {
             CLIENT_OK=false
-            ISSUES_FOUND+=("Webapp lint, formatting, or typecheck failed. Run: bun run check:client")
+            ISSUES_FOUND+=("Webapp lint, formatting, or typecheck failed. Run: pnpm run check:client")
           }
-          (cd .. && bun run check:components) || { COMPONENTS_OK=false; ISSUES_FOUND+=("Components must take data as props. Run: bun run check:components"); }
-          (cd .. && bun run check:stories) || { STORIES_OK=false; ISSUES_FOUND+=("Story prose renders HTML paragraphs. Run: bun run check:stories"); }
-          (cd .. && bun run check:story-sort) || { SORT_OK=false; ISSUES_FOUND+=("Storybook sidebar order is stale. Run: bun run check:story-sort"); }
-          (cd .. && bun run check:docs-tokens) || { TOKENS_OK=false; ISSUES_FOUND+=("The docs site copies a web app colour that has since changed. Run: bun run check:docs-tokens"); }
-          timeout --kill-after=30s 10m bun run test \
-            || { TESTS_OK=false; ISSUES_FOUND+=("Unit tests failed. Run: cd webapp && bun run test"); }
+          (cd .. && pnpm run check:components) || { COMPONENTS_OK=false; ISSUES_FOUND+=("Components must take data as props. Run: pnpm run check:components"); }
+          (cd .. && pnpm run check:stories) || { STORIES_OK=false; ISSUES_FOUND+=("Story prose renders HTML paragraphs. Run: pnpm run check:stories"); }
+          (cd .. && pnpm run check:story-sort) || { SORT_OK=false; ISSUES_FOUND+=("Storybook sidebar order is stale. Run: pnpm run check:story-sort"); }
+          (cd .. && pnpm run check:docs-tokens) || { TOKENS_OK=false; ISSUES_FOUND+=("The docs site copies a web app colour that has since changed. Run: pnpm run check:docs-tokens"); }
+          timeout --kill-after=30s 10m pnpm run test \
+            || { TESTS_OK=false; ISSUES_FOUND+=("Unit tests failed. Run: cd webapp && pnpm run test"); }
 
           # Vite generates src/routeTree.gen.ts; compare it with the committed copy after building.
-          bun run vite build || { BUILD_OK=false; ISSUES_FOUND+=("The webapp does not build. Run: cd webapp && bun run build"); }
+          pnpm exec vite build || { BUILD_OK=false; ISSUES_FOUND+=("The webapp does not build. Run: cd webapp && pnpm run build"); }
           if [ "$BUILD_OK" = "true" ] && ! git diff --exit-code -- src/routeTree.gen.ts; then
             ROUTES_OK=false
-            ISSUES_FOUND+=("routeTree.gen.ts is stale. Run: cd webapp && bun run build, then commit the result")
+            ISSUES_FOUND+=("routeTree.gen.ts is stale. Run: cd webapp && pnpm run build, then commit the result")
           fi
 
           if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
             echo "### Webapp Quality" >> $GITHUB_STEP_SUMMARY
             echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
             echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
-            [[ "$CLIENT_OK" == "false" ]] && echo "| Lint, format, and TypeScript | :x: Failed | \`bun run check:client\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$COMPONENTS_OK" == "false" ]] && echo "| Presentational components | :x: Failed | \`bun run check:components\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$STORIES_OK" == "false" ]] && echo "| Story prose | :x: Failed | \`bun run check:stories\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$SORT_OK" == "false" ]] && echo "| Storybook sidebar order | :x: Failed | \`bun run check:story-sort\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$TOKENS_OK" == "false" ]] && echo "| Docs colour tokens | :x: Failed | \`bun run check:docs-tokens\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$BUILD_OK" == "false" ]] && echo "| Vite build | :x: Failed | \`cd webapp && bun run build\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$ROUTES_OK" == "false" ]] && echo "| routeTree.gen.ts up to date | :x: Stale | \`cd webapp && bun run build\` and commit |" >> $GITHUB_STEP_SUMMARY
-            [[ "$TESTS_OK" == "false" ]] && echo "| Unit tests | :x: Failed | \`cd webapp && bun run test\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$CLIENT_OK" == "false" ]] && echo "| Lint, format, and TypeScript | :x: Failed | \`pnpm run check:client\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$COMPONENTS_OK" == "false" ]] && echo "| Presentational components | :x: Failed | \`pnpm run check:components\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$STORIES_OK" == "false" ]] && echo "| Story prose | :x: Failed | \`pnpm run check:stories\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$SORT_OK" == "false" ]] && echo "| Storybook sidebar order | :x: Failed | \`pnpm run check:story-sort\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$TOKENS_OK" == "false" ]] && echo "| Docs colour tokens | :x: Failed | \`pnpm run check:docs-tokens\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$BUILD_OK" == "false" ]] && echo "| Vite build | :x: Failed | \`cd webapp && pnpm run build\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$ROUTES_OK" == "false" ]] && echo "| routeTree.gen.ts up to date | :x: Stale | \`cd webapp && pnpm run build\` and commit |" >> $GITHUB_STEP_SUMMARY
+            [[ "$TESTS_OK" == "false" ]] && echo "| Unit tests | :x: Failed | \`cd webapp && pnpm run test\` |" >> $GITHUB_STEP_SUMMARY
             for issue in "${ISSUES_FOUND[@]}"; do echo "::error::$issue"; done
             exit 1
           fi
@@ -232,7 +232,7 @@ jobs:
       - name: Summarize webapp unit tests
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'webapp-quality' && always()
         continue-on-error: true
-        run: bun run summarize:test-results "Webapp Unit" webapp/test-results ci-metrics/webapp-unit.json
+        run: pnpm run summarize:test-results "Webapp Unit" webapp/test-results ci-metrics/webapp-unit.json
 
       - name: Upload webapp test metrics
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'webapp-quality' && always()
@@ -251,15 +251,15 @@ jobs:
           DATABASE_URL: postgresql://fake:fake@localhost:5432/fake
           MODEL_NAME: fake:model
         run: |
-          bun install --frozen-lockfile
-          bun run generate:api
+          pnpm install --frozen-lockfile
+          pnpm run generate:api
           git add .
           if ! git diff --cached --quiet; then
-            echo "::error::OpenAPI out of sync. Run: bun run generate:api"
+            echo "::error::OpenAPI out of sync. Run: pnpm run generate:api"
             echo "### OpenAPI Validation" >> $GITHUB_STEP_SUMMARY
             echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
             echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
-            echo "| API specs sync | :x: Out of sync | \`bun run generate:api\` |" >> $GITHUB_STEP_SUMMARY
+            echo "| API specs sync | :x: Out of sync | \`pnpm run generate:api\` |" >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
 
@@ -268,10 +268,12 @@ jobs:
         continue-on-error: true
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'server-contracts' && always()
         run: |
-          if [[ "${{ inputs.postgres_image_changed }}" == "true" ]]; then
+          # The base-sha tag is published by that commit's own main run, which can still be in
+          # flight when the base just advanced — fall back to building the identical Dockerfile.
+          if [[ "${{ inputs.postgres_image_changed }}" == "true" ]] ||
+            ! docker pull ghcr.io/ls1intum/hephaestus/postgres:${{ github.event.pull_request.base.sha || github.sha }}; then
             docker build -t hephaestus-postgres:ci docker/postgres
           else
-            docker pull ghcr.io/ls1intum/hephaestus/postgres:${{ github.event.pull_request.base.sha || github.sha }}
             docker tag ghcr.io/ls1intum/hephaestus/postgres:${{ github.event.pull_request.base.sha || github.sha }} hephaestus-postgres:ci
           fi
           docker run -d --name postgres-db \
@@ -298,17 +300,17 @@ jobs:
           # draft-changelog first applies the full master.xml chain to the empty DB via
           # liquibase:update — so this step is ALSO the empty→head migration-chain replay gate (a
           # changelog that doesn't apply fails here). Keep that apply intact.
-          bun run db:draft-changelog || ISSUES_FOUND+=("Schema check / migration-chain apply failed. Run: bun run db:draft-changelog")
+          pnpm run db:draft-changelog || ISSUES_FOUND+=("Schema check / migration-chain apply failed. Run: pnpm run db:draft-changelog")
           if [ -f "server/application/src/main/resources/db/changelog_new.xml" ]; then
-            echo "::error::Schema drift detected. Run: bun run db:draft-changelog"
+            echo "::error::Schema drift detected. Run: pnpm run db:draft-changelog"
             cat server/application/src/main/resources/db/changelog_new.xml
             ISSUES_FOUND+=("Schema drift detected")
           fi
 
-          bun run db:generate-erd-docs || ISSUES_FOUND+=("ERD generation failed. Run: bun run db:generate-erd-docs")
+          pnpm run db:generate-erd-docs || ISSUES_FOUND+=("ERD generation failed. Run: pnpm run db:generate-erd-docs")
           git add docs/contributor/erd/schema.mmd
           if ! git diff --cached --quiet docs/contributor/erd/schema.mmd; then
-            echo "::error::ERD outdated. Run: bun run db:generate-erd-docs"
+            echo "::error::ERD outdated. Run: pnpm run db:generate-erd-docs"
             ISSUES_FOUND+=("ERD outdated")
           fi
 

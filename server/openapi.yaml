@@ -9068,7 +9068,7 @@ components:
           minLength: 3
         precomputeScript:
           type: string
-          description: TypeScript/Bun static analysis run before automated review
+          description: TypeScript/Node static analysis run before automated review
           maxLength: 100000
           minLength: 0
         slug:
@@ -11510,7 +11510,7 @@ components:
           description: Human-readable name
         precomputeScript:
           type: string
-          description: TypeScript/Bun precompute script for static analysis before
+          description: TypeScript/Node precompute script for static analysis before
             AI review
         slug:
           type: string
@@ -15182,7 +15182,7 @@ components:
           pattern: .*\S.*
         precomputeScript:
           type: string
-          description: TypeScript/Bun static analysis run before automated review
+          description: TypeScript/Node static analysis run before automated review
           maxLength: 100000
           minLength: 0
         whatGoodLooksLike:

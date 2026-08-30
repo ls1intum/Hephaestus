@@ -23,7 +23,7 @@ export function parseBase(args: string[]): string {
 	const [flag, revision] = args;
 	if (args.length === 2 && flag === "--base" && revision !== undefined && revision !== "")
 		return revision;
-	throw new Error("Usage: bun run check:affected [--base <revision>]");
+	throw new Error("Usage: pnpm run check:affected [--base <revision>]");
 }
 
 const fullGateInputs = [
@@ -33,8 +33,9 @@ const fullGateInputs = [
 	/^\.changeset\//,
 	/^scripts\//,
 	/^package\.json$/,
-	/^bun\.lock$/,
-	/^bunfig\.toml$/,
+	/^pnpm-lock\.yaml$/,
+	/^pnpm-workspace\.yaml$/,
+	/^patches\//,
 	/^tsconfig(?:\.agents)?\.json$/,
 	/^\.ox(?:fmt|lint)rc\.json$/,
 	/^server\/openapi\.yaml$/,
@@ -89,12 +90,12 @@ export function changedPaths(requestedBase: string, cwd = process.cwd()): string
 }
 
 export function commandsFor(scopes: Scope[]): Command[] {
-	if (scopes.includes("full")) return [["bun", "run", "check"]];
+	if (scopes.includes("full")) return [["pnpm", "run", "check"]];
 	const commands: Record<Exclude<Scope, "full">, Command> = {
-		agents: ["bun", "run", "check:agent-runtime"],
-		docs: ["bun", "run", "check:docs"],
-		server: ["bun", "run", "check:server:affected"],
-		webapp: ["bun", "run", "check:webapp:affected"],
+		agents: ["pnpm", "run", "check:agent-runtime"],
+		docs: ["pnpm", "run", "check:docs"],
+		server: ["pnpm", "run", "check:server:affected"],
+		webapp: ["pnpm", "run", "check:webapp:affected"],
 	};
 	return scopes.map((scope) => {
 		if (scope === "full") throw new Error("Full scope must override scoped commands");
@@ -127,7 +128,7 @@ function main(): void {
 	if (scopes.includes("full")) console.log("Complete local quality gate passed.");
 	else
 		console.log(
-			"Affected checks passed. The complete local gate has not run; use `bun run check` before pushing.",
+			"Affected checks passed. The complete local gate has not run; use `pnpm run check` before pushing.",
 		);
 }
 

@@ -47,7 +47,7 @@ import tools.jackson.databind.node.ObjectNode;
  * <ol>
  *   <li>Ensures the Pi SDK is installed under {@code target/pi-sdk/node_modules} (idempotent;
  *       the install marker survives across test runs and parallel JVMs use a directory lock).</li>
- *   <li>Spawns {@code pi-mentor-runner.ts} directly with {@code bun} — no Docker — and points
+ *   <li>Spawns {@code pi-mentor-runner.ts} directly with {@code node} — no Docker — and points
  *       it at a real OpenAI-compatible endpoint through the production provider contract.</li>
  *   <li>Drives the JSON-RPC protocol the same way {@code MentorRunnerClient} drives it in prod
  *       (hello → open_thread → prompt) and translates every emitted event through the real
@@ -83,8 +83,7 @@ class MentorLiveLlmTest {
 
     @BeforeAll
     static void installPiSdk() throws Exception {
-        // The marker file lets parallel test JVMs and repeated runs short-circuit. The file lock
-        // is acquired on a sibling lockfile so two JVMs racing to install do not both spawn Bun.
+        // The marker avoids repeat installs; the sibling lock serializes concurrent JVMs.
         Files.createDirectories(SDK_DIR);
         Path marker = SDK_DIR.resolve(".installed-" + PI_SDK_VERSION);
         if (Files.exists(marker)) {
@@ -105,16 +104,22 @@ class MentorLiveLlmTest {
                             + PI_SDK_VERSION
                             + "\"}}");
             ProcessBuilder pb = new ProcessBuilder(
-                    "bun", "install", "--cwd", SDK_DIR.toString(), "--ignore-scripts", "--no-progress");
+                    "pnpm",
+                    "install",
+                    "--dir",
+                    SDK_DIR.toString(),
+                    "--ignore-workspace",
+                    "--ignore-scripts",
+                    "--reporter=silent");
             pb.redirectErrorStream(true);
             pb.inheritIO();
             Process p = pb.start();
             if (!p.waitFor(180, TimeUnit.SECONDS)) {
                 p.destroyForcibly();
-                throw new IllegalStateException("Bun install for Pi SDK timed out after 180s");
+                throw new IllegalStateException("pnpm install for Pi SDK timed out after 180s");
             }
             if (p.exitValue() != 0) {
-                throw new IllegalStateException("Bun install for Pi SDK failed; see stderr above");
+                throw new IllegalStateException("pnpm install for Pi SDK failed; see stderr above");
             }
             Files.writeString(marker, "ok\n");
         }
@@ -634,7 +639,7 @@ class MentorLiveLlmTest {
                         .toString());
         pb.directory(workspace.toFile());
 
-        pb.command("bun", workspace.resolve("pi-mentor-runner.ts").toString());
+        pb.command("node", workspace.resolve("pi-mentor-runner.ts").toString());
 
         pb.redirectErrorStream(false);
         Process process = pb.start();

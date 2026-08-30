@@ -1009,7 +1009,7 @@ export type CreatePracticeRequest = {
    */
   name: string;
   /**
-   * TypeScript/Bun static analysis run before automated review
+   * TypeScript/Node static analysis run before automated review
    */
   precomputeScript?: string;
   /**
@@ -2650,7 +2650,7 @@ export type Practice = {
    */
   name: string;
   /**
-   * TypeScript/Bun precompute script for static analysis before AI review
+   * TypeScript/Node precompute script for static analysis before AI review
    */
   precomputeScript?: string;
   /**
@@ -5141,7 +5141,7 @@ export type UpdatePracticeRequest = {
    */
   name?: string;
   /**
-   * TypeScript/Bun static analysis run before automated review
+   * TypeScript/Node static analysis run before automated review
    */
   precomputeScript?: string;
   /**

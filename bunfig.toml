@@ -1,6 +1,0 @@
-[install]
-linker = "isolated"
-hoist = false
-publicHoistPattern = ["react", "react-dom", "@types/react", "@types/react-dom", "@types/hast"]
-minimumReleaseAge = 259200
-peer = true

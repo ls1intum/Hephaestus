@@ -79,16 +79,7 @@ async function main(): Promise<void> {
 		}
 	}
 	console.log("Installing dependencies...");
-	const lockfile = join(root, "bun.lock");
-	const lockfileBefore = await readFile(lockfile, "utf8");
-	try {
-		await run("bun", ["install", "--frozen-lockfile"], { cwd: root });
-	} catch {
-		console.log("  WARN: the frozen install failed — retrying without --frozen-lockfile.");
-		await run("bun", ["install"], { cwd: root });
-		if ((await readFile(lockfile, "utf8")) !== lockfileBefore)
-			console.log("  WARN: bun.lock changed — commit it, or qualify:bun-lockfile fails in CI.");
-	}
+	await run("pnpm", ["install", "--frozen-lockfile"], { cwd: root });
 	console.log("✅ Jean worktree setup complete.");
 }
 

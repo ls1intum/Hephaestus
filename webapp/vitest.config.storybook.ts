@@ -14,7 +14,7 @@ export default defineConfig({
 		...appSourcePlugins(),
 		storybookTest({
 			configDir: path.join(import.meta.dirname, ".storybook"),
-			storybookScript: "bun run storybook:dev -- --ci",
+			storybookScript: "pnpm run storybook:dev -- --ci",
 		}),
 	],
 	resolve: {

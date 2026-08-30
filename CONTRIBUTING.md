@@ -2,7 +2,7 @@
 
 Read the [local development guide](https://ls1intum.github.io/Hephaestus/contributor/local-development) on how to set up your environment.
 
-Repository tooling requires the Node.js version pinned in `package.json#devEngines.runtime`. Bun
+Repository tooling requires the Node.js version pinned in `package.json#devEngines.runtime`. pnpm
 installs dependencies and dispatches package scripts; TypeScript scripts and application tools execute
 on Node.js.
 
@@ -32,8 +32,8 @@ Contributions that do not adhere to these guidelines will be rejected. We align 
 
 ## Contribution Process
 
-Use `bun run check:affected` for fast feedback. Before pushing, run `bun run check`; the hook runs it
-automatically. Run `bun run verify` before requesting review. Scope, budgets, and exclusions are documented in the
+Use `pnpm run check:affected` for fast feedback. Before pushing, run `pnpm run check`; the hook runs it
+automatically. Run `pnpm run verify` before requesting review. Scope, budgets, and exclusions are documented in the
 [local verification guide](https://ls1intum.github.io/Hephaestus/contributor/local-verification).
 
 1. **External contributors only**: Fork the Repository and create a branch.
@@ -83,8 +83,8 @@ We use automated semantic pull request validation to ensure consistent and meani
 (`verify-changesets`); commit types and scopes never affect versioning.
 
 ```bash
-bun changeset          # user-facing change: pick the bump, describe it
-bun changeset --empty  # no user-facing effect — then write why in the file body
+pnpm changeset          # user-facing change: pick the bump, describe it
+pnpm changeset --empty  # no user-facing effect — then write why in the file body
 ```
 
 > ⚠️ **Pre-1.0:** never pick a `major` bump — on `0.x` it cuts 1.0.0 (CI rejects it). Use `minor` for

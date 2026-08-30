@@ -162,7 +162,7 @@ void describe("preview controller admission", () => {
 	void it("refuses PR-controlled changes to any part of the deployment control plane", async () => {
 		for (const filename of [
 			".github/workflows/reusable-docker-build.yml",
-			".github/actions/setup-bun/action.yml",
+			".github/actions/setup-node-pnpm/action.yml",
 			"docker/preview/compose.app.yaml",
 			"docker/preview/.env.example",
 		]) {

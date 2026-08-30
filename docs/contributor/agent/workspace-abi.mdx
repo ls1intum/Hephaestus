@@ -33,7 +33,7 @@ vs writable is decided by *where* a file lives, not by convention. Three top-lev
 │   │                                #   ALWAYS present, empty on a first-ever review.
 │   └── practices/                   #   Practice catalog (index.json, {slug}.md, all-criteria.md).
 ├── work/                            # AGENT + PRECOMPUTE SCRATCH. Never collected back into SQL.
-│   ├── precompute/                  #   Per-practice precompute scripts (TypeScript, run on Bun).
+│   ├── precompute/                  #   Per-practice precompute scripts (TypeScript, run on Node).
 │   ├── precompute-out/              #   Precompute runtime output (logs, structured hints).
 │   └── analysis/practices/          #   Per-practice analysis output (holds the .gitkeep marker).
 ├── out/                             # THE ONLY collected directory — result.json, review-state.json,
@@ -55,8 +55,8 @@ vs writable is decided by *where* a file lives, not by convention. Three top-lev
 ```
 
 The mentor runner stages `pi-provider.ts`, `pi-error-text.ts` and `pi-mentor-protocol.ts` instead. Everything
-here runs on Bun; see
-[ADR 0030](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0030-agent-runtime-is-typescript-on-bun.md).
+here runs on Node; see
+[ADR 0036](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0036-agent-runtime-runs-on-node-24.md).
 
 The mentor interactive sandbox has its own `context/target/`, `context/user/`, and `scratch/` layout and is not
 covered by this ABI.
@@ -89,7 +89,7 @@ covered by this ABI.
 - **`out/`** — the *only* directory the sandbox collects after the run.
 - **`node_modules`** — a symlink to `/opt/pi-sdk/node_modules`, so the runner's bare-specifier
   import of `@earendil-works/pi-coding-agent` resolves. The runner, precompute scripts, and SDK native
-  bindings execute on Bun.
+  bindings execute on Node.
 - **`task.json`** — `TaskEnvelope<T extends Task>`. Schema version `1`. The runner asserts
   `schemaVersion` and `task.kind`, exiting `42` on mismatch (envelope/image drift signal).
 - **`.pi*`** / `inputs/practices/` / `work/precompute*` / `work/analysis/` / `out/`

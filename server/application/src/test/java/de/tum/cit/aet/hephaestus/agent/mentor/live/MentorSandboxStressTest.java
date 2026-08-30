@@ -699,7 +699,7 @@ class MentorSandboxStressTest {
         Path shim = workspace.resolve("runner-entry.ts");
         Path stagedRunner = workspace.resolve("pi-mentor-runner.ts");
         Files.writeString(shim, buildRunnerShim(workspace, stagedRunner));
-        pb.command("bun", shim.toString());
+        pb.command("node", shim.toString());
         pb.redirectErrorStream(false);
         Process process = pb.start();
         return new StdioAttachedSandbox(

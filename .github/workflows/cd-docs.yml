@@ -32,18 +32,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: ./.github/actions/setup-bun
+      - uses: ./.github/actions/setup-node-pnpm
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             docs/.docusaurus
             docs/node_modules/.cache
-          key: ${{ runner.os }}-docusaurus-preview-${{ hashFiles('bun.lock') }}-${{ hashFiles('docs/**/*.md', 'docs/**/*.mdx', 'docs/**/*.ts') }}
+          key: ${{ runner.os }}-docusaurus-preview-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('docs/**/*.md', 'docs/**/*.mdx', 'docs/**/*.ts') }}
           restore-keys: |
-            ${{ runner.os }}-docusaurus-preview-${{ hashFiles('bun.lock') }}-
+            ${{ runner.os }}-docusaurus-preview-${{ hashFiles('pnpm-lock.yaml') }}-
             ${{ runner.os }}-docusaurus-preview-
-      - run: bun install --frozen-lockfile
-      - run: bun run --filter docs build
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter docs run build
         env:
           DOCUSAURUS_BASE_URL: "/"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -59,18 +59,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: ./.github/actions/setup-bun
+      - uses: ./.github/actions/setup-node-pnpm
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             docs/.docusaurus
             docs/node_modules/.cache
-          key: ${{ runner.os }}-docusaurus-production-${{ hashFiles('bun.lock') }}-${{ hashFiles('docs/**/*.md', 'docs/**/*.mdx', 'docs/**/*.ts') }}
+          key: ${{ runner.os }}-docusaurus-production-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('docs/**/*.md', 'docs/**/*.mdx', 'docs/**/*.ts') }}
           restore-keys: |
-            ${{ runner.os }}-docusaurus-production-${{ hashFiles('bun.lock') }}-
+            ${{ runner.os }}-docusaurus-production-${{ hashFiles('pnpm-lock.yaml') }}-
             ${{ runner.os }}-docusaurus-production-
-      - run: bun install --frozen-lockfile
-      - run: bun run --filter docs build
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter docs run build
         env:
           DOCUSAURUS_BASE_URL: "/Hephaestus/"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -93,8 +93,8 @@ jobs:
         with:
           name: docs-build-preview
           path: docs-build
-      - uses: ./.github/actions/setup-bun
-      - run: bun install --frozen-lockfile --ignore-scripts
+      - uses: ./.github/actions/setup-node-pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Deploy to Surge.sh
         env:
           SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}

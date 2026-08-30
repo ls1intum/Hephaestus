@@ -25,7 +25,7 @@
  * longer has fails too, so a rename cannot leave a dead entry behind that silently checks nothing.
  *
  * Compose is read here rather than through `docker compose config`, which would be a stricter parse:
- * this gate runs in `bun run check` and the pre-push hook, where a Docker daemon is not a given, and
+ * this gate runs in `pnpm run check` and the pre-push hook, where a Docker daemon is not a given, and
  * `config` interpolates from the ambient environment, so its verdict would depend on whose shell it
  * ran in. What the shipped topology does with nothing set is the question, so the `${VAR:-default}`
  * defaults are what gets evaluated. A compose file that yields no services fails rather than passes,

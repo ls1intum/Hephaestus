@@ -46,14 +46,6 @@ RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack 
         /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
         /usr/local/bin/yarn /usr/local/bin/yarnpkg /usr/local/bin/pnpm /usr/local/bin/pnpx && \
     set -eu; \
-    if command -v bun >/dev/null 2>&1; then \
-        echo "FATAL: Bun resolves to $(command -v bun); this image must be Node-only." >&2; exit 1; \
-    fi; \
-    found="$(find /usr/bin /usr/local/bin /bin /sbin /usr/sbin /opt -maxdepth 3 -name bun \
-        \( -type f -o -type l \) 2>/dev/null || true)"; \
-    if [ -n "$found" ]; then \
-        echo "FATAL: Bun artefacts present in the image:" >&2; echo "$found" >&2; exit 1; \
-    fi; \
     node --version; \
     # `!` exempts a command from errexit and only the last iteration's status would escape the
     # loop, so each hit must fail explicitly.

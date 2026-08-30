@@ -11,7 +11,6 @@ import { loadConfig } from "./e2e-setup.ts";
 import { isHostname } from "./jean-public-test.ts";
 import { updateEnv } from "./jean-setup.ts";
 import { positivePort, readEnvFile } from "./lib/env.ts";
-import { parseIterations } from "./qualify-bun-lockfile.ts";
 
 await describe("environment parsing", async () => {
 	await test("parses data without evaluating shell syntax", async () => {
@@ -46,14 +45,6 @@ await test("duplicate configured ports fail the preflight", async () => {
 		child.once("exit", (code) => resolve([code]));
 	});
 	assert.equal(exitCode, 1);
-});
-
-await test("lockfile qualification accepts only positive integers", () => {
-	assert.equal(parseIterations(undefined), 25);
-	assert.equal(parseIterations("3"), 3);
-	assert.throws(() => parseIterations("0"), /positive integer/);
-	assert.throws(() => parseIterations("1; rm -rf /"), /positive integer/);
-	assert.throws(() => parseIterations("999999999999999999999999"), /safe integer/);
 });
 
 await test("public host validation rejects Traefik rule syntax", () => {

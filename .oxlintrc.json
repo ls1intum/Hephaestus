@@ -245,8 +245,7 @@
 				"ignoreLastCallback": true
 			}
 		],
-		// No allowance: the SPA's covers CSS side effects and module augmentation, neither of which a Bun
-		// CLI or a build script has. An import here is for what it binds.
+		// Unlike the SPA, these trees have no approved CSS side-effect or module-augmentation imports.
 		"import/no-unassigned-import": "error",
 		"no-unused-vars": [
 			"error",
@@ -273,7 +272,7 @@
 			"rules": { "import/no-relative-parent-imports": "off" }
 		},
 		{
-			// The runner and the precompute scripts execute on Bun inside the agent sandbox, and a CLI
+			// The runner and the precompute scripts execute on Node inside the agent sandbox, and a CLI
 			// entry point ends the process rather than returning a status nobody reads.
 			"files": [
 				"server/application/src/main/resources/agent/**",

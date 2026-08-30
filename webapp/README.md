@@ -10,14 +10,14 @@ look at the tree does not tell you, several of which fail the build if you guess
 
 | Task | Command |
 |------|---------|
-| Dev server | `bun run dev:webapp` — port 4200 |
-| Type check | `bun run typecheck:webapp` |
-| Lint and format | `bun run check:webapp` — does **not** type-check |
-| Unit tests | `bun run test:webapp` |
-| Storybook | `bun run --filter webapp storybook:dev` |
-| Story tests | `bun run --filter webapp test:storybook` |
+| Dev server | `pnpm run dev:webapp` — port 4200 |
+| Type check | `pnpm run typecheck:webapp` |
+| Lint and format | `pnpm run check:webapp` — does **not** type-check |
+| Unit tests | `pnpm run test:webapp` |
+| Storybook | `pnpm --filter webapp run storybook:dev` |
+| Story tests | `pnpm --filter webapp run test:storybook` |
 
-The repository-wide gates are `bun run check` before pushing and `bun run verify` before requesting
+The repository-wide gates are `pnpm run check` before pushing and `pnpm run verify` before requesting
 review; the root [`AGENTS.md`](../AGENTS.md) lists what each one covers.
 
 Component and story conventions live in the `storybook-components` skill

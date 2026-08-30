@@ -8,7 +8,7 @@ These tests drive the SPA against the real backend using the local dev login. Se
 Start the backend:
 
 ```bash
-bun dev:server:e2e
+pnpm run dev:server:e2e
 ```
 
 Create the test account and seed its workspace:
@@ -24,7 +24,7 @@ docker compose -f server/compose.yaml exec -T postgres \
 Run the suite:
 
 ```bash
-bun run --filter webapp test:e2e
+pnpm --filter webapp run test:e2e
 ```
 
 Provider-backed integration checks are opt-in because they require configured live workspaces:
@@ -32,7 +32,7 @@ Provider-backed integration checks are opt-in because they require configured li
 ```bash
 E2E_LIVE_USERNAME=e2e E2E_GITHUB_WORKSPACE=github-workspace \
   E2E_GITLAB_WORKSPACE=gitlab-workspace LIVE_INTEGRATION_E2E=true \
-  bun run --filter webapp test:e2e -- sync-observability.live.spec.ts
+  pnpm --filter webapp run test:e2e -- sync-observability.live.spec.ts
 ```
 
 Set `E2E_MUTATE_LIVE_INTEGRATIONS=true` as well to run the provider-sync mutation test.

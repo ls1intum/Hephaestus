@@ -12,7 +12,7 @@
 	"minimumReleaseAge": "3 days",
 	"semanticCommitScope": "deps",
 	"enabledManagers": [
-		"bun",
+		"npm",
 		"maven",
 		"maven-wrapper",
 		"dockerfile",

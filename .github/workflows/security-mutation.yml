@@ -5,10 +5,10 @@ on:
   pull_request:
     paths:
       - ".github/workflows/security-mutation.yml"
-      - ".github/actions/setup-bun/**"
+      - ".github/actions/setup-node-pnpm/**"
       - "package.json"
-      - "bun.lock"
-      - "bunfig.toml"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
       - "scripts/run-security-mutations.ts"
       - "scripts/run-security-mutations.test.ts"
       - "server/application/pom.xml"
@@ -46,13 +46,13 @@ jobs:
           cache: maven
           cache-dependency-path: "server/**/pom.xml"
 
-      - uses: ./.github/actions/setup-bun
+      - uses: ./.github/actions/setup-node-pnpm
 
       - name: Install repository tooling
-        run: bun install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Run security mutation suite
-        run: timeout --kill-after=30s 8m bun run test:server:mutation
+        run: timeout --kill-after=30s 8m pnpm run test:server:mutation
 
       - name: Upload mutation report
         if: always()

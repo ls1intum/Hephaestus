@@ -343,7 +343,7 @@ obligation. Only what is different about the multi-file stack is listed here.
    self-host stack brings its own; this one does not.)
 2. **Configure the environment:** Copy `docker/.env.example` to `docker/.env` and fill it in per
    [Install § 2](./install#2-configure-env) plus the three reference-only variables above. Note
-   `server/.env` is the local-development file used by `bun run dev:server` — no Compose service reads
+   `server/.env` is the local-development file used by `pnpm run dev:server` — no Compose service reads
    it.
 3. **Bootstrap secrets:** Load those variables into your secret manager or the `.env` files consumed
    by Docker/Kubernetes.

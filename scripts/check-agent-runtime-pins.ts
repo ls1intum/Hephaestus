@@ -18,9 +18,6 @@ function dockerArg(name: string): string {
 
 const nodeVersion = dockerArg("NODE_VERSION");
 const piVersion = dockerArg("PI_VERSION");
-// devEngines.runtime.version is the repository's authoritative Node pin: the setup-bun composite
-// provisions CI from it (node-version-file: package.json), so the agent suites run on the same
-// Node the image ships.
 const devEngines = isRecord(packageJson.devEngines) ? packageJson.devEngines : {};
 const devEnginesRuntime = isRecord(devEngines.runtime) ? devEngines.runtime : {};
 const repoNodeVersion = devEnginesRuntime.version;

@@ -53,7 +53,7 @@ void describe("CI contract", () => {
 			const command = scripts[name];
 			if (!command) return [];
 			const viaRun = Object.keys(scripts).filter((candidate) =>
-				new RegExp(`(?:bun|npm|pnpm) run ${escapeRegExp(candidate)}(?:\\s|$)`).test(command),
+				new RegExp(`(?:node|npm|pnpm) run ${escapeRegExp(candidate)}(?:\\s|$)`).test(command),
 			);
 			// run-s chains package scripts by name, so every named token is an edge.
 			const viaRunS = /(?:^|[;&|]\s*)run-s(?:\s|$)/.test(command)
@@ -75,9 +75,7 @@ void describe("CI contract", () => {
 		}
 		for (const source of (await workflowSources()).values()) {
 			for (const line of source.split("\n")) {
-				const invocation = line.match(
-					/^\s*(?:run:\s+)?(?:\(cd \.\. && )?bun(?: --bun)? run ([\w:-]+)/,
-				)?.[1];
+				const invocation = line.match(/^\s*(?:run:\s+)?(?:\(cd \.\. && )?pnpm run ([\w:-]+)/)?.[1];
 				if (invocation && scripts[invocation]) visit(invocation);
 				const file = line.match(/(?:^|\s)node (?:--test )?(?:\.\.\/)?(scripts\/[\w./-]+\.ts)/)?.[1];
 				for (const name of file ? (scriptsByFile.get(file) ?? []) : []) visit(name);
@@ -158,7 +156,7 @@ void describe("CI contract", () => {
 			await readFile(".github/workflows/ci-tests.yml", "utf8"),
 			"webapp-storybook",
 		);
-		assert.equal((storybook.match(/bun run --filter webapp build-storybook/g) ?? []).length, 1);
+		assert.equal((storybook.match(/pnpm --filter webapp run build-storybook/g) ?? []).length, 1);
 		assert.match(storybook, /test -s webapp\/storybook-static\/preview-stats\.json/);
 		assert.match(storybook, /storybookBuildDir: storybook-static/);
 		assert.match(storybook, /onlyChanged: true/);

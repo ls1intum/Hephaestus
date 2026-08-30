@@ -44,7 +44,7 @@ jobs:
           ref: ${{ inputs.candidate-source-sha || inputs.candidate-sha || github.sha }}
           persist-credentials: false
 
-      - uses: ./.github/actions/setup-bun
+      - uses: ./.github/actions/setup-node-pnpm
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0

@@ -43,12 +43,14 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
           sparse-checkout: |
-            .github/actions/setup-bun
+            .github/actions/setup-node-pnpm
             package.json
+            pnpm-lock.yaml
+            pnpm-workspace.yaml
             scripts
 
-      - name: Set up the repository's Bun version
-        uses: ./.github/actions/setup-bun
+      - name: Set up the repository's Node.js and pnpm versions
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Resolve the pull request head
         id: context

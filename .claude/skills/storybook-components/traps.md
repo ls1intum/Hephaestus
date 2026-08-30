@@ -48,7 +48,7 @@ story file installs no handlers at all, and `scripts/check-presentational-compon
 `.github/workflows/ci-tests.yml` runs the webapp package's `export:readme-assets` immediately after
 `test:storybook`, and fails the job if `docs/images/readme` is dirty afterwards. So the storybook job can go red
 having printed a clean pass line. If a change moves or renames a story that exports a README asset,
-run `bun run --filter webapp export:readme-assets` and commit the result.
+run `pnpm --filter webapp run export:readme-assets` and commit the result.
 
 ## 6. A hand-rolled stateful wrapper swallows the spy in `meta.args`
 

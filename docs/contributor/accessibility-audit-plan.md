@@ -42,7 +42,7 @@ WCAG criterion, owner, and target release.
 
 ## Automated checks
 
-`bun run --filter webapp test:storybook` runs the maintained Storybook states in Chromium and treats
+`pnpm --filter webapp run test:storybook` runs the maintained Storybook states in Chromium and treats
 axe violations as errors. Record the revision, browser version, command result, and retained report
 with each audit. Automated results do not establish WCAG conformance.
 
