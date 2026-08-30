@@ -25,6 +25,8 @@ allowBuilds:
   protobufjs: false
 
 overrides:
+  # unplugin 3.1+ declares an optional peer on the retired runtime's types package, whose name
+  # would re-enter the lockfile and fail check:package-manager's repository-wide token ban.
   "@tanstack/router-plugin>unplugin": 3.0.0
   mermaid: 11.16.1
   vitest: 4.1.11

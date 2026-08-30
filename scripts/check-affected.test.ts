@@ -59,6 +59,9 @@ await test("maps scopes to the documented commands", () => {
 await test("fails closed for shared, generated, contract, tooling, and unknown inputs", () => {
 	for (const path of [
 		"package.json",
+		"pnpm-lock.yaml",
+		"pnpm-workspace.yaml",
+		"patches/zod@4.4.3.patch",
 		".oxlintrc.json",
 		"scripts/check-affected.ts",
 		"server/openapi.yaml",
