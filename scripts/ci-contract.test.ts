@@ -137,18 +137,19 @@ void describe("CI contract", () => {
 		assert.deepEqual(rejected, [], "Workflows may only request recognised cache types");
 	});
 
-	void test("shares one server build with integration and E2E", async () => {
+	void test("runs server integration independently and reuses the server build for E2E", async () => {
 		const source = await readFile(".github/workflows/ci-tests.yml", "utf8");
 		const build = job(source, "server-build");
 		const integration = job(source, "server-integration");
 		const e2e = job(source, "webapp-e2e");
 		assert.equal((build.match(/actions\/upload-artifact@/g) ?? []).length, 1);
-		for (const consumer of [integration, e2e]) {
-			assert.match(consumer, /needs: server-build/);
-			assert.equal((consumer.match(/actions\/download-artifact@/g) ?? []).length, 1);
-			assert.match(consumer, /name: \${{ env\.SERVER_REACTOR_ARTIFACT }}/);
-		}
-		assert.match(integration, /\.\/mvnw -pl application -am initialize surefire:test/);
+		assert.match(build, /name: \${{ env\.SERVER_REACTOR_ARTIFACT }}/);
+		assert.doesNotMatch(integration, /^ {4}needs:/m);
+		assert.doesNotMatch(integration, /actions\/download-artifact@/);
+		assert.match(integration, /pnpm run test:server:integration/);
+		assert.match(e2e, /needs: server-build/);
+		assert.equal((e2e.match(/actions\/download-artifact@/g) ?? []).length, 1);
+		assert.match(e2e, /name: \${{ env\.SERVER_REACTOR_ARTIFACT }}/);
 	});
 
 	void test("builds Storybook once and gives its TurboSnap stats to Chromatic", async () => {
