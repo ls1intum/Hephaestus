@@ -103,11 +103,21 @@ jobs:
           fetch-depth: ${{ matrix.check == 'application-server-quality' && '0' || '1' }}
           persist-credentials: false
 
-      - name: Setup Node.js and pnpm
+      - name: Setup JavaScript toolchain
         if: steps.should_run.outputs.run == 'true'
         uses: ./.github/actions/setup-node-pnpm
         with:
           install: "frozen"
+
+      - name: Restore Vite Task cache
+        if: steps.should_run.outputs.run == 'true' && matrix.check != 'server-contracts'
+        id: vite-task-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules/.vite/task-cache
+          key: vite-task-${{ runner.os }}-${{ runner.arch }}-${{ matrix.check }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            vite-task-${{ runner.os }}-${{ runner.arch }}-${{ matrix.check }}-
 
       - name: Setup application-server caches
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'application-server-quality'
@@ -129,8 +139,8 @@ jobs:
           ISSUES_FOUND=()
           SERVER_OK=true; PMD_CANARY_OK=true; NULLNESS_OK=true; CONTRACTS_OK=true; ENV_OK=true
 
-          pnpm run check:server || { SERVER_OK=false; ISSUES_FOUND+=("Server formatting or PMD failed. Run: pnpm run check:server"); }
-          pnpm run check:java-nullness \
+          vp run gate:server || { SERVER_OK=false; ISSUES_FOUND+=("Server formatting or PMD failed. Run: pnpm run check:server"); }
+          vp run gate:java-nullness \
             || { NULLNESS_OK=false; ISSUES_FOUND+=("Java nullness policy failed. Run: pnpm run check:java-nullness"); }
           if [ "$SERVER_OK" = "true" ] && [ "${INPUTS_PMD_CANARY}" = "true" ]; then
             PMD_CANARY=server/application/src/main/java/de/tum/cit/aet/hephaestus/Application.java
@@ -144,8 +154,8 @@ jobs:
             cp "$RUNNER_TEMP/Application.java" "$PMD_CANARY"
             trap - EXIT
           fi
-          pnpm run check:contracts || { CONTRACTS_OK=false; ISSUES_FOUND+=("Artifact-source contract validation failed. Run: pnpm run check:contracts"); }
-          pnpm run check:env || { ENV_OK=false; ISSUES_FOUND+=("A setting does not reach a container that can read it. Run: pnpm run check:env"); }
+          vp run gate:contracts || { CONTRACTS_OK=false; ISSUES_FOUND+=("Artifact-source contract validation failed. Run: pnpm run check:contracts"); }
+          vp run gate:env || { ENV_OK=false; ISSUES_FOUND+=("A setting does not reach a container that can read it. Run: pnpm run check:env"); }
 
           if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
             echo "### App Server Quality" >> $GITHUB_STEP_SUMMARY
@@ -165,23 +175,19 @@ jobs:
       - name: Tooling and docs quality
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'tooling-quality'
         run: |
-          pnpm run check:package-manager
-          pnpm run check:agent-runtime-pins
-          pnpm run check:agents
-          pnpm run format:load:check
-          pnpm run test:load:syntax
-          pnpm run test:agents
-          pnpm run check:instructions
-          pnpm run docs:lint
-          pnpm run check:diagrams
+          vp run gate:package-manager
+          vp run gate:agent-runtime-pins
+          vp run gate:agents
+          vp run gate:load-format
+          vp run gate:load-syntax
+          vp run gate:agent-tests
+          vp run gate:instructions
+          vp run gate:docs
+          vp run gate:diagrams
 
       - name: Webapp quality
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'webapp-quality'
-        working-directory: ./webapp
         run: |
-          cd ..
-          cd webapp
-
           ISSUES_FOUND=()
           CLIENT_OK=true
           COMPONENTS_OK=true
@@ -192,20 +198,20 @@ jobs:
           ROUTES_OK=true
           TESTS_OK=true
 
-          (cd .. && pnpm run check:client) || {
+          vp run gate:webapp || {
             CLIENT_OK=false
             ISSUES_FOUND+=("Webapp lint, formatting, or typecheck failed. Run: pnpm run check:client")
           }
-          (cd .. && pnpm run check:components) || { COMPONENTS_OK=false; ISSUES_FOUND+=("Components must take data as props. Run: pnpm run check:components"); }
-          (cd .. && pnpm run check:stories) || { STORIES_OK=false; ISSUES_FOUND+=("Story prose renders HTML paragraphs. Run: pnpm run check:stories"); }
-          (cd .. && pnpm run check:story-sort) || { SORT_OK=false; ISSUES_FOUND+=("Storybook sidebar order is stale. Run: pnpm run check:story-sort"); }
-          (cd .. && pnpm run check:docs-tokens) || { TOKENS_OK=false; ISSUES_FOUND+=("The docs site copies a web app colour that has since changed. Run: pnpm run check:docs-tokens"); }
-          timeout --kill-after=30s 10m pnpm run test \
+          vp run gate:components || { COMPONENTS_OK=false; ISSUES_FOUND+=("Components must take data as props. Run: pnpm run check:components"); }
+          vp run gate:stories || { STORIES_OK=false; ISSUES_FOUND+=("Story prose renders HTML paragraphs. Run: pnpm run check:stories"); }
+          vp run gate:story-sort || { SORT_OK=false; ISSUES_FOUND+=("Storybook sidebar order is stale. Run: pnpm run check:story-sort"); }
+          vp run gate:docs-tokens || { TOKENS_OK=false; ISSUES_FOUND+=("The docs site copies a web app colour that has since changed. Run: pnpm run check:docs-tokens"); }
+          timeout --kill-after=30s 10m vp run gate:webapp-tests \
             || { TESTS_OK=false; ISSUES_FOUND+=("Unit tests failed. Run: cd webapp && pnpm run test"); }
 
           # Vite generates src/routeTree.gen.ts; compare it with the committed copy after building.
-          pnpm exec vite build || { BUILD_OK=false; ISSUES_FOUND+=("The webapp does not build. Run: cd webapp && pnpm run build"); }
-          if [ "$BUILD_OK" = "true" ] && ! git diff --exit-code -- src/routeTree.gen.ts; then
+          vp run gate:webapp-build || { BUILD_OK=false; ISSUES_FOUND+=("The webapp does not build. Run: cd webapp && pnpm run build"); }
+          if [ "$BUILD_OK" = "true" ] && ! git diff --exit-code -- webapp/src/routeTree.gen.ts; then
             ROUTES_OK=false
             ISSUES_FOUND+=("routeTree.gen.ts is stale. Run: cd webapp && pnpm run build, then commit the result")
           fi
@@ -347,3 +353,10 @@ jobs:
             echo "::error::OpenAPI or database validation failed; review both independently reported steps."
             exit 1
           fi
+
+      - name: Save Vite Task cache
+        if: steps.should_run.outputs.run == 'true' && matrix.check != 'server-contracts' && success()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules/.vite/task-cache
+          key: ${{ steps.vite-task-cache.outputs.cache-primary-key }}

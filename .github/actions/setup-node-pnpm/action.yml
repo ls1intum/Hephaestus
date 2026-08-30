@@ -1,5 +1,5 @@
-name: "Setup Node.js and pnpm"
-description: "Installs the versions declared by package.json and restores the pnpm store cache."
+name: "Setup JavaScript toolchain"
+description: "Installs the versions declared by package.json, restores the pnpm store cache, and provisions the pinned Vite+ toolchain."
 inputs:
   install:
     description: "Install mode: none skips, frozen requires the lockfile, hardened also disables lifecycle scripts."
@@ -11,13 +11,23 @@ runs:
     - name: Disable Git hooks in CI
       shell: bash
       run: echo "HUSKY=0" >> "$GITHUB_ENV"
-    - name: Setup Node.js and pnpm
+    - name: Setup repository-pinned Node.js
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version-file: package.json
+    - name: Setup repository-pinned pnpm
       uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
       with:
         cache: true
         cache-dependency-path: pnpm-lock.yaml
         install: ${{ inputs.install == 'frozen' }}
         require-lockfile: ${{ inputs.install == 'frozen' }}
+    - name: Setup Vite+
+      uses: voidzero-dev/setup-vp@1b32467adbe183473499fd9d5d372c3ed9641754 # v1.18.0
+      with:
+        node-manager: false
+        cache: false
+        run-install: false
     - name: Validate install mode
       shell: bash
       env:

@@ -69,6 +69,7 @@ jobs:
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'
             webapp-image:
+              - '.oxfmtrc.json'
               - 'patches/**'
               - 'webapp/public/**'
               - 'webapp/docker/**'

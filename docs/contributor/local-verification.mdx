@@ -47,3 +47,11 @@ never rewrites the working tree.
 The live hosted-check inventory is documented in [CI/CD](./ci-cd.mdx). CI additionally owns checks
 that need browsers, services, images, release infrastructure, or credentials. Hosted CI performance is
 tracked in [issue #1496](https://github.com/ls1intum/Hephaestus/issues/1496).
+
+## Vite+ task cache
+
+Use `pnpm run check` for the local quality gate and `pnpm run verify` for the complete local CI mirror.
+Both enter the Vite+ task graph and reuse unchanged task results. Run `vp run --last-details` to
+inspect the latest run or `vp cache clean` to discard the local task cache.
+
+Node is pinned by `package.json#devEngines.runtime`; Vite+ does not manage the runtime.
