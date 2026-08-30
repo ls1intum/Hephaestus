@@ -33,4 +33,9 @@ export async function loginAsDevAdmin(page: Page, username = "e2e"): Promise<voi
 	await page.getByPlaceholder("username").fill(username);
 	await page.getByRole("button", { name: /continue as dev admin/i }).click();
 	await page.waitForURL((url) => !url.pathname.startsWith("/login"));
+	if (new URL(page.url()).pathname === "/consent") {
+		await page.getByRole("checkbox", { name: /terms/i }).check();
+		await page.getByRole("button", { name: /continue/i }).click();
+		await page.waitForURL((url) => url.pathname !== "/consent");
+	}
 }
