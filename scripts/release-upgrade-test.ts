@@ -43,7 +43,12 @@ function startApplication(name: string, image: string): number {
 		"--env",
 		"SPRING_DATASOURCE_PASSWORD=root",
 		"--env",
-		"NATS_ENABLED=false",
+		"HEPHAESTUS_SYNC_NATS_ENABLED=false",
+		"--env",
+		// Exercise the server/database upgrade without optional worker infrastructure.
+		"HEPHAESTUS_RUNTIME_WORKER_ENABLED=false",
+		"--env",
+		"HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED=false",
 		"--env",
 		"AGENT_ENABLED=false",
 		"--env",
