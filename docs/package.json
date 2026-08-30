@@ -3,17 +3,17 @@
 	"version": "0.0.0",
 	"private": true,
 	"scripts": {
-		"start": "docusaurus start --no-open",
-		"build": "docusaurus build",
+		"start": "vp exec docusaurus start --no-open",
+		"build": "vp exec docusaurus build",
 		"swizzle": "docusaurus swizzle",
 		"deploy": "docusaurus deploy",
 		"clear": "docusaurus clear",
-		"serve": "docusaurus serve",
+		"serve": "vp exec docusaurus serve",
 		"write-translations": "docusaurus write-translations",
 		"write-heading-ids": "docusaurus write-heading-ids",
-		"typecheck": "tsc --noEmit",
-		"lint:md": "markdownlint-cli2",
-		"lint": "pnpm run typecheck && pnpm run lint:md"
+		"typecheck": "vp lint --type-aware --type-check .",
+		"lint:md": "vp exec markdownlint-cli2",
+		"lint": "vp lint --type-aware --type-check . && vp exec markdownlint-cli2"
 	},
 	"dependencies": {
 		"@docusaurus/core": "3.10.1",

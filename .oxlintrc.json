@@ -12,7 +12,7 @@
 
 	// Root-only, and global: `typeAware` governs every config in the repo, nested ones included. It
 	// needs `oxlint-tsgolint`; without it oxlint refuses to start rather than skipping the rules.
-	"options": { "reportUnusedDisableDirectives": "error", "typeAware": true },
+	"options": { "reportUnusedDisableDirectives": "error", "typeAware": true, "typeCheck": true },
 
 	"categories": {
 		"correctness": "error",

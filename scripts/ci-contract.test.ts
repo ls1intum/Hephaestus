@@ -241,3 +241,62 @@ void describe("CI contract", () => {
 		}
 	});
 });
+
+void test("CI and package scripts enter the Vite+ task graph", async () => {
+	const manifest: unknown = JSON.parse(await readFile("package.json", "utf8"));
+	assert.ok(
+		manifest &&
+			typeof manifest === "object" &&
+			"scripts" in manifest &&
+			"devDependencies" in manifest,
+	);
+	const scripts: unknown = manifest.scripts;
+	const devDependencies: unknown = manifest.devDependencies;
+	assert.ok(scripts && typeof scripts === "object");
+	assert.ok(devDependencies && typeof devDependencies === "object");
+	assert.ok("check" in scripts && "verify" in scripts);
+	assert.equal(scripts.check, "vp run quality");
+	assert.equal(scripts.verify, "vp run verification");
+	assert.equal("npm-run-all2" in devDependencies, false);
+
+	const graph = await readFile("vite.config.ts", "utf8");
+	for (const entry of [
+		"quality",
+		"verification",
+		"gate:server",
+		"gate:env",
+		"gate:lint-contract",
+	]) {
+		assert.match(graph, new RegExp(`(?:^|\\s)"?${escapeRegExp(entry)}"?:`));
+	}
+	for (const entry of [
+		"gate:package-manager",
+		"gate:java-nullness",
+		"gate:server",
+		"gate:lint-contract",
+		"gate:agents",
+		"gate:agent-tests",
+		"gate:preview-stack",
+		"gate:env",
+		"gate:contracts",
+		"gate:instructions",
+		"gate:docs",
+		"gate:webapp-tests",
+		"gate:webapp-build",
+		"gate:load-syntax",
+		"gate:verify:storybook-tests",
+		"gate:verify:webapp-build",
+		"gate:verify:storybook-build",
+		"gate:verify:docs-build",
+		"gate:verify:server",
+	])
+		assert.match(graph, new RegExp(`"${escapeRegExp(entry)}": uncached\\(`));
+
+	for (const [file, source] of await workflowSources()) {
+		assert.doesNotMatch(
+			source,
+			/^\s*(?:run:\s*)?(?:pnpm exec )?(?:vite|vitest|oxlint|oxfmt)(?:\s|$)/m,
+			`${file} bypasses the pinned Vite+ interface`,
+		);
+	}
+});

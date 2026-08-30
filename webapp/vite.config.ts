@@ -2,91 +2,112 @@ import * as fs from "node:fs";
 import path, { resolve } from "node:path";
 
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
-import { defineConfig, type ViteDevServer } from "vite";
+import { parse } from "jsonc-parser";
+import type { OxfmtConfig } from "oxfmt";
+import type { OxlintConfig } from "oxlint";
 import Terminal from "vite-plugin-terminal";
+import type { ViteDevServer } from "vite-plus";
 import { configDefaults } from "vitest/config";
 
 import { appSourcePlugins } from "./vite.shared.ts";
 
-// https://vitejs.dev/config/
-export default defineConfig(({ command }) => {
-	const isDevelopment = command !== "build";
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion
+const formatConfig = parse(
+	fs.readFileSync(new URL("../.oxfmtrc.json", import.meta.url), "utf8"),
+) as OxfmtConfig;
+const fmt = {
+	...formatConfig,
+	ignorePatterns: [
+		"**/*.md",
+		"**/*.html",
+		"src/api/**",
+		"src/routeTree.gen.ts",
+		"public/mockServiceWorker.js",
+	],
+};
 
-	return {
-		plugins: [
-			tanstackRouter({ autoCodeSplitting: true }),
-			...appSourcePlugins(),
-			isDevelopment &&
-				Terminal({
-					output: ["terminal", "console"],
-				}),
-			// Dev only plugin to serialize the achievement node layout from the dev mode into a json file for consistency
-			isDevelopment && {
-				name: "save-achievement-layout",
-				apply: "serve" as const,
-				configureServer(server: ViteDevServer) {
-					server.middlewares.use("/__save-coordinates", (req, res) => {
-						if (req.method !== "POST") {
-							res.statusCode = 405;
-							res.end("Method Not Allowed");
-							return;
-						}
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion
+const lintConfig = parse(
+	fs.readFileSync(new URL(".oxlintrc.json", import.meta.url), "utf8"),
+) as OxlintConfig;
+const lint = {
+	...lintConfig,
+	options: { ...lintConfig.options, typeAware: true, typeCheck: true },
+};
 
-						let body = "";
-						req.on("data", (chunk: Buffer) => {
-							body += chunk.toString();
-						});
+const viteConfig = {
+	root: import.meta.dirname,
+	fmt,
+	lint,
+	plugins: [
+		tanstackRouter({ autoCodeSplitting: true }),
+		...appSourcePlugins(),
+		...Terminal({ output: ["terminal", "console"] }).map(
+			(plugin) => plugin && { ...plugin, apply: "serve" as const },
+		),
+		{
+			name: "save-achievement-layout",
+			apply: "serve" as const,
+			configureServer(server: ViteDevServer) {
+				server.middlewares.use("/__save-coordinates", (req, res) => {
+					if (req.method !== "POST") {
+						res.statusCode = 405;
+						res.end("Method Not Allowed");
+						return;
+					}
 
-						req.on("end", () => {
-							try {
-								JSON.parse(body);
-								const filePath = path.resolve(
-									import.meta.dirname,
-									"src/components/achievements/coordinates.json",
-								);
-								fs.writeFileSync(filePath, body);
-								res.statusCode = 200;
-								res.end("Layout saved successfully");
-							} catch {
-								res.statusCode = 400;
-								res.end("Invalid JSON");
-							}
-						});
+					let body = "";
+					req.on("data", (chunk: Buffer) => {
+						body += chunk.toString();
 					});
-				},
-			},
-		],
-		build: {
-			sourcemap: false,
-		},
-		optimizeDeps: {
-			exclude: ["storybook-static"],
-		},
-		test: {
-			globals: true,
-			environment: "jsdom",
-			// Keep Vitest out of the Playwright harness — e2e/*.spec.ts is browser-driven and must run via
-			// `playwright test`, not Vitest (it imports @playwright/test and has no jsdom equivalent).
-			exclude: [...configDefaults.exclude, "e2e/**"],
-			// Stand up the MSW Node server (handlers shared with Storybook) for the query-driven
-			// auth component tests; harmless for tests that issue no requests (unhandled = bypass).
-			setupFiles: ["./src/test/setup-msw.ts"],
-			reporters: ["default", "junit"],
-			outputFile: {
-				junit: "./test-results/junit-webapp.xml",
+
+					req.on("end", () => {
+						try {
+							JSON.parse(body);
+							const filePath = path.resolve(
+								import.meta.dirname,
+								"src/components/achievements/coordinates.json",
+							);
+							fs.writeFileSync(filePath, body);
+							res.statusCode = 200;
+							res.end("Layout saved successfully");
+						} catch {
+							res.statusCode = 400;
+							res.end("Invalid JSON");
+						}
+					});
+				});
 			},
 		},
-		resolve: {
-			alias: {
-				"@": resolve(import.meta.dirname, "./src"),
-			},
+	],
+	build: {
+		sourcemap: false,
+	},
+	optimizeDeps: {
+		exclude: ["storybook-static"],
+	},
+	test: {
+		globals: true,
+		environment: "jsdom",
+		exclude: [...configDefaults.exclude, "e2e/**"],
+		setupFiles: ["./src/test/setup-msw.ts"],
+		reporters: ["default", "junit"],
+		outputFile: {
+			junit: "./test-results/junit-webapp.xml",
 		},
-		server: {
-			port: Number.parseInt(process.env.WEBAPP_PORT ?? "", 10) || 4200,
-			strictPort: true,
-			fs: {
-				allow: [resolve(import.meta.dirname, "..")],
-			},
+	},
+	resolve: {
+		alias: {
+			"@": resolve(import.meta.dirname, "./src"),
 		},
-	};
-});
+	},
+	server: {
+		port: Number.parseInt(process.env.WEBAPP_PORT ?? "", 10) || 4200,
+		strictPort: true,
+		fs: {
+			allow: [resolve(import.meta.dirname, "..")],
+		},
+	},
+};
+
+export default viteConfig;

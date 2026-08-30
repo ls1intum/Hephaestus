@@ -102,6 +102,12 @@ expectConfig("allowBuilds", {
 });
 
 const setup = readFileSync(".github/actions/setup-node-pnpm/action.yml", "utf8");
+if (!/^\s*uses: actions\/setup-node@[a-f0-9]{40} # v7\.0\.0$/m.test(setup)) {
+	throw new Error("setup-node-pnpm must pin actions/setup-node to a full commit SHA");
+}
+if (!/^\s*node-version-file: package\.json$/m.test(setup)) {
+	throw new Error("CI must provision package.json#devEngines.runtime before setup-vp");
+}
 if (!/^\s*uses: pnpm\/setup@[a-f0-9]{40} # v\d+\.\d+\.\d+$/m.test(setup)) {
 	throw new Error("setup-node-pnpm must pin pnpm/setup to a full commit SHA");
 }
@@ -112,6 +118,15 @@ if (
 	!setup.includes("pnpm install --frozen-lockfile --ignore-scripts")
 ) {
 	throw new Error("setup-node-pnpm must own frozen and hardened dependency installation");
+}
+if (!/^\s*uses: voidzero-dev\/setup-vp@[a-f0-9]{40} # v1\.18\.0$/m.test(setup)) {
+	throw new Error("setup-node-pnpm must pin setup-vp to a full commit SHA");
+}
+if (!/^\s*node-manager: false$/m.test(setup)) {
+	throw new Error("setup-vp must leave Node management to the repository-pinned runtime");
+}
+if (!/^\s*run-install: false$/m.test(setup)) {
+	throw new Error("setup-vp must leave dependency installation to the install-mode input");
 }
 if (/^\s*(?:version|runtime):/m.test(setup)) {
 	throw new Error("setup-node-pnpm must read tool versions from package.json");

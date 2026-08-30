@@ -90,12 +90,12 @@ export function changedPaths(requestedBase: string, cwd = process.cwd()): string
 }
 
 export function commandsFor(scopes: Scope[]): Command[] {
-	if (scopes.includes("full")) return [["pnpm", "run", "check"]];
+	if (scopes.includes("full")) return [["vp", "run", "quality"]];
 	const commands: Record<Exclude<Scope, "full">, Command> = {
-		agents: ["pnpm", "run", "check:agent-runtime"],
-		docs: ["pnpm", "run", "check:docs"],
-		server: ["pnpm", "run", "check:server:affected"],
-		webapp: ["pnpm", "run", "check:webapp:affected"],
+		agents: ["vp", "run", "affected:agents"],
+		docs: ["vp", "run", "affected:docs"],
+		server: ["vp", "run", "affected:server"],
+		webapp: ["vp", "run", "affected:webapp"],
 	};
 	return scopes.map((scope) => {
 		if (scope === "full") throw new Error("Full scope must override scoped commands");

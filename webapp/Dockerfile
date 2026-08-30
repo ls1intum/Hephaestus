@@ -2,7 +2,7 @@
 FROM ghcr.io/pnpm/pnpm:12.0.0@sha256:bce5ae25ef95edd79e696d7fa8489b80561ef660100fd35bd0286d0f90db3dcc AS build
 WORKDIR /repo
 RUN pnpm runtime set node 24.19.0 -g
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json /repo/
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .oxfmtrc.json /repo/
 COPY patches/ /repo/patches/
 COPY webapp/package.json /repo/webapp/
 COPY docs/package.json /repo/docs/
