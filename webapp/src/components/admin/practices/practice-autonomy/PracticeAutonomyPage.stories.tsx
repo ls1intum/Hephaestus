@@ -202,6 +202,9 @@ export const GroupOverride: Story = {
 		});
 		await expect(within(testing).getByRole("radio", { name: "Off" })).toBeChecked();
 		await userEvent.click(within(testing).getByRole("radio", { name: "Send automatically" }));
+		const dialog = within(await screen.findByRole("alertdialog"));
+		await expect(args.onSetGroupAutonomy).not.toHaveBeenCalled();
+		await userEvent.click(dialog.getByRole("button", { name: "Start sending automatically" }));
 		await expect(args.onSetGroupAutonomy).toHaveBeenCalledWith("testing", "AUTOMATIC");
 
 		const unassigned = canvas.getByText("Unassigned").closest('[data-slot="accordion-item"]');
@@ -210,6 +213,34 @@ export const GroupOverride: Story = {
 		await expect(
 			within(unassigned).queryByRole("radiogroup", { name: /How far reviews go in/ }),
 		).not.toBeInTheDocument();
+	},
+};
+
+export const WorkspaceAutomaticCanBeCancelled: Story = {
+	play: async ({ args, canvas, userEvent }) => {
+		const workspace = canvas.getByRole("radiogroup", {
+			name: "How far reviews go without you",
+		});
+		await userEvent.click(within(workspace).getByRole("radio", { name: "Send automatically" }));
+		const dialog = within(await screen.findByRole("alertdialog"));
+		await userEvent.click(dialog.getByRole("button", { name: "Cancel" }));
+		await expect(args.onSetWorkspaceDefault).not.toHaveBeenCalled();
+	},
+};
+
+export const PracticeAutomaticRequiresConfirmation: Story = {
+	play: async ({ args, canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: /Pull request hygiene/ }));
+		const row = canvas.getByText("States the motivation").closest("li");
+		if (!(row instanceof HTMLElement)) throw new Error("Practice row not rendered");
+		await userEvent.click(within(row).getByRole("radio", { name: "Send automatically" }));
+		const dialog = within(await screen.findByRole("alertdialog"));
+		await expect(args.onSetPracticeAutonomy).not.toHaveBeenCalled();
+		await userEvent.click(dialog.getByRole("button", { name: "Start sending automatically" }));
+		await expect(args.onSetPracticeAutonomy).toHaveBeenCalledWith(
+			"pull-request-hygiene-states-the-motivation",
+			"AUTOMATIC",
+		);
 	},
 };
 
@@ -340,7 +371,7 @@ export const BulkSet: Story = {
 	},
 };
 
-export const BulkAutomaticShowsBlastRadius: Story = {
+export const BulkAutomaticRequiresConfirmation: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: /Pull request hygiene/ }));
 		await userEvent.click(
@@ -354,11 +385,9 @@ export const BulkAutomaticShowsBlastRadius: Story = {
 		);
 
 		const dialog = within(await screen.findByRole("alertdialog"));
-		await expectSettledVisible(dialog.getByText(/2 selected practices/));
-		await expectSettledVisible(dialog.getByText(/42 review jobs entered/));
 		await expect(args.onBulkSetAutonomy).not.toHaveBeenCalled();
 
-		await userEvent.click(dialog.getByRole("button", { name: "Send automatically" }));
+		await userEvent.click(dialog.getByRole("button", { name: "Start sending automatically" }));
 		await expect(args.onBulkSetAutonomy).toHaveBeenCalledWith(
 			[
 				"pull-request-hygiene-states-the-motivation",
