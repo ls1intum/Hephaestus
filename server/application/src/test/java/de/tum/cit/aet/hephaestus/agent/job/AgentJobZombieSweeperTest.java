@@ -93,7 +93,8 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
                 transactionTemplate,
                 lifecycleService,
                 usageRecorder,
-                meterRegistry);
+                meterRegistry,
+                new AgentJobTelemetry(meterRegistry));
     }
 
     private ConfigSnapshot admittedSnapshot(int timeoutSeconds) {

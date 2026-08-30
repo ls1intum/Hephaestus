@@ -323,7 +323,7 @@ public class AgentJobService {
                             "Deduplicated job submission: existingJobId={}, idempotencyKey={}",
                             existing.get().getId(),
                             detectionKey);
-                    return SubmissionOutcome.of(existing.get());
+                    return SubmissionOutcome.joined(existing.get());
                 }
             }
 
@@ -397,16 +397,14 @@ public class AgentJobService {
                 signalRecorder.markTriggered(signalKey, job.getId());
             }
 
-            log.info(
-                    "Agent job submitted: jobId={}, jobType={}, workspaceId={}",
-                    job.getId(),
-                    jobType,
-                    workspace.getId());
-
-            return SubmissionOutcome.of(job);
+            return SubmissionOutcome.created(job);
         });
-        // Every branch above returns an outcome; a null here would be a refusal with no reason.
-        return Objects.requireNonNull(outcome, "submission outcome");
+        SubmissionOutcome committed = Objects.requireNonNull(outcome, "submission outcome");
+        AgentJob job = committed.job();
+        if (job != null && committed.created()) {
+            AgentJobTelemetry.queued(job);
+        }
+        return committed;
     }
 
     /** Settle a refused signal inside the submission transaction, so the two stand or fall together. */

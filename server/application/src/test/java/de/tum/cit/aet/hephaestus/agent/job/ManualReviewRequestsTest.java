@@ -334,7 +334,7 @@ class ManualReviewRequestsTest extends BaseUnitTest {
         AgentJob job = new AgentJob();
         job.setId(UUID.randomUUID());
         when(agentJobService.submitWithOutcome(anyLong(), any(), any(), any(), any(GateDecision.Detect.class)))
-                .thenReturn(SubmissionOutcome.of(job));
+                .thenReturn(SubmissionOutcome.created(job));
     }
 
     private PullRequest pullRequest() {

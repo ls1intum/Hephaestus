@@ -7,6 +7,8 @@ public final class AgentMetrics {
     public static final String AGENT_JOB_DELIVERY_RECOVERED = "agent.job.delivery.recovered";
     public static final String AGENT_JOB_EXECUTION_DURATION = "agent.job.execution.duration";
     public static final String AGENT_JOB_INFRA_RETRY_REQUEUED = "agent.job.infra.retry.requeued";
+    public static final String AGENT_JOB_TOTAL = "agent.job.total";
+    public static final String AGENT_JOB_DURATION = "agent.job.duration";
     public static final String AGENT_JOB_ORPHAN_FAILED = "agent.job.orphan.failed";
     public static final String AGENT_JOB_ORPHAN_REQUEUED = "agent.job.orphan.requeued";
     public static final String AGENT_JOB_RETENTION_DELETED = "agent.job.retention.deleted";

@@ -153,6 +153,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 transactionTemplate,
                 objectMapper,
                 meterRegistry,
+                new AgentJobTelemetry(meterRegistry),
                 usageRecorder,
                 llmBudgetService,
                 NO_LIVE_ADMISSION,
@@ -279,6 +280,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     transactionTemplate,
                     objectMapper,
                     meterRegistry,
+                    new AgentJobTelemetry(meterRegistry),
                     usageRecorder,
                     llmBudgetService,
                     NO_LIVE_ADMISSION,
@@ -726,6 +728,20 @@ class AgentJobExecutorTest extends BaseUnitTest {
                             .counter()
                             .count())
                     .isOne();
+            // The pre-existing execution-duration label is unchanged; the lifecycle contract records
+            // the committed terminal state as completed.
+            assertThat(meterRegistry
+                            .get("agent.job.execution.duration")
+                            .tag("status", "INSUFFICIENT_EVIDENCE")
+                            .timer()
+                            .count())
+                    .isOne();
+            assertThat(meterRegistry
+                            .get("agent.job.total")
+                            .tag("outcome", "completed")
+                            .counter()
+                            .count())
+                    .isOne();
             verify(sandboxManager, never()).execute(any());
         }
 
@@ -935,7 +951,6 @@ class AgentJobExecutorTest extends BaseUnitTest {
         }
     }
 
-    /** See AgentJobExecutor#handleExecutionFailure's javadoc for why this errs conservative. */
     @Nested
     @DisplayName("Error classification")
     class ErrorClassification {
@@ -982,6 +997,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     transactionTemplate,
                     objectMapper,
                     meterRegistry,
+                    new AgentJobTelemetry(meterRegistry),
                     usageRecorder,
                     llmBudgetService,
                     NO_LIVE_ADMISSION,
@@ -1043,6 +1059,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     transactionTemplate,
                     objectMapper,
                     meterRegistry,
+                    new AgentJobTelemetry(meterRegistry),
                     usageRecorder,
                     llmBudgetService,
                     NO_LIVE_ADMISSION,
@@ -1086,6 +1103,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     transactionTemplate,
                     objectMapper,
                     meterRegistry,
+                    new AgentJobTelemetry(meterRegistry),
                     usageRecorder,
                     llmBudgetService,
                     NO_LIVE_ADMISSION,
@@ -1522,6 +1540,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     transactionTemplate,
                     objectMapper,
                     meterRegistry,
+                    new AgentJobTelemetry(meterRegistry),
                     usageRecorder,
                     llmBudgetService,
                     NO_LIVE_ADMISSION,
@@ -1586,6 +1605,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     transactionTemplate,
                     objectMapper,
                     meterRegistry,
+                    new AgentJobTelemetry(meterRegistry),
                     usageRecorder,
                     llmBudgetService,
                     NO_LIVE_ADMISSION,
@@ -1634,6 +1654,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     transactionTemplate,
                     objectMapper,
                     meterRegistry,
+                    new AgentJobTelemetry(meterRegistry),
                     usageRecorder,
                     llmBudgetService,
                     NO_LIVE_ADMISSION,
@@ -1694,6 +1715,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                         transactionTemplate,
                         objectMapper,
                         meterRegistry,
+                        new AgentJobTelemetry(meterRegistry),
                         usageRecorder,
                         llmBudgetService,
                         NO_LIVE_ADMISSION,
@@ -1727,6 +1749,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     transactionTemplate,
                     objectMapper,
                     meterRegistry,
+                    new AgentJobTelemetry(meterRegistry),
                     usageRecorder,
                     llmBudgetService,
                     NO_LIVE_ADMISSION,
@@ -1767,6 +1790,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     transactionTemplate,
                     objectMapper,
                     meterRegistry,
+                    new AgentJobTelemetry(meterRegistry),
                     usageRecorder,
                     llmBudgetService,
                     NO_LIVE_ADMISSION,
@@ -1824,6 +1848,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     transactionTemplate,
                     objectMapper,
                     meterRegistry,
+                    new AgentJobTelemetry(meterRegistry),
                     usageRecorder,
                     llmBudgetService,
                     NO_LIVE_ADMISSION,
@@ -1860,6 +1885,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
                     transactionTemplate,
                     objectMapper,
                     meterRegistry,
+                    new AgentJobTelemetry(meterRegistry),
                     usageRecorder,
                     llmBudgetService,
                     NO_LIVE_ADMISSION,

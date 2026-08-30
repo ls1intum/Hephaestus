@@ -74,6 +74,7 @@ public class AgentJobZombieSweeper {
     private final Counter orphanFailed;
     private final Counter deliveryRecovered;
     private final Counter snapshotUnreadable;
+    private final AgentJobTelemetry jobTelemetry;
 
     @Autowired
     public AgentJobZombieSweeper(
@@ -84,7 +85,8 @@ public class AgentJobZombieSweeper {
             TransactionTemplate transactionTemplate,
             AgentJobLifecycleService lifecycleService,
             LlmUsageRecorder usageRecorder,
-            MeterRegistry meterRegistry) {
+            MeterRegistry meterRegistry,
+            AgentJobTelemetry jobTelemetry) {
         this.jobRepository = jobRepository;
         this.workerRegistryRepository = workerRegistryRepository;
         this.agentProperties = agentProperties;
@@ -107,6 +109,7 @@ public class AgentJobZombieSweeper {
         this.snapshotUnreadable = Counter.builder(AgentMetrics.AGENT_JOB_SNAPSHOT_UNREADABLE)
                 .description("Terminal accounting events whose config snapshot could not be read; billed UNPRICED")
                 .register(meterRegistry);
+        this.jobTelemetry = jobTelemetry;
     }
 
     /**
@@ -126,21 +129,24 @@ public class AgentJobZombieSweeper {
         // the jobs the batch already reaped (and their ledger events) at commit time.
         for (AgentJob job : staleJobs) {
             try {
-                transactionTemplate.executeWithoutResult(status -> reapIfStale(job.getId()));
+                AgentJob reaped = transactionTemplate.execute(status -> reapIfStale(job.getId()));
+                if (reaped != null) {
+                    jobTelemetry.terminal(reaped, AgentJobStatus.TIMED_OUT, AgentJobTelemetry.age(reaped));
+                }
             } catch (Exception e) {
                 log.warn("Failed to reap stale job: jobId={}, error={}", job.getId(), e.getMessage());
             }
         }
     }
 
-    private void reapIfStale(UUID jobId) {
+    private @Nullable AgentJob reapIfStale(UUID jobId) {
         AgentJob lockedJob = jobRepository.findByIdWithWorkspaceForUpdate(jobId).orElse(null);
-        if (lockedJob == null || lockedJob.getStatus() != AgentJobStatus.RUNNING) return;
+        if (lockedJob == null || lockedJob.getStatus() != AgentJobStatus.RUNNING) return null;
         int timeoutSeconds = getTimeoutFromSnapshot(lockedJob);
         Duration maxLifetime = Duration.ofSeconds(timeoutSeconds).plus(RUNNING_BUFFER);
         if (lockedJob.getStartedAt() != null
                 && lockedJob.getStartedAt().plus(maxLifetime).isAfter(Instant.now())) {
-            return;
+            return null;
         }
 
         int updated = jobRepository.transitionStatus(
@@ -154,7 +160,9 @@ public class AgentJobZombieSweeper {
             recordUnverifiableUsage(lockedJob);
             zombieReaped.increment();
             log.warn("Reaped stale RUNNING job: jobId={}, startedAt={}", jobId, lockedJob.getStartedAt());
+            return lockedJob;
         }
+        return null;
     }
 
     /**

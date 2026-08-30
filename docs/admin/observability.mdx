@@ -1,0 +1,33 @@
+---
+title: Observability
+---
+
+# Observability contract
+
+Production logs are JSON records. `job.id` and `workspace.id` are fields, not metric labels.
+
+## Agent-job lifecycle
+
+Lifecycle records contain `event.name`, `job.id`, `workspace.id`, `job.type`, `job.phase`,
+`job.outcome`, and `duration.ms`.
+
+| `event.name` | Emitted when | `job.phase` | `job.outcome` | `duration.ms` |
+| --- | --- | --- | --- | --- |
+| `agent.job.queued` | A new job transaction commits | `queue` | `queued` | `0` |
+| `agent.job.started` | A worker starts a claimed job | `queue` | `started` | Creation to start |
+| `agent.job.delivery` | A delivery attempt finishes | `delivery` | `delivered`, `failed` | Delivery attempt |
+| `agent.job.terminal` | A terminal transition commits | `total` | `completed`, `failed`, `timed_out`, `cancelled` | Creation to terminal emission |
+
+Delivery is optional. Jobs that do not complete successfully may have no delivery event.
+
+## Agent-job metrics
+
+| Prometheus name | Type | Labels | Meaning |
+| --- | --- | --- | --- |
+| `agent_job_total` | Counter | `outcome` | Committed terminal transitions |
+| `agent_job_duration_seconds` | Histogram | `phase` | Queue, execution-attempt, delivery-attempt, and total durations |
+
+`outcome` is one of `completed`, `failed`, `timed_out`, or `cancelled`. `phase` is one of `queue`,
+`execution`, `delivery`, or `total`. Identifiers, model and provider names, worker IDs, and exception text are not
+labels. See [Practice Review Operations](./practice-review-operations.mdx) for queue health and the
+existing execution metric.
