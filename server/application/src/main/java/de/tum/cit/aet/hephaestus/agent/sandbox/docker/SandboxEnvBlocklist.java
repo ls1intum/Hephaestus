@@ -53,6 +53,9 @@ public final class SandboxEnvBlocklist {
                 "SSL_CERT_FILE",
                 "SSL_CERT_DIR",
                 "REQUESTS_CA_BUNDLE",
+                // Server-owned correlation context.
+                "TRACE_ID",
+                "TRACEPARENT",
                 // Proxy hijacking.
                 "http_proxy",
                 "https_proxy",

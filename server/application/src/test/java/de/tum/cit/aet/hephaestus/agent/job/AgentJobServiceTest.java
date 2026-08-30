@@ -30,6 +30,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
+import de.tum.cit.aet.hephaestus.observability.StructuredLogKeys;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
@@ -41,6 +42,7 @@ import jakarta.persistence.Convert;
 import java.util.List;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -49,6 +51,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.slf4j.MDC;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
@@ -183,6 +186,11 @@ class AgentJobServiceTest extends BaseUnitTest {
         // 5-segment key grammar: <type>:<nameWithOwner>:<number>:<phase>:<freshness>
         // (PullRequestReviewHandler emits the trigger-event phase before the head SHA).
         return new JobSubmission(metadata, "pr_review:owner/repo:42:authoring:abc123");
+    }
+
+    @AfterEach
+    void clearTraceContext() {
+        MDC.remove(StructuredLogKeys.TRACE_ID);
     }
 
     @Nested
@@ -370,6 +378,7 @@ class AgentJobServiceTest extends BaseUnitTest {
 
         @Test
         void shouldCreateAQueuedJobWithItsPurposeIdempotencyKeyAndFrozenSnapshot() {
+            MDC.put(StructuredLogKeys.TRACE_ID, "0123456789abcdef0123456789abcdef");
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
 
             JobTypeHandler handler = mock(JobTypeHandler.class);
@@ -396,6 +405,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             assertThat(job.getIdempotencyKey()).isEqualTo("pr_review:owner/repo:42:authoring:abc123:detection");
             assertThat(job.getConfigSnapshot()).isNotNull();
             assertThat(job.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
+            assertThat(job.getTraceId()).isEqualTo("0123456789abcdef0123456789abcdef");
         }
 
         @Test

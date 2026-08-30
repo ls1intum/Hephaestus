@@ -30,7 +30,8 @@ class LlmProxyWebClientConfigTest extends BaseUnitTest {
                     provider,
                     loop,
                     new LlmProperties(
-                            "", new LlmProperties.Egress(false), new LlmProperties.Fx(LlmProperties.ECB_DAILY_URL)));
+                            "", new LlmProperties.Egress(false), new LlmProperties.Fx(LlmProperties.ECB_DAILY_URL)),
+                    WebClient.builder());
 
             Throwable thrown = catchThrowable(() -> client.get()
                     .uri(LOOPBACK_URL)

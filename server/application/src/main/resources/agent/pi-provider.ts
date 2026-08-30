@@ -77,6 +77,7 @@ export function registerHephaestusProvider(
 		baseUrl,
 		apiKey: "$LLM_PROXY_TOKEN",
 		authHeader: true,
+		headers: env.TRACEPARENT ? { traceparent: env.TRACEPARENT } : undefined,
 		api: config.apiProtocol,
 		models: [model],
 	});

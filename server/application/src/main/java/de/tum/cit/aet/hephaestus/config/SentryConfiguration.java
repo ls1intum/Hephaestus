@@ -1,9 +1,14 @@
 package de.tum.cit.aet.hephaestus.config;
 
+import de.tum.cit.aet.hephaestus.observability.StructuredLogKeys;
+import io.sentry.EventProcessor;
+import io.sentry.Hint;
 import io.sentry.Sentry;
+import io.sentry.SentryEvent;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.context.annotation.Configuration;
@@ -51,6 +56,16 @@ public class SentryConfiguration {
                 });
                 options.setEnvironment(getEnvironment());
                 options.setRelease(hephaestusVersion);
+                // Links a Sentry event to its JSON log lines; the tag survives the beforeSend scrub,
+                // which removes only user, request, and breadcrumb context.
+                options.addEventProcessor(new EventProcessor() {
+                    @Override
+                    public SentryEvent process(SentryEvent event, Hint hint) {
+                        String traceId = MDC.get(StructuredLogKeys.TRACE_ID);
+                        if (traceId != null) event.setTag(StructuredLogKeys.TRACE_ID, traceId);
+                        return event;
+                    }
+                });
             });
 
             log.info("Initialized Sentry");

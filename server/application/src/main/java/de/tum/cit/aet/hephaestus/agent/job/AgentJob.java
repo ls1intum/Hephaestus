@@ -153,6 +153,9 @@ public class AgentJob {
     @Column(name = "idempotency_key", length = 255)
     private String idempotencyKey;
 
+    @Column(name = "trace_id", nullable = false, updatable = false, length = 32)
+    private String traceId;
+
     @Column(name = "exit_code")
     private Integer exitCode;
 
@@ -317,6 +320,9 @@ public class AgentJob {
     public void prePersist() {
         if (this.id == null) {
             this.id = UUID.randomUUID();
+        }
+        if (this.traceId == null) {
+            this.traceId = UUID.randomUUID().toString().replace("-", "");
         }
         if (this.jobToken == null) {
             this.jobToken = generateJobToken();

@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
+import de.tum.cit.aet.hephaestus.observability.StructuredLogKeys;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
@@ -346,6 +347,7 @@ public class DockerSandboxAdapter implements SandboxManager {
                 env.put(entry.getKey(), entry.getValue());
             }
         }
+        addTraceEnvironment(env);
 
         // Git security
         // Env-based config has HIGHEST precedence in git — overrides .git/config in any repo
@@ -392,6 +394,15 @@ public class DockerSandboxAdapter implements SandboxManager {
         }
 
         return env;
+    }
+
+    private static void addTraceEnvironment(Map<String, String> env) {
+        String traceId = MDC.get(StructuredLogKeys.TRACE_ID);
+        String spanId = MDC.get(StructuredLogKeys.SPAN_ID);
+        if (traceId != null && spanId != null) {
+            env.put("TRACE_ID", traceId);
+            env.put("TRACEPARENT", "00-" + traceId + "-" + spanId + "-00");
+        }
     }
 
     /**

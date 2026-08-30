@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
+import de.tum.cit.aet.hephaestus.observability.StructuredLogKeys;
 import io.micrometer.core.instrument.Timer;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -279,6 +280,12 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
                 continue;
             }
             env.put(entry.getKey(), entry.getValue());
+        }
+        String traceId = MDC.get(StructuredLogKeys.TRACE_ID);
+        String spanId = MDC.get(StructuredLogKeys.SPAN_ID);
+        if (traceId != null && spanId != null) {
+            env.put("TRACE_ID", traceId);
+            env.put("TRACEPARENT", "00-" + traceId + "-" + spanId + "-00");
         }
         if (spec.networkPolicy() != null && spec.networkPolicy().llmProxyUrl() != null) {
             String url = spec.networkPolicy().llmProxyUrl();

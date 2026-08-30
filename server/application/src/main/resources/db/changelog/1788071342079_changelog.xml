@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+    <changeSet author="request-correlation" id="1788071342079-1">
+        <preConditions onFail="MARK_RAN">
+            <not><columnExists tableName="agent_job" columnName="trace_id"/></not>
+        </preConditions>
+        <addColumn tableName="agent_job">
+            <column name="trace_id" type="varchar(32)"/>
+        </addColumn>
+        <sql>
+            UPDATE agent_job
+               SET trace_id = replace(gen_random_uuid()::text, '-', '')
+             WHERE trace_id IS NULL;
+        </sql>
+        <addNotNullConstraint tableName="agent_job" columnName="trace_id" columnDataType="varchar(32)"/>
+        <rollback>
+            <dropColumn tableName="agent_job" columnName="trace_id"/>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>
