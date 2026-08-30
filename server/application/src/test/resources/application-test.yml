@@ -53,6 +53,9 @@ spring:
 
 # Disable workspace bootstrapping during tests to prevent API calls
 hephaestus:
+    auth:
+        rate-limit:
+            enabled: false
     # Worker role off in tests: the worker capability is the Docker sandbox
     # (DockerSandboxConfiguration + AgentImagePullBootstrapper), which has no Docker daemon in
     # CI. Disabling the role keeps those beans out of the context — mentor beans still wire
