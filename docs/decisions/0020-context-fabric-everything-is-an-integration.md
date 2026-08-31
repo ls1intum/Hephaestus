@@ -387,3 +387,7 @@ materializations remain disposable projections.
 There is no filesystem content-addressed evidence store in the 1.0 target. ADR 0039 supersedes the
 `cas/sha256/**` and `jobs/**` replay layout, manifest-walking garbage collection, independent CAS
 retention clock, and shared-fabric deployment contract above.
+
+The 2026-08-04 update's "bounded residual windows" consequence for the CAS and replay cache remains
+accurate for pre-cutover releases only; in the 1.0 target ADR 0039's SQL-root-set collection replaces
+it, and selective erasure stops being a deployment-approval consideration tied to a filesystem cache.
