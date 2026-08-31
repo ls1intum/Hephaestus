@@ -17,7 +17,7 @@ function isUpstreamImage(value: unknown): value is UpstreamImage {
 }
 
 export function releaseImages(workflow: string): string[] {
-	return [...workflow.matchAll(/image-name:\s*["']ls1intum\/hephaestus\/([^"']+)["']/g)].map(
+	return [...workflow.matchAll(/image-name:\s*["']hephaestus-build\/([^"']+)["']/g)].map(
 		(match) => match[1] ?? "",
 	);
 }

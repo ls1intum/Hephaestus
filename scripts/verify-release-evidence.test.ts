@@ -9,6 +9,7 @@ import {
 } from "./verify-release-evidence.ts";
 
 const digest = `sha256:${"a".repeat(64)}`;
+const namespace = "ghcr.io/hephaestus-build";
 const inventory = { schemaVersion: 1, images: ["server"], upstream: [] };
 const subject = (platform: "linux/amd64" | "linux/arm64") => ({
 	digest,
@@ -16,7 +17,7 @@ const subject = (platform: "linux/amd64" | "linux/arm64") => ({
 	indexDigest: digest,
 	platform,
 	provenance: "first-party" as const,
-	repository: "ghcr.io/ls1intum/hephaestus/server",
+	repository: "ghcr.io/hephaestus-build/server",
 });
 
 void describe("release evidence manifest", () => {
@@ -24,13 +25,19 @@ void describe("release evidence manifest", () => {
 		const result = validateManifest(
 			{ schemaVersion: 1, subjects: [subject("linux/amd64"), subject("linux/arm64")] },
 			inventory,
+			namespace,
 		);
 		assert.equal(result.subjects.length, 2);
 	});
 
 	void it("fails closed on missing, reordered, and duplicate platforms", () => {
 		assert.throws(
-			() => validateManifest({ schemaVersion: 1, subjects: [subject("linux/amd64")] }, inventory),
+			() =>
+				validateManifest(
+					{ schemaVersion: 1, subjects: [subject("linux/amd64")] },
+					inventory,
+					namespace,
+				),
 			/canonical order/,
 		);
 		assert.throws(
@@ -38,6 +45,7 @@ void describe("release evidence manifest", () => {
 				validateManifest(
 					{ schemaVersion: 1, subjects: [subject("linux/arm64"), subject("linux/amd64")] },
 					inventory,
+					namespace,
 				),
 			/canonical order/,
 		);
@@ -46,6 +54,7 @@ void describe("release evidence manifest", () => {
 				validateManifest(
 					{ schemaVersion: 1, subjects: [subject("linux/amd64"), subject("linux/amd64")] },
 					inventory,
+					namespace,
 				),
 			/duplicate image platforms/,
 		);
@@ -65,6 +74,7 @@ void describe("release evidence manifest", () => {
 					validateManifest(
 						{ schemaVersion: 1, subjects: [invalid, subject("linux/arm64")] },
 						inventory,
+						namespace,
 					),
 				/malformed|does not match/,
 			);
@@ -78,6 +88,7 @@ void describe("release evidence manifest", () => {
 				validateManifest(
 					{ schemaVersion: 1, subjects },
 					{ schemaVersion: 1, images: ["server", "server"], upstream: [] },
+					namespace,
 				),
 			/duplicate release image/,
 		);
@@ -86,6 +97,7 @@ void describe("release evidence manifest", () => {
 				validateManifest(
 					{ schemaVersion: 1, subjects },
 					{ schemaVersion: 1, images: ["../server"], upstream: [] },
+					namespace,
 				),
 			/invalid image/,
 		);
@@ -114,13 +126,14 @@ void describe("release evidence manifest", () => {
 		});
 		const valid = [upstreamSubject("linux/amd64"), upstreamSubject("linux/arm64")];
 		assert.doesNotThrow(() =>
-			validateManifest({ schemaVersion: 1, subjects: valid }, upstreamInventory),
+			validateManifest({ schemaVersion: 1, subjects: valid }, upstreamInventory, namespace),
 		);
 		assert.throws(
 			() =>
 				validateManifest(
 					{ schemaVersion: 1, subjects: [{ ...valid[0], provenance: "first-party" }, valid[1]] },
 					upstreamInventory,
+					namespace,
 				),
 			/does not match its inventory/,
 		);
@@ -129,6 +142,7 @@ void describe("release evidence manifest", () => {
 				validateManifest(
 					{ schemaVersion: 1, subjects: [{ ...valid[0], indexDigest: digest }, valid[1]] },
 					upstreamInventory,
+					namespace,
 				),
 			/does not match its inventory/,
 		);
@@ -143,6 +157,7 @@ void describe("release evidence manifest", () => {
 						],
 					},
 					inventory,
+					namespace,
 				),
 			/one index digest/,
 		);

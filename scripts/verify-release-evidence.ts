@@ -5,6 +5,8 @@ import { isDeepStrictEqual } from "node:util";
 
 import { validateReleaseSbom } from "./check-release-sbom.ts";
 import { evaluate } from "./check-release-vulnerabilities.ts";
+import { releaseIdentityFor } from "./lib/release-identities.ts";
+import { isRelease } from "./release-image-lock.ts";
 
 type Subject = {
 	digest: string;
@@ -79,7 +81,11 @@ export function attestationContainsSbom(value: unknown, sbom: unknown): boolean 
 	});
 }
 
-export function validateManifest(value: unknown, inventoryValue: unknown): Manifest {
+export function validateManifest(
+	value: unknown,
+	inventoryValue: unknown,
+	firstPartyNamespace: string,
+): Manifest {
 	if (!record(value) || value.schemaVersion !== 1 || !Array.isArray(value.subjects))
 		throw new Error("release manifest must use schema version 1 and contain subjects");
 	if (
@@ -101,7 +107,7 @@ export function validateManifest(value: unknown, inventoryValue: unknown): Manif
 	for (const image of images)
 		expectedImages.set(image, {
 			provenance: "first-party",
-			repository: `ghcr.io/ls1intum/hephaestus/${image}`,
+			repository: `${firstPartyNamespace}/${image}`,
 		});
 	for (const item of inventoryValue.upstream) {
 		if (
@@ -186,9 +192,19 @@ export function verifyReleaseEvidence(
 	directory: string,
 	mode: VerificationMode = "verify",
 ): Manifest {
+	const manifestValue = readJson(join(directory, "manifest.json"));
+	if (
+		!record(manifestValue) ||
+		typeof manifestValue.release !== "string" ||
+		!isRelease(manifestValue.release)
+	)
+		throw new Error("release manifest must name the release it evidences");
+	// The evidence may belong to a release published under a pre-transfer namespace,
+	// which its images keep forever (issue #1599) — resolve it per version.
 	const manifest = validateManifest(
-		readJson(join(directory, "manifest.json")),
+		manifestValue,
 		readJson(join(directory, "release-images.json")),
+		releaseIdentityFor(manifestValue.release).namespace,
 	);
 	const policy = readJson(join(directory, "vulnerability-policy.json"));
 	for (const subject of manifest.subjects) {

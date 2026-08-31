@@ -7,7 +7,7 @@
 // owner/repo in their certificate either way.
 
 const FALLBACK_SERVER_URL = "https://github.com";
-const FALLBACK_REPOSITORY = "ls1intum/Hephaestus";
+const FALLBACK_REPOSITORY = "hephaestus-build/Hephaestus";
 
 export function releaseSignerRepository(environment: NodeJS.ProcessEnv): string {
 	const repository = environment.GITHUB_REPOSITORY;

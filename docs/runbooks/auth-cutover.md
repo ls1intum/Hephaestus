@@ -21,7 +21,7 @@ Operational guide for shipping and operating the auth replacement (ADR 0017). Re
 - [ ] Reverse proxy (Coolify / TUM) verified to NOT inject a `Domain=` on Set-Cookie — a
       `__Host-` cookie with a Domain attribute is silently dropped by browsers → infinite
       redirect loop. Smoke-test the full login on staging behind the real proxy.
-- [ ] Postgres image ships `pg_partman` (`ghcr.io/ls1intum/hephaestus/postgres` — see ADR 0018)
+- [ ] Postgres image ships `pg_partman` (`ghcr.io/hephaestus-build/postgres` — see ADR 0018)
       plus `citext`. `auth_event` is partman-managed (create-ahead + 12-month retention); maintenance
       runs via `AuthEventPartitionMaintenance` (`CALL run_maintenance_proc`, ShedLock) — no
       `shared_preload_libraries`. Liquibase's `create_parent` builds current+2 partitions + the

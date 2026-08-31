@@ -15,7 +15,7 @@ import { isRecord } from "./lib/json.ts";
 const COMPOSE_FILE = "docker/preview/compose.app.yaml";
 const REFERENCE_FILE = "docker/compose.app.yaml";
 /** Images this repository builds, addressed by commit rather than digest. */
-const OWN_IMAGE_PREFIX = "ghcr.io/ls1intum/hephaestus/";
+const OWN_IMAGE_PREFIX = "ghcr.io/hephaestus-build/";
 
 /**
  * Reference variables a preview deliberately does not set. Inheriting the reference instead of

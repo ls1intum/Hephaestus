@@ -3,7 +3,8 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 
 import { run } from "./lib/process.ts";
-import { releaseSignerIdentity, releaseSignerRepository } from "./lib/release-signer.ts";
+import { releaseCertificateIdentity } from "./lib/release-identities.ts";
+import { releaseSignerRepository } from "./lib/release-signer.ts";
 import { isRelease } from "./release-image-lock.ts";
 
 const repositoryRoot = join(import.meta.dirname, "..");
@@ -37,7 +38,9 @@ try {
 		"--bundle",
 		join(directory, `${asset}.sigstore.json`),
 		"--certificate-identity",
-		releaseSignerIdentity(process.env),
+		// Locks signed before the repository transfer carry the old owner/repo in their
+		// certificate, so the expected identity is the release's, not the run's (issue #1599).
+		releaseCertificateIdentity(release, process.env),
 		"--certificate-oidc-issuer",
 		"https://token.actions.githubusercontent.com",
 		join(directory, asset),

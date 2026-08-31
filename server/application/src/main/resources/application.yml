@@ -511,7 +511,7 @@ hephaestus:
     # for QUEUED rows on a fixed interval. Disabled by default.
     agent:
         image:
-            reference: ghcr.io/ls1intum/hephaestus/agent-pi:${spring.application.version}
+            reference: ghcr.io/hephaestus-build/agent-pi:${spring.application.version}
         enabled: ${AGENT_ENABLED:false}
         # How long the poll loop sleeps when there is nothing to claim.
         poll-interval: ${AGENT_POLL_INTERVAL:1s}
