@@ -69,6 +69,11 @@ jobs:
             node scripts/verify-changesets.ts /tmp/changeset-status.json "${changesets_changed[@]}"
           fi
           if [ "${#migration_changed[@]}" -gt 0 ]; then
+            # No --since here: a fragment may pair with a pending changeset merged by an earlier
+            # PR, and --since filters those out of the status output. Without --since the
+            # changesets CLI resolves its configured baseBranch by the exact ref name `main`,
+            # which a detached PR merge-ref checkout does not have — give it one.
+            git rev-parse --verify --quiet main >/dev/null || git branch main origin/main
             pnpm changeset status --output /tmp/pending-changeset-status.json
             node scripts/verify-changesets.ts /tmp/pending-changeset-status.json --migration "${migration_changed[@]}"
           fi

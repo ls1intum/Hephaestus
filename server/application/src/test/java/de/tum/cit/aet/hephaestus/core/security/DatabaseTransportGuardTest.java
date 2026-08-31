@@ -41,6 +41,35 @@ class DatabaseTransportGuardTest extends BaseUnitTest {
     }
 
     @Test
+    void shouldRejectUppercaseDisableBecausePgjdbcMatchesValuesCaseInsensitively() {
+        var guard = new DatabaseTransportGuard(
+                prod(), "jdbc:postgresql://db.example.com/hephaestus?sslmode=DISABLE", false);
+
+        assertThatThrownBy(guard::assertRemoteDatabaseUsesTls)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("db.example.com");
+    }
+
+    @Test
+    void shouldAcceptUppercaseTlsModeAsPgjdbcDoes() {
+        var guard = new DatabaseTransportGuard(
+                prod(), "jdbc:postgresql://db.example.com/hephaestus?sslmode=REQUIRE", false);
+
+        assertThatNoException().isThrownBy(guard::assertRemoteDatabaseUsesTls);
+    }
+
+    @Test
+    void shouldRejectWhenAnyDuplicateSslModeIsInsecure() {
+        // pgJDBC lets a later duplicate override an earlier value; every occurrence must be a TLS mode.
+        var guard = new DatabaseTransportGuard(
+                prod(), "jdbc:postgresql://db.example.com/hephaestus?sslmode=require&sslmode=disable", false);
+
+        assertThatThrownBy(guard::assertRemoteDatabaseUsesTls)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("db.example.com");
+    }
+
+    @Test
     void shouldRejectWhenAnyDatabaseHostIsRemoteAndTlsIsOptional() {
         var guard = new DatabaseTransportGuard(
                 prod(), "jdbc:postgresql://postgres,db.example.com/hephaestus?sslmode=prefer", false);
