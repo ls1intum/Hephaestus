@@ -12,7 +12,10 @@ permissions: {}
 
 concurrency:
   group: review-policy-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Never cancel: a cancelled check run on the required `review-policy` context is evaluated
+  # by the ruleset as the context's state and silently blocks merge-queue entry (observed on
+  # PRs #1655/#1664, 2026-08-31). The job takes seconds; queueing duplicates is cheap.
+  cancel-in-progress: false
 
 jobs:
   review-policy:
