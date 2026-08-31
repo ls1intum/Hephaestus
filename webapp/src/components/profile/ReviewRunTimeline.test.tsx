@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { PracticeGroupReviewObservation, PracticeGroupReviewRun } from "@/api/types.gen";
+import { daysBefore } from "@/components/common/story-clock";
 import { ReviewRunTimeline } from "./ReviewRunTimeline";
 
 const baseObservation = {
@@ -18,7 +19,7 @@ const baseObservation = {
 
 const run = {
 	reviewId: "00000000-0000-0000-0000-000000000101",
-	reviewedAt: new Date("2026-08-12T10:26:00Z"),
+	reviewedAt: daysBefore(2),
 	reviewedWork: {
 		type: "scm.pull_request",
 		id: 902,

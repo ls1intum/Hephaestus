@@ -1,12 +1,4 @@
-import {
-	ChevronDownIcon,
-	CircleAlertIcon,
-	CircleCheckIcon,
-	CircleDashedIcon,
-	CircleHelpIcon,
-	CircleXIcon,
-	ShieldCheckIcon,
-} from "lucide-react";
+import { ChevronDownIcon } from "lucide-react";
 import type { PracticeGroupReviewObservation } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import {
@@ -31,25 +23,12 @@ import { cn } from "@/lib/utils";
 import { toEvidenceLocations } from "./evidence";
 import { EvidenceFileBlock } from "./EvidenceFileBlock";
 import { FeedbackComment } from "./FeedbackComment";
-import {
-	OBSERVATION_OUTCOME_PRESENTATION,
-	type ObservationOutcome,
-	observationOutcome,
-} from "./observation-outcome";
+import { OBSERVATION_OUTCOME_PRESENTATION, observationOutcome } from "./observation-outcome";
 import {
 	type FeedbackResponse,
 	feedbackResponseOf,
 	type ObservationDetailState,
 } from "./review-runs";
-
-const OUTCOME_ICON: Record<ObservationOutcome, typeof CircleCheckIcon> = {
-	PRESENT_GOOD: CircleCheckIcon,
-	ABSENT_GOOD: ShieldCheckIcon,
-	PRESENT_BAD: CircleAlertIcon,
-	ABSENT_BAD: CircleXIcon,
-	NOT_APPLICABLE: CircleDashedIcon,
-	INCONCLUSIVE: CircleHelpIcon,
-};
 
 interface ResponseChoiceProps<TValue extends string> {
 	legend: string;
@@ -126,7 +105,7 @@ export function ReviewObservationRow({
 }: ReviewObservationRowProps) {
 	const outcome = observationOutcome(observation);
 	const status = OBSERVATION_OUTCOME_PRESENTATION[outcome];
-	const StatusIcon = OUTCOME_ICON[outcome];
+	const StatusIcon = status.icon;
 	const canRespond = Boolean(observation.feedbackId && onRespond);
 	const canOpen = onToggle !== undefined || canRespond;
 	const detail = detailState?.detail;

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { PracticeGroup, PracticeGroupReviewRun, PracticeGroupStanding } from "@/api/types.gen";
+import { daysBefore } from "@/components/common/story-clock";
 import { PracticeGroupDetailPage } from "./PracticeGroupDetailPage";
 
 const group: PracticeGroup = {
@@ -23,7 +24,7 @@ const standing: PracticeGroupStanding = {
 
 const run: PracticeGroupReviewRun = {
 	reviewId: "00000000-0000-0000-0000-000000000901",
-	reviewedAt: new Date("2026-08-12T10:26:00Z"),
+	reviewedAt: daysBefore(2),
 	reviewedWork: { id: 902, type: "scm.pull_request", provider: "GITHUB", number: 902 },
 	observations: [],
 };

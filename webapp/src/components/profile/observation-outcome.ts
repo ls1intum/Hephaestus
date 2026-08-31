@@ -1,3 +1,13 @@
+import {
+	CircleAlertIcon,
+	CircleCheckIcon,
+	CircleDashedIcon,
+	CircleHelpIcon,
+	CircleXIcon,
+	type LucideIcon,
+	ShieldCheckIcon,
+} from "lucide-react";
+
 import type { Assessment } from "@/components/practice-vocabulary/assessment-defs";
 import type { Presence } from "@/components/practice-vocabulary/presence-defs";
 
@@ -21,22 +31,27 @@ export type ObservationOutcome =
 export const OBSERVATION_OUTCOME_PRESENTATION = {
 	PRESENT_GOOD: {
 		label: "Strength shown",
+		icon: CircleCheckIcon,
 		className: "text-success",
 	},
 	ABSENT_GOOD: {
 		label: "Risk avoided",
+		icon: ShieldCheckIcon,
 		className: "text-success",
 	},
 	PRESENT_BAD: {
 		label: "Problem observed",
+		icon: CircleAlertIcon,
 		className: "text-destructive",
 	},
 	ABSENT_BAD: {
 		label: "Expected practice missing",
+		icon: CircleXIcon,
 		className: "text-destructive",
 	},
 	NOT_APPLICABLE: {
 		label: "Not assessed",
+		icon: CircleDashedIcon,
 		className: "text-muted-foreground",
 	},
 	// A distinct silence from NOT_APPLICABLE: the reviewer looked at work that DID offer the opportunity
@@ -44,9 +59,13 @@ export const OBSERVATION_OUTCOME_PRESENTATION = {
 	// reviewer was simply unsure about.
 	INCONCLUSIVE: {
 		label: "Not certain enough to say",
+		icon: CircleHelpIcon,
 		className: "text-muted-foreground",
 	},
-} as const satisfies Record<ObservationOutcome, { label: string; className: string }>;
+} as const satisfies Record<
+	ObservationOutcome,
+	{ label: string; icon: LucideIcon; className: string }
+>;
 
 /**
  * Derives the complete 2×2 observation state plus the two verdict-less states. The API guarantees no

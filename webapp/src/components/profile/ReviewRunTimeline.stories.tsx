@@ -1,11 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import type { PracticeGroupReviewRun } from "@/api/types.gen";
+import { daysBefore } from "@/components/common/story-clock";
 import { ReviewRunTimeline } from "./ReviewRunTimeline";
 
 const runs: PracticeGroupReviewRun[] = [
 	{
 		reviewId: "00000000-0000-0000-0000-000000000101",
-		reviewedAt: new Date("2026-08-12T10:26:00Z"),
+		reviewedAt: daysBefore(2),
 		reviewedWork: {
 			type: "scm.pull_request",
 			id: 902,
@@ -27,7 +28,7 @@ const runs: PracticeGroupReviewRun[] = [
 	},
 	{
 		reviewId: "00000000-0000-0000-0000-000000000201",
-		reviewedAt: new Date("2026-08-09T16:40:00Z"),
+		reviewedAt: daysBefore(5),
 		reviewedWork: {
 			type: "chat.conversation_thread",
 			id: 42,
