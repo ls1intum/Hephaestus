@@ -39,12 +39,6 @@ client.setConfig({
 	credentials: "include",
 });
 
-// Attach the CSRF double-submit header (X-XSRF-TOKEN from the __Host-XSRF-TOKEN cookie) on every
-// state-changing request, plus the impersonation write-allow header when write-mode is on. The pure
-// logic lives in applyStateChangingHeaders (unit-tested); the store read stays here at the wiring edge.
-// While impersonating, writes are blocked by the server's ImpersonationGuard unless the operator has
-// explicitly enabled write-mode (a second confirmation in ImpersonationBanner); the flag is in-memory
-// and resets on reload, so it is always a deliberate, fresh opt-in.
 // Register the web-app manifest from here rather than an inline <script> in index.html: the
 // deployed Content-Security-Policy is `script-src 'self'` (webapp/docker/security-headers.conf and
 // the Traefik edge middleware), which blocks inline scripts. Browsers process a manifest <link>
@@ -57,6 +51,12 @@ client.setConfig({
 	document.head.appendChild(manifestLink);
 }
 
+// Attach the CSRF double-submit header (X-XSRF-TOKEN from the __Host-XSRF-TOKEN cookie) on every
+// state-changing request, plus the impersonation write-allow header when write-mode is on. The pure
+// logic lives in applyStateChangingHeaders (unit-tested); the store read stays here at the wiring edge.
+// While impersonating, writes are blocked by the server's ImpersonationGuard unless the operator has
+// explicitly enabled write-mode (a second confirmation in ImpersonationBanner); the flag is in-memory
+// and resets on reload, so it is always a deliberate, fresh opt-in.
 client.interceptors.request.use((request) =>
 	applyStateChangingHeaders(request, useImpersonationStore.getState().writesEnabled),
 );
