@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { PracticeGroup, PracticeGroupStanding } from "@/api/types.gen";
+import type { PracticeGroup, PracticeGroupReviewRun, PracticeGroupStanding } from "@/api/types.gen";
 import { PracticeGroupDetailPage } from "./PracticeGroupDetailPage";
 
 const group: PracticeGroup = {
@@ -21,6 +21,13 @@ const standing: PracticeGroupStanding = {
 	sources: [],
 };
 
+const run: PracticeGroupReviewRun = {
+	reviewId: "00000000-0000-0000-0000-000000000901",
+	reviewedAt: new Date("2026-08-12T10:26:00Z"),
+	reviewedWork: { id: 902, type: "scm.pull_request", provider: "GITHUB", number: 902 },
+	observations: [],
+};
+
 describe("PracticeGroupDetailPage", () => {
 	it("shows the group standing and practices", () => {
 		render(
@@ -29,7 +36,6 @@ describe("PracticeGroupDetailPage", () => {
 				standing={standing}
 				practices={[{ slug: "small-changes", name: "Keep changes focused" }]}
 				practiceStandings={{ "small-changes": "MIXED" }}
-				reviewRuns={[]}
 				isLoading={false}
 			/>,
 		);
@@ -46,7 +52,6 @@ describe("PracticeGroupDetailPage", () => {
 				group={group}
 				standing={standing}
 				practices={[{ slug: "small-changes", name: "Keep changes focused" }]}
-				reviewRuns={[]}
 				onSelectPractice={onSelectPractice}
 				isLoading={false}
 			/>,
@@ -60,22 +65,91 @@ describe("PracticeGroupDetailPage", () => {
 	it("tells an empty filtered feed apart from a group that was never reviewed", () => {
 		// One empty feed, two meanings. Saying "no review runs match your filters" to someone who set
 		// none reads as a fault in the page; saying "none yet" to someone filtering hides their filter.
-		const { rerender } = render(
-			<PracticeGroupDetailPage group={group} reviewRuns={[]} isLoading={false} />,
-		);
+		const { rerender } = render(<PracticeGroupDetailPage group={group} isLoading={false} />);
 		screen.getByText("Review runs appear here once your work has been reviewed.");
 
 		rerender(
 			<PracticeGroupDetailPage
 				group={group}
-				reviewRuns={[]}
 				reviewRunFilters={{ sources: ["scm.pull_request"], severities: [] }}
+				onReviewRunFiltersChange={vi.fn()}
 				isLoading={false}
 			/>,
 		);
-		screen.getByText(
-			"No review runs match the current filters. Clear them to see every review in this group.",
+		screen.getByText("No review runs match the current filters.");
+	});
+
+	it("offers a way out of a filter that emptied the feed", () => {
+		// Naming the filter without offering to clear it leaves the reader to find the control that
+		// caused it — which is above the fold on a phone.
+		const onReviewRunFiltersChange = vi.fn();
+		const onSelectPractice = vi.fn();
+		render(
+			<PracticeGroupDetailPage
+				group={group}
+				practices={[{ slug: "small-changes", name: "Keep changes focused" }]}
+				selectedPracticeSlug="small-changes"
+				onSelectPractice={onSelectPractice}
+				reviewRunFilters={{ sources: ["scm.pull_request"], severities: ["MAJOR"] }}
+				onReviewRunFiltersChange={onReviewRunFiltersChange}
+				isLoading={false}
+			/>,
 		);
+
+		fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+		expect(onReviewRunFiltersChange).toHaveBeenCalledWith({ sources: [], severities: [] });
+		expect(onSelectPractice).toHaveBeenCalledWith(undefined);
+	});
+
+	it("loads earlier reviews without losing the ones already shown", () => {
+		const onLoadMore = vi.fn();
+		const { rerender } = render(
+			<PracticeGroupDetailPage
+				group={group}
+				feed={{
+					status: "ready",
+					runs: [],
+					hasMore: true,
+					isLoadingMore: false,
+					onLoadMore,
+				}}
+				isLoading={false}
+			/>,
+		);
+		// An empty ready feed shows its empty state, so the control only appears once there are runs.
+		expect(screen.queryByRole("button", { name: "View earlier reviews" })).toBeNull();
+
+		rerender(
+			<PracticeGroupDetailPage
+				group={group}
+				feed={{ status: "ready", runs: [run], hasMore: true, isLoadingMore: false, onLoadMore }}
+				isLoading={false}
+			/>,
+		);
+		fireEvent.click(screen.getByRole("button", { name: "View earlier reviews" }));
+		expect(onLoadMore).toHaveBeenCalledOnce();
+
+		rerender(
+			<PracticeGroupDetailPage
+				group={group}
+				feed={{ status: "ready", runs: [run], hasMore: true, isLoadingMore: true, onLoadMore }}
+				isLoading={false}
+			/>,
+		);
+		expect(screen.getByRole("button", { name: "Loading…" }).hasAttribute("disabled")).toBe(true);
+	});
+
+	it("offers a retry when the feed itself failed", () => {
+		const onRetry = vi.fn();
+		render(
+			<PracticeGroupDetailPage
+				group={group}
+				feed={{ status: "error", error: new Error("Gateway timeout"), onRetry }}
+				isLoading={false}
+			/>,
+		);
+		fireEvent.click(screen.getByRole("button", { name: /retry/i }));
+		expect(onRetry).toHaveBeenCalledOnce();
 	});
 
 	it("offers navigation when the group is missing", () => {

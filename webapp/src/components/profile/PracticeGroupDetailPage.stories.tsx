@@ -1,7 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "storybook/test";
-import type { PracticeGroup, PracticeGroupStanding } from "@/api/types.gen";
-import { PracticeGroupDetailPage } from "./PracticeGroupDetailPage";
+import { expect, fn } from "storybook/test";
+import type {
+	PracticeGroup,
+	PracticeGroupReviewObservation,
+	PracticeGroupReviewRun,
+	PracticeGroupStanding,
+} from "@/api/types.gen";
+import { daysBefore } from "@/components/common/story-clock";
+import { expectNoPageOverflow } from "@/test/reflow";
+import { PracticeGroupDetailPage, type ReviewRunFeedState } from "./PracticeGroupDetailPage";
 
 const group: PracticeGroup = {
 	id: 1,
@@ -39,7 +46,6 @@ const meta = {
 			},
 		],
 		practiceStandings: { "small-changes": "MIXED" },
-		reviewRuns: [],
 		isLoading: false,
 		onBack: fn(),
 		onSelectPractice: fn(),
@@ -49,7 +55,108 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+const observation: PracticeGroupReviewObservation = {
+	observationId: "00000000-0000-0000-0000-000000000102",
+	feedbackId: "00000000-0000-0000-0000-000000000103",
+	practiceSlug: "small-changes",
+	practiceName: "Keep changes focused",
+	title: "The refactor and the fix arrived together",
+	presence: "PRESENT",
+	assessment: "BAD",
+	severity: "MAJOR",
+};
+
+const run: PracticeGroupReviewRun = {
+	reviewId: "00000000-0000-0000-0000-000000000101",
+	reviewedAt: daysBefore(2),
+	reviewedWork: {
+		id: 902,
+		type: "scm.pull_request",
+		provider: "GITHUB",
+		number: 902,
+		title: "Split the practice catalog loader per workspace",
+		repositoryName: "ls1intum/Hephaestus",
+		url: "https://github.com/ls1intum/Hephaestus/pull/902",
+	},
+	observations: [observation],
+};
+
+const readyFeed = {
+	status: "ready",
+	runs: [run],
+	hasMore: false,
+	isLoadingMore: false,
+	onLoadMore: fn(),
+} satisfies ReviewRunFeedState;
+
 export const Default: Story = {};
 export const Loading: Story = { args: { isLoading: true } };
 export const Missing: Story = { args: { group: undefined } };
 export const Failure: Story = { args: { error: new Error("Unavailable") } };
+
+/** The feed as a reader normally meets it: reviews, their observations, and the filters above them. */
+export const WithReviewRuns: Story = {
+	args: {
+		feed: readyFeed,
+		onReviewRunFiltersChange: fn(),
+		onToggleObservation: fn(),
+		onRespond: fn(),
+	},
+};
+
+/** More to load: the control names what it will fetch rather than a page number. */
+export const MoreToLoad: Story = {
+	args: {
+		feed: { ...readyFeed, hasMore: true },
+		onReviewRunFiltersChange: fn(),
+	},
+};
+
+export const FeedLoading: Story = {
+	args: { feed: { status: "loading" }, skeletonRows: 4 },
+};
+
+/** The feed failed on its own while the rest of the page is fine, so only it carries the error. */
+export const FeedFailed: Story = {
+	args: {
+		feed: { status: "error", error: new Error("Gateway timeout"), onRetry: fn() },
+		onReviewRunFiltersChange: fn(),
+	},
+};
+
+/** Narrowed to nothing: the empty state names the filter and offers to drop it. */
+export const FilteredToEmpty: Story = {
+	args: {
+		selectedPracticeSlug: "small-changes",
+		reviewRunFilters: { sources: ["scm.pull_request"], severities: ["CRITICAL"] },
+		onReviewRunFiltersChange: fn(),
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Clear filters" })).toBeVisible();
+	},
+};
+
+/** A practice selected: the feed is scoped to it, and the pill says how to undo that. */
+export const PracticeSelected: Story = {
+	args: {
+		feed: readyFeed,
+		selectedPracticeSlug: "small-changes",
+		onReviewRunFiltersChange: fn(),
+	},
+	play: async ({ args, canvas, userEvent }) => {
+		await userEvent.click(
+			canvas.getByRole("button", { name: "Clear practice filter (Keep changes focused)" }),
+		);
+		await expect(args.onSelectPractice).toHaveBeenCalledWith(undefined);
+	},
+};
+
+/** At 320px the two-column layout has to stack without pushing anything off the page. */
+export const MobileReflow: Story = {
+	args: { feed: readyFeed, onReviewRunFiltersChange: fn() },
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320] },
+	},
+	play: expectNoPageOverflow,
+};

@@ -1,12 +1,5 @@
 import { PulseIcon } from "@primer/octicons-react";
-import {
-	ArrowLeftIcon,
-	ChevronDownIcon,
-	CircleDashedIcon,
-	InfoIcon,
-	Settings2Icon,
-	XIcon,
-} from "lucide-react";
+import { ArrowLeftIcon, ChevronDownIcon, CircleDashedIcon, InfoIcon } from "lucide-react";
 import { useState } from "react";
 import type {
 	PracticeGroup,
@@ -17,29 +10,34 @@ import type {
 	PracticeTrend,
 } from "@/api/types.gen";
 import { getGroupVisual } from "@/components/admin/practice-catalog/group-visuals";
+import { type FacetOption, FacetMultiSelect } from "@/components/common/FacetMultiSelect";
+import { FilterToolbar } from "@/components/common/FilterToolbar";
+import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { ReferenceFilterPill } from "@/components/common/ReferenceFilterPill";
 import { PRACTICE_GROUP_STANDING_DEFS } from "@/components/practice-vocabulary/practice-group-standing-defs";
 import { SEVERITY_DEFS, type Severity } from "@/components/practice-vocabulary/severity-defs";
 import {
 	type StatusDef,
+	statusFacetOptions,
 	statusToneClass,
-	statusValues,
 } from "@/components/practice-vocabulary/status-def";
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
-import { EmptyState } from "@/components/shared/EmptyState";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import {
-	Popover,
-	PopoverContent,
-	PopoverDescription,
-	PopoverHeader,
-	PopoverTitle,
-	PopoverTrigger,
-} from "@/components/ui/popover";
+	Empty,
+	EmptyContent,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ARTIFACT_KIND_VALUES, artifactKindPluralLabel } from "@/lib/artifact-kinds";
+import {
+	ARTIFACT_KIND_VALUES,
+	artifactKindIcon,
+	artifactKindPluralLabel,
+} from "@/lib/artifact-kinds";
 import { cn } from "@/lib/utils";
 import { PracticeNextStepCallout } from "./PracticeNextStepCallout";
 import { PracticeTrendChip } from "./PracticeTrendChip";
@@ -76,6 +74,37 @@ export interface ReviewRunFilters {
 
 const NO_FILTERS: ReviewRunFilters = { sources: [], severities: [] };
 
+/**
+ * The review-run feed as one value rather than seven flags. Loading-and-failed was representable
+ * before this, and an error could arrive without a retry — `PanelState` makes both unspellable.
+ */
+export type ReviewRunFeedState = PanelState<{
+	runs: PracticeGroupReviewRun[];
+	hasMore: boolean;
+	isLoadingMore: boolean;
+	onLoadMore: () => void;
+}>;
+
+const EMPTY_FEED: ReviewRunFeedState = {
+	status: "ready",
+	runs: [],
+	hasMore: false,
+	isLoadingMore: false,
+	onLoadMore: () => undefined,
+};
+
+/**
+ * Both facets read their options off the registries that own the values, so a filter option carries
+ * the same word and glyph as the badge on the row it selects. Every kind this build can name is
+ * offered, which makes a newly registered one filterable the day the server first sends it.
+ */
+const SOURCE_OPTIONS: FacetOption[] = ARTIFACT_KIND_VALUES.map((kind) => ({
+	value: kind,
+	label: artifactKindPluralLabel(kind),
+	icon: artifactKindIcon(kind),
+}));
+const SEVERITY_OPTIONS = statusFacetOptions(SEVERITY_DEFS);
+
 export interface ContributingPractice {
 	slug: string;
 	name: string;
@@ -93,15 +122,12 @@ export interface PracticeGroupDetailPageProps {
 	practiceNextSteps?: Record<string, string | undefined>;
 	selectedPracticeSlug?: string;
 	onSelectPractice?: (practiceSlug: string | undefined) => void;
-	reviewRuns?: PracticeGroupReviewRun[];
-	isReviewRunsLoading?: boolean;
-	reviewRunsError?: unknown;
-	onRetryReviewRuns?: () => void;
+	/** The feed as one state: loading, failed with a retry, or ready with its paging controls. */
+	feed?: ReviewRunFeedState;
 	reviewRunFilters?: ReviewRunFilters;
 	onReviewRunFiltersChange?: (filters: ReviewRunFilters) => void;
-	hasMoreReviewRuns?: boolean;
-	isLoadingMoreReviewRuns?: boolean;
-	onLoadMoreReviewRuns?: () => void;
+	/** How many placeholder rows the loading feed draws — the caller knows its page size. */
+	skeletonRows?: number;
 	openObservationId?: string;
 	observationDetail?: ObservationDetailState;
 	onToggleObservation?: (observationId: string) => void;
@@ -141,15 +167,10 @@ export function PracticeGroupDetailPage({
 	practiceNextSteps,
 	selectedPracticeSlug,
 	onSelectPractice,
-	reviewRuns,
-	isReviewRunsLoading,
-	reviewRunsError,
-	onRetryReviewRuns,
+	feed = EMPTY_FEED,
 	reviewRunFilters = NO_FILTERS,
 	onReviewRunFiltersChange,
-	hasMoreReviewRuns,
-	isLoadingMoreReviewRuns,
-	onLoadMoreReviewRuns,
+	skeletonRows = 3,
 	openObservationId,
 	observationDetail,
 	onToggleObservation,
@@ -207,27 +228,15 @@ export function PracticeGroupDetailPage({
 	const badge = PRACTICE_GROUP_STANDING_DEFS[groupStanding];
 	const { Icon: GroupIcon, pill: groupPill } = getGroupVisual(group.icon, group.color);
 	const selectedPractice = practices?.find((practice) => practice.slug === selectedPracticeSlug);
-	const activeFilterCount = reviewRunFilters.sources.length + reviewRunFilters.severities.length;
-	const hasAnyFeedNarrowing = activeFilterCount > 0 || selectedPractice !== undefined;
-	const hasReviewRuns = (reviewRuns?.length ?? 0) > 0;
-
-	// Every kind the build can name, so a document review is filterable the day the server sends one.
-	const sourceOptions: { value: ReviewRunSource; label: string }[] = ARTIFACT_KIND_VALUES.map(
-		(kind) => ({ value: kind, label: artifactKindPluralLabel(kind) }),
-	);
-
-	const toggleSource = (source: ReviewRunSource, checked: boolean) => {
-		const sources = checked
-			? [...new Set([...reviewRunFilters.sources, source])]
-			: reviewRunFilters.sources.filter((candidate) => candidate !== source);
-		onReviewRunFiltersChange?.({ ...reviewRunFilters, sources });
+	const clearAllNarrowing = () => {
+		onReviewRunFiltersChange?.(NO_FILTERS);
+		onSelectPractice?.(undefined);
 	};
-	const toggleSeverity = (severity: Severity, checked: boolean) => {
-		const severities = checked
-			? [...new Set([...reviewRunFilters.severities, severity])]
-			: reviewRunFilters.severities.filter((candidate) => candidate !== severity);
-		onReviewRunFiltersChange?.({ ...reviewRunFilters, severities });
-	};
+	const hasAnyFeedNarrowing =
+		reviewRunFilters.sources.length > 0 ||
+		reviewRunFilters.severities.length > 0 ||
+		selectedPractice !== undefined;
+
 	const nextStepFor = (practice: ContributingPractice, practiceStanding: PracticeStandingKey) => {
 		const deliveredStep = practiceNextSteps?.[practice.slug]?.trim();
 		if (deliveredStep) return deliveredStep;
@@ -454,132 +463,103 @@ export function PracticeGroupDetailPage({
 					title="Review runs"
 					description="Complete reviews of your work in this group, newest first."
 				/>
-				<div className="flex min-h-8 flex-wrap items-center gap-2">
-					{selectedPractice && (
-						<Button
-							type="button"
-							size="default"
-							variant="outline"
-							className="max-w-full"
-							onClick={() => onSelectPractice?.(undefined)}
+				{onReviewRunFiltersChange && (
+					<div className="flex flex-col gap-1">
+						<FilterToolbar
+							hasFilter={hasAnyFeedNarrowing}
+							onReset={() => {
+								onReviewRunFiltersChange(NO_FILTERS);
+								onSelectPractice?.(undefined);
+							}}
 						>
-							<span className="truncate">{`Showing: ${selectedPractice.name}`}</span>
-							<XIcon className="size-3.5" aria-hidden />
-						</Button>
-					)}
-					<div className="ml-auto flex flex-wrap items-center gap-2">
-						{onReviewRunFiltersChange && (
-							<Popover>
-								<PopoverTrigger
-									render={
-										<Button type="button" variant="outline">
-											Filter
-											{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
-											<Settings2Icon data-icon="inline-end" />
-										</Button>
-									}
+							{selectedPractice && (
+								<ReferenceFilterPill
+									label="Practice"
+									value={selectedPractice.name}
+									onClear={() => {
+										onSelectPractice?.(undefined);
+									}}
 								/>
-								<PopoverContent align="end" className="w-80">
-									<PopoverHeader>
-										<PopoverTitle>Review runs</PopoverTitle>
-										<PopoverDescription>
-											Narrow the review runs; nothing selected shows everything.
-										</PopoverDescription>
-									</PopoverHeader>
-									<div className="grid gap-4">
-										<div className="grid gap-2">
-											<p className="text-sm font-medium">Sources</p>
-											{sourceOptions.map((option) => {
-												const id = `review-run-source-${option.value}`;
-												return (
-													<Label
-														key={option.value}
-														htmlFor={id}
-														className="grid min-h-8 grid-cols-[1rem_1fr] items-center gap-2 text-sm font-normal"
-													>
-														<Checkbox
-															id={id}
-															checked={reviewRunFilters.sources.includes(option.value)}
-															onCheckedChange={(checked) => toggleSource(option.value, checked)}
-														/>
-														<span className="truncate">{option.label}</span>
-													</Label>
-												);
-											})}
-										</div>
-										<div className="grid gap-2">
-											<p className="text-sm font-medium">Severity</p>
-											{statusValues(SEVERITY_DEFS).map((severity) => {
-												const id = `review-run-severity-${severity}`;
-												return (
-													<Label
-														key={severity}
-														htmlFor={id}
-														className="grid min-h-8 grid-cols-[1rem_1fr] items-center gap-2 text-sm font-normal"
-													>
-														<Checkbox
-															id={id}
-															checked={reviewRunFilters.severities.includes(severity)}
-															onCheckedChange={(checked) => toggleSeverity(severity, checked)}
-														/>
-														<span>{SEVERITY_DEFS[severity].label}</span>
-													</Label>
-												);
-											})}
-											<p className="text-xs text-muted-foreground">
-												Strengths carry no severity and always stay visible.
-											</p>
-										</div>
-									</div>
-								</PopoverContent>
-							</Popover>
-						)}
+							)}
+							<FacetMultiSelect
+								title="Source"
+								options={SOURCE_OPTIONS}
+								selected={reviewRunFilters.sources}
+								onChange={(sources) => onReviewRunFiltersChange({ ...reviewRunFilters, sources })}
+							/>
+							<FacetMultiSelect
+								title="Severity"
+								options={SEVERITY_OPTIONS}
+								selected={reviewRunFilters.severities}
+								onChange={(severities) =>
+									onReviewRunFiltersChange({ ...reviewRunFilters, severities })
+								}
+							/>
+						</FilterToolbar>
+						{/* Kept out of the severity facet on purpose: it explains what the filter cannot do,
+						    which is not one of the options. */}
+						<p className="text-xs text-muted-foreground">
+							Strengths carry no severity and always stay visible.
+						</p>
 					</div>
-				</div>
-				{reviewRunsError ? (
+				)}
+				{feed.status === "error" ? (
 					<QueryErrorAlert
-						error={reviewRunsError}
+						error={feed.error}
 						title="Could not load review runs"
-						onRetry={onRetryReviewRuns}
+						onRetry={feed.onRetry}
 					/>
-				) : isReviewRunsLoading ? (
-					<div className="flex flex-col gap-3">
-						{Array.from({ length: 3 }, (_, i) => (
+				) : feed.status === "loading" ? (
+					<div className="flex flex-col gap-3" role="status">
+						<span className="sr-only">Loading review runs</span>
+						{Array.from({ length: skeletonRows }, (_, i) => (
 							<Skeleton key={i} className="h-16 w-full" />
 						))}
 					</div>
-				) : hasReviewRuns ? (
+				) : feed.runs.length > 0 ? (
 					<>
 						<ReviewRunTimeline
-							runs={reviewRuns ?? []}
+							runs={feed.runs}
 							openObservationId={openObservationId}
 							observationDetail={observationDetail}
 							onToggleObservation={onToggleObservation}
 							onRespond={onRespond}
 							pendingFeedbackId={pendingFeedbackId}
 						/>
-						{hasMoreReviewRuns && onLoadMoreReviewRuns && (
+						{feed.hasMore && (
 							<Button
 								type="button"
 								variant="link"
 								className="w-fit px-0 text-primary"
-								onClick={onLoadMoreReviewRuns}
-								disabled={isLoadingMoreReviewRuns}
+								onClick={feed.onLoadMore}
+								disabled={feed.isLoadingMore}
 							>
-								{isLoadingMoreReviewRuns ? "Loading…" : "View earlier reviews"}
+								{feed.isLoadingMore ? "Loading…" : "View earlier reviews"}
 							</Button>
 						)}
 					</>
 				) : (
-					<EmptyState
-						icon={PulseIcon}
-						title="No review runs"
-						description={
-							hasAnyFeedNarrowing
-								? "No review runs match the current filters. Clear them to see every review in this group."
-								: "Review runs appear here once your work has been reviewed."
-						}
-					/>
+					<Empty>
+						<EmptyHeader>
+							<EmptyMedia variant="icon">
+								<PulseIcon />
+							</EmptyMedia>
+							<EmptyTitle>No review runs</EmptyTitle>
+							<EmptyDescription>
+								{hasAnyFeedNarrowing
+									? "No review runs match the current filters."
+									: "Review runs appear here once your work has been reviewed."}
+							</EmptyDescription>
+						</EmptyHeader>
+						{/* The filtered case offers the way out rather than only naming it. */}
+						{hasAnyFeedNarrowing && onReviewRunFiltersChange && (
+							<EmptyContent>
+								<Button type="button" variant="outline" size="sm" onClick={clearAllNarrowing}>
+									Clear filters
+								</Button>
+							</EmptyContent>
+						)}
+					</Empty>
 				)}
 			</section>
 		</div>

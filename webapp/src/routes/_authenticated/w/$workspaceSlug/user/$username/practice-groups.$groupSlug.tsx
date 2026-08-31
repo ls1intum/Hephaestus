@@ -16,6 +16,7 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import {
 	PracticeGroupDetailPage,
+	type ReviewRunFeedState,
 	type ReviewRunFilters,
 } from "@/components/profile/PracticeGroupDetailPage";
 import {
@@ -148,7 +149,23 @@ function PracticeGroupDetail() {
 			return [practice.slug, nextStep];
 		}),
 	);
-	const reviewRuns = loadedPages(activityQuery.data).flatMap((page) => page.content);
+	// One value instead of seven flags: the page cannot be handed "loading and failed" at once, and an
+	// error always arrives with the retry that clears it.
+	const reviewRunFeed: ReviewRunFeedState = activityQuery.isPending
+		? { status: "loading" }
+		: activityQuery.error
+			? {
+					status: "error",
+					error: activityQuery.error,
+					onRetry: () => void activityQuery.refetch(),
+				}
+			: {
+					status: "ready",
+					runs: loadedPages(activityQuery.data).flatMap((page) => page.content),
+					hasMore: activityQuery.hasNextPage,
+					isLoadingMore: activityQuery.isFetchingNextPage,
+					onLoadMore: () => void activityQuery.fetchNextPage(),
+				};
 
 	const observationDetail: ObservationDetailState | undefined = openObservationId
 		? {
@@ -172,18 +189,13 @@ function PracticeGroupDetail() {
 				setSelectedPracticeSlug(practiceSlug);
 				setOpenObservationId(undefined);
 			}}
-			reviewRuns={reviewRuns}
-			isReviewRunsLoading={activityQuery.isPending}
-			reviewRunsError={activityQuery.error ?? undefined}
-			onRetryReviewRuns={() => void activityQuery.refetch()}
+			feed={reviewRunFeed}
+			skeletonRows={ACTIVITY_PAGE_SIZE}
 			reviewRunFilters={activityFilters}
 			onReviewRunFiltersChange={(filters) => {
 				setActivityFilters(filters);
 				setOpenObservationId(undefined);
 			}}
-			hasMoreReviewRuns={activityQuery.hasNextPage}
-			isLoadingMoreReviewRuns={activityQuery.isFetchingNextPage}
-			onLoadMoreReviewRuns={() => void activityQuery.fetchNextPage()}
 			openObservationId={openObservationId}
 			observationDetail={observationDetail}
 			onToggleObservation={(observationId) =>
