@@ -16,7 +16,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { asArray, asRecord, asString } from "./json.ts";
-import { releaseSignerIdentity } from "./release-signer.ts";
+import { releaseSignerRepository } from "./release-signer.ts";
 
 export type ReleaseIdentity = {
 	firstVersion: string;
@@ -115,18 +115,46 @@ export function currentReleaseIdentity(
 }
 
 /**
- * The cosign certificate identity that signed the given release's lock. Historical
- * entries are pinned by the map; the current entry follows the run context so a
- * fork or future transfer verifies its own releases without editing the map.
+ * The `owner/repo` whose workflows signed the given release's artifacts. Historical
+ * entries are pinned by the map; the current entry follows the run context so a fork
+ * or future transfer verifies its own releases without editing the map. In CI the
+ * run context is required rather than merely preferred — verifying a current release
+ * against the map's fallback would hide a misconfigured environment.
  */
-export function releaseCertificateIdentity(
+export function releaseRepository(
 	release: string,
 	environment: NodeJS.ProcessEnv,
 	identities: ReleaseIdentity[] = loadReleaseIdentities(),
 ): string {
 	const identity = releaseIdentityFor(release, identities);
-	if (identity === identities.at(-1) && environment.GITHUB_REPOSITORY)
-		return releaseSignerIdentity(environment);
+	if (identity === identities.at(-1) && (environment.GITHUB_REPOSITORY || environment.CI))
+		return releaseSignerRepository(environment);
+	return identity.certificateIdentityRepository;
+}
+
+/** The owner half of {@link releaseRepository} — `gh attestation verify --owner`. */
+export function releaseOwner(
+	release: string,
+	environment: NodeJS.ProcessEnv,
+	identities: ReleaseIdentity[] = loadReleaseIdentities(),
+): string {
+	const [owner] = releaseRepository(release, environment, identities).split("/");
+	if (!owner) throw new Error(`could not derive an owner for ${release}`);
+	return owner;
+}
+
+/**
+ * The cosign certificate identity of a workflow in the repository that cut the given
+ * release. Defaults to `release.yml`, which signs the release lock; the image indexes
+ * and their SBOM attestations are signed by `reusable-docker-build.yml`.
+ */
+export function releaseCertificateIdentity(
+	release: string,
+	environment: NodeJS.ProcessEnv,
+	identities: ReleaseIdentity[] = loadReleaseIdentities(),
+	workflow = "release.yml",
+): string {
 	const serverUrl = environment.GITHUB_SERVER_URL ?? "https://github.com";
-	return `${serverUrl}/${identity.certificateIdentityRepository}/.github/workflows/release.yml@refs/heads/main`;
+	const repository = releaseRepository(release, environment, identities);
+	return `${serverUrl}/${repository}/.github/workflows/${workflow}@refs/heads/main`;
 }

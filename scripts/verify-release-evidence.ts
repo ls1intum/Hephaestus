@@ -5,7 +5,12 @@ import { isDeepStrictEqual } from "node:util";
 
 import { validateReleaseSbom } from "./check-release-sbom.ts";
 import { evaluate } from "./check-release-vulnerabilities.ts";
-import { releaseIdentityFor } from "./lib/release-identities.ts";
+import {
+	releaseCertificateIdentity,
+	releaseIdentityFor,
+	releaseOwner,
+	releaseRepository,
+} from "./lib/release-identities.ts";
 import { isRelease } from "./release-image-lock.ts";
 
 type Subject = {
@@ -199,12 +204,14 @@ export function verifyReleaseEvidence(
 		!isRelease(manifestValue.release)
 	)
 		throw new Error("release manifest must name the release it evidences");
-	// The evidence may belong to a release published under a pre-transfer namespace,
-	// which its images keep forever (issue #1599) — resolve it per version.
+	// The evidence may belong to a release published under a pre-transfer namespace and
+	// signed by the pre-transfer repository, both of which it keeps forever (issue
+	// #1599) — resolve namespace *and* signer per version, never from the run context.
+	const release = manifestValue.release;
 	const manifest = validateManifest(
 		manifestValue,
 		readJson(join(directory, "release-images.json")),
-		releaseIdentityFor(manifestValue.release).namespace,
+		releaseIdentityFor(release).namespace,
 	);
 	const policy = readJson(join(directory, "vulnerability-policy.json"));
 	for (const subject of manifest.subjects) {
@@ -245,13 +252,12 @@ export function verifyReleaseEvidence(
 		if (!indexContainsSubject(index, subject))
 			throw new Error(`${subject.image} index does not contain ${subject.platform} digest`);
 		if (mode === "verify-signatures" && subject.provenance === "first-party") {
-			const repository = requiredEnvironment("GITHUB_REPOSITORY");
 			const attestations = readJsonFromCommand("cosign", [
 				"verify-attestation",
 				"--type",
 				"spdxjson",
 				"--certificate-identity",
-				`https://github.com/${repository}/.github/workflows/release.yml@refs/heads/main`,
+				releaseCertificateIdentity(release, process.env),
 				"--certificate-oidc-issuer",
 				"https://token.actions.githubusercontent.com",
 				reference,
@@ -260,7 +266,7 @@ export function verifyReleaseEvidence(
 				throw new Error(`${subject.image} SBOM attestation does not match its durable evidence`);
 		}
 	}
-	if (mode === "verify-signatures") verifyIndexSignatures(manifest);
+	if (mode === "verify-signatures") verifyIndexSignatures(manifest, release);
 	return manifest;
 }
 
@@ -268,15 +274,11 @@ function readJsonFromCommand(name: string, args: string[]): unknown {
 	return JSON.parse(command(name, args, true)) as unknown;
 }
 
-function requiredEnvironment(name: string): string {
-	const value = process.env[name];
-	if (!value) throw new Error(`${name} is required`);
-	return value;
-}
-
-function verifyIndexSignatures(manifest: Manifest): void {
-	const repository = requiredEnvironment("GITHUB_REPOSITORY");
-	const owner = requiredEnvironment("GITHUB_REPOSITORY_OWNER");
+function verifyIndexSignatures(manifest: Manifest, release: string): void {
+	// The image indexes are signed by reusable-docker-build.yml in the repository that
+	// built them, which for a pre-transfer release is the pre-transfer slug (#1599).
+	const repository = releaseRepository(release, process.env);
+	const owner = releaseOwner(release, process.env);
 	const indexes = new Map(
 		manifest.subjects
 			.filter(({ provenance }) => provenance === "first-party")
@@ -292,7 +294,7 @@ function verifyIndexSignatures(manifest: Manifest): void {
 				"verify",
 				reference,
 				"--certificate-identity",
-				`https://github.com/${repository}/.github/workflows/reusable-docker-build.yml@refs/heads/main`,
+				releaseCertificateIdentity(release, process.env, undefined, "reusable-docker-build.yml"),
 				"--certificate-oidc-issuer",
 				"https://token.actions.githubusercontent.com",
 				"--certificate-github-workflow-repository",

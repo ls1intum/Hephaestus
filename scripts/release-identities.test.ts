@@ -8,6 +8,8 @@ import {
 	parseReleaseIdentities,
 	releaseCertificateIdentity,
 	releaseIdentityFor,
+	releaseOwner,
+	releaseRepository,
 } from "./lib/release-identities.ts";
 
 const identities = loadReleaseIdentities();
@@ -108,6 +110,47 @@ await test("the map rejects malformed or unordered entries", () => {
 			}),
 		/owner\/name/,
 	);
+});
+
+await test("a misconfigured CI environment fails instead of using the map fallback", () => {
+	const boundary = currentReleaseIdentity(identities).firstVersion;
+	// Outside CI the map is the documented operator fallback…
+	assert.equal(releaseRepository(`v${boundary}`, {}, identities), "hephaestus-build/Hephaestus");
+	// …but CI without GITHUB_REPOSITORY must not silently verify against it.
+	assert.throws(
+		() => releaseRepository(`v${boundary}`, { CI: "true" }, identities),
+		/GITHUB_REPOSITORY/,
+	);
+	assert.throws(
+		() => releaseCertificateIdentity(`v${boundary}`, { CI: "true" }, identities),
+		/GITHUB_REPOSITORY/,
+	);
+	// A historical release is pinned by the map, so it never consults the run context.
+	assert.equal(releaseRepository("v0.74.0", { CI: "true" }, identities), "ls1intum/Hephaestus");
+});
+
+await test("image-index signatures resolve the building repository, owner and workflow", () => {
+	const currentRun = { GITHUB_REPOSITORY: "hephaestus-build/Hephaestus" };
+	assert.equal(releaseOwner("v0.74.0", currentRun, identities), "ls1intum");
+	assert.equal(releaseOwner("v1.0.0", currentRun, identities), "hephaestus-build");
+	// The indexes and their SBOM attestations are signed by reusable-docker-build.yml,
+	// not release.yml, in the repository that built that release.
+	assert.equal(
+		releaseCertificateIdentity("v0.74.0", currentRun, identities, "reusable-docker-build.yml"),
+		"https://github.com/ls1intum/Hephaestus/.github/workflows/reusable-docker-build.yml@refs/heads/main",
+	);
+	assert.equal(
+		releaseCertificateIdentity("v0.74.0", currentRun, identities),
+		"https://github.com/ls1intum/Hephaestus/.github/workflows/release.yml@refs/heads/main",
+	);
+});
+
+await test("evidence verification never derives a signer from the run context", () => {
+	const evidence = readFileSync("scripts/verify-release-evidence.ts", "utf8");
+	assert.doesNotMatch(evidence, /requiredEnvironment\("GITHUB_REPOSITORY/);
+	assert.doesNotMatch(evidence, /GITHUB_REPOSITORY_OWNER/);
+	assert.match(evidence, /releaseRepository\(release, process\.env\)/);
+	assert.match(evidence, /releaseOwner\(release, process\.env\)/);
 });
 
 await test("the previous-release upgrade gate resolves the previous namespace per version", () => {
