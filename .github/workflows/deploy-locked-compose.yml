@@ -9,6 +9,15 @@ on:
       release:
         type: string
         required: true
+      expected-signer-repository:
+        description: >-
+          owner/repo whose release workflow signed the lock being deployed. Defaults to
+          this repository. A lock signed before a repository transfer still carries the
+          old owner/repo in its certificate identity, so deploying such a release needs
+          this override pointed at the old slug (issue #1599).
+        type: string
+        required: false
+        default: ""
 
 jobs:
   deploy:
@@ -29,6 +38,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE: ${{ inputs.release }}
+          SERVER_URL: ${{ github.server_url }}
+          # The lock's certificate names the repository whose release workflow signed it.
+          # Deriving the default from the run context keeps signing and verification
+          # aligned across a repository transfer — but locks signed *before* the move
+          # still verify against the old owner/repo, which is what the
+          # expected-signer-repository override is for (issue #1599).
+          EXPECTED_SIGNER_REPOSITORY: ${{ inputs.expected-signer-repository || github.repository }}
         run: |
           set -euo pipefail
           [[ "$RELEASE" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || {
@@ -41,7 +57,7 @@ jobs:
           cosign verify-blob \
             --bundle "$RUNNER_TEMP/verified-release/$asset.sigstore.json" \
             --certificate-identity \
-              'https://github.com/ls1intum/Hephaestus/.github/workflows/release.yml@refs/heads/main' \
+              "${SERVER_URL}/${EXPECTED_SIGNER_REPOSITORY}/.github/workflows/release.yml@refs/heads/main" \
             --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
             "$RUNNER_TEMP/verified-release/$asset"
           commit=$(jq -er '.commit | select(test("^[a-f0-9]{40}$"))' \

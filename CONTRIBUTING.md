@@ -1,6 +1,6 @@
 # Contribution Guidelines for Hephaestus
 
-Read the [local development guide](https://ls1intum.github.io/Hephaestus/contributor/local-development) on how to set up your environment.
+Read the [local development guide](https://docs.hephaestus.build/contributor/local-development) on how to set up your environment.
 
 Repository tooling requires the Node.js version pinned in `package.json#devEngines.runtime`. pnpm
 installs dependencies and dispatches package scripts; TypeScript scripts and application tools execute
@@ -34,7 +34,7 @@ Contributions that do not adhere to these guidelines will be rejected. We align 
 
 Use `pnpm run check:affected` for fast feedback. Before pushing, run `pnpm run check`; the hook runs it
 automatically. Run `pnpm run verify` before requesting review. Scope, budgets, and exclusions are documented in the
-[local verification guide](https://ls1intum.github.io/Hephaestus/contributor/local-verification).
+[local verification guide](https://docs.hephaestus.build/contributor/local-verification).
 
 1. **External contributors only**: Fork the Repository and create a branch.
 2. **Create a feature branch**: Work on your changes in a separate branch.
@@ -63,7 +63,7 @@ coordinate with a maintainer.
 Want a running copy of your branch on a URL? Add the `preview` label to your pull request. It runs the
 images CI built for your commit and redeploys on every push; it never waits for your tests, so it
 exists even when they are red. Remove the label to tear it down. See
-[Preview Deployments](https://ls1intum.github.io/Hephaestus/contributor/ci-cd) for what a preview does
+[Preview Deployments](https://docs.hephaestus.build/contributor/ci-cd) for what a preview does
 and does not contain.
 
 ## Pull Request Title Guidelines
@@ -92,8 +92,8 @@ pnpm changeset --empty  # no user-facing effect — then write why in the file b
 
 Changesets accumulate into a **Version PR**; merging it cuts the release. How releases are cut, how to
 write good changesets, and what a version number promises all live in the
-[release management guide](https://ls1intum.github.io/Hephaestus/contributor/release-management) and the
-[compatibility policy](https://ls1intum.github.io/Hephaestus/admin/compatibility-policy).
+[release management guide](https://docs.hephaestus.build/contributor/release-management) and the
+[compatibility policy](https://docs.hephaestus.build/admin/compatibility-policy).
 
 ### Allowed Types
 

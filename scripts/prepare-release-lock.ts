@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 
 import { run } from "./lib/process.ts";
+import { releaseSignerIdentity, releaseSignerRepository } from "./lib/release-signer.ts";
 import { isRelease } from "./release-image-lock.ts";
 
 const repositoryRoot = join(import.meta.dirname, "..");
@@ -21,7 +22,7 @@ try {
 		"download",
 		release,
 		"--repo",
-		"ls1intum/Hephaestus",
+		releaseSignerRepository(process.env),
 		"--dir",
 		directory,
 		"--pattern",
@@ -36,7 +37,7 @@ try {
 		"--bundle",
 		join(directory, `${asset}.sigstore.json`),
 		"--certificate-identity",
-		"https://github.com/ls1intum/Hephaestus/.github/workflows/release.yml@refs/heads/main",
+		releaseSignerIdentity(process.env),
 		"--certificate-oidc-issuer",
 		"https://token.actions.githubusercontent.com",
 		join(directory, asset),

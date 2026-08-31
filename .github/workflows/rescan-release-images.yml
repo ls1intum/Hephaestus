@@ -36,7 +36,7 @@ jobs:
           lock="release-$tag.json"
           cosign verify-blob \
             --bundle "release-evidence/$lock.sigstore.json" \
-            --certificate-identity 'https://github.com/ls1intum/Hephaestus/.github/workflows/release.yml@refs/heads/main' \
+            --certificate-identity '${{ github.server_url }}/${{ github.repository }}/.github/workflows/release.yml@refs/heads/main' \
             --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
             "release-evidence/$lock"
           node scripts/release-image-lock.ts "release-evidence/$lock" \

@@ -5,10 +5,11 @@ import { themes as prismThemes } from "prism-react-renderer";
 const envBaseUrl = process.env.DOCUSAURUS_BASE_URL;
 
 /*
- * PR previews on Surge.sh need '/', production GitHub Pages needs '/Hephaestus/'. Unset and empty
- * both mean production: an empty base URL would resolve every asset against the site root.
+ * Production (docs.hephaestus.build) and PR previews on Surge.sh both serve from the domain root.
+ * DOCUSAURUS_BASE_URL stays overridable for builds hosted under a path prefix; unset and empty both
+ * mean the root, because an empty base URL would resolve every asset against the current page.
  */
-const baseUrl = envBaseUrl === undefined || envBaseUrl === "" ? "/Hephaestus/" : envBaseUrl;
+const baseUrl = envBaseUrl === undefined || envBaseUrl === "" ? "/" : envBaseUrl;
 
 /** The site's one-sentence definition of the product, kept in step with the README's opening. */
 const DESCRIPTION =
@@ -44,7 +45,7 @@ const config: Config = {
 		},
 	},
 
-	url: "https://ls1intum.github.io",
+	url: "https://docs.hephaestus.build",
 	baseUrl,
 	organizationName: "ls1intum",
 	projectName: "Hephaestus",

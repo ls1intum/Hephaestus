@@ -41,4 +41,4 @@ Example (a migration-bearing fix):
 Fixes duplicate leaderboard entries after a team rename.
 ```
 
-Full flow and rules: [release management guide](https://ls1intum.github.io/Hephaestus/contributor/release-management).
+Full flow and rules: [release management guide](https://docs.hephaestus.build/contributor/release-management).
