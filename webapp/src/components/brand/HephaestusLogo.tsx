@@ -1,23 +1,15 @@
-import { HephIcon } from "./HephIcon";
-
 export function HephMark({ className = "size-8" }: { className?: string }) {
 	return (
-		<span
-			className={`inline-flex shrink-0 items-center justify-center rounded-full bg-brand text-white ${className}`}
-			aria-hidden="true"
-		>
-			<HephIcon className="size-[72%]" animated={false} pad={3} />
+		<span className={`inline-flex shrink-0 ${className}`} aria-hidden="true">
+			<img className="size-full" src="/brand/hephaestus-mark.svg" alt="" />
 		</span>
 	);
 }
 
 export function HephaestusWordmark({ className = "" }: { className?: string }) {
 	return (
-		<span className={className} aria-label="Hephaestus">
-			<span className="text-brand-accent" aria-hidden="true">
-				Heph
-			</span>
-			<span aria-hidden="true">aestus</span>
+		<span className={className}>
+			<span className="text-brand-accent">Heph</span>aestus
 		</span>
 	);
 }

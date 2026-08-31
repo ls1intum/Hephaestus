@@ -4,50 +4,44 @@ title: Brand assets
 
 # Brand assets
 
-Hephaestus uses one identity system:
+Hephaestus uses the solid signal-blue Heph mark for product identity. The bare, animated Heph drawing
+is reserved for the mentor persona.
 
-- the **solid signal-blue Heph mark** for product identity, app icons, favicons, and external profiles;
-- the **Heph-accent wordmark** for lockups; and
-- the bare, animated Heph drawing only when Heph is acting as the mentor persona.
+## Source and generation
 
-The vector sources live in `webapp/brand/`. Do not edit the copies or PNG derivatives under
-`webapp/public/` or `docs/static/img/` directly. Regenerate them with:
+`webapp/brand/hephaestus-mark.svg` is the source for the static mark. The React `HephMark` renders
+that file directly. `webapp/scripts/export-brand-assets.ts` produces the tracked browser, app,
+documentation, README, social-card, and external-profile assets:
 
 ```bash
 pnpm --filter webapp run export:brand-assets
 ```
 
-The solid mark keeps `#315FDC` in both color modes. UI text uses the mode-aware `brand-accent` token,
-so the wordmark remains legible on dark surfaces. Product prose always spells the name normally as
-“Hephaestus”; the accent is visual identity, not punctuation or a new product name.
+Do not edit generated files under `webapp/public/` or `docs/static/img/`. CI regenerates them and
+fails when the committed output differs.
 
-White on signal blue has a 5.52:1 contrast ratio. This clears the WCAG 2.2 AA threshold for normal
-text and the mark's essential shapes clear the 3:1 non-text threshold; see the W3C guidance for
-[text contrast](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html) and
-[non-text contrast](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html).
-
-## Choosing an asset
+## Usage
 
 | Context | Asset |
 |---|---|
-| App header, sign-in, product page | React `HephaestusLogo` or `HephMark` |
-| Mentor conversation | React `HephIcon` |
-| README | Theme-aware lockup SVGs |
-| Documentation navbar | Docusaurus `logo.src` and `logo.srcDark` |
+| In-app product lockup | `HephaestusLogo` or `HephMark` |
+| Mentor conversation | `HephIcon` |
+| README and documentation navbar | Light/dark lockup PNGs |
 | Browser tab | `favicon.png` |
-| Installed web app | 192px, 512px, and maskable PNGs declared in the manifest |
-| GitHub App or another external profile | `hephaestus-app-icon-1024.png` |
+| Installed web app | 192px, 512px, and maskable PNGs from `webapp/public/manifest.json` |
 | Link preview | `hephaestus-social-card.png` |
+| GitHub App profile | `docs/static/img/brand/github-app-icon-1024.png` |
 
-These choices follow the native surfaces rather than adding theme-detection code: GitHub supports
-[theme-specific README pictures](https://github.blog/changelog/2021-11-24-specify-theme-context-for-images-in-markdown/),
-Docusaurus supports [`favicon`, `logo.src`, and `logo.srcDark`](https://docusaurus.io/docs/api/themes/configuration),
-and web app manifests support icon sizes and purposes including
-[`maskable`](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Manifest/Reference/icons).
-The maskable export keeps the drawing inside the platform
-[safe zone](https://web.dev/articles/maskable-icon). Decorative copies use empty alternative text or
-are hidden from assistive technology; informative images follow the
-[W3C image text-alternative guidance](https://www.w3.org/WAI/tutorials/images/).
-Opaque app-icon exports also follow Apple's guidance to keep icons simple and recognizable and to
-let each platform apply its own mask; see the
-[Apple app-icon guidance](https://developer.apple.com/design/human-interface-guidelines/app-icons).
+The static mark remains signal blue (`#315FDC`) in both color modes. UI wordmarks use the
+mode-aware `brand-accent` token from `webapp/src/styles.css`; prose always spells the product name
+“Hephaestus.” Unlabelled React marks are decorative. Informative uses need a concise accessible name.
+
+The README uses [GitHub's theme-aware picture sources](https://github.blog/changelog/2021-11-24-specify-theme-context-for-images-in-markdown/),
+the documentation navbar uses [Docusaurus light/dark logo sources](https://docusaurus.io/docs/api/themes/configuration),
+and the installed-app exports follow the manifest [icon-purpose contract](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Manifest/Reference/icons)
+and [maskable safe zone](https://web.dev/articles/maskable-icon).
+
+## External surfaces
+
+Generated files do not update third-party accounts. After changing the static mark, a repository
+maintainer must upload `github-app-icon-1024.png` in the GitHub App settings.

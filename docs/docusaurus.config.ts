@@ -11,7 +11,6 @@ const envBaseUrl = process.env.DOCUSAURUS_BASE_URL;
  */
 const baseUrl = envBaseUrl === undefined || envBaseUrl === "" ? "/" : envBaseUrl;
 
-/** The site's one-sentence definition of the product, kept in step with the README's opening. */
 const DESCRIPTION =
 	"Hephaestus is an open-source AI mentor for software teams. It reads the work developers already do against the practices their project cares about, and writes back feedback they can act on.";
 
@@ -173,8 +172,8 @@ const config: Config = {
 		navbar: {
 			logo: {
 				alt: "Hephaestus",
-				src: "img/brand/hephaestus-lockup-light.svg",
-				srcDark: "img/brand/hephaestus-lockup-dark.svg",
+				src: "img/brand/hephaestus-lockup-light.png",
+				srcDark: "img/brand/hephaestus-lockup-dark.png",
 				width: 155,
 				height: 32,
 			},

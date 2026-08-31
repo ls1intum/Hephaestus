@@ -1,4 +1,4 @@
-import { MessageSquareCheck } from "lucide-react";
+import { Hammer } from "lucide-react";
 import { HephIcon } from "@/components/brand/HephIcon";
 import { InstitutionalAttribution } from "@/components/core/InstitutionalAttribution";
 import { Badge } from "@/components/ui/badge";
@@ -6,7 +6,7 @@ import { FeatureCard, type FeatureData } from "./FeatureCard";
 
 const FEATURES_DATA: FeatureData[] = [
 	{
-		icon: <MessageSquareCheck className="size-5" strokeWidth={1.7} />,
+		icon: <Hammer className="size-5" strokeWidth={1.7} />,
 		badge: "Core feature",
 		title: "Practice feedback",
 		description: "Specific feedback on how the work was done",

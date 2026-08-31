@@ -162,9 +162,16 @@ jobs:
         run: |
           timeout --kill-after=30s 15m pnpm --filter webapp run test:storybook
           pnpm --filter webapp run export:readme-assets
+          pnpm --filter webapp run export:brand-assets
           if [[ -n "$(git status --porcelain --untracked-files=all -- docs/images/readme)" ]]; then
             echo "::error::README or documentation images are stale. Run 'pnpm --filter webapp run export:readme-assets' and commit the result."
             git status --short --untracked-files=all -- docs/images/readme
+            exit 1
+          fi
+          BRAND_ASSETS=(webapp/brand webapp/public docs/static/img/brand docs/static/img/favicon.png docs/static/img/hephaestus-social-card.png)
+          if [[ -n "$(git status --porcelain --untracked-files=all -- "${BRAND_ASSETS[@]}")" ]]; then
+            echo "::error::Brand assets are stale. Run 'pnpm --filter webapp run export:brand-assets' and commit the result."
+            git status --short --untracked-files=all -- "${BRAND_ASSETS[@]}"
             exit 1
           fi
       - name: Build Storybook with dependency stats
