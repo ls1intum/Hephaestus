@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn } from "storybook/test";
 import type { PracticeGroupReviewRun } from "@/api/types.gen";
 import { daysBefore } from "@/components/common/story-clock";
+import { expectNoPageOverflow } from "@/test/reflow";
 import { ReviewRunCard } from "./ReviewRunCard";
 
 const run: PracticeGroupReviewRun = {
@@ -165,4 +166,26 @@ export const ManyObservations: Story = {
 		await userEvent.click(canvas.getByRole("button", { name: "Show less" }));
 		await expect(canvas.queryByText(held)).toBeNull();
 	},
+};
+
+/**
+ * At 320px the date column, the timeline gutter and the title share one row. A long identity and a
+ * repository name have to wrap rather than push the card sideways.
+ */
+export const MobileReflow: Story = {
+	args: {
+		run: {
+			...run,
+			reviewedWork: {
+				...run.reviewedWork,
+				title: "Split the practice catalog loader per workspace and move the seeding behind a flag",
+				repositoryName: "ls1intum/hephaestus-practice-validation-fixtures",
+			},
+		},
+	},
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320] },
+	},
+	play: expectNoPageOverflow,
 };

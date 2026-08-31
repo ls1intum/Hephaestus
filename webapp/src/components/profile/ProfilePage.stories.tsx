@@ -86,7 +86,6 @@ export const Default: Story = {
 		...baseMonitorArgs,
 		practiceGroupStandings,
 		isLoading: false,
-		error: false,
 		username: "johndoe",
 		currUserIsDashboardUser: true,
 		workspaceSlug: "aet",
@@ -135,7 +134,6 @@ export const Loading: Story = {
 	args: {
 		...baseMonitorArgs,
 		isLoading: true,
-		error: false,
 		username: "johndoe",
 		profileData: undefined,
 		currUserIsDashboardUser: true,
@@ -150,7 +148,7 @@ export const ErrorState: Story = {
 	args: {
 		...baseMonitorArgs,
 		isLoading: false,
-		error: true,
+		error: new Error("Request failed with status 503"),
 		username: "johndoe",
 		profileData: undefined,
 		currUserIsDashboardUser: true,
@@ -165,7 +163,6 @@ export const Empty: Story = {
 	args: {
 		...baseMonitorArgs,
 		isLoading: false,
-		error: false,
 		username: "emptydoe",
 		currUserIsDashboardUser: true,
 		workspaceSlug: "aet",

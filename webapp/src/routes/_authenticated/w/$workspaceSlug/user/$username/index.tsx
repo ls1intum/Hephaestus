@@ -207,7 +207,8 @@ function UserProfile() {
 				workspaceQuery.isPending ||
 				(activityMonitorQuery.isPending && !activityMonitorQuery.data)
 			}
-			error={profileQuery.isError}
+			error={profileQuery.error ?? undefined}
+			onRetry={() => void profileQuery.refetch()}
 			username={username}
 			currUserIsDashboardUser={currUserIsDashboardUser}
 			workspaceSlug={workspaceSlug}
