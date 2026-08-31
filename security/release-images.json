@@ -1,5 +1,11 @@
 {
-	"images": ["webapp", "application-server", "agent-pi", "postgres"],
+	"schemaVersion": 1,
+	"images": [
+		"webapp",
+		"application-server",
+		"agent-pi",
+		"postgres"
+	],
 	"upstream": [
 		{
 			"name": "alpine",
