@@ -1479,6 +1479,7 @@ async function admitObservations() {
 		headers: {
 			authorization: `Bearer ${process.env.LLM_PROXY_TOKEN}`,
 			"content-type": "application/json",
+			...(process.env.TRACEPARENT ? { traceparent: process.env.TRACEPARENT } : {}),
 		},
 		body: JSON.stringify({ schemaVersion: 1, observations: reviewState.observations }),
 	});

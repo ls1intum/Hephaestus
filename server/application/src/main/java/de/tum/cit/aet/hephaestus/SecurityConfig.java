@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.core.security.SpaCsrfTokenRequestHandler;
 import de.tum.cit.aet.hephaestus.core.security.StaleAuthCookieFilter;
 import de.tum.cit.aet.hephaestus.feature.FeatureFlag;
 import de.tum.cit.aet.hephaestus.observability.ReplicaIdentityFilter;
+import de.tum.cit.aet.hephaestus.observability.RequestCorrelationFilter;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -422,7 +423,8 @@ public class SecurityConfig {
                         "Origin",
                         "X-XSRF-TOKEN",
                         "X-Impersonation-Allow-Writes"));
-        configuration.setExposedHeaders(List.of(ReplicaIdentityFilter.HEADER_NAME));
+        configuration.setExposedHeaders(
+                List.of(ReplicaIdentityFilter.HEADER_NAME, RequestCorrelationFilter.HEADER_NAME));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

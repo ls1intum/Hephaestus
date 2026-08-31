@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.observability.StructuredLogKeys;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
@@ -17,6 +18,7 @@ import java.util.concurrent.TimeUnit;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.PageRequest;
@@ -131,7 +133,17 @@ public class AgentJobZombieSweeper {
             try {
                 AgentJob reaped = transactionTemplate.execute(status -> reapIfStale(job.getId()));
                 if (reaped != null) {
-                    jobTelemetry.terminal(reaped, AgentJobStatus.TIMED_OUT, AgentJobTelemetry.age(reaped));
+                    // The sweeper thread has no ambient trace context; restore the job's own trace ID
+                    // (with a fresh span so no stale scheduler-thread value pairs with it) so the
+                    // terminal event joins the lifecycle it closes.
+                    MDC.put(StructuredLogKeys.TRACE_ID, reaped.getTraceId());
+                    MDC.put(StructuredLogKeys.SPAN_ID, AgentJobExecutor.randomSpanId());
+                    try {
+                        jobTelemetry.terminal(reaped, AgentJobStatus.TIMED_OUT, AgentJobTelemetry.age(reaped));
+                    } finally {
+                        MDC.remove(StructuredLogKeys.TRACE_ID);
+                        MDC.remove(StructuredLogKeys.SPAN_ID);
+                    }
                 }
             } catch (Exception e) {
                 log.warn("Failed to reap stale job: jobId={}, error={}", job.getId(), e.getMessage());

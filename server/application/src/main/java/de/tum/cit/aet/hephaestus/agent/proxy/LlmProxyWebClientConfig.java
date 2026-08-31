@@ -49,7 +49,8 @@ class LlmProxyWebClientConfig {
     WebClient llmProxyWebClient(
             ConnectionProvider llmProxyConnectionProvider,
             LoopResources llmProxyLoopResources,
-            LlmProperties llmProperties) {
+            LlmProperties llmProperties,
+            WebClient.Builder webClientBuilder) {
         boolean allowLoopback = llmProperties.egress().allowLoopback();
         HttpClient httpClient = HttpClient.create(llmProxyConnectionProvider)
                 .runOn(llmProxyLoopResources)
@@ -65,7 +66,7 @@ class LlmProxyWebClientConfig {
                 .codecs(cfg -> cfg.defaultCodecs().maxInMemorySize(1024 * 1024))
                 .build();
 
-        return WebClient.builder()
+        return webClientBuilder
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
                 .exchangeStrategies(strategies)
                 .build();

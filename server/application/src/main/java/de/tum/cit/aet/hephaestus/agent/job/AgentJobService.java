@@ -23,6 +23,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.observability.StructuredLogKeys;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
@@ -42,6 +43,7 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -357,6 +359,7 @@ public class AgentJobService {
             job.setPracticeTriggerMode(admission == null ? TriggerMode.MANUAL : admission.triggerMode());
             job.setMetadata(submission.metadata());
             job.setIdempotencyKey(detectionKey);
+            job.setTraceId(resolveTraceId());
             try {
                 job.setConfigSnapshot(
                         ConfigSnapshot.from(binding, llmModelResolver).toJson(objectMapper));
@@ -405,6 +408,12 @@ public class AgentJobService {
             AgentJobTelemetry.queued(job);
         }
         return committed;
+    }
+
+    private String resolveTraceId() {
+        return Objects.requireNonNullElseGet(
+                MDC.get(StructuredLogKeys.TRACE_ID),
+                () -> UUID.randomUUID().toString().replace("-", ""));
     }
 
     /** Settle a refused signal inside the submission transaction, so the two stand or fall together. */

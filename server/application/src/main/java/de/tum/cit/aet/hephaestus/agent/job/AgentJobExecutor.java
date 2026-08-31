@@ -570,8 +570,10 @@ public class AgentJobExecutor {
 
     /** Runs on the sandbox executor, not the poll thread. */
     private void runClaimedJob(UUID jobId, ClaimResult claim) {
-        MDC.put(MDC_JOB_ID, jobId.toString());
         AgentJob job = claim.job;
+        MDC.put(StructuredLogKeys.TRACE_ID, job.getTraceId());
+        MDC.put(StructuredLogKeys.SPAN_ID, randomSpanId());
+        MDC.put(MDC_JOB_ID, jobId.toString());
         MDC.put(StructuredLogKeys.WORKSPACE_ID, job.getWorkspace().getId().toString());
         MDC.put(MDC_JOB_TYPE, job.getJobType().name());
         Instant startTime = Instant.now();
@@ -655,6 +657,8 @@ public class AgentJobExecutor {
             MDC.remove(MDC_JOB_ID);
             MDC.remove(StructuredLogKeys.WORKSPACE_ID);
             MDC.remove(MDC_JOB_TYPE);
+            MDC.remove(StructuredLogKeys.TRACE_ID);
+            MDC.remove(StructuredLogKeys.SPAN_ID);
         }
     }
 
@@ -665,6 +669,15 @@ public class AgentJobExecutor {
         } catch (IllegalArgumentException ignored) {
             return null;
         }
+    }
+
+    /** Package-private: the zombie sweeper reuses it when it restores a reaped job's trace context. */
+    static String randomSpanId() {
+        long value;
+        do {
+            value = ThreadLocalRandom.current().nextLong();
+        } while (value == 0);
+        return "%016x".formatted(value);
     }
 
     private boolean markExecutionStarted(UUID jobId) {
