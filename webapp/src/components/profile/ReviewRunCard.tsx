@@ -7,20 +7,22 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ARTIFACT_KIND, artifactKindIcon, artifactKindLabel } from "@/lib/artifact-kinds";
 import { asDate } from "@/lib/dates";
+import { getProviderLabel } from "@/lib/provider";
 import type { FeedbackUsefulness, ObservationDetailState } from "./review-runs";
 import { ReviewObservationRow } from "./ReviewObservationRow";
 
 const DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
 const TIME = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" });
 
-const PROVIDER_META = {
-	GITHUB: { label: "GitHub", Icon: GithubIcon },
-	SLACK: { label: "Slack", Icon: SlackIcon },
-	GITLAB: { label: "GitLab", Icon: GitlabIcon },
-	OUTLINE: { label: "Outline", Icon: OutlineIcon },
+/** Marks only — the words come from `getProviderLabel`, which owns provider copy for every surface. */
+const PROVIDER_ICONS = {
+	GITHUB: GithubIcon,
+	SLACK: SlackIcon,
+	GITLAB: GitlabIcon,
+	OUTLINE: OutlineIcon,
 } satisfies Record<
 	NonNullable<PracticeGroupReviewRun["reviewedWork"]["provider"]>,
-	{ label: string; Icon: typeof GithubIcon }
+	typeof GithubIcon
 >;
 
 /**
@@ -30,7 +32,9 @@ const PROVIDER_META = {
  */
 function providerMeta(run: PracticeGroupReviewRun) {
 	const provider = run.reviewedWork.provider;
-	return provider ? PROVIDER_META[provider] : undefined;
+	return provider
+		? { label: getProviderLabel(provider), Icon: PROVIDER_ICONS[provider] }
+		: undefined;
 }
 
 /**
