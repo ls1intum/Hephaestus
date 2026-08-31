@@ -8,8 +8,8 @@ export type FeedbackUsefulness = NonNullable<PracticeGroupReviewObservation["fee
 
 /**
  * Whether delivered feedback was worth receiving — the half of a response about the review, where
- * resolution is about the work. Written inline once, where its tinted background left the label at
- * 4.46:1, under WCAG 2.2 SC 1.4.3; rendering both halves from a registry settles that.
+ * `feedback-resolution-defs` is about the work. Neither derives the other: feedback can be useful
+ * and still not apply.
  */
 export const FEEDBACK_USEFULNESS_DEFS: StatusDefs<FeedbackUsefulness> = {
 	HELPFUL: {

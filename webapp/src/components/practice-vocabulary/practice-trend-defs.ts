@@ -9,7 +9,6 @@ export type TrendDirection = PracticeTrend["direction"];
 /**
  * Which way recent evidence points. `UNCERTAIN` means the comparison was made and did not separate;
  * `INSUFFICIENT_EVIDENCE` that none was possible. Both render muted, so the icon separates them.
- * The wording claims nothing about ability — only about a stretch of recent work.
  */
 export const PRACTICE_TREND_DEFS: StatusDefs<TrendDirection> = {
 	IMPROVING: {
