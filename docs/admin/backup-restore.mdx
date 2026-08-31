@@ -11,7 +11,7 @@ holds bounded evidence copies that may become irreproducible after upstream cont
 
 | Data | Where | Priority |
 | --- | --- | --- |
-| PostgreSQL volume | Compose-managed volume mounted by `postgres` | **Everything.** Accounts, workspaces, observations, feedback, encrypted provider tokens, JWT signing keys. |
+| PostgreSQL database | Compose-managed `postgresql-data` volume mounted by `postgres` | **Everything.** Accounts, workspaces, observations, feedback, encrypted provider tokens, JWT signing keys. |
 | `.env` | `/opt/hephaestus/docker/self-host/.env` | **Equal priority.** Its encryption keys protect values inside the database backup. Without them, provider credentials and signing material are unreadable. |
 | TLS certificates | `./letsencrypt/` | Optional — Let's Encrypt re-issues on first boot (rate limits permitting). |
 | Context Fabric | `git-repos` volume | Back up when replayable evidence is required. Skipping it discards repository clones and bounded replay/CAS content; durable job provenance remains in PostgreSQL, but the exact source bytes may be unrecoverable. |
@@ -57,13 +57,22 @@ timestamp.
 
 ## PostgreSQL 17 to 18
 
-PostgreSQL major-version data directories are not binary compatible. The PostgreSQL 18 image stores
-`PGDATA` under `/var/lib/postgresql/18/docker`.
-Do **not** point the PostgreSQL 18 container at the old PostgreSQL 17 volume and do not delete the
-old volume until the restored instance passes verification.
+PostgreSQL major-version data directories are not binary compatible, and the PostgreSQL 18 image
+stores `PGDATA` under `/var/lib/postgresql/18/docker`. The Compose volume keeps its stable
+`postgresql-data` name across the upgrade, so the move is: dump, destroy the volume, let
+PostgreSQL 18 initialize a fresh empty cluster under the same name, restore.
 
-From the PostgreSQL 17 release, stop application writes, make a logical dump, and record the exact
-Compose volume name:
+Skipping the procedure fails loudly, not silently: a PostgreSQL 18 container attached to the volume
+still holding PostgreSQL 17 data refuses to start (the entrypoint reports the old data and exits),
+so nothing is lost by starting the new release too early — the container just stays down until the
+steps below are completed.
+
+**Step (c) destroys the PostgreSQL 17 data.** From that point on, the dump is the only copy. Do not
+remove the volume before the dump has passed `pg_restore --list`, and copy the dump (and its
+checksum) off the host first.
+
+**(a)** From the running PostgreSQL 17 release, stop application writes and take a verified
+custom-format dump:
 
 ```bash
 cd /opt/hephaestus/docker/self-host
@@ -73,16 +82,30 @@ dc exec -T postgres pg_dump -U root -Fc hephaestus > /var/tmp/hephaestus-pg17.du
 test -s /var/tmp/hephaestus-pg17.dump
 dc exec -T postgres pg_restore --list < /var/tmp/hephaestus-pg17.dump >/dev/null
 sha256sum /var/tmp/hephaestus-pg17.dump > /var/tmp/hephaestus-pg17.dump.sha256
-PG17_VOLUME=$(docker inspect "$(dc ps -q postgres)" \
-  --format '{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql/data"}}{{.Name}}{{end}}{{end}}')
-test -n "$PG17_VOLUME"
-dc down
-printf 'Preserved PostgreSQL 17 volume: %s\n' "$PG17_VOLUME"
 ```
 
-Check out the new release and prepare its signed release lock as described in [Upgrades](./install#upgrades).
-The supported self-host stack creates no custom roles or tablespaces; operators who added either must
-migrate those cluster-global objects separately. Restore into the new PostgreSQL 18 volume:
+Copy `/var/tmp/hephaestus-pg17.dump` and its `.sha256` off the host now.
+
+**(b)** Stop and remove the database container:
+
+```bash
+dc down postgres
+```
+
+**(c)** Remove the PostgreSQL 17 volume. Docker prefixes the Compose project name, so the exact
+name is `<project>_postgresql-data` — list the volumes and use the one ending in
+`_postgresql-data`:
+
+```bash
+docker volume ls --format '{{.Name}}' | grep '_postgresql-data$'
+docker volume rm <project>_postgresql-data
+```
+
+This deletes the PostgreSQL 17 cluster permanently.
+
+**(d)** Check out the new release and prepare its signed release lock as described in
+[Upgrades](./install#upgrades), then start the database alone. PostgreSQL 18 initializes a fresh,
+empty cluster in the recreated volume:
 
 ```bash
 dc() { docker compose --env-file .env --env-file release-lock.env "$@"; }
@@ -90,27 +113,41 @@ dc up -d postgres
 until dc exec -T postgres pg_isready -U root -d hephaestus; do sleep 2; done
 test "$(dc exec -T postgres psql -U root -d hephaestus -Atc \
   "SELECT current_setting('server_version_num')::int / 10000 || ':' || (to_regclass('public.databasechangelog') IS NULL)")" = "18:true"
+```
+
+**(e)** Restore the dump. The supported self-host stack creates no custom roles or tablespaces;
+operators who added either must migrate those cluster-global objects separately:
+
+```bash
 sha256sum -c /var/tmp/hephaestus-pg17.dump.sha256
 dc exec -T postgres dropdb -U root hephaestus
 dc exec -T postgres createdb -U root hephaestus
 dc exec -T postgres pg_restore -U root -d hephaestus --no-owner --no-acl \
   --single-transaction < /var/tmp/hephaestus-pg17.dump
+```
+
+**(f)** Update the pg_partman extension to the version bundled with the new image, then start the
+stack:
+
+```bash
 dc exec -T postgres psql -U root -d hephaestus -v ON_ERROR_STOP=1 \
   -c 'ALTER EXTENSION pg_partman UPDATE'
 dc up -d --wait
 ```
 
-Verify application health, sign in, and inspect recent workspace activity. Then verify the database
-major, extension, and partition policy:
+**(g)** Verify application health, sign in, and inspect recent workspace activity. Then verify the
+database major, extension, partition policy, and that row counts in the tables you know best match
+the pre-upgrade state:
 
 ```bash
 dc exec -T postgres psql -U root -d hephaestus -Atc \
   "SELECT current_setting('server_version_num')::int / 10000 = 18; SELECT extversion = '5.5.0' FROM pg_extension WHERE extname = 'pg_partman'; SELECT count(*) = 1 FROM partman.part_config WHERE parent_table = 'public.auth_event';"
 ```
 
-Keep the dump and PostgreSQL 17 volume until acceptance checks pass and backup policy permits their
-deletion. Rollback means stopping PostgreSQL 18 and starting the prior release against the preserved
-volume; never run the prior application against the PostgreSQL 18 database.
+Keep the dump until acceptance checks pass and backup policy permits its deletion. Rollback means
+checking out the prior release, removing the volume again, starting its PostgreSQL 17 container
+against the recreated empty volume, and restoring the same dump; never run the prior application
+against the PostgreSQL 18 database.
 
 ### After a point-in-time restore
 
