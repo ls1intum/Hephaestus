@@ -22,7 +22,7 @@ services:
       POSTGRES_USER: hephaestus
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - postgres-data-v18:/var/lib/postgresql
+      - postgres-data:/var/lib/postgresql
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -376,4 +376,4 @@ networks:
     name: shared-network
 
 volumes:
-  postgres-data-v18:
+  postgres-data:
