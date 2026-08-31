@@ -77,6 +77,34 @@ export const MultipleIcons: Story = {
 	},
 };
 
+export const BrandExport: Story = {
+	parameters: {
+		chromatic: { disableSnapshot: true },
+		docs: {
+			description: {
+				story:
+					"Capture surfaces for `pnpm --filter webapp run export:brand-assets`, which screenshots them into `docs/static/img/brand/`. Colors are literal white and black so the export matches the hammer marks and never follows the Storybook theme.",
+			},
+		},
+	},
+	render: () => (
+		<div className="flex gap-8">
+			<div
+				data-brand-export="heph-avatar"
+				className="flex size-[512px] items-center justify-center bg-white text-black"
+			>
+				<MentorIcon size={400} pad={2} animated={false} />
+			</div>
+			<div
+				data-brand-export="heph-avatar-transparent"
+				className="flex size-[512px] items-center justify-center bg-transparent text-black"
+			>
+				<MentorIcon size={400} pad={2} animated={false} />
+			</div>
+		</div>
+	),
+};
+
 export const AccessibilityPreference: Story = {
 	render: () => (
 		<div className="space-y-4">
