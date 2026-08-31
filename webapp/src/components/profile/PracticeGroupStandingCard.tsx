@@ -7,7 +7,7 @@ import { PRACTICE_GROUP_STANDING_DEFS } from "@/components/practice-vocabulary/p
 import { statusToneClass, statusValues } from "@/components/practice-vocabulary/status-def";
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { artifactKindCountLabel, artifactKindIcon } from "@/lib/artifact-kinds";
 import { cn } from "@/lib/utils";
@@ -117,9 +117,9 @@ export function PracticeGroupStandingCard({
 									>
 										<Icon className="size-5" aria-hidden />
 									</span>
-									<CardTitle className="min-w-0 flex-1 text-lg leading-snug">
-										{group.name}
-									</CardTitle>
+									{/* A real heading, not just card-title styling: the section above is an h2, so
+									    these are the level a reader navigates the groups by. */}
+									<h3 className="min-w-0 flex-1 text-lg font-medium leading-snug">{group.name}</h3>
 									{onOpenDetails && (
 										<ChevronRightIcon className="size-4 text-muted-foreground" aria-hidden />
 									)}

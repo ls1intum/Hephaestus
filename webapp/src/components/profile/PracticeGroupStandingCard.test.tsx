@@ -47,6 +47,53 @@ describe("PracticeGroupStandingCard", () => {
 		expect(onOpenDetails).toHaveBeenCalledWith(group);
 	});
 
+	it("puts the groups that need attention first", () => {
+		// The order is the registry's, so a reader scanning top-down meets the worst standing first —
+		// and it must not follow the order the workspace happens to list its groups in.
+		const groups = ["going-well", "needs-attention", "mixed"].map((slug, index) => ({
+			...group,
+			id: index + 1,
+			slug,
+			name: slug,
+		}));
+		render(
+			<PracticeGroupStandingCard
+				groups={groups}
+				standings={{
+					"going-well": { ...standing, groupSlug: "going-well", standing: "STRENGTH" },
+					"needs-attention": {
+						...standing,
+						groupSlug: "needs-attention",
+						standing: "DEVELOPING",
+					},
+					mixed: { ...standing, groupSlug: "mixed", standing: "MIXED" },
+				}}
+				isLoading={false}
+			/>,
+		);
+
+		const headings = screen.getAllByRole("heading", { level: 3 }).map((node) => node.textContent);
+		expect(headings).toStrictEqual(["needs-attention", "mixed", "going-well"]);
+	});
+
+	it("collapses past three groups and says how many are hidden", () => {
+		const groups = Array.from({ length: 5 }, (_, index) => ({
+			...group,
+			id: index + 1,
+			slug: `group-${index}`,
+			name: `Group ${index}`,
+		}));
+		render(<PracticeGroupStandingCard groups={groups} standings={{}} isLoading={false} />);
+
+		expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(3);
+		const toggle = screen.getByRole("button", { name: "Show all 5 practice groups" });
+		expect(toggle.getAttribute("aria-expanded")).toBe("false");
+
+		fireEvent.click(toggle);
+		expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(5);
+		screen.getByRole("button", { name: "Show fewer groups" });
+	});
+
 	it("shows an empty workspace state", () => {
 		render(<PracticeGroupStandingCard groups={[]} standings={{}} isLoading={false} />);
 		screen.getByText("No practice groups are configured yet.");

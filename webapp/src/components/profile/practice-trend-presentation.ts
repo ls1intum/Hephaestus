@@ -6,21 +6,13 @@ function reviewedWork(count: number): string {
 	return `${count} ${count === 1 ? "piece" : "pieces"} of reviewed work`;
 }
 
-/**
- * Which trend a chip is showing. The server computes the two differently and the sentence has to
- * follow: a practice trend really does hold one bundle of opportunities against the one before it,
- * while a group trend pools the practices' finished comparisons — there is no group-level "latest
- * against previous" to describe.
- */
+/** A practice trend compares two bundles; a group trend pools finished comparisons. */
 export type TrendScope = "practice" | "group";
 
 /**
- * Says what the returned support actually establishes — never a comparison the server did not make.
- *
- * Three cases the earlier one-liner got wrong. `INSUFFICIENT_EVIDENCE` means no posterior was formed
- * at all, so describing a comparison there contradicted the chip's own "Not enough to compare yet".
- * A group trend never compares bundles. And the calendar span covers the visible evidence trail, not
- * the two bundles, so it is its own sentence rather than a clause hung on the comparison.
+ * Says what the support establishes, never a comparison the server did not make: none is formed for
+ * `INSUFFICIENT_EVIDENCE`, and a group trend compares no bundles at all. The calendar span covers
+ * the visible evidence trail rather than the two bundles, so it stands as its own sentence.
  */
 export function formatTrendProvenance(
 	support: TrendSupport,
