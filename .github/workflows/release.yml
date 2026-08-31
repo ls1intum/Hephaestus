@@ -101,7 +101,7 @@ jobs:
           if [ -n "$PREV_TAG" ] && ! git diff --quiet "$PREV_TAG" "$SHA" -- server/application/src/main/resources/db/changelog/; then
             {
               echo "> [!WARNING]"
-              echo "> This release contains **schema migrations**. They run automatically on startup — back up your database before upgrading. See the [migration guide](https://github.com/ls1intum/Hephaestus/blob/main/MIGRATION.md)."
+              echo "> This release contains **schema migrations**. They run automatically on startup — back up your database before upgrading. See the [migration guide](${{ github.server_url }}/${{ github.repository }}/blob/main/MIGRATION.md)."
               echo ""
             } >> "$NOTES"
           fi
@@ -368,7 +368,7 @@ jobs:
           set -euo pipefail
           cosign verify-blob \
             --bundle "${ASSET}.sigstore.json" \
-            --certificate-identity 'https://github.com/ls1intum/Hephaestus/.github/workflows/release.yml@refs/heads/main' \
+            --certificate-identity '${{ github.server_url }}/${{ github.repository }}/.github/workflows/release.yml@refs/heads/main' \
             --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
             "$ASSET"
 
@@ -571,7 +571,7 @@ jobs:
           lock="release-${TAG_NAME}.json"
           cosign verify-blob \
             --bundle "evidence/$lock.sigstore.json" \
-            --certificate-identity 'https://github.com/ls1intum/Hephaestus/.github/workflows/release.yml@refs/heads/main' \
+            --certificate-identity '${{ github.server_url }}/${{ github.repository }}/.github/workflows/release.yml@refs/heads/main' \
             --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
             "evidence/$lock"
           node scripts/release-image-lock.ts "evidence/$lock" evidence/manifest.json \
@@ -579,7 +579,7 @@ jobs:
           node scripts/verify-release-evidence.ts evidence --verify-signatures
           asset="evidence/release-${TAG_NAME}.json"
           cosign verify-blob --bundle "${asset}.sigstore.json" \
-            --certificate-identity 'https://github.com/ls1intum/Hephaestus/.github/workflows/release.yml@refs/heads/main' \
+            --certificate-identity '${{ github.server_url }}/${{ github.repository }}/.github/workflows/release.yml@refs/heads/main' \
             --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' "$asset" >/dev/null
 
       - name: Promote verified image digests
