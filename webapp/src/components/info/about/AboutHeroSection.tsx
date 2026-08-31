@@ -1,10 +1,12 @@
+import { HephMark, HephaestusWordmark } from "@/components/brand/HephaestusLogo";
+
 export function AboutHeroSection() {
 	return (
 		<section aria-labelledby="about-hero-heading" className="space-y-6 py-4 text-center">
-			<img className="mx-auto size-16 dark:invert" src="/brand/hammer.svg" alt="" />
+			<HephMark className="mx-auto size-16" />
 
 			<h1 id="about-hero-heading" className="text-4xl font-bold tracking-[-0.035em] sm:text-5xl">
-				About Hephaestus
+				About <HephaestusWordmark />
 			</h1>
 			<p className="mx-auto max-w-2xl text-pretty text-xl leading-relaxed text-muted-foreground">
 				Hephaestus is an open-source AI mentor for software teams. It reads the work developers

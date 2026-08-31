@@ -18,6 +18,7 @@ const sidebars: SidebarsConfig = {
 				"accessibility-audit-plan",
 				"security-mutation-testing",
 				"coding-guidelines",
+				"brand-assets",
 				"api-error-handling",
 				"workspace-context",
 				"ai-agent-workflow",

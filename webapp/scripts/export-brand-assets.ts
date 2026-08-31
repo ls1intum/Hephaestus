@@ -1,161 +1,60 @@
-import { spawn } from "node:child_process";
-import { mkdir, readFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { inflateSync } from "node:zlib";
 
-import { type Browser, chromium } from "playwright";
+import { chromium } from "playwright";
 
-const scriptDirectory = import.meta.dirname;
-const webappDirectory = resolve(scriptDirectory, "..");
-const outputDirectory = resolve(webappDirectory, "../docs/static/img/brand");
-const port = 6107;
-const storybookUrl = `http://127.0.0.1:${port}`;
-const storyId = "components-mentor-mentoricon--brand-export";
+const webappDirectory = resolve(import.meta.dirname, "..");
+const sourceDirectory = resolve(webappDirectory, "brand");
+const publicDirectory = resolve(webappDirectory, "public");
+const docsImageDirectory = resolve(webappDirectory, "../docs/static/img");
+const docsBrandDirectory = resolve(docsImageDirectory, "brand");
+const markSvg = await readFile(resolve(sourceDirectory, "hephaestus-mark.svg"), "utf8");
 
-interface CaptureConfig {
-	/** Output filename inside docs/static/img/brand/. */
-	fileName: string;
-	selector: string;
-	/** Whether to capture with a transparent backdrop instead of the tile's own background. */
-	transparent: boolean;
+await mkdir(resolve(publicDirectory, "brand"), { recursive: true });
+await mkdir(docsBrandDirectory, { recursive: true });
+
+for (const [source, targets] of [
+	[
+		"hephaestus-mark.svg",
+		[
+			resolve(publicDirectory, "brand/hephaestus-mark.svg"),
+			resolve(docsImageDirectory, "hephaestus-mark.svg"),
+			resolve(docsBrandDirectory, "hephaestus-mark.svg"),
+		],
+	],
+	["hephaestus-lockup-light.svg", [resolve(docsBrandDirectory, "hephaestus-lockup-light.svg")]],
+	["hephaestus-lockup-dark.svg", [resolve(docsBrandDirectory, "hephaestus-lockup-dark.svg")]],
+] as const) {
+	for (const target of targets) await copyFile(resolve(sourceDirectory, source), target);
 }
 
-// Each tile is 512 CSS pixels; deviceScaleFactor 2 yields the 1024x1024 brand asset.
-const expectedTileSize = 512;
-const expectedPixelSize = 1024;
+const browser = await chromium.launch();
+const page = await browser.newPage();
 
-const captureConfigs: CaptureConfig[] = [
-	{
-		fileName: "heph-avatar-1024.png",
-		selector: '[data-brand-export="heph-avatar"]',
-		transparent: false,
-	},
-	{
-		fileName: "heph-avatar-1024-transparent.png",
-		selector: '[data-brand-export="heph-avatar-transparent"]',
-		transparent: true,
-	},
-];
-
-function indexContains(index: unknown): boolean {
-	if (!index || typeof index !== "object" || !("entries" in index)) return false;
-	const { entries } = index;
-	return Boolean(entries && typeof entries === "object" && storyId in entries);
+async function captureMark(
+	path: string,
+	size: number,
+	opaque = false,
+	keepInsideSafeZone = false,
+): Promise<void> {
+	await page.setViewportSize({ width: size, height: size });
+	await page.setContent(
+		`<style>*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:${opaque ? "#315FDC" : "transparent"};display:grid;place-items:center}svg{display:block;width:${keepInsideSafeZone ? "80%" : "100%"};height:${keepInsideSafeZone ? "80%" : "100%"}}</style>${markSvg}`,
+	);
+	await page.screenshot({ path, omitBackground: !opaque });
 }
 
-async function waitForStorybook(): Promise<void> {
-	for (let attempt = 0; attempt < 120; attempt += 1) {
-		const response = await fetch(`${storybookUrl}/index.json`).catch(() => undefined);
-		if (response?.ok) {
-			if (!indexContains(await response.json())) {
-				throw new Error(`Story ${storyId} is not in the Storybook index. Was it renamed?`);
-			}
-			return;
-		}
-		await new Promise((resolveDelay) => {
-			setTimeout(resolveDelay, 500);
-		});
-	}
-	throw new Error("Storybook did not start within 60 seconds.");
-}
+await captureMark(resolve(publicDirectory, "favicon.png"), 64);
+await captureMark(resolve(publicDirectory, "apple-touch-icon.png"), 180, true);
+await captureMark(resolve(publicDirectory, "icon-192.png"), 192, true);
+await captureMark(resolve(publicDirectory, "icon-512.png"), 512, true);
+await captureMark(resolve(publicDirectory, "icon-maskable-512.png"), 512, true, true);
+await captureMark(resolve(docsBrandDirectory, "hephaestus-app-icon-1024.png"), 1024, true);
+await captureMark(resolve(docsImageDirectory, "favicon.png"), 64);
 
-/**
- * Asserted after render; a mismatch fails the export instead of committing a wrong image.
- * Beyond the dimensions, the solid export must be opaque RGB (Slack rejects icons that rely on
- * transparency) and the transparent export must actually carry an alpha channel with an empty
- * corner, so a silently ignored `omitBackground` cannot slip through.
- */
-async function assertPng(path: string, transparent: boolean): Promise<void> {
-	const png = await readFile(path);
-	const width = png.readUInt32BE(16);
-	const height = png.readUInt32BE(20);
-	if (width !== expectedPixelSize || height !== expectedPixelSize) {
-		throw new Error(`${path} is ${width}x${height}px; expected ${expectedPixelSize}px square.`);
-	}
-	const colorType = png.readUInt8(25);
-	if (!transparent) {
-		if (colorType !== 2) {
-			throw new Error(`${path} has PNG color type ${colorType}; the solid export must be RGB (2).`);
-		}
-		return;
-	}
-	if (colorType !== 6) {
-		throw new Error(
-			`${path} has PNG color type ${colorType}; the transparent export must be RGBA (6).`,
-		);
-	}
-	const idat: Buffer[] = [];
-	for (let offset = 8; offset + 8 <= png.length;) {
-		const chunkLength = png.readUInt32BE(offset);
-		const chunkType = png.toString("latin1", offset + 4, offset + 8);
-		if (chunkType === "IDAT") idat.push(png.subarray(offset + 8, offset + 8 + chunkLength));
-		if (chunkType === "IEND") break;
-		offset += chunkLength + 12;
-	}
-	// Every PNG filter reads the first pixel's neighbours as zero, so its RGBA bytes appear
-	// verbatim right after row 0's filter byte and the corner alpha is byte 4.
-	const cornerAlpha = inflateSync(Buffer.concat(idat)).readUInt8(4);
-	if (cornerAlpha !== 0) {
-		throw new Error(`${path} has corner alpha ${cornerAlpha}; the transparent export needs 0.`);
-	}
-}
-
-async function capture(browser: Browser, config: CaptureConfig): Promise<void> {
-	const page = await browser.newPage({
-		viewport: { width: 1400, height: 700 },
-		deviceScaleFactor: 2,
-		colorScheme: "light",
-		reducedMotion: "reduce",
-	});
-
-	try {
-		const globals = encodeURIComponent("theme:light");
-		await page.goto(`${storybookUrl}/iframe.html?id=${storyId}&viewMode=story&globals=${globals}`);
-		await page.waitForLoadState("networkidle");
-		await page.addStyleTag({
-			content: `*,*::before,*::after{animation:none!important;transition:none!important}${
-				config.transparent ? "html,body{background:transparent!important}" : ""
-			}`,
-		});
-
-		const exportSurface = page.locator(config.selector);
-		await exportSurface.waitFor({ state: "visible" });
-		const bounds = await exportSurface.boundingBox();
-		if (!bounds || Math.round(bounds.width) !== expectedTileSize) {
-			throw new Error(
-				`${config.fileName} export width was ${bounds?.width ?? "missing"}px; expected ${expectedTileSize}px.`,
-			);
-		}
-
-		const outputPath = resolve(outputDirectory, config.fileName);
-		await exportSurface.screenshot({ path: outputPath, omitBackground: config.transparent });
-		await assertPng(outputPath, config.transparent);
-		process.stdout.write(`Exported ${outputPath}\n`);
-	} finally {
-		await page.close();
-	}
-}
-
-// The brand directory also holds hand-drawn SVG marks, so it is never wiped — the
-// export only overwrites the PNGs it owns.
-await mkdir(outputDirectory, { recursive: true });
-const storybook = spawn(
-	"pnpm",
-	["run", "storybook:dev", "--port", String(port), "--ci", "--host", "127.0.0.1"],
-	{
-		cwd: webappDirectory,
-		stdio: "ignore",
-	},
+await page.setViewportSize({ width: 1200, height: 630 });
+await page.setContent(
+	`<style>html,body{margin:0;width:100%;height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#111318;color:#f8fafc}.card{height:100%;display:flex;align-items:center;padding:96px;gap:56px}.mark{width:230px;height:230px}.name{font-size:86px;font-weight:700;letter-spacing:-3px}.heph{color:#8eaeff}.tagline{margin-top:22px;font-size:34px;color:#b8bec9;max-width:650px;line-height:1.25}</style><main class="card"><div class="mark">${markSvg}</div><div><div class="name"><span class="heph">Heph</span>aestus</div><div class="tagline">Learn from the work you're already doing</div></div></main>`,
 );
-
-try {
-	await waitForStorybook();
-	const browser = await chromium.launch();
-	try {
-		for (const config of captureConfigs) await capture(browser, config);
-	} finally {
-		await browser.close();
-	}
-} finally {
-	storybook.kill("SIGTERM");
-}
+await page.screenshot({ path: resolve(docsImageDirectory, "hephaestus-social-card.png") });
+await browser.close();

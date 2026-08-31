@@ -1,8 +1,9 @@
 import { TagIcon } from "@primer/octicons-react";
 import { Link } from "@tanstack/react-router";
-import { Hammer, LogOut, Settings, User } from "lucide-react";
+import { LogOut, Settings, User } from "lucide-react";
 
 import { SignInButtons } from "@/components/auth/SignInButtons";
+import { HephaestusLogo } from "@/components/brand/HephaestusLogo";
 import { ModeToggle } from "@/components/core/ModeToggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -75,8 +76,7 @@ export default function Header({
 							aria-label="Hephaestus home"
 							className="flex gap-2 items-center hover:text-muted-foreground"
 						>
-							<Hammer className="text-2xl sm:text-3xl" />
-							<span className="hidden text-xl font-semibold sm:inline">Hephaestus</span>
+							<HephaestusLogo wordmarkClassName="hidden text-xl sm:inline" />
 						</Link>
 					) : (
 						<Link
@@ -84,8 +84,7 @@ export default function Header({
 							aria-label="Hephaestus home"
 							className="flex gap-2 items-center hover:text-muted-foreground"
 						>
-							<Hammer className="text-2xl sm:text-3xl" />
-							<span className="hidden text-xl font-semibold sm:inline">Hephaestus</span>
+							<HephaestusLogo wordmarkClassName="hidden text-xl sm:inline" />
 						</Link>
 					)}
 					{badge.kind === "release" ? (

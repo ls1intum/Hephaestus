@@ -1,8 +1,8 @@
 import { Link } from "@tanstack/react-router";
-import { Hammer } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { SignInButtons } from "@/components/auth/SignInButtons";
+import { HephaestusLogo } from "@/components/brand/HephaestusLogo";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -56,8 +56,7 @@ export function LoginCard({ title, description, error, onSignIn, devReturnTo }: 
 				aria-label="Hephaestus home"
 				className="flex items-center gap-2 font-medium hover:opacity-80"
 			>
-				<Hammer className="size-5" />
-				<span className="text-lg font-semibold tracking-tight">Hephaestus</span>
+				<HephaestusLogo markClassName="size-7" wordmarkClassName="text-lg" />
 			</Link>
 
 			<Card className="w-full max-w-sm">

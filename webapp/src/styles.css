@@ -70,6 +70,8 @@ code {
 	--league-diamond: oklch(0.52 0.206 265.51);
 	--league-master: oklch(0.73 0.1946 351.86);
 
+	--brand: oklch(0.546 0.245 262.881);
+	--brand-accent: oklch(0.546 0.245 262.881);
 	--mentor: oklch(0.546 0.245 262.881);
 	--mentor-foreground: oklch(0.97 0.014 254.604);
 
@@ -139,6 +141,8 @@ code {
 	--league-diamond: oklch(0.52 0.206 265.51);
 	--league-master: oklch(0.73 0.1946 351.86);
 
+	--brand: oklch(0.546 0.245 262.881);
+	--brand-accent: oklch(0.707 0.165 254.624);
 	--mentor: oklch(0.707 0.165 254.624);
 	--mentor-foreground: oklch(0.21 0.006 285.885);
 
@@ -178,6 +182,8 @@ code {
 	--color-muted-foreground: var(--muted-foreground);
 	--color-accent: var(--accent);
 	--color-accent-foreground: var(--accent-foreground);
+	--color-brand: var(--brand);
+	--color-brand-accent: var(--brand-accent);
 	--color-destructive: var(--destructive);
 	--color-destructive-foreground: var(--destructive-foreground);
 	--color-success: var(--success);

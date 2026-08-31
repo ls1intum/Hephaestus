@@ -2,7 +2,7 @@ import { CircleDot, GitMerge, GitPullRequest, type LucideIcon, Sparkle } from "l
 import { motion, useReducedMotion } from "motion/react";
 import type { CSSProperties, ReactNode } from "react";
 import { getGroupVisual } from "@/components/admin/practice-catalog/group-visuals";
-import { MentorIcon } from "@/components/mentor/MentorIcon";
+import { HephIcon } from "@/components/brand/HephIcon";
 import { ASSESSMENT_DEFS } from "@/components/practice-vocabulary/assessment-defs";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -213,7 +213,7 @@ export function LandingFeedbackCard({
 				{children}
 			</div>
 			<span className="absolute right-2 bottom-1.5 text-mentor opacity-35" aria-hidden="true">
-				<MentorIcon size={13} pad={3} animated={false} />
+				<HephIcon size={13} pad={3} animated={false} />
 			</span>
 		</div>
 	);
@@ -229,7 +229,7 @@ export function LandingHephFigure({ className, lead, body }: LandingHephFigurePr
 	return (
 		<div className={cn(styles.hephFigure, className)}>
 			<span className={styles.hephAvatar} aria-hidden="true">
-				<MentorIcon pad={2} animated />
+				<HephIcon pad={2} animated />
 			</span>
 			<div className={cn(styles.speechBubble, "text-left text-sm")}>
 				<p className="sr-only">Hephaestus says:</p>

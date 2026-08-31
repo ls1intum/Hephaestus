@@ -1,11 +1,9 @@
 <div align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./docs/static/img/brand/hammer_bg_dark.svg">
-    <source media="(prefers-color-scheme: light)" srcset="./docs/static/img/brand/hammer_bg.svg">
-    <img alt="" height="100" src="./docs/static/img/brand/hammer_bg.svg">
+    <source media="(prefers-color-scheme: dark)" srcset="./docs/static/img/brand/hephaestus-lockup-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="./docs/static/img/brand/hephaestus-lockup-light.svg">
+    <img alt="Hephaestus" height="100" src="./docs/static/img/brand/hephaestus-lockup-light.svg">
   </picture>
-
-  <h1>Hephaestus</h1>
   <p><strong>Learn from the work you're already doing</strong></p>
 
   <p>

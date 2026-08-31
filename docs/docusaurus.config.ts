@@ -31,7 +31,7 @@ function rawMermaidSourcePlugin(_context: LoadContext): Plugin {
 const config: Config = {
 	title: "Hephaestus Documentation",
 	tagline: "Learn from the work you're already doing",
-	favicon: "img/favicon.ico",
+	favicon: "img/favicon.png",
 
 	future: {
 		v4: true,
@@ -154,7 +154,7 @@ const config: Config = {
 	],
 
 	themeConfig: {
-		image: "img/hephaestus-social-card.jpg",
+		image: "img/hephaestus-social-card.png",
 		colorMode: {
 			respectPrefersColorScheme: true,
 			disableSwitch: false,
@@ -171,10 +171,12 @@ const config: Config = {
 			{ name: "twitter:description", content: DESCRIPTION },
 		],
 		navbar: {
-			title: "Hephaestus",
 			logo: {
-				alt: "Hephaestus logo",
-				src: "img/hammer.svg",
+				alt: "Hephaestus",
+				src: "img/brand/hephaestus-lockup-light.svg",
+				srcDark: "img/brand/hephaestus-lockup-dark.svg",
+				width: 155,
+				height: 32,
 			},
 			items: [
 				{
