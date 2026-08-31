@@ -11,10 +11,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Lockup: Story = {
-	render: () => <HephaestusLogo markClassName="size-12" wordmarkClassName="text-3xl" />,
-};
-
 export const LightAndDark: Story = {
 	render: () => (
 		<div className="grid overflow-hidden rounded-2xl border sm:grid-cols-2">
@@ -24,6 +20,25 @@ export const LightAndDark: Story = {
 			<div className="dark flex min-h-48 items-center bg-[#111318] p-10 text-white">
 				<HephaestusLogo markClassName="size-12" wordmarkClassName="text-3xl" />
 			</div>
+		</div>
+	),
+};
+
+export const PlatformFit: Story = {
+	render: () => (
+		<div className="flex flex-wrap items-end gap-8">
+			{[
+				{ label: "Slack mobile · 36px", size: 36, shape: "rounded-lg" },
+				{ label: "GitHub profile · circle", size: 96, shape: "rounded-full" },
+				{ label: "App icon · squircle", size: 96, shape: "rounded-[22%]" },
+			].map(({ label, size, shape }) => (
+				<div key={label} className="text-center">
+					<div className={`mx-auto overflow-hidden ${shape}`} style={{ width: size, height: size }}>
+						<HephMark className="size-full" />
+					</div>
+					<p className="mt-3 text-xs text-muted-foreground">{label}</p>
+				</div>
+			))}
 		</div>
 	),
 };
