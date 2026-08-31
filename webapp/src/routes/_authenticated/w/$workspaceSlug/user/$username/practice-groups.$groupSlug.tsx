@@ -18,7 +18,10 @@ import {
 	PracticeGroupDetailPage,
 	type ReviewRunFilters,
 } from "@/components/profile/PracticeGroupDetailPage";
-import type { ObservationDetailState } from "@/components/profile/review-runs";
+import {
+	isEmptyFeedbackResponse,
+	type ObservationDetailState,
+} from "@/components/profile/review-runs";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { loadedPages } from "@/integrations/tanstack-query/spring-page";
 import { problemDetailOf } from "@/lib/problem-detail";
@@ -186,23 +189,18 @@ function PracticeGroupDetail() {
 			onToggleObservation={(observationId) =>
 				setOpenObservationId((current) => (current === observationId ? undefined : observationId))
 			}
-			onChangeUsefulness={(observation, usefulness) => {
+			onRespond={(observation, response) => {
 				const feedbackId = observation.feedbackId;
 				if (!feedbackId) return;
-				const resolution = observation.feedbackResolution;
-				const comment = observation.feedbackResponseComment;
-
-				if (usefulness === undefined && resolution === undefined) {
+				// An answer with nothing left in it is a withdrawal, not an empty update — the endpoint
+				// replaces what it receives, so storing a blank response would keep a row saying nothing.
+				if (isEmptyFeedbackResponse(response)) {
 					deleteResponseMutation.mutate({ path: { workspaceSlug, feedbackId } });
 					return;
 				}
 				replaceResponseMutation.mutate({
 					path: { workspaceSlug, feedbackId },
-					body: {
-						usefulness,
-						resolution,
-						comment,
-					},
+					body: response,
 				});
 			}}
 			pendingFeedbackId={

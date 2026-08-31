@@ -1,18 +1,16 @@
 import type { PracticeGroupReviewObservation, PracticeGroupReviewRun } from "@/api/types.gen";
-import type { FeedbackUsefulness, ObservationDetailState } from "./review-runs";
+import type { FeedbackResponse, ObservationDetailState } from "./review-runs";
 import { ReviewRunCard } from "./ReviewRunCard";
 
-export type { FeedbackUsefulness, ObservationDetailState } from "./review-runs";
+export type { FeedbackResponse, ObservationDetailState } from "./review-runs";
 
 export interface ReviewRunTimelineProps {
 	runs: PracticeGroupReviewRun[];
 	openObservationId?: string;
 	observationDetail?: ObservationDetailState;
 	onToggleObservation?: (observationId: string) => void;
-	onChangeUsefulness?: (
-		observation: PracticeGroupReviewObservation,
-		usefulness?: FeedbackUsefulness,
-	) => void;
+	/** The developer's complete answer to one piece of feedback; the endpoint replaces, not patches. */
+	onRespond?: (observation: PracticeGroupReviewObservation, response: FeedbackResponse) => void;
 	pendingFeedbackId?: string;
 }
 
@@ -21,7 +19,7 @@ export function ReviewRunTimeline({
 	openObservationId,
 	observationDetail,
 	onToggleObservation,
-	onChangeUsefulness,
+	onRespond,
 	pendingFeedbackId,
 }: ReviewRunTimelineProps) {
 	// No empty state here: the caller decides what an empty feed means — no runs at all, or none
@@ -35,7 +33,7 @@ export function ReviewRunTimeline({
 					openObservationId={openObservationId}
 					observationDetail={observationDetail}
 					onToggleObservation={onToggleObservation}
-					onChangeUsefulness={onChangeUsefulness}
+					onRespond={onRespond}
 					pendingFeedbackId={pendingFeedbackId}
 				/>
 			))}

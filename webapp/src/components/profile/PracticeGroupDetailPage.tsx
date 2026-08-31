@@ -43,7 +43,7 @@ import { ARTIFACT_KIND_VALUES, artifactKindPluralLabel } from "@/lib/artifact-ki
 import { cn } from "@/lib/utils";
 import { PracticeNextStepCallout } from "./PracticeNextStepCallout";
 import { PracticeTrendChip } from "./PracticeTrendChip";
-import type { FeedbackUsefulness, ObservationDetailState } from "./review-runs";
+import type { FeedbackResponse, ObservationDetailState } from "./review-runs";
 import { ReviewRunTimeline } from "./ReviewRunTimeline";
 
 type PracticeStandingKey = NonNullable<PracticeStanding["standing"]> | "UNMEASURED";
@@ -105,10 +105,8 @@ export interface PracticeGroupDetailPageProps {
 	openObservationId?: string;
 	observationDetail?: ObservationDetailState;
 	onToggleObservation?: (observationId: string) => void;
-	onChangeUsefulness?: (
-		observation: PracticeGroupReviewObservation,
-		usefulness?: FeedbackUsefulness,
-	) => void;
+	/** The developer's complete answer to one piece of feedback; the endpoint replaces, not patches. */
+	onRespond?: (observation: PracticeGroupReviewObservation, response: FeedbackResponse) => void;
 	pendingFeedbackId?: string;
 	isLoading: boolean;
 	error?: unknown;
@@ -155,7 +153,7 @@ export function PracticeGroupDetailPage({
 	openObservationId,
 	observationDetail,
 	onToggleObservation,
-	onChangeUsefulness,
+	onRespond,
 	pendingFeedbackId,
 	isLoading,
 	error,
@@ -557,7 +555,7 @@ export function PracticeGroupDetailPage({
 							openObservationId={openObservationId}
 							observationDetail={observationDetail}
 							onToggleObservation={onToggleObservation}
-							onChangeUsefulness={onChangeUsefulness}
+							onRespond={onRespond}
 							pendingFeedbackId={pendingFeedbackId}
 						/>
 						{hasMoreReviewRuns && onLoadMoreReviewRuns && (

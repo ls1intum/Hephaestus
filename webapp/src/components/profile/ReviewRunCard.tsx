@@ -8,7 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { ARTIFACT_KIND, artifactKindIcon, artifactKindLabel } from "@/lib/artifact-kinds";
 import { asDate } from "@/lib/dates";
 import { getProviderLabel } from "@/lib/provider";
-import type { FeedbackUsefulness, ObservationDetailState } from "./review-runs";
+import type { FeedbackResponse, ObservationDetailState } from "./review-runs";
 import { ReviewObservationRow } from "./ReviewObservationRow";
 
 const DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
@@ -62,10 +62,8 @@ export interface ReviewRunCardProps {
 	openObservationId?: string;
 	observationDetail?: ObservationDetailState;
 	onToggleObservation?: (observationId: string) => void;
-	onChangeUsefulness?: (
-		observation: PracticeGroupReviewObservation,
-		usefulness?: FeedbackUsefulness,
-	) => void;
+	/** The developer's complete answer to one piece of feedback; the endpoint replaces, not patches. */
+	onRespond?: (observation: PracticeGroupReviewObservation, response: FeedbackResponse) => void;
 	pendingFeedbackId?: string;
 }
 
@@ -75,7 +73,7 @@ export function ReviewRunCard({
 	openObservationId,
 	observationDetail,
 	onToggleObservation,
-	onChangeUsefulness,
+	onRespond,
 	pendingFeedbackId,
 }: ReviewRunCardProps) {
 	const [showAllObservations, setShowAllObservations] = useState(false);
@@ -156,7 +154,7 @@ export function ReviewRunCard({
 									openObservationId === observation.observationId ? observationDetail : undefined
 								}
 								onToggle={onToggleObservation}
-								onChangeUsefulness={onChangeUsefulness}
+								onRespond={onRespond}
 								isFeedbackResponsePending={pendingFeedbackId === observation.feedbackId}
 							/>
 						))}

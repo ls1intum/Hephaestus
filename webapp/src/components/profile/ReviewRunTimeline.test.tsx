@@ -43,19 +43,44 @@ describe("ReviewRunTimeline", () => {
 		screen.getByText("Strength shown");
 	});
 
-	it("passes the complete observation when usefulness changes", () => {
-		const onChangeUsefulness = vi.fn();
+	it("sends the whole response when one part of it changes", () => {
+		// The endpoint replaces rather than patches, so a control that reported only its own field
+		// would erase the other two. `baseObservation` already carries all three.
+		const onRespond = vi.fn();
 		render(
 			<ReviewRunTimeline
 				runs={runs}
 				onToggleObservation={() => undefined}
 				openObservationId={baseObservation.observationId}
-				onChangeUsefulness={onChangeUsefulness}
+				onRespond={onRespond}
 			/>,
 		);
 
 		fireEvent.click(screen.getByRole("button", { name: "Helpful" }));
-		expect(onChangeUsefulness).toHaveBeenCalledWith(baseObservation, undefined);
+		expect(onRespond).toHaveBeenCalledWith(baseObservation, {
+			usefulness: undefined,
+			resolution: "ADDRESSED",
+			comment: "Applied in the next revision.",
+		});
+	});
+
+	it("records a resolution without disturbing the usefulness already given", () => {
+		const onRespond = vi.fn();
+		render(
+			<ReviewRunTimeline
+				runs={runs}
+				onToggleObservation={() => undefined}
+				openObservationId={baseObservation.observationId}
+				onRespond={onRespond}
+			/>,
+		);
+
+		fireEvent.click(screen.getByRole("button", { name: "Disputed" }));
+		expect(onRespond).toHaveBeenCalledWith(baseObservation, {
+			usefulness: "HELPFUL",
+			resolution: "DISPUTED",
+			comment: "Applied in the next revision.",
+		});
 	});
 
 	it("keeps a dense review run compact until requested", () => {

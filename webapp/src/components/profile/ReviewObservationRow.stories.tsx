@@ -77,7 +77,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const StrengthShown: Story = {
-	args: { observation: strength, onChangeUsefulness: fn() },
+	args: { observation: strength, onRespond: fn() },
 };
 
 /** Every outcome the review can record, in the order the registry declares them. */
@@ -133,7 +133,7 @@ export const Opened: Story = {
 		observation: strength,
 		isOpen: true,
 		onToggle: fn(),
-		onChangeUsefulness: fn(),
+		onRespond: fn(),
 		detailState: { isLoading: false, detail },
 	},
 };
@@ -144,7 +144,7 @@ export const DetailLoading: Story = {
 		observation: strength,
 		isOpen: true,
 		onToggle: fn(),
-		onChangeUsefulness: fn(),
+		onRespond: fn(),
 		detailState: { isLoading: true },
 	},
 };
@@ -155,7 +155,7 @@ export const DetailFailed: Story = {
 		observation: strength,
 		isOpen: true,
 		onToggle: fn(),
-		onChangeUsefulness: fn(),
+		onRespond: fn(),
 		detailState: { isLoading: false, error: new Error("Request failed with status 503") },
 	},
 };
@@ -166,7 +166,7 @@ export const NoFurtherDetail: Story = {
 		observation: strength,
 		isOpen: true,
 		onToggle: fn(),
-		onChangeUsefulness: fn(),
+		onRespond: fn(),
 		detailState: {
 			isLoading: false,
 			detail: {
@@ -185,7 +185,7 @@ export const FeedbackPending: Story = {
 		observation: { ...strength, feedbackUsefulness: "UNHELPFUL" },
 		isOpen: true,
 		onToggle: fn(),
-		onChangeUsefulness: fn(),
+		onRespond: fn(),
 		isFeedbackResponsePending: true,
 		detailState: { isLoading: false, detail },
 	},
@@ -197,13 +197,76 @@ export const RecordsAResponse: Story = {
 		observation: strength,
 		isOpen: true,
 		onToggle: fn(),
-		onChangeUsefulness: fn(),
+		onRespond: fn(),
 		detailState: { isLoading: false, detail },
 	},
 	play: async ({ args, canvas, userEvent }) => {
-		// `strength` arrives already marked HELPFUL, so pressing it again withdraws the response —
-		// which is why the expected second argument is undefined rather than "HELPFUL".
+		// `strength` arrives already marked HELPFUL, so pressing it again withdraws that half. The other
+		// two fields still travel — the endpoint replaces, so omitting them would clear them.
 		await userEvent.click(canvas.getByRole("button", { name: "Helpful" }));
-		await expect(args.onChangeUsefulness).toHaveBeenCalledWith(strength, undefined);
+		await expect(args.onRespond).toHaveBeenCalledWith(strength, {
+			usefulness: undefined,
+			resolution: undefined,
+			comment: undefined,
+		});
+	},
+};
+
+/**
+ * The response in full: how useful the review was, what the developer did about it, and room to say
+ * why. The three are independent — the server keeps them apart, and so does this.
+ */
+export const RespondingInFull: Story = {
+	args: {
+		observation: {
+			...strength,
+			feedbackUsefulness: "HELPFUL",
+			feedbackResolution: "ADDRESSED",
+			feedbackResponseComment:
+				"Split the change into two commits so the reasoning reads on its own.",
+		},
+		isOpen: true,
+		onToggle: fn(),
+		onRespond: fn(),
+		detailState: { isLoading: false, detail },
+	},
+};
+
+/**
+ * Disputing is the one answer the server insists on an explanation for, so the field says it is
+ * required and the save button stays disabled until something is written.
+ */
+export const DisputedNeedsAnExplanation: Story = {
+	args: {
+		observation: { ...strength, feedbackUsefulness: "UNHELPFUL", feedbackResolution: "DISPUTED" },
+		isOpen: true,
+		onToggle: fn(),
+		onRespond: fn(),
+		detailState: { isLoading: false, detail },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Disputed" })).toHaveAttribute(
+			"aria-pressed",
+			"true",
+		);
+		await expect(canvas.getByRole("button", { name: "Save comment" })).toBeDisabled();
+	},
+};
+
+/** Recording a resolution keeps the usefulness already given — the whole answer travels together. */
+export const RecordsAResolution: Story = {
+	args: {
+		observation: { ...strength, feedbackUsefulness: "HELPFUL" },
+		isOpen: true,
+		onToggle: fn(),
+		onRespond: fn(),
+		detailState: { isLoading: false, detail },
+	},
+	play: async ({ args, canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "Not applicable" }));
+		await expect(args.onRespond).toHaveBeenCalledWith(
+			{ ...strength, feedbackUsefulness: "HELPFUL" },
+			{ usefulness: "HELPFUL", resolution: "NOT_APPLICABLE", comment: undefined },
+		);
 	},
 };

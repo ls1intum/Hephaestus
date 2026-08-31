@@ -62,9 +62,6 @@ code {
 	--sidebar-accent-foreground: oklch(0.21 0.006 285.885);
 	--sidebar-border: oklch(0.92 0.004 286.32);
 	--sidebar-ring: oklch(0.871 0.006 286.286);
-	/* Code surface: a distinctly flatter plane than --card, so a quoted snippet reads as a
-	   different kind of content rather than as more card. Near-black in dark mode; a light
-	   neutral in light mode — a hard black block would fail the surrounding light layout. */
 	--code: oklch(0.98 0.002 286.3);
 	--code-header: oklch(0.955 0.003 286.3);
 
