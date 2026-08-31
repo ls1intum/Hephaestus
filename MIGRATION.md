@@ -65,6 +65,8 @@ Entries exist only for releases that need operator action. Everything else is in
 
 ### Next release
 
+### v0.75.0
+
 #### 🔴 Integration credentials use a dedicated encryption key
 
 **Affected**: reference deployments and custom deployments. The supported self-host installer handles
@@ -105,8 +107,6 @@ the bundled PostgreSQL 17 image.
 [Backup & Restore](https://ls1intum.github.io/Hephaestus/admin/backup-restore#postgresql-17-to-18).
 Keep the PostgreSQL 17 volume until the upgraded deployment passes its acceptance checks.
 
-### v0.76.0
-
 #### 🔴 Upgrade the server and agent image together
 
 **Affected**: every deployment that runs practice reviews or mentor sessions.
@@ -120,8 +120,6 @@ starts.
 **Migration**: deploy the application server/worker and the matching `hephaestus-agent` image from the
 same release. Do not reuse or independently pin an older agent image. After deployment, verify the agent
 image reports `hephaestus.agent.runtime-contract=2`, contains Node 24, and does not contain Bun.
-
-### v0.75.0
 
 #### 🔴 Practice reviews now require the person being evaluated to be a workspace member
 
@@ -232,6 +230,88 @@ below no longer applies to previews.
    then delete the old broad `COOLIFY_API_TOKEN`.
 
 Leaving previews disabled needs no action: without the repository variables, nothing deploys.
+
+#### 🔴 The PostHog integration is removed
+
+**Affected**: deployments that carry PostHog settings in their `.env` or pass them as deploy
+secrets. Deployments that never configured PostHog need no changes.
+
+**Before**: the stack read `POSTHOG_ENABLED`, `POSTHOG_API_HOST`, `POSTHOG_PROJECT_ID`,
+`POSTHOG_PROJECT_API_KEY`, and `POSTHOG_PERSONAL_API_KEY`, and the webapp could load the PostHog
+client and its cloud-backed surveys when they were set.
+
+**After**: none of these variables are read anywhere; product feedback and surveys are stored in
+the instance's own PostgreSQL and reviewed in **Administration → Feedback**. No replacement
+variable exists.
+
+**Migration**: delete the `POSTHOG_*` lines from your `.env` and remove any corresponding deploy
+or preview secrets; leftover values are ignored but keep an unused credential in circulation, so
+also revoke the PostHog personal API key in PostHog itself if one was ever issued. The schema
+migration for the new feedback tables runs automatically.
+
+#### 🔴 The runtime envelope is hardened: NATS requires credentials, remote databases require TLS
+
+**Affected**: every reference and self-hosted deployment. Deployments using a remote (non-Compose)
+PostgreSQL host are additionally affected by the TLS requirement.
+
+**Before**: the bundled NATS broker accepted unauthenticated connections (mitigated only by its
+loopback bind), a remote `DATABASE_URL` with `sslmode=disable` connected silently, and each server
+role opened up to 30 database connections.
+
+**After**: the broker, publisher, and consumer all require the same credentials and the stack
+refuses to start without them; in production a remote PostgreSQL host without `sslmode=require`
+(or stronger) aborts startup; each server role's connection pool defaults to 20.
+
+**Migration**: before deploying, set `NATS_USERNAME` and `NATS_PASSWORD` in your `.env` to freshly
+generated random values (do not reuse an application key); deployments driven by the deploy
+workflow need the same pair as environment secrets. If your database host is remote, add
+`sslmode=require`, `verify-ca`, or `verify-full` to `DATABASE_URL` — only set
+`HEPHAESTUS_DATABASE_ALLOW_INSECURE_REMOTE=true` after explicitly accepting plaintext transport.
+Optional tuning: `HIKARI_MAXIMUM_POOL_SIZE` restores a larger pool, and the new
+`APPLICATION_SERVER_CPUS`/`APPLICATION_SERVER_PIDS_LIMIT` (plus the worker and webhook variants)
+adjust the container ceilings.
+
+#### 🔴 Container images moved to `ghcr.io/hephaestus-build/<image>`
+
+**Affected**: deployments with registry mirrors, egress allowlists, or hand-written image
+references. The standard install and upgrade flow — Compose plus the signed release lock — follows
+the move on its own.
+
+**Before**: all images lived under `ghcr.io/ls1intum/hephaestus/<image>`, and every release lock was
+signed as `ls1intum/Hephaestus`.
+
+**After**: this release and everything newer publish under `ghcr.io/hephaestus-build/<image>`
+(without the redundant `hephaestus/` segment) and sign as `hephaestus-build/Hephaestus`. Releases
+published before the move are unchanged: GHCR packages do not transfer between organizations, so
+their images stay at `ghcr.io/ls1intum/hephaestus/<image>`, and their signatures name the old
+repository forever. `security/release-identities.json` records which namespace and signing identity
+each release uses, and the upgrade gate, deploy workflows, and lock verifier resolve it per release.
+
+**Migration**: allow `ghcr.io/hephaestus-build/<image>` wherever registry access is restricted or
+mirrored. If you overrode an image reference by hand — for example a pinned
+`HEPHAESTUS_AGENT_IMAGE_REFERENCE` — repoint it at the new namespace when you next update the pin.
+When verifying an old release yourself, use the identity recorded for its version in
+`security/release-identities.json` (releases before the move:
+`https://github.com/ls1intum/Hephaestus/.github/workflows/release.yml@refs/heads/main`).
+
+#### 🔴 The PostgreSQL upgrade keeps the stable volume name — rely on the verified dump, not a retained volume
+
+**Affected**: operators performing the PostgreSQL 17 → 18 migration this release requires. This
+entry corrects the "Restore PostgreSQL 17 data into PostgreSQL 18" entry above, which predates it.
+
+**Before**: this release was drafted to start PostgreSQL 18 on a new `postgresql-data-v18` volume,
+leaving the PostgreSQL 17 volume in place as the rollback path.
+
+**After**: the Compose volume keeps its stable `postgresql-data` name. The documented upgrade
+verifies the dump, removes the PostgreSQL 17 volume, and lets PostgreSQL 18 initialize a fresh
+cluster under the same name. Starting the new release without migrating is safe: a PostgreSQL 18
+container attached to PostgreSQL 17 data refuses to start rather than coming up healthy and empty.
+
+**Migration**: follow the current
+[Backup & Restore](https://docs.hephaestus.build/admin/backup-restore#postgresql-17-to-18)
+procedure. Where the entry above says to keep the PostgreSQL 17 volume until acceptance checks
+pass, keep the verified dump (with an off-host copy) instead — the old volume is removed during
+the upgrade, so the dump is the rollback artifact.
 
 ### v0.74.0
 

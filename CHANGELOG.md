@@ -1,5 +1,237 @@
 # Changelog
 
+## 0.75.0
+
+### Minor Changes
+
+- Your practice feedback now lists every practice your workspace reviews, not only the ones that raised something. A practice with nothing to report says which kind of nothing it is: either no review has reached it yet, or the reviews ran and your work offered no relevant occasion. Those are different answers to "how am I doing here", and until now both looked like an absent row. Practices with actual feedback still come first, worst first; the quiet ones sort to the end.
+
+  A group's standing is now read straight off its practices, including the quiet ones, so the summary at the top of a group and the practices beneath it can no longer tell different stories.
+
+- Deciding whether to adopt a practice now starts with why the habit matters, not with the rule the reviewer follows. The rule is still there, under **How it decides**, next to what the practice reads and what it measures first — but it is written for the model that applies it, runs to several thousand characters, and is not what you need in order to choose.
+
+  The library list carries each practice's reason too, so you can work through the catalog without opening every entry to find out what it is for.
+
+- Instance administrators can publish workspace-targeted surveys and review survey responses and product feedback
+  without sending data to an external analytics service. Contributors can send feedback, respond to surveys, or
+  permanently dismiss them; submissions remain in the instance database.
+
+  **Operators:** the PostHog integration is removed entirely. `POSTHOG_ENABLED`, `POSTHOG_API_HOST`,
+  `POSTHOG_PROJECT_ID`, `POSTHOG_PROJECT_API_KEY`, and `POSTHOG_PERSONAL_API_KEY` are no longer read
+  and can be deleted from your `.env`; no replacement variable is needed and no other action is
+  required.
+
+- Operators can monitor agent-job phase latency and terminal outcomes through a documented JSON log and Prometheus contract.
+- Workspace administrators now choose which practices their workspace reviews, instead of receiving a copy of the instance library at creation. Practice setup shows the library beside the practices you already have, so you can read a practice's full definition, the evidence it needs, and what it will look like in your workspace before you add it. Adding one gives you an independent copy you can edit; later library changes never rewrite it. A whole group can be added at once, and a group you removed earlier can be restored from the same place.
+
+  Adding never starts sending feedback on its own. A practice Hephaestus can review starts at **Review before sending**, and a practice it cannot review stays **Off** until you connect what it reads.
+
+  You can also add a whole group at once. Hephaestus shows every practice it would add, reuse, or skip first, and applies the result in one step or not at all. Adding is refused if the library or your workspace changed while you were reading the preview, so you always act on what you saw.
+
+  Workspaces you already have keep everything in them, and a workspace that has never recorded a catalog installation still receives one at the next start, so nothing goes missing.
+
+- Practice reviews can now be rolled out to part of a workspace instead of all of it. Choose which
+  monitored repositories are reviewed and, for each of them, which base branches; choose whether
+  everybody's work is reviewed or only selected people's. Before a change widens either list, a preview
+  says how many repositories and people it would cover, so a pilot can be checked before it starts.
+  Sending feedback is now its own switch: pause it and reviews keep running, developers can still read
+  their own feedback in Hephaestus, and nothing reaches a pull request or the mentor. Feedback refused
+  while paused is never released by resuming. Proposals that nobody has decided remain available for an
+  administrator to approve or reject after sending resumes.
+
+  When a review needs approval, the approval page now shows the exact summary and every inline comment
+  as one package. One decision releases or rejects the whole review; automatically authorized observations
+  in the same review wait for that decision instead of appearing early. After approval, the delivery
+  page shows how many comments have reached the provider while safe retries finish the remainder.
+
+  Every delivery decision now keeps its reasoning. On a piece of work under Review activity, a workspace
+  administrator can see, for each attempt, which checks ran and in what order, which one stopped it, and
+  the repository, branch, author and settings it was judged against — so "why did this go quiet?" is
+  answerable from the screen instead of from the logs.
+
+  **Operators:** reviews now run only on work whose author is a member of the workspace, so a pull request
+  from an outside contributor who is not on the **Members** screen is no longer reviewed and no feedback is
+  prepared about them. Signing in to Hephaestus does not make somebody a member. After upgrading, read the
+  **People** count under Practices → Review → When and where; `MIGRATION.md` says how to cover anybody who
+  is missing.
+
+- Practice reviews deliver feedback again. A review measured a pull request, recorded what it found, and then stopped: the step that turns those observations into something a developer reads was never switched on, so every review ended with its results stored and nothing said. Reviews now compose feedback for each lane the occasion can reach — the note on the work, the developer's own practice pages, and an ongoing conversation — and issue reviews compose for the two longitudinal lanes, since an issue is not the work a note belongs on.
+
+  **Operators:** feedback now appears where it previously did not, so a workspace with review switched on begins posting again. Nothing new is required of you, and the instance-wide Silent Mode brake still holds everything back while it is engaged — but if you upgraded during the window where reviews were silent, this is the change that ends it.
+
+- **Operators:** Install, upgrade, and roll back with the signed release image lock; production and staging now refuse mutable tags or any image digest that did not pass the release evidence gate.
+- Each piece of practice feedback now says what kind it is: a behaviour you demonstrated, a trap you avoided, something harmful that was done, or something needed that was left out. Reading a strength no longer means guessing whether you did the good thing or steered clear of the bad one — and the two kinds call for different responses.
+- Hardens the reference deployment with HTTPS security headers, a TLS floor, a request-size ceiling, shared rate limits for costly operations, authenticated internal messaging, and container resource limits.
+
+  **Operators:** Set the new required `NATS_USERNAME` and `NATS_PASSWORD` variables. Optional `*_CPUS` and `*_PIDS_LIMIT` variables tune container ceilings. Remote databases require TLS unless `HEPHAESTUS_DATABASE_ALLOW_INSECURE_REMOTE=true` explicitly accepts plaintext transport. Each server role's database pool now defaults to 20 connections instead of 30; the optional `HIKARI_MAXIMUM_POOL_SIZE` variable tunes it.
+
+- Run sandboxed practice reviews and mentor sessions on Node.js 24 with a 256 MB JavaScript heap ceiling and scoped runner filesystem permissions.
+
+  **Operators:** Upgrade the agent image and server together. Runtime contract v2 reports a mismatched image as unsupported; follow the coordinated upgrade steps in `MIGRATION.md`.
+
+- Moves the container images to `ghcr.io/hephaestus-build/<image>` after the repository's transfer to the hephaestus-build organization, dropping the redundant `hephaestus/` path segment. Releases published before the move keep their images and signatures at `ghcr.io/ls1intum/hephaestus/<image>`; upgrades, deploys, and signature verification select the right namespace and signing identity per release automatically.
+
+  **Operators:** From this release on, images pull from `ghcr.io/hephaestus-build/<image>`. Update any registry mirrors, egress allowlists, or hand-written image references (such as a pinned `HEPHAESTUS_AGENT_IMAGE_REFERENCE`); the standard install and upgrade flow needs no changes. Older releases remain valid at their original `ghcr.io/ls1intum/hephaestus/<image>` paths.
+
+- The application API can now answer where a developer stands in each practice group: the current standing and its guidance, how the group has developed across recently reviewed work, which kinds of work contributed feedback, a filterable observation history, and the complete review runs behind it. An undecided observation remains visible in that history without being presented as a verdict. Developers can also replace or delete their response to delivered feedback, recording whether it was helpful, how they handled it, and an optional explanation. Every endpoint answers only for the signed-in developer.
+
+  **Operators:** direct API callers must replace `/practice-areas` with `/practice-groups`, use the corresponding group schema and field names, replace `/practices/learner` with `/practices/reviewed`, and move from the older reaction endpoint to the combined response endpoint. Existing response history is preserved; `MIGRATION.md` lists the contract changes. The generated Hephaestus web client is updated in the same release.
+
+- Where you stand on a practice now follows your most recently reviewed work instead of the whole 90-day record. Two problem-free pieces of reviewed work in a row are enough for a practice to read as going well again, so fixing a habit becomes visible within two reviews — and a problem on your newest piece of reviewed work registers just as quickly. How much of the work went well is counted rather than merely whether anything went wrong, so a single problem among otherwise clean reviews no longer weighs the same as a run of them. The list of feedback below the standing is unchanged: it stays the complete record of what the window raised, while the standing above it describes where things stand now.
+- The practice screens now read the way the decision is actually made, and they stop implying things that are not true.
+
+  A practice leads with why the habit matters; what adding it will do sits at the bottom, next to the button that does it. **Not independently validated** is gone — it appeared on every practice, so it told you nothing while looking like a warning. In its place is a sentence saying nobody has measured how often the practice is right, which is why a new one starts by asking you to approve each piece of feedback.
+
+  Provenance says what actually happens. A copy never tracks the catalog, whether you edited it or not, so the badges now say **Same as the catalog**, **Catalog changed, yours did not**, and **No longer in the catalog** — and the matching case is finally labelled instead of silent.
+
+  Opening or dismissing a panel no longer moves the page behind it, panels slide rather than jump when you step back, and the whole thing respects a reduced-motion setting.
+
+  Loading no longer means a spinner in an empty box: each screen draws the shape of what is coming, so nothing jumps when it arrives, and quick responses no longer flash a loading state at all.
+
+  One word throughout: the set of practices this instance offers is the **catalog**.
+
+- A practice group now reports how it has developed by comparing its four most recent relevant pieces of reviewed work with the four before them. It shows improvement or decline only when that evidence supports a direction; otherwise it reports that the direction is unclear or that more reviewed work is needed.
+- Pull request previews are now self-service. Add the `preview` label to a pull request in this repository and it deploys; every commit after that redeploys on its own. A preview waits only for its images to be published, never for the test suite, so it exists even when the tests are red — and it runs the same artifacts staging and production run, so what you see is what ships. A comment on the pull request carries the preview link, and GitHub's native deployment link opens it too. Removing the label, closing the pull request, or converting it back to draft removes the stack. Up to three previews run at once by default, and when the host is full the pull request comment names the ones holding the slots.
+
+  Each preview starts from a copy of staging's database, so workspaces and synced work are already there — and that copy is silenced before the app starts: review triggers, agent bindings and sweep schedules off, queued jobs cancelled, and the sign-in identity dropped so the preview issues its own tokens. It reads staging's event stream on a consumer of its own. Agent runs and inbound webhooks stay off. Previews never run for forks, nor for changes to the deployment workflows themselves. Stacked pull requests each get their own preview.
+
+  **Operators:** follow the preview runbook before enabling the Coolify application. It requires a `preview` repository label, a preview-only Coolify application, two scoped Coolify secrets, and the repository variables listed there — including the optional `PREVIEW_MAX_ACTIVE` limit. Previews must be deployed onto the staging host: they seed from its database and read its event stream. That needs a read-only PostgreSQL role on staging, whose password goes in `PREVIEW_SEED_SOURCE_PASSWORD` — the runbook has the grant. Keep Coolify's automatic repository webhook disabled.
+
+- **Operators:** PostgreSQL 18 is now the bundled and qualified database target. Before upgrading a stack whose volume was initialized by PostgreSQL 17, follow the documented dump-and-restore procedure; do not attach the old data directory to the new container.
+- New and existing users now review a first-login transparency notice and make a separate, optional research choice before entering Hephaestus. Research participation is off by default, every grant and withdrawal is recorded with the exact notice version, and consent can be withdrawn in one action from settings.
+- Production startup now reports all catalogued production configuration problems together without
+  exposing configured values, and instance administrators can inspect redacted deployment and runtime
+  readiness facts through the API. New self-hosted installations generate and preserve internal secrets
+  with `setup.sh`. **Operators:** validate production settings against the configuration readiness guide
+  before upgrading; the process now refuses to start when a catalogued required setting is missing or
+  invalid.
+- Removing a practice group now asks what should happen to the practices in it: keep them and move them to Unassigned, or delete them together with the group. Deleting them also deletes their observations, and the dialog says so before you choose. Previously the practices were always kept, with no way to remove a group and its practices in one step.
+- Operators can rotate stored integration credential encryption keys without disconnecting configured providers. **Operators:** set `HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY` before upgrading; the supported self-host installer derives the initial value automatically. The optional `HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY_VERSION`, `HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY`, `HEPHAESTUS_SECURITY_PRIOR_CREDENTIAL_ENCRYPTION_KEY_VERSION`, and `HEPHAESTUS_SECURITY_CREDENTIAL_ROTATION_ENABLED` variables drive the documented online rotation procedure.
+- **Operators:** the PostgreSQL Compose volume keeps its stable `postgresql-data` name across the 17 → 18 upgrade instead of moving to a version-suffixed `postgresql-data-v18`. This corrects the PostgreSQL 18 qualification shipping in this same release, so no deployed instance ever sees the `-v18` name. The upgrade is dump, remove the volume, restore into the freshly initialized PostgreSQL 18 cluster; a PostgreSQL 18 container started against un-migrated PostgreSQL 17 data refuses to start instead of coming up empty.
+- Operators can now ingest application logs as structured JSON, correlate agent-job logs by job or workspace, and scrape application metrics from the Prometheus actuator endpoint. Bearer, GitLab, GitHub, and token-query-string credentials are masked before console output.
+
+  **Operators:** the server now writes one JSON object per log line instead of plain text, by default and in every profile. Anything that parses the previous plain-text format — log shippers, alerts, grep-based tooling — must be updated to read JSON; see `MIGRATION.md`.
+
+- HTTP responses now expose a request ID that follows queued reviews through sandbox and model calls, so operators can correlate request, job, proxy, sandbox, and Sentry records without a tracing collector.
+
+### Patch Changes
+
+- A review comment now stays as it was written. Where a later look at the same change used to rewrite the original comment in place — and quietly demote anything already answered on the diff — it now leaves a new comment beside the old one, the way a person would. The comment also stops repeating the notes that sit on the diff: those live on the lines they are about, and anything that could not be placed on a line falls back into the comment rather than disappearing between the two.
+- Keyboard users can skip repeated navigation and move directly to the page's main content. The documentation now explains the current accessibility assessment and how to report barriers.
+- Practice setup no longer sends you to another page to look at something on it. Selecting a practice — one of yours, or one the library is offering — opens it beside the tree you were reading, and selecting something inside that opens on top of it, so you can go two levels deep and step back one at a time with Escape, a press on the page, the browser's Back button, or a swipe. The page behind stays readable rather than blurred, and each panel leaves a column of the one beneath it showing.
+
+  Your own practices now have a read-only view for the first time. Opening one used to mean opening the edit form, so "what does this practice say?" and "change this practice" were the same act; now reading is reading, and editing is one clearly marked step away. A practice looks the same whether you met it in the library or in your own tree, because both show the same definition.
+
+  Writing a practice no longer takes over the page either — on Practice setup and in the instance catalog, **Create** and **Edit** open beside the tree the practice belongs to, so you can see where it is going while you write it. An editor closes the same four ways everything else does — Escape, a press on the page beside it, a swipe, or its own controls — and asks before discarding unsaved changes on any of them, so nothing is lost and nothing silently refuses to close. The old addresses still work and open the same editor.
+
+  Adding a practice returns you to the library you were working through — the practice moves into your own tree and stops being offered — instead of dropping you into an edit form. Adding five practices is now five selections rather than five round trips. Everything is addressable: the URL you are looking at is the URL you can share, and it reopens exactly the panels you had open.
+
+- A comment written alongside "not helpful" is no longer lost. Explaining why a piece of feedback missed the mark, without also saying whether you addressed or disputed it, stored the text and then never showed it again — the next answer overwrote the reading with its own empty comment. The words now stay with the answer they came with.
+- Creating or editing a practice group now lets you pick its icon and colour, the same way the instance library does. Left alone, both still follow the group's name.
+
+  A practice's "What to look for" is written in markdown — the editor says so — and the read view now renders it. Headings, lists, emphasis and inline code used to reach you as literal `##` and `-` characters in one long paragraph of bold text.
+
+- Releases now reject high and critical image vulnerabilities unless a disposition is bound to the exact image digest and platform, owned, evidence-backed, and expires within 90 days. Clean verification and recurring rescans authenticate and re-evaluate the same signed release lock.
+- Pull request responses no longer require a URL when the upstream provider does not supply one.
+- The landing and about pages now say plainly what Hephaestus is, show the kind of gap it points out, name the practice groups a workspace can turn on, and credit Applied Education Technologies at TUM.
+- Hardens automated reviews and mentor conversations against instructions embedded in imported work, messages, and documents.
+- No operator action is required for the repository's package-manager migration.
+- Practice-review comments now identify themselves as AI-generated and link to an explanation and delivery controls.
+- Review runs now identify every eligible practice they did not evaluate, so partial reviews no longer appear complete.
+- Updates the frameworks the web application is built from. Error reports still infer nothing about
+  who reported them, and now say category by category what they may carry. No action is needed to
+  upgrade.
+- The documentation now lives at <https://docs.hephaestus.build>. Links in the web app, the sample configuration files, and server messages point at the new address, and the old github.io pages redirect there — no action needed.
+- Fixes three faults in the sliding panels used across practice setup and the instance catalog. A panel now slides in from the edge instead of appearing fully formed. Opening a panel on top of another no longer makes the one behind jump back and re-animate when you step back out of it. And a covered panel keeps a readable column of its own content on screen rather than a bare strip of its margin, which is the whole reason these stack instead of replacing each other.
+- A review whose evidence check fails on one observation now delivers the others. The check that refuses to show a developer a claim it cannot trace back to the code applied to the whole review at once: one practice that mis-quoted its source — by a stray character, in a file the reader never sees — withheld every other observation in that review, including correct, fully evidenced ones. The developer saw nothing at all. Only a quote that does not match its source is treated this way; a citation to evidence the review never gathered still stops the whole delivery, as before. What was withheld is logged with the reason, and a review in which no claim can be verified still fails rather than arriving empty.
+- Practice reviews now reuse shared evidence while assessing every applicable practice, recover missing coverage, and produce one coherent set of feedback.
+- In-context practice feedback now uses the default delivery preference for developers who have not saved
+  account settings. Explicit opt-outs remain honoured everywhere.
+- Feedback about a practice no longer disappears when a later review of the same work never got to that practice. A review that was skipped for partial evidence, refused, timed out or ran out of budget covers fewer practices than the one before it, and the untouched practices' earlier observations were being dropped as though the newer review had reconsidered them — so an interrupted review looked exactly like a fixed habit. A later review now replaces only what it actually re-examined. The same holds per person: a review that had something to say about one contributor no longer clears what an earlier one found about another. Re-reviewing the same work with the same practice still replaces the earlier verdict, as before.
+- On preview and staging deployments the footer's branch link now opens the branch it names. Builds of
+  a pull request recorded the merge ref (`1538/merge`) rather than the branch, so the link led nowhere.
+- The webapp image is now built from a digest-pinned nginx base without an ad-hoc package-upgrade layer, so the image you deploy matches its published SBOM and signed provenance; base updates arrive as reviewed dependency bumps instead of changing silently at build time.
+- New agent bindings default to a three-hour run timeout, allowing comprehensive reviews to finish when model requests are queued.
+- Notes prepared for the mentor now say where a point has already been put to the developer and whether anything has moved without help, so a conversation does not repeat feedback they have already had twice. Notes written before this carry no such record, which reads as nothing having been said rather than as nothing to say.
+- When the library changes while you are reading a group's plan, the panel now stays open and shows you the refreshed plan, the same way a single practice already did. It used to close and leave you a message asking you to go and look at the group again.
+- Screen readers now announce what every dropdown list is for. The status, timeframe, work-type,
+  rows-per-page and model pickers each opened a list of options with no name attached, so the list
+  itself was announced as unlabelled.
+
+  Also fixed, all surfaced by a stricter type and lint gate across the whole codebase:
+
+  - A review schedule saved with a time that had no minutes (`9` rather than `09:00`) stored no minute
+    at all instead of falling back to the hour's start.
+  - Audit-log entries and the instance catalog version panel printed `[object Object]` for any field
+    whose value was not plain text.
+  - A cookie-consent choice was read back from browser storage without checking it, so a corrupted
+    entry could be treated as a decision.
+  - A theme, a workspace role or a feature flag that the browser or server reported as something this
+    build does not recognise is now ignored rather than trusted: the theme falls back to the default,
+    the role is refused, and the flag reads as off.
+  - GitLab sub-issue sync could delete parent links it had never looked at. When a page walk stopped
+    early — an error, or a repository past the pagination ceiling — the cleanup step still ran against
+    the partial result and cleared the parent of every issue whose link lived on a page it never
+    fetched, then reported the sync as completed.
+  - Server errors now keep their original stack trace. Fifty-two places caught an exception and threw a
+    new one without attaching the cause, so the log recorded where the failure was reported rather than
+    where it happened. Sign-in, token validation and Slack preference failures were all affected.
+  - Scrollbars inside scrollable panels rendered 2px wide with no border instead of the intended 10px.
+  - A checkbox or radio that is switched off now looks switched off: its label kept full contrast, and
+    the control itself showed neither the dimming nor the blocked cursor.
+  - The primary button gave no hover feedback. The style was written so that it only applied when the
+    button was rendered as a link, so the most-used button in the app looked inert under the cursor.
+  - A mentor attachment that failed to upload disappeared with no message, leaving the sender believing
+    it was attached. The failure is now reported.
+  - A disabled accordion section still opened when clicked.
+  - Copying a mentor reply to the clipboard failed silently when the browser refused.
+  - Countdowns now advance while the page is open: an Outline token's expiry, and the wait shown while a
+    sync is rate-limited, previously only moved when something else on the page happened to redraw.
+  - Screen readers no longer hear an orientation announced on grouped toggle buttons, which is not
+    something a group can meaningfully have.
+  - The achievements API described an unlock time as always present, even for an achievement nobody
+    has earned. It is now reported as absent, which is what the server was already sending.
+
+- A panel covered by another one now leaves noticeably more of itself showing, so the thing you opened from stays readable rather than reduced to a stripe of its margin.
+- Tidies the practice and group editors. Their Save and Cancel buttons now sit on the panel's own bottom edge, spanning it, instead of floating in a bar that stopped short of both sides and left a strip of empty space beneath it. The fields fill the panel rather than stopping partway across, so the buttons line up with them. Panel headings no longer squeeze the practice name into a narrow column beside a badge — the badge moves under the name, which leaves the name room to read on a phone. The scrollable part of a panel can also be scrolled from the keyboard, including while a form is saving and every field in it is disabled.
+- Editing a practice no longer costs you your place: opening the editor from a practice panel and saving or cancelling returns you to that panel, with the catalog still open where you left it.
+
+  Rows that pair a label with a dropdown now stack on a narrow screen instead of squeezing the label into a sliver beside it.
+
+- The practice screens say one thing one way. The set of practices an instance offers is the **catalog** everywhere, entries are **included** or **excluded** rather than offered, a practice with no group is **Unassigned**, and the grouping is called a **group** — or not named at all where its own name is already on screen.
+
+  Filtering the practice list to nothing now says so and gives you a button to clear the filter, instead of leaving you with empty groups and a note about a filter you had no way to remove.
+
+- Browser errors now carry release and source-map context and show recovery controls. Server and browser reports omit Sentry request, user, and breadcrumb context.
+- Updates Spring Boot to 4.0.7 for CVE-2026-40992 and the PostgreSQL driver to 42.7.12 for CVE-2026-54291.
+- Prevents observations from crossing workspace boundaries and preserves the practice revision that produced each observation.
+- Ensures practice reviews and mentor conversations use the configured model, and prevents mentor responses from completing while automatic retries are still running.
+- Review comments no longer repeat their own issue count in the opening line, no longer run a strength and its next step together into one unpunctuated sentence, and no longer report how long the run took.
+- Practice reviews now assess reviewer-facing practices against the person who submitted each review, including when several reviews target the same pull request revision.
+- A problem the review found by opening a file now arrives as a comment on the changed line, rather than as a paragraph at the bottom of the merge request.
+- A review comment now leads with its most serious point and the one edit that fixes it, instead of leading with whichever one happened to have no line number attached. Each point says what to do before it says why it matters, and the reasoning is one sentence rather than the same paragraph on every review that touches the practice.
+- A review comment now opens with a sentence written about your change, instead of one of a handful of fixed lines that read the same on every review — including on reviews that opened with praise ahead of a serious problem. When the review has nothing worth opening on, it opens on its first observation.
+- Review comments no longer append the workspace's own wording about a practice to each note. That paragraph was identical on every review that touched the practice, and it was about the practice rather than about the change in front of you. The practice still decides what gets raised; it just doesn't get quoted back.
+- Workspace administrators now confirm before setting practices, groups, or the workspace default to Send automatically. Feedback already awaiting approval remains unchanged.
+- Prevents workspace profiles and activity views from revealing users who only belong to another workspace.
+- OAuth return targets now reject excessive percent-encoding, and OAuth intent cookies enforce expiration and future timestamps at millisecond precision.
+- Releases now publish verifiable SBOM, license, provenance, signature, and vulnerability evidence for every supported production image and platform. Production NATS, Traefik, nginx, and Alpine images are pinned to reviewed digests and covered by the same release evidence and recurring scans as Hephaestus images.
+- Workspace isolation checks now fail closed by default instead of allowing a detected unscoped query to continue.
+- The sortable columns in the workspace members and achievements admin tables now say which column is
+  sorted and in which direction — the arrow points, and a screen reader announces it. Both showed the
+  same static icon whatever the sort was. Their "Columns" menus no longer offer the column of row
+  actions, which was never meaningful to hide, and while a search is active both tables now count
+  "Showing 5 of 12" against the rows that matched rather than against every row.
+- Rejects mentor chat requests missing a message and integration connection requests missing a provider kind.
+- A start that cannot read one of its settings — a variable referenced but never provided, or one that
+  refers to itself — now prints the configuration report naming that setting, instead of ending at a
+  stack trace about an unresolved placeholder. A setting that cannot be read is never answered with its
+  default either, so a security switch whose value is unreadable is reported as needing attention
+  rather than as satisfied, and the reason is logged.
+- Agent sandboxes now use short-lived, proxy-scoped JWTs instead of reusable database-backed job secrets.
+- Fixes the "Uses Hephaestus default" notice in the instance practice catalog running edge to edge while every field below it was indented. It now sits inside the panel like the rest of the content, and scrolls with it instead of holding a fixed strip at the top.
+- Practice reviews now also start for practices that have no precompute script. Preparing the sandbox failed for those, so the review ended before it began.
+
 ## 0.74.0
 
 ### Minor Changes
@@ -1101,7 +1333,6 @@
   The README distinguishes implemented delivery surfaces from the broader feedback loop and links to the release plan for remaining scope. It explains how GitHub, GitLab, Slack, and Outline contribute project context, and describes the three ways to receive feedback without tying them to specific page names. It also explains what pre-1.0 releases mean for self-hosted deployments and provides clear paths to the app, documentation, Storybook, and contribution guide. Theme-aware artwork shows the human story from project work to feedback and developer choice, with phone, tablet, and desktop compositions that remain readable at each size.
 
   The user guide now matches the shipped multi-workspace GitHub and GitLab setup, current Heph chat, practice-feedback delivery, optional leaderboard and leagues, and configurable Slack digest. Account settings now state clearly that turning off pull-request comments controls delivery only; reviews still run and observations remain available to workspace admins.
-
 
 - When a review has more to say than one comment can hold, the suggestions that survive are now chosen by how much of your change they were actually seen in, rather than by how sure the reviewer said it felt. Previously every observation carried a self-reported confidence score, and that score decided which suggestions made the cut and which strength got acknowledged. Measured across 580 real observations it never once dropped below 90% and was a flat 100% more than half the time — so it was deciding those cuts on noise. It is gone.
 
