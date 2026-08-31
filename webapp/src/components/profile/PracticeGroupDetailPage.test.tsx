@@ -70,18 +70,17 @@ describe("PracticeGroupDetailPage", () => {
 		rerender(
 			<PracticeGroupDetailPage
 				group={group}
-				reviewRunFilters={{ sources: ["scm.pull_request"], severities: [] }}
-				onReviewRunFiltersChange={vi.fn()}
+				practices={[{ slug: "small-changes", name: "Keep changes focused" }]}
+				selectedPracticeSlug="small-changes"
 				isLoading={false}
 			/>,
 		);
-		screen.getByText("No review runs match the current filters.");
+		screen.getByText("No review runs mention Keep changes focused.");
 	});
 
-	it("offers a way out of a filter that emptied the feed", () => {
-		// Naming the filter without offering to clear it leaves the reader to find the control that
-		// caused it — which is above the fold on a phone.
-		const onReviewRunFiltersChange = vi.fn();
+	it("offers a way out when the chosen practice emptied the feed", () => {
+		// Naming what narrowed the feed without offering to widen it leaves the reader to find the
+		// control that did it — which is above the fold on a phone.
 		const onSelectPractice = vi.fn();
 		render(
 			<PracticeGroupDetailPage
@@ -89,14 +88,11 @@ describe("PracticeGroupDetailPage", () => {
 				practices={[{ slug: "small-changes", name: "Keep changes focused" }]}
 				selectedPracticeSlug="small-changes"
 				onSelectPractice={onSelectPractice}
-				reviewRunFilters={{ sources: ["scm.pull_request"], severities: ["MAJOR"] }}
-				onReviewRunFiltersChange={onReviewRunFiltersChange}
 				isLoading={false}
 			/>,
 		);
 
-		fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
-		expect(onReviewRunFiltersChange).toHaveBeenCalledWith({ sources: [], severities: [] });
+		fireEvent.click(screen.getByRole("button", { name: "Show every review in this group" }));
 		expect(onSelectPractice).toHaveBeenCalledWith(undefined);
 	});
 

@@ -10,18 +10,10 @@ import type {
 	PracticeTrend,
 } from "@/api/types.gen";
 import { getGroupVisual } from "@/components/admin/practice-catalog/group-visuals";
-import { type FacetOption, FacetMultiSelect } from "@/components/common/FacetMultiSelect";
-import { FilterToolbar } from "@/components/common/FilterToolbar";
 import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
-import { ReferenceFilterPill } from "@/components/common/ReferenceFilterPill";
 import { PRACTICE_GROUP_STANDING_DEFS } from "@/components/practice-vocabulary/practice-group-standing-defs";
-import { SEVERITY_DEFS, type Severity } from "@/components/practice-vocabulary/severity-defs";
-import {
-	type StatusDef,
-	statusFacetOptions,
-	statusToneClass,
-} from "@/components/practice-vocabulary/status-def";
+import { type StatusDef, statusToneClass } from "@/components/practice-vocabulary/status-def";
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,11 +25,6 @@ import {
 	EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-	ARTIFACT_KIND_VALUES,
-	artifactKindIcon,
-	artifactKindPluralLabel,
-} from "@/lib/artifact-kinds";
 import { cn } from "@/lib/utils";
 import { PracticeNextStepCallout } from "./PracticeNextStepCallout";
 import { PracticeTrendChip } from "./PracticeTrendChip";
@@ -65,15 +52,6 @@ function standingNode(standing: PracticeStandingKey): StatusDef {
 	return standing === "UNMEASURED" ? UNMEASURED_NODE : PRACTICE_GROUP_STANDING_DEFS[standing];
 }
 
-export type ReviewRunSource = string;
-
-export interface ReviewRunFilters {
-	sources: ReviewRunSource[];
-	severities: Severity[];
-}
-
-const NO_FILTERS: ReviewRunFilters = { sources: [], severities: [] };
-
 /**
  * The review-run feed as one value rather than seven flags. Loading-and-failed was representable
  * before this, and an error could arrive without a retry — `PanelState` makes both unspellable.
@@ -92,18 +70,6 @@ const EMPTY_FEED: ReviewRunFeedState = {
 	isLoadingMore: false,
 	onLoadMore: () => undefined,
 };
-
-/**
- * Both facets read their options off the registries that own the values, so a filter option carries
- * the same word and glyph as the badge on the row it selects. Every kind this build can name is
- * offered, which makes a newly registered one filterable the day the server first sends it.
- */
-const SOURCE_OPTIONS: FacetOption[] = ARTIFACT_KIND_VALUES.map((kind) => ({
-	value: kind,
-	label: artifactKindPluralLabel(kind),
-	icon: artifactKindIcon(kind),
-}));
-const SEVERITY_OPTIONS = statusFacetOptions(SEVERITY_DEFS);
 
 /**
  * A practice in the group, with everything this page shows about it.
@@ -134,8 +100,6 @@ export interface PracticeGroupDetailPageProps {
 	onSelectPractice?: (practiceSlug: string | undefined) => void;
 	/** The feed as one state: loading, failed with a retry, or ready with its paging controls. */
 	feed?: ReviewRunFeedState;
-	reviewRunFilters?: ReviewRunFilters;
-	onReviewRunFiltersChange?: (filters: ReviewRunFilters) => void;
 	/** How many placeholder rows the loading feed draws — the caller knows its page size. */
 	skeletonRows?: number;
 	openObservationId?: string;
@@ -175,8 +139,6 @@ export function PracticeGroupDetailPage({
 	selectedPracticeSlug,
 	onSelectPractice,
 	feed = EMPTY_FEED,
-	reviewRunFilters = NO_FILTERS,
-	onReviewRunFiltersChange,
 	skeletonRows = 3,
 	openObservationId,
 	observationDetail,
@@ -235,14 +197,7 @@ export function PracticeGroupDetailPage({
 	const badge = PRACTICE_GROUP_STANDING_DEFS[groupStanding];
 	const { Icon: GroupIcon, pill: groupPill } = getGroupVisual(group.icon, group.color);
 	const selectedPractice = practices?.find((practice) => practice.slug === selectedPracticeSlug);
-	const clearAllNarrowing = () => {
-		onReviewRunFiltersChange?.(NO_FILTERS);
-		onSelectPractice?.(undefined);
-	};
-	const hasAnyFeedNarrowing =
-		reviewRunFilters.sources.length > 0 ||
-		reviewRunFilters.severities.length > 0 ||
-		selectedPractice !== undefined;
+	const hasAnyFeedNarrowing = selectedPractice !== undefined;
 
 	const nextStepFor = (practice: ContributingPractice, practiceStanding: PracticeStandingKey) => {
 		const deliveredStep = practice.nextStep?.trim();
@@ -470,46 +425,6 @@ export function PracticeGroupDetailPage({
 					title="Review runs"
 					description="Complete reviews of your work in this group, newest first."
 				/>
-				{onReviewRunFiltersChange && (
-					<div className="flex flex-col gap-1">
-						<FilterToolbar
-							hasFilter={hasAnyFeedNarrowing}
-							onReset={() => {
-								onReviewRunFiltersChange(NO_FILTERS);
-								onSelectPractice?.(undefined);
-							}}
-						>
-							{selectedPractice && (
-								<ReferenceFilterPill
-									label="Practice"
-									value={selectedPractice.name}
-									onClear={() => {
-										onSelectPractice?.(undefined);
-									}}
-								/>
-							)}
-							<FacetMultiSelect
-								title="Source"
-								options={SOURCE_OPTIONS}
-								selected={reviewRunFilters.sources}
-								onChange={(sources) => onReviewRunFiltersChange({ ...reviewRunFilters, sources })}
-							/>
-							<FacetMultiSelect
-								title="Severity"
-								options={SEVERITY_OPTIONS}
-								selected={reviewRunFilters.severities}
-								onChange={(severities) =>
-									onReviewRunFiltersChange({ ...reviewRunFilters, severities })
-								}
-							/>
-						</FilterToolbar>
-						{/* Kept out of the severity facet on purpose: it explains what the filter cannot do,
-						    which is not one of the options. */}
-						<p className="text-xs text-muted-foreground">
-							Strengths carry no severity and always stay visible.
-						</p>
-					</div>
-				)}
 				{feed.status === "error" ? (
 					<QueryErrorAlert
 						error={feed.error}
@@ -554,15 +469,20 @@ export function PracticeGroupDetailPage({
 							<EmptyTitle>No review runs</EmptyTitle>
 							<EmptyDescription>
 								{hasAnyFeedNarrowing
-									? "No review runs match the current filters."
+									? `No review runs mention ${selectedPractice.name}.`
 									: "Review runs appear here once your work has been reviewed."}
 							</EmptyDescription>
 						</EmptyHeader>
-						{/* The filtered case offers the way out rather than only naming it. */}
-						{hasAnyFeedNarrowing && onReviewRunFiltersChange && (
+						{/* The narrowed case offers the way out rather than only naming it. */}
+						{hasAnyFeedNarrowing && onSelectPractice && (
 							<EmptyContent>
-								<Button type="button" variant="outline" size="sm" onClick={clearAllNarrowing}>
-									Clear filters
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									onClick={() => onSelectPractice(undefined)}
+								>
+									Show every review in this group
 								</Button>
 							</EmptyContent>
 						)}

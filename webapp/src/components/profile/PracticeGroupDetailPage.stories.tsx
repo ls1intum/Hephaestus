@@ -98,7 +98,6 @@ export const Failure: Story = { args: { error: new Error("Unavailable") } };
 export const WithReviewRuns: Story = {
 	args: {
 		feed: readyFeed,
-		onReviewRunFiltersChange: fn(),
 		onToggleObservation: fn(),
 		onRespond: fn(),
 	},
@@ -108,7 +107,6 @@ export const WithReviewRuns: Story = {
 export const MoreToLoad: Story = {
 	args: {
 		feed: { ...readyFeed, hasMore: true },
-		onReviewRunFiltersChange: fn(),
 	},
 };
 
@@ -120,40 +118,22 @@ export const FeedLoading: Story = {
 export const FeedFailed: Story = {
 	args: {
 		feed: { status: "error", error: new Error("Gateway timeout"), onRetry: fn() },
-		onReviewRunFiltersChange: fn(),
 	},
 };
 
-/** Narrowed to nothing: the empty state names the filter and offers to drop it. */
-export const FilteredToEmpty: Story = {
-	args: {
-		selectedPracticeSlug: "small-changes",
-		reviewRunFilters: { sources: ["scm.pull_request"], severities: ["CRITICAL"] },
-		onReviewRunFiltersChange: fn(),
-	},
+/** Narrowed to one practice that has nothing: the empty state names it and offers the way back. */
+export const NarrowedToEmpty: Story = {
+	args: { selectedPracticeSlug: "small-changes" },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("button", { name: "Clear filters" })).toBeVisible();
-	},
-};
-
-/** A practice selected: the feed is scoped to it, and the pill says how to undo that. */
-export const PracticeSelected: Story = {
-	args: {
-		feed: readyFeed,
-		selectedPracticeSlug: "small-changes",
-		onReviewRunFiltersChange: fn(),
-	},
-	play: async ({ args, canvas, userEvent }) => {
-		await userEvent.click(
-			canvas.getByRole("button", { name: "Clear practice filter (Keep changes focused)" }),
-		);
-		await expect(args.onSelectPractice).toHaveBeenCalledWith(undefined);
+		await expect(
+			canvas.getByRole("button", { name: "Show every review in this group" }),
+		).toBeVisible();
 	},
 };
 
 /** At 320px the two-column layout has to stack without pushing anything off the page. */
 export const MobileReflow: Story = {
-	args: { feed: readyFeed, onReviewRunFiltersChange: fn() },
+	args: { feed: readyFeed },
 	parameters: {
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320] },

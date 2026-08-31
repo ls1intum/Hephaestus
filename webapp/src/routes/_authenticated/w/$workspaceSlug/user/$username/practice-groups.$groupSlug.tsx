@@ -18,7 +18,6 @@ import type { PracticeStanding } from "@/api/types.gen";
 import {
 	PracticeGroupDetailPage,
 	type ReviewRunFeedState,
-	type ReviewRunFilters,
 } from "@/components/profile/PracticeGroupDetailPage";
 import {
 	isEmptyFeedbackResponse,
@@ -58,10 +57,6 @@ function PracticeGroupDetail() {
 	const isOwnProfile = isCurrentUser(username);
 	const [openObservationId, setOpenObservationId] = useState<string>();
 	const [selectedPracticeSlug, setSelectedPracticeSlug] = useState<string>();
-	const [activityFilters, setActivityFilters] = useState<ReviewRunFilters>({
-		sources: [],
-		severities: [],
-	});
 
 	useEffect(() => {
 		if (!isOwnProfile) {
@@ -103,8 +98,6 @@ function PracticeGroupDetail() {
 		query: {
 			size: ACTIVITY_PAGE_SIZE,
 			practiceSlug: selectedPracticeSlug,
-			artifactKinds: activityFilters.sources.length > 0 ? activityFilters.sources : undefined,
-			severities: activityFilters.severities.length > 0 ? activityFilters.severities : undefined,
 		},
 	};
 	const activityQuery = useInfiniteQuery({
@@ -202,11 +195,6 @@ function PracticeGroupDetail() {
 			}}
 			feed={reviewRunFeed}
 			skeletonRows={ACTIVITY_PAGE_SIZE}
-			reviewRunFilters={activityFilters}
-			onReviewRunFiltersChange={(filters) => {
-				setActivityFilters(filters);
-				setOpenObservationId(undefined);
-			}}
 			openObservationId={openObservationId}
 			observationDetail={observationDetail}
 			onToggleObservation={(observationId) =>
