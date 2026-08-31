@@ -1,9 +1,13 @@
-export type ObservationPresence = "PRESENT" | "ABSENT" | "NOT_APPLICABLE" | "INCONCLUSIVE";
-export type ObservationAssessment = "GOOD" | "BAD";
+import type { Assessment } from "@/components/practice-vocabulary/assessment-defs";
+import type { Presence } from "@/components/practice-vocabulary/presence-defs";
 
+/**
+ * Taken from the registries that own the two enums rather than spelled out again: a value the server
+ * adds then fails the build here instead of falling through to a silent default.
+ */
 export interface ObservationOutcomeInput {
-	presence: ObservationPresence;
-	assessment?: ObservationAssessment;
+	presence: Presence;
+	assessment?: Assessment;
 }
 
 export type ObservationOutcome =

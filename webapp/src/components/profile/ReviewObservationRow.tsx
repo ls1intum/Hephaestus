@@ -254,7 +254,10 @@ export function ReviewObservationRow({
 											isPending={isFeedbackResponsePending}
 											onChoose={toggleResolution}
 										/>
+										{/* Keyed on the answer it seeds from: a comment that changes underneath — saved,
+										    withdrawn, refetched — restarts the draft instead of leaving stale text. */}
 										<FeedbackComment
+											key={`${observation.observationId}:${recorded.comment ?? ""}`}
 											comment={recorded.comment}
 											isRequired={recorded.resolution === "DISPUTED"}
 											isPending={isFeedbackResponsePending}

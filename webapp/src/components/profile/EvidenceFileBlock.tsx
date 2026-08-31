@@ -92,7 +92,7 @@ export function EvidenceFileBlock({
 				<p className="flex items-start gap-2 border-t p-3 text-sm text-muted-foreground">
 					<ShieldAlertIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
 					{detector === SECRET_SCANNER
-						? "Not quoted. This looked like a credential, so the text was never stored — open the location above to read it."
+						? "Not quoted. This looked like a credential, so the text was never stored — the path and line above are where it sits."
 						: "Not quoted. The passage was withheld, so only its location was kept."}
 				</p>
 			)}
