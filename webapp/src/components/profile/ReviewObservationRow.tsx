@@ -15,8 +15,8 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { EvidenceFileBlock } from "./EvidenceFileBlock";
 import { toEvidenceLocations } from "./evidence";
+import { EvidenceFileBlock } from "./EvidenceFileBlock";
 import {
 	OBSERVATION_OUTCOME_PRESENTATION,
 	type ObservationOutcome,

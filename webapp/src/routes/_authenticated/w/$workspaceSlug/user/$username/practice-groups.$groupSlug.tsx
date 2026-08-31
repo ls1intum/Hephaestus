@@ -20,6 +20,7 @@ import {
 } from "@/components/profile/PracticeGroupDetailPage";
 import type { ObservationDetailState } from "@/components/profile/review-runs";
 import { useAuth } from "@/integrations/auth/AuthContext";
+import { loadedPages } from "@/integrations/tanstack-query/spring-page";
 import { problemDetailOf } from "@/lib/problem-detail";
 
 const ACTIVITY_PAGE_SIZE = 10;
@@ -144,7 +145,7 @@ function PracticeGroupDetail() {
 			return [practice.slug, nextStep];
 		}),
 	);
-	const reviewRuns = activityQuery.data.pages.flatMap((page) => page.content);
+	const reviewRuns = loadedPages(activityQuery.data).flatMap((page) => page.content);
 
 	const observationDetail: ObservationDetailState | undefined = openObservationId
 		? {

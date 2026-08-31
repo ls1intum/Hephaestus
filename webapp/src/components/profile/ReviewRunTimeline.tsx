@@ -1,6 +1,6 @@
 import type { PracticeGroupReviewObservation, PracticeGroupReviewRun } from "@/api/types.gen";
-import { ReviewRunCard } from "./ReviewRunCard";
 import type { FeedbackUsefulness, ObservationDetailState } from "./review-runs";
+import { ReviewRunCard } from "./ReviewRunCard";
 
 export type { FeedbackUsefulness, ObservationDetailState } from "./review-runs";
 
@@ -24,14 +24,8 @@ export function ReviewRunTimeline({
 	onChangeUsefulness,
 	pendingFeedbackId,
 }: ReviewRunTimelineProps) {
-	if (runs.length === 0) {
-		return (
-			<div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-				No reviewed work matches these filters.
-			</div>
-		);
-	}
-
+	// No empty state here: the caller decides what an empty feed means — no runs at all, or none
+	// matching the filters — and renders that itself. A second one here could only ever be wrong.
 	return (
 		<ol className="flex min-w-0 flex-col" aria-label="Review runs">
 			{runs.map((run) => (

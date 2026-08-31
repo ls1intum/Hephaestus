@@ -57,6 +57,27 @@ describe("PracticeGroupDetailPage", () => {
 		expect(onSelectPractice).toHaveBeenCalledWith("small-changes");
 	});
 
+	it("tells an empty filtered feed apart from a group that was never reviewed", () => {
+		// One empty feed, two meanings. Saying "no review runs match your filters" to someone who set
+		// none reads as a fault in the page; saying "none yet" to someone filtering hides their filter.
+		const { rerender } = render(
+			<PracticeGroupDetailPage group={group} reviewRuns={[]} isLoading={false} />,
+		);
+		screen.getByText("Review runs appear here once your work has been reviewed.");
+
+		rerender(
+			<PracticeGroupDetailPage
+				group={group}
+				reviewRuns={[]}
+				reviewRunFilters={{ sources: ["scm.pull_request"], severities: [] }}
+				isLoading={false}
+			/>,
+		);
+		screen.getByText(
+			"No review runs match the current filters. Clear them to see every review in this group.",
+		);
+	});
+
 	it("offers navigation when the group is missing", () => {
 		const onBack = vi.fn();
 		render(<PracticeGroupDetailPage isLoading={false} onBack={onBack} />);

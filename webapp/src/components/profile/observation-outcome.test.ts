@@ -15,12 +15,14 @@ describe("observation outcome contract", () => {
 		// the practice did not apply to this work, INCONCLUSIVE means it did and the reviewer could not
 		// tell. Collapsing them would report "not assessed" for a practice that WAS looked at.
 		expect(observationOutcome({ presence: "INCONCLUSIVE" })).toBe("INCONCLUSIVE");
-		expect(OBSERVATION_OUTCOME_PRESENTATION.INCONCLUSIVE.trendPolarity).toBeNull();
+		expect(OBSERVATION_OUTCOME_PRESENTATION.INCONCLUSIVE.label).not.toBe(
+			OBSERVATION_OUTCOME_PRESENTATION.NOT_APPLICABLE.label,
+		);
 	});
 
 	it("presents every outcome, including the one the outcome vector does not count", () => {
 		// The first five mirror the server's OutcomeVector 1:1. INCONCLUSIVE is display-only — it is shown
-		// to the developer but contributes no cell to the trend, which is why it carries no polarity.
+		// to the developer but contributes no cell to the trend.
 		expect(Object.keys(OBSERVATION_OUTCOME_PRESENTATION)).toStrictEqual([
 			"PRESENT_GOOD",
 			"ABSENT_GOOD",
