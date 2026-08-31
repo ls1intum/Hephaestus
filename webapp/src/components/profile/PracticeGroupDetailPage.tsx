@@ -105,21 +105,31 @@ const SOURCE_OPTIONS: FacetOption[] = ARTIFACT_KIND_VALUES.map((kind) => ({
 }));
 const SEVERITY_OPTIONS = statusFacetOptions(SEVERITY_DEFS);
 
+/**
+ * A practice in the group, with everything this page shows about it.
+ *
+ * One array rather than the four slug-keyed records this used to take: those could disagree — a
+ * standing for a slug the practice list did not have, or the reverse — and nothing would say so.
+ * The route already holds all four facts together before splitting them up, so joining them there
+ * is both shorter and the only place that can do it correctly.
+ */
 export interface ContributingPractice {
 	slug: string;
 	name: string;
 	whyItMatters?: string;
 	whatGoodLooksLike?: string;
+	/** Absent when the server reported no standing for this practice at all. */
+	standing?: PracticeStanding["standing"];
+	trend?: PracticeTrend;
+	/** The delivered guidance, when the review had any; the page falls back to the catalog text. */
+	nextStep?: string;
 }
 
 export interface PracticeGroupDetailPageProps {
 	group?: PracticeGroup;
 	standing?: PracticeGroupStanding;
 	practices?: ContributingPractice[];
-	practiceStandings?: Record<string, PracticeStanding["standing"] | undefined>;
-	practiceTrends?: Record<string, PracticeTrend | undefined>;
 	groupTrend?: PracticeTrend;
-	practiceNextSteps?: Record<string, string | undefined>;
 	selectedPracticeSlug?: string;
 	onSelectPractice?: (practiceSlug: string | undefined) => void;
 	/** The feed as one state: loading, failed with a retry, or ready with its paging controls. */
@@ -161,10 +171,7 @@ export function PracticeGroupDetailPage({
 	group,
 	standing,
 	practices,
-	practiceStandings,
-	practiceTrends,
 	groupTrend,
-	practiceNextSteps,
 	selectedPracticeSlug,
 	onSelectPractice,
 	feed = EMPTY_FEED,
@@ -238,7 +245,7 @@ export function PracticeGroupDetailPage({
 		selectedPractice !== undefined;
 
 	const nextStepFor = (practice: ContributingPractice, practiceStanding: PracticeStandingKey) => {
-		const deliveredStep = practiceNextSteps?.[practice.slug]?.trim();
+		const deliveredStep = practice.nextStep?.trim();
 		if (deliveredStep) return deliveredStep;
 		if (practiceStanding === "STRENGTH" && practice.whatGoodLooksLike) {
 			return `Keep doing this: ${practice.whatGoodLooksLike}`;
@@ -334,11 +341,11 @@ export function PracticeGroupDetailPage({
 					<div className="hidden h-8 lg:block" aria-hidden />
 					<ul className="flex flex-col gap-3">
 						{practices.map((practice) => {
-							const practiceStanding = practiceStandings?.[practice.slug] ?? "UNMEASURED";
+							const practiceStanding = practice.standing ?? "UNMEASURED";
 							const node = standingNode(practiceStanding);
 							const NodeIcon = node.icon;
 							const nodeTone = statusToneClass(node.badgeVariant);
-							const practiceTrend = practiceTrends?.[practice.slug];
+							const practiceTrend = practice.trend;
 							const isSelected = practice.slug === selectedPracticeSlug;
 							const isInfoOpen = practice.slug === openPracticeInfoSlug;
 							const nextStep = nextStepFor(practice, practiceStanding);

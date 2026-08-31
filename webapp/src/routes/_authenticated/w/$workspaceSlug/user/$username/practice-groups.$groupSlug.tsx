@@ -14,6 +14,7 @@ import {
 	listReviewedPracticesOptions,
 	replaceFeedbackResponseMutation,
 } from "@/api/@tanstack/react-query.gen";
+import type { PracticeStanding } from "@/api/types.gen";
 import {
 	PracticeGroupDetailPage,
 	type ReviewRunFeedState,
@@ -28,6 +29,20 @@ import { loadedPages } from "@/integrations/tanstack-query/spring-page";
 import { problemDetailOf } from "@/lib/problem-detail";
 
 const ACTIVITY_PAGE_SIZE = 10;
+
+/**
+ * The one thing a developer should do next for a practice: the guidance a review actually delivered,
+ * or the observation's own title when it says something the practice name does not already say.
+ */
+function nextStepOf(practiceStanding?: PracticeStanding): string | undefined {
+	const firstAction = practiceStanding?.toWorkOn[0];
+	if (!firstAction) return undefined;
+	const deliveredGuidance = firstAction.deliveredFeedback?.trim();
+	const observationTitle = firstAction.title.trim();
+	const distinctTitle =
+		observationTitle !== practiceStanding.name.trim() ? observationTitle : undefined;
+	return [deliveredGuidance, distinctTitle].find((value) => value !== undefined && value !== "");
+}
 
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/user/$username/practice-groups/$groupSlug",
@@ -127,28 +142,27 @@ function PracticeGroupDetail() {
 
 	const group = groupsQuery.data?.find((candidate) => candidate.slug === groupSlug);
 	const standing = statusesQuery.data?.find((candidate) => candidate.groupSlug === groupSlug);
-	const practices = practicesQuery.data?.filter((practice) => practice.groupSlug === groupSlug);
-	const standingsForGroup = (standingsQuery.data ?? []).filter(
-		(practice) => practice.groupSlug === groupSlug,
+	const standingsBySlug = new Map(
+		(standingsQuery.data ?? [])
+			.filter((practice) => practice.groupSlug === groupSlug)
+			.map((practice) => [practice.slug, practice]),
 	);
-	const practiceStandings = Object.fromEntries(
-		standingsForGroup.map((practice) => [practice.slug, practice.standing]),
-	);
-	const practiceTrends = Object.fromEntries(
+	const trendsBySlug = new Map(
 		(trendQuery.data?.practices ?? []).map((practiceTrend) => [practiceTrend.slug, practiceTrend]),
 	);
-	const practiceNextSteps = Object.fromEntries(
-		standingsForGroup.map((practice) => {
-			const firstAction = practice.toWorkOn[0];
-			const deliveredGuidance = firstAction?.deliveredFeedback?.trim();
-			const findingTitle = firstAction?.title.trim();
-			const distinctTitle = findingTitle !== practice.name.trim() ? findingTitle : undefined;
-			const nextStep = [deliveredGuidance, distinctTitle].find(
-				(value) => value !== undefined && value !== "",
-			);
-			return [practice.slug, nextStep];
-		}),
-	);
+	// Joined here rather than handed down as four slug-keyed records: this is the only place that
+	// holds all four answers at once, so it is the only place that can align them.
+	const practices = practicesQuery.data
+		?.filter((practice) => practice.groupSlug === groupSlug)
+		.map((practice) => {
+			const practiceStanding = standingsBySlug.get(practice.slug);
+			return {
+				...practice,
+				standing: practiceStanding?.standing,
+				trend: trendsBySlug.get(practice.slug),
+				nextStep: nextStepOf(practiceStanding),
+			};
+		});
 	// One value instead of seven flags: the page cannot be handed "loading and failed" at once, and an
 	// error always arrives with the retry that clears it.
 	const reviewRunFeed: ReviewRunFeedState = activityQuery.isPending
@@ -180,10 +194,7 @@ function PracticeGroupDetail() {
 			group={group}
 			standing={standing}
 			practices={practices}
-			practiceStandings={practiceStandings}
-			practiceTrends={practiceTrends}
 			groupTrend={trendQuery.data?.group}
-			practiceNextSteps={practiceNextSteps}
 			selectedPracticeSlug={selectedPracticeSlug}
 			onSelectPractice={(practiceSlug) => {
 				setSelectedPracticeSlug(practiceSlug);

@@ -34,8 +34,7 @@ describe("PracticeGroupDetailPage", () => {
 			<PracticeGroupDetailPage
 				group={group}
 				standing={standing}
-				practices={[{ slug: "small-changes", name: "Keep changes focused" }]}
-				practiceStandings={{ "small-changes": "MIXED" }}
+				practices={[{ slug: "small-changes", name: "Keep changes focused", standing: "MIXED" }]}
 				isLoading={false}
 			/>,
 		);
