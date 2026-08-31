@@ -30,7 +30,7 @@ describe("PracticeGroupStandingCard", () => {
 			/>,
 		);
 		screen.getByText("Nothing to report yet");
-		screen.getByText(/recent work was reviewed/i);
+		screen.getByText(/nothing here could be judged/i);
 	});
 
 	it("opens a group", () => {

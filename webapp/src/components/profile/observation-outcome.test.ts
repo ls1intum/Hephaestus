@@ -20,9 +20,12 @@ describe("observation outcome contract", () => {
 		);
 	});
 
-	it("presents every outcome, including the one the outcome vector does not count", () => {
-		// The first five mirror the server's OutcomeVector 1:1. INCONCLUSIVE is display-only — it is shown
-		// to the developer but contributes no cell to the trend.
+	it("presents every outcome the server can record", () => {
+		// The four assessed cells map onto the server's OutcomeVector one for one. Its fifth counter,
+		// `notApplicable`, is the union of the last two here: `ObservationOutcome.of` folds
+		// INCONCLUSIVE in with NOT_APPLICABLE because neither may move a trend in either direction.
+		// The vector is a five-cell collapse of these six, not a five-plus-one split — only surfaces
+		// that explain a review, like this one, keep the two silences apart.
 		expect(Object.keys(OBSERVATION_OUTCOME_PRESENTATION)).toStrictEqual([
 			"PRESENT_GOOD",
 			"ABSENT_GOOD",

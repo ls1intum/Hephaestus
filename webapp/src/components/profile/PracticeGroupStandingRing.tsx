@@ -1,8 +1,5 @@
 import type { PracticeStanding } from "@/api/types.gen";
-import {
-	PRACTICE_GROUP_STANDING_DEFS,
-	PRACTICE_GROUP_STANDING_SHORT_LABELS,
-} from "@/components/practice-vocabulary/practice-group-standing-defs";
+import { PRACTICE_GROUP_STANDING_DEFS } from "@/components/practice-vocabulary/practice-group-standing-defs";
 import { statusToneClass, statusValues } from "@/components/practice-vocabulary/status-def";
 
 type Standing = PracticeStanding["standing"];
@@ -29,7 +26,7 @@ const SEGMENTS: ReadonlyArray<{
 	standing,
 	colorClass:
 		RING_OPACITY[standing] ?? statusToneClass(PRACTICE_GROUP_STANDING_DEFS[standing].badgeVariant),
-	label: PRACTICE_GROUP_STANDING_SHORT_LABELS[standing],
+	label: PRACTICE_GROUP_STANDING_DEFS[standing].shortLabel,
 }));
 
 export const STANDING_LEGEND = SEGMENTS;

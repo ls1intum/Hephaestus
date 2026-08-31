@@ -269,7 +269,11 @@ export function PracticeGroupDetailPage({
 					<h1 className="min-w-0 text-pretty text-2xl font-semibold">{group.name}</h1>
 					<StatusBadge def={badge} />
 					{groupTrend && (
-						<PracticeTrendChip direction={groupTrend.direction} support={groupTrend.support} />
+						<PracticeTrendChip
+							direction={groupTrend.direction}
+							support={groupTrend.support}
+							scope="group"
+						/>
 					)}
 				</div>
 				{standing?.guidance && (
@@ -370,6 +374,7 @@ export function PracticeGroupDetailPage({
 														<PracticeTrendChip
 															direction={practiceTrend.direction}
 															support={practiceTrend.support}
+															scope="practice"
 															// Above this row's own z-10 overlay link.
 															className="relative z-20"
 														/>

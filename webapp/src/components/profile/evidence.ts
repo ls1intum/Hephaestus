@@ -28,7 +28,6 @@ export interface EvidenceLocation {
  * <p>`evidence` arrives typed and pre-validated: the server rejects a citation whose lines are absent or
  * inverted, and enforces that a quote is present unless it was explicitly redacted (see
  * {@link file://../../../../server/src/main/java/de/tum/cit/aet/hephaestus/practices/observation/dto/EvidenceCitationDTO.java EvidenceCitationDTO}).
- * Nothing is narrowed or guessed here — this only reshapes citations into what the rendering needs.
  */
 export function toEvidenceLocations(evidence: ObservationDetail["evidence"]): EvidenceLocation[] {
 	return (evidence?.citations ?? []).map((citation) => ({

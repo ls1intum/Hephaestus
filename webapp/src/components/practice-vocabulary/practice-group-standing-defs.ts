@@ -8,13 +8,28 @@ import {
 
 import type { PracticeGroupStanding } from "@/api/types.gen";
 
-import type { StatusDefs } from "./status-def";
+import type { StatusDef } from "./status-def";
 
 export type PracticeGroupStandingValue = PracticeGroupStanding["standing"];
 
 /**
+ * `shortLabel` travels inside the entry rather than beside it, so a value cannot gain one spelling
+ * and miss the other — the same reason `EvidenceSourceDef` carries its `locator` here.
+ */
+export interface PracticeGroupStandingDef extends StatusDef {
+	shortLabel: string;
+}
+
+/**
  * Where a developer stands in a practice group, ordered worst first so a sorted list and a filter
  * read the same way.
+ *
+ * The descriptions follow `PracticeStandingDTO.Standing` on the server rather than paraphrasing it.
+ * Two of them used to overreach: `DEVELOPING` said "raised problems", which is equally true of
+ * `MIXED` — what separates them is that the problems *predominate*. And `NO_OPPORTUNITY` named only
+ * the missing occasion, dropping the case where evidence existed but settled nothing. That is
+ * `INCONCLUSIVE`, and reporting it as "no opportunity" is precisely the collapse `observation-outcome`
+ * refuses to make one screen further in.
  *
  * `shortLabel` exists for the ring legend, where five entries share one row and the badge's full
  * phrase does not fit. It says the same thing in fewer words and is never a different word — the
@@ -23,45 +38,44 @@ export type PracticeGroupStandingValue = PracticeGroupStanding["standing"];
  * `NOT_OBSERVED` and `NO_OPPORTUNITY` are both silences and both render outline, so the icon is what
  * separates them: a dashed circle for "nothing seen yet", a slash for "nothing to see".
  */
-export const PRACTICE_GROUP_STANDING_DEFS: StatusDefs<PracticeGroupStandingValue> = {
+export const PRACTICE_GROUP_STANDING_DEFS: Record<
+	PracticeGroupStandingValue,
+	PracticeGroupStandingDef
+> = {
 	DEVELOPING: {
+		shortLabel: "Needs attention",
 		label: "Needs attention",
 		icon: CircleAlertIcon,
 		badgeVariant: "destructive",
-		description: "Recent reviews raised problems in this group.",
+		description: "Recent reviews here were mostly problems.",
 	},
 	MIXED: {
+		shortLabel: "Mixed",
 		label: "Mixed feedback",
 		icon: CircleMinusIcon,
 		badgeVariant: "warning",
 		description: "Recent reviews found both strengths and problems here.",
 	},
 	STRENGTH: {
+		shortLabel: "Going well",
 		label: "Going well",
 		icon: CircleCheckIcon,
 		badgeVariant: "success",
-		description: "Nothing needs your attention here right now.",
+		description: "Recent reviews here were almost entirely positive.",
 	},
 	NO_OPPORTUNITY: {
+		shortLabel: "Nothing to report",
 		label: "Nothing to report yet",
 		icon: CircleSlashIcon,
 		badgeVariant: "outline",
 		description:
-			"Your recent work was reviewed, but it either offered no opportunity for these practices or raised nothing worth mentioning.",
+			"Your work was reviewed, but nothing here could be judged — either these practices did not apply to it, or the evidence did not settle the question.",
 	},
 	NOT_OBSERVED: {
+		shortLabel: "Not observed",
 		label: "Not observed yet",
 		icon: CircleDashedIcon,
 		badgeVariant: "outline",
-		description: "These practices have not been observed in your reviewed work yet.",
+		description: "No practice in this group has a current verdict for you.",
 	},
-};
-
-/** The legend's shorter wording, for the one row that cannot hold the full labels. */
-export const PRACTICE_GROUP_STANDING_SHORT_LABELS: Record<PracticeGroupStandingValue, string> = {
-	DEVELOPING: "Needs attention",
-	MIXED: "Mixed",
-	STRENGTH: "Going well",
-	NO_OPPORTUNITY: "Nothing to report",
-	NOT_OBSERVED: "Not observed",
 };

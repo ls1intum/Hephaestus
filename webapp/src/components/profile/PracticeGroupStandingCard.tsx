@@ -4,12 +4,12 @@ import type { PracticeGroup, PracticeGroupStanding, PracticeStanding } from "@/a
 import { getGroupVisual } from "@/components/admin/practice-catalog/group-visuals";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { PRACTICE_GROUP_STANDING_DEFS } from "@/components/practice-vocabulary/practice-group-standing-defs";
-import { statusValues } from "@/components/practice-vocabulary/status-def";
+import { statusToneClass, statusValues } from "@/components/practice-vocabulary/status-def";
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { artifactKindCountLabel } from "@/lib/artifact-kinds";
+import { artifactKindCountLabel, artifactKindIcon } from "@/lib/artifact-kinds";
 import { cn } from "@/lib/utils";
 import {
 	PracticeGroupStandingRing,
@@ -103,9 +103,11 @@ export function PracticeGroupStandingCard({
 					const practices = practicesByGroup?.[group.slug] ?? [];
 					const breakdown = summarizePracticeStandings(practices);
 					const { Icon, pill } = getGroupVisual(group.icon, group.color);
+					// `pt-0` cancels the card's own top padding: the header carries a fill, and inside that
+					// padding it would leave a strip of card colour above itself.
 					return (
-						<Card key={group.slug} className="relative flex h-full flex-col overflow-hidden">
-							<CardHeader className="gap-2 border-b bg-muted/40">
+						<Card key={group.slug} className="relative flex h-full flex-col overflow-hidden pt-0">
+							<CardHeader className="gap-2 border-b bg-muted/40 pt-4">
 								<div className="flex items-center gap-3">
 									<span
 										className={cn(
@@ -132,6 +134,7 @@ export function PracticeGroupStandingCard({
 											<PracticeTrendChip
 												direction={groupStanding.direction}
 												support={groupStanding.trendSupport}
+												scope="group"
 												// Above the whole-card link below: it comes later in the DOM, so without
 												// this it swallows the hover and click that reveal the chip's provenance.
 												className="relative z-10"
@@ -140,20 +143,42 @@ export function PracticeGroupStandingCard({
 									</div>
 									{practices.length > 0 && <PracticeGroupStandingRing practices={practices} />}
 								</div>
+								{/* The registries carry a glyph for every value; the counts read them rather than
+								    reducing to bare text, so the same standing looks the same wherever it appears. */}
 								{breakdown.length > 0 && (
-									<p className="text-xs text-muted-foreground">
-										{breakdown
-											.map(({ count, label }) => `${count} ${label.toLowerCase()}`)
-											.join(" · ")}
-									</p>
+									<ul className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+										{breakdown.map(({ standing, count, label }) => {
+											const StandingIcon = PRACTICE_GROUP_STANDING_DEFS[standing].icon;
+											return (
+												<li key={standing} className="flex items-center gap-1">
+													<StandingIcon
+														className={cn(
+															"size-3.5 shrink-0",
+															statusToneClass(PRACTICE_GROUP_STANDING_DEFS[standing].badgeVariant),
+														)}
+														aria-hidden
+													/>
+													{count} {label.toLowerCase()}
+												</li>
+											);
+										})}
+									</ul>
 								)}
 								{groupStanding && groupStanding.sources.length > 0 && (
-									<p className="text-xs text-muted-foreground">
-										Based on{" "}
-										{groupStanding.sources
-											.map(({ workKind, count }) => artifactKindCountLabel(workKind, count))
-											.join(", ")}
-									</p>
+									<div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+										<span>Based on</span>
+										<ul className="flex flex-wrap items-center gap-x-3 gap-y-1">
+											{groupStanding.sources.map(({ workKind, count }) => {
+												const SourceIcon = artifactKindIcon(workKind);
+												return (
+													<li key={workKind} className="flex items-center gap-1">
+														<SourceIcon className="size-3.5 shrink-0" aria-hidden />
+														{artifactKindCountLabel(workKind, count)}
+													</li>
+												);
+											})}
+										</ul>
+									</div>
 								)}
 							</CardContent>
 							{onOpenDetails && (
