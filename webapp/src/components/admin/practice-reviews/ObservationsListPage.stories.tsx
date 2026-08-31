@@ -31,7 +31,7 @@ const PEOPLE: ReviewPeople = {
 	isLoading: false,
 	isError: false,
 };
-const AREAS: FacetSource = {
+const GROUPS: FacetSource = {
 	options: groupFacetOptions(practiceGroups),
 	isLoading: false,
 	isError: false,
@@ -124,7 +124,7 @@ const meta = {
 		isLoading: false,
 		error: undefined,
 		onRetry: fn(),
-		groups: AREAS,
+		groups: GROUPS,
 		practices: PRACTICES,
 		// The facet needs a label per slug; the hover card on a row's practice name needs the record.
 		practiceRecords: workspacePractices,
