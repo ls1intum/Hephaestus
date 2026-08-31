@@ -24,6 +24,19 @@ export const Streaming: Story = { args: { streaming: true } };
 
 export const Static: Story = { args: { animated: false } };
 
+export const LightAndDark: Story = {
+	render: () => (
+		<div className="grid overflow-hidden rounded-2xl border sm:grid-cols-2">
+			<div className="flex size-48 items-center justify-center bg-white text-[#596174]">
+				<HephIcon size={112} pad={4} animated={false} />
+			</div>
+			<div className="dark flex size-48 items-center justify-center bg-[#111318] text-[#aab4ca]">
+				<HephIcon size={112} pad={4} animated={false} />
+			</div>
+		</div>
+	),
+};
+
 export const Informative: Story = {
 	args: { label: "Heph, AI mentor" },
 	play: async ({ canvas }) => {

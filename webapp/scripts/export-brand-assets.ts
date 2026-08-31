@@ -113,23 +113,23 @@ try {
 	await captureLockup(resolve(docsBrandDirectory, "hephaestus-lockup-light.png"), false);
 	await captureLockup(resolve(docsBrandDirectory, "hephaestus-lockup-dark.png"), true);
 
-	await page.setViewportSize({ width: 1200, height: 630 });
-	await page.setContent(
-		`<style>${FONT_FACE}html,body{margin:0;width:100%;height:100%;font-family:Inter,sans-serif;background:${DARK_SURFACE};color:#f8fafc}.card{height:100%;display:flex;align-items:center;padding:96px;gap:56px}.mark{width:230px;height:230px}.name{font-size:86px;font-weight:700;letter-spacing:-3px}.heph{color:${DARK_ACCENT}}.tagline{margin-top:22px;font-size:34px;color:#b8bec9;max-width:650px;line-height:1.25}</style><main class="card"><div class="mark">${markSvg}</div><div><div class="name"><span class="heph">Heph</span>aestus</div><div class="tagline">Learn from the work you're already doing</div></div></main>`,
-	);
-	await page.evaluate(() => document.fonts.ready);
-	const socialCard = resolve(docsImageDirectory, "hephaestus-social-card.png");
-	await page.screenshot({ path: socialCard });
-	await copyFile(socialCard, resolve(publicDirectory, "hephaestus-social-card.png"));
+	const captureSocialCard = async (width: number, height: number, path: string): Promise<void> => {
+		await page.setViewportSize({ width, height });
+		await page.setContent(
+			`<style>${FONT_FACE}*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;font-family:Inter,sans-serif;background:${DARK_SURFACE};color:#f8fafc}.card{position:relative;isolation:isolate;height:100%;display:flex;align-items:center;padding:0 104px;gap:56px;overflow:hidden}.card::before{content:"";position:absolute;z-index:-1;width:560px;height:560px;left:-170px;top:-250px;border-radius:50%;background:#315fdc;opacity:.22;filter:blur(80px)}.mark{width:196px;height:196px;flex:none;filter:drop-shadow(0 18px 32px rgb(0 0 0/.24))}.eyebrow{font-size:18px;font-weight:650;letter-spacing:2.4px;text-transform:uppercase;color:${DARK_ACCENT}}.name{margin-top:14px;font-size:82px;font-weight:720;letter-spacing:-3.5px;line-height:1}.heph{color:${DARK_ACCENT}}.tagline{margin-top:24px;font-size:29px;color:#c7ccd6;line-height:1.25;white-space:nowrap}</style><main class="card"><div class="mark">${markSvg}</div><div><div class="eyebrow">Open-source AI mentor for software teams</div><div class="name"><span class="heph">Heph</span>aestus</div><div class="tagline">Learn from the work you're already doing</div></div></main>`,
+		);
+		await page.evaluate(() => document.fonts.ready);
+		await page.screenshot({ path });
+	};
 
-	await page.setViewportSize({ width: 1280, height: 640 });
-	await page.setContent(
-		`<style>${FONT_FACE}html,body{margin:0;width:100%;height:100%;font-family:Inter,sans-serif;background:${DARK_SURFACE};color:#f8fafc}.card{height:100%;display:flex;align-items:center;padding:96px 112px;gap:56px}.mark{width:230px;height:230px}.name{font-size:86px;font-weight:700;letter-spacing:-3px}.heph{color:${DARK_ACCENT}}.tagline{margin-top:22px;font-size:34px;color:#b8bec9;max-width:650px;line-height:1.25}</style><main class="card"><div class="mark">${markSvg}</div><div><div class="name"><span class="heph">Heph</span>aestus</div><div class="tagline">Learn from the work you're already doing</div></div></main>`,
+	const socialCard = resolve(docsImageDirectory, "hephaestus-social-card.png");
+	await captureSocialCard(1200, 630, socialCard);
+	await copyFile(socialCard, resolve(publicDirectory, "hephaestus-social-card.png"));
+	await captureSocialCard(
+		1280,
+		640,
+		resolve(docsBrandDirectory, "github-repository-social-preview-1280x640.png"),
 	);
-	await page.evaluate(() => document.fonts.ready);
-	await page.screenshot({
-		path: resolve(docsBrandDirectory, "github-repository-social-preview-1280x640.png"),
-	});
 
 	await exportReadmeImages(browser);
 } finally {

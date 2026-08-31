@@ -1,6 +1,6 @@
 .icon {
-	--mentor-shadow-opacity: 0.08;
-	--mentor-blush-opacity: 0.25;
+	--mentor-shadow-opacity: 0.16;
+	--mentor-blush-opacity: 0.12;
 }
 
 .shadow {
@@ -29,8 +29,8 @@
 }
 
 :global(.dark) .icon {
-	--mentor-shadow-opacity: 0.15;
-	--mentor-blush-opacity: 0.2;
+	--mentor-shadow-opacity: 0.2;
+	--mentor-blush-opacity: 0.1;
 }
 
 @media (prefers-reduced-motion: no-preference) {
