@@ -8,7 +8,7 @@ the stack and frees its slot.
 
 This directory is infrastructure for this repository's own pull requests. It is not part of a
 self-hosted Hephaestus install — `docker/self-host/` is that. Contributors use previews through
-[CI/CD → Preview Deployments](https://ls1intum.github.io/Hephaestus/contributor/ci-cd).
+[CI/CD → Preview Deployments](https://docs.hephaestus.build/contributor/ci-cd).
 
 ## Security boundary
 

@@ -40,7 +40,7 @@ All three scopes use the same definition fields. What differs is who owns the va
 
 Neither step silently rewrites a customized instance definition or an existing workspace practice.
 The badge tables an administrator reads for both scopes live in the
-[Practice Catalog admin guide](https://ls1intum.github.io/Hephaestus/admin/practice-catalog).
+[Practice Catalog admin guide](https://docs.hephaestus.build/admin/practice-catalog).
 
 | Stakeholder                | Primary task                                                                                                               | Deliberately not their task                      |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |

@@ -53,7 +53,7 @@ export function LandingCtaSection({
 							className="w-full sm:w-auto"
 						/>
 						<a
-							href="https://ls1intum.github.io/Hephaestus/user/overview"
+							href="https://docs.hephaestus.build/user/overview"
 							target="_blank"
 							rel="noopener noreferrer"
 							className={buttonVariants({ size: "lg", variant: "outline" })}
@@ -69,7 +69,7 @@ export function LandingCtaSection({
 							Running your own deployment?{" "}
 							<a
 								className="font-medium text-foreground underline underline-offset-4"
-								href="https://ls1intum.github.io/Hephaestus/admin/install"
+								href="https://docs.hephaestus.build/admin/install"
 								target="_blank"
 								rel="noopener noreferrer"
 							>

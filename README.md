@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://hephaestus.aet.cit.tum.de"><img alt="Open the TUM-operated Hephaestus web app" src="https://img.shields.io/badge/web_app-try_it-493C83"></a>
-    <a href="https://ls1intum.github.io/Hephaestus/"><img alt="Read the Hephaestus documentation" src="https://img.shields.io/badge/docs-read_online-1F75CB?logo=docusaurus&logoColor=white"></a>
+    <a href="https://docs.hephaestus.build/"><img alt="Read the Hephaestus documentation" src="https://img.shields.io/badge/docs-read_online-1F75CB?logo=docusaurus&logoColor=white"></a>
     <a href="https://github.com/ls1intum/Hephaestus/releases/latest"><img alt="Latest Hephaestus release" src="https://img.shields.io/github/v/release/ls1intum/Hephaestus?display_name=tag&sort=semver"></a>
     <a href="https://github.com/ls1intum/Hephaestus/actions/workflows/cicd.yml"><img alt="Hephaestus CI status" src="https://github.com/ls1intum/Hephaestus/actions/workflows/cicd.yml/badge.svg?branch=main"></a>
     <a href="https://github.com/ls1intum/Hephaestus/blob/main/LICENSE"><img alt="MIT license" src="https://img.shields.io/github/license/ls1intum/Hephaestus"></a>
@@ -34,7 +34,7 @@ relationships stay with people.
     <source media="(prefers-color-scheme: light)" srcset="./docs/images/readme/landing-hero-light.png">
     <img alt="An illustration of one change through a project: issue #412 has no acceptance criteria, the pull request grows to 34 files, a reviewer asks a specific question, and it merges with that thread unresolved. Hephaestus points back to the issue." src="./docs/images/readme/landing-hero-light.png" width="1280">
   </picture>
-  <p><sub>An illustration of the feedback Hephaestus writes. See the <a href="https://ls1intum.github.io/Hephaestus/user/ai-code-review">user guide</a> for the real interface.</sub></p>
+  <p><sub>An illustration of the feedback Hephaestus writes. See the <a href="https://docs.hephaestus.build/user/ai-code-review">user guide</a> for the real interface.</sub></p>
 </div>
 
 > [!IMPORTANT]
@@ -43,7 +43,7 @@ relationships stay with people.
 > maintenance branches, no backports. Until 1.0, a *minor* release can change configuration or the
 > API in ways that need you to act, so read the release notes before every upgrade.
 > Version 1.0 is what makes upgrades, configuration, Compose and the REST API predictable:
-> [compatibility policy](https://ls1intum.github.io/Hephaestus/admin/compatibility-policy) ·
+> [compatibility policy](https://docs.hephaestus.build/admin/compatibility-policy) ·
 > [1.0 milestone](https://github.com/ls1intum/Hephaestus/issues/1378).
 
 ## What Hephaestus does
@@ -82,7 +82,7 @@ The feedback is advisory: it does not approve a change for merge or grade anyone
 ## Get started
 
 - **Try the hosted app:** open the [TUM deployment](https://hephaestus.aet.cit.tum.de).
-- **Learn how it works:** read the [user guide](https://ls1intum.github.io/Hephaestus/user/overview).
+- **Learn how it works:** read the [user guide](https://docs.hephaestus.build/user/overview).
 - **Run your own deployment.** One 64-bit Linux host, 4 vCPUs / 8 GB RAM / 40 GB SSD recommended:
 
   ```bash
@@ -94,13 +94,13 @@ The feedback is advisory: it does not approve a change for merge or grade anyone
   ```
 
   The stack refuses to start until `.env` is complete, so finish the
-  [installation guide](https://ls1intum.github.io/Hephaestus/admin/install) before the first
+  [installation guide](https://docs.hephaestus.build/admin/install) before the first
   `docker compose up -d` — it covers the sign-in OAuth app, TLS, and the first admin account. Before
   upgrading, read the release notes and the [migration guide](./MIGRATION.md), then test the upgrade
   in staging.
 
 - **Contribute:** start with the
-  [local development guide](https://ls1intum.github.io/Hephaestus/contributor/local-development); the
+  [local development guide](https://docs.hephaestus.build/contributor/local-development); the
   web app's components are browsable in
   [Storybook](https://main--66a8981a27ced8fef3190d41.chromatic.com/).
 

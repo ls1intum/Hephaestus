@@ -2,7 +2,7 @@
 
 [![Documentation Status](https://github.com/ls1intum/Hephaestus/actions/workflows/cd-docs.yml/badge.svg)](https://github.com/ls1intum/Hephaestus/actions/workflows/cd-docs.yml)
 
-**Live Site:** [https://ls1intum.github.io/Hephaestus/](https://ls1intum.github.io/Hephaestus/)
+**Live Site:** [https://docs.hephaestus.build/](https://docs.hephaestus.build/)
 
 This site is powered by [Docusaurus 3](https://docusaurus.io/) with Rspack, SWC, and LightningCSS for 2-4x faster builds. The content is split into three guides:
 
@@ -39,7 +39,7 @@ into them by absolute GitHub URL rather than a relative path.
 
 ```bash
 # From repo root (recommended)
-pnpm run docs:dev       # Start dev server at http://localhost:3000/Hephaestus/
+pnpm run docs:dev       # Start dev server at http://localhost:3000/
 
 # Or from docs directory
 cd docs && pnpm run start
