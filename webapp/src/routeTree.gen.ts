@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AboutRouteImport } from './routes/about'
+import { Route as ConsentRouteImport } from './routes/consent'
 import { Route as ImprintRouteImport } from './routes/imprint'
 import { Route as LandingRouteImport } from './routes/landing'
 import { Route as LoginRouteImport } from './routes/login'
@@ -100,6 +101,11 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
 const AboutRoute = AboutRouteImport.update({
   id: '/about',
   path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConsentRoute = ConsentRouteImport.update({
+  id: '/consent',
+  path: '/consent',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ImprintRoute = ImprintRouteImport.update({
@@ -569,6 +575,7 @@ const AuthenticatedWWorkspaceSlugAdminPracticesReviewsTargetsArtifactKindArtifac
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/consent': typeof ConsentRoute
   '/imprint': typeof ImprintRoute
   '/landing': typeof LandingRoute
   '/login': typeof LoginRoute
@@ -648,6 +655,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/consent': typeof ConsentRoute
   '/imprint': typeof ImprintRoute
   '/landing': typeof LandingRoute
   '/login': typeof LoginRoute
@@ -720,6 +728,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/about': typeof AboutRoute
+  '/consent': typeof ConsentRoute
   '/imprint': typeof ImprintRoute
   '/landing': typeof LandingRoute
   '/login': typeof LoginRoute
@@ -801,6 +810,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/about'
+    | '/consent'
     | '/imprint'
     | '/landing'
     | '/login'
@@ -880,6 +890,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/about'
+    | '/consent'
     | '/imprint'
     | '/landing'
     | '/login'
@@ -951,6 +962,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/about'
+    | '/consent'
     | '/imprint'
     | '/landing'
     | '/login'
@@ -1032,6 +1044,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   AboutRoute: typeof AboutRoute
+  ConsentRoute: typeof ConsentRoute
   ImprintRoute: typeof ImprintRoute
   LandingRoute: typeof LandingRoute
   LoginRoute: typeof LoginRoute
@@ -1062,6 +1075,13 @@ declare module '@tanstack/react-router' {
       path: '/about'
       fullPath: '/about'
       preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/consent': {
+      id: '/consent'
+      path: '/consent'
+      fullPath: '/consent'
+      preLoaderRoute: typeof ConsentRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/imprint': {
@@ -1910,6 +1930,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AboutRoute: AboutRoute,
+  ConsentRoute: ConsentRoute,
   ImprintRoute: ImprintRoute,
   LandingRoute: LandingRoute,
   LoginRoute: LoginRoute,

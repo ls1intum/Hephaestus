@@ -107,6 +107,8 @@ tags:
   name: Practice Group Standings
 - description: Asking for a review of a piece of work by hand
   name: Practice review requests
+- description: Current account transparency and research consent
+  name: Consent
 - description: Read-only access to practice evaluation observations
   name: Practice Observations
 - description: Adopt instance catalog practices into a workspace
@@ -1783,6 +1785,56 @@ paths:
       summary: Get the current user
       tags:
       - Account
+  /user/consent:
+    get:
+      operationId: getConsentStatus
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentStatus"
+          description: OK
+      summary: Get the current consent notice and status
+      tags:
+      - Consent
+    put:
+      operationId: completeFirstLoginConsent
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FirstLoginConsent"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentStatus"
+          description: OK
+      summary: Complete the first-login transparency step
+      tags:
+      - Consent
+  /user/consent/research:
+    put:
+      operationId: updateResearchConsent
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResearchConsent"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsentStatus"
+          description: OK
+      summary: Grant or withdraw research consent
+      tags:
+      - Consent
   /user/exports:
     post:
       operationId: requestDataExport
@@ -8811,6 +8863,22 @@ components:
       - health
       - kind
       - resourceCounts
+    ConsentStatus:
+      type: object
+      properties:
+        completed:
+          type: boolean
+        noticeText:
+          type: string
+        noticeVersion:
+          type: string
+        participateInResearch:
+          type: boolean
+      required:
+      - completed
+      - noticeText
+      - noticeVersion
+      - participateInResearch
     Contributor:
       type: object
       description: Information about a contributor to the Hephaestus project
@@ -9992,6 +10060,19 @@ components:
       required:
       - count
       - workKind
+    FirstLoginConsent:
+      type: object
+      properties:
+        noticeVersion:
+          type: string
+        participateInResearch:
+          type: boolean
+        termsAccepted:
+          type: boolean
+      required:
+      - noticeVersion
+      - participateInResearch
+      - termsAccepted
     FxRateInfo:
       type: object
       description: "Display-only currency conversion for the USD amounts in this response.\
@@ -13113,6 +13194,13 @@ components:
       - id
       - name
       - nameWithOwner
+    ResearchConsent:
+      type: object
+      properties:
+        granted:
+          type: boolean
+      required:
+      - granted
     ResourceCounts:
       type: object
       description: Resource-level rollup for the connection overview badge

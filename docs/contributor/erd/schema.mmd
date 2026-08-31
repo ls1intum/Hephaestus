@@ -251,6 +251,24 @@ erDiagram
         TIMESTAMPTZ occurred_at "NOT NULL"
     }
 
+    ConsentDecision {
+        BIGINT id PK
+        BIGINT account_id FK
+        VARCHAR(40) purpose "NOT NULL"
+        BOOLEAN granted "NOT NULL"
+        VARCHAR(32) mechanism "NOT NULL"
+        VARCHAR(32) notice_version FK "NOT NULL"
+        VARCHAR(64) notice_sha256 FK "NOT NULL"
+        TIMESTAMPTZ occurred_at "NOT NULL"
+    }
+
+    ConsentNotice {
+        VARCHAR(32) version PK,UK
+        TEXT notice_text "NOT NULL"
+        VARCHAR(64) sha256 UK "NOT NULL"
+        TIMESTAMPTZ published_at "NOT NULL"
+    }
+
     CuratedGroupOverride {
         VARCHAR(64) slug PK
         VARCHAR(128) name
@@ -1530,6 +1548,8 @@ erDiagram
     Workspace ||--o{ ConfigAuditEvent : has
     Workspace ||--o{ Connection : has
     Connection ||--o{ ConnectionAudit : has
+    Account ||--o{ ConsentDecision : has
+    ConsentNotice ||--o{ ConsentDecision : references
     Feedback ||--o{ DeliveryPolicyEvaluation : references
     AgentJob ||--o{ DeliveryPolicyEvaluation : references
     Workspace ||--o{ DeliveryPolicyEvaluation : has

@@ -13,8 +13,8 @@ import type React from "react";
 import { toast } from "sonner";
 
 import {
+	getConsentStatusOptions,
 	getIntegrationCatalogOptions,
-	getUserSettingsOptions,
 	listThreadsOptions,
 } from "@/api/@tanstack/react-query.gen";
 import { ImpersonationBanner } from "@/components/auth/ImpersonationBanner";
@@ -65,13 +65,13 @@ function RootLayout() {
 	});
 	const { isAuthenticated, isLoading } = useAuth();
 	const { enabled: hasMentorAccess } = useFeatureFlag("MENTOR_ACCESS");
-	const { data: userSettings, isError: userSettingsError } = useQuery({
-		...getUserSettingsOptions({}),
+	const { data: accountConsent, isError: userSettingsError } = useQuery({
+		...getConsentStatusOptions({}),
 		enabled: isAuthenticated && isPosthogEnabled,
 		retry: 1,
 	});
 	const allowSurveys =
-		isPosthogEnabled && !userSettingsError && (userSettings?.participateInResearch ?? true);
+		isPosthogEnabled && !userSettingsError && (accountConsent?.participateInResearch ?? false);
 	const showCopilot =
 		!isLoading && isAuthenticated && hasMentorAccess && !isCopilotExcludedRoute(pathname);
 

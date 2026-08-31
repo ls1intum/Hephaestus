@@ -43,6 +43,10 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
      */
     Optional<Account> findByPrimaryEmail(String primaryEmail);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM Account a WHERE a.id = :id")
+    Optional<Account> findByIdForUpdate(@Param("id") Long id);
+
     /**
      * Usable (ACTIVE) accounts in the given role, write-locked for the surrounding transaction. Backs
      * the last-admin guard. Selects the entity (not a scalar) so Hibernate emits {@code FOR UPDATE} —

@@ -1,5 +1,6 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 
+import { getConsentStatusOptions } from "@/api/@tanstack/react-query.gen";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { resolveCurrentUser } from "@/integrations/auth/guard";
@@ -17,6 +18,10 @@ export const Route = createFileRoute("/_authenticated")({
 				to: "/login",
 				search: { returnTo: location.href },
 			});
+		}
+		const consent = await context.queryClient.query(getConsentStatusOptions({}));
+		if (!consent.completed) {
+			throw redirect({ to: "/consent", search: { returnTo: location.href } });
 		}
 	},
 	pendingComponent: () => (
