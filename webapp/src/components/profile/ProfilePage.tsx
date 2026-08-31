@@ -1,4 +1,5 @@
 import { XCircleIcon } from "lucide-react";
+import type { ReactNode } from "react";
 
 import type { Profile, ProfileActivityMonitor } from "@/api/types.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -7,10 +8,6 @@ import type { ActivityMonitorFilters } from "@/lib/activity-monitor";
 import type { ProviderType } from "@/lib/provider";
 import type { LeaderboardSchedule } from "@/lib/timeframe";
 
-import {
-	PracticeGroupStandingCard,
-	type PracticeGroupStandingSectionProps,
-} from "./PracticeGroupStandingCard";
 import { ProfileContent } from "./ProfileContent";
 import { ProfileHeader } from "./ProfileHeader";
 
@@ -32,7 +29,11 @@ interface ProfileProps {
 	achievementsEnabled?: boolean;
 	progressionEnabled?: boolean;
 	leaguesEnabled?: boolean;
-	practiceGroupStandings?: PracticeGroupStandingSectionProps;
+	/**
+	 * The practice-group section, rendered by the route that has its data. A slot rather than that
+	 * component's props, so this page does not carry a type for a section it only places.
+	 */
+	practiceGroupStandings?: ReactNode;
 }
 
 export function ProfilePage({
@@ -83,7 +84,7 @@ export function ProfilePage({
 			/>
 			{practiceGroupStandings && (
 				<>
-					<PracticeGroupStandingCard {...practiceGroupStandings} />
+					{practiceGroupStandings}
 					<Separator />
 				</>
 			)}

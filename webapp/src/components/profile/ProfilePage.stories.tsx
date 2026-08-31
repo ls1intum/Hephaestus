@@ -7,6 +7,7 @@ import { STORY_NOW } from "@/components/common/story-clock";
 import { withStandardPage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/test/reflow";
 
+import { PracticeGroupStandingCard } from "./PracticeGroupStandingCard";
 import { ProfilePage } from "./ProfilePage";
 
 const now = new Date(STORY_NOW);
@@ -70,13 +71,15 @@ const groupPractices: PracticeStanding[] = [
 ];
 
 /** The section a developer sees on their own profile, above the activity monitor. */
-const practiceGroupStandings = {
-	groups: [practiceGroup],
-	standings: { [practiceGroup.slug]: practiceGroupStanding },
-	practicesByGroup: { [practiceGroup.slug]: groupPractices },
-	isLoading: false,
-	onOpenDetails: fn(),
-};
+const practiceGroupStandings = (
+	<PracticeGroupStandingCard
+		groups={[practiceGroup]}
+		standings={{ [practiceGroup.slug]: practiceGroupStanding }}
+		practicesByGroup={{ [practiceGroup.slug]: groupPractices }}
+		isLoading={false}
+		onOpenDetails={fn()}
+	/>
+);
 
 export const Default: Story = {
 	args: {

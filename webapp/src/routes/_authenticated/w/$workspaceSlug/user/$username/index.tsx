@@ -13,6 +13,7 @@ import {
 import type { PracticeStanding } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { useNow } from "@/components/common/use-now";
+import { PracticeGroupStandingCard } from "@/components/profile/PracticeGroupStandingCard";
 import { ProfilePage } from "@/components/profile/ProfilePage";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { useAuth } from "@/integrations/auth/AuthContext";
@@ -218,28 +219,30 @@ function UserProfile() {
 			progressionEnabled={progressionEnabled === true}
 			leaguesEnabled={leaguesEnabled === true}
 			practiceGroupStandings={
-				currUserIsDashboardUser
-					? {
-							groups: practiceGroups,
-							standings: groupStandings,
-							practicesByGroup,
-							isLoading:
-								groupsQuery.isPending || groupStandingsQuery.isPending || standingsQuery.isPending,
-							error:
-								groupsQuery.error ?? groupStandingsQuery.error ?? standingsQuery.error ?? undefined,
-							onRetry: () => {
-								if (groupsQuery.isError) void groupsQuery.refetch();
-								if (groupStandingsQuery.isError) void groupStandingsQuery.refetch();
-								if (standingsQuery.isError) void standingsQuery.refetch();
-							},
-							onOpenDetails: (group) => {
-								void navigate({
-									to: "/w/$workspaceSlug/user/$username/practice-groups/$groupSlug",
-									params: { workspaceSlug, username, groupSlug: group.slug },
-								});
-							},
+				currUserIsDashboardUser ? (
+					<PracticeGroupStandingCard
+						groups={practiceGroups}
+						standings={groupStandings}
+						practicesByGroup={practicesByGroup}
+						isLoading={
+							groupsQuery.isPending || groupStandingsQuery.isPending || standingsQuery.isPending
 						}
-					: undefined
+						error={
+							groupsQuery.error ?? groupStandingsQuery.error ?? standingsQuery.error ?? undefined
+						}
+						onRetry={() => {
+							if (groupsQuery.isError) void groupsQuery.refetch();
+							if (groupStandingsQuery.isError) void groupStandingsQuery.refetch();
+							if (standingsQuery.isError) void standingsQuery.refetch();
+						}}
+						onOpenDetails={(group) => {
+							void navigate({
+								to: "/w/$workspaceSlug/user/$username/practice-groups/$groupSlug",
+								params: { workspaceSlug, username, groupSlug: group.slug },
+							});
+						}}
+					/>
+				) : undefined
 			}
 		/>
 	);
