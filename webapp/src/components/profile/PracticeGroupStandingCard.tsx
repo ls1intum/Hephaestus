@@ -3,13 +3,14 @@ import { useState } from "react";
 import type { PracticeGroup, PracticeGroupStanding, PracticeStanding } from "@/api/types.gen";
 import { getGroupVisual } from "@/components/admin/practice-catalog/group-visuals";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
-import { Badge } from "@/components/ui/badge";
+import { PRACTICE_GROUP_STANDING_DEFS } from "@/components/practice-vocabulary/practice-group-standing-defs";
+import { statusValues } from "@/components/practice-vocabulary/status-def";
+import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { artifactKindCountLabel } from "@/lib/artifact-kinds";
 import { cn } from "@/lib/utils";
-import { PRACTICE_GROUP_STANDING_BADGE } from "./practice-group-standing-presentation";
 import {
 	PracticeGroupStandingRing,
 	STANDING_LEGEND,
@@ -18,13 +19,8 @@ import {
 import { PracticeTrendChip } from "./PracticeTrendChip";
 
 const COLLAPSED_GROUP_COUNT = 3;
-const STANDING_PRIORITY: Record<PracticeGroupStanding["standing"], number> = {
-	DEVELOPING: 0,
-	MIXED: 1,
-	STRENGTH: 2,
-	NO_OPPORTUNITY: 3,
-	NOT_OBSERVED: 4,
-};
+/** Worst first — the registry declares that order once, so a second list cannot drift from it. */
+const STANDING_ORDER = statusValues(PRACTICE_GROUP_STANDING_DEFS);
 
 export interface PracticeGroupStandingSectionProps {
 	groups: PracticeGroup[];
@@ -66,7 +62,7 @@ export function PracticeGroupStandingCard({
 	const orderedGroups = [...groups].sort((left, right) => {
 		const leftStanding = standings[left.slug]?.standing ?? "NOT_OBSERVED";
 		const rightStanding = standings[right.slug]?.standing ?? "NOT_OBSERVED";
-		return STANDING_PRIORITY[leftStanding] - STANDING_PRIORITY[rightStanding];
+		return STANDING_ORDER.indexOf(leftStanding) - STANDING_ORDER.indexOf(rightStanding);
 	});
 	const collapsible = orderedGroups.length > COLLAPSED_GROUP_COUNT;
 	const visibleGroups = showAll ? orderedGroups : orderedGroups.slice(0, COLLAPSED_GROUP_COUNT);
@@ -103,7 +99,7 @@ export function PracticeGroupStandingCard({
 				{visibleGroups.map((group) => {
 					const groupStanding = standings[group.slug];
 					const presentation =
-						PRACTICE_GROUP_STANDING_BADGE[groupStanding?.standing ?? "NOT_OBSERVED"];
+						PRACTICE_GROUP_STANDING_DEFS[groupStanding?.standing ?? "NOT_OBSERVED"];
 					const practices = practicesByGroup?.[group.slug] ?? [];
 					const breakdown = summarizePracticeStandings(practices);
 					const { Icon, pill } = getGroupVisual(group.icon, group.color);
@@ -130,10 +126,8 @@ export function PracticeGroupStandingCard({
 							<CardContent className="flex flex-1 flex-col gap-3">
 								<div className="flex flex-1 items-center gap-4">
 									<div className="grid min-w-0 flex-1 gap-1.5">
-										<Badge variant={presentation.variant} className="w-fit">
-											{presentation.label}
-										</Badge>
-										<p className="text-sm text-muted-foreground">{presentation.explanation}</p>
+										<StatusBadge def={presentation} className="w-fit" />
+										<p className="text-sm text-muted-foreground">{presentation.description}</p>
 										{groupStanding?.direction && groupStanding.trendSupport && (
 											<PracticeTrendChip
 												direction={groupStanding.direction}

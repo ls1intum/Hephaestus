@@ -21,8 +21,11 @@ import type {
 } from "@/api/types.gen";
 import { getGroupVisual } from "@/components/admin/practice-catalog/group-visuals";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { PRACTICE_GROUP_STANDING_DEFS } from "@/components/practice-vocabulary/practice-group-standing-defs";
+import { SEVERITY_DEFS, type Severity } from "@/components/practice-vocabulary/severity-defs";
+import { statusValues } from "@/components/practice-vocabulary/status-def";
+import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -37,12 +40,10 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { ARTIFACT_KIND_VALUES, artifactKindPluralLabel } from "@/lib/artifact-kinds";
 import { cn } from "@/lib/utils";
-import { PRACTICE_GROUP_STANDING_BADGE } from "./practice-group-standing-presentation";
 import { PracticeNextStepCallout } from "./PracticeNextStepCallout";
 import { PracticeTrendChip } from "./PracticeTrendChip";
 import type { FeedbackUsefulness, ObservationDetailState } from "./review-runs";
 import { ReviewRunTimeline } from "./ReviewRunTimeline";
-import { SEVERITY_ORDER, SEVERITY_PRESENTATION, type SeverityKey } from "./severity-presentation";
 
 type PracticeStandingKey = NonNullable<PracticeStanding["standing"]> | "UNMEASURED";
 
@@ -91,14 +92,14 @@ const STANDING_NODE: Record<
 function standingNodeLabel(standing: PracticeStandingKey): string {
 	return standing === "UNMEASURED"
 		? "Not measured yet"
-		: PRACTICE_GROUP_STANDING_BADGE[standing].label;
+		: PRACTICE_GROUP_STANDING_DEFS[standing].label;
 }
 
 export type ReviewRunSource = string;
 
 export interface ReviewRunFilters {
 	sources: ReviewRunSource[];
-	severities: SeverityKey[];
+	severities: Severity[];
 }
 
 const NO_FILTERS: ReviewRunFilters = { sources: [], severities: [] };
@@ -233,7 +234,7 @@ export function PracticeGroupDetailPage({
 	}
 
 	const groupStanding = standing?.standing ?? "NOT_OBSERVED";
-	const badge = PRACTICE_GROUP_STANDING_BADGE[groupStanding];
+	const badge = PRACTICE_GROUP_STANDING_DEFS[groupStanding];
 	const { Icon: GroupIcon, pill: groupPill } = getGroupVisual(group.icon, group.color);
 	const selectedPractice = practices?.find((practice) => practice.slug === selectedPracticeSlug);
 	const activeFilterCount = reviewRunFilters.sources.length + reviewRunFilters.severities.length;
@@ -251,7 +252,7 @@ export function PracticeGroupDetailPage({
 			: reviewRunFilters.sources.filter((candidate) => candidate !== source);
 		onReviewRunFiltersChange?.({ ...reviewRunFilters, sources });
 	};
-	const toggleSeverity = (severity: SeverityKey, checked: boolean) => {
+	const toggleSeverity = (severity: Severity, checked: boolean) => {
 		const severities = checked
 			? [...new Set([...reviewRunFilters.severities, severity])]
 			: reviewRunFilters.severities.filter((candidate) => candidate !== severity);
@@ -294,7 +295,7 @@ export function PracticeGroupDetailPage({
 						<GroupIcon className="size-5" aria-hidden />
 					</span>
 					<h1 className="min-w-0 text-pretty text-2xl font-semibold">{group.name}</h1>
-					<Badge variant={badge.variant}>{badge.label}</Badge>
+					<StatusBadge def={badge} />
 					{groupTrend && (
 						<PracticeTrendChip direction={groupTrend.direction} support={groupTrend.support} />
 					)}
@@ -531,7 +532,7 @@ export function PracticeGroupDetailPage({
 										</div>
 										<div className="grid gap-2">
 											<p className="text-sm font-medium">Severity</p>
-											{SEVERITY_ORDER.map((severity) => {
+											{statusValues(SEVERITY_DEFS).map((severity) => {
 												const id = `review-run-severity-${severity}`;
 												return (
 													<Label
@@ -544,7 +545,7 @@ export function PracticeGroupDetailPage({
 															checked={reviewRunFilters.severities.includes(severity)}
 															onCheckedChange={(checked) => toggleSeverity(severity, checked)}
 														/>
-														<span>{SEVERITY_PRESENTATION[severity].label}</span>
+														<span>{SEVERITY_DEFS[severity].label}</span>
 													</Label>
 												);
 											})}

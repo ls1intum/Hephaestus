@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import type { PracticeGroupReviewObservation } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,7 +24,6 @@ import {
 	observationOutcome,
 } from "./observation-outcome";
 import type { FeedbackUsefulness, ObservationDetailState } from "./review-runs";
-import { SEVERITY_PRESENTATION } from "./severity-presentation";
 
 const OUTCOME_ICON: Record<ObservationOutcome, typeof CircleCheckIcon> = {
 	PRESENT_GOOD: CircleCheckIcon,
@@ -105,7 +105,7 @@ export function ReviewObservationRow({
 					<div className="flex flex-wrap items-center gap-2 sm:justify-end">
 						{observation.assessment === "BAD" && observation.severity && (
 							<span className="text-xs text-muted-foreground">
-								{SEVERITY_PRESENTATION[observation.severity].label}
+								{SEVERITY_DEFS[observation.severity].label}
 							</span>
 						)}
 						<span

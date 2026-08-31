@@ -16,7 +16,12 @@ export interface PracticeTrendChipProps {
 	className?: string;
 }
 
-/** Keyboard-reachable compact direction; provenance remains supplementary in its tooltip. */
+/**
+ * Keyboard-reachable compact direction; provenance remains supplementary in its tooltip.
+ *
+ * Carries no stacking of its own: a caller that lays a whole-card link over its content has to lift
+ * the chip above it via `className`, and only that caller knows it has one.
+ */
 export function PracticeTrendChip({ direction, support, className }: PracticeTrendChipProps) {
 	const presentation = PRACTICE_TREND_PRESENTATION[direction];
 	return (
@@ -26,7 +31,7 @@ export function PracticeTrendChip({ direction, support, className }: PracticeTre
 					<button
 						type="button"
 						className={cn(
-							"relative z-20 flex w-fit cursor-help flex-wrap items-center gap-x-1 rounded-sm text-sm leading-5 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
+							"flex w-fit cursor-help flex-wrap items-center gap-x-1 rounded-sm text-sm leading-5 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
 							TONE_CLASS[presentation.tone],
 							className,
 						)}

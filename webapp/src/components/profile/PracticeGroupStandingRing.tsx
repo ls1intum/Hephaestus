@@ -1,25 +1,22 @@
 import type { PracticeStanding } from "@/api/types.gen";
-import { PRACTICE_GROUP_STANDING_BADGE } from "./practice-group-standing-presentation";
+import {
+	PRACTICE_GROUP_STANDING_DEFS,
+	PRACTICE_GROUP_STANDING_SHORT_LABELS,
+} from "@/components/practice-vocabulary/practice-group-standing-defs";
+import { statusToneClass, statusValues } from "@/components/practice-vocabulary/status-def";
 
 type Standing = PracticeStanding["standing"];
 
 /**
- * Ring order is worst-first, so the segment a reader should act on starts at twelve o'clock. The
- * words come from the standing registry rather than from here — the legend this feeds sits directly
- * above the badge that names the same value.
+ * One segment per standing, in the registry's own worst-first order, so the segment a reader should
+ * act on starts at twelve o'clock. Words and colour both come from the registry — the legend this
+ * feeds sits directly above the badge naming the same value, and the two used to disagree.
+ *
+ * The two outline standings are the one place the ring departs from `statusToneClass`: both would
+ * resolve to the same muted grey, and two adjacent identical arcs are not a breakdown. They are
+ * separated by opacity here, and by their icons in the badge.
  */
-const SEGMENT_ORDER: readonly Standing[] = [
-	"DEVELOPING",
-	"MIXED",
-	"STRENGTH",
-	"NOT_OBSERVED",
-	"NO_OPPORTUNITY",
-];
-
-const SEGMENT_COLORS: Record<Standing, string> = {
-	DEVELOPING: "text-destructive",
-	MIXED: "text-warning",
-	STRENGTH: "text-success",
+const RING_OPACITY: Partial<Record<Standing, string>> = {
 	NOT_OBSERVED: "text-muted-foreground/75",
 	NO_OPPORTUNITY: "text-muted-foreground/45",
 };
@@ -28,10 +25,11 @@ const SEGMENTS: ReadonlyArray<{
 	standing: Standing;
 	colorClass: string;
 	label: string;
-}> = SEGMENT_ORDER.map((standing) => ({
+}> = statusValues(PRACTICE_GROUP_STANDING_DEFS).map((standing) => ({
 	standing,
-	colorClass: SEGMENT_COLORS[standing],
-	label: PRACTICE_GROUP_STANDING_BADGE[standing].shortLabel,
+	colorClass:
+		RING_OPACITY[standing] ?? statusToneClass(PRACTICE_GROUP_STANDING_DEFS[standing].badgeVariant),
+	label: PRACTICE_GROUP_STANDING_SHORT_LABELS[standing],
 }));
 
 export const STANDING_LEGEND = SEGMENTS;
