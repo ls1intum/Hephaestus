@@ -7,17 +7,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { artifactKindCountLabel } from "@/lib/artifact-kinds";
 import { cn } from "@/lib/utils";
+import { PRACTICE_GROUP_STANDING_BADGE } from "./practice-group-standing-presentation";
 import {
 	PracticeGroupStandingRing,
 	STANDING_LEGEND,
 	summarizePracticeStandings,
 } from "./PracticeGroupStandingRing";
 import { PracticeTrendChip } from "./PracticeTrendChip";
-import {
-	PRACTICE_GROUP_SOURCE_META,
-	PRACTICE_GROUP_STANDING_BADGE,
-} from "./practice-group-standing-presentation";
 
 const COLLAPSED_GROUP_COUNT = 3;
 const STANDING_PRIORITY: Record<PracticeGroupStanding["standing"], number> = {
@@ -36,12 +34,6 @@ export interface PracticeGroupStandingSectionProps {
 	onRetry?: () => void;
 	onOpenDetails?: (group: PracticeGroup) => void;
 	practicesByGroup?: Record<string, PracticeStanding[] | undefined>;
-}
-
-function sourceLabel(workKind: string, count: number): string {
-	const metadata = PRACTICE_GROUP_SOURCE_META[workKind];
-	if (!metadata) return `${count} ${workKind}`;
-	return `${count} ${count === 1 ? metadata.singular : metadata.plural}`;
 }
 
 export function PracticeGroupStandingCard({
@@ -162,7 +154,7 @@ export function PracticeGroupStandingCard({
 									<p className="text-xs text-muted-foreground">
 										Based on{" "}
 										{groupStanding.sources
-											.map(({ workKind, count }) => sourceLabel(workKind, count))
+											.map(({ workKind, count }) => artifactKindCountLabel(workKind, count))
 											.join(", ")}
 									</p>
 								)}

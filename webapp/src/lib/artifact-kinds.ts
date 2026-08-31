@@ -56,6 +56,28 @@ export function artifactKindPluralLabel(kind: string | undefined): string {
 	return isKnownArtifactKind(kind) ? ARTIFACT_KIND_PLURAL_LABELS[kind] : kind;
 }
 
+/**
+ * The same kinds as they read mid-sentence — "Based on 4 pull requests" rather than the title-case
+ * form a heading or a filter option wants. Kept beside those labels so a kind cannot gain one
+ * spelling and miss the other.
+ */
+const ARTIFACT_KIND_INLINE_LABELS: Record<KnownArtifactKind, { one: string; many: string }> = {
+	[ARTIFACT_KIND.pullRequest]: { one: "pull request", many: "pull requests" },
+	[ARTIFACT_KIND.issue]: { one: "issue", many: "issues" },
+	[ARTIFACT_KIND.conversationThread]: { one: "conversation", many: "conversations" },
+	[ARTIFACT_KIND.document]: { one: "document", many: "documents" },
+};
+
+/**
+ * A counted phrase for running text. An unknown kind keeps its raw id rather than being dropped, so
+ * a kind the server added before this build stays legible instead of vanishing from the total.
+ */
+export function artifactKindCountLabel(kind: string | undefined, count: number): string {
+	if (!kind || !isKnownArtifactKind(kind)) return `${count} ${kind ?? "reviewed work"}`;
+	const labels = ARTIFACT_KIND_INLINE_LABELS[kind];
+	return `${count} ${count === 1 ? labels.one : labels.many}`;
+}
+
 const ARTIFACT_KIND_ICONS: Record<KnownArtifactKind, LucideIcon> = {
 	[ARTIFACT_KIND.pullRequest]: GitPullRequestIcon,
 	[ARTIFACT_KIND.issue]: CircleDotIcon,

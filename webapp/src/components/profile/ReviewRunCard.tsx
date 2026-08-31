@@ -1,44 +1,55 @@
-import { GitPullRequestIcon, IssueOpenedIcon } from "@primer/octicons-react";
 import { ChevronDownIcon, ChevronUpIcon, ExternalLinkIcon } from "lucide-react";
 import { useState } from "react";
 import type { PracticeGroupReviewObservation, PracticeGroupReviewRun } from "@/api/types.gen";
-import { GithubIcon, GitlabIcon, SlackIcon } from "@/components/icons/brand";
+import { GithubIcon, GitlabIcon, OutlineIcon, SlackIcon } from "@/components/icons/brand";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ReviewObservationRow } from "./ReviewObservationRow";
+import { ARTIFACT_KIND, artifactKindIcon, artifactKindLabel } from "@/lib/artifact-kinds";
+import { asDate } from "@/lib/dates";
 import type { FeedbackUsefulness, ObservationDetailState } from "./review-runs";
+import { ReviewObservationRow } from "./ReviewObservationRow";
 
 const DAY = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
 const TIME = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit" });
 
+const PROVIDER_META = {
+	GITHUB: { label: "GitHub", Icon: GithubIcon },
+	SLACK: { label: "Slack", Icon: SlackIcon },
+	GITLAB: { label: "GitLab", Icon: GitlabIcon },
+	OUTLINE: { label: "Outline", Icon: OutlineIcon },
+} satisfies Record<
+	NonNullable<PracticeGroupReviewRun["reviewedWork"]["provider"]>,
+	{ label: string; Icon: typeof GithubIcon }
+>;
+
+/**
+ * The provider's own mark, or none at all. A run whose provider the server left off gets the kind's
+ * glyph beside it either way, so the header never borrows a mark for a platform it is not from —
+ * which is what a GitHub default did to every Slack thread and Outline document.
+ */
 function providerMeta(run: PracticeGroupReviewRun) {
-	if (run.reviewedWork.type === "CONVERSATION_THREAD") return { label: "Slack", Icon: SlackIcon };
-	return run.reviewedWork.provider === "GITLAB"
-		? { label: "GitLab", Icon: GitlabIcon }
-		: { label: "GitHub", Icon: GithubIcon };
+	const provider = run.reviewedWork.provider;
+	return provider ? PROVIDER_META[provider] : undefined;
 }
 
-function workIcon(kind: string) {
-	if (kind === "PULL_REQUEST") return GitPullRequestIcon;
-	if (kind === "ISSUE") return IssueOpenedIcon;
-	return undefined;
-}
-
-function workTypeLabel(kind: string) {
-	const words = kind.replaceAll("_", " ").toLowerCase();
-	return words.charAt(0).toUpperCase() + words.slice(1);
-}
-
-function workIdentity(run: PracticeGroupReviewRun, providerLabel: string) {
+/**
+ * `reviewedWork.type` is an `ArtifactKind` — a lower-case `<domain>.<kind>` string such as
+ * `scm.pull_request`, never the Java constant's name. The shared registry owns the labels and glyphs
+ * so a kind added on the server shows up here as its raw id instead of silently reading as a
+ * pull request.
+ */
+function workIdentity(run: PracticeGroupReviewRun, providerLabel?: string) {
 	const work = run.reviewedWork;
-	if (work.type === "CONVERSATION_THREAD") {
-		return work.channelName ? `#${work.channelName}` : `Conversation on ${providerLabel}`;
+	if (work.type === ARTIFACT_KIND.conversationThread && work.channelName) {
+		return `#${work.channelName}`;
 	}
-	return (
-		[work.number !== undefined && `#${work.number}`, work.title].filter(Boolean).join(" · ") ||
-		`${workTypeLabel(work.type)} on ${providerLabel}`
-	);
+	const numbered = [work.number !== undefined && `#${work.number}`, work.title]
+		.filter(Boolean)
+		.join(" · ");
+	if (numbered) return numbered;
+	const kind = artifactKindLabel(work.type);
+	return providerLabel ? `${kind} on ${providerLabel}` : kind;
 }
 
 export interface ReviewRunCardProps {
@@ -65,9 +76,9 @@ export function ReviewRunCard({
 }: ReviewRunCardProps) {
 	const [showAllObservations, setShowAllObservations] = useState(false);
 	const provider = providerMeta(run);
-	const KindIcon = workIcon(run.reviewedWork.type);
-	const reviewedAt = new Date(run.reviewedAt);
-	const identity = workIdentity(run, provider.label);
+	const KindIcon = artifactKindIcon(run.reviewedWork.type);
+	const reviewedAt = asDate(run.reviewedAt);
+	const identity = workIdentity(run, provider?.label);
 	const collapsedCount = Math.max(1, initialObservationCount);
 	const hiddenCount = Math.max(0, run.observations.length - collapsedCount);
 	const visibleObservations = showAllObservations
@@ -76,13 +87,15 @@ export function ReviewRunCard({
 
 	return (
 		<li className="group grid min-w-0 grid-cols-[1rem_minmax(0,1fr)] gap-x-3 sm:grid-cols-[4.5rem_1rem_minmax(0,1fr)]">
-			<time
-				dateTime={reviewedAt.toISOString()}
-				className="col-start-2 mb-1 flex w-fit gap-1 text-xs text-muted-foreground sm:col-start-1 sm:row-start-1 sm:mt-3 sm:flex-col sm:items-end"
-			>
-				<span className="font-medium text-foreground">{DAY.format(reviewedAt)}</span>
-				<span>{TIME.format(reviewedAt)}</span>
-			</time>
+			{reviewedAt && (
+				<time
+					dateTime={reviewedAt.toISOString()}
+					className="col-start-2 mb-1 flex w-fit gap-1 text-xs text-muted-foreground sm:col-start-1 sm:row-start-1 sm:mt-3 sm:flex-col sm:items-end"
+				>
+					<span className="font-medium text-foreground">{DAY.format(reviewedAt)}</span>
+					<span>{TIME.format(reviewedAt)}</span>
+				</time>
+			)}
 			<div className="relative col-start-1 row-start-1 row-end-3 sm:col-start-2">
 				<span
 					className="absolute left-1/2 top-3 z-10 size-2.5 -translate-x-1/2 rounded-full border-2 border-background bg-muted-foreground"
@@ -96,10 +109,10 @@ export function ReviewRunCard({
 			<Card className="col-start-2 mb-3 min-w-0 gap-0 overflow-hidden py-0 shadow-none sm:col-start-3 sm:row-start-1">
 				<CardContent className="min-w-0 p-0">
 					<div className="flex min-w-0 items-start gap-2 border-b bg-muted/50 px-4 py-3">
-						<provider.Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
-						{KindIcon && (
-							<KindIcon className="mt-0.5 shrink-0 text-muted-foreground" size={14} aria-hidden />
+						{provider && (
+							<provider.Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
 						)}
+						<KindIcon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden />
 						<div className="min-w-0">
 							{run.reviewedWork.url ? (
 								<Tooltip>
@@ -108,13 +121,14 @@ export function ReviewRunCard({
 											<a
 												href={run.reviewedWork.url}
 												target="_blank"
-												rel="noreferrer"
+												rel="noopener noreferrer"
 												className="flex min-w-0 items-center gap-1 text-sm font-medium underline decoration-dotted underline-offset-2 hover:text-foreground"
 											/>
 										}
 									>
 										<span className="truncate">{identity}</span>
 										<ExternalLinkIcon className="size-3 shrink-0" aria-hidden />
+										<span className="sr-only"> (opens in a new tab)</span>
 									</TooltipTrigger>
 									<TooltipContent className="max-w-80 text-pretty">{identity}</TooltipContent>
 								</Tooltip>

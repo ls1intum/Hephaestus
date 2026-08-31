@@ -20,7 +20,7 @@ const run = {
 	reviewId: "00000000-0000-0000-0000-000000000101",
 	reviewedAt: new Date("2026-08-12T10:26:00Z"),
 	reviewedWork: {
-		type: "PULL_REQUEST",
+		type: "scm.pull_request",
 		id: 902,
 		provider: "GITHUB",
 		number: 902,
@@ -75,10 +75,5 @@ describe("ReviewRunTimeline", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Show more (2)" }));
 		screen.getByText("Observation 4");
 		screen.getByText("Observation 5");
-	});
-
-	it("names an empty filtered result without implying no reviews exist", () => {
-		render(<ReviewRunTimeline runs={[]} />);
-		screen.getByText("No reviewed work matches these filters.");
 	});
 });

@@ -35,57 +35,64 @@ import {
 	PopoverTrigger,
 } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ARTIFACT_KIND_VALUES, artifactKindPluralLabel } from "@/lib/artifact-kinds";
 import { cn } from "@/lib/utils";
+import { PRACTICE_GROUP_STANDING_BADGE } from "./practice-group-standing-presentation";
 import { PracticeNextStepCallout } from "./PracticeNextStepCallout";
 import { PracticeTrendChip } from "./PracticeTrendChip";
-import { PRACTICE_GROUP_STANDING_BADGE } from "./practice-group-standing-presentation";
-import { ReviewRunTimeline } from "./ReviewRunTimeline";
 import type { FeedbackUsefulness, ObservationDetailState } from "./review-runs";
+import { ReviewRunTimeline } from "./ReviewRunTimeline";
 import { SEVERITY_ORDER, SEVERITY_PRESENTATION, type SeverityKey } from "./severity-presentation";
 
 type PracticeStandingKey = NonNullable<PracticeStanding["standing"]> | "UNMEASURED";
 
+/**
+ * The node's glyph and colour. Its **words** come from the standing registry, so a practice node and
+ * the group badge above it can never name the same value differently — they used to disagree on
+ * three of five. `UNMEASURED` is the one entry the registry cannot own: it is not a standing the
+ * server reports but the client's word for a practice it sent no standing for at all.
+ */
 const STANDING_NODE: Record<
 	PracticeStandingKey,
-	{ Icon: typeof CircleCheckIcon; circleClass: string; textClass: string; label: string }
+	{ Icon: typeof CircleCheckIcon; circleClass: string; textClass: string }
 > = {
 	DEVELOPING: {
 		Icon: CircleAlertIcon,
 		circleClass: "border-destructive/50 text-destructive",
 		textClass: "text-destructive",
-		label: "Needs attention",
 	},
 	MIXED: {
 		Icon: CircleMinusIcon,
 		circleClass: "border-warning/60 text-warning",
 		textClass: "text-warning",
-		label: "Mixed feedback",
 	},
 	STRENGTH: {
 		Icon: CircleCheckIcon,
 		circleClass: "border-success/60 text-success",
 		textClass: "text-success",
-		label: "Going well",
 	},
 	NOT_OBSERVED: {
 		Icon: CircleDashedIcon,
 		circleClass: "border-border text-muted-foreground",
 		textClass: "text-muted-foreground",
-		label: "Not observed yet",
 	},
 	NO_OPPORTUNITY: {
 		Icon: CircleDashedIcon,
 		circleClass: "border-border text-muted-foreground",
 		textClass: "text-muted-foreground",
-		label: "No occasion yet",
 	},
 	UNMEASURED: {
 		Icon: CircleDashedIcon,
 		circleClass: "border-border text-muted-foreground",
 		textClass: "text-muted-foreground",
-		label: "Not measured yet",
 	},
 };
+
+function standingNodeLabel(standing: PracticeStandingKey): string {
+	return standing === "UNMEASURED"
+		? "Not measured yet"
+		: PRACTICE_GROUP_STANDING_BADGE[standing].label;
+}
 
 export type ReviewRunSource = string;
 
@@ -233,11 +240,10 @@ export function PracticeGroupDetailPage({
 	const hasAnyFeedNarrowing = activeFilterCount > 0 || selectedPractice !== undefined;
 	const hasReviewRuns = (reviewRuns?.length ?? 0) > 0;
 
-	const sourceOptions: { value: ReviewRunSource; label: string }[] = [
-		{ value: "scm.pull_request", label: "Pull requests" },
-		{ value: "scm.issue", label: "Issues" },
-		{ value: "chat.conversation_thread", label: "Slack conversations" },
-	];
+	// Every kind the build can name, so a document review is filterable the day the server sends one.
+	const sourceOptions: { value: ReviewRunSource; label: string }[] = ARTIFACT_KIND_VALUES.map(
+		(kind) => ({ value: kind, label: artifactKindPluralLabel(kind) }),
+	);
 
 	const toggleSource = (source: ReviewRunSource, checked: boolean) => {
 		const sources = checked
@@ -384,7 +390,9 @@ export function PracticeGroupDetailPage({
 													{practice.name}
 												</span>
 												<div className="relative z-20 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm leading-5">
-													<span className={node.textClass}>{node.label}</span>
+													<span className={node.textClass}>
+														{standingNodeLabel(practiceStanding)}
+													</span>
 													{practiceTrend && (
 														<PracticeTrendChip
 															direction={practiceTrend.direction}

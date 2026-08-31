@@ -7,7 +7,7 @@ const runs: PracticeGroupReviewRun[] = [
 		reviewId: "00000000-0000-0000-0000-000000000101",
 		reviewedAt: new Date("2026-08-12T10:26:00Z"),
 		reviewedWork: {
-			type: "PULL_REQUEST",
+			type: "scm.pull_request",
 			id: 902,
 			provider: "GITHUB",
 			number: 902,
@@ -29,7 +29,7 @@ const runs: PracticeGroupReviewRun[] = [
 		reviewId: "00000000-0000-0000-0000-000000000201",
 		reviewedAt: new Date("2026-08-09T16:40:00Z"),
 		reviewedWork: {
-			type: "CONVERSATION_THREAD",
+			type: "chat.conversation_thread",
 			id: 42,
 			provider: "SLACK",
 			channelName: "dev-hephaestus",
@@ -57,4 +57,3 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = { args: { runs } };
-export const Empty: Story = { args: { runs: [] } };
