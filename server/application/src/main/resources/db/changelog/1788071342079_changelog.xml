@@ -11,7 +11,18 @@
             <column name="trace_id" type="varchar(32)"/>
         </addColumn>
         <rollback>
-            <dropColumn tableName="agent_job" columnName="trace_id"/>
+            <!-- Drop only when this changeset actually created the column: a MARK_RAN run means the
+                 column pre-existed, and rolling back must not destroy its data. -->
+            <sql splitStatements="false">
+                DO $$
+                BEGIN
+                    IF EXISTS (SELECT 1 FROM databasechangelog
+                                WHERE id = '1788071342079-1' AND exectype = 'EXECUTED') THEN
+                        ALTER TABLE agent_job DROP COLUMN trace_id;
+                    END IF;
+                END
+                $$;
+            </sql>
         </rollback>
     </changeSet>
     <changeSet author="request-correlation" id="1788071342079-2">
