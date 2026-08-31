@@ -2,8 +2,6 @@ import type { PracticeGroupReviewObservation, PracticeGroupReviewRun } from "@/a
 import type { FeedbackResponse, ObservationDetailState } from "./review-runs";
 import { ReviewRunCard } from "./ReviewRunCard";
 
-export type { FeedbackResponse, ObservationDetailState } from "./review-runs";
-
 export interface ReviewRunTimelineProps {
 	runs: PracticeGroupReviewRun[];
 	openObservationId?: string;

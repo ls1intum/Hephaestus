@@ -51,7 +51,7 @@ describe("ReviewRunTimeline", () => {
 		render(
 			<ReviewRunTimeline
 				runs={runs}
-				onToggleObservation={() => undefined}
+				onToggleObservation={vi.fn()}
 				openObservationId={baseObservation.observationId}
 				onRespond={onRespond}
 			/>,
@@ -70,7 +70,7 @@ describe("ReviewRunTimeline", () => {
 		render(
 			<ReviewRunTimeline
 				runs={runs}
-				onToggleObservation={() => undefined}
+				onToggleObservation={vi.fn()}
 				openObservationId={baseObservation.observationId}
 				onRespond={onRespond}
 			/>,
