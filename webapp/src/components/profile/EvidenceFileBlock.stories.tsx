@@ -160,3 +160,25 @@ export const ObjectSource: Story = {
 		},
 	},
 };
+
+/**
+ * A quote from the old side of the change: the line is marked, because it is not what the file says
+ * now. The new side carries no marker — it is where nearly every quote comes from, so labelling it
+ * would say nothing.
+ */
+export const QuotedFromBeforeTheChange: Story = {
+	args: {
+		location: {
+			path: "webapp/src/components/profile/ReviewRunCard.tsx",
+			startLine: 23,
+			endLine: 24,
+			sourceKind: "scm.pull-request.diff",
+			side: "OLD",
+			redacted: false,
+			snippet: [
+				'if (kind === "PULL_REQUEST") return GitPullRequestIcon;',
+				"return undefined;",
+			].join("\n"),
+		},
+	},
+};

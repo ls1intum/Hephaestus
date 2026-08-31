@@ -67,9 +67,12 @@ export function EvidenceFileBlock({
 						{evidenceLineRangeLabel(location)}
 					</span>
 				)}
-				{locatedByLine && location.side && (
+				{/* Only the old side is marked. Nearly every quote comes from the new one, so saying
+				    "after" on all of them is noise — while "before" is the thing a reader has to know:
+				    the line quoted here is not what the file says now. */}
+				{locatedByLine && location.side === "OLD" && (
 					<Badge variant="outline" className="shrink-0">
-						{DIFF_SIDE_LABELS[location.side]}
+						{DIFF_SIDE_LABELS.OLD}
 					</Badge>
 				)}
 
