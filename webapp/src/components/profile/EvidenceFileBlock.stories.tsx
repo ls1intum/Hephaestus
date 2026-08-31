@@ -8,8 +8,9 @@ const meta = {
 		docs: {
 			description: {
 				component:
-					"One quoted file behind an observation: path as header, lines beneath. The path truncates in the " +
-					"middle so the file name survives, and long lines scroll with the line gutter pinned.",
+					"One quoted citation behind an observation: its source as header, the quote beneath. A code " +
+					"source is located by line and keeps a pinned gutter; an object source is not, because its " +
+					"numbers are offsets into a serialised file rather than places a reader could open.",
 			},
 		},
 	},
@@ -31,6 +32,7 @@ export const Default: Story = {
 			path: "server/src/main/java/de/tum/cit/aet/hephaestus/practices/review/ReadyAndTraceableHandoff.java",
 			startLine: 60,
 			endLine: 64,
+			sourceKind: "scm.pull-request.diff",
 			redacted: false,
 			snippet: [
 				"  public DeliveryResult handoff(ReviewRequest request) {",
@@ -50,6 +52,7 @@ export const SingleLine: Story = {
 			path: "webapp/src/routes/_authenticated/w/$workspaceSlug/user/$username/index.tsx",
 			startLine: 118,
 			endLine: 118,
+			sourceKind: "scm.pull-request.diff",
 			redacted: false,
 			snippet:
 				"  const statusesQuery = useQuery(listPracticeGroupStandingsOptions({ path: { workspaceSlug } }));",
@@ -65,6 +68,7 @@ export const Collapsed: Story = {
 			path: "server/src/main/resources/db/changelog/1786939608194_changelog.xml",
 			startLine: 12,
 			endLine: 14,
+			sourceKind: "scm.pull-request.diff",
 			redacted: false,
 			snippet:
 				'<changeSet id="1786939608194-1" author="hephaestus">\n  <addColumn tableName="observation" />\n</changeSet>',
@@ -79,6 +83,7 @@ export const Redacted: Story = {
 			path: "docs/contributor/practice-catalogue.md",
 			startLine: 31,
 			endLine: 44,
+			sourceKind: "scm.pull-request.diff",
 			redacted: true,
 		},
 	},
@@ -91,6 +96,7 @@ export const BareFileName: Story = {
 			path: "CHANGELOG.md",
 			startLine: 1,
 			endLine: 1,
+			sourceKind: "scm.pull-request.diff",
 			redacted: false,
 			snippet: "## 0.14.0",
 		},
@@ -104,10 +110,33 @@ export const LongLines: Story = {
 			path: "server/src/main/java/de/tum/cit/aet/hephaestus/practices/observation/ObservationRepository.java",
 			startLine: 1,
 			endLine: 2,
+			sourceKind: "scm.pull-request.diff",
 			redacted: false,
 			snippet: [
-				'SELECT o.agent_job_id AS "jobId", MAX(o.observed_at) AS "reviewedAt" FROM observation o JOIN practice p ON p.id = o.practice_id JOIN practice_area a ON a.id = p.practice_area_id',
-				"WHERE o.about_user_id = :aboutUserId AND p.workspace_id = :workspaceId AND a.slug = :groupSlug AND o.presence <> 'NOT_APPLICABLE'",
+				'SELECT o.agent_job_id AS "jobId", MAX(o.observed_at) AS "reviewedAt" FROM observation o JOIN practice p ON p.id = o.practice_id JOIN practice_group g ON g.id = p.practice_group_id',
+				"WHERE o.about_user_id = :aboutUserId AND p.workspace_id = :workspaceId AND g.slug = :groupSlug AND o.presence <> 'NOT_APPLICABLE'",
+			].join("\n"),
+		},
+	},
+};
+
+/**
+ * A quote from an object source. Its numbers are offsets into a serialised context file, not lines
+ * of anything the reader could open, so no gutter and no range are shown — only the source and the
+ * quote. This is the case that used to render a Slack message as though it were code.
+ */
+export const ObjectSource: Story = {
+	args: {
+		location: {
+			path: "conversation_thread.json",
+			startLine: 62,
+			endLine: 70,
+			sourceKind: "slack.conversation.thread",
+			redacted: false,
+			snippet: [
+				"@marta: are we rolling this out behind the flag, or straight to everyone?",
+				"@jon: behind the flag — I want a day of telemetry before we widen it.",
+				"@marta: works for me. I'll write the rollback step into the runbook.",
 			].join("\n"),
 		},
 	},

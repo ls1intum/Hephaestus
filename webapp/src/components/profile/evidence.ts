@@ -5,6 +5,14 @@ export interface EvidenceLocation {
 	path: string;
 	startLine: number;
 	endLine: number;
+	/**
+	 * Which registered input the quote came from. It decides whether the numbers above are lines of a
+	 * file or offsets into a serialised object — `evidence-source-defs` owns that ruling, and printing
+	 * an offset as a line number dresses a coordinate up as a place the reader could open.
+	 */
+	sourceKind: string;
+	/** Which side of a diff the quote was read from; absent for anything that is not a diff. */
+	side?: "OLD" | "NEW";
 	/** The quoted source. Absent exactly when {@link redacted} — a citation always names its lines. */
 	snippet?: string;
 	/**
@@ -27,6 +35,8 @@ export function toEvidenceLocations(evidence: ObservationDetail["evidence"]): Ev
 		path: citation.path,
 		startLine: citation.startLine,
 		endLine: citation.endLine,
+		sourceKind: citation.sourceKind,
+		side: citation.side,
 		snippet: citation.quote,
 		redacted: citation.quoteRedacted,
 	}));

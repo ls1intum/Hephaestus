@@ -23,10 +23,23 @@ describe("toEvidenceLocations", () => {
 				path: "src/Main.java",
 				startLine: 42,
 				endLine: 44,
+				sourceKind: "scm.pull-request.diff",
+				side: "NEW",
 				snippet: "a();\nb();",
 				redacted: false,
 			},
 		]);
+	});
+
+	it("keeps the source kind, which decides whether the numbers are lines at all", () => {
+		// An object source counts offsets into a serialised context file. Dropping the kind here is
+		// what let a Slack message render with a line gutter, as though it were a file.
+		const [location] = toEvidenceLocations({
+			citations: [citation({ sourceKind: "slack.conversation.thread", side: undefined })],
+		});
+
+		expect(location?.sourceKind).toBe("slack.conversation.thread");
+		expect(location?.side).toBeUndefined();
 	});
 
 	it("keeps a redacted citation, so a withheld quote stays distinguishable from an unquoted one", () => {
@@ -69,14 +82,26 @@ describe("splitPath", () => {
 
 describe("evidenceLineRangeLabel", () => {
 	it("collapses a single-line range", () => {
-		expect(evidenceLineRangeLabel({ path: "a", startLine: 62, endLine: 62, redacted: false })).toBe(
-			"62",
-		);
+		expect(
+			evidenceLineRangeLabel({
+				path: "a",
+				startLine: 62,
+				endLine: 62,
+				sourceKind: "scm.pull-request.diff",
+				redacted: false,
+			}),
+		).toBe("62");
 	});
 
 	it("renders a real range", () => {
-		expect(evidenceLineRangeLabel({ path: "a", startLine: 62, endLine: 70, redacted: false })).toBe(
-			"62–70",
-		);
+		expect(
+			evidenceLineRangeLabel({
+				path: "a",
+				startLine: 62,
+				endLine: 70,
+				sourceKind: "scm.pull-request.diff",
+				redacted: false,
+			}),
+		).toBe("62–70");
 	});
 });

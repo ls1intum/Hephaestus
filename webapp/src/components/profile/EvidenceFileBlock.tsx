@@ -1,5 +1,10 @@
-import { ChevronDownIcon, FileCodeIcon } from "lucide-react";
+import { ChevronDownIcon } from "lucide-react";
 import { useId, useState } from "react";
+import {
+	DIFF_SIDE_LABELS,
+	evidenceSourceDef,
+} from "@/components/practice-vocabulary/evidence-source-defs";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { type EvidenceLocation, evidenceLineRangeLabel, splitPath } from "./evidence";
 
@@ -8,15 +13,25 @@ interface EvidenceFileBlockProps {
 	defaultOpen?: boolean;
 }
 
+/**
+ * A quoted citation, rendered as what its source actually is.
+ *
+ * Only a `code` source is located by line: for an `object` source the same numbers are offsets into
+ * a serialised context file — a line of `conversation_thread.json`, not a message of the thread — so
+ * a gutter and a range there would dress a coordinate up as a place the reader could open. The
+ * registry in `evidence-source-defs` owns that ruling and the icon that goes with each source.
+ */
 export function EvidenceFileBlock({ location, defaultOpen = true }: EvidenceFileBlockProps) {
 	const [isOpen, setIsOpen] = useState(defaultOpen);
 	const instanceId = useId();
+	const source = evidenceSourceDef(location.sourceKind);
+	const locatedByLine = source.locator === "code";
 	const { directory, fileName } = splitPath(location.path);
-	const rangeLabel = evidenceLineRangeLabel(location);
 	const lines = location.snippet?.split("\n") ?? [];
 	const firstLineNumber = location.startLine;
 	const hasSnippet = lines.length > 0;
 	const bodyId = `evidence-${location.path.replace(/[^\w-]/g, "-")}-${firstLineNumber}-${instanceId}`;
+	const SourceIcon = source.icon;
 
 	return (
 		<figure className="min-w-0 overflow-hidden rounded-md border">
@@ -26,12 +41,25 @@ export function EvidenceFileBlock({ location, defaultOpen = true }: EvidenceFile
 					isOpen && hasSnippet && "border-b",
 				)}
 			>
-				<FileCodeIcon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+				<SourceIcon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
 				<span className="flex min-w-0 flex-1 font-mono text-xs" title={location.path}>
-					{directory && <span className="truncate text-muted-foreground">{directory}</span>}
-					<span className="shrink-0 font-medium">{fileName}</span>
+					{locatedByLine && directory && (
+						<span className="truncate text-muted-foreground">{directory}</span>
+					)}
+					<span className={cn("min-w-0 font-medium", locatedByLine ? "shrink-0" : "truncate")}>
+						{locatedByLine ? fileName : location.path}
+					</span>
 				</span>
-				<span className="shrink-0 font-mono text-xs text-muted-foreground">{rangeLabel}</span>
+				{locatedByLine && (
+					<span className="shrink-0 font-mono text-xs text-muted-foreground">
+						{evidenceLineRangeLabel(location)}
+					</span>
+				)}
+				{locatedByLine && location.side && (
+					<Badge variant="outline" className="shrink-0">
+						{DIFF_SIDE_LABELS[location.side]}
+					</Badge>
+				)}
 				{location.redacted && (
 					<span className="shrink-0 text-xs text-muted-foreground italic">quote withheld</span>
 				)}
@@ -40,7 +68,7 @@ export function EvidenceFileBlock({ location, defaultOpen = true }: EvidenceFile
 						type="button"
 						aria-expanded={isOpen}
 						aria-controls={bodyId}
-						aria-label={`${isOpen ? "Hide" : "Show"} the quoted lines of ${fileName}`}
+						aria-label={`${isOpen ? "Hide" : "Show"} the quote from ${locatedByLine ? fileName : source.label}`}
 						className="-me-1 shrink-0 rounded p-0.5 text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
 						onClick={() => setIsOpen((open) => !open)}
 					>
@@ -61,11 +89,16 @@ export function EvidenceFileBlock({ location, defaultOpen = true }: EvidenceFile
 						{lines.map((line, index) => {
 							const lineNumber = firstLineNumber + index;
 							return (
-								<span key={`${bodyId}-${lineNumber}`} className="grid grid-cols-[auto_1fr]">
-									<span className="sticky left-0 select-none bg-inherit pe-3 ps-2.5 text-end tabular-nums text-muted-foreground">
-										{lineNumber}
-									</span>
-									<span className="pe-2.5">{line || " "}</span>
+								<span
+									key={`${bodyId}-${lineNumber}`}
+									className={cn("grid", locatedByLine ? "grid-cols-[auto_1fr]" : "grid-cols-1")}
+								>
+									{locatedByLine && (
+										<span className="sticky left-0 select-none bg-inherit pe-3 ps-2.5 text-end tabular-nums text-muted-foreground">
+											{lineNumber}
+										</span>
+									)}
+									<span className={cn("pe-2.5", !locatedByLine && "ps-2.5")}>{line || " "}</span>
 								</span>
 							);
 						})}
