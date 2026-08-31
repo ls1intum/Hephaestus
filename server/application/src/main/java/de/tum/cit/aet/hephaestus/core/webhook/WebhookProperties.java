@@ -126,7 +126,7 @@ public record WebhookProperties(
      * inside that window a shed webhook is recoverable from the provider API and outside it, by
      * nothing (ADR 0008: webhook deliveries are not redeliverable).
      *
-     * @see <a href="https://ls1intum.github.io/Hephaestus/admin/webhook-ingestion-operations">Webhook
+     * @see <a href="https://docs.hephaestus.build/admin/webhook-ingestion-operations">Webhook
      *     ingestion operations</a>
      */
     public record Stream(

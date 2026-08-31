@@ -10,7 +10,7 @@ New ADRs use the next available number and link from this index.
 
 `docs/decisions/`, `docs/runbooks/`, `docs/auth-architecture.md` and `docs/auth-glossary.md` are
 **not** registered with any Docusaurus plugin and never appear on
-[the site](https://ls1intum.github.io/Hephaestus/). That is a decision, not an oversight. They are
+[the site](https://docs.hephaestus.build/). That is a decision, not an oversight. They are
 written against internal class names, they are amended by the same PR that changes the code, and
 their reader already has the repository checked out. This index is their table of contents.
 

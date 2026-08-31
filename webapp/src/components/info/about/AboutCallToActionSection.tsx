@@ -30,7 +30,7 @@ export function AboutCallToActionSection() {
 					<span className="sr-only">(opens in a new tab)</span>
 				</a>
 				<a
-					href="https://ls1intum.github.io/Hephaestus/contributor/overview"
+					href="https://docs.hephaestus.build/contributor/overview"
 					target="_blank"
 					rel="noopener noreferrer"
 					className={buttonVariants({ variant: "outline", size: "lg" })}

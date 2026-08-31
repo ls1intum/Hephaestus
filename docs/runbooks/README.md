@@ -8,7 +8,7 @@ before, the order of operations, and how to roll back.
 | [`auth-cutover.md`](auth-cutover.md) | Shipping the Keycloak → Spring-native auth replacement (ADR 0017): pre-launch checklist, first-instance-admin bootstrap, rollback. |
 
 **Repo-only, like `docs/decisions/`.** Nothing in this directory is registered with a Docusaurus
-plugin, so none of it appears on [the site](https://ls1intum.github.io/Hephaestus/). Link a runbook
+plugin, so none of it appears on [the site](https://docs.hephaestus.build/). Link a runbook
 from a published page by absolute GitHub URL
 (`https://github.com/ls1intum/Hephaestus/blob/main/docs/runbooks/<file>.md`), never by a relative
 path — see [`../decisions/README.md`](../decisions/README.md) for the full rule.

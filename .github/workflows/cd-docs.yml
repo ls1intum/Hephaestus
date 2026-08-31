@@ -73,7 +73,7 @@ jobs:
             ${{ runner.os }}-docusaurus-production-
       - run: pnpm --filter docs run build
         env:
-          DOCUSAURUS_BASE_URL: "/Hephaestus/"
+          DOCUSAURUS_BASE_URL: "/"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: docs-build-production

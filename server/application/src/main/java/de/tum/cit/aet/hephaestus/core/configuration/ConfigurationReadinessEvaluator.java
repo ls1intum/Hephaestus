@@ -20,7 +20,7 @@ public final class ConfigurationReadinessEvaluator {
 
     private static final Logger log = LoggerFactory.getLogger(ConfigurationReadinessEvaluator.class);
 
-    static final String DOC = "https://ls1intum.github.io/Hephaestus/admin/configuration-readiness";
+    static final String DOC = "https://docs.hephaestus.build/admin/configuration-readiness";
     private static final Pattern DIGEST = Pattern.compile("^[a-z0-9][a-z0-9._/:\\-]*@sha256:[a-f0-9]{64}$");
 
     private final Environment environment;
