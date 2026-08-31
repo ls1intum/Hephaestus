@@ -22,12 +22,9 @@ interface EvidenceFileBlockProps {
 }
 
 /**
- * A quoted citation, rendered as what its source actually is.
- *
- * Only a `code` source is located by line: for an `object` source the same numbers are offsets into
- * a serialised context file — a line of `conversation_thread.json`, not a message of the thread — so
- * a gutter and a range there would dress a coordinate up as a place the reader could open. The
- * registry in `evidence-source-defs` owns that ruling and the icon that goes with each source.
+ * A quoted citation, rendered as what its source is. Only a `code` source is located by line: for an
+ * `object` source the numbers index a stored copy, not a place the reader could open, so it gets no
+ * gutter. `evidence-source-defs` owns that ruling.
  */
 export function EvidenceFileBlock({
 	location,

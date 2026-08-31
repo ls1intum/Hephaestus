@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import { toast } from "sonner";
 import {
 	deleteFeedbackResponseMutation,
@@ -23,16 +23,13 @@ import {
 	isEmptyFeedbackResponse,
 	type ObservationDetailState,
 } from "@/components/profile/review-runs";
-import { useAuth } from "@/integrations/auth/AuthContext";
+import { resolveCurrentUser } from "@/integrations/auth/guard";
 import { loadedPages } from "@/integrations/tanstack-query/spring-page";
 import { problemDetailOf } from "@/lib/problem-detail";
 
 const ACTIVITY_PAGE_SIZE = 10;
 
-/**
- * The one thing a developer should do next for a practice: the guidance a review actually delivered,
- * or the observation's own title when it says something the practice name does not already say.
- */
+/** The delivered guidance, or the observation's title when it adds something the practice name lacks. */
 function nextStepOf(practiceStanding?: PracticeStanding): string | undefined {
 	const firstAction = practiceStanding?.toWorkOn[0];
 	if (!firstAction) return undefined;
@@ -46,52 +43,45 @@ function nextStepOf(practiceStanding?: PracticeStanding): string | undefined {
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/user/$username/practice-groups/$groupSlug",
 )({
+	/** Own profile only — gated here so another user's URL never mounts the page or its queries. */
+	beforeLoad: async ({ context, params }) => {
+		const user = await resolveCurrentUser(context.queryClient);
+		const isOwnProfile = user?.username?.toLowerCase() === params.username.toLowerCase();
+		if (!isOwnProfile) {
+			throw redirect({
+				to: "/w/$workspaceSlug/user/$username",
+				params: { workspaceSlug: params.workspaceSlug, username: params.username },
+				replace: true,
+			});
+		}
+	},
 	component: PracticeGroupDetail,
 });
 
 function PracticeGroupDetail() {
 	const { workspaceSlug, username, groupSlug } = Route.useParams();
-	const { isCurrentUser } = useAuth();
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
-	const isOwnProfile = isCurrentUser(username);
 	const [openObservationId, setOpenObservationId] = useState<string>();
 	const [selectedPracticeSlug, setSelectedPracticeSlug] = useState<string>();
-
-	useEffect(() => {
-		if (!isOwnProfile) {
-			void navigate({
-				to: "/w/$workspaceSlug/user/$username",
-				params: { workspaceSlug, username },
-				replace: true,
-			});
-		}
-	}, [isOwnProfile, workspaceSlug, username, navigate]);
-
-	const enabled = Boolean(workspaceSlug) && isOwnProfile;
 
 	const groupsQuery = useQuery({
 		...listGroupsOptions({
 			path: { workspaceSlug },
 			query: { visibleInPracticeDashboardsOnly: true },
 		}),
-		enabled,
 	});
 	const statusesQuery = useQuery({
 		...listPracticeGroupStandingsOptions({ path: { workspaceSlug } }),
-		enabled,
 	});
 	const practicesQuery = useQuery({
 		...listReviewedPracticesOptions({ path: { workspaceSlug } }),
-		enabled,
 	});
 	const standingsQuery = useQuery({
 		...listPracticeStandingsOptions({ path: { workspaceSlug } }),
-		enabled,
 	});
 	const trendQuery = useQuery({
 		...getPracticeGroupTrendOptions({ path: { workspaceSlug, groupSlug } }),
-		enabled,
 	});
 	const reviewRunsRequest = {
 		path: { workspaceSlug, groupSlug },
@@ -104,7 +94,6 @@ function PracticeGroupDetail() {
 		...listPracticeGroupReviewRunsInfiniteOptions(reviewRunsRequest),
 		initialPageParam: 0,
 		getNextPageParam: (lastPage) => (lastPage.hasNext ? (lastPage.page ?? 0) + 1 : undefined),
-		enabled,
 	});
 	const invalidateReviewRuns = () =>
 		queryClient.invalidateQueries({
@@ -126,12 +115,8 @@ function PracticeGroupDetail() {
 		...getObservationOptions({
 			path: { workspaceSlug, observationId: openObservationId ?? "" },
 		}),
-		enabled: enabled && Boolean(openObservationId),
+		enabled: Boolean(openObservationId),
 	});
-
-	if (!isOwnProfile) {
-		return null;
-	}
 
 	const group = groupsQuery.data?.find((candidate) => candidate.slug === groupSlug);
 	const standing = statusesQuery.data?.find((candidate) => candidate.groupSlug === groupSlug);
@@ -143,8 +128,7 @@ function PracticeGroupDetail() {
 	const trendsBySlug = new Map(
 		(trendQuery.data?.practices ?? []).map((practiceTrend) => [practiceTrend.slug, practiceTrend]),
 	);
-	// Joined here rather than handed down as four slug-keyed records: this is the only place that
-	// holds all four answers at once, so it is the only place that can align them.
+	// Joined here: this is the only place holding all four answers at once.
 	const practices = practicesQuery.data
 		?.filter((practice) => practice.groupSlug === groupSlug)
 		.map((practice) => {
@@ -156,8 +140,7 @@ function PracticeGroupDetail() {
 				nextStep: nextStepOf(practiceStanding),
 			};
 		});
-	// One value instead of seven flags: the page cannot be handed "loading and failed" at once, and an
-	// error always arrives with the retry that clears it.
+	// One value, not seven flags: "loading and failed" at once is unspellable.
 	const reviewRunFeed: ReviewRunFeedState = activityQuery.isPending
 		? { status: "loading" }
 		: activityQuery.error
@@ -203,8 +186,7 @@ function PracticeGroupDetail() {
 			onRespond={(observation, response) => {
 				const feedbackId = observation.feedbackId;
 				if (!feedbackId) return;
-				// An answer with nothing left in it is a withdrawal, not an empty update — the endpoint
-				// replaces what it receives, so storing a blank response would keep a row saying nothing.
+				// Nothing left in the answer means withdraw it, not store a blank one.
 				if (isEmptyFeedbackResponse(response)) {
 					deleteResponseMutation.mutate({ path: { workspaceSlug, feedbackId } });
 					return;

@@ -120,9 +120,14 @@ interface DetailSectionIntroProps {
 	description: string;
 }
 
+/**
+ * The heading of one column. Both columns place theirs in the same subgrid row, so the browser
+ * matches their heights and the content below starts level — a fixed `min-height` guessed at that
+ * and broke the moment one description wrapped to a second line.
+ */
 function DetailSectionIntro({ id, title, description }: DetailSectionIntroProps) {
 	return (
-		<div className="grid content-start gap-1 lg:min-h-20">
+		<div className="grid content-start gap-1">
 			<h2 id={id} className="text-lg font-semibold leading-6">
 				{title}
 			</h2>
@@ -215,7 +220,7 @@ export function PracticeGroupDetailPage({
 	};
 
 	return (
-		<div className="mx-auto grid w-full max-w-6xl gap-6 lg:grid-cols-[minmax(20rem,2fr)_minmax(0,3fr)] lg:items-stretch">
+		<div className="mx-auto grid w-full max-w-6xl gap-6 lg:grid-cols-[minmax(20rem,2fr)_minmax(0,3fr)] lg:grid-rows-[auto_auto_1fr] lg:items-stretch">
 			{onBack && (
 				<div className="lg:col-span-2">
 					<Button type="button" size="sm" variant="ghost" className="-ml-2" onClick={onBack}>
@@ -287,13 +292,15 @@ export function PracticeGroupDetailPage({
 			</header>
 
 			{practices && practices.length > 0 && (
-				<section className="flex min-w-0 flex-col gap-3" aria-labelledby="practices-heading">
+				<section
+					className="flex min-w-0 flex-col gap-3 lg:row-span-2 lg:row-start-3 lg:grid lg:grid-rows-subgrid lg:content-start lg:gap-3"
+					aria-labelledby="practices-heading"
+				>
 					<DetailSectionIntro
 						id="practices-heading"
 						title="Practices in this group"
 						description="Select a practice to filter the review runs. Use its info button for more context."
 					/>
-					<div className="hidden h-8 lg:block" aria-hidden />
 					<ul className="flex flex-col gap-3">
 						{practices.map((practice) => {
 							const practiceStanding = practice.standing ?? "UNMEASURED";
@@ -416,8 +423,8 @@ export function PracticeGroupDetailPage({
 				className={cn(
 					"flex min-w-0 flex-col gap-3",
 					practices && practices.length > 0
-						? "border-t pt-6 lg:self-stretch lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0"
-						: "lg:col-span-2",
+						? "border-t pt-6 lg:row-span-2 lg:row-start-3 lg:grid lg:grid-rows-subgrid lg:content-start lg:gap-3 lg:self-stretch lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0"
+						: "lg:col-span-2 lg:row-start-3",
 				)}
 			>
 				<DetailSectionIntro

@@ -14,12 +14,8 @@ export interface FeedbackCommentProps {
 }
 
 /**
- * The written half of a response, kept in its own component so the draft cannot outlive the row it
- * belongs to: keying on the recorded comment means switching observations starts a fresh draft
- * instead of showing the previous one's text under a new heading.
- *
- * Uncontrolled on purpose — the draft is local until it is saved, so a keystroke does not send a
- * request, and abandoning it leaves the recorded comment untouched.
+ * The written half of a response. The draft stays local until saved, so a keystroke sends no request
+ * and abandoning it leaves the recorded comment untouched.
  */
 export function FeedbackComment({ comment, isRequired, isPending, onSave }: FeedbackCommentProps) {
 	const [draft, setDraft] = useState(comment ?? "");

@@ -1,0 +1,70 @@
+import type { Meta, StoryObj } from "@storybook/react";
+import { PracticeNextStepCallout } from "./PracticeNextStepCallout";
+
+const meta = {
+	title: "Profile/Practice next step callout",
+	component: PracticeNextStepCallout,
+	parameters: {
+		layout: "padded",
+		docs: {
+			description: {
+				component:
+					"The one thing to try next, shown the same way whether it applies to a whole group or to a " +
+					"single practice. It takes its body as children, so the caller decides what a next step is " +
+					"— delivered guidance, or the catalog's own description of what good looks like.",
+			},
+		},
+	},
+	tags: ["autodocs"],
+	decorators: [
+		(Story) => (
+			<div className="max-w-lg">
+				<Story />
+			</div>
+		),
+	],
+} satisfies Meta<typeof PracticeNextStepCallout>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+/** At group level: the guidance the review delivered for the group as a whole. */
+export const SuggestedNextStep: Story = {
+	args: {
+		label: "Suggested next step",
+		children:
+			"Keep changes focused on one concern, so a reviewer can hold the whole change in view.",
+	},
+};
+
+/**
+ * Inside a practice row the callout gives up its own edges, so it reads as part of the card it sits
+ * in rather than as a second box drawn on top of one.
+ */
+export const InsideAPracticeRow: Story = {
+	args: {
+		label: "Your next step",
+		className: "rounded-none border-x-0 border-b-0",
+		children:
+			"Record why the timeout was raised next to the value itself — the diff cannot say it for you.",
+	},
+	decorators: [
+		(Story) => (
+			<div className="max-w-lg overflow-hidden rounded-xl border bg-card">
+				<div className="p-4 text-sm font-medium">Explain significant decisions</div>
+				<Story />
+			</div>
+		),
+	],
+};
+
+/** Long guidance wraps rather than truncating: a next step read half-way is worse than none. */
+export const LongGuidance: Story = {
+	args: {
+		label: "Your next step",
+		children:
+			"Split this into the refactor and the behaviour change, land the refactor first, and say in " +
+			"the second description which behaviour moved — otherwise a reviewer has to separate the two " +
+			"themselves before they can judge either.",
+	},
+};

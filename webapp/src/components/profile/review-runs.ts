@@ -14,15 +14,9 @@ export interface ObservationDetailState {
 export type { FeedbackUsefulness } from "@/components/practice-vocabulary/feedback-usefulness-defs";
 
 /**
- * A developer's complete answer to one piece of delivered feedback.
- *
- * The wire type is what travels, because the endpoint **replaces** the response rather than patching
- * it: sending only the half a control just changed would erase the other half. Carrying the whole
- * answer through the props makes that impossible to get wrong — an earlier version passed usefulness
- * alone, and the route had to read the remaining fields back off the observation to avoid clearing
- * them.
- *
- * Every field is optional and an answer with none of them set is how a response is withdrawn.
+ * A developer's complete answer to one piece of feedback. The endpoint **replaces** rather than
+ * patches, so the whole answer travels: sending one changed half would erase the others. An answer
+ * with no field set is how a response is withdrawn.
  */
 export type FeedbackResponse = FeedbackResponseRequest;
 

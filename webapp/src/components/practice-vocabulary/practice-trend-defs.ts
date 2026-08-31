@@ -7,15 +7,9 @@ import type { StatusDefs } from "./status-def";
 export type TrendDirection = PracticeTrend["direction"];
 
 /**
- * Which way recent evidence points, in developer-facing words.
- *
- * `UNCERTAIN` and `INSUFFICIENT_EVIDENCE` are different answers and must not read alike: the first
- * means the comparison was made and did not separate, the second that no comparison was possible
- * yet. Both render muted, so the icon carries the distinction — a question mark against a dashed
- * circle.
- *
- * The wording deliberately claims nothing about ability. What the direction describes is a stretch
- * of recent work, which is also what the chip's tooltip says out loud.
+ * Which way recent evidence points. `UNCERTAIN` means the comparison was made and did not separate;
+ * `INSUFFICIENT_EVIDENCE` that none was possible. Both render muted, so the icon separates them.
+ * The wording claims nothing about ability — only about a stretch of recent work.
  */
 export const PRACTICE_TREND_DEFS: StatusDefs<TrendDirection> = {
 	IMPROVING: {
