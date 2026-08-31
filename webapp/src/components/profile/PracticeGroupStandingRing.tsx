@@ -1,18 +1,38 @@
 import type { PracticeStanding } from "@/api/types.gen";
+import { PRACTICE_GROUP_STANDING_BADGE } from "./practice-group-standing-presentation";
 
 type Standing = PracticeStanding["standing"];
+
+/**
+ * Ring order is worst-first, so the segment a reader should act on starts at twelve o'clock. The
+ * words come from the standing registry rather than from here — the legend this feeds sits directly
+ * above the badge that names the same value.
+ */
+const SEGMENT_ORDER: readonly Standing[] = [
+	"DEVELOPING",
+	"MIXED",
+	"STRENGTH",
+	"NOT_OBSERVED",
+	"NO_OPPORTUNITY",
+];
+
+const SEGMENT_COLORS: Record<Standing, string> = {
+	DEVELOPING: "text-destructive",
+	MIXED: "text-warning",
+	STRENGTH: "text-success",
+	NOT_OBSERVED: "text-muted-foreground/75",
+	NO_OPPORTUNITY: "text-muted-foreground/45",
+};
 
 const SEGMENTS: ReadonlyArray<{
 	standing: Standing;
 	colorClass: string;
 	label: string;
-}> = [
-	{ standing: "DEVELOPING", colorClass: "text-destructive", label: "Needs attention" },
-	{ standing: "MIXED", colorClass: "text-warning", label: "Mixed" },
-	{ standing: "STRENGTH", colorClass: "text-success", label: "Going well" },
-	{ standing: "NOT_OBSERVED", colorClass: "text-muted-foreground/75", label: "Not observed" },
-	{ standing: "NO_OPPORTUNITY", colorClass: "text-muted-foreground/45", label: "No opportunity" },
-];
+}> = SEGMENT_ORDER.map((standing) => ({
+	standing,
+	colorClass: SEGMENT_COLORS[standing],
+	label: PRACTICE_GROUP_STANDING_BADGE[standing].shortLabel,
+}));
 
 export const STANDING_LEGEND = SEGMENTS;
 
