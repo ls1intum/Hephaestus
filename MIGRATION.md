@@ -2,7 +2,7 @@
 
 This document helps you upgrade between versions of Hephaestus. For what a version number promises
 (public contract, upgrade guarantee, support statement), see the
-[Compatibility Policy](https://docs.hephaestus.build/admin/compatibility-policy).
+[Compatibility Policy](https://ls1intum.github.io/Hephaestus/admin/compatibility-policy).
 
 > ⚠️ **Pre-1.0 Notice**: We are in active development. Minor versions (0.x.0) may contain breaking changes. Always test in staging before production.
 
@@ -77,7 +77,7 @@ rotated independently without invalidating sessions or unrelated encrypted data.
 
 **Migration**: before deploying, set `HEPHAESTUS_SECURITY_CREDENTIAL_ENCRYPTION_KEY` to the current
 value of `HEPHAESTUS_SECURITY_ENCRYPTION_KEY`. After every runtime is upgraded, follow the
-[credential-key rotation procedure](https://docs.hephaestus.build/admin/credential-key-rotation)
+[credential-key rotation procedure](https://ls1intum.github.io/Hephaestus/admin/credential-key-rotation)
 to replace it with an independent key. Self-hosted installations using `docker/self-host/setup.sh`
 receive the initial value automatically.
 
@@ -102,7 +102,7 @@ examples in the practice-review operations guide.
 the bundled PostgreSQL 17 image.
 
 **Migration**: before starting this release, follow the
-[Backup & Restore](https://docs.hephaestus.build/admin/backup-restore#postgresql-17-to-18).
+[Backup & Restore](https://ls1intum.github.io/Hephaestus/admin/backup-restore#postgresql-17-to-18).
 Keep the PostgreSQL 17 volume until the upgraded deployment passes its acceptance checks.
 
 ### v0.76.0
@@ -139,7 +139,7 @@ review runs and no feedback is prepared about them.
 
 **Operator action after upgrading**: open **Practices → Review → When and where** and confirm the
 **People** and **Repositories** counts. Existing members need no action. If expected contributors are
-missing, follow [Who counts as a person](https://docs.hephaestus.build/admin/practice-review#who-counts-as-a-person).
+missing, follow [Who counts as a person](https://ls1intum.github.io/Hephaestus/admin/practice-review#who-counts-as-a-person).
 
 #### 🔴 Production configuration is validated before startup
 
@@ -151,7 +151,7 @@ catalog together and refuse to start until every reported error is resolved. The
 identifies properties and documentation but never includes configured values.
 
 **Action**: before upgrading, compare every production role's settings with the
-[configuration readiness guide](https://docs.hephaestus.build/admin/configuration-readiness).
+[configuration readiness guide](https://ls1intum.github.io/Hephaestus/admin/configuration-readiness).
 Run a staging process with the production profile and correct every required setting it reports.
 After the server role starts, an instance administrator can inspect the redacted facts through
 `GET /api/admin/configuration-readiness`.
@@ -281,7 +281,7 @@ HEPHAESTUS_AGENT_IMAGE_REFERENCE=ghcr.io/ls1intum/hephaestus/agent-pi@sha256:<di
 
 A deployment tracking `main` keeps `HEPHAESTUS_RELEASE_PIN_SKIP=true` and
 `HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST=false`; the derived reference is a matched tag, not a digest.
-See [Release image lock](https://docs.hephaestus.build/admin/release-image-lock).
+See [Release image lock](https://ls1intum.github.io/Hephaestus/admin/release-image-lock).
 
 #### 🟡 Preview deployments name their own agent image
 
@@ -365,7 +365,7 @@ has drifted from what this deployment expects is left entirely alone and logged 
 `nats stream edit` before the bound can be applied.
 
 Full metric roster and the wedged-broker procedure:
-[Webhook ingestion operations](https://docs.hephaestus.build/admin/webhook-ingestion-operations).
+[Webhook ingestion operations](https://ls1intum.github.io/Hephaestus/admin/webhook-ingestion-operations).
 
 
 #### 🟡 Readiness now answers for more than "the process started"
@@ -786,7 +786,7 @@ containers and their memory sits outside these limits (`SANDBOX_MEMORY_BYTES`, d
 concurrent sandbox).
 
 **Migration**: on a host below 8 GB RAM, set lower values in `.env` before the first start of the new
-version. The [install guide](https://docs.hephaestus.build/admin/install) states the floor
+version. The [install guide](https://ls1intum.github.io/Hephaestus/admin/install) states the floor
 and how the limits relate to it.
 
 #### 🔴 A workspace's per-run AI timeout is capped at one hour
@@ -907,7 +907,7 @@ HEPHAESTUS_MENTOR_AGENT_PULL_POLICY=IF_NOT_PRESENT
 
 ### v1.0.0 (Future)
 
-At v1.0.0 the [Compatibility Policy](https://docs.hephaestus.build/admin/compatibility-policy)
+At v1.0.0 the [Compatibility Policy](https://ls1intum.github.io/Hephaestus/admin/compatibility-policy)
 takes effect — the public contract, the "any 1.x → any later 1.y" upgrade guarantee,
 deprecation-ahead-of-removal, and latest-release-only support. Until then, expect rapid iteration and
 occasional breaking changes in minor releases.
@@ -923,7 +923,7 @@ and review the release notes for endpoint changes.
 
 ### New Required Environment Variable
 
-1. Check the release notes and the [Production Setup](https://docs.hephaestus.build/admin/production-setup) guide for new variables
+1. Check the release notes and the [Production Setup](https://ls1intum.github.io/Hephaestus/admin/production-setup) guide for new variables
 2. Add them to your deployment's environment (see the `docker/compose.app.yaml` env block)
 3. Restart services
 
@@ -957,7 +957,7 @@ in CI and are not a supported recovery path. The supported recoveries, in order 
    changesets succeeded before deciding.
 2. **Restore from backup** if the instance must come back now and forward-fixing will take longer than
    the outage budget. Follow
-   [Backup & restore](https://docs.hephaestus.build/admin/backup-restore); restore the
+   [Backup & restore](https://ls1intum.github.io/Hephaestus/admin/backup-restore); restore the
    database dump *and* the `.env` holding `HEPHAESTUS_SECURITY_ENCRYPTION_KEY`, or every encrypted
    credential in the restored database is unreadable. Then pin `IMAGE_TAG` to the version the dump
    was taken under so it is not immediately re-migrated by the release that failed.
