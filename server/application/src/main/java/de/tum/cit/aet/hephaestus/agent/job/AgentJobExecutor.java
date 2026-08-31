@@ -671,7 +671,8 @@ public class AgentJobExecutor {
         }
     }
 
-    private static String randomSpanId() {
+    /** Package-private: the zombie sweeper reuses it when it restores a reaped job's trace context. */
+    static String randomSpanId() {
         long value;
         do {
             value = ThreadLocalRandom.current().nextLong();

@@ -133,13 +133,16 @@ public class AgentJobZombieSweeper {
             try {
                 AgentJob reaped = transactionTemplate.execute(status -> reapIfStale(job.getId()));
                 if (reaped != null) {
-                    // The sweeper thread has no ambient trace context; restore the job's own so the
+                    // The sweeper thread has no ambient trace context; restore the job's own trace ID
+                    // (with a fresh span so no stale scheduler-thread value pairs with it) so the
                     // terminal event joins the lifecycle it closes.
                     MDC.put(StructuredLogKeys.TRACE_ID, reaped.getTraceId());
+                    MDC.put(StructuredLogKeys.SPAN_ID, AgentJobExecutor.randomSpanId());
                     try {
                         jobTelemetry.terminal(reaped, AgentJobStatus.TIMED_OUT, AgentJobTelemetry.age(reaped));
                     } finally {
                         MDC.remove(StructuredLogKeys.TRACE_ID);
+                        MDC.remove(StructuredLogKeys.SPAN_ID);
                     }
                 }
             } catch (Exception e) {
